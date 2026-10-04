@@ -201,10 +201,10 @@ export default function App() {
       </AnimatePresence>
 
       <footer className="pied-application">
-        <a href="/a-propos/">À propos</a>
-        <a href="/confidentialite/">Confidentialité</a>
-        <a href="/mentions-legales/">Mentions légales</a>
-        <a href="/contact/">Contact</a>
+        <a href="/a-propos/">{t("ui.307ef284ba57")}</a>
+        <a href="/confidentialite/">{t("ui.f19bb4113daf")}</a>
+        <a href="/mentions-legales/">{t("ui.cce9c0a1b975")}</a>
+        <a href="/contact/">{t("ui.2b5c3d26721a")}</a>
       </footer>
 
       {/* Cérémonie : le trophée gagné s'affiche en 3D, un par un */}

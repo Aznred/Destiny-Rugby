@@ -18,7 +18,7 @@ import { semaine, libelleDate, libelleSemaine, SEMAINES_PAR_SAISON, CALENDRIER }
 import { AGE_RETRAITE_LIBRE, AGE_RETRAITE_FORCEE, RECONVERSIONS } from '../store/useGame';
 import { amisPresents } from '../lib/vestiaire';
 import { TRAIT_PAR_ID, descriptionTrait, nomTrait } from '../data/traits';
-import { nombre, t, tn } from '../lib/i18n';
+import { nombre, t, tn, texteTraduit } from '../lib/i18n';
 import { matchDeLaSemaine } from '../lib/matchLive';
 import { equipeU20 } from '../lib/international';
 import { coupeEnDirect, coupesDuClub, matchDuTourCourant } from '../lib/coupe';
@@ -224,7 +224,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
           title={`${t('pj.generale')}${joueur.potentiel ? ` - ${t('pj.potentiel', { note: joueur.potentiel })}` : ''}`}
         >
           <b>{generale}</b>
-          <span aria-hidden="true">OVR</span>
+          <span aria-hidden="true">{t('pj.noteCourte')}</span>
           {joueur.potentiel && joueur.potentiel > generale && (
             <em className="badge-potentiel">↗ {joueur.potentiel}</em>
           )}
@@ -243,7 +243,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
           {/* La tenue achetée au vestiaire. Purement décoratif — c'est tout
               l'intérêt : elle se VOIT, et elle ne change rien au terrain. */}
           {tenue.map((e) => (
-            <span key={e.id} className="pastille pastille-tenue" title={e.detail}>{e.emoji} {e.nom}</span>
+            <span key={e.id} className="pastille pastille-tenue" title={texteTraduit(e.detail)}>{e.emoji} {texteTraduit(e.nom)}</span>
           ))}
         </div>
       )}
@@ -290,7 +290,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
         const sanction = miseAuBancSociale(joueur.miseAuBanc!.semaines);
         return (
           <div className="bandeau-blessure" data-gravite="banc">
-            <Icone nom="banc" taille={14} /> <b>{sanction.titre}</b>
+            <Icone nom="banc" taille={14} /> <b>{texteTraduit(sanction.titre)}</b>
             <span>{sanction.texte}</span>
           </div>
         );
@@ -337,7 +337,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
             <b>
               {contrat.salaire > 0
                 ? `${Math.round(contrat.salaire / 1000)} k€`
-                : `${nombre(contrat.primeMatch ?? 0)} €/match`}
+                : t("ui.a531dbfaf21e", { v0: nombre(contrat.primeMatch ?? 0) })}
             </b>{' '}
             · {contrat.saisons > 0 ? `${contrat.saisons} s.` : t('pj.contrat')}
           </span>
@@ -559,7 +559,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
               prendreRetraite(
                 finDeCarriere ? reconversion : undefined,
                 'retraiteChoisie',
-                `Retraite annoncée à ${joueur.age} ans, après ${joueur.saison} saison${joueur.saison > 1 ? 's' : ''}.`,
+                tn('pj.retraiteAnnoncee', joueur.saison, { age: joueur.age, saisons: joueur.saison }),
               );
             }}
             onNon={() => setConfirmerRetraite(false)}
@@ -580,13 +580,13 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
         )}
       </AnimatePresence>
 
-      <button className="btn fantome" onClick={() => setCalendrierOuvert(true)}>Calendrier mondial / Avancer</button>
+      <button className="btn fantome" onClick={() => setCalendrierOuvert(true)}>{t("ui.9f52ce2beda2")}</button>
       {situation.annonce && <section className="manager-cal-decision">
-        <b>{situation.camp ? 'En rassemblement' : 'Convocation annoncée'} · {situation.annonce.nation}</b>
-        <p>{situation.annonce.nom} · groupe de 34 · du {libelleDate(semaine(situation.annonce.debut))} au {libelleDate(semaine(situation.annonce.fin))}</p>
-        <p>{situation.camp ? ({ titulaire: 'Titulaire', remplacant: 'Remplaçant', horsGroupe: 'Hors des 23 · tu restes avec la sélection', preparation: 'Préparation / récupération avec la sélection' }[situation.role])
-          : 'Le départ approche. Tu restes disponible pour ton club jusqu’au rassemblement.'}</p>
-        {situation.camp && <small>Ton club poursuit ses rencontres sans toi. Retour après élimination et 5 jours de récupération.</small>}
+        <b>{situation.camp ? t("ui.12c7d3fcf891") : t("ui.6e0e01d6c13c")} · {situation.annonce.nation}</b>
+        <p>{t("ui.cb99cf2dda6f", { v0: situation.annonce.nom, v1: libelleDate(semaine(situation.annonce.debut)), v2: libelleDate(semaine(situation.annonce.fin)) })}</p>
+        <p>{situation.camp ? texteTraduit({ titulaire: 'Titulaire', remplacant: 'Remplaçant', horsGroupe: 'Hors des 23 · tu restes avec la sélection', preparation: 'Préparation / récupération avec la sélection' }[situation.role])
+          : t("ui.960cdd275769")}</p>
+        {situation.camp && <small>{t("ui.c63a285ea5af")}</small>}
       </section>}
       {calendrierOuvert && createPortal(<CalendrierMondial onFermer={() => setCalendrierOuvert(false)} />, document.body)}
 
@@ -626,10 +626,10 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
           --------------------------------------------------------------- */}
       {!matchOuvert && createPortal(
         <div className="barre-jouer">
-          <button className="barre-jouer-calendrier" aria-label="Calendrier mondial" onClick={() => setCalendrierOuvert(true)}><Icone nom="calendrier" taille={21} /></button>
+          <button className="barre-jouer-calendrier" aria-label={t("ui.f6cd6af3ce41")} onClick={() => setCalendrierOuvert(true)}><Icone nom="calendrier" taille={21} /></button>
           <span className="barre-jouer-info">
-            <b>S{joueur.saison}</b> · {libelleDate(semaineActuelle)}
-            {matchAJouer && adversaire ? ` · ${adversaire}` : ` · ${libelleSemaine(semaineActuelle, joueur.saison)}`}
+            <span><b>S{joueur.saison}</b> · {libelleDate(semaineActuelle)}</span>
+            <small>{matchAJouer && adversaire ? adversaire : libelleSemaine(semaineActuelle, joueur.saison)}</small>
           </span>
           {matchAJouer ? (
             <button
@@ -651,7 +651,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
               disabled={bloque}
               title={bloque ? motifBlocage : undefined}
             >
-              {aRepondre ? t('pj.reponds') : semaineActuelle.numero >= SEMAINES_PAR_SAISON ? t('pj.cloreSaison') : t('pj.semaineSuivante')}
+              {aRepondre ? t('pj.reponds') : semaineActuelle.numero >= SEMAINES_PAR_SAISON ? t('pj.cloreSaison') : t('pj.semaineSuivanteCourte')}
             </button>
           )}
         </div>,

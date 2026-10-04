@@ -1,3 +1,4 @@
+import { t } from '../lib/i18n';
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { CommandeCarriere, VueCarriereEnLigne } from '../lib/ligue/typesCarriere';
@@ -47,10 +48,10 @@ function Ceremonie({ joueurs, club, competition, saison, couleur, trophee, ferme
     return () => { actif = false; };
   }, [trophee.modele, trophee.couleur]);
   return createPortal(<div ref={overlayRef} className="celebration-ligue">
-    <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={`Champion : ${club}`} tabIndex={-1}>
+    <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={t("ui.03e4b9d4b708", { v0: club })} tabIndex={-1}>
       {etape === 'coupe' ? <TropheeGagne tropheeId={trophee.id} tropheePersonnalise={trophee} index={1} total={1} onFermer={() => void fermerCoupe()} /> : <>
-        <p className="eyebrow">LA VICTOIRE EST À VOUS</p><h2>{club}</h2>
-        <div className="celebration-terrain" role="img" aria-label={`Les joueurs de ${club} célèbrent ensemble la victoire en ${competition} avec la coupe`}>
+        <p className="eyebrow">{t("ui.8b6cf3ed3341")}</p><h2>{club}</h2>
+        <div className="celebration-terrain" role="img" aria-label={t("ui.d1765af2de00", { v0: club, v1: competition })}>
           <div className="celebration-tribunes" />
           <div className="celebration-joueurs celebration-joueurs-arriere">
             {joueurs.slice(0, 7).map((joueur, i) => <SpriteCelebration key={`${joueur.nom}-${i}`} nom={joueur.nom} poste={joueur.poste} numero={i + 1} couleur={couleur} />)}
@@ -62,10 +63,10 @@ function Ceremonie({ joueurs, club, competition, saison, couleur, trophee, ferme
             {joueurs[7] && <SpriteCelebration nom={joueurs[7].nom} poste={joueurs[7].poste} numero={8} couleur={couleur} capitaine />}
             {imageCoupe && <img className="celebration-coupe" src={imageCoupe} alt="" />}
           </div>
-          <div className="celebration-panneau"><small>{competition}</small><strong>CHAMPIONS · SAISON {saison}</strong></div>
+          <div className="celebration-panneau"><small>{competition}</small><strong>{t("ui.0ac362015b18", { v0: saison })}</strong></div>
           <div className="celebration-confettis" aria-hidden="true" />
         </div>
-        <button className="btn primaire" onClick={suivant}>Voir la coupe en 3D</button>
+        <button className="btn primaire" onClick={suivant}>{t("ui.7e6252aa9b8a")}</button>
       </>}
     </div>
   </div>, document.body);

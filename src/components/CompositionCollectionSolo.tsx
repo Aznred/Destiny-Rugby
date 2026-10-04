@@ -408,7 +408,7 @@ export function CompositionCollectionSolo({ cartes, onFermer, onEnregistrer }: P
                   type="button"
                   className="btn fantome"
                   onClick={() => supprimerEquipeSauvegardee(eq.id)}
-                  aria-label={`Supprimer ${eq.nom}`}
+                  aria-label={t("ui.30283dd7e597", { v0: eq.nom })}
                 >
                   {t('compoSolo.deleteTeamBtn')}
                 </button>
@@ -471,10 +471,10 @@ export function CompositionCollectionSolo({ cartes, onFermer, onEnregistrer }: P
         </section>
       </div>
 
-      <section className="solo-compo-mobile" aria-label="Composition tactile">
-        <nav className="solo-compo-mobile-onglets" aria-label="Groupes de joueurs">
+      <section className="solo-compo-mobile" aria-label={t("ui.11a3e348a258")}>
+        <nav className="solo-compo-mobile-onglets" aria-label={t("ui.fc1636e12fdc")}>
           {(['titulaires', 'remplacants', 'reserves'] as const).map(groupe => <button type="button" key={groupe} aria-pressed={groupeMobile === groupe} onClick={() => { setGroupeMobile(groupe); setEmplacementMobile(null); }}>
-            {groupe === 'titulaires' ? `Titulaires · ${composition.titulaires.filter(Boolean).length}/15` : groupe === 'remplacants' ? `Remplaçants · ${composition.remplacants.filter(Boolean).length}/8` : `Réserves · ${nbReservesTotal}`}
+            {groupe === 'titulaires' ? t("ui.b47cc001b0ae", { v0: composition.titulaires.filter(Boolean).length }) : groupe === 'remplacants' ? t("ui.1d390cc07268", { v0: composition.remplacants.filter(Boolean).length }) : t("ui.5f0808cb028b", { v0: nbReservesTotal })}
           </button>)}
         </nav>
         {groupeMobile !== 'reserves' ? <div className="solo-compo-mobile-emplacements">
@@ -483,22 +483,22 @@ export function CompositionCollectionSolo({ cartes, onFermer, onEnregistrer }: P
             const carte = cartesParId.get(composition[zone][index]);
             return <button type="button" key={`${zone}-${index}`} className="solo-compo-mobile-emplacement" onClick={() => { setEmplacementMobile({ zone, index }); setRechercheMobile(''); }}>
               <span className="solo-compo-mobile-numero">{index + (zone === 'titulaires' ? 1 : 16)}</span>
-              {carte ? <><span className="solo-compo-mobile-carte"><CarteJoueurEnLigne carte={carte} compacte /></span><span className="solo-compo-mobile-identite"><b>{carte.nom}</b><small>{nomPoste(carte.poste)} · {carte.clubReel}</small></span></> : <span className="solo-compo-mobile-identite"><b>Emplacement libre</b><small>{zone === 'titulaires' ? nomPoste(POSTES_XV_MANAGER[index]) : 'Banc'}</small></span>}
-              <span className="solo-compo-mobile-modifier">Changer</span>
+              {carte ? <><span className="solo-compo-mobile-carte"><CarteJoueurEnLigne carte={carte} compacte /></span><span className="solo-compo-mobile-identite"><b>{carte.nom}</b><small>{nomPoste(carte.poste)} · {carte.clubReel}</small></span></> : <span className="solo-compo-mobile-identite"><b>{t("sv.libre")}</b><small>{zone === 'titulaires' ? nomPoste(POSTES_XV_MANAGER[index]) : t("compo.banc")}</small></span>}
+              <span className="solo-compo-mobile-modifier">{t("ui.7a35caf2252f")}</span>
             </button>;
           })}
         </div> : <div className="solo-compo-mobile-reserves">
-          <p>Choisis une carte, puis sa place dans le XV ou sur le banc.</p>
-          <input type="search" value={rechercheMobile} onChange={e => setRechercheMobile(e.target.value)} placeholder="Rechercher une réserve" aria-label="Rechercher une réserve" />
+          <p>{t("ui.cd67f78290a5")}</p>
+          <input type="search" value={rechercheMobile} onChange={e => setRechercheMobile(e.target.value)} placeholder={t("ui.b0af29565c68")} aria-label={t("ui.b0af29565c68")} />
           <div className="solo-compo-mobile-grille">{candidatesMobile.filter(c => !idsSurFeuille.has(c.id) && reservesVisibles.has(c.id)).map(c => <button type="button" key={c.id} onClick={() => setReserveMobile(c.id)}><CarteJoueurEnLigne carte={c} compacte /><span>{c.nom}</span></button>)}</div>
-          {nbReservesTotal > 32 && <p>Recherche par nom pour voir toutes les cartes de ta collection.</p>}
+          {nbReservesTotal > 32 && <p>{t("ui.b8fc581781c2")}</p>}
         </div>}
-        {reserveMobile && <div className="solo-compo-mobile-choix" role="dialog" aria-modal="true" aria-label="Placer une réserve"><div className="solo-compo-mobile-choix-tete"><h3>Placer {cartesParId.get(reserveMobile)?.nom}</h3><button type="button" className="btn fantome" onClick={() => setReserveMobile(null)}>Fermer</button></div><div className="solo-compo-mobile-destinations">{(['titulaires', 'remplacants'] as const).map(zone => <section key={zone}><h4>{zone === 'titulaires' ? 'Titulaires' : 'Remplaçants'}</h4>{Array.from({ length: zone === 'titulaires' ? 15 : 8 }, (_, index) => <button type="button" key={index} onClick={() => { changerJoueur(zone, index, reserveMobile); setReserveMobile(null); setGroupeMobile(zone); }}>{index + (zone === 'titulaires' ? 1 : 16)} · {cartesParId.get(composition[zone][index])?.nom ?? 'Emplacement libre'}</button>)}</section>)}</div></div>}
-        {emplacementMobile && <div className="solo-compo-mobile-choix" role="dialog" aria-modal="true" aria-label="Choisir un joueur">
-          <div className="solo-compo-mobile-choix-tete"><div><small>EMPLACEMENT {emplacementMobile.index + (emplacementMobile.zone === 'titulaires' ? 1 : 16)}</small><h3>Choisir un joueur</h3></div><button type="button" className="btn fantome" onClick={() => setEmplacementMobile(null)}>Fermer</button></div>
-          <input type="search" autoFocus value={rechercheMobile} onChange={e => setRechercheMobile(e.target.value)} placeholder="Nom, club ou poste" aria-label="Rechercher un joueur" />
+        {reserveMobile && <div className="solo-compo-mobile-choix" role="dialog" aria-modal="true" aria-label={t("ui.3c5a7b8b8c5c")}><div className="solo-compo-mobile-choix-tete"><h3>{t("ui.d7aefc080ec8", { v0: cartesParId.get(reserveMobile)?.nom })}</h3><button type="button" className="btn fantome" onClick={() => setReserveMobile(null)}>{t("ov.fermer")}</button></div><div className="solo-compo-mobile-destinations">{(['titulaires', 'remplacants'] as const).map(zone => <section key={zone}><h4>{zone === 'titulaires' ? t("ui.81b5ec2f631c") : t("ml.tv.remplacants")}</h4>{Array.from({ length: zone === 'titulaires' ? 15 : 8 }, (_, index) => <button type="button" key={index} onClick={() => { changerJoueur(zone, index, reserveMobile); setReserveMobile(null); setGroupeMobile(zone); }}>{index + (zone === 'titulaires' ? 1 : 16)} · {cartesParId.get(composition[zone][index])?.nom ?? t("sv.libre")}</button>)}</section>)}</div></div>}
+        {emplacementMobile && <div className="solo-compo-mobile-choix" role="dialog" aria-modal="true" aria-label={t("ui.971104a2bfaa")}>
+          <div className="solo-compo-mobile-choix-tete"><div><small>{t("ui.b99f9e177b8b", { v0: emplacementMobile.index + (emplacementMobile.zone === 'titulaires' ? 1 : 16) })}</small><h3>{t("ui.971104a2bfaa")}</h3></div><button type="button" className="btn fantome" onClick={() => setEmplacementMobile(null)}>{t("ov.fermer")}</button></div>
+          <input type="search" autoFocus value={rechercheMobile} onChange={e => setRechercheMobile(e.target.value)} placeholder={t("ui.30c2aeaf26f2")} aria-label={t("compoSolo.searchPlayer")} />
           <div className="solo-compo-mobile-grille">{candidatesMobile.map(c => <button type="button" key={c.id} onClick={() => { changerJoueur(emplacementMobile.zone, emplacementMobile.index, c.id); setEmplacementMobile(null); }}><CarteJoueurEnLigne carte={c} compacte /><span>{c.nom}</span><small>{c.clubReel}</small></button>)}</div>
-          {cartes.length > candidatesMobile.length && <p>Recherche un joueur par son nom pour voir le reste de ta collection.</p>}
+          {cartes.length > candidatesMobile.length && <p>{t("ui.a9415a01b013")}</p>}
         </div>}
       </section>
 

@@ -23,7 +23,7 @@ import {
 } from './mj.js';
 import { consequenceAutorisee, niveauDeFaute } from './consequences.js';
 import { appelIAJSON } from './groq.js';
-import { consigneDeLangue, t } from './i18n.js';
+import { consigneDeLangue, t, texteTraduit } from './i18n.js';
 import { POSTE_PAR_ID, ATTRIBUTS_LABELS } from '../data/rugby.js';
 
 // --------------------------------------------------------------------------
@@ -52,11 +52,11 @@ export function interviewEnScenario(interview: Interview): Scenario {
   return {
     id: `interview-${interview.id}`,
     emoji: interview.emoji,
-    titre: interview.titre,
-    situation: `${interview.question}`,
+    titre: texteTraduit(interview.titre),
+    situation: texteTraduit(interview.question),
     choix: interview.tons.map((t) => ({
-      texte: t.texte,
-      issue: { recit: t.recit, deltas: t.deltas, ovas: 8, coach: t.coach, fans: t.fans },
+      texte: texteTraduit(t.texte),
+      issue: { recit: texteTraduit(t.recit), deltas: t.deltas, ovas: 8, coach: t.coach, fans: t.fans },
     })),
   };
 }
@@ -177,7 +177,7 @@ function parserSituation(brut: string, j: Joueur, genre: string): Scenario {
   return {
     id: `ia-${genre}-${Date.now()}`,
     emoji: typeof obj.emoji === 'string' ? obj.emoji : '🎬',
-    titre: typeof obj.titre === 'string' ? obj.titre : 'Une situation à trancher',
+    titre: typeof obj.titre === 'string' ? obj.titre : texteTraduit('Une situation à trancher'),
     situation: typeof obj.situation === 'string' ? obj.situation : '',
     choix,
   };
@@ -519,7 +519,7 @@ export function jugementLocal(
   });
 
   return {
-    recit: pool[Math.floor(tirage * pool.length) % pool.length],
+    recit: texteTraduit(pool[Math.floor(tirage * pool.length) % pool.length]),
     titre: evenement.titre,
     reussite,
     deltas: deltas as Partial<Record<StatVariable, number>>,

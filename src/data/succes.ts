@@ -23,7 +23,7 @@
 // ~60 de trophées et ~70 de saisons, situations et retraite.
 
 import type { Joueur, PostSocial, LegendeSauvegardee } from '../types.js';
-import { langueCourante } from '../lib/i18n.js';
+import { langueCourante, texteTraduit } from '../lib/i18n.js';
 
 export interface ContexteSucces {
   joueur: Joueur;
@@ -524,11 +524,13 @@ const SUCCES_ANGLAIS: Record<string, { nom: string; desc: string }> = {
 };
 
 export function nomSucces(succes: Succes): string {
-  return langueCourante() === 'en' ? SUCCES_ANGLAIS[succes.id]?.nom ?? succes.nom : succes.nom;
+  const traduit = texteTraduit(succes.nom);
+  return traduit === succes.nom && langueCourante() === 'en' ? SUCCES_ANGLAIS[succes.id]?.nom ?? succes.nom : traduit;
 }
 
 export function descriptionSucces(succes: Succes): string {
-  return langueCourante() === 'en' ? SUCCES_ANGLAIS[succes.id]?.desc ?? succes.desc : succes.desc;
+  const traduit = texteTraduit(succes.desc);
+  return traduit === succes.desc && langueCourante() === 'en' ? SUCCES_ANGLAIS[succes.id]?.desc ?? succes.desc : traduit;
 }
 
 const DEFIS_ANGLAIS: Record<string, string> = {
@@ -539,7 +541,8 @@ const DEFIS_ANGLAIS: Record<string, string> = {
 };
 
 export function texteDefi(id: string, texte: string): string {
-  return langueCourante() === 'en' ? DEFIS_ANGLAIS[id] ?? texte : texte;
+  const traduit = texteTraduit(texte);
+  return traduit === texte && langueCourante() === 'en' ? DEFIS_ANGLAIS[id] ?? texte : traduit;
 }
 
 // --- DÉFIS DE LA SEMAINE ---------------------------------------------------

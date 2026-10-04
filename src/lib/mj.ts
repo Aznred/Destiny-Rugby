@@ -13,7 +13,7 @@ import type {
   ActionClub, ConsequenceDure, DecisionClub, Joueur, ReponseMJ,
 } from '../types.js';
 import { POSTE_PAR_ID, ATTRIBUTS_LABELS } from '../data/rugby.js';
-import { consigneDeLangue, t } from './i18n.js';
+import { consigneDeLangue, t, texteTraduit } from './i18n.js';
 import { appelIAJSON, erreurSilencieuse } from './groq.js';
 
 // ⚠️ COMPACTÉE (économie de tokens). Une fiche sur neuf lignes, renvoyée à
@@ -282,7 +282,7 @@ function parserReponse(brut: string): ReponseMJ {
     // Tentative de récupération : extraire le premier bloc { ... }
     const m = brut.match(/\{[\s\S]*\}/);
     if (!m) {
-      return { recit: brut.trim() || 'Le MJ reste silencieux…', deltas: {} };
+      return { recit: brut.trim() || texteTraduit('Le MJ reste silencieux…'), deltas: {} };
     }
     try {
       obj = JSON.parse(m[0]);
@@ -292,7 +292,7 @@ function parserReponse(brut: string): ReponseMJ {
   }
   const o = obj as Record<string, unknown>;
   return {
-    recit: typeof o.recit === 'string' ? o.recit : 'Action prise en compte.',
+    recit: typeof o.recit === 'string' ? o.recit : texteTraduit('Action prise en compte.'),
     evenement: typeof o.evenement === 'string' ? o.evenement : undefined,
     deltas: nettoyerDeltas(o.deltas),
     consequences: typeof o.consequences === 'string' ? o.consequences : undefined,

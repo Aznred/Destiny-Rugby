@@ -22,9 +22,10 @@ import { ClassementLateral } from '../components/ClassementLateral';
 import { demanderAuMJ, messageErreurIA } from '../lib/mj';
 import { ecouterEtatIA, etatIA } from '../lib/groq';
 import { genererEvenementHebdo, jugementLocal, jugerReaction } from '../lib/ia';
-import { semaine, libelleDate } from '../data/calendrier';
+import { semaine, libelleDate, libelleSemaine } from '../data/calendrier';
 import { labelAttribut, nomPoste } from '../data/rugby';
-import { t } from '../lib/i18n';
+import { nombre, t, texteTraduit, texteTraduitExact } from '../lib/i18n';
+import './Carriere.css';
 import type { EntreeJournal } from '../types';
 
 import { Icone } from '../components/Icone';
@@ -66,7 +67,7 @@ export function Carriere({ onReglages }: Props) {
   // est la porte d'entrée : la fiche et le classement restent à un toucher,
   // sans imposer plusieurs écrans de défilement avant de pouvoir jouer.
   const [vueMobile, setVueMobile] = useState<'jeu' | 'joueur' | 'classement'>('jeu');
-  const finRef = useRef<HTMLDivElement>(null);
+  const journalRef = useRef<HTMLDivElement>(null);
   // ⚠️ Verrou de ré-entrée. Sans lui, le moindre re-rendu pendant la génération
   // relançait une génération : deux scènes pour la même semaine, et deux fois
   // le coût en tokens.
@@ -84,7 +85,8 @@ export function Carriere({ onReglages }: Props) {
   );
 
   useEffect(() => {
-    finRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const fil = journalRef.current;
+    if (fil) fil.scrollTo({ top: fil.scrollHeight, behavior: 'smooth' });
   }, [journal, enCours]);
 
   // ═══ LA SCÈNE DE LA SEMAINE ═════════════════════════════════════════════
@@ -112,7 +114,7 @@ export function Carriere({ onReglages }: Props) {
         const evt = await genererEvenementHebdo({
           modele,
           joueur,
-          semaine: `${libelleDate(sem)} - ${sem.libelle}`,
+          semaine: `${libelleDate(sem)} - ${libelleSemaine(sem, joueur.saison)}`,
           contexte: derniere
             ? `${derniere.titre ?? ''} - ${derniere.texte}`.slice(0, 240)
             : undefined,
@@ -212,7 +214,7 @@ export function Carriere({ onReglages }: Props) {
     <section className="carriere" data-mobile-vue={vueMobile}>
       <header className="carriere-entete manager-entete">
         <div>
-          <div className="eyebrow">Carrière joueur · Saison {joueur.saison} · {libelleDate(semaine(joueur.semaine ?? 1))}</div>
+          <div className="eyebrow">{t("ui.18afe0a36a0e", { v0: joueur.saison, v1: libelleDate(semaine(joueur.semaine ?? 1)) })}</div>
           <h1><Icone nom="joueur" taille={26} /> {joueur.nom}</h1>
         </div>
         <div className="carriere-identite-club manager-identite-club">
@@ -249,7 +251,7 @@ export function Carriere({ onReglages }: Props) {
       <PanneauJoueur joueur={joueur} />
 
       <div id="carriere-jeu" className="carte jeu">
-        <div className="journal" role="log" aria-live="polite" aria-relevant="additions text" aria-label={t('car.vueJeu')}>
+        <div ref={journalRef} className="journal" role="log" aria-live="polite" aria-relevant="additions text" aria-label={t('car.vueJeu')}>
           <AnimatePresence initial={false}>
             {journal.map((e) => (
               <Message key={e.id} entree={e} />
@@ -265,7 +267,6 @@ export function Carriere({ onReglages }: Props) {
               </div>
             </div>
           )}
-          <div ref={finRef} />
         </div>
 
         {erreur && <div className="alerte" role="alert" style={{ margin: '0 1.2rem' }}>{erreur}</div>}
@@ -360,12 +361,12 @@ function Message({ entree }: { entree: EntreeJournal }) {
     : null;
   const titre = estDebut
     ? t('car.debutTitre')
-    : transfert ? t('car.mercatoOfficiel') : entree.titre;
+    : transfert ? t('car.mercatoOfficiel') : entree.role === 'systeme' ? texteTraduit(entree.titre) : entree.role === 'mj' ? texteTraduitExact(entree.titre) : entree.titre;
   const texte = estDebut && joueur
     ? t('car.debutTexte', { joueur: joueur.nom, poste: nomPoste(joueur.poste).toLowerCase(), club: joueur.club })
     : transfert
       ? t('car.transfertOfficiel', { joueur: transfert[1], de: transfert[2], vers: transfert[3] })
-      : entree.texte;
+      : entree.role === 'systeme' ? texteTraduit(entree.texte) : entree.role === 'mj' ? texteTraduitExact(entree.texte) : entree.texte;
   return (
     <motion.div
       className={`msg ${entree.role}`}
@@ -375,7 +376,7 @@ function Message({ entree }: { entree: EntreeJournal }) {
     >
       <div className="bulle">
         {titre && entree.role === 'mj' && (
-          <div className="titre-evt">◆ {entree.titre}</div>
+          <div className="titre-evt">◆ {titre}</div>
         )}
         {titre && entree.role === 'systeme' && (
           <div className="titre-evt" style={{ color: 'var(--brume)' }}>{titre}</div>
@@ -392,8 +393,8 @@ function Message({ entree }: { entree: EntreeJournal }) {
                 {/* Les abonnés se comptent par milliers : sans séparateur,
                     « +12400 » ne se lit pas. */}
                 {k === 'argent'
-                  ? `${v.toLocaleString('fr-FR')} €`
-                  : k === 'abonnes' ? v.toLocaleString('fr-FR') : v}
+                  ? `${nombre(v)} €`
+                  : k === 'abonnes' ? nombre(v) : v}
               </span>
             ))}
           </div>

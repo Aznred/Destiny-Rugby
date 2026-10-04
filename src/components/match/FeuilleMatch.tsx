@@ -185,7 +185,7 @@ export function FeuilleMatch({
           <div className="ml-bilan-entete" style={{ gridTemplateColumns: grilleColonnes }}>
             <span /><span>{t('ml.joueur')}</span>
             {colonnes.map((c) => <span key={c.cle} title={t(c.titreCle)}>{c.entete}</span>)}
-            <span>min</span>
+            <span>{t("ui.1f6fa6f69d18")}</span>
           </div>
           {stats.parJoueur
             .filter((j) => j.club === club)

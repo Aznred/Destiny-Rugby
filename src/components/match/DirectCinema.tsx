@@ -1,3 +1,4 @@
+import { tn, t } from '../../lib/i18n';
 import { useEffect, useState } from 'react';
 import type { VueMatchEnLigne } from '../../lib/ligue/matchCarriere';
 import { creerScenarioDirect } from '../../lib/ligue/scenarioDirect';
@@ -97,13 +98,13 @@ export function DirectCinema({
   const hasAlerte = Boolean(m.decision || alerteVif || alertePrep);
 
   return (
-    <section className="dc" aria-label="Direct vidéo du match">
+    <section className="dc" aria-label={t("ui.a223eeb07f09")}>
       <header className="dc-entete">
         <span>
           <i />
-          {m.termine ? 'TERMINÉ' : 'EN DIRECT'} <b>MATCH ANIMÉ · 30 JOUEURS + ARBITRE</b>
+          {m.termine ? t("online.match.finished") : t("ui.c089a4499f41")} <b>{t("ui.2a109b609a5b")}</b>
         </span>
-        <span>Terrain complet · animations rugby</span>
+        <span>{t("ui.f3ba155271f1")}</span>
       </header>
       <div className="dc-score">
         <time>{heure(m.horloge * 60)}</time>
@@ -113,7 +114,7 @@ export function DirectCinema({
         </strong>
         <span style={{ borderColor: couleurs.exterieur }}>{exterieur}</span>
       </div>
-      {m.monCote && cahier && (cahier.modeCombinaisons === 'configure' || !!cahier.combinaisons?.length) && <div className={`dc-cahier ${cahier.modeCombinaisons === 'configure' && combinaisonsActives ? 'actif' : ''}`}><Icone nom="sifflet" taille={16} /><span>{cahier.modeCombinaisons === 'automatique' ? 'Jeu automatique · Tes combinaisons sont désactivées pour ce match' : combinaisonsActives ? `Cahier actif · ${combinaisonsActives} combinaison${combinaisonsActives > 1 ? 's' : ''}` : 'Cahier chargé · Aucune combinaison active'}</span></div>}
+      {m.monCote && cahier && (cahier.modeCombinaisons === 'configure' || !!cahier.combinaisons?.length) && <div className={`dc-cahier ${cahier.modeCombinaisons === 'configure' && combinaisonsActives ? 'actif' : ''}`}><Icone nom="sifflet" taille={16} /><span>{cahier.modeCombinaisons === 'automatique' ? t("ui.89b87c5d09fc") : combinaisonsActives ? tn("ui.13ebe03563fd", combinaisonsActives, { v0: combinaisonsActives }) : t("ui.c2b2701297f3")}</span></div>}
       <div className={`dc-ecran ${isTmo ? 'dc-ecran-tmo' : ''} ${hasAlerte ? 'dc-ecran-alerte' : ''}`}>
         {m.terrain ? (
           <TerrainEnDirect
@@ -132,8 +133,8 @@ export function DirectCinema({
         ) : (
           <p className="dc-attente">
             {m.termine
-              ? 'Match terminé. Retrouve toutes les actions ci-dessous.'
-              : 'Les équipes prennent place…'}
+              ? t("ui.2ce809c64e56")
+              : t("ui.d725dbfdd9aa")}
           </p>
         )}
         {/* ---------- 📺 TMO : CADRE TÉLÉ REPLAY BROADCAST (L'ACTION RESTE VISIBLE AU CENTRE) ---------- */}
@@ -149,10 +150,10 @@ export function DirectCinema({
 
         {(m.decision || alerteVif) && (
           <div className={`dc-alerte-terrain dc-alerte-${m.decision ? 'penalite' : momentVif?.type}`} role="status">
-            <b><Icone nom={m.decision ? 'sifflet' : iconeMoment(momentVif!.type)} taille={16} /> {m.decision ? 'PÉNALITÉ · DÉCISION' : libelleMoment(momentVif!.type, momentVif!.texte)}</b>
+            <b><Icone nom={m.decision ? 'sifflet' : iconeMoment(momentVif!.type)} taille={16} /> {m.decision ? t("ui.229b9ae7b57f") : libelleMoment(momentVif!.type, momentVif!.texte)}</b>
             <span>
               {m.decision
-                ? 'Choisis ton option ci-dessous'
+                ? t("ui.be54646015c1")
                 : <TexteIcones texte={momentVif!.texte} />}
             </span>
           </div>
@@ -160,8 +161,8 @@ export function DirectCinema({
 
         {alertePrep && (
           <div className="dc-alerte-terrain dc-alerte-penalite" role="status">
-            <b><Icone nom="cible" taille={16} /> {prep?.transformation ? 'TRANSFORMATION' : 'TIR AU BUT'}</b>
-            <span>Prise d’élan et concentration face aux poteaux…</span>
+            <b><Icone nom="cible" taille={16} /> {prep?.transformation ? t("ui.608665dbbdd1") : t("ui.8ef71761d747")}</b>
+            <span>{t("ui.e88e6f5ad19c")}</span>
           </div>
         )}
       </div>
@@ -172,15 +173,15 @@ export function DirectCinema({
           {momentSelectionne
             ? ` · ${heure(momentSelectionne.seconde)} · ${momentSelectionne.score.domicile}–${momentSelectionne.score.exterieur}`
             : scenario
-              ? ` · ${scenario.sequence}e phase`
+              ? t("ui.466408d4ea15", { v0: scenario.sequence })
               : ''}
         </span>
         <p>
           {m.decision
-            ? 'Une pénalité à jouer : choisis ton option dans le panneau de décision.'
+            ? t("ui.0b0e23e2076f")
             : <TexteIcones texte={commentaire} />}
         </p>
-        {selection && <button onClick={() => setSelection(null)}>Revenir au direct</button>}
+        {selection && <button onClick={() => setSelection(null)}>{t("ui.4f00a5d0128e")}</button>}
       </div>
       <div className="dc-chiffres">
         {[
@@ -198,8 +199,8 @@ export function DirectCinema({
       </div>
       <div className="dc-moments">
         <div className="dc-titre">
-          <h3>Temps forts du match</h3>
-          <span>{moments.length} actions</span>
+          <h3>{t("ui.0bc62a01f8cc")}</h3>
+          <span>{t("ui.545a48fc341f", { v0: moments.length })}</span>
         </div>
         <div className="dc-liste">
           {[...moments].reverse().map((v) => (
@@ -207,8 +208,8 @@ export function DirectCinema({
               <time>{heure(v.seconde)}</time>
               <span>
                 <b>
-                  {v.cote === 'domicile' ? domicile : v.cote === 'exterieur' ? exterieur : 'Le match'}
-                  {v.points ? ` · +${v.points} pts` : ''}
+                  {v.cote === 'domicile' ? domicile : v.cote === 'exterieur' ? exterieur : t("ui.4f3619d26a09")}
+                  {v.points ? t("ui.bc26b8a2ad14", { v0: v.points }) : ''}
                 </b>
                 <small><TexteIcones texte={v.texte} /></small>
               </span>
@@ -218,7 +219,7 @@ export function DirectCinema({
             </button>
           ))}
         </div>
-        {!moments.length && <p className="dc-attente">Les actions importantes s’afficheront ici.</p>}
+        {!moments.length && <p className="dc-attente">{t("ui.01e3902d4152")}</p>}
       </div>
     </section>
   );

@@ -1,0 +1,94 @@
+/* La fiche, le récit et la barre d'action partagent le même espace mobile. */
+@media (max-width: 900px) {
+  .carriere { height: auto; }
+  .carriere .carriere-mobile-vues {
+    position: static;
+    width: 100%;
+    margin: 0;
+  }
+  .carriere .carriere-identite-club {
+    min-width: 0;
+    min-height: 48px;
+  }
+  .carriere .carriere-identite-club span { display: flex; min-width: 0; }
+  .carriere .carriere-mobile-vues button { min-width: 0; padding: .55rem .25rem; }
+  .carriere .carriere-mobile-vues button svg { flex-shrink: 0; }
+  .carriere > .jeu {
+    height: auto;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .carriere .jeu .journal {
+    flex: none;
+    height: auto;
+    min-height: 180px;
+    max-height: clamp(240px, calc(100dvh - 420px), 540px);
+    justify-content: flex-start;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scroll-padding: .75rem;
+  }
+  .carriere .jeu .journal > :first-child { margin-top: 0; }
+  .carriere .choix-rapides {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: .5rem;
+    overflow: visible;
+    padding: .75rem !important;
+  }
+  .carriere .choix-rapides button {
+    width: 100%;
+    min-width: 0;
+    min-height: 44px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    text-align: left;
+    border-radius: 12px;
+  }
+  .carriere .saisie { padding: .75rem; min-width: 0; }
+  .carriere .saisie textarea { min-width: 0; font-size: 16px; }
+  .carriere .saisie .btn { flex-shrink: 0; min-height: 44px; }
+  .carriere .panneau-joueur { min-width: 0; }
+  .carriere .panneau-joueur .nom { overflow-wrap: anywhere; }
+  .carriere .panneau-joueur .sous { flex-wrap: wrap; }
+  .carriere .pastille { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+  .barre-jouer {
+    height: 68px;
+    min-height: 68px;
+    gap: .5rem;
+    padding: .45rem .65rem;
+    bottom: calc(var(--nav-mobile-hauteur, 64px) + env(safe-area-inset-bottom, 0px));
+  }
+  .barre-jouer .barre-jouer-info {
+    display: flex;
+    flex: 1 1 0;
+    flex-direction: column;
+    gap: .2rem;
+    min-width: 0;
+  }
+  .barre-jouer-info > span, .barre-jouer-info > small {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .barre-jouer-info > small { font-size: .68rem; }
+  .barre-jouer .barre-jouer-calendrier { flex: 0 0 44px; min-height: 44px; padding: .4rem; }
+  .barre-jouer .btn {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 0;
+    max-width: 46%;
+    min-height: 46px;
+    padding: .5rem .65rem;
+    font-size: .78rem;
+    line-height: 1.2;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}
+@media (max-width: 540px) {
+  .carriere .carriere-identite-club { width: 100%; max-width: none; }
+  .carriere .carriere-mobile-vues button { font-size: .76rem; gap: .3rem; }
+  .carriere .choix-rapides { grid-template-columns: minmax(0, 1fr); }
+}

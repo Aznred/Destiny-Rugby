@@ -5,7 +5,7 @@
 // vieillit. Une blessure va de la semaine de repos à la fin de carrière.
 
 import type { Blessure, GraviteBlessure, Joueur } from '../types.js';
-import { langueCourante } from './i18n.js';
+import { t, tn, texteTraduit } from './i18n.js';
 
 interface Modele {
   gravite: GraviteBlessure;
@@ -33,29 +33,9 @@ const MODELES: Modele[] = [
   },
 ];
 
-const BLESSURES_ANGLAISES: Record<string, string> = {
-  'Contusion à la cuisse': 'Thigh contusion',
-  'Entorse de la cheville': 'Ankle sprain',
-  'Élongation aux ischios': 'Hamstring strain',
-  'Commotion (protocole)': 'Concussion (protocol)',
-  'Côtes douloureuses': 'Sore ribs',
-  'Déchirure musculaire': 'Muscle tear',
-  'Fracture de la main': 'Hand fracture',
-  'Entorse du genou': 'Knee sprain',
-  'Luxation de l’épaule': 'Shoulder dislocation',
-  'Fracture du nez et du plancher orbitaire': 'Nasal and orbital-floor fracture',
-  'Rupture des ligaments croisés': 'Cruciate ligament rupture',
-  'Fracture du péroné': 'Fibula fracture',
-  'Rupture du tendon d’Achille': 'Achilles tendon rupture',
-  'Hernie discale opérée': 'Surgery for a slipped disc',
-  'Commotions à répétition, le médecin est formel': 'Repeated concussions, the doctor is unequivocal',
-  'Rachis cervical : l’arrêt est impératif': 'Cervical spine injury: retirement is mandatory',
-  'Genou détruit, l’articulation ne suivra plus': 'Destroyed knee: the joint will not hold up',
-};
-
 /** Nom affiché, sans modifier le libellé canonique sauvegardé avec la carrière. */
 export function nomBlessure(b: Blessure): string {
-  return langueCourante() === 'en' ? BLESSURES_ANGLAISES[b.nom] ?? b.nom : b.nom;
+  return texteTraduit(b.nom);
 }
 
 // Risque de blessure sur UN match. ~4 % pour un joueur frais de 25 ans, ça
@@ -86,24 +66,12 @@ export function tirerBlessure(alea = Math.random(), alea2 = Math.random()): Bles
 }
 
 export function messageBlessure(b: Blessure): string {
-  const nom = nomBlessure(b);
-  if (langueCourante() === 'en') {
-    switch (b.gravite) {
-      case 'legere': return `${nom}. Nothing serious: ${b.semaines} week${b.semaines > 1 ? 's' : ''} of treatment, then you are back.`;
-      case 'moyenne': return `${nom}. The staff expect ${b.semaines} weeks out, it will be a long season.`;
-      case 'saison': return `${nom}. Your season is over: surgery, rehabilitation and a serious mental test ahead.`;
-      default: return `${nom}. The doctors agree: you will not play again. Your career ends here.`;
-    }
-  }
+  const vars = { nom: nomBlessure(b), n: b.semaines };
   switch (b.gravite) {
-    case 'legere':
-      return `${nom}. Rien de grave : ${b.semaines} semaine${b.semaines > 1 ? 's' : ''} de soins et tu reprends.`;
-    case 'moyenne':
-      return `${nom}. Le staff annonce ${b.semaines} semaines d’indisponibilité, la saison va être longue.`;
-    case 'saison':
-      return `${nom}. C’est terminé pour la saison : opération, rééducation, et un mental à toute épreuve.`;
-    default:
-      return `${nom}. Les médecins sont unanimes : tu ne rejoueras plus. Ta carrière s’arrête ici.`;
+    case 'legere': return tn('blessure.legere', b.semaines, vars);
+    case 'moyenne': return t('blessure.moyenne', vars);
+    case 'saison': return t('blessure.saison', vars);
+    default: return t('blessure.carriere', vars);
   }
 }
 

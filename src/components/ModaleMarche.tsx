@@ -22,12 +22,12 @@ import { useModalDialog } from '../lib/useModalDialog';
 import { valeurVenteRapide, plafondVenteRapide } from '../lib/ligue/venteRapideCarriere';
 import { NOMS_PACK } from '../lib/presentationPacks';
 import type { CarteCarriere, CommandeCarriere, VenteCarriere } from '../lib/ligue/typesCarriere';
-import { t } from '../lib/i18n';
+import { locale, t } from '../lib/i18n';
 import './ModaleMarche.css';
 
 const nombres = new Intl.NumberFormat('fr-FR');
 const montant = (n: number) => nombres.format(n);
-const dateHeure = (iso: string) => new Date(iso).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+const dateHeure = (iso: string) => new Date(iso).toLocaleString(locale(), { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 const deuxChiffres = (n: number) => String(n).padStart(2, '0');
 
 /** Le pas d'enchère du serveur, recopié pour proposer le bon montant d'avance. */
@@ -60,7 +60,7 @@ function useCompteARebours(echeance: string): { jours: number; heures: number; m
 function CompteARebours({ echeance }: { echeance: string }) {
   const reste = useCompteARebours(echeance);
   if (!reste) return <b className="mm-fini">{t('online.market.closed')}</b>;
-  return <b className="mm-rebours" aria-label={`Temps restant : ${reste.jours ? `${reste.jours} jours ` : ''}${reste.heures} heures ${reste.minutes} minutes ${reste.secondes} secondes`}>
+  return <b className="mm-rebours" aria-label={t("ui.b37c7d388fb9", { v0: reste.jours ? t("ui.a2ee20f2339d", { v0: reste.jours }) : '', v1: reste.heures, v2: reste.minutes, v3: reste.secondes })}>
     {reste.jours > 0 && <span>{reste.jours} j</span>}
     <span>{deuxChiffres(reste.heures)}</span><i>:</i><span>{deuxChiffres(reste.minutes)}</span><i>:</i><span>{deuxChiffres(reste.secondes)}</span>
   </b>;
@@ -97,7 +97,7 @@ export function ModaleMarche({ carte, vente, monClubId, ovas, logoClub, nomDe, o
     // panneaux crée un bloc conteneur qui piège les `position: fixed`.
     <div className="overlay" ref={overlayRef} onClick={onFermer}>
       <motion.div
-        className="carte modale mm" role="dialog" aria-modal="true" aria-label={`${carte.nom}, ${carte.note} GEN`}
+        className="carte modale mm" role="dialog" aria-modal="true" aria-label={t("ui.f43b8032fd08", { v0: carte.nom, v1: carte.note })}
         ref={dialogRef} tabIndex={-1} onClick={(e) => e.stopPropagation()}
         initial={{ opacity: 0, y: 14, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: 0.2 }}
       >

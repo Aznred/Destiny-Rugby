@@ -1,3 +1,4 @@
+import { t } from '../../lib/i18n';
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { Icone } from '../Icone';
 import { PelouseMemo } from './Pelouse';
@@ -831,16 +832,16 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
       if (qteGesteRef.current?.id === event.pointerId) qteGesteRef.current = null;
     }}>
     <header className="amical-entete">
-      <button type="button" className="btn fantome amical-btn-retour" onClick={onQuitter}><Icone nom="fleche-droite" taille={16} /> Quitter</button>
+      <button type="button" className="btn fantome amical-btn-retour" onClick={onQuitter}><Icone nom="fleche-droite" taille={16} />{t("pub.quitter")}</button>
       <div className="amical-scoreboard">
         <div className={`amical-equipe domicile ${monCamp === 'A' ? 'mon-camp' : ''}`}><span className="amical-nom-equipe">{equipeA.nom}</span><span className="amical-score">{scoreA}</span></div>
-        <div className="amical-centre-chrono"><span className="amical-badge-chrono">{Math.floor(tempsSimule / 60)}:{(tempsSimule % 60).toString().padStart(2, '0')}{m?.sirene ? '+' : ''} / 80:00</span><span className="amical-mode-label">{m ? libellePhase(m) : 'Chargement'}</span></div>
+        <div className="amical-centre-chrono"><span className="amical-badge-chrono">{Math.floor(tempsSimule / 60)}:{(tempsSimule % 60).toString().padStart(2, '0')}{m?.sirene ? '+' : ''} / 80:00</span><span className="amical-mode-label">{m ? libellePhase(m) : t("ui.79e17f144e88")}</span></div>
         <div className={`amical-equipe exterieur ${monCamp === 'B' ? 'mon-camp' : ''}`}><span className="amical-score">{scoreB}</span><span className="amical-nom-equipe">{equipeB.nom}</span></div>
       </div>
       <div className="amical-endurance-badge"><Icone nom="eclair" taille={14} /><div className="amical-jauge-endurance"><div style={{ width: `${enduranceJauge}%`, backgroundColor: enduranceJauge > 40 ? '#10b981' : '#f59e0b' }} /></div></div>
     </header>
 
-    <div className="amical-bandeau-action" role="status">{messageAction}{manetteDetectee ? ' · Manette connectée' : ''}</div>
+    <div className="amical-bandeau-action" role="status">{messageAction}{manetteDetectee ? t("ui.37972b13b3e5") : ''}</div>
 
     <div className="amical-terrain-viewport" onPointerDown={debutGeste} onPointerMove={bougerGeste} onPointerUp={finGeste} onPointerCancel={() => { gesteRef.current = null; if (viseeGesteRef.current) viseeGesteRef.current.style.display = 'none'; }}>
       {vueCamera && m && terrain && <svg ref={svgRef} className="amical-terrain-svg" viewBox={vueCamera.viewBox} preserveAspectRatio="xMidYMid meet">
@@ -859,7 +860,7 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
               noeud.setAttribute('transform', `translate(${(affiche.x - origine.x).toFixed(2)} ${(affiche.y - origine.y).toFixed(2)})`);
             }}>
               <SpriteRugbymanMemo pion={direct} position={p.pos} terrain={terrain} maillot={p.cote === 'A' ? maillotA : maillotB} porteur={m.porteur?.id === p.id} positionPorteur={m.porteur?.pos} redresser={vueCamera.redresser} hauteurMetres={5.3} temps={tempsSprite} compact={appareilTactileRef.current} />
-              {p.id === pionControleId && <g transform={`translate(${p.pos.x} ${p.pos.y})`} aria-label="Joueur contrôlé">
+              {p.id === pionControleId && <g transform={`translate(${p.pos.x} ${p.pos.y})`} aria-label={t("ui.5cd1a2f11bad")}>
                 <g transform={vueCamera.redresser} className="amical-fleche-controle">
                   <path d="M0 -4.15 L-.68 -5.25 L.68 -5.25 Z" fill="#ffe181" stroke="#211906" strokeWidth={.16} strokeLinejoin="round" />
                 </g>
@@ -878,46 +879,46 @@ export function MatchAmicalManette({ equipeA, equipeB, monCamp, mode, salonCode,
       <div className="amical-visee-tactile" ref={viseeGesteRef} aria-hidden="true" />
 
       {qteAffichee && <div className={`amical-qte amical-qte-${qteAffichee.type} amical-qte-${qteAffichee.etapeTir ?? 'timing'}`} style={{ ...styleQte, ...positionQte }}>
-        <strong>{qteAffichee.type === 'melee' ? 'Poussée en mêlée' : qteAffichee.type === 'touche' ? 'Duel en touche' : qteAffichee.type === 'tir' ? `${qteAffichee.valeurTir === 3 ? 'Pénalité' : 'Transformation'} · ${qteAffichee.etapeTir === 'direction' ? 'visée' : 'puissance'}` : 'Grattage'}</strong>
+        <strong>{qteAffichee.type === 'melee' ? t("ui.d8e8e18aa900") : qteAffichee.type === 'touche' ? t("ui.7ace331b3af3") : qteAffichee.type === 'tir' ? `${qteAffichee.valeurTir === 3 ? 'Pénalité' : 'Transformation'} · ${qteAffichee.etapeTir === 'direction' ? 'visée' : 'puissance'}` : t("ui.7833b280fc3f")}</strong>
         {qteAffichee.type === 'touche' && <div className="amical-qte-choix">
-          {(['court', 'milieu', 'long'] as const).map((option) => <button type="button" key={option} className={qteAffichee.choix?.[monCamp] === option ? 'actif' : ''} onClick={() => emettreAction('ACTION_SECONDARY', { option })}>{option === 'court' ? 'Court' : option === 'milieu' ? 'Milieu' : 'Long'}</button>)}
+          {(['court', 'milieu', 'long'] as const).map((option) => <button type="button" key={option} className={qteAffichee.choix?.[monCamp] === option ? 'actif' : ''} onClick={() => emettreAction('ACTION_SECONDARY', { option })}>{option === 'court' ? t("ui.60f6a4163e82") : option === 'milieu' ? t("ui.a14161186b6f") : t("ui.d1d87c4717d5")}</button>)}
         </div>}
-        {qteAffichee.type === 'touche' && <div className="amical-qte-choix-tactile" aria-label="Zone de lancer">
-          {(['court', 'milieu', 'long'] as const).map((option) => <span key={option} className={(qteAffichee.choix?.[monCamp] ?? 'milieu') === option ? 'actif' : ''}>{option === 'court' ? '← Court' : option === 'milieu' ? '↓ Milieu' : 'Long →'}</span>)}
+        {qteAffichee.type === 'touche' && <div className="amical-qte-choix-tactile" aria-label={t("ui.3fac3d6d649d")}>
+          {(['court', 'milieu', 'long'] as const).map((option) => <span key={option} className={(qteAffichee.choix?.[monCamp] ?? 'milieu') === option ? 'actif' : ''}>{option === 'court' ? t("ui.b9347df078d1") : option === 'milieu' ? t("ui.d956c20bc727") : t("ui.ad82b7d87fc3")}</span>)}
         </div>}
         {qteAffichee.type === 'tir' && qteAffichee.etapeTir === 'puissance'
           ? <div className="amical-qte-puissance-vertical" ref={puissanceBarreRef} style={{ '--qte-puissance': '0%' } as CSSProperties}><i /><span>↑</span></div>
           : <div className={`amical-qte-jauge${qteAffichee.type === 'tir' ? ' amical-qte-direction' : ''}`}><i /><span /></div>}
-        {qteAffichee.type === 'melee' && <><div className="amical-qte-poussee"><span>Recul</span><div><i /></div><span>Avance</span></div>
-          <small className="amical-qte-resultat-pack">{scorePoussee === undefined ? 'Touche au bon moment pour pousser' : scorePoussee >= .55 ? 'Ton pack avance !' : 'Ton pack recule'}</small></>}
-        <button type="button" disabled={qteLocaleDejaJouee || (qteAffichee.type === 'tir' && qteAffichee.initiateur !== monCamp)} onClick={() => emettreAction('ACTION_PRIMARY')}>{qteLocaleDejaJouee ? 'Timing envoyé' : qteAffichee.type === 'ruck' ? 'Relâcher' : qteAffichee.type === 'tir' ? 'Frapper' : 'Maintenant'}</button>
+        {qteAffichee.type === 'melee' && <><div className="amical-qte-poussee"><span>{t("ui.3dfa504acd07")}</span><div><i /></div><span>{t("ui.a3a09e188e03")}</span></div>
+          <small className="amical-qte-resultat-pack">{scorePoussee === undefined ? t("ui.6ba4a4c7703f") : scorePoussee >= .55 ? t("ui.c95c107f35ee") : t("ui.904bdd3efc7f")}</small></>}
+        <button type="button" disabled={qteLocaleDejaJouee || (qteAffichee.type === 'tir' && qteAffichee.initiateur !== monCamp)} onClick={() => emettreAction('ACTION_PRIMARY')}>{qteLocaleDejaJouee ? t("ui.9ccc03d9c52d") : qteAffichee.type === 'ruck' ? t("ui.57b5f2826805") : qteAffichee.type === 'tir' ? t("ml.act.frapper") : t("ui.4303250da364")}</button>
         <p className="amical-qte-aide-tactile">{qteAffichee.type === 'tir' && qteAffichee.etapeTir === 'puissance'
-          ? 'Pose le doigt en bas et glisse le plus haut possible'
-          : qteAffichee.type === 'tir' ? 'Touche l’écran quand la flèche vise le centre'
-            : qteAffichee.type === 'touche' ? 'Touche l’écran au bon moment · glisse pour choisir'
-              : 'Touche n’importe où au bon moment'}</p>
+          ? t("ui.cdd71fc318e3")
+          : qteAffichee.type === 'tir' ? t("ui.850aced531db")
+            : qteAffichee.type === 'touche' ? t("ui.6097cf31c09b")
+              : t("ui.83f225ec979f")}</p>
       </div>}
-      <div className="amical-geste-indication"><span>{m?.phase === 'ruck' || m?.phase === 'maul' ? 'Touche le ruck : soutien ou grattage' : m?.porteur?.cote === monCamp ? '↑ Passe gauche · ↓ Passe droite · → Pied dirigé · touche un rival : raffut' : 'Glisse vers le porteur : plaquage · touche le terrain : changer'}</span><small>Joystick au bord : sprint automatique</small></div>
+      <div className="amical-geste-indication"><span>{m?.phase === 'ruck' || m?.phase === 'maul' ? t("ui.173dc2e4f6d2") : m?.porteur?.cote === monCamp ? t("ui.104f9effa86c") : t("ui.23b3196897a6")}</span><small>{t("ui.12446b20badb")}</small></div>
     </div>
 
     <footer className="amical-hud">
-      <div className="amical-joystick-zone" onPointerDown={debutJoystick} onPointerMove={bougerJoystick} onPointerUp={finirJoystick} onPointerCancel={finirJoystick} aria-label="Joystick de déplacement, bord extérieur pour sprinter" aria-disabled={m?.phase === 'melee' || m?.phase === 'touche'}>
-        <div className="amical-joystick-base" ref={joystickBaseRef}><div className="amical-joystick-manche" ref={joystickMancheRef} /></div><span className="amical-joystick-guide">{m?.phase === 'melee' || m?.phase === 'touche' ? 'Placement verrouillé' : 'Bord extérieur : sprint'}</span>
+      <div className="amical-joystick-zone" onPointerDown={debutJoystick} onPointerMove={bougerJoystick} onPointerUp={finirJoystick} onPointerCancel={finirJoystick} aria-label={t("ui.a10f47e7f76e")} aria-disabled={m?.phase === 'melee' || m?.phase === 'touche'}>
+        <div className="amical-joystick-base" ref={joystickBaseRef}><div className="amical-joystick-manche" ref={joystickMancheRef} /></div><span className="amical-joystick-guide">{m?.phase === 'melee' || m?.phase === 'touche' ? t("ui.cbbf8f3e4737") : t("ui.ee23ff8bae4a")}</span>
       </div>
     </footer>
 
-    <div className="amical-aide-pc">WASD · Maj sprint · Q/E passes · Espace action · F action 2 · C pied · Tab changer</div>
+    <div className="amical-aide-pc">{t("ui.00b9e84d8542")}</div>
 
     {finDeMatch && <div className="amical-modale-fin" role="dialog" aria-modal="true"><div className="amical-modale-contenu carte">
-      <h2>Fin du match</h2><div className="amical-score-final"><span>{equipeA.nom} <b>{scoreA}</b></span><span>–</span><span><b>{scoreB}</b> {equipeB.nom}</span></div>
-      <p className="amical-message-vainqueur">{scoreA > scoreB ? `Victoire de ${equipeA.nom}` : scoreB > scoreA ? `Victoire de ${equipeB.nom}` : 'Match nul'}</p>
-      <button type="button" className="btn primaire" onClick={onQuitter}>Retour à la collection</button>
+      <h2>{t("ml.tv.finMatch")}</h2><div className="amical-score-final"><span>{equipeA.nom} <b>{scoreA}</b></span><span>–</span><span><b>{scoreB}</b> {equipeB.nom}</span></div>
+      <p className="amical-message-vainqueur">{scoreA > scoreB ? t("ui.6e37c6094676", { v0: equipeA.nom }) : scoreB > scoreA ? t("ui.6e37c6094676", { v0: equipeB.nom }) : t("ui.636759ecc94c")}</p>
+      <button type="button" className="btn primaire" onClick={onQuitter}>{t("ui.e724b8fa463f")}</button>
     </div></div>}
-    {portraitMobile && <div className="amical-paysage-requis" role="dialog" aria-modal="true" aria-label="Mode paysage requis">
-      <strong>Tourne ton téléphone en mode paysage</strong>
-      <p>Le terrain et les commandes sont prévus pour un écran horizontal.</p>
-      <button type="button" onClick={() => { void activerPaysage(); }}>Passer en plein écran</button>
-      <button type="button" className="amical-paysage-quitter" onClick={onQuitter}>Quitter le match</button>
+    {portraitMobile && <div className="amical-paysage-requis" role="dialog" aria-modal="true" aria-label={t("ui.60a9dce8da2d")}>
+      <strong>{t("ui.16b3773650dd")}</strong>
+      <p>{t("ui.538ed7aa41b8")}</p>
+      <button type="button" onClick={() => { void activerPaysage(); }}>{t("ui.418c5a79d440")}</button>
+      <button type="button" className="amical-paysage-quitter" onClick={onQuitter}>{t("ui.82e3739c0c94")}</button>
     </div>}
   </div>;
 }

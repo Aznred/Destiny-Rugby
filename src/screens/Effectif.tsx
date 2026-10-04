@@ -5,7 +5,7 @@ import { effectifDuClub, noteDuClub, forceEffectif, estEspoir, estDeclinant } fr
 import { blessuresParJoueur } from '../lib/carriereAvancee';
 import { EFFECTIFS_REELS } from '../data/effectifsReels';
 import { POSTES, nomPoste } from '../data/rugby';
-import { t } from '../lib/i18n';
+import { t, texteTraduit } from '../lib/i18n';
 import { clubParNom } from '../data/clubs';
 import { competitionEffective } from '../lib/divisions';
 import { Blason, LogoEquipe } from '../components/Blason';
@@ -263,7 +263,7 @@ export function Effectif() {
                     aria-expanded={blessureOuverte === l.id}
                   >
                     <Icone nom="soin" taille={13} />
-                    <em>{b.semaines} sem.</em>
+                    <em>{t("ui.f9564428ad5d", { v0: b.semaines })}</em>
                   </button>
                 );
               })()}
@@ -282,12 +282,9 @@ export function Effectif() {
               };
               return (
                 <div className={`j-blessure-detail ${b.gravite}`} role="status">
-                  <b><Icone nom="soin" taille={14} /> {mots[b.gravite] ?? b.gravite} · {b.type}</b>
-                  <span>
-                    Indisponible {b.semaines} {b.semaines > 1 ? 'semaines' : 'semaine'}
-                    {b.douleur > 0 && ` · douleur ${b.douleur}/10`}
-                  </span>
-                  <em>{decisions[b.decision] ?? b.decision}</em>
+                  <b><Icone nom="soin" taille={14} /> {texteTraduit(mots[b.gravite] ?? b.gravite)} · {texteTraduit(b.type)}</b>
+                  <span>{t("ui.5fc6a79eea3a", { v0: b.semaines, v1: b.semaines > 1 ? t("ui.bee8862c9ceb") : t("ui.a733cdf10c56"), v2: b.douleur > 0 && t("ui.25673904a3f5", { v0: b.douleur }) })}</span>
+                  <em>{texteTraduit(decisions[b.decision] ?? b.decision)}</em>
                 </div>
               );
             })()}

@@ -104,8 +104,8 @@ export function Reglages({ onFermer }: Props) {
         <div className="eyebrow">{t('reg.eyebrow')}</div>
         <h2 id="reglages-titre">{t('reg.titre')}</h2>
         <div className="champ reglages-confort">
-          <label><input type="checkbox" checked={animationsMenus} onChange={e => setAnimationsMenus(e.target.checked)} /> Effets décoratifs des menus</label>
-          <p className="aide">Désactivés par défaut pour une navigation plus réactive. Les animations du match restent actives.</p>
+          <label><input type="checkbox" checked={animationsMenus} onChange={e => setAnimationsMenus(e.target.checked)} />{t("ui.5fa56ad8c721")}</label>
+          <p className="aide">{t("ui.6520acf6e8d3")}</p>
         </div>
         <p className="aide">{t('reg.iaAide')}</p>
 
@@ -117,7 +117,7 @@ export function Reglages({ onFermer }: Props) {
           <label>{t('reg.iaMJ')}</label>
           <div className="ia-locale-entete">
             <div>
-              <strong>Groq</strong>
+              <strong>{t("ui.493727d6225f")}</strong>
               <span> · {etat.modele ?? MODELES_GROQ[0]}</span>
             </div>
             <span className={`badge-cle ${iaActivee && etat.disponible ? 'ok' : 'ko'}`}>

@@ -82,9 +82,9 @@ function ChoixDeCarriere({ onJoueur, onEntraineur, onEnLigne }: {
         </button>
         <button type="button" className="cr-mode" onClick={onEnLigne}>
           <span className="cr-mode-ico"><Icone nom="equipe" taille={30} /></span>
-          <b>Carrière en ligne</b>
-          <span className="cr-mode-desc">Crée ton club, retrouve tes amis dans une ligue privée et construis votre histoire, saison après saison.</span>
-          <em className="cr-mode-suite">30 Bronze au départ · Packs, marché et duels tactiques en direct</em>
+          <b>{t("online.title")}</b>
+          <span className="cr-mode-desc">{t("ui.5d1ccde3f6cb")}</span>
+          <em className="cr-mode-suite">{t("ui.145bff936fe8")}</em>
         </button>
       </div>
     </div>

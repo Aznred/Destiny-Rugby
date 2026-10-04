@@ -3,7 +3,7 @@ import { lazy, Suspense, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import { useGame } from '../store/useGame';
-import { t } from '../lib/i18n';
+import { texteTraduit, t } from '../lib/i18n';
 // ⚠️ PAS DE `lazy` ICI. Le tutoriel doit être là au premier rendu de l'accueil :
 // il existe pour retenir quelqu'un qui hésite à rester, une seconde d'attente
 // le viderait de son sens. Il ne monte ni canvas ni modèle 3D — c'est du texte.
@@ -112,23 +112,23 @@ export function Accueil() {
       <Tutoriel />
       {interfacePC ? <section className="accueil-hub">
         <motion.header custom={0} variants={apparait} initial="hidden" animate="show" className="accueil-hub-tete">
-          <div><span className="eyebrow">{t('accueil.eyebrow')}</span><h1>Choisis ton <em>terrain</em></h1></div>
+          <div><span className="eyebrow">{t('accueil.eyebrow')}</span><h1>{t("ui.3990dc966295")}<em>{t("ml.terrain")}</em></h1></div>
           <p>{t('accueil.chapo')}</p>
         </motion.header>
 
-        <div className="accueil-modes" aria-label="Modes de jeu">
+        <div className="accueil-modes" aria-label={t("ui.4e7eb38b54fe")}>
           <motion.button custom={1} variants={apparait} initial="hidden" animate="show" type="button" className="accueil-mode accueil-mode-online" onClick={() => setEcran('carriereEnLigne')}>
             <span className="accueil-online-montage" aria-hidden="true">
               <span className="accueil-online-terrain"><i /><i /><i /></span>
               <span className="accueil-online-club domicile"><EcussonClub logo="/logos/toulouse.png" taille={58} /></span>
-              <span className="accueil-online-score"><i>DIRECT</i><b>17 <em>–</em> 14</b><small>63′</small></span>
+              <span className="accueil-online-score"><i>{t('ui.directCourt')}</i><b>17 <em>–</em> 14</b><small>63′</small></span>
               <span className="accueil-online-club exterieur"><EcussonClub logo="/logos/bordeaux.png" taille={58} /></span>
               <span className="accueil-online-public"><i /><i /><i /><i /><i /></span>
             </span>
             <span className="accueil-mode-numero">01</span>
             <span className="accueil-mode-icone"><Icone nom="equipe" taille={31} /></span>
-            <span className="accueil-online-enseigne" aria-hidden="true">Carrière en ligne</span>
-            <span className="accueil-mode-contenu"><span className="accueil-mode-surtitre">Multijoueur</span><strong>Carrière en ligne</strong><small>Crée ta ligue privée, invite tes amis et vis les matchs en direct.</small></span>
+            <span className="accueil-online-enseigne" aria-hidden="true">{t("online.title")}</span>
+            <span className="accueil-mode-contenu"><span className="accueil-mode-surtitre">{t("ui.07b0fc1ff5b8")}</span><strong>{t("online.title")}</strong><small>{t("ui.e7e1885be618")}</small></span>
             <span className="accueil-mode-fleche"><Icone nom="fleche-droite" taille={22} /></span>
           </motion.button>
 
@@ -136,7 +136,7 @@ export function Accueil() {
             <motion.button custom={2} variants={apparait} initial="hidden" animate="show" type="button" className="accueil-mode accueil-mode-carriere" onClick={() => setEcran(destinationCarriere)}>
               <span className="accueil-mode-visuel" aria-hidden="true"><Suspense fallback={<span className="hero-canvas-skel" />}><Hero3D skinId={skinActif} /></Suspense></span>
               <span className="accueil-mode-numero">02</span>
-              <span className="accueil-mode-contenu"><span className="accueil-mode-surtitre">Carrière solo</span><strong>{titreCarriere}</strong><small>{detailCarriere}</small><span className="accueil-mode-badges"><i>Joueur</i><i>Entraîneur</i><i>15 saisons</i></span></span>
+              <span className="accueil-mode-contenu"><span className="accueil-mode-surtitre">{t("ui.791af388c7f3")}</span><strong>{titreCarriere}</strong><small>{detailCarriere}</small><span className="accueil-mode-badges"><i>{t("ml.joueur")}</i><i>{t("cr.modeEntraineur")}</i><i>{t("ui.43b5ebe0a46e")}</i></span></span>
               <span className="accueil-mode-fleche"><Icone nom="fleche-droite" taille={20} /></span>
             </motion.button>
 
@@ -145,25 +145,25 @@ export function Accueil() {
                 <span className="accueil-boutique-montage" aria-hidden="true"><PieceOvas taille={54} /><PieceOvas taille={38} /><PieceOvas taille={28} /></span>
                 <span className="accueil-mode-numero">03</span>
                 <span className="accueil-mode-icone"><Icone nom="boutique" taille={27} /></span>
-                <span className="accueil-mode-contenu"><span className="accueil-mode-surtitre">Boutique</span><strong>Ovas et bundles</strong><small>Recharges, cosmétiques et nouveaux traits.</small></span>
+                <span className="accueil-mode-contenu"><span className="accueil-mode-surtitre">{t("bo.titre")}</span><strong>{t("ui.249f85b35ca5")}</strong><small>{t("ui.94e5627a1ac0")}</small></span>
                 <span className="accueil-mode-fleche"><Icone nom="fleche-droite" taille={18} /></span>
               </motion.button>
               <motion.button custom={4} variants={apparait} initial="hidden" animate="show" type="button" className="accueil-mode accueil-mode-collection" onClick={() => setEcran('collectionSolo')}>
                 <span className="accueil-packs-eventail" aria-hidden="true"><Suspense fallback={null}><PacksEventailAccueil /></Suspense></span>
                 <span className="accueil-mode-numero">04</span>
                 <span className="accueil-mode-icone"><Icone nom="cadeau" taille={27} /></span>
-                <span className="accueil-mode-contenu"><span className="accueil-mode-surtitre">Club house</span><strong>Collection</strong><small>Packs, cartes et doublons.</small></span>
+                <span className="accueil-mode-contenu"><span className="accueil-mode-surtitre">{t("ui.be2da8643671")}</span><strong>{t("solo.status")}</strong><small>{t("ui.d44e175de687")}</small></span>
                 <span className="accueil-mode-fleche"><Icone nom="fleche-droite" taille={18} /></span>
               </motion.button>
               <motion.button custom={5} variants={apparait} initial="hidden" animate="show" type="button" className="accueil-mode accueil-mode-parties" onClick={() => setPartiesOuvertes((v) => !v)} aria-expanded={partiesOuvertes}>
                 <span className="accueil-saves-montage" aria-hidden="true">
-                  <span className="accueil-save-carte save-arriere"><Icone nom="equipe" taille={15} /><span><small>EN LIGNE</small><b>Ligue privée</b></span><EcussonClub logo="/logos/bayonne.png" taille={27} /></span>
-                  <span className="accueil-save-carte save-milieu"><Icone nom="entraineur" taille={15} /><span><small>ENTRAÎNEUR</small><b>{managerActif?.nom ?? 'Nouveau banc'}</b></span><EcussonClub logo="/logos/bordeaux.png" taille={27} /></span>
-                  <span className="accueil-save-carte save-devant"><Icone nom="joueur" taille={15} /><span><small>JOUEUR · S{joueur?.saison ?? '—'}</small><b>{joueur?.nom ?? 'Nouvelle carrière'}</b></span><EcussonClub logo="/logos/toulouse.png" taille={27} /></span>
+                  <span className="accueil-save-carte save-arriere"><Icone nom="equipe" taille={15} /><span><small>{t("ui.7799a276ccda")}</small><b>{t("ui.895fbf3cb144")}</b></span><EcussonClub logo="/logos/bayonne.png" taille={27} /></span>
+                  <span className="accueil-save-carte save-milieu"><Icone nom="entraineur" taille={15} /><span><small>{t("ui.f3f369bdba22")}</small><b>{managerActif?.nom ?? t("ui.9aceaef88ff5")}</b></span><EcussonClub logo="/logos/bordeaux.png" taille={27} /></span>
+                  <span className="accueil-save-carte save-devant"><Icone nom="joueur" taille={15} /><span><small>{t("ui.54365b371014", { v0: joueur?.saison ?? '—' })}</small><b>{joueur?.nom ?? t("sv.nouvelle")}</b></span><EcussonClub logo="/logos/toulouse.png" taille={27} /></span>
                 </span>
                 <span className="accueil-mode-numero">05</span>
                 <span className="accueil-mode-icone"><Icone nom="disquette" taille={27} /></span>
-                <span className="accueil-mode-contenu"><span className="accueil-mode-surtitre">Profils</span><strong>{t('sv.mesParties')}</strong><small>Retrouve ou change de sauvegarde.</small></span>
+                <span className="accueil-mode-contenu"><span className="accueil-mode-surtitre">{t("ui.45ed18718f8b")}</span><strong>{t('sv.mesParties')}</strong><small>{t("ui.46a1d3dbcde6")}</small></span>
                 <span className="accueil-mode-fleche"><Icone nom="fleche-droite" taille={18} /></span>
               </motion.button>
             </div>
@@ -171,9 +171,9 @@ export function Accueil() {
         </div>
 
         <motion.div custom={6} variants={apparait} initial="hidden" animate="show" className="accueil-hub-pied">
-          <span><b>15</b> postes</span><span><b>∞</b> scénarios</span><span><b>15</b> saisons</span>
+          <span><b>15</b>{t("ui.7853a94e30b2")}</span><span><b>∞</b>{t("ui.442cbf6549f5")}</span><span><b>15</b>{t("nego.saisons")}</span>
           {joueur && <button type="button" onClick={() => setEcran('profil')}><Icone nom="profil" taille={16} /> {t('accueil.voirProfil')}</button>}
-          {managerActif && <button type="button" onClick={() => setEcran('tableau')}><Icone nom="resultats" taille={16} /> Tableau du club</button>}
+          {managerActif && <button type="button" onClick={() => setEcran('tableau')}><Icone nom="resultats" taille={16} />{t("ui.82a16c0c1ce1")}</button>}
         </motion.div>
       </section> : <section className="hero">
         <div className="hero-texte">
@@ -181,14 +181,14 @@ export function Accueil() {
           <h1>{t('accueil.titre1')} <span className="surligne">{t('accueil.titre2')}</span> {t('accueil.titre3')}</h1>
           <p className="accroche">{t('accueil.chapo')}</p>
           <div className="cta-groupe">
-            <button className="btn primaire grand" onClick={() => setEcran('carriereEnLigne')}><Icone nom="equipe" taille={19} /> Carrière en ligne</button>
+            <button className="btn primaire grand" onClick={() => setEcran('carriereEnLigne')}><Icone nom="equipe" taille={19} />{t("online.title")}</button>
             {joueur && <button className="btn fantome grand" onClick={() => setEcran('profil')}>{t('accueil.voirProfil')}</button>}
             {managerActif && <button className="btn fantome grand" onClick={() => setEcran('tableau')}>{t('accueil.voirProfil')}</button>}
           </div>
           <div className="accueil-modes-secondaires">
-            <button className="btn fantome accueil-en-ligne" onClick={() => setEcran(destinationCarriere)}><Icone nom="joueur" taille={19} /> Carrière solo · {titreCarriere}</button>
-            <button className="btn fantome accueil-en-ligne" onClick={() => setEcran('collectionSolo')}><Icone nom="cadeau" taille={19} /> Collection · Packs et doublons</button>
-            <button className="btn fantome accueil-en-ligne" onClick={() => setEcran('boutique')}><Icone nom="boutique" taille={19} /> Boutique · Ovas, cosmétiques et traits</button>
+            <button className="btn fantome accueil-en-ligne" onClick={() => setEcran(destinationCarriere)}><Icone nom="joueur" taille={19} />{t("ui.5b4019626c8d", { v0: titreCarriere })}</button>
+            <button className="btn fantome accueil-en-ligne" onClick={() => setEcran('collectionSolo')}><Icone nom="cadeau" taille={19} />{t("ui.3ca32e49765f")}</button>
+            <button className="btn fantome accueil-en-ligne" onClick={() => setEcran('boutique')}><Icone nom="boutique" taille={19} />{t("ui.572a4cfbd1c3")}</button>
           </div>
           <div className="stats-bandeau"><div className="stat"><b>15</b><span>{t('accueil.postes')}</span></div><div className="stat"><b>∞</b><span>{t('accueil.scenarios')}</span></div><div className="stat"><b>15</b><span>{t('accueil.saisons')}</span></div></div>
           <button type="button" className="btn fantome accueil-parties" onClick={() => setPartiesOuvertes((v) => !v)} aria-expanded={partiesOuvertes}><Icone nom="disquette" taille={17} /> {t('sv.mesParties')}</button>
@@ -197,7 +197,7 @@ export function Accueil() {
       </section>}
 
       <div style={{ margin: '16px 0', textAlign: 'center' }}>
-        <a className="btn fantome" href="/rn26/index.html"><Icone nom="stade" taille={18} /> Essayer le match 3D · Aperçu</a>
+        <a className="btn fantome" href="/rn26/index.html"><Icone nom="stade" taille={18} />{t("ui.686f615696b4")}</a>
       </div>
       {partiesOuvertes && <FenetreParties onFermer={() => setPartiesOuvertes(false)} />}
 
@@ -230,7 +230,7 @@ export function Accueil() {
               viewport={{ once: true, margin: '-60px' }}
             >
               <span className="ico"><Icone nom={p.ico} taille={26} /></span>
-              <b>{t(p.titre)}</b>
+              <b>{t(texteTraduit(p.titre))}</b>
               <span className="lecture-desc">{t(p.desc)}</span>
             </motion.a>
           ))}

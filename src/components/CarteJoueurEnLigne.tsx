@@ -91,7 +91,7 @@ export function CarteJoueurEnLigne({ carte, proprietaire, logoClub, onClick, com
           className={`dr-player-status${estBlesse ? ' dr-player-status-blesse' : ''}`}
           title={bulle}
         >
-          {estBlesse ? `🚑 ${t('compo.badge.blesse')} (${tempsRestant})` : carte.fatigue > 55 ? t('compo.badge.fatigue') : proprietaire ?? 'DESTINY RUGBY'}
+          {estBlesse ? `🚑 ${t('compo.badge.blesse')} (${tempsRestant})` : carte.fatigue > 55 ? t('compo.badge.fatigue') : proprietaire ?? t("ui.5d32d136eb83")}
         </span>
       );
     })()}

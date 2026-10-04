@@ -1,3 +1,4 @@
+import { tn, texteTraduit, t } from '../lib/i18n';
 import { useMemo, useState } from 'react';
 import { CALENDRIER, libelleDate, libelleSemaine, SEMAINES_PAR_SAISON, semaine } from '../data/calendrier';
 import { afficheDuClub, affichesChampionnatDuClub, libelleAfficheManager } from '../lib/matchLive';
@@ -55,9 +56,9 @@ export function CalendrierManager({ onMatch }: { onMatch: () => void }) {
       selections: programmeInternational(date.numero, manager.saison),
       contenu: <>
         {resultats.map((r) => <span className="manager-cal-score" key={r.cle}><b>{r.scorePour} – {r.scoreContre}</b> {r.adversaire}</span>)}
-        {affiches.filter((a) => !manager.resultats[a.cle]).map((a) => <span key={a.cle}>{a.match.domicile === manager.club ? 'Domicile' : 'Extérieur'} · {a.match.domicile === manager.club ? a.match.exterieur : a.match.domicile}</span>)}
+        {affiches.filter((a) => !manager.resultats[a.cle]).map((a) => <span key={a.cle}>{a.match.domicile === manager.club ? t("ui.4a0f86de4420") : t("ui.ac31e0c080fe")} · {a.match.domicile === manager.club ? a.match.exterieur : a.match.domicile}</span>)}
         {!affiche && !resultats.length && <span>{date.type === 'phaseFinale' || date.type === 'coupe'
-          ? (future ? 'Selon qualification · adversaire à confirmer' : 'Pas de match du club') : 'Repos, préparation et vie du club'}</span>}
+          ? (future ? t("ui.8b851ce2a16d") : t("ui.ec367a0b2714")) : t("ui.43d81e2853df")}</span>}
       </>,
     };
   });
@@ -73,31 +74,28 @@ export function CalendrierManager({ onMatch }: { onMatch: () => void }) {
   };
   return <section className="manager-calendrier">
     <div className="carte manager-cal-commandes manager-cal-principal">
-      <div className="comp-tete"><div><b><Icone nom="calendrier" taille={19} /> Calendrier · saison {manager.saison}</b>
-        <small>Aujourd’hui : {libelleDate(semaine(manager.semaine))} · semaine {manager.semaine}/{SEMAINES_PAR_SAISON}</small></div>
-        {aJouer && <button className="btn primaire" onClick={onMatch}>Coacher le match</button>}
+      <div className="comp-tete"><div><b><Icone nom="calendrier" taille={19} />{t("ui.8e964d6a0eb7", { v0: manager.saison })}</b>
+        <small>{t("ui.a8ac739c1b3c", { v0: libelleDate(semaine(manager.semaine)), v1: manager.semaine, v2: SEMAINES_PAR_SAISON })}</small></div>
+        {aJouer && <button className="btn primaire" onClick={onMatch}>{t("ui.010f4333aeb4")}</button>}
       </div>
       <FriseCalendrier saison={manager.saison} numero={manager.semaine} selection={selection} onSelection={setCible} etapes={etapes} actions={<>
-        <label className="manager-cal-delegation"><input type="checkbox" checked={deleguer} onChange={(e) => setDeleguer(e.target.checked)} />
-          Confier les matchs au staff</label>
+        <label className="manager-cal-delegation"><input type="checkbox" checked={deleguer} onChange={(e) => setDeleguer(e.target.checked)} />{t("ui.d25341e81495")}</label>
         <div className="manager-cal-boutons">
           <button className="btn primaire" disabled={selection <= manager.semaine} onClick={() => lancer()}>
-            {selection <= manager.semaine ? 'Choisis une date à venir' : `Avancer jusqu’à ${dateCible}`} <Icone nom="fleche-droite" taille={16} /></button>
-          <button className="btn fantome" onClick={() => lancer(true)}>Prochain rendez-vous</button>
+            {selection <= manager.semaine ? t("ui.d7a079a9a62f") : t("ui.c2ae6be294dd", { v0: dateCible })} <Icone nom="fleche-droite" taille={16} /></button>
+          <button className="btn fantome" onClick={() => lancer(true)}>{t("ui.41cb0f85ccff")}</button>
         </div>
-        <small>{deleguer ? 'Matchs simulés, résultats conservés.' : 'Arrêt avant chaque match à coacher.'} Les décisions restent à résoudre.</small>
+        <small>{t("ui.98a39d4d7ded", { v0: deleguer ? t("ui.e4df7f9c3582") : t("ui.3aeb0afb2123") })}</small>
       </>} />
-      {bilan && <p className="manager-avance-bilan" role="status">{bilan.semaines} semaine{bilan.semaines > 1 ? 's' : ''} avancée{bilan.semaines > 1 ? 's' : ''} · {motifs[bilan.arret]}</p>}
-      {manager.decision && <div className="manager-cal-decision"><b>{manager.decision.titre}</b><p>{manager.decision.texte}</p>
-        {manager.decision.choix.map((c) => <button className="btn fantome" key={c.id} onClick={() => repondre(manager.decision!.id, c.id)}>{c.label}</button>)}
+      {bilan && <p className="manager-avance-bilan" role="status">{tn("ui.a1bd0bed0bb4", bilan.semaines, { v0: bilan.semaines, v3: motifs[bilan.arret] })}</p>}
+      {manager.decision && <div className="manager-cal-decision"><b>{texteTraduit(manager.decision.titre)}</b><p>{texteTraduit(manager.decision.texte)}</p>
+        {manager.decision.choix.map((c) => <button className="btn fantome" key={c.id} onClick={() => repondre(manager.decision!.id, c.id)}>{texteTraduit(c.label)}</button>)}
       </div>}
     </div>
-    <p className="manager-cal-reglement"><Icone nom="trophee" taille={16} /> Playoffs en juin · {qualifies} qualifiés par poule.
-      {auDessus ? ` Le vainqueur monte en ${nomDivision(auDessus)} ; le finaliste joue le barrage d’accès.` : ' Le vainqueur de la finale remporte le titre.'}</p>
+    <p className="manager-cal-reglement"><Icone nom="trophee" taille={16} />{t("ui.db7d1924170c", { v0: qualifies, v1: auDessus ? t("ui.cdd7b2e9d6c7", { v0: nomDivision(auDessus) }) : t("ui.10f08cb68cfd") })}</p>
     <QualificationsMondial saison={manager.saison} numero={manager.semaine} />
-    {!!manager.avancee?.convocations.length && <details className="carte manager-cal-commandes"><summary>Convocations et rassemblements · {manager.avancee.convocations.length} joueurs</summary>
-      {manager.avancee.convocations.map((c) => <p key={c.id}>{c.nom} · {c.nation} · {c.competition}<br />
-        Du {libelleDate(semaine(c.debut))} au {libelleDate(semaine(c.fin))} · {manager.semaine < c.debut ? 'Départ à venir' : 'Indisponible pour le club'}</p>)}
+    {!!manager.avancee?.convocations.length && <details className="carte manager-cal-commandes"><summary>{t("ui.eaee921b00a9", { v0: manager.avancee.convocations.length })}</summary>
+      {manager.avancee.convocations.map((c) => <p key={c.id}>{c.nom} · {c.nation} · {c.competition}<br />{t("ui.91395a560243", { v0: libelleDate(semaine(c.debut)), v1: libelleDate(semaine(c.fin)), v2: manager.semaine < c.debut ? t("ui.429042e3ba31") : t("ui.1cd6cb797eb4") })}</p>)}
     </details>}
   </section>;
 }

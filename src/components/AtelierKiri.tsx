@@ -1,3 +1,4 @@
+import { locale, tn, t } from '../lib/i18n';
 import { statistiquesCarte } from '../lib/ligue/statistiquesCarte';
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
@@ -31,7 +32,7 @@ export function AtelierKiri() {
       const retour=await requete(q,{action:'atelier',operation,revision:(operation==='pack'?revisionPack:revisionJoueur)??donnees.revision,...(operation==='pack'?{pack}:{sourceId:joueur?.sourceId,joueur:{note:joueur?.note,potentiel:joueur?.potentiel,photo:joueur?.photo,nation:joueur?.nation,clubReel:joueur?.clubReel,poste:joueur?.poste,postesSecondaires:joueur?.postesSecondaires??[]}})});
       if(operation==='pack')setRevisionPack(retour.revision);else setRevisionJoueur(retour.revision);
       setDonnees(d=>d?{...d,revision:retour.revision}:d);setActualisation(n=>n+1);
-      setMessage('Enregistré pour toutes les ligues. Les changements apparaissent à leur prochaine actualisation.');
+      setMessage(t("ui.615a7b4e50c5"));
     }catch(e){setErreur((e as Error).message);}finally{setOccupe(false);}
   };
   const supprimerPack=async()=>{
@@ -41,7 +42,7 @@ export function AtelierKiri() {
     try {
       const retour=await requete(q,{action:'atelier',operation:'supprimerPack',revision:revisionPack??donnees.revision,packId:pack.id});
       setRevisionPack(retour.revision);setDonnees(d=>d?{...d,revision:retour.revision}:d);setPack(nouveauPack());setActualisation(n=>n+1);
-      setMessage('Pack supprimé de l’Atelier et du catalogue des prochaines ligues.');
+      setMessage(t("ui.be3ab10ccfff"));
     }catch(e){setErreur((e as Error).message);}finally{setOccupe(false);}
   };
   const reglerRotation=async(active:boolean)=>{
@@ -62,26 +63,26 @@ export function AtelierKiri() {
       const ratio=Math.min(1,320/Math.max(bitmap.width,bitmap.height));canvas.width=Math.round(bitmap.width*ratio);canvas.height=Math.round(bitmap.height*ratio);
       canvas.getContext('2d')!.drawImage(bitmap,0,0,canvas.width,canvas.height);bitmap.close();
       const url=canvas.toDataURL('image/webp',.8);if(url.length>90000)throw new Error('Cette image reste trop lourde. Choisis une photo plus simple.');
-      setJoueur(j=>j?{...j,photo:url}:j);setMessage('Photo prête dans l’aperçu. Enregistre le joueur pour la publier.');
+      setJoueur(j=>j?{...j,photo:url}:j);setMessage(t("ui.64a204832804"));
     }catch(e){setErreur((e as Error).message);}finally{setOccupe(false);}
   };
   const soumettre=(operation:'pack'|'joueur')=>(e:FormEvent)=>{e.preventDefault();void sauver(operation);};
   const total=Object.values(pack.probabilites).reduce((a,b)=>a+b,0);
   const rarete=(note:number):RareteCarriere=>note>=88?'star':note>=80?'elite':note>=65?'or':note>=50?'argent':'bronze';
   return <section className="atelier-kiri">
-    <header className="ak-entete"><div><div className="eyebrow">Administration · Kiri uniquement</div><h2>Atelier des packs & joueurs</h2><p>Un catalogue commun à toutes les ligues. Les matchs déjà commencés gardent leurs effectifs.</p></div><span className="ak-badge">GLOBAL</span></header>
-    <nav className="ak-onglets" aria-label="Atelier Kiri"><button className={onglet==='packs'?'actif':''} onClick={()=>setOnglet('packs')}>Créer et modifier les packs</button><button className={onglet==='joueurs'?'actif':''} onClick={()=>setOnglet('joueurs')}>Joueurs · GEN & photos</button></nav>
-    {erreur&&<p role="alert" className="ak-erreur">{erreur} <button onClick={()=>setActualisation(n=>n+1)}>Recharger l’atelier</button></p>}{message&&<p role="status" className="ak-succes">{message}</p>}
-    {donnees&&onglet==='packs'&&<section className={`ak-rotation ${donnees.rotationPacks?'active':''}`}><div><span>RAYON DES LIGUES</span><b>{donnees.rotationPacks?'Rotation spéciale active':'Bronze · Argent · Or uniquement'}</b><small>{donnees.rotationPacks?'Les packs spéciaux du jour sont publiés avec les trois packs permanents.':'Aucun pack spécial ne peut apparaître tant que tu ne l’actives pas ici.'}</small></div><button type="button" disabled={occupe} aria-pressed={donnees.rotationPacks} onClick={()=>void reglerRotation(!donnees.rotationPacks)}><i />{donnees.rotationPacks?'Désactiver la rotation':'Activer la rotation'}</button></section>}
-    {!donnees?<p>Chargement du catalogue…</p>:onglet==='packs'?<div className="ak-grille"><aside className="ak-liste"><button className="btn principal" disabled={occupe} onClick={()=>{setPack(nouveauPack());setRevisionPack(donnees.revision);setMessage('');}}>+ Créer un pack</button>{donnees.packs.map(p=><button key={p.id} disabled={occupe} className={pack.id===p.id?'selectionne':''} onClick={()=>{setPack(structuredClone(p));setRevisionPack(donnees.revision);setMessage('');}}><b>{p.nom}</b><small>{p.cartes} cartes · {p.prix.toLocaleString('fr-FR')} OVA</small></button>)}</aside>
-      <form onSubmit={soumettre('pack')}><fieldset disabled={occupe}><legend>Réglages du pack</legend><label>Nom<input required maxLength={60} value={pack.nom} onChange={e=>setPack({...pack,nom:e.target.value})}/></label><label>Description<textarea maxLength={180} value={pack.promesse??''} onChange={e=>setPack({...pack,promesse:e.target.value})}/></label><div className="ak-champs"><label>Prix en OVA<input required type="number" min={1} max={1000000} value={pack.prix} onChange={e=>setPack({...pack,prix:Number(e.target.value)})}/></label><label>Nombre de cartes<input required type="number" min={1} max={12} value={pack.cartes} onChange={e=>setPack({...pack,cartes:Number(e.target.value)})}/></label></div>
-      <h3>Probabilités de rareté</h3><div className="ak-poids">{RARETES.map(r=><label key={r}>{r}<input required type="number" min={0} max={100} step="0.01" value={pack.probabilites[r]} onChange={e=>setPack({...pack,probabilites:{...pack.probabilites,[r]:Number(e.target.value)}})}/></label>)}</div><p className={Math.abs(total-100)>.001?'ak-erreur':'ak-note'}>Total : {Number(total.toFixed(2))} % / 100 %</p>
-      <label>Carte garantie au minimum<select value={pack.garantie??''} onChange={e=>setPack({...pack,garantie:(e.target.value||undefined) as RareteCarriere|undefined})}><option value="">Aucune garantie</option>{RARETES.map(r=><option key={r}>{r}</option>)}</select></label>
-      <div className="ak-champs"><label>Joueurs éligibles<select value={pack.filtre?.categorie??''} onChange={e=>setPack({...pack,filtre:{...pack.filtre,categorie:(e.target.value||undefined) as 'avant'|'arriere'|undefined}})}><option value="">Tous les postes</option><option value="avant">Avants</option><option value="arriere">Arrières</option></select></label><label>Championnat<select value={pack.filtre?.championnats?.length===1?pack.filtre.championnats[0]:pack.filtre?.championnats?.length?'__multiple':''} onChange={e=>setPack({...pack,filtre:{...pack.filtre,championnats:e.target.value?[e.target.value]:undefined}})}><option value="">Tous les championnats</option>{(pack.filtre?.championnats?.length??0)>1&&<option value="__multiple">Sélection existante ({pack.filtre!.championnats!.length})</option>}{donnees.championnats.map(c=><option key={c}>{c}</option>)}</select></label></div>
-      <label>Nation des joueurs<select value={pack.filtre?.nations?.length===1?pack.filtre.nations[0]:pack.filtre?.nations?.length?'__multiple':''} onChange={e=>setPack({...pack,filtre:{...pack.filtre,nations:e.target.value&&e.target.value!=='__multiple'?[e.target.value]:e.target.value==='__multiple'?pack.filtre?.nations:undefined}})}><option value="">Toutes les nations</option>{(pack.filtre?.nations?.length??0)>1&&<option value="__multiple">Sélection existante ({pack.filtre!.nations!.length})</option>}{donnees.nations.map(n=><option key={n}>{n}</option>)}</select></label>
-      {pack.filtre&&Object.keys(pack.filtre).length>0&&<p className="ak-note">Filtres : {[pack.filtre.categorie, ...(pack.filtre.championnats??[]), ...(pack.filtre.pays??[]), ...(pack.filtre.nations??[]), ...(pack.filtre.familles??[]).map(f=>f.replaceAll('_',' ')), pack.filtre.ageMin?`À partir de ${pack.filtre.ageMin} ans`:null, pack.filtre.ageMax?`Jusqu’à ${pack.filtre.ageMax} ans`:null, pack.filtre.horsFrance?'Hors France':null].filter(Boolean).join(' · ')||'Tous les joueurs'} <button type="button" onClick={()=>setPack({...pack,filtre:undefined})}>Retirer les filtres</button></p>}
-      <div className="ak-resume"><b>{pack.nom}</b><span>{pack.cartes} cartes · {pack.prix.toLocaleString('fr-FR')} OVA</span><p>{pack.promesse}</p></div><div className="ak-actions-pack"><button className="btn principal" disabled={Math.abs(total-100)>.001}>{occupe?'Enregistrement…':'Enregistrer pour toutes les ligues'}</button>{pack.id.startsWith('kiri-')&&donnees.packs.some(p=>p.id===pack.id)&&<button type="button" className="btn ak-supprimer" disabled={occupe} onClick={()=>void supprimerPack()}>Supprimer ce pack</button>}</div><p className="ak-note">Les nouveaux packs Kiri restent dans la liste de l’Atelier jusqu’à leur suppression.</p></fieldset></form></div>:<>
-      <label className="ak-recherche">Rechercher un joueur ou un club<input type="search" value={q} placeholder="Nom du joueur, club…" onChange={e=>setQ(e.target.value)}/></label><p className="ak-note">{donnees.total.toLocaleString('fr-FR')} résultats · 40 affichés maximum, précise la recherche.</p>
+    <header className="ak-entete"><div><div className="eyebrow">{t("ui.78b19b3c259c")}</div><h2>{t("ui.7147dd99cb24")}</h2><p>{t("ui.74e78178b0bf")}</p></div><span className="ak-badge">{t("ui.e7440dd384f1")}</span></header>
+    <nav className="ak-onglets" aria-label="Atelier Kiri"><button className={onglet==='packs'?'actif':''} onClick={()=>setOnglet('packs')}>{t("ui.3af52d03d2ca")}</button><button className={onglet==='joueurs'?'actif':''} onClick={()=>setOnglet('joueurs')}>{t("ui.44fb4db9dbb5")}</button></nav>
+    {erreur&&<p role="alert" className="ak-erreur">{erreur} <button onClick={()=>setActualisation(n=>n+1)}>{t("ui.f3d8437a7b93")}</button></p>}{message&&<p role="status" className="ak-succes">{message}</p>}
+    {donnees&&onglet==='packs'&&<section className={`ak-rotation ${donnees.rotationPacks?'active':''}`}><div><span>{t("ui.57ed50e159d9")}</span><b>{donnees.rotationPacks?t("ui.1945949b7c2b"):t("ui.3ebba2a0ea4f")}</b><small>{donnees.rotationPacks?t("ui.c59684a701b9"):t("ui.78f2f2f35de3")}</small></div><button type="button" disabled={occupe} aria-pressed={donnees.rotationPacks} onClick={()=>void reglerRotation(!donnees.rotationPacks)}><i />{donnees.rotationPacks?t("ui.8cdfd792187a"):t("ui.6babefbed0af")}</button></section>}
+    {!donnees?<p>{t("ui.109826adfba2")}</p>:onglet==='packs'?<div className="ak-grille"><aside className="ak-liste"><button className="btn principal" disabled={occupe} onClick={()=>{setPack(nouveauPack());setRevisionPack(donnees.revision);setMessage('');}}>{t("ui.96850919656c")}</button>{donnees.packs.map(p=><button key={p.id} disabled={occupe} className={pack.id===p.id?'selectionne':''} onClick={()=>{setPack(structuredClone(p));setRevisionPack(donnees.revision);setMessage('');}}><b>{p.nom}</b><small>{t("ui.d524fdd9e585", { v0: p.cartes, v1: p.prix.toLocaleString(locale()) })}</small></button>)}</aside>
+      <form onSubmit={soumettre('pack')}><fieldset disabled={occupe}><legend>{t("ui.4fb3fffd4dc9")}</legend><label>{t("mgr.creation.nom")}<input required maxLength={60} value={pack.nom} onChange={e=>setPack({...pack,nom:e.target.value})}/></label><label>{t("ui.526e0087cc3f")}<textarea maxLength={180} value={pack.promesse??''} onChange={e=>setPack({...pack,promesse:e.target.value})}/></label><div className="ak-champs"><label>{t("ui.835188baacf3")}<input required type="number" min={1} max={1000000} value={pack.prix} onChange={e=>setPack({...pack,prix:Number(e.target.value)})}/></label><label>{t("ui.d2298b895a6a")}<input required type="number" min={1} max={12} value={pack.cartes} onChange={e=>setPack({...pack,cartes:Number(e.target.value)})}/></label></div>
+      <h3>{t("ui.0704ab1079a9")}</h3><div className="ak-poids">{RARETES.map(r=><label key={r}>{r}<input required type="number" min={0} max={100} step="0.01" value={pack.probabilites[r]} onChange={e=>setPack({...pack,probabilites:{...pack.probabilites,[r]:Number(e.target.value)}})}/></label>)}</div><p className={Math.abs(total-100)>.001?'ak-erreur':'ak-note'}>{t("ui.9dcd04df9f8d", { v0: Number(total.toFixed(2)) })}</p>
+      <label>{t("ui.5a690cf74c41")}<select value={pack.garantie??''} onChange={e=>setPack({...pack,garantie:(e.target.value||undefined) as RareteCarriere|undefined})}><option value="">{t("ui.ff561b510519")}</option>{RARETES.map(r=><option key={r}>{r}</option>)}</select></label>
+      <div className="ak-champs"><label>{t("ui.3b2df1589fb9")}<select value={pack.filtre?.categorie??''} onChange={e=>setPack({...pack,filtre:{...pack.filtre,categorie:(e.target.value||undefined) as 'avant'|'arriere'|undefined}})}><option value="">{t("online.squad.allPositions")}</option><option value="avant">{t("ml.tv.avants")}</option><option value="arriere">{t("ml.tv.arrieres")}</option></select></label><label>{t("pj.championnat")}<select value={pack.filtre?.championnats?.length===1?pack.filtre.championnats[0]:pack.filtre?.championnats?.length?'__multiple':''} onChange={e=>setPack({...pack,filtre:{...pack.filtre,championnats:e.target.value?[e.target.value]:undefined}})}><option value="">{t("ui.f8ef16c2fc53")}</option>{(pack.filtre?.championnats?.length??0)>1&&<option value="__multiple">{t("ui.9b03b09586d4", { v0: pack.filtre!.championnats!.length })}</option>}{donnees.championnats.map(c=><option key={c}>{c}</option>)}</select></label></div>
+      <label>{t("ui.1eacb202b33f")}<select value={pack.filtre?.nations?.length===1?pack.filtre.nations[0]:pack.filtre?.nations?.length?'__multiple':''} onChange={e=>setPack({...pack,filtre:{...pack.filtre,nations:e.target.value&&e.target.value!=='__multiple'?[e.target.value]:e.target.value==='__multiple'?pack.filtre?.nations:undefined}})}><option value="">{t("ui.ff526e985c7f")}</option>{(pack.filtre?.nations?.length??0)>1&&<option value="__multiple">{t("ui.9b03b09586d4", { v0: pack.filtre!.nations!.length })}</option>}{donnees.nations.map(n=><option key={n}>{n}</option>)}</select></label>
+      {pack.filtre&&Object.keys(pack.filtre).length>0&&<p className="ak-note">{t("ui.9ee19e7f66ce", { v0: [pack.filtre.categorie, ...(pack.filtre.championnats??[]), ...(pack.filtre.pays??[]), ...(pack.filtre.nations??[]), ...(pack.filtre.familles??[]).map(f=>f.replaceAll('_',' ')), pack.filtre.ageMin?`À partir de ${pack.filtre.ageMin} ans`:null, pack.filtre.ageMax?`Jusqu’à ${pack.filtre.ageMax} ans`:null, pack.filtre.horsFrance?'Hors France':null].filter(Boolean).join(' · ')||t("ui.8e13e13375fb") })}<button type="button" onClick={()=>setPack({...pack,filtre:undefined})}>{t("ui.a31cee3ae5ce")}</button></p>}
+      <div className="ak-resume"><b>{pack.nom}</b><span>{t("ui.d524fdd9e585", { v0: pack.cartes, v1: pack.prix.toLocaleString(locale()) })}</span><p>{pack.promesse}</p></div><div className="ak-actions-pack"><button className="btn principal" disabled={Math.abs(total-100)>.001}>{occupe?t("ui.0f02d9ec0f50"):t("ui.74c852de3450")}</button>{pack.id.startsWith('kiri-')&&donnees.packs.some(p=>p.id===pack.id)&&<button type="button" className="btn ak-supprimer" disabled={occupe} onClick={()=>void supprimerPack()}>{t("ui.6c4b39b83a5c")}</button>}</div><p className="ak-note">{t("ui.468615ee5443")}</p></fieldset></form></div>:<>
+      <label className="ak-recherche">{t("ui.36f8e71b4f47")}<input type="search" value={q} placeholder={t("ui.dcb3a6a0fdf5")} onChange={e=>setQ(e.target.value)}/></label><p className="ak-note">{t("ui.c8501ca4a37a", { v0: donnees.total.toLocaleString(locale()) })}</p>
       <div className="ak-grille">
         <aside className="ak-liste">
           {donnees.joueurs.map((j) => (
@@ -106,7 +107,7 @@ export function AtelierKiri() {
               </small>
             </button>
           ))}
-          {!donnees.joueurs.length && <p>Aucun joueur trouvé.</p>}
+          {!donnees.joueurs.length && <p>{t("ui.e440317ef1a6")}</p>}
         </aside>
         {joueur ? (
           <form onSubmit={soumettre('joueur')}>
@@ -115,9 +116,7 @@ export function AtelierKiri() {
               <div className="ak-joueur">
                 <div>
                   <div className="ak-champs">
-                    <label>
-                      GEN du joueur
-                      <input
+                    <label>{t("ui.8324e40d692a")}<input
                         required
                         type="number"
                         min={20}
@@ -129,9 +128,7 @@ export function AtelierKiri() {
                         }}
                       />
                     </label>
-                    <label>
-                      Potentiel
-                      <input
+                    <label>{t("mgr.inst.col.potentiel")}<input
                         required
                         type="number"
                         min={joueur.note}
@@ -142,9 +139,7 @@ export function AtelierKiri() {
                     </label>
                   </div>
                   <div className="ak-champs">
-                    <label>
-                      Nation du joueur
-                      <select
+                    <label>{t("ui.a4ac14435ca0")}<select
                         required
                         value={joueur.nation}
                         onChange={(e) => setJoueur({ ...joueur, nation: e.target.value })}
@@ -154,9 +149,7 @@ export function AtelierKiri() {
                         ))}
                       </select>
                     </label>
-                    <label>
-                      Club du joueur
-                      <select
+                    <label>{t("ui.4dc29fb88eb5")}<select
                         required
                         value={joueur.clubReel}
                         onChange={(e) => {
@@ -176,9 +169,7 @@ export function AtelierKiri() {
                       </select>
                     </label>
                   </div>
-                  <label>
-                    Poste principal
-                    <select
+                  <label>{t("ui.5906bb89c85f")}<select
                       value={joueur.poste}
                       onChange={(e) => {
                         const p = e.target.value as PosteId;
@@ -200,25 +191,17 @@ export function AtelierKiri() {
                   </label>
                   <div className="ak-postes-secondaires">
                     <div className="ak-postes-titre">
-                      <label>
-                        Postes secondaires{' '}
-                        <em>
-                          ({(joueur.postesSecondaires ?? []).length} sélectionné{(joueur.postesSecondaires ?? []).length > 1 ? 's' : ''})
-                        </em>
+                      <label>{t("ui.26f82ff790ff", { v0: ' ' })}<em>{tn("ui.03720f6760c8", (joueur.postesSecondaires ?? []).length, { v0: (joueur.postesSecondaires ?? []).length })}</em>
                       </label>
                       {(joueur.postesSecondaires ?? []).length > 0 && (
                         <button
                           type="button"
                           className="ak-btn-texte"
                           onClick={() => setJoueur({ ...joueur, postesSecondaires: [] })}
-                        >
-                          Tout décocher
-                        </button>
+                        >{t("online.squad.uncheckAll")}</button>
                       )}
                     </div>
-                    <small className="ak-note-sec">
-                      Clique sur un poste pour l'ajouter ou le retirer des postes secondaires :
-                    </small>
+                    <small className="ak-note-sec">{t("ui.5cf20b795fb2")}</small>
                     <div className="ak-chips-postes">
                       {POSTES.filter((p) => p.id !== joueur.poste).map((p) => {
                         const actif = (joueur.postesSecondaires ?? []).includes(p.id);
@@ -227,7 +210,7 @@ export function AtelierKiri() {
                             key={p.id}
                             type="button"
                             className={`ak-chip-poste ${actif ? 'actif' : ''}`}
-                            title={actif ? `Retirer ${p.nom} des postes secondaires` : `Ajouter ${p.nom} comme poste secondaire`}
+                            title={actif ? t("ui.1a3f66b664f1", { v0: p.nom }) : t("ui.0af82643d2e1", { v0: p.nom })}
                             onClick={() => {
                               const actuels = joueur.postesSecondaires ?? [];
                               const nouveaux = actif
@@ -245,19 +228,15 @@ export function AtelierKiri() {
                     </div>
                   </div>
                   <div className="ak-champs">
-                    <label>
-                      Importer une photo
-                      <input
+                    <label>{t("ov.importerPhoto")}<input
                         type="file"
                         accept="image/png,image/jpeg,image/webp"
                         onChange={(e) => void photo(e.target.files?.[0])}
                       />
                     </label>
-                    <label>
-                      Adresse HTTPS de la photo
-                      <input
+                    <label>{t("ui.768ab98ad39c")}<input
                         value={joueur.photo?.startsWith('data:') ? '' : (joueur.photo ?? '')}
-                        placeholder={joueur.photo?.startsWith('data:') ? 'Photo importée' : 'https://…'}
+                        placeholder={joueur.photo?.startsWith('data:') ? t("ui.af84ec9533ad") : t("ui.ab04e20ed4f2")}
                         onChange={(e) => setJoueur({ ...joueur, photo: e.target.value })}
                       />
                     </label>
@@ -278,16 +257,16 @@ export function AtelierKiri() {
                       clubs: [],
                     }}
                   />
-                  <small>Aperçu · carte FUT mise à jour en direct</small>
+                  <small>{t("ui.19e5f0b52e8e")}</small>
                 </div>
               </div>
               <button className="btn principal">
-                {occupe ? 'Enregistrement…' : 'Enregistrer ce joueur dans toutes les ligues'}
+                {occupe ? t("ui.0f02d9ec0f50") : t("ui.ceeb68ba84c6")}
               </button>
             </fieldset>
           </form>
         ) : (
-          <div className="ak-vide">Sélectionne un joueur pour modifier sa carte.</div>
+          <div className="ak-vide">{t("ui.e7931514058e")}</div>
         )}
       </div>
     </>}

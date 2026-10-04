@@ -782,6 +782,14 @@ s'affiche dans ⚙️ ; il n'est associé à aucun coût ni quota.
   de repli hors ligne. Un choix fait dans les réglages reste toujours prioritaire.
   Et ce n'est pas qu'un habillage : le Maître du Jeu, les situations, les tweets
   et les messages privés sont ÉCRITS dans ta langue, pas traduits après coup.
+- **Plus de 8 600 clés vérifiées dans les sept langues**, dont plus de 1 700 nouveaux libellés
+  d'interface, équipements, succès, blessures, décisions et descriptions. Les
+  variables des phrases sont contrôlées par `npm run verify:traductions`. Les
+  noms propres restent identiques ; les anciens récits libres de l'IA gardent
+  leur langue d'origine.
+- **Carrière joueur sur mobile** : le récit défile dans son panneau, les choix
+  passent à la ligne et le club reste visible. La barre d'action de 68 px
+  réserve sa place au-dessus de la navigation et respecte la zone sûre du téléphone.
 - **Les réglages s'appliquent au clic, il n'y a plus rien à enregistrer.** Un clic
   sur « English » repeint le jeu tout de suite ; l'ambiance aussi. ⚠️ Et c'est ce
   qui a réparé la détection par IP : l'ancien bouton « Enregistrer » republiait la

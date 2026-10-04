@@ -1,3 +1,4 @@
+import { t } from '../lib/i18n';
 import { useEffect, useRef, useState } from 'react';
 
 async function api(ligue: string, corps?: object) {
@@ -49,7 +50,7 @@ export function NotificationsMatch({ ligue }: {ligue:string}) {
       const cle = Uint8Array.from(atob(c.cle.replace(/-/g,'+').replace(/_/g,'/')),v=>v.charCodeAt(0));
       abonnement ??= await c.worker.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:cle});
       await api(ligue,{operation:'activer',abonnement:abonnement.toJSON()});
-      setActif(true); setMessage('Alertes activées pour les matchs de ton club.');
+      setActif(true); setMessage(t("ui.a1130bdbe84a"));
     } catch (e) { setErreur(e instanceof Error ? e.message : 'Activation impossible. Réessaie.'); }
     finally { setOccupe(false); }
   };
@@ -59,18 +60,18 @@ export function NotificationsMatch({ ligue }: {ligue:string}) {
       const abonnement = await config.current?.worker.pushManager.getSubscription();
       if (!abonnement) throw new Error('Réactive les notifications de cet appareil.');
       await api(ligue,{operation:'tester',abonnement:abonnement.toJSON()});
-      setMessage('Test envoyé. Vérifie le centre de notifications du téléphone.');
+      setMessage(t("ui.56f7817c6c09"));
     } catch(e) { setErreur(e instanceof Error ? e.message : 'Échec du test.'); }
     finally { setOccupe(false); }
   };
   return <section className="cel-panneau cel-notifications-telephone">
-    <div className="cel-titre-ligne"><h2>Ton match, même écran verrouillé</h2>
-      <button className="btn" disabled={!pret || occupe} onClick={() => void basculer()} aria-pressed={actif}>{occupe ? 'Patiente…' : actif ? 'Désactiver les alertes' : 'Activer les notifications'}</button></div>
-    <p className="cel-note">Essais, transformations, pénalités, cartons, décisions et résultat : les moments importants de ton club dans les notifications du téléphone.</p>
-    <p className="cel-note">Sur iPhone (iOS 16.4 ou plus), ajoute Destiny Rugby à l’écran d’accueil depuis le menu Partager de Safari, puis ouvre le jeu avec cette icône pour activer les alertes.</p>
-    {!support && <p role="status">Ouvre le jeu installé sur l’écran d’accueil, ou utilise un navigateur compatible avec les notifications.</p>}
+    <div className="cel-titre-ligne"><h2>{t("ui.d99ad11703a9")}</h2>
+      <button className="btn" disabled={!pret || occupe} onClick={() => void basculer()} aria-pressed={actif}>{occupe ? t("ui.06877cd0a9fa") : actif ? t("ui.02484d9a26c0") : t("ui.b00bb72da4e6")}</button></div>
+    <p className="cel-note">{t("ui.65cd588e4757")}</p>
+    <p className="cel-note">{t("ui.ed0aba031b37")}</p>
+    {!support && <p role="status">{t("ui.d6e4d72a0b26")}</p>}
     {erreur && <p className="cel-erreur" role="alert">{erreur}</p>}
     {message && <p role="status">{message}</p>}
-    {actif && <button className="btn fantome" disabled={occupe} onClick={() => void tester()}>Envoyer une notification de test</button>}
+    {actif && <button className="btn fantome" disabled={occupe} onClick={() => void tester()}>{t("ui.fa0c8516738e")}</button>}
   </section>;
 }

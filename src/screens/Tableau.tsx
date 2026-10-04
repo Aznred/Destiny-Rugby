@@ -297,12 +297,12 @@ function Tableau1({ lignes, club, tete = 6 }: { lignes: LigneTableau[]; club: st
         <span />
         <span />
         <span className="cl-nom">{t('tb.club')}</span>
-        <span title={t('tb.points')}>Pts</span>
+        <span title={t('tb.points')}>{t('ui.pointsCourts')}</span>
         <span title={t('tb.joues')}>J</span>
         <span title={t('tb.gagnes')}>G</span>
         <span title={t('tb.nuls')}>N</span>
         <span title={t('tb.perdus')}>P</span>
-        <span title={t('tb.difference')}>Diff</span>
+        <span title={t('tb.difference')}>{t('ui.differenceCourte')}</span>
         <span title={t('tb.bonus')}>B</span>
       </div>
       {lignes.map((l) => {
@@ -872,9 +872,9 @@ export function Tableau() {
             <div className="classement-tableau tableau-live">
               <div className="classement-entete">
                 <span /><span /><span className="cl-nom">{t('tb.selection')}</span>
-                <span title={t('tb.points')}>Pts</span><span title={t('tb.joues')}>J</span>
+                <span title={t('tb.points')}>{t('ui.pointsCourts')}</span><span title={t('tb.joues')}>J</span>
                 <span title={t('tb.gagnes')}>G</span><span title={t('tb.nuls')}>N</span><span title={t('tb.perdus')}>P</span>
-                <span title={t('tb.difference')}>Diff</span><span title={t('tb.bonus')}>B</span>
+                <span title={t('tb.difference')}>{t('ui.differenceCourte')}</span><span title={t('tb.bonus')}>B</span>
               </div>
               {inter.etat.classement.map((l) => (
                 <div key={l.club} className="classement-ligne" data-moi={l.club === maNation ? 'oui' : undefined}>
@@ -982,9 +982,7 @@ export function Tableau() {
               <Arbre matchs={matchsPhaseVisibles} club={carriere.club} />
               {finaleTerminee && phase.champion && phase.finaliste && (
                 <p style={{ color: 'var(--craie-dim)', fontSize: '0.85rem', marginTop: '0.7rem' }}>
-                  <Icone nom="trophee" taille={14} /> Champion : <b>{phase.champion}</b>. {phase.finaliste} est battu en finale, il
-                  disputera le match d’accès à la division supérieure contre son avant-dernier.
-                </p>
+                  <Icone nom="trophee" taille={14} />{t("ui.b1e7011b139d")}<b>{phase.champion}</b>{t("ui.8bc1540aac4c", { v0: phase.finaliste })}</p>
               )}
             </div>
           )}
@@ -1049,15 +1047,15 @@ export function Tableau() {
           dit combien il y en a — « ça avance » n'est pas une information. */}
       {destination != null && (
         <Confirmation
-          titre={`Jouer jusqu’au ${libelleDate(semaine(destination))} ?`}
+          titre={t("ui.ef5bffeaf971", { v0: libelleDate(semaine(destination)) })}
           message={
-            `${destination - numero} semaine(s) vont être jouées, une par une : matchs, `
-            + `statistiques, forme, blessures et sélections comprises. Tu ne verras pas ces `
-            + `matchs en direct, ils sont simulés par le même moteur. Le jeu s’arrêtera avant `
-            + `si une scène du Maître du Jeu t’attend, s’il faut signer un contrat, ou si la `
-            + `saison se termine.`
+            t("ui.035bca586416", { v0: destination - numero })
+            + t("ui.4c6339f15d7b")
+            + t("ui.a24318c5237e")
+            + t("ui.4328508159d4")
+            + t("ui.98c07a08e0db")
           }
-          libelleOui="▶️ Jouer jusque-là"
+          libelleOui={t("ui.93abe8aad6f8")}
           onNon={() => setDestination(null)}
           onOui={() => {
             const cible = destination;
@@ -1079,10 +1077,10 @@ export function Tableau() {
       )}
       {bilanAvance && (
         <Confirmation
-          titre="Avance terminée"
+          titre={t("ui.a95147bf7843")}
           message={bilanAvance}
-          libelleOui="Retour à la carrière"
-          libelleNon="Rester ici"
+          libelleOui={t("ui.2f8477e024c6")}
+          libelleNon={t("ui.461a09d11952")}
           onNon={() => setBilanAvance(null)}
           onOui={() => { setBilanAvance(null); setEcran('carriere'); }}
         />

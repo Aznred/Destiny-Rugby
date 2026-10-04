@@ -27,7 +27,7 @@ import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import { nomPoste } from '../data/rugby';
-import { nombre, t } from '../lib/i18n';
+import { texteTraduit, nombre, t } from '../lib/i18n';
 import {
   ABREVIATION, NOM_RARETE, attributsDe, axesDe, estPepite, rareteDe, statutDe,
   valeurAxe,
@@ -245,7 +245,7 @@ export function FicheJoueur({ joueur, rapport, marche, onFermer }: Props) {
                 disabled={marche.action.desactive}
                 onClick={() => { marche.action!.onClic(); onFermer(); }}
               >
-                {marche.action.libelle}
+                {texteTraduit(marche.action.libelle)}
               </button>
             )}
             {marche.observer && (

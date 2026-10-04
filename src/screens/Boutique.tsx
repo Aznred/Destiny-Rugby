@@ -6,9 +6,9 @@ import {
   SKINS, SKIN_PAR_ID, PACKS, BUNDLES, EQUIPEMENTS, EQUIPEMENT_PAR_ID, CATEGORIES_EQUIPEMENT,
 } from '../data/boutique';
 import {
-  TRAITS_A_DEBLOQUER, TRAIT_PAR_ID, descriptionTrait, nomTrait,
+  TRAITS_A_DEBLOQUER, descriptionTrait, nomTrait,
 } from '../data/traits';
-import { t } from '../lib/i18n';
+import { locale, tn, t, texteTraduit } from '../lib/i18n';
 import { CartePubRecompensee, BoutonDeblocageParPub } from '../components/Pub';
 import { IconeArticle } from '../components/ModeleObjet';
 import { PieceOvas } from '../components/PieceOvas';
@@ -132,7 +132,7 @@ export function Boutique() {
           <div className="eyebrow">{t('bo.apercu')}</div>
           {apercuType === 'ballon' ? (
             <>
-              <h2>{SKINS.find((s) => s.id === apercu)?.nom}</h2>
+              <h2>{texteTraduit(SKINS.find((s) => s.id === apercu)?.nom ?? '')}</h2>
               <p style={{ color: 'var(--craie-dim)' }}>{t('bo.apercuAide')}</p>
               {inventaire.includes(apercu) ? (
                 skinActif === apercu ? (
@@ -146,8 +146,8 @@ export function Boutique() {
             </>
           ) : (
             <>
-              <h2>{articleVu.nom}</h2>
-              <p style={{ color: 'var(--craie-dim)' }}>{articleVu.detail}</p>
+              <h2>{texteTraduit(articleVu.nom)}</h2>
+              <p style={{ color: 'var(--craie-dim)' }}>{texteTraduit(articleVu.detail)}</p>
               {equipements.includes(articleVu.id) ? (
                 <button
                   className={equipementActif[articleVu.categorie] === articleVu.id ? 'btn fantome' : 'btn primaire'}
@@ -162,14 +162,14 @@ export function Boutique() {
                    `ArticleEquipement.parPub` et `debloquerParPub` (store). */
                 <BoutonDeblocageParPub
                   id={articleVu.id}
-                  onDebloque={() => message(t('bo.debloque', { article: articleVu.nom }))}
+                  onDebloque={() => message(t('bo.debloque', { article: texteTraduit(articleVu.nom) }))}
                 />
               ) : (
                 <button
                   className="btn primaire"
                   disabled={coins < articleVu.prix}
                   onClick={() => {
-                    if (acheterEquipement(articleVu.id)) message(t('bo.debloque', { article: articleVu.nom }));
+                    if (acheterEquipement(articleVu.id)) message(t('bo.debloque', { article: texteTraduit(articleVu.nom) }));
                     else message(t('bo.pasAssez'));
                   }}
                 >
@@ -199,7 +199,7 @@ export function Boutique() {
               }>
                 <Vignette skinId={s.id} />
               </Suspense>
-              <div className="article-nom">{s.nom}</div>
+              <div className="article-nom">{texteTraduit(s.nom)}</div>
               {equipe ? (
                 <span className="badge-cle ok">{t('bo.equipe')}</span>
               ) : possede ? (
@@ -212,7 +212,7 @@ export function Boutique() {
                   disabled={coins < s.prix}
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (acheterSkin(s.id)) message(t('bo.debloque', { article: s.nom }));
+                    if (acheterSkin(s.id)) message(t('bo.debloque', { article: texteTraduit(s.nom) }));
                     else message(t('bo.pasAssez'));
                   }}
                 >
@@ -259,8 +259,8 @@ export function Boutique() {
                   {/* Le VRAI modèle 3D en icône — rendu une fois hors écran,
                       puis servi en image (voir `lib/vignettes3d.ts`). */}
                   <IconeArticle url={e.glb} teinte={e.teinte} emoji={e.emoji} />
-                  <div className="article-nom">{e.nom}</div>
-                  <div className="article-detail">{e.detail}</div>
+                  <div className="article-nom">{texteTraduit(e.nom)}</div>
+                  <div className="article-detail">{texteTraduit(e.detail)}</div>
                   {/* Un article « par pub » annonce la couleur AVANT le clic :
                       pas de prix barré, pas de fausse promo — juste ce qu'il
                       faut faire pour l'avoir. */}
@@ -277,14 +277,14 @@ export function Boutique() {
                   ) : e.parPub ? (
                     <BoutonDeblocageParPub
                       id={e.id}
-                      onDebloque={() => message(t('bo.debloque', { article: e.nom }))}
+                      onDebloque={() => message(t('bo.debloque', { article: texteTraduit(e.nom) }))}
                     />
                   ) : (
                     <button
                       className="btn primaire petit"
                       disabled={coins < e.prix}
                       onClick={() => {
-                        if (acheterEquipement(e.id)) message(t('bo.debloque', { article: e.nom }));
+                        if (acheterEquipement(e.id)) message(t('bo.debloque', { article: texteTraduit(e.nom) }));
                         else message(t('bo.pasAssez'));
                       }}
                     >
@@ -350,18 +350,16 @@ export function Boutique() {
       </div>
 
       <div className="eyebrow section-titre">{t('bo.recharges')}</div>
-      {paiement && <p role="status">{paiement} {new URLSearchParams(location.search).has('session_id') && <button className="btn fantome petit" onClick={() => setVerification(v => v + 1)}>Vérifier à nouveau</button>}</p>}
-      <p style={{ color: 'var(--brume)', fontSize: '0.85rem', marginBottom: '0.8rem' }}>
-        Paiement sécurisé par Stripe. Le contenu est ajouté au compte après confirmation du paiement.
-      </p>
+      {paiement && <p role="status">{paiement} {new URLSearchParams(location.search).has('session_id') && <button className="btn fantome petit" onClick={() => setVerification(v => v + 1)}>{t("ui.72912f6f74e9")}</button>}</p>}
+      <p style={{ color: 'var(--brume)', fontSize: '0.85rem', marginBottom: '0.8rem' }}>{t("ui.707bf51a6afa")}</p>
       <div className="grille-boutique grille-recharges">
         {PACKS.map((p) => (
           <div key={p.id} className={`carte article pack recharge-ovas${p.populaire ? ' populaire' : ''}`}>
-            {p.populaire && <div className="pack-populaire">Le plus choisi</div>}
+            {p.populaire && <div className="pack-populaire">{t("ui.9a53354ffff4")}</div>}
             <PieceOvas taille={42} />
-            <div className="pack-nom">Recharge {p.nom}</div>
-            <div className="pack-ovas">{p.ovas.toLocaleString('fr-FR')} Ovas</div>
-            {p.bonus && <div className="pack-bonus">Bonus {p.bonus}</div>}
+            <div className="pack-nom">{t("ui.12ea799ed506", { v0: texteTraduit(p.nom) })}</div>
+            <div className="pack-ovas">{p.ovas.toLocaleString(locale())} Ovas</div>
+            {p.bonus && <div className="pack-bonus">{t("ui.0fee32c89ee2", { v0: p.bonus })}</div>}
             <button className="btn fantome petit" disabled={achatEnCours} onClick={() => void acheter(p.id)}>
               {p.prix}
             </button>
@@ -369,29 +367,27 @@ export function Boutique() {
         ))}
       </div>
 
-      <div className="eyebrow section-titre">Bundles cosmétiques et traits</div>
-      <p style={{ color: 'var(--brume)', fontSize: '0.85rem', marginBottom: '0.8rem' }}>
-        Des offres séparées avec un contenu fixe : les objets et traits indiqués sont débloqués directement sur le compte.
-      </p>
+      <div className="eyebrow section-titre">{t("ui.e27b28415c23")}</div>
+      <p style={{ color: 'var(--brume)', fontSize: '0.85rem', marginBottom: '0.8rem' }}>{t("ui.2acea2053661")}</p>
       <div className="grille-boutique grille-bundles">
         {BUNDLES.map((p) => {
           const cosmetiques = [
-            ...(p.ballons ?? []).map(id => SKIN_PAR_ID[id]?.nom ?? id),
-            ...(p.equipements ?? []).map(id => EQUIPEMENT_PAR_ID[id]?.nom ?? id),
+            ...(p.ballons ?? []).map(id => texteTraduit(SKIN_PAR_ID[id]?.nom ?? id)),
+            ...(p.equipements ?? []).map(id => texteTraduit(EQUIPEMENT_PAR_ID[id]?.nom ?? id)),
           ];
-          const traits = (p.traits ?? []).map(id => TRAIT_PAR_ID[id]?.nom ?? id);
+          const traits = (p.traits ?? []).map(id => nomTrait(id));
           const detail = [...cosmetiques, ...traits].join(' · ');
           return (
             <div key={p.id} className={`carte article pack bundle${p.populaire ? ' populaire' : ''}`}>
-              {p.populaire && <div className="pack-populaire">Le plus choisi</div>}
+              {p.populaire && <div className="pack-populaire">{t("ui.9a53354ffff4")}</div>}
               <PieceOvas taille={42} />
-              <div className="pack-nom">Bundle {p.nom}</div>
-              <div className="pack-ovas">{p.ovas.toLocaleString('fr-FR')} Ovas</div>
-              {p.bonus && <div className="pack-bonus">Bonus {p.bonus}</div>}
+              <div className="pack-nom">{t("ui.25b803cb85f4", { v0: texteTraduit(p.nom) })}</div>
+              <div className="pack-ovas">{p.ovas.toLocaleString(locale())} Ovas</div>
+              {p.bonus && <div className="pack-bonus">{t("ui.0fee32c89ee2", { v0: p.bonus })}</div>}
               {(cosmetiques.length > 0 || traits.length > 0) && (
                 <div className="pack-contenu" title={detail}>
-                  {cosmetiques.length > 0 && <span><Icone nom="cadeau" taille={14} /> {cosmetiques.length} cosmétique{cosmetiques.length > 1 ? 's' : ''}</span>}
-                  {traits.length > 0 && <span><Icone nom="joueur" taille={14} /> {traits.length === TRAITS_A_DEBLOQUER.length ? 'Tous les traits' : `${traits.length} trait${traits.length > 1 ? 's' : ''}`}</span>}
+                  {cosmetiques.length > 0 && <span><Icone nom="cadeau" taille={14} />{tn("ui.169c6917999f", cosmetiques.length, { v0: cosmetiques.length })}</span>}
+                  {traits.length > 0 && <span><Icone nom="joueur" taille={14} /> {traits.length === TRAITS_A_DEBLOQUER.length ? t("ui.b8e6641b2ac0") : tn("ui.216a85fa1c6e", traits.length, { v0: traits.length })}</span>}
                   <small>{detail}</small>
                 </div>
               )}

@@ -165,7 +165,7 @@ export function CartePubRecompensee() {
           {t('pub.restantes', { n: String(dispo.restantes), total: String(PUBS_PAR_JOUR) })}
         </div>
         {!PUBLICITE_ACTIVEE ? (
-          <button type="button" className="btn fantome petit" disabled>Publicités bientôt disponibles</button>
+          <button type="button" className="btn fantome petit" disabled>{t("ui.b3bdedf18c24")}</button>
         ) : consentement === 'non' ? (
           <button type="button" className="btn fantome petit" onClick={() => setConsentement('oui')}>
             {t('pub.reactiver')}
@@ -226,7 +226,7 @@ export function BoutonDeblocageParPub({ id, onDebloque }: { id: string; onDebloq
 
   const dispo = pubDisponible(pubs);
 
-  if (!PUBLICITE_ACTIVEE) return <button type="button" className="btn fantome petit" disabled>Publicités bientôt disponibles</button>;
+  if (!PUBLICITE_ACTIVEE) return <button type="button" className="btn fantome petit" disabled>{t("ui.b3bdedf18c24")}</button>;
 
   if (consentement === 'non') {
     return (

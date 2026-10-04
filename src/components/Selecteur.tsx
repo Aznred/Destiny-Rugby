@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { t } from '../lib/i18n';
+import { langueCourante, t, texteTraduit } from '../lib/i18n';
 import { Icone } from './Icone';
 
 // Liste déroulante maison : un <select> natif ne peut afficher ni drapeau ni
@@ -64,12 +64,20 @@ const LARGEUR_MINIMALE = 232;
 
 export function Selecteur({
   id,
-  options,
+  options: optionsSource,
   valeur,
   onChange,
   placeholder,
   recherche,
 }: Props) {
+  const langue = langueCourante();
+  const options = useMemo(() => optionsSource.map(o => ({
+    ...o, label: texteTraduit(o.label),
+    sous: o.sous == null ? undefined : texteTraduit(o.sous),
+    groupe: o.groupe == null ? undefined : texteTraduit(o.groupe),
+  // La traduction lit la langue globale ; cette dépendance actualise les libellés.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  })), [optionsSource, langue]);
   const [ouvert, setOuvert] = useState(false);
   const [filtre, setFiltre] = useState('');
   const [survol, setSurvol] = useState(0);

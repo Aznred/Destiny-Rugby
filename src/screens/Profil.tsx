@@ -8,7 +8,7 @@ import { Drapeau } from '../components/Drapeau';
 import { nomNationTraduit } from '../lib/nations';
 import { Confirmation } from '../components/Confirmation';
 import type { Joueur } from '../types';
-import { nombre, t, tn } from '../lib/i18n';
+import { texteTraduit, nombre, t, tn } from '../lib/i18n';
 import { titreTraduit } from '../lib/tropheesI18n';
 import { bilanInternational } from '../lib/rassemblements';
 
@@ -102,11 +102,11 @@ export function Profil() {
             )}
           </div>
 
-          <section className="manager-cal-decision"><b>Carrière internationale</b>
-            <p>{international.capes} capes · {international.titularisations} titularisations · {international.essais} essais · {international.points} points</p>
-            <p>{international.participations} participation(s) à la Coupe du monde</p>
+          <section className="manager-cal-decision"><b>{t("ui.dcec05d5a8fc")}</b>
+            <p>{t("ui.8595ffdb4741", { v0: international.capes, v1: international.titularisations, v2: international.essais, v3: international.points })}</p>
+            <p>{t("ui.0b3ec62d10d9", { v0: international.participations })}</p>
             {international.titres.map((titre) => <p key={titre}>{titre}</p>)}
-            {!international.capes && <small>Les convocations dépendent du niveau et de la concurrence à ton poste.</small>}
+            {!international.capes && <small>{t("ui.415822ef5c66")}</small>}
           </section>
           {/* Statistiques détaillées de carrière (mode journée par journée) */}
           {joueur.stats && joueur.stats.plaquages + joueur.stats.points > 0 && (
@@ -147,7 +147,7 @@ export function Profil() {
             {evenements.length ? (
               evenements.slice().reverse().map((e) => (
                 <div key={e.id} style={{ fontSize: '0.88rem', paddingBottom: '0.6rem', borderBottom: '1px solid var(--bordure)' }}>
-                  <b style={{ color: 'var(--or-400)' }}>{t('gen.saison')} {e.saison} · {e.titre}</b>
+                  <b style={{ color: 'var(--or-400)' }}>{t('gen.saison')} {e.saison} · {texteTraduit(e.titre)}</b>
                   <div style={{ color: 'var(--craie-dim)', marginTop: '0.2rem' }}>{e.texte}</div>
                 </div>
               ))

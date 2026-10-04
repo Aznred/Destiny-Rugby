@@ -158,7 +158,7 @@ export function Composition({ e, cote, couleur }: { e: EtatMatch; cote: Cote; co
               return p ? (
                 <figure key={n}>
                   <span className="tv-photo"><img src={portrait(p.nom, club)} alt="" loading="lazy" /><i>{n}</i></span>
-                  <figcaption>{nomCourt(p.nom)}{p.capitaine && <b title="Capitaine"> (c)</b>}</figcaption>
+                  <figcaption>{nomCourt(p.nom)}{p.capitaine && <b title={t("pj.capitaine")}> (c)</b>}</figcaption>
                 </figure>
               ) : null;
             })}

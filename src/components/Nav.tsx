@@ -56,8 +56,8 @@ function MenuMobile({ ecran, joueurPresent, onFermer, onNaviguer, onReglages }: 
           </button>
         </div>
         <div className="nav-mobile-menu-grille">
-          {entree('carriereEnLigne', <Icone nom="equipe" taille={19} />, 'Carrière en ligne')}
-          {entree('collectionSolo', <Icone nom="cadeau" taille={19} />, 'Collection solo')}
+          {entree('carriereEnLigne', <Icone nom="equipe" taille={19} />, t("online.title"))}
+          {entree('collectionSolo', <Icone nom="cadeau" taille={19} />, t('nav.collectionSolo'))}
           {joueurPresent && entree('profil', <Icone nom="profil" taille={19} />, t('nav.profil'))}
           {entree('championnats', <Icone nom="stade" taille={19} />, t('nav.clubs'))}
           {entree('classement', <Icone nom="trophee" taille={19} />, t('nav.classement'))}
@@ -138,8 +138,8 @@ export function Nav({ onReglages }: NavProps) {
 
         <nav className="liens nav-bureau" aria-label={t('nav.navigation')}>
           {lien('accueil', t('nav.accueil'))}
-          {lien('carriereEnLigne', 'En ligne')}
-          {lien('collectionSolo', 'Collection solo')}
+          {lien('carriereEnLigne', t('nav.enLigne'))}
+          {lien('collectionSolo', t('nav.collectionSolo'))}
           {joueur
             ? lien(
                 'carriere',

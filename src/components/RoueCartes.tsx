@@ -1,3 +1,4 @@
+import { t } from '../lib/i18n';
 // LA ROUE DES CARTES DU MARCHÉ — le présentoir de la boutique, avec des cartes.
 //
 // ⚠️ ELLE NE RÉAGISSAIT PAS COMME CELLE DES PACKS, ET C'ÉTAIT LE RETOUR DE JEU.
@@ -157,10 +158,10 @@ function Roue({ cartes, onChoisir, selection, selections, titre, vide }: Paramet
   const affiche = modulo(centre, n);
   const decalage = Math.floor(visibles / 2);
   return <section className="rc" aria-label={titre}>
-    <header><h3>{titre}</h3><span>{affiche + 1} / {n} joueurs</span></header>
+    <header><h3>{titre}</h3><span>{t("ui.fe9620dc1148", { v0: affiche + 1, v1: n })}</span></header>
     <div
       className="rc-scene" ref={scene} tabIndex={0} role="group"
-      aria-label="Roue de cartes. Flèches pour tourner, Entrée pour choisir."
+      aria-label={t("ui.5f23fa2ef490")}
       onKeyDown={(e) => {
         if (e.target !== e.currentTarget) return;
         if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { e.preventDefault(); tourner(e.key === 'ArrowRight' ? 1 : -1); }
@@ -207,7 +208,7 @@ function Roue({ cartes, onChoisir, selection, selections, titre, vide }: Paramet
         return <button
           type="button" key={carte.id} ref={(noeud) => { noeuds.current[i] = noeud; }}
           className={`rc-carte${choisie ? ' choisie' : ''}`}
-          aria-label={`${choisie && selections ? 'Retirer' : 'Choisir'} ${carte.nom}, ${carte.note} GEN`} aria-pressed={choisie}
+          aria-label={t("ui.f73b72a3f8c8", { v0: choisie && selections ? t("ov.retirer") : t("bo.choisir"), v1: carte.nom, v2: carte.note })} aria-pressed={choisie}
           onClick={() => {
             if (performance.now() < ignorer.current) return;
             mouvement.current.touchee = true;
@@ -218,9 +219,9 @@ function Roue({ cartes, onChoisir, selection, selections, titre, vide }: Paramet
       })}
     </div>
     <footer>
-      <button type="button" disabled={n < 2} aria-label="Joueur précédent" onClick={() => tourner(-1)}>←</button>
-      <span>Glisse pour tourner · Clique sur une carte</span>
-      <button type="button" disabled={n < 2} aria-label="Joueur suivant" onClick={() => tourner(1)}>→</button>
+      <button type="button" disabled={n < 2} aria-label={t("ui.8ebcefdb1674")} onClick={() => tourner(-1)}>←</button>
+      <span>{t("ui.27b4756a12b7")}</span>
+      <button type="button" disabled={n < 2} aria-label={t("ui.f2647a51c8af")} onClick={() => tourner(1)}>→</button>
     </footer>
   </section>;
 }

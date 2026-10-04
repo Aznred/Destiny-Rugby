@@ -1,3 +1,4 @@
+import { t } from '../../lib/i18n';
 import { Icone } from '../Icone';
 
 export interface CadreTmoReplayProps {
@@ -47,18 +48,16 @@ export function CadreTmoReplay({
       <div className="tmo-tv-header">
         <div className="tmo-tv-header-gauche">
           <span className="tmo-tv-rec">
-            <span className="tmo-tv-rec-dot" /> REC
-          </span>
+            <span className="tmo-tv-rec-dot" />{t("ui.6fcb69fbe9be")}</span>
           <span className="tmo-tv-badge">
-            <Icone nom="video" taille={13} /> TMO · REPLAY OFFICIEL
-          </span>
+            <Icone nom="video" taille={13} />{t("ui.e7827480d059")}</span>
           <span className="tmo-tv-cam">
-            {cadreCamera || 'CAM 1 · LIGNE D’EN-BUT'}
+            {cadreCamera || t("ui.1b4c1ae628cb")}
           </span>
         </div>
         <div className="tmo-tv-header-droite">
-          <span className="tmo-tv-ralenti">SLOW-MO 50%</span>
-          {horloge && <span className="tmo-tv-timecode">TC {horloge}</span>}
+          <span className="tmo-tv-ralenti">{t("ui.707798d16b92")}</span>
+          {horloge && <span className="tmo-tv-timecode">{t("ui.d4c68774331b", { v0: horloge })}</span>}
         </div>
       </div>
 
@@ -67,9 +66,9 @@ export function CadreTmoReplay({
       {/* Bandeau inférieur TV officiel (Chyron / Lower-Third) */}
       <div className="tmo-tv-lower-third">
         <div className="tmo-tv-barre-motif">
-          <span className="tmo-tv-motif-tag">ARBITRAGE VIDÉO</span>
+          <span className="tmo-tv-motif-tag">{t("sifflet.tmo")}</span>
           <span className="tmo-tv-motif-texte">
-            <b>Vérification :</b> {action}
+            <b>{t("ui.86542d88d109")}</b> {action}
           </span>
         </div>
         <div className="tmo-tv-barre-decision">
@@ -79,7 +78,7 @@ export function CadreTmoReplay({
             {statutClasse === 'sanction' && <Icone nom="alerte" taille={14} />}
             {statutClasse === 'scanning' && <span className="tmo-tv-pulse-dot" />}
             <span className="tmo-tv-decision-texte">
-              {decision.toUpperCase().startsWith('DÉCISION') ? decision : `DÉCISION : ${decision}`}
+              {decision.toUpperCase().startsWith('DÉCISION') ? decision : t("ui.1274f6d9e237", { v0: decision })}
             </span>
           </span>
         </div>

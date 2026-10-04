@@ -1,3 +1,4 @@
+import { texteTraduit, t } from '../lib/i18n';
 import { useState, useMemo, useCallback } from 'react';
 import {
   CATEGORIES_SITUATIONS,
@@ -124,62 +125,55 @@ export function BancDessaiSituations({ className }: Props) {
       {/* ── EN-TÊTE DU BANC D'ESSAI ── */}
       <header className="banc-situations-entete">
         <div className="banc-situations-titres">
-          <div className="eyebrow">Laboratoire Kiri · Banc d'essai officiel</div>
-          <h2>Simulateur des 30 situations de match</h2>
-          <p>
-            Vérifie et visionne en direct toutes les situations possibles du moteur de jeu :
-            Arbitrage Vidéo (TMO), essais & replays télévisés, conquête, lancements, jeu au pied et impacts physiques "sur les fesses".
-          </p>
+          <div className="eyebrow">{t("ui.54f066a1ea70")}</div>
+          <h2>{t("ui.9b4f7eefc9b0")}</h2>
+          <p>{t("ui.c86fb5b41d83")}</p>
         </div>
         <div className="banc-situations-actions-rapides">
           <button
             type="button"
             className="btn fantome"
             onClick={allerAleatoire}
-            title="Tirer une situation au sort"
+            title={t("ui.0a3983a778f4")}
           >
-            <Icone nom="eclair" taille={16} />
-            Situation aléatoire
-          </button>
+            <Icone nom="eclair" taille={16} />{t("ui.e647b9c81fad")}</button>
           <button
             type="button"
             className={`btn ${enLecture ? 'fantome' : 'primaire'}`}
             onClick={() => setEnLecture((l) => !l)}
-            title={enLecture ? 'Mettre l’animation en pause' : 'Reprendre la lecture'}
+            title={enLecture ? t("ui.4ae791b14933") : t("ui.f0be9ff887d9")}
           >
             <Icone nom={enLecture ? 'stop' : 'chrono'} taille={16} />
-            {enLecture ? 'Pause' : 'Lecture'}
+            {enLecture ? t("ml.pause") : t("ui.a757c6b4039f")}
           </button>
           <button
             type="button"
             className={`btn ${vitesse === 0.5 ? 'secondaire' : 'fantome'}`}
             onClick={() => setVitesse((v) => (v === 1 ? 0.5 : 1))}
-            title={vitesse === 0.5 ? 'Revenir à vitesse normale (1x)' : 'Activer le ralenti (0.5x)'}
+            title={vitesse === 0.5 ? t("ui.4482ecf95dfb") : t("ui.edd05f57c1fa")}
           >
             <Icone nom="chrono" taille={16} />
-            {vitesse === 0.5 ? 'Ralenti 0.5x' : 'Vitesse 1x'}
+            {vitesse === 0.5 ? t("ui.e315ed404122") : t("ui.34d66e741b67")}
           </button>
           <button
             type="button"
             className="btn primaire"
             onClick={rejouer}
-            title="Relancer l'action et réinitialiser les animations à zéro"
+            title={t("ui.fbe0214db2df")}
           >
-            <Icone nom="bouclier" taille={16} />
-            Rejouer l'action
-          </button>
+            <Icone nom="bouclier" taille={16} />{t("ui.5bb58abde10c")}</button>
         </div>
       </header>
 
       {/* ── ONGLET DES CATÉGORIES ── */}
-      <nav className="banc-situations-categories" aria-label="Catégories de situations">
+      <nav className="banc-situations-categories" aria-label={t("ui.56cfaf71b1e1")}>
         <button
           type="button"
           className={`banc-cat-btn ${categorieActive === 'toutes' ? 'actif' : ''}`}
           onClick={() => setCategorieActive('toutes')}
         >
           <Icone nom="stade" taille={15} />
-          <span>Toutes</span>
+          <span>{t("compoSolo.allFeminine")}</span>
           <span className="banc-cat-badge">{SITUATIONS_LABORATOIRE.length}</span>
         </button>
         {CATEGORIES_SITUATIONS.map(cat => {
@@ -191,7 +185,7 @@ export function BancDessaiSituations({ className }: Props) {
               key={cat.id}
               className={`banc-cat-btn ${actif ? 'actif' : ''}`}
               onClick={() => setCategorieActive(cat.id)}
-              title={cat.description}
+              title={texteTraduit(cat.description)}
             >
               <Icone nom={cat.icone} taille={15} />
               <span>{cat.nom}</span>
@@ -219,7 +213,7 @@ export function BancDessaiSituations({ className }: Props) {
                 <span className="banc-sit-numero">#{idx + 1}</span>
                 {s.badge && <span className="banc-sit-badge">{s.badge}</span>}
               </div>
-              <strong className="banc-sit-titre">{s.titre}</strong>
+              <strong className="banc-sit-titre">{texteTraduit(s.titre)}</strong>
               <small className="banc-sit-soustitre">{s.sousTitre}</small>
               <div className="banc-sit-meta">
                 {cat && (
@@ -243,15 +237,12 @@ export function BancDessaiSituations({ className }: Props) {
           onClick={allerPrecedent}
           disabled={situationsFiltrees.length <= 1}
         >
-          <Icone nom="chevron" taille={14} />
-          Précédente
-        </button>
+          <Icone nom="chevron" taille={14} />{t("ui.9aff6c5679b2")}</button>
 
         <div className="banc-nav-info">
-          <span className="banc-nav-compteur">
-            Situation <b>{indexGlobal + 1}</b> / {SITUATIONS_LABORATOIRE.length}
+          <span className="banc-nav-compteur">{t("ui.00e3bd2e750b")}<b>{indexGlobal + 1}</b> / {SITUATIONS_LABORATOIRE.length}
           </span>
-          <span className="banc-nav-titre-actif">{situationActive.titre}</span>
+          <span className="banc-nav-titre-actif">{texteTraduit(situationActive.titre)}</span>
         </div>
 
         <button
@@ -259,9 +250,7 @@ export function BancDessaiSituations({ className }: Props) {
           className="btn fantome btn-nav"
           onClick={allerSuivant}
           disabled={situationsFiltrees.length <= 1}
-        >
-          Suivante
-          <Icone nom="chevron" taille={14} />
+        >{t("ui.faf9a798db90")}<Icone nom="chevron" taille={14} />
         </button>
       </div>
 
@@ -285,13 +274,13 @@ export function BancDessaiSituations({ className }: Props) {
       {/* ── INSPECTEUR TECHNIQUE & RÈGLES OFFICIELLES ── */}
       <aside className="banc-situations-inspecteur">
         <div className="banc-inspecteur-bloc">
-          <div className="eyebrow">Scénario & Description tactique</div>
-          <h3>{situationActive.titre}</h3>
-          <p className="banc-desc">{situationActive.description}</p>
+          <div className="eyebrow">{t("ui.6599614153ea")}</div>
+          <h3>{texteTraduit(situationActive.titre)}</h3>
+          <p className="banc-desc">{texteTraduit(situationActive.description)}</p>
         </div>
 
         <div className="banc-inspecteur-bloc banc-bloc-regle">
-          <div className="eyebrow">Règle officielle World Rugby appliquée</div>
+          <div className="eyebrow">{t("ui.b661db057602")}</div>
           <div className="banc-regle-texte">
             <Icone nom="sifflet" taille={18} />
             <p>{situationActive.regle}</p>
@@ -300,21 +289,21 @@ export function BancDessaiSituations({ className }: Props) {
 
         <div className="banc-inspecteur-grille-details">
           <div className="banc-detail-card">
-            <span className="banc-detail-label">Phase moteur</span>
+            <span className="banc-detail-label">{t("ui.aa1b5f572cb0")}</span>
             <strong className="banc-detail-valeur">{LIBELLES_PHASE[situationActive.phase] ?? situationActive.phase}</strong>
           </div>
           <div className="banc-detail-card">
-            <span className="banc-detail-label">Cadrage caméra</span>
+            <span className="banc-detail-label">{t("ui.11caf21b10b8")}</span>
             <strong className="banc-detail-valeur">{LIBELLES_CADRAGE[situationActive.cadrage] ?? situationActive.cadrage}</strong>
           </div>
           <div className="banc-detail-card">
-            <span className="banc-detail-label">Geste arbitre</span>
+            <span className="banc-detail-label">{t("ui.e2aeb22581d8")}</span>
             <strong className="banc-detail-valeur">
-              {situationActive.gesteArbitre ? (LIBELLES_GESTES_ARBITRE[situationActive.gesteArbitre] ?? situationActive.gesteArbitre) : 'Aucun'}
+              {situationActive.gesteArbitre ? (LIBELLES_GESTES_ARBITRE[situationActive.gesteArbitre] ?? situationActive.gesteArbitre) : t("ui.4679b3b12de0")}
             </strong>
           </div>
           <div className="banc-detail-card">
-            <span className="banc-detail-label">Scénario dynamique</span>
+            <span className="banc-detail-label">{t("ui.25bdfebb5ee3")}</span>
             <strong className="banc-detail-valeur">{LIBELLES_SCENARIO[situationActive.scenarioType] ?? situationActive.scenarioType}</strong>
           </div>
         </div>
@@ -324,20 +313,20 @@ export function BancDessaiSituations({ className }: Props) {
           <div className="banc-tmo-inspecteur-panel">
             <div className="banc-tmo-inspecteur-entete">
               <Icone nom="video" taille={18} />
-              <b>Contrôle TMO actif : {tmo.action}</b>
+              <b>{t("ui.b58622ea9e65", { v0: tmo.action })}</b>
             </div>
             <div className="banc-tmo-inspecteur-corps">
               <div className="banc-tmo-ligne">
-                <span>Décision arbitrale :</span>
+                <span>{t("ui.918a0f543f69")}</span>
                 <strong>{tmo.decision}</strong>
               </div>
               <div className="banc-tmo-ligne">
-                <span>Angle caméra :</span>
+                <span>{t("ui.2867bada2db2")}</span>
                 <code>{tmo.cadreCamera}</code>
               </div>
               {tmo.explication && (
                 <div className="banc-tmo-ligne explication">
-                  <span>Motivation :</span>
+                  <span>{t("ui.10bfb1d0c332")}</span>
                   <p>{tmo.explication}</p>
                 </div>
               )}

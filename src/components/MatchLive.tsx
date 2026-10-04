@@ -143,7 +143,7 @@ import {
   compositionManagerParDefaut, feuilleDepuisComposition, noteCompositionManager,
   reconcilerCompositionManager,
 } from '../lib/compositionManager';
-import { t } from '../lib/i18n';
+import { texteTraduit, t } from '../lib/i18n';
 import { useModalDialog } from '../lib/useModalDialog';
 
 function couleursDe(nom: string): [string, string] {
@@ -1604,10 +1604,10 @@ export function MatchLive({
                   )}
                   {actionImportante && (
                     <div className={`ml-evenement-terrain ml-evenement-${actionImportante.type}`} role="status">
-                      <b><IconeEmoji emoji={EMOJI[actionImportante.type] ?? '⚡'} /> {actionImportante.type === 'essai' ? 'ESSAI'
-                        : actionImportante.type === 'carton' ? (/rouge/i.test(actionImportante.texte) ? 'CARTON ROUGE' : 'CARTON JAUNE')
-                          : actionImportante.type === 'penalite' || actionImportante.type === 'faute' ? 'PÉNALITÉ'
-                            : actionImportante.type === 'but' ? 'TIR RÉUSSI' : actionImportante.type === 'butRate' ? 'TIR MANQUÉ' : 'ACTION IMPORTANTE'}</b>
+                      <b><IconeEmoji emoji={EMOJI[actionImportante.type] ?? '⚡'} /> {actionImportante.type === 'essai' ? t("ui.1eb3a59bf5f9")
+                        : actionImportante.type === 'carton' ? (/rouge/i.test(actionImportante.texte) ? t("sifflet.cartonRouge") : t("sifflet.cartonJaune"))
+                          : actionImportante.type === 'penalite' || actionImportante.type === 'faute' ? t("sifflet.penalite")
+                            : actionImportante.type === 'but' ? t("ui.fcf7ac0edb73") : actionImportante.type === 'butRate' ? t("ui.7a76058c02fe") : t("ui.a2ffe5ba4631")}</b>
                       <span><TexteIcones texte={actionImportante.texte} /></span>
                     </div>
                   )}
@@ -1786,8 +1786,7 @@ export function MatchLive({
                   {/* ---------- ⚡ GROS IMPACT ("SUR LES FESSES") ---------- */}
                   {e.grosImpact && e.grosImpact.restant > 0 && (
                     <div className="ml-gros-impact-flash" role="status">
-                      <Icone nom="eclair" taille={16} /> GROS IMPACT PHYSIQUE
-                    </div>
+                      <Icone nom="eclair" taille={16} />{t("ui.ce5342afc229")}</div>
                   )}
 
                   {/* ---------- 🎬 CE QUE MON CHOIX A DONNÉ, SUR MON JOUEUR ----------
@@ -1951,11 +1950,11 @@ export function MatchLive({
                       key={v.id}
                       type="button"
                       className={`ml-tempo${tempo === v.id ? ' actif' : ''}`}
-                      title={v.id === 'suivre' ? 'Environ dix minutes, à vitesse naturelle' : v.id === 'accelere' ? 'Deux fois plus rapide' : v.id === 'fin' ? 'Quatre fois plus rapide' : t(v.aide)}
-                      aria-label={v.id === 'suivre' ? 'Temps réel' : v.id === 'accelere' ? '×2' : v.id === 'fin' ? '×4' : t(v.cle)}
+                      title={v.id === 'suivre' ? t("ui.3d83d13a7d65") : v.id === 'accelere' ? t("ui.9a94d8bba00b") : v.id === 'fin' ? t("ui.ee3221158417") : t(v.aide)}
+                      aria-label={v.id === 'suivre' ? t("ui.ac6c3bcc1174") : v.id === 'accelere' ? '×2' : v.id === 'fin' ? '×4' : t(v.cle)}
                       onClick={() => setTempo(v.id)}
                     >
-                      <b><Icone nom={v.id === 'suivre' ? 'oeil' : v.id === 'accelere' ? 'eclair' : v.id === 'fin' ? 'fleche-droite' : 'chrono'} taille={17} /></b><span>{v.id === 'suivre' ? 'Temps réel' : t(v.cle)}</span>
+                      <b><Icone nom={v.id === 'suivre' ? 'oeil' : v.id === 'accelere' ? 'eclair' : v.id === 'fin' ? 'fleche-droite' : 'chrono'} taille={17} /></b><span>{v.id === 'suivre' ? t("ui.ac6c3bcc1174") : t(v.cle)}</span>
                     </button>
                   ))}
                   <button
@@ -2100,13 +2099,13 @@ function CoachingManager({
   return (
     <div className="ml-coaching-manager">
       <div className="ml-coaching-manager-tete">
-        <b><Icone nom="banc" taille={15} /> Banc tactique</b>
-        <span>Les changements s’appliquent à la prochaine action.</span>
+        <b><Icone nom="banc" taille={15} />{t("ui.858229f340b7")}</b>
+        <span>{t("ui.e93d3d44d4bc")}</span>
       </div>
       {(Object.keys(OPTIONS_TACTIQUES) as (keyof typeof OPTIONS_TACTIQUES)[]).map((cle) => (
         <fieldset key={cle}>
-          <legend>{cle === 'attaque' ? 'Avec le ballon' : cle === 'defense' ? 'Sans le ballon'
-            : cle === 'rythme' ? 'Rythme' : cle === 'penalites' ? 'Pénalités' : 'Banc'}</legend>
+          <legend>{cle === 'attaque' ? t("ui.79ac10a3ad0f") : cle === 'defense' ? t("ui.cfdb4389e03f")
+            : cle === 'rythme' ? t("online.tactics.rhythm") : cle === 'penalites' ? t("ui.4752bb854318") : t("compo.banc")}</legend>
           <div>
             {OPTIONS_TACTIQUES[cle].map(([id, label]) => (
               <button
@@ -2123,14 +2122,14 @@ function CoachingManager({
         </fieldset>
       ))}
       <fieldset className="ml-changement-manuel">
-        <legend>Changement manuel</legend>
+        <legend>{t("ui.38a64c1b6084")}</legend>
         {banc.length ? (
           <div>
-            <label><span>Sortir</span><Selecteur options={terrain.map((p) => ({ valeur: p.sourceId, label: `n° ${p.numero} · ${p.nom}`, sous: `${Math.round(p.endurance)} % d'endurance` }))} valeur={sortantActif} onChange={setSortant} /></label>
-            <label><span>Faire entrer</span><Selecteur options={banc.map((p) => ({ valeur: p.sourceId, label: `n° ${p.numero} · ${p.nom}` }))} valeur={entrantActif} onChange={setEntrant} /></label>
-            <button type="button" disabled={!sortantActif || !entrantActif || !!demande} onClick={() => demanderRemplacement(e, cote, entrantActif, sortantActif)}><Icone nom={demande ? 'chrono' : 'repost'} taille={14} /> {demande ? 'Prévu au prochain arrêt' : 'Programmer le changement'}</button>
+            <label><span>{t("ui.d1da21c06848")}</span><Selecteur options={terrain.map((p) => ({ valeur: p.sourceId, label: `n° ${p.numero} · ${p.nom}`, sous: `${Math.round(p.endurance)} % d'endurance` }))} valeur={sortantActif} onChange={setSortant} /></label>
+            <label><span>{t("ui.1a2aefe036bd")}</span><Selecteur options={banc.map((p) => ({ valeur: p.sourceId, label: `n° ${p.numero} · ${p.nom}` }))} valeur={entrantActif} onChange={setEntrant} /></label>
+            <button type="button" disabled={!sortantActif || !entrantActif || !!demande} onClick={() => demanderRemplacement(e, cote, entrantActif, sortantActif)}><Icone nom={demande ? 'chrono' : 'repost'} taille={14} /> {demande ? t("ui.7d17c0e5befb") : t("ui.42793cb3e65d")}</button>
           </div>
-        ) : <span className="ml-banc-vide">Les huit remplaçants sont entrés.</span>}
+        ) : <span className="ml-banc-vide">{t("ui.3a62cacca18a")}</span>}
       </fieldset>
     </div>
   );
@@ -2160,7 +2159,7 @@ function Coaching({
         {envoiConsigne ? '…' : t('ml.transmettre')}
       </button>
       {e.consigne && e.consigne !== CONSIGNE_NEUTRE && (
-        <span className="ml-consigne">{e.consigne.libelle}</span>
+        <span className="ml-consigne">{texteTraduit(e.consigne.libelle)}</span>
       )}
     </div>
   );

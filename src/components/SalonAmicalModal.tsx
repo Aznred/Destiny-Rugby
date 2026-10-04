@@ -218,7 +218,7 @@ export function SalonAmicalModal({ onFermer, codeInitial }: Props) {
         </header>
 
         {erreur && <p className="amical-erreur-alerte" role="alert">{erreur}</p>}
-        {!effectifPret && <p className="amical-erreur-alerte" role="alert">Il faut au moins 15 joueurs différents dans ta collection pour lancer un match.</p>}
+        {!effectifPret && <p className="amical-erreur-alerte" role="alert">{t("ui.534fc23d4a6c")}</p>}
 
         <nav className="amical-onglets-nav">
           <button
@@ -233,8 +233,7 @@ export function SalonAmicalModal({ onFermer, codeInitial }: Props) {
             className={onglet === 'ordinateur' ? 'actif' : ''}
             onClick={() => setOnglet('ordinateur')}
           >
-            <Icone nom="equipe" taille={15} /> Ordinateur
-          </button>
+            <Icone nom="equipe" taille={15} />{t("ui.91c5b96f9d1a")}</button>
           <button
             type="button"
             className={onglet === 'enLigne' ? 'actif' : ''}
@@ -281,8 +280,7 @@ export function SalonAmicalModal({ onFermer, codeInitial }: Props) {
 
             <div className="amical-actions-depart">
               <button type="button" className="btn primaire amical-btn-lancer-solo" onClick={() => setOnglet('ordinateur')}>
-                <Icone nom="eclair" taille={18} /> Jouer contre l’ordinateur
-              </button>
+                <Icone nom="eclair" taille={18} />{t("ui.a9c22f842491")}</button>
               <button type="button" className="btn amical-btn-aller-online" onClick={() => setOnglet('enLigne')}>
                 <Icone nom="profil" taille={18} /> {t('amical.playOnline')}
               </button>
@@ -295,44 +293,43 @@ export function SalonAmicalModal({ onFermer, codeInitial }: Props) {
             <div className="amical-ordinateur-intro">
               <div>
                 <div className="eyebrow">{t('amical.badge')}</div>
-                <h3>Choisis ton adversaire</h3>
-                <p>Ton XV face à un club professionnel. Coup d’envoi dès que tu es prêt.</p>
+                <h3>{t("ui.fda6c5c450cd")}</h3>
+                <p>{t("ui.b67a6d38fa42")}</p>
               </div>
               <div className="amical-note-globale">
-                <span>Ton XV</span>
+                <span>{t("compo.tonXV")}</span>
                 <strong>{monEquipe.noteMoyenne}</strong>
               </div>
             </div>
             <div className="amical-choix-club">
               <button type="button" className="amical-club-actuel" aria-expanded={listeClubsOuverte} onClick={() => setListeClubsOuverte((ouvert) => !ouvert)}>
-                <span><small>Adversaire sélectionné</small><b>{clubOrdinateur || 'Choisir un club'}</b></span>
-                <span>Changer <Icone nom="fleche-droite" taille={15} /></span>
+                <span><small>{t("ui.ee388c0c04ae")}</small><b>{clubOrdinateur || t("ui.aec34503d495")}</b></span>
+                <span>{t("ui.7a35caf2252f")}<Icone nom="fleche-droite" taille={15} /></span>
               </button>
               {listeClubsOuverte && <div className="amical-cherche-club">
-                <label htmlFor="amical-recherche-club">Rechercher un club ou un championnat</label>
-                <input id="amical-recherche-club" type="search" value={rechercheClub} onChange={(event) => setRechercheClub(event.target.value)} placeholder="Ex : Toulouse, Top 14…" autoComplete="off" />
-                <div className="amical-liste-clubs" aria-label="Clubs professionnels">
+                <label htmlFor="amical-recherche-club">{t("ui.4a1aae6fb81f")}</label>
+                <input id="amical-recherche-club" type="search" value={rechercheClub} onChange={(event) => setRechercheClub(event.target.value)} placeholder={t("ui.f2de47ed90a0")} autoComplete="off" />
+                <div className="amical-liste-clubs" aria-label={t("ui.75014977aa36")}>
                   {clubsFiltres.map((club) => <button type="button" aria-pressed={club.nom === clubOrdinateur} key={club.nom} onClick={() => {
                     setClubOrdinateur(club.nom); setListeClubsOuverte(false); setRechercheClub('');
                   }}><span><b>{club.nom}</b><small>{club.championnat}</small></span><strong>{club.noteMoyenne}</strong></button>)}
-                  {clubsFiltres.length === 0 && <p>Aucun club trouvé.</p>}
+                  {clubsFiltres.length === 0 && <p>{t("ui.e57aabd5a6a7")}</p>}
                 </div>
               </div>}
             </div>
             <div className="amical-duel-clubs">
               <div style={{ '--couleur-club': monEquipe.couleur } as React.CSSProperties}>
                 {monEquipe.embleme ? <img src={monEquipe.embleme} alt="" /> : <Icone nom="equipe" taille={32} />}
-                <b>{monEquipe.nom}</b><span>Note {monEquipe.noteMoyenne}</span>
+                <b>{monEquipe.nom}</b><span>{t("ui.64127e39e0f6", { v0: monEquipe.noteMoyenne })}</span>
               </div>
-              <strong>VS</strong>
+              <strong>{t("ui.8db1a2e199a2")}</strong>
               <div style={{ '--couleur-club': equipeAdverseOrdinateur.couleur } as React.CSSProperties}>
                 {equipeAdverseOrdinateur.embleme ? <img src={equipeAdverseOrdinateur.embleme} alt="" /> : <Icone nom="equipe" taille={32} />}
-                <b>{equipeAdverseOrdinateur.nom}</b><span>Note {equipeAdverseOrdinateur.noteMoyenne}</span>
+                <b>{equipeAdverseOrdinateur.nom}</b><span>{t("ui.64127e39e0f6", { v0: equipeAdverseOrdinateur.noteMoyenne })}</span>
               </div>
             </div>
             <button type="button" className="btn primaire amical-lancer-ordinateur" onClick={lancerMatchOrdinateur} disabled={!clubOrdinateur || !effectifPret}>
-              <Icone nom="eclair" taille={18} /> Lancer le match
-            </button>
+              <Icone nom="eclair" taille={18} />{t("ui.526fcc11e11b")}</button>
           </section>
         )}
 
@@ -355,7 +352,7 @@ export function SalonAmicalModal({ onFermer, codeInitial }: Props) {
                   <p>{t('amical.joinFriendHelp')}</p>
                   <div className="amical-champ-rejoindre">
                     <input
-                      placeholder="Ex : XV-A1B2C3"
+                      placeholder={t("ui.e20a2386c0c1")}
                       value={codeSaisi}
                       onChange={(e) => setCodeSaisi(e.target.value.toUpperCase())}
                       maxLength={12}

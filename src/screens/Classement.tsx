@@ -447,9 +447,7 @@ export function Classement() {
         </div>
         {mondial?.etat === 'ok' && mondial.filtreIgnore && (
           <p className="aide">
-            <Icone nom="alerte" taille={14} /> Le serveur n’a pas pu filtrer par catégorie (base restée au
-            schéma v1) : c’est le classement complet qui s’affiche.
-            Voir <code>serveur/MIGRATION-FICHES.md</code>.
+            <Icone nom="alerte" taille={14} />{t("ui.7995bf4321fb")}<code>{t("ui.c5272739616a")}</code>.
           </p>
         )}
 
@@ -684,10 +682,7 @@ export function Classement() {
           <p>
             <Icone nom="stade" taille={16} /> <b>{t('clst.vide')}</b>
           </p>
-          <p className="aide">
-            Aucune carrière n'a encore été menée à son terme sur cet appareil.
-            Joue, raccroche les crampons, et ton nom s'inscrira ici le premier.
-          </p>
+          <p className="aide">{t("ui.ad6d3642bd5f")}</p>
         </div>
       ) : (
       <div className="carte tableau-classement">

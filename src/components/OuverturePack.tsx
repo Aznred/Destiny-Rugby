@@ -150,7 +150,7 @@ export default function OuverturePack({ cartes, pack, modele, garantie, apparenc
   return createPortal(<div ref={dialogue} tabIndex={-1} className={`pack-show phase-${phase} palier-${rarete}${calme ? ' calme' : ''}${instant ? ' instant' : ''}`} style={{ '--pack-color': COULEURS[rang] } as CSSProperties} role="dialog" aria-modal="true" aria-labelledby="pack-show-title" onKeyDown={e => {
     if (e.key === 'Tab') { const elements = Array.from(dialogue.current?.querySelectorAll<HTMLElement>('button:not(:disabled), [tabindex="0"]') ?? []); const premier = elements[0], dernier = elements[elements.length-1]; if (e.shiftKey && document.activeElement === premier) { e.preventDefault(); dernier?.focus(); } else if (!e.shiftKey && document.activeElement === dernier) { e.preventDefault(); premier?.focus(); } }
   }}><main className="pack-show-main cel-panneau">
-    <div className="pack-show-heading"><p className="eyebrow">Pack {pack}{cartes ? ` · ${t('online.shop.cards',{n:cartes.length})}` : ''}</p><h2 id="pack-show-title" key={phase} aria-live="polite">{phase === 'cartes' ? t('online.pack.recruits') : pack}</h2></div>
+    <div className="pack-show-heading"><p className="eyebrow">{t("ui.4dfd1ccc8b22", { v0: pack, v1: cartes ? ` · ${t('online.shop.cards',{n:cartes.length})}` : '' })}</p><h2 id="pack-show-title" key={phase} aria-live="polite">{phase === 'cartes' ? t('online.pack.recruits') : pack}</h2></div>
     {phase !== 'cartes' ? <><div className="pack-show-stage">
       <div className="pack-show-beams" aria-hidden="true"/><div className="pack-show-orbit" aria-hidden="true"/>
       <div className="pack-show-particles" key={rang} aria-hidden="true">{Array.from({length:28}, (_,i) => <i key={i} style={{'--x':`${i*37%100}%`, '--delay':`${i%9*-.35}s`, '--duration':`${2+i%4}s`, '--drift':`${(i%2?1:-1)*(20+i*3)}px`} as CSSProperties}/>)}</div>
@@ -162,7 +162,7 @@ export default function OuverturePack({ cartes, pack, modele, garantie, apparenc
       const visible = i >= ordre.length - revelees;
       const meilleure = i === 0;
       const active = i === carteActive;
-      return <div ref={element => { cartesRefs.current[i] = element; }} key={carte.id} role="listitem" aria-label={visible ? `${carte.nom}, note ${carte.note}` : undefined} tabIndex={visible && active ? 0 : -1} className={`pack-show-card ${visible?'visible':''} ${meilleure?'meilleure':''} ${active?'active':''}`} style={{ '--slot': i, zIndex: active ? ordre.length + 2 : ordre.length - i } as CSSProperties} onPointerEnter={() => visible && setCarteActive(i)} onPointerDown={() => visible && setCarteActive(i)} onFocus={() => visible && setCarteActive(i)} onKeyDown={e => {
+      return <div ref={element => { cartesRefs.current[i] = element; }} key={carte.id} role="listitem" aria-label={visible ? t("ui.fe37aca21b70", { v0: carte.nom, v1: carte.note }) : undefined} tabIndex={visible && active ? 0 : -1} className={`pack-show-card ${visible?'visible':''} ${meilleure?'meilleure':''} ${active?'active':''}`} style={{ '--slot': i, zIndex: active ? ordre.length + 2 : ordre.length - i } as CSSProperties} onPointerEnter={() => visible && setCarteActive(i)} onPointerDown={() => visible && setCarteActive(i)} onFocus={() => visible && setCarteActive(i)} onKeyDown={e => {
         if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'Home' || e.key === 'End') {
           e.preventDefault();
           const debut = Math.max(0, ordre.length - revelees);
@@ -171,7 +171,7 @@ export default function OuverturePack({ cartes, pack, modele, garantie, apparenc
         }
       }}>
         {meilleure && visible && <span className="pack-show-best">{t('online.pack.best')}</span>}
-        <div className="pack-show-flipper"><div className="pack-show-cardback" aria-hidden="true"><span className="pack-back-border"/><small>DESTINY</small><b>DR</b><span>RUGBY</span><i>✦</i></div><div className="pack-show-front" aria-hidden={!visible}>{visible && rendreCarte(carte)}</div></div>
+        <div className="pack-show-flipper"><div className="pack-show-cardback" aria-hidden="true"><span className="pack-back-border"/><small>{t("ui.f173c39dab2b")}</small><b>{t("ui.40c30a28814a")}</b><span>{t("ui.f02addd67834")}</span><i>✦</i></div><div className="pack-show-front" aria-hidden={!visible}>{visible && rendreCarte(carte)}</div></div>
       </div>;
     })}</div>}
     {phase === 'cartes' && <footer className="pack-show-footer"><button ref={principale} className="btn primaire" onClick={toutes ? onFermer : passer}>{toutes ? t('online.pack.clubhouse') : t('online.pack.reveal')}</button></footer>}

@@ -1,5 +1,5 @@
 import type { Manager } from '../types';
-import { nombre } from '../lib/i18n';
+import { t, nombre } from '../lib/i18n';
 import { budgetsDuClub, salairesEffectif, situationSalariale } from '../lib/recrutementManager';
 import { reportsBudgets } from '../lib/tresorerieManager';
 import { coutAmelioration, NIVEAU_INSTALLATION_MAX } from '../lib/installations';
@@ -19,52 +19,52 @@ export function TresorerieManager({ manager: m, onMarche, onStructures }: {
     .reduce((total, [, montant]) => total + montant, 0);
   return <div className="tresorerie-manager">
     <section className="carte tresorerie-tete">
-      <div><div className="eyebrow">Comptes du club · saison {m.saison}</div>
-        <h2><Icone nom="euro" taille={24} /> Trésorerie</h2>
-        <p>Les moyens disponibles pour recruter, payer l’effectif et développer les structures.</p></div>
-      <div className="tresorerie-reference"><span>Budget annuel de référence</span><strong>{euros(dotation.budget)}</strong><small>{m.club} · {m.divisionNom}</small></div>
+      <div><div className="eyebrow">{t("ui.58a38c41299f", { v0: m.saison })}</div>
+        <h2><Icone nom="euro" taille={24} />{t("ui.f40a457d4191")}</h2>
+        <p>{t("ui.ab145ed373d3")}</p></div>
+      <div className="tresorerie-reference"><span>{t("ui.39920b1da0da")}</span><strong>{euros(dotation.budget)}</strong><small>{m.club} · {m.divisionNom}</small></div>
     </section>
     <div className="tresorerie-enveloppes">
       <section className="carte tresorerie-enveloppe">
-        <h3>Recrutement</h3><small>Solde disponible</small><strong>{euros(m.budgetTransferts)}</strong>
-        <p>Indemnités de transfert, primes à la signature et recrutement des jeunes.</p>
-        <dl><div><dt>Dotation annuelle de référence</dt><dd>{euros(dotation.transferts)}</dd></div>
-          <div><dt>Report si clôture à ce solde · 28 %</dt><dd>{euros(reports.transferts)}</dd></div></dl>
-        <button className="btn fantome" onClick={onMarche}>Ouvrir le marché <Icone nom="marche" taille={15} /></button>
+        <h3>{t("mgr.x.recrutement")}</h3><small>{t("ui.81d3d138273b")}</small><strong>{euros(m.budgetTransferts)}</strong>
+        <p>{t("ui.38cdc4878d77")}</p>
+        <dl><div><dt>{t("ui.cb1d83462427")}</dt><dd>{euros(dotation.transferts)}</dd></div>
+          <div><dt>{t("ui.0189d7125064")}</dt><dd>{euros(reports.transferts)}</dd></div></dl>
+        <button className="btn fantome" onClick={onMarche}>{t("ui.f5bf0eeb5c92")}<Icone nom="marche" taille={15} /></button>
       </section>
       <section className={`carte tresorerie-enveloppe${salaires.disponible < 0 ? ' tresorerie-alerte' : ''}`}>
-        <h3>Salaires des joueurs</h3><small>{salaires.disponible < 0 ? 'Dépassement du plafond annuel' : 'Marge annuelle disponible'}</small>
+        <h3>{t("ui.c3a5429174cd")}</h3><small>{salaires.disponible < 0 ? t("ui.10ccf14fd77d") : t("ui.4bd89f29faca")}</small>
         <strong>{euros(Math.abs(salaires.disponible))}</strong>
-        <p>{salaires.disponible < 0 ? 'La masse salariale dépasse le plafond : aucune nouvelle charge ne peut être signée.' : 'Une signature utilise cette marge. Le plafond annuel reste le même.'}</p>
-        <dl><div><dt>Masse engagée / an</dt><dd>{euros(salaires.engagee)}</dd></div>
-          <div><dt>Plafond autorisé / an</dt><dd>{euros(salaires.plafond)}</dd></div>
-          {salaires.cap !== null && <div><dt>Salary cap de la division</dt><dd>{euros(salaires.cap)}</dd></div>}
-          <div><dt>Report de marge · 20 %</dt><dd>{euros(reports.salarial)}</dd></div></dl>
+        <p>{salaires.disponible < 0 ? t("ui.ddcb8c2ba300") : t("ui.aca60a55d626")}</p>
+        <dl><div><dt>{t("ui.1c203ebdfcfb")}</dt><dd>{euros(salaires.engagee)}</dd></div>
+          <div><dt>{t("ui.9715bc339d34")}</dt><dd>{euros(salaires.plafond)}</dd></div>
+          {salaires.cap !== null && <div><dt>{t("ui.c3f23f985e70")}</dt><dd>{euros(salaires.cap)}</dd></div>}
+          <div><dt>{t("ui.8acdb43fda35")}</dt><dd>{euros(reports.salarial)}</dd></div></dl>
       </section>
       <section className="carte tresorerie-enveloppe">
-        <h3>Structures</h3><small>Épargne disponible</small><strong>{euros(m.budgetStructure)}</strong>
-        <p>Une enveloppe commune à la formation, l’entraînement et au réseau de recruteurs.</p>
-        <dl><div><dt>Dotation annuelle de référence</dt><dd>{euros(dotation.structure)}</dd></div>
-          <div><dt>Report intégral · 100 %</dt><dd>{euros(reports.structure)}</dd></div></dl>
-        <button className="btn fantome" onClick={onStructures}>Développer les structures <Icone nom="formation" taille={15} /></button>
+        <h3>{t("ui.b912533f7f9a")}</h3><small>{t("ui.3b429b4dd69b")}</small><strong>{euros(m.budgetStructure)}</strong>
+        <p>{t("ui.7882b6ff0772")}</p>
+        <dl><div><dt>{t("ui.cb1d83462427")}</dt><dd>{euros(dotation.structure)}</dd></div>
+          <div><dt>{t("ui.9dcf5950b2bf")}</dt><dd>{euros(reports.structure)}</dd></div></dl>
+        <button className="btn fantome" onClick={onStructures}>{t("ui.08d706f62a30")}<Icone nom="formation" taille={15} /></button>
       </section>
     </div>
     <section className="carte tresorerie-regles">
-      <h3>D’une saison à l’autre</h3>
-      <p>À la clôture, les dotations de la nouvelle division s’ajoutent aux reports ci-dessus. Le report salarial porte seulement sur la marge inutilisée et reste limité par le salary cap.</p>
-      <p>Les indemnités de formation vont au recrutement. Les revenus marketing versent 35 % au recrutement et 15 % aux structures. Ces recettes sont calculées et créditées à la clôture.</p>
-      <dl><div><dt>Revenus de formation déjà crédités au club · toutes saisons</dt><dd>{euros(formation)}</dd></div></dl>
-      <small>Le budget annuel de référence couvre aussi le fonctionnement du club. Il ne constitue pas un solde supplémentaire à dépenser.</small>
+      <h3>{t("ui.3292cee16e56")}</h3>
+      <p>{t("ui.4958bbece59c")}</p>
+      <p>{t("ui.7c0b8f52e096")}</p>
+      <dl><div><dt>{t("ui.4c4521a3cb27")}</dt><dd>{euros(formation)}</dd></div></dl>
+      <small>{t("ui.5d67711b77ca")}</small>
     </section>
     <section className="carte tresorerie-tarifs">
-      <h3>Prix fixes des structures</h3><p>Le même prix pour les trois structures, quelle que soit la division. Chaque palier s’achète séparément.</p>
-      <ol>{Array.from({ length: NIVEAU_INSTALLATION_MAX }, (_, i) => <li key={i}><span>Niveau {i + 1}</span><b>{euros(coutAmelioration(i)!)}</b></li>)}</ol>
+      <h3>{t("ui.92b6bca8cb06")}</h3><p>{t("ui.1dd11454123f")}</p>
+      <ol>{Array.from({ length: NIVEAU_INSTALLATION_MAX }, (_, i) => <li key={i}><span>{t("ui.960adc59f347", { v0: i + 1 })}</span><b>{euros(coutAmelioration(i)!)}</b></li>)}</ol>
     </section>
     <details className="carte tresorerie-salaires">
-      <summary>Détail de la masse salariale <b>{euros(salaires.engagee)} / an</b></summary>
-      <p>Les recrues suivent leur salaire signé jusqu’à la fin du contrat. Pour les autres joueurs, le jeu applique son barème de salaire. Un départ libère sa charge.</p>
-      <ul>{contrats.map((j) => <li key={j.joueurId}><span>{j.nom}<small>{j.negocie ? 'Contrat signé' : j.salaire === 0 ? 'Amateur · sans salaire fixe' : 'Barème du club'}</small></span><b>{euros(j.salaire)} / an</b></li>)}</ul>
+      <summary>{t("ui.6f3334f5761c")}<b>{t("ui.d4c3dafe222c", { v0: euros(salaires.engagee) })}</b></summary>
+      <p>{t("ui.723f9876b04b")}</p>
+      <ul>{contrats.map((j) => <li key={j.joueurId}><span>{j.nom}<small>{j.negocie ? t("ui.8b1856728f53") : j.salaire === 0 ? t("ui.94102386da88") : t("ui.9d53971555ec")}</small></span><b>{t("ui.d4c3dafe222c", { v0: euros(j.salaire) })}</b></li>)}</ul>
     </details>
-    <section className="carte tresorerie-personnelle"><Icone nom="entraineur" taille={21} /><div><h3>Ta rémunération d’entraîneur</h3><p>{euros(m.contrat?.salaire ?? 0)} / an · Patrimoine personnel : {euros(m.argent)}.</p><small>Versée en fin de saison, elle reste distincte des enveloppes du club.</small></div></section>
+    <section className="carte tresorerie-personnelle"><Icone nom="entraineur" taille={21} /><div><h3>{t("ui.b6ff650e0ba1")}</h3><p>{t("ui.0ae1d0bbdfb1", { v0: euros(m.contrat?.salaire ?? 0), v1: euros(m.argent) })}</p><small>{t("ui.deeb16d81daf")}</small></div></section>
   </div>;
 }

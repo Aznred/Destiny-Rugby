@@ -29,7 +29,7 @@ import { COMPETITIONS, clubParNom } from '../data/clubs';
 import { Blason, LogoEquipe } from './Blason';
 import { situationInternationale } from '../lib/rassemblements';
 import { semaine, CALENDRIER, libelleSemaine } from '../data/calendrier';
-import { t } from '../lib/i18n';
+import { texteTraduit, t } from '../lib/i18n';
 import type { Joueur } from '../types';
 import type { LigneTableau } from '../lib/championnat';
 import { Icone } from './Icone';
@@ -176,7 +176,7 @@ export function ClassementLateral({ joueur }: { joueur: Joueur }) {
           <div className="eyebrow" style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
             <LogoCompet id={vue.logo} taille={18} /> {t('cl.titre')}
           </div>
-          <b>{vue.titre}</b>
+          <b>{texteTraduit(vue.titre)}</b>
         </div>
         <span className="cl-lat-journee">{vue.sousTitre}</span>
       </div>

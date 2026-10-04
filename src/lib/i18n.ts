@@ -161,9 +161,58 @@ export function definirLangue(l: Langue): void {
 
 // Le dictionnaire, alimenté par `src/data/textes.ts`.
 let dictionnaire: Record<string, Traduction> = {};
+let clesParTexte = new Map<string, string>();
+let modelesParTexte: { cle: string; motif: RegExp; variables: string[] }[] = [];
+const cacheTextes = new Map<string, string>();
+const normaliserTexte = (texte: string) => texte.replace(/[’']/g, "'").replace(/\s+/g, ' ').trim();
 
 export function chargerTextes(textes: Record<string, Traduction>): void {
   dictionnaire = textes;
+  cacheTextes.clear();
+  clesParTexte = new Map();
+  modelesParTexte = [];
+  for (const [cle, entree] of Object.entries(textes)) {
+    for (const valeur of new Set(Object.values(entree))) {
+      if (!valeur) continue;
+      const source = normaliserTexte(valeur);
+      const variables = [...source.matchAll(/\{(\w+)\}/g)].map(m => m[1]);
+      if (!variables.length) clesParTexte.set(source, cle);
+      else if (valeur === entree.fr && source.replace(/\{\w+\}/g, '').replace(/\W/g, '').length >= 12) {
+        const motif = source.split(/\{\w+\}/g).map(partie => partie.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('(.+?)');
+        modelesParTexte.push({ cle, motif: new RegExp(`^${motif}$`), variables });
+      }
+    }
+  }
+}
+
+/** Localise uniquement les libellés connus du jeu, conservés en français dans les données/sauvegardes.
+ * Le texte libre du joueur et les récits générés ne doivent pas passer ici. */
+export function texteTraduit(source: string | null | undefined): string {
+  if (source == null) return '';
+  const normalise = normaliserTexte(source);
+  const cle = clesParTexte.get(normalise);
+  if (cle) return t(cle);
+  const cleCache = `${courante}\0${source}`;
+  const enCache = cacheTextes.get(cleCache);
+  if (enCache != null) return enCache;
+  for (const modele of modelesParTexte) {
+    const capture = modele.motif.exec(normalise);
+    if (capture) {
+      const traduit = t(modele.cle, Object.fromEntries(modele.variables.map((variable, i) => [variable, capture[i + 1]])));
+      cacheTextes.set(cleCache, traduit);
+      return traduit;
+    }
+  }
+  if (cacheTextes.size >= 1000) cacheTextes.clear();
+  cacheTextes.set(cleCache, source);
+  return source;
+}
+
+/** Reconnaît un texte préécrit à l'identique, sans appliquer de modèle au récit libre. */
+export function texteTraduitExact(source: string | null | undefined): string {
+  if (source == null) return '';
+  const cle = clesParTexte.get(normaliserTexte(source));
+  return cle ? t(cle) : source;
 }
 
 /**
@@ -175,7 +224,7 @@ export function chargerTextes(textes: Record<string, Traduction>): void {
  * ⚠️ Une clé inconnue renvoie la clé elle-même : à l'écran, ça saute aux yeux
  * en développement, et ça reste lisible en production plutôt que d'être vide.
  */
-export function t(cle: string, vars?: Record<string, string | number>): string {
+export function t(cle: string, vars?: Record<string, string | number | boolean | null | undefined>): string {
   const entree = dictionnaire[cle]
     ?? (cle.startsWith('sifflet.') ? dictionnaire[`ml.${cle}`] : undefined)
     ?? (cle.startsWith('ml.sifflet.') ? dictionnaire[cle.replace(/^ml\./, '')] : undefined);
@@ -183,14 +232,14 @@ export function t(cle: string, vars?: Record<string, string | number>): string {
   let texte = entree[courante] ?? entree.fr;
   if (vars) {
     for (const [k, v] of Object.entries(vars)) {
-      texte = texte.split(`{${k}}`).join(String(v));
+      texte = texte.split(`{${k}}`).join(v == null || typeof v === 'boolean' ? '' : String(v));
     }
   }
   return texte;
 }
 
 /** Le pluriel, à la française : 0 et 1 au singulier, le reste au pluriel. */
-export function tn(cle: string, n: number, vars?: Record<string, string | number>): string {
+export function tn(cle: string, n: number, vars?: Record<string, string | number | boolean | null | undefined>): string {
   const pluriel = new Intl.PluralRules(locale()).select(n) !== 'one';
   return t(pluriel ? `${cle}.pluriel` : cle, { ...vars, n });
 }
@@ -233,6 +282,8 @@ export function consigneDeLangue(l: Langue = courante): string {
   return `\n\nIMPORTANT : LANGUAGE: write EVERY piece of text you output in `
     + `${langue.enAnglais} (${langue.nom}), and nothing else. This includes the `
     + `narrative, the event titles, the choices, the tweets and the replies. `
+    + `The language of the player's input, quoted context or older messages `
+    + `does not change this output language. `
     + `Keep club names, competition names and player names EXACTLY as given : `
     + `they are proper nouns and must never be translated. The JSON keys stay in `
     + `English/French as specified in the format above.`;

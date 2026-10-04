@@ -122,6 +122,14 @@ GÉNÉRÉS.** Ne jamais les éditer à la main.
 | Succès | **78** joueur + **20** manager |
 | Langues | **7** (fr, en, es, it, de, pt, **ja**) |
 
+**Traductions** : `textesInterface.ts` complète les libellés et données fixes ;
+`textesInterfaceCorrections.ts` garde la priorité après fusion. `npm run
+verify:traductions` vérifie les sept langues, les variables et les clés appelées.
+`texteTraduit()` localise les données canoniques sans les modifier ; pour un
+récit préécrit dans le journal, `texteTraduitExact()` reconnaît uniquement une
+phrase connue. Le texte libre du joueur et les noms propres restent intacts.
+L'affichage mobile de la carrière joueur est ajusté dans `screens/Carriere.css`.
+
 **Pour corriger un club, une division ou une note** : tout se passe dans
 `scripts/ligues.cjs` (déclarer la ligue, son `srcLigue`, son `echelle`, ses
 clubs) et `scripts/vedettes.cjs` (~450 internationaux notés à la main), puis

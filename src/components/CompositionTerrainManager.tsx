@@ -260,7 +260,7 @@ function CarteJoueur({
           + `${rarete ? ` · ${NOM_RARETE[rarete]}` : ''}`
         : nomPoste(posteSlot)}
     >
-      {joueur && rendreCarte ? <>{rendreCarte(joueur)}<span className="ct-fut-nom">{nomCarte(joueur.nom)}</span><span className="ct-fut-indicateurs"><b>{numero}</b><span title={t(`compo.adq.${adequation}`)}><PastilleAdequation adequation={adequation} /></span>{capitaine && <i title="Capitaine">C</i>}{buteur && <i title="Buteur">B</i>}{etat?.condition !== undefined && <small>{etat.condition}%</small>}</span>{rendreSousCarte?.(joueur)}</> : <>
+      {joueur && rendreCarte ? <>{rendreCarte(joueur)}<span className="ct-fut-nom">{nomCarte(joueur.nom)}</span><span className="ct-fut-indicateurs"><b>{numero}</b><span title={t(`compo.adq.${adequation}`)}><PastilleAdequation adequation={adequation} /></span>{capitaine && <i title={t("pj.capitaine")}>C</i>}{buteur && <i title={t("compo.buteur")}>B</i>}{etat?.condition !== undefined && <small>{etat.condition}%</small>}</span>{rendreSousCarte?.(joueur)}</> : <>
       {/* ⚠️ LE TALON NE PORTE PLUS LE NUMÉRO. Il l'écrivait à la verticale
           dans dix-sept pixels de large : illisible, et redondant depuis que la
           tête l'affiche. Il reste ce qu'il a toujours été — la perforation qui
@@ -438,20 +438,20 @@ function PanneauJoueur({
           </li>
         ))}
       </ul>
-      {(joueur.clubReel || joueur.championnat) && <section className="ct-origines-joueur" aria-label="Club et ligue du joueur">
+      {(joueur.clubReel || joueur.championnat) && <section className="ct-origines-joueur" aria-label={t("ui.9e4fda533dd2")}>
         {joueur.clubReel && <div className="ct-origine-joueur">
           <span className="ct-origine-logo">
             {blasonClub
               ? <EcussonClub logo={blasonClub} nom={joueur.clubReel} taille={34} />
               : <Blason club={clubParNom(joueur.clubReel) ?? { nom: joueur.clubReel, c1: '#0a2a6b', c2: '#c1121f' }} taille={34} />}
           </span>
-          <span><small>Club</small><b>{joueur.clubReel}</b></span>
+          <span><small>{t("tb.club")}</small><b>{joueur.clubReel}</b></span>
         </div>}
         {joueur.championnat && <div className="ct-origine-joueur">
           <span className="ct-origine-logo">{logoLigue
             ? <img src={logoLigue} alt="" width={34} height={34} loading="lazy" decoding="async" />
             : <Icone nom="trophee" taille={22} />}</span>
-          <span><small>Ligue</small><b>{joueur.championnat}</b></span>
+          <span><small>{t("compoSolo.league")}</small><b>{joueur.championnat}</b></span>
         </div>}
       </section>}
       <details className="ct-brut">
@@ -682,7 +682,7 @@ export function CompositionTerrainManager({
             <>
               {rendreCarte(joueurSelectionne)}
               <b className="ct-selection-nom">{joueurSelectionne.nom}</b>
-              <span className="ct-selection-poste-gen">{nomPoste(joueurSelectionne.poste)} · {joueurSelectionne.note} GEN</span>
+              <span className="ct-selection-poste-gen">{nomPoste(joueurSelectionne.poste)} · {joueurSelectionne.note}{t('pj.noteCourte')}</span>
               {(joueurSelectionne.clubReel || joueurSelectionne.championnat) && (
                 <div className="ct-selection-club-ligue">
                   {joueurSelectionne.clubReel && <span className="ct-badge-club">{joueurSelectionne.clubReel}</span>}
@@ -775,7 +775,7 @@ export function CompositionTerrainManager({
       {rendreCarte && <>
         <div className="ct-selection-actions" aria-live="polite">
           {joueurSelectionne ? <>
-            <b>{joueurSelectionne.nom} · {joueurSelectionne.note} GEN · {nomPoste(joueurSelectionne.poste)}</b>
+            <b>{t("ui.89b7011841ac", { v0: joueurSelectionne.nom, v1: joueurSelectionne.note, v2: nomPoste(joueurSelectionne.poste) })}</b>
             <span>{t('compo.selection.permuter')}</span>
             <button type="button" onClick={() => setDetailsSelection(true)}>{t('compo.selection.fiche')}</button>
             <button type="button" onClick={() => setSelection(null)}>{t('compo.selection.annuler')}</button>

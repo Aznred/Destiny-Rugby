@@ -20,7 +20,7 @@
 //     les comptes sont débridés : insulte-les, ils répondent.
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { nombre, t, tn } from '../lib/i18n';
+import { texteTraduit, nombre, t, tn } from '../lib/i18n';
 import { motion } from 'framer-motion';
 import { useGame, PLAFOND_OVAS_DEFIS_PAR_SAISON } from '../store/useGame';
 import { clubParNom } from '../data/clubs';
@@ -281,7 +281,7 @@ function Media({ media, legende }: { media: NonNullable<PostSocial['media']>; le
         decoding="async"
         onError={() => setSrc(vignetteLocale(media.legende || legende))}
       />
-      {media.gif && <span className="x-tag-gif">GIF</span>}
+      {media.gif && <span className="x-tag-gif">{t("ui.76c664ef152e")}</span>}
     </span>
   );
 }
@@ -523,7 +523,7 @@ function Composer() {
             title={tenorKey ? t('ov.ajouterMedia') : t('ov.ajouterImage')}
             onClick={() => { setGalerie([]); void lancerRecherche(requete || 'rugby'); }}
           >
-            {tenorKey ? 'GIF' : <Icone d={I_IMAGE} />}
+            {tenorKey ? t("ui.76c664ef152e") : <Icone d={I_IMAGE} />}
           </button>
           <span className={`x-compteur${restant < 40 ? ' bas' : ''}`}>{restant}</span>
           <button
@@ -652,7 +652,7 @@ function MonProfil({ onProfil, onRecherche }: { onProfil: (pseudo: string) => vo
         </div>
         <h2>{enregistre.nomAffiche}{estCertifie(joueur) && <Certifie />}</h2>
         <span className="x-pseudo">@{enregistre.pseudo}</span>
-        <p className="x-bio">{enregistre.bio || `${joueur.club} · saison ${joueur.saison}`}</p>
+        <p className="x-bio">{enregistre.bio || t("ui.aac5bf10c708", { v0: joueur.club, v1: joueur.saison })}</p>
         <div className="x-profil-chiffres">
           <span><b>{compact(joueur.abonnes ?? 0)}</b> {t('gen.abonnes')}</span>
           <span><b>{suivis.length}</b> {t('ov.abonnements')}</span>
@@ -858,8 +858,8 @@ function PanneauSuccesManager() {
   return (
     <div className="x-succes x-succes-manager">
       <div className="x-defis x-palmares-manager">
-        <h3>Palmarès de {manager.nom}</h3>
-        <p className="x-note">Les trophées viennent des finales réellement remportées par ton équipe.</p>
+        <h3>{t("ui.9ff5086d702a", { v0: manager.nom })}</h3>
+        <p className="x-note">{t("ui.a27377726d04")}</p>
         {manager.palmares.length ? (
           <div className="x-palmares-liste">
             {manager.palmares.slice().reverse().map((titre, index) => (
@@ -867,16 +867,16 @@ function PanneauSuccesManager() {
                 <span><Icone d={I_TROPHEE} /></span>
                 <div>
                   <b>{TROPHEES[titre.trophee]?.nom ?? titre.nom}</b>
-                  <small>{titre.club} · saison {titre.saison}</small>
+                  <small>{t("ui.aac5bf10c708", { v0: titre.club, v1: titre.saison })}</small>
                 </div>
               </article>
             ))}
           </div>
-        ) : <p className="x-note">La première coupe remportée ouvrira l’armoire à trophées.</p>}
+        ) : <p className="x-note">{t("ui.ee628e02eda2")}</p>}
       </div>
 
       <div className="x-succes-tete">
-        <h3>Succès d’entraîneur</h3>
+        <h3>{t("ui.491048ce532e")}</h3>
         <span>{faits} / {total}</span>
       </div>
       <div className="x-barre"><i style={{ width: `${total ? (faits / total) * 100 : 0}%` }} /></div>
@@ -1202,7 +1202,7 @@ function NegociationRecrueManager({ pseudo }: { pseudo: string }) {
   return (
     <div className="x-nego x-nego-manager" data-etat={nego.etat}>
       <div className="x-nego-tete">
-        <b>{interne ? nego.nature === 'revalorisation' ? 'Revalorisation' : 'Prolongation' : t('mgr.x.offreContrat')}</b>
+        <b>{interne ? nego.nature === 'revalorisation' ? t("ui.2ebe313a62c8") : t("ov.prolongation") : t('mgr.x.offreContrat')}</b>
         {nego.etat === 'ouverte' && (
           <span className="x-nego-patience" title={t('mgr.x.patience')}>
             {'●'.repeat(nego.patience)}{'○'.repeat(Math.max(0, 4 - nego.patience))}
@@ -1214,9 +1214,9 @@ function NegociationRecrueManager({ pseudo }: { pseudo: string }) {
         <span><small>{t('mgr.x.prime')}</small><b>{nombre(nego.offre.prime)} €</b></span>
         <span><small>{t('mgr.x.duree')}</small><b>{nego.offre.duree} {t('mgr.x.ans')}</b></span>
         <span><small>{t('mgr.x.role')}</small><b>{role}</b></span>
-        <span><small>Primes performance</small><b>{nombre((nego.offre.primeTitularisation ?? 0) + (nego.offre.primeVictoire ?? 0) + (nego.offre.primeEssai ?? 0) + (nego.offre.primeTitre ?? 0))} €</b></span>
-        <span><small>Option</small><b>{nego.offre.option ?? 'aucune'}{nego.offre.optionMatchs ? ` · ${nego.offre.optionMatchs} matchs` : ''}</b></span>
-        <span><small>Clause</small><b>{nego.offre.clauseLiberation ? `${nombre(nego.offre.clauseLiberation)} €` : nego.offre.clauseRelegation ? 'départ si relégation' : 'aucune'}</b></span>
+        <span><small>{t("ui.21a21422e5d1")}</small><b>{nombre((nego.offre.primeTitularisation ?? 0) + (nego.offre.primeVictoire ?? 0) + (nego.offre.primeEssai ?? 0) + (nego.offre.primeTitre ?? 0))} €</b></span>
+        <span><small>{t("ui.45aaacba7ea1")}</small><b>{nego.offre.option ?? t("ui.3424b4ac5317")}{nego.offre.optionMatchs ? t("ui.cb1992ef2b47", { v0: nego.offre.optionMatchs }) : ''}</b></span>
+        <span><small>{t("ui.797021cd22bd")}</small><b>{nego.offre.clauseLiberation ? `${nombre(nego.offre.clauseLiberation)} €` : nego.offre.clauseRelegation ? t("ui.c54db6a13d2b") : t("ui.3424b4ac5317")}</b></span>
       </div>
       {!interne && <p className="x-nego-offre">
         {t('mgr.x.indemniteClub', {
@@ -1225,9 +1225,9 @@ function NegociationRecrueManager({ pseudo }: { pseudo: string }) {
         })}
       </p>}
       <div className="nego-contexte-reel">
-        <p><b>Priorités :</b> {(nego.motivations ?? []).map((m) => `${m.type} ${m.importance}`).join(' · ') || 'profil en cours'}</p>
-        <p><b>Intérêt :</b> {nego.interet ?? 50}/100 · <b>Concurrence :</b> {nego.offresConcurrentes?.length ? nego.offresConcurrentes.map((o) => `${o.club} (${o.niveau})`).join(', ') : 'aucune offre connue'}</p>
-        {nego.examenMedical && <p className={`examen-${nego.examenMedical.risque}`}><b>Visite médicale :</b> risque {nego.examenMedical.risque} · {nego.examenMedical.reserve}</p>}
+        <p><b>{t("ui.67c4e82c984a")}</b> {(nego.motivations ?? []).map((m) => `${m.type} ${m.importance}`).join(' · ') || t("ui.dbe644c3d8a1")}</p>
+        <p><b>{t("ui.b1886a0146d8")}</b> {nego.interet ?? 50}/100 · <b>{t("ui.8484c31e4fa7")}</b> {nego.offresConcurrentes?.length ? nego.offresConcurrentes.map((o) => `${o.club} (${o.niveau})`).join(', ') : t("ui.544cb541d338")}</p>
+        {nego.examenMedical && <p className={`examen-${nego.examenMedical.risque}`}><b>{t("ui.e777caa1a109")}</b>{t("ui.6ec49efc159e", { v0: nego.examenMedical.risque, v1: nego.examenMedical.reserve })}</p>}
       </div>
 
       {nego.etat === 'ouverte' && (
@@ -1237,9 +1237,9 @@ function NegociationRecrueManager({ pseudo }: { pseudo: string }) {
             <button onClick={() => negocier(nego.id, 'prime')}>{t('mgr.x.augmenterPrime')}</button>
             <button onClick={() => negocier(nego.id, 'duree')}>{t('mgr.x.allonger')}</button>
             <button onClick={() => negocier(nego.id, 'role')}>{t('mgr.x.meilleurRole')}</button>
-            <button onClick={() => negocier(nego.id, 'bonus')}>Primes de performance</button>
-            <button onClick={() => negocier(nego.id, 'option')}>Option contractuelle</button>
-            <button onClick={() => negocier(nego.id, 'clause')}>Clauses et garanties</button>
+            <button onClick={() => negocier(nego.id, 'bonus')}>{t("ui.a87c19944ee7")}</button>
+            <button onClick={() => negocier(nego.id, 'option')}>{t("ui.43a139aa5e11")}</button>
+            <button onClick={() => negocier(nego.id, 'clause')}>{t("ui.e36a2ce380bd")}</button>
           </div>
           <div className="x-nego-fin">
             <button className="x-nego-oui" onClick={() => accepterDemandes(nego.id)}>{t('mgr.x.accepterDemandes')}</button>
@@ -1273,26 +1273,26 @@ function NegociationClubVendeur({ pseudo }: { pseudo: string }) {
   const transfertFinalise = joueurDejaRecrute(manager, nego.cible.id);
   return (
     <div className="x-nego x-nego-manager" data-etat={nego.etat}>
-      <div className="x-nego-tete"><b><Icone d={I_STADE} /> Accord entre clubs</b>{nego.etat === 'ouverte' && <span className="x-nego-patience">{'●'.repeat(nego.patience)}{'○'.repeat(Math.max(0, 4 - nego.patience))}</span>}</div>
+      <div className="x-nego-tete"><b><Icone d={I_STADE} />{t("ui.ac72b876322e")}</b>{nego.etat === 'ouverte' && <span className="x-nego-patience">{'●'.repeat(nego.patience)}{'○'.repeat(Math.max(0, 4 - nego.patience))}</span>}</div>
       <div className="manager-x-termes manager-x-termes-club">
-        <span><small>Demande</small><b>{nombre(nego.demande)} €</b></span>
-        <span><small>Ton offre</small><b>{nombre(nego.offre)} €</b></span>
-        <span><small>Bonus différés</small><b>{nombre(nego.bonus ?? 0)} €</b></span>
-        <span><small>Part à la revente</small><b>{nego.pourcentageRevente ?? 0}%</b></span>
+        <span><small>{t("ui.e79fa141dd58")}</small><b>{nombre(nego.demande)} €</b></span>
+        <span><small>{t("ui.2576d6240979")}</small><b>{nombre(nego.offre)} €</b></span>
+        <span><small>{t("ui.be4903b8e5f3")}</small><b>{nombre(nego.bonus ?? 0)} €</b></span>
+        <span><small>{t("ui.285ea65cb6a1")}</small><b>{nego.pourcentageRevente ?? 0}%</b></span>
       </div>
       {nego.etat === 'ouverte' && <>
-        <p className="x-nego-offre">Besoin vendeur : {nego.besoinVendeur ?? 'non communiqué'} · urgence {nego.urgence ?? 50}/100 · {nego.alternatives ?? 0} alternative(s). Le prix minimum reste caché.</p>
+        <p className="x-nego-offre">{t("ui.eb289f02091a", { v0: nego.besoinVendeur ?? t("ui.968becc8949c"), v1: nego.urgence ?? 50, v2: nego.alternatives ?? 0 })}</p>
         <div className="x-nego-leviers">
-          <button onClick={() => negocier(nego.id, 'monter')}>Monter l’offre</button>
-          <button onClick={() => negocier(nego.id, 'bonus')}>Ajouter des bonus</button>
-          <button onClick={() => negocier(nego.id, 'revente')}>10% à la revente</button>
-          <button onClick={() => negocier(nego.id, 'accepter')}>Accepter {nombre(nego.demande)} €</button>
+          <button onClick={() => negocier(nego.id, 'monter')}>{t("ui.4811519f8b31")}</button>
+          <button onClick={() => negocier(nego.id, 'bonus')}>{t("ui.d369178be41b")}</button>
+          <button onClick={() => negocier(nego.id, 'revente')}>{t("ui.cffaa7f65aae")}</button>
+          <button onClick={() => negocier(nego.id, 'accepter')}>{t("ui.1e137d73e74c", { v0: nombre(nego.demande) })}</button>
         </div>
       </>}
       {nego.etat === 'accord' && (transfertFinalise
         ? <div className="x-nego-accord"><Icone d={I_OK} /> <b>{t('mgr.x.transfertFinalise')}</b></div>
-        : <div className="manager-x-signature"><p className="budget-ok">Accord à {nombre(nego.offre)} €. Tu peux maintenant parler au joueur.</p><button className="x-nego-oui" onClick={() => contacterJoueur(nego.cible)}>Écrire à {nego.cible.nom}</button></div>)}
-      {nego.etat === 'rompue' && <div className="x-nego-accord"><b>Le club a quitté la table des négociations pour cette saison.</b></div>}
+        : <div className="manager-x-signature"><p className="budget-ok">{t("ui.7678021506ea", { v0: nombre(nego.offre) })}</p><button className="x-nego-oui" onClick={() => contacterJoueur(nego.cible)}>{t("ui.596ae3161d0a", { v0: nego.cible.nom })}</button></div>)}
+      {nego.etat === 'rompue' && <div className="x-nego-accord"><b>{t("ui.436837c02a4b")}</b></div>}
     </div>
   );
 }
@@ -1320,45 +1320,41 @@ function ApprocheClubCarte({ pseudo }: { pseudo: string }) {
   return (
     <div className="x-nego x-nego-manager x-approche" data-etat={approche.etat}>
       <div className="x-nego-tete">
-        <b><Icone d={I_STADE} /> Offre pour {approche.nom}</b>
+        <b><Icone d={I_STADE} />{t("ui.39bdf351807f", { v0: approche.nom })}</b>
         {approche.etat === 'negociation' && <span className="x-nego-patience">{'●'.repeat(approche.patience)}{'○'.repeat(Math.max(0, 4 - approche.patience))}</span>}
       </div>
       <div className="manager-x-termes manager-x-termes-club">
-        <span><small>Leur offre</small><b>{nombre(approche.offre)} €</b></span>
-        <span><small>Ta demande</small><b>{nombre(approche.demande)} €</b></span>
-        <span><small>Bonus différés</small><b>{nombre(approche.bonus)} €</b></span>
-        <span><small>Part à la revente</small><b>{approche.pourcentageRevente}%</b></span>
+        <span><small>{t("ui.321ab51cd2d6")}</small><b>{nombre(approche.offre)} €</b></span>
+        <span><small>{t("ui.978b481a134e")}</small><b>{nombre(approche.demande)} €</b></span>
+        <span><small>{t("ui.be4903b8e5f3")}</small><b>{nombre(approche.bonus)} €</b></span>
+        <span><small>{t("ui.285ea65cb6a1")}</small><b>{approche.pourcentageRevente}%</b></span>
       </div>
-      <p className="x-nego-offre">
-        {approche.club} · {approche.division} · {nomPoste(approche.poste)} {approche.age} ans, note {approche.note}.
-        Contrat restant : {approche.saisonsRestantes} saison(s). Motif : {besoins[approche.besoin]} ·
-        urgence {approche.urgence}/100 · {approche.alternatives} alternative(s) dans leur groupe.
-      </p>
+      <p className="x-nego-offre">{t("ui.24272510994d", { v0: approche.club, v1: approche.division, v2: nomPoste(approche.poste), v3: approche.age, v4: approche.note, v5: approche.saisonsRestantes, v6: besoins[approche.besoin], v7: approche.urgence, v8: approche.alternatives })}</p>
       {approche.etat === 'ouverte' && <div className="x-nego-leviers">
-        <button className="x-nego-oui" onClick={() => repondre(approche.id, 'accepter')}>Accepter {nombre(approche.offre)} €</button>
-        <button onClick={() => repondre(approche.id, 'negocier')}>Négocier</button>
-        <button onClick={() => repondre(approche.id, 'refuser')}>Refuser</button>
-        <button className="x-nego-non" onClick={() => repondre(approche.id, 'indisponible')}>Il n’est pas disponible</button>
+        <button className="x-nego-oui" onClick={() => repondre(approche.id, 'accepter')}>{t("ui.1e137d73e74c", { v0: nombre(approche.offre) })}</button>
+        <button onClick={() => repondre(approche.id, 'negocier')}>{t("ui.d806a83080e8")}</button>
+        <button onClick={() => repondre(approche.id, 'refuser')}>{t("pub.refuser")}</button>
+        <button className="x-nego-non" onClick={() => repondre(approche.id, 'indisponible')}>{t("ui.118e46a4d403")}</button>
       </div>}
       {approche.etat === 'negociation' && <>
         <label className="x-approche-exigence">
-          <span>Ce que tu réclames</span>
+          <span>{t("ui.d3478eb2c063")}</span>
           <input type="number" step={25_000} min={0} value={approche.demande}
             onChange={(e) => exiger(approche.id, Number(e.target.value))} />
         </label>
         <div className="x-nego-leviers">
-          <button onClick={() => negocier(approche.id, 'exiger')}>Qu’ils montent</button>
-          <button onClick={() => negocier(approche.id, 'bonus')}>Accepter des bonus</button>
-          <button onClick={() => negocier(approche.id, 'revente')}>+10% à la revente</button>
-          <button className="x-nego-oui" onClick={() => negocier(approche.id, 'accepter')}>Prendre {nombre(approche.offre)} €</button>
+          <button onClick={() => negocier(approche.id, 'exiger')}>{t("ui.5d66229b5098")}</button>
+          <button onClick={() => negocier(approche.id, 'bonus')}>{t("ui.be22f7ed188c")}</button>
+          <button onClick={() => negocier(approche.id, 'revente')}>{t("ui.a219c96637da")}</button>
+          <button className="x-nego-oui" onClick={() => negocier(approche.id, 'accepter')}>{t("ui.acf4767918cb", { v0: nombre(approche.offre) })}</button>
         </div>
       </>}
-      {approche.etat === 'conclue' && <div className="x-nego-accord"><Icone d={I_OK} /> <b>Transfert conclu avec {approche.club}.</b></div>}
-      {approche.etat === 'rompue' && <div className="x-nego-accord"><b>Négociations terminées : le club s’est retiré.</b></div>}
+      {approche.etat === 'conclue' && <div className="x-nego-accord"><Icone d={I_OK} /> <b>{t("ui.95e2c6732120", { v0: approche.club })}</b></div>}
+      {approche.etat === 'rompue' && <div className="x-nego-accord"><b>{t("ui.3cb8c99c6625")}</b></div>}
       {(approche.etat === 'refusee' || approche.etat === 'indisponible') && <div className="x-nego-accord">
-        <b>{approche.etat === 'refusee' ? 'Offre refusée.' : 'Joueur déclaré indisponible.'}</b>
+        <b>{approche.etat === 'refusee' ? t("ui.45d311cbbea9") : t("ui.f1230f0df43b")}</b>
         {approche.reaction && <span>{approche.reaction === 'demandeDepart'
-          ? ' Le joueur a demandé son départ.' : ' Le joueur a accepté la décision.'}</span>}
+          ? t("ui.a27ad3bc1a8b") : t("ui.2e8d9e6022b4")}</span>}
       </div>}
     </div>
   );
@@ -1372,13 +1368,13 @@ function DemandeVestiaireManager({ pseudo }: { pseudo: string }) {
   if (!demande) return null;
   return (
     <div className="x-nego x-nego-manager" data-etat={demande.etat}>
-      <div className="x-nego-tete"><b>{demande.type === 'depart' ? 'Demande de départ' : 'Temps de jeu'}</b></div>
-      <p className="x-nego-offre">{demande.nom} · {nomPoste(demande.poste)} · note {demande.note} · raison : {(demande.raison ?? demande.type).replace(/([A-Z])/g, ' $1').toLowerCase()}</p>
+      <div className="x-nego-tete"><b>{demande.type === 'depart' ? t("ui.1cbc6b812fe3") : t("stats.minutes")}</b></div>
+      <p className="x-nego-offre">{t("ui.37b448e91c81", { v0: demande.nom, v1: nomPoste(demande.poste), v2: demande.note, v3: (demande.raison ?? demande.type).replace(/([A-Z])/g, ' $1').toLowerCase() })}</p>
       {demande.etat === 'ouverte' ? <div className="x-nego-fin">
-        <button className="x-nego-oui" onClick={() => repondre(demande.id, true)}>{demande.type === 'depart' ? 'Accepter et le mettre en vente' : 'Promettre plus de temps de jeu'}</button>
-        {demande.type === 'depart' && <button onClick={() => ouvrirContrat(demande.joueurId)}>Proposer un nouveau contrat</button>}
-        <button className="x-nego-non" onClick={() => repondre(demande.id, false)}>Refuser</button>
-      </div> : <div className="x-nego-accord">{demande.etat === 'acceptee' ? 'Demande acceptée' : 'Demande refusée'}</div>}
+        <button className="x-nego-oui" onClick={() => repondre(demande.id, true)}>{demande.type === 'depart' ? t("ui.cb38c88ab368") : t("ui.ab627960c187")}</button>
+        {demande.type === 'depart' && <button onClick={() => ouvrirContrat(demande.joueurId)}>{t("ui.ffd2d75b1a88")}</button>}
+        <button className="x-nego-non" onClick={() => repondre(demande.id, false)}>{t("pub.refuser")}</button>
+      </div> : <div className="x-nego-accord">{demande.etat === 'acceptee' ? t("ui.20967bdf0d4b") : t("ui.a5c1aef9d92a")}</div>}
     </div>
   );
 }
@@ -1394,18 +1390,18 @@ function VentesManager({ recherche = '' }: { recherche?: string }) {
   ));
   return (
     <div className="manager-x-ventes">
-      <section className="manager-x-vente-intro"><div><span className="eyebrow">Direction sportive</span><h2>Gérer les départs</h2><p>Place un joueur sur la liste, compare les projets reçus puis valide sa destination. Dans le rugby amateur, le départ reste gratuit mais il fonctionne vraiment.</p></div><strong>{nombre(manager.budgetTransferts)} €<small>budget transferts</small></strong></section>
+      <section className="manager-x-vente-intro"><div><span className="eyebrow">{t("ui.2d430bce73d0")}</span><h2>{t("ui.b459bc34caaa")}</h2><p>{t("ui.d9e587eac266")}</p></div><strong>{nombre(manager.budgetTransferts)} €<small>{t("ui.071290377b62")}</small></strong></section>
       {manager.ventes.map((vente) => (
         <article className="manager-x-vente" key={vente.joueurId}>
-          <header><div><b>{vente.nom}</b><span>{nomPoste(vente.poste)} · {vente.age} ans · note {vente.note} · potentiel {vente.potentiel}</span></div><strong>{vente.valeur > 0 ? `${nombre(vente.valeur)} €` : 'Départ libre'}</strong><button onClick={() => retirer(vente.joueurId)}>Retirer</button></header>
+          <header><div><b>{vente.nom}</b><span>{t("ui.33d28cc82d9d", { v0: nomPoste(vente.poste), v1: vente.age, v2: vente.note, v3: vente.potentiel })}</span></div><strong>{vente.valeur > 0 ? `${nombre(vente.valeur)} €` : t("ui.ba80afe3fa97")}</strong><button onClick={() => retirer(vente.joueurId)}>{t("ov.retirer")}</button></header>
           {vente.offres.length ? <div className="manager-x-offres">{vente.offres.map((offre) => {
             const club = clubParNom(offre.club);
-            return <div key={offre.id}><span>{club && <Blason club={club} taille={34} />}<b>{offre.club}</b><small>{offre.division}</small></span><strong>{offre.montant > 0 ? `${nombre(offre.montant)} €` : 'Projet amateur'}</strong><button className="x-poster" onClick={() => accepter(vente.joueurId, offre.id)}>{offre.montant > 0 ? 'Accepter' : 'Valider le départ'}</button></div>;
-          })}</div> : <p className="manager-x-sans-offre">Aucun club ne s’est encore positionné sur ce joueur.</p>}
+            return <div key={offre.id}><span>{club && <Blason club={club} taille={34} />}<b>{offre.club}</b><small>{offre.division}</small></span><strong>{offre.montant > 0 ? `${nombre(offre.montant)} €` : t("ui.9a291ac36788")}</strong><button className="x-poster" onClick={() => accepter(vente.joueurId, offre.id)}>{offre.montant > 0 ? t("pub.accepter") : t("ui.018993b59ac6")}</button></div>;
+          })}</div> : <p className="manager-x-sans-offre">{t("ui.8aa29937168c")}</p>}
         </article>
       ))}
       <section className="manager-x-effectif">
-        <h3>Effectif du club</h3>
+        <h3>{t("ui.91aebbab5007")}</h3>
         <div>{effectif.map((joueur) => {
           const liste = manager.ventes.some((v) => v.joueurId === joueur.id);
           const profilMedical = manager.avancee?.profilsMedicaux[joueur.id];
@@ -1415,7 +1411,7 @@ function VentesManager({ recherche = '' }: { recherche?: string }) {
             sequelles: Object.values(profilMedical?.sequelles ?? {}).reduce((n, x) => n + (x ?? 0), 0),
             contratFin: contratJoueur?.fin,
           });
-          return <article key={joueur.id}><em>{joueur.note}</em><span><b>{joueur.nom}</b><small>{nomPoste(joueur.poste)} · {joueur.age} ans</small></span><strong>{valeur > 0 ? `${nombre(valeur)} €` : 'Libre'}</strong><button disabled={liste} onClick={() => mettreEnVente(joueur.id)}>{liste ? 'Sur la liste' : valeur > 0 ? 'Mettre en vente' : 'Proposer un départ'}</button></article>;
+          return <article key={joueur.id}><em>{joueur.note}</em><span><b>{joueur.nom}</b><small>{t("ui.8754083c2e25", { v0: nomPoste(joueur.poste), v1: joueur.age })}</small></span><strong>{valeur > 0 ? `${nombre(valeur)} €` : t("mgr.libreGratuit")}</strong><button disabled={liste} onClick={() => mettreEnVente(joueur.id)}>{liste ? t("ui.a0e942020a31") : valeur > 0 ? t("online.market.tab.sell") : t("ui.a9bbc5772a3c")}</button></article>;
         })}</div>
       </section>
     </div>
@@ -1618,7 +1614,7 @@ export function OvaleManager({ embarque = false, onRetour }: OvaleManagerProps =
 
         {onglet === 'timeline' && <>
           {recherche.trim() && <div className="x-explorer manager-x-comptes-recherche">
-            <div className="x-bloc-tete"><h3>Comptes pour « {recherche} »</h3></div>
+            <div className="x-bloc-tete"><h3>{t("ui.200292aa729d", { v0: recherche })}</h3></div>
             {/* Le compte entier est cliquable, comme dans L'Ovale du joueur. */}
             {resultatsComptes.map((compte) => <div key={compte.pseudo} className="x-compte-carte">
               <button className="x-lien-profil" onClick={() => ouvrirProfil(compte.pseudo)}>
@@ -1631,19 +1627,19 @@ export function OvaleManager({ embarque = false, onRetour }: OvaleManagerProps =
               </button>
             </div>)}
             {!resultatsComptes.length && <p className="x-vide">{t('ov.aucunCompte')}</p>}
-            <div className="x-bloc-tete"><h3>Publications</h3></div>
+            <div className="x-bloc-tete"><h3>{t("ui.82b2eb07aaea")}</h3></div>
           </div>}
           <div className="manager-x-timeline">
             {postsFiltres.length
               ? postsFiltres.map((post) => <Post key={post.id} post={post} lectureSeule onProfil={ouvrirProfil} onRecherche={(mot) => { setRecherche(mot); setOnglet('timeline'); }} />)
-              : <div className="x-vide manager-x-vide"><b>{recherche ? 'Aucune publication' : 'Le fil se prépare'}</b><p>{recherche ? `Aucune publication ne correspond à « ${recherche} ».` : 'Les clubs, médias et supporters publieront au rythme des semaines et des résultats.'}</p></div>}
+              : <div className="x-vide manager-x-vide"><b>{recherche ? t("ui.cdc8e5edcc0d") : t("ui.550c5290dc32")}</b><p>{recherche ? t("ui.dc04fca1b208", { v0: recherche }) : t("ui.809baf845984")}</p></div>}
           </div>
         </>}
 
         {onglet === 'explorer' && (
           <>
             <div className="manager-x-explorer-tete">
-              <div><b>Mercato du manager</b><span>Arrivées depuis le marché mondial · départs depuis L’Ovale</span></div>
+              <div><b>{t("ui.6e8e47fe7724")}</b><span>{t("ui.57525e72cb0a")}</span></div>
               {/* Le bouton mène là où L'Ovale ne va pas : le MARCHÉ, pas le
                   bureau. « Ouvrir le bureau » renvoyait à l'onglet d'à côté. */}
               <button className="x-poster" onClick={() => retournerAuManager('marche')}>
@@ -1683,16 +1679,16 @@ export function OvaleManager({ embarque = false, onRetour }: OvaleManagerProps =
               {actif && dossier?.type === 'demande' && <DemandeVestiaireManager pseudo={actif} />}
               {actif && dossier?.type === 'approche' && <ApprocheClubCarte pseudo={actif} />}
               {actif && (dossier?.type === 'libre' || dossier?.type === 'club' || dossier?.type === 'joueur') && <form className="x-envoi" onSubmit={e=>{e.preventDefault();if(texteLibre.trim()){void envoyerLibre(actif,texteLibre);setTexteLibre('');}}}>
-                <input aria-label="Écrire un message" value={texteLibre} maxLength={400} onChange={e=>setTexteLibre(e.target.value)} placeholder={dossier.type === 'libre' ? 'Écrire un message' : 'Écrire à ton interlocuteur · ajuste l’offre avec les boutons ci-dessus'} />
-                <button className="x-poster" disabled={!texteLibre.trim()}>Envoyer</button>
+                <input aria-label={t("ui.5e8d80ab8a23")} value={texteLibre} maxLength={400} onChange={e=>setTexteLibre(e.target.value)} placeholder={dossier.type === 'libre' ? t("ui.5e8d80ab8a23") : t("ui.cdb7a36303a7")} />
+                <button className="x-poster" disabled={!texteLibre.trim()}>{t("ov.envoyer")}</button>
               </form>}
             </div>
           </div>
-        ) : <div className="x-vide manager-x-vide"><b>Aucune discussion en cours</b><p>Recherche un compte ou un joueur pour lui écrire.</p><button className="x-poster" onClick={() => setOnglet('explorer')}>Chercher un destinataire</button></div>)}
+        ) : <div className="x-vide manager-x-vide"><b>{t("mgr.aucuneDiscussion")}</b><p>{t("ui.34e9ba915dad")}</p><button className="x-poster" onClick={() => setOnglet('explorer')}>{t("ui.a45db6a5c5d8")}</button></div>)}
 
         {onglet === 'notifs' && <div className="x-fil">
-          {notifs.length === 0 && <p className="x-vide">Les résultats, offres et demandes du vestiaire apparaîtront ici.</p>}
-          {notifs.map((n) => <div key={n.id} className="x-notif"><span className="x-notif-emoji">{n.emoji}</span><div><b>{n.titre}</b><p>{n.texte}</p>{dateEtHeure(n) && <time className="x-notif-date">{dateEtHeure(n)}</time>}</div></div>)}
+          {notifs.length === 0 && <p className="x-vide">{t("ui.a6613f58faa9")}</p>}
+          {notifs.map((n) => <div key={n.id} className="x-notif"><span className="x-notif-emoji">{n.emoji}</span><div><b>{texteTraduit(n.titre)}</b><p>{n.texte}</p>{dateEtHeure(n) && <time className="x-notif-date">{dateEtHeure(n)}</time>}</div></div>)}
         </div>}
 
         {onglet === 'profil' && <div className="x-profil manager-x-profil">
@@ -1702,9 +1698,9 @@ export function OvaleManager({ embarque = false, onRetour }: OvaleManagerProps =
             {/* Plus de « Ouvrir le bureau » ici non plus : sur SON PROPRE
                 profil, le bouton ne parlait même pas du profil. */}
             <h2>{manager.club}<Certifie /></h2>
-            <span className="x-pseudo">@{pseudoDe(manager.club)} · entraîné par {manager.nom}</span>
-            <p className="x-bio">{manager.divisionNom} · saison {manager.saison}. Actualité officielle, résultats et coulisses du club.</p>
-            <div className="x-profil-chiffres"><span><b>{Math.round(manager.prestige)}</b> prestige</span><span><b>{Math.round(manager.confiance)}%</b> confiance</span><span><b>{manager.ventes.length}</b> départs ouverts</span><span><b>{dossiers.length}</b> discussions</span></div>
+            <span className="x-pseudo">{t("ui.0f712484c08f", { v0: pseudoDe(manager.club), v1: manager.nom })}</span>
+            <p className="x-bio">{t("ui.b194434e1354", { v0: manager.divisionNom, v1: manager.saison })}</p>
+            <div className="x-profil-chiffres"><span><b>{Math.round(manager.prestige)}</b>{t("sv.prestige")}</span><span><b>{Math.round(manager.confiance)}%</b>{t("ui.91335fba6c07")}</span><span><b>{manager.ventes.length}</b>{t("ui.01ea4af4679a")}</span><span><b>{dossiers.length}</b>{t("ui.a3bf4c4641e7")}</span></div>
           </div>
         </div>}
 
@@ -1725,21 +1721,21 @@ export function OvaleManager({ embarque = false, onRetour }: OvaleManagerProps =
       <aside className="x-droite">
         <form className="x-recherche" onSubmit={(e) => { e.preventDefault(); setOnglet(onglet === 'explorer' ? 'explorer' : 'timeline'); }}>
           <Icone d={I_LOUPE} />
-          <input value={recherche} onChange={(e) => setRecherche(e.target.value)} placeholder="Rechercher dans L’Ovale" />
+          <input value={recherche} onChange={(e) => setRecherche(e.target.value)} placeholder={t("ui.76589d2c0f55")} />
           {recherche && <button type="button" className="x-vider" onClick={() => setRecherche('')} title={t('ov.effacer')}><Icone d={I_CROIX} /></button>}
         </form>
         <div className="x-bloc">
-          <h3>Ton club</h3>
+          <h3>{t("of.tonClub")}</h3>
           <div className="manager-x-club-droite">{club && <Blason club={club} taille={46} />}<span><b>{manager.club}</b><small>{manager.divisionNom}</small></span></div>
-          <div className="x-audience"><div><b>{Math.round(manager.confiance)}%</b><span>confiance</span></div><div><b>{manager.ventes.length}</b><span>départs</span></div><div><b>{dossiers.length}</b><span>dossiers</span></div></div>
+          <div className="x-audience"><div><b>{Math.round(manager.confiance)}%</b><span>{t("ui.91335fba6c07")}</span></div><div><b>{manager.ventes.length}</b><span>{t("ui.de8721dbdc98")}</span></div><div><b>{dossiers.length}</b><span>{t("ui.6ea219c96a04")}</span></div></div>
         </div>
         <div className="x-bloc">
-          <h3>Mercato</h3>
-          <button className="x-tendance" onClick={() => setOnglet('messages')}><span className="x-tendance-cat">Négociations</span><b>#Messages</b><span className="x-tendance-vol">{dossiers.length} dossier(s) · {nonLusMessages} non lu(s)</span></button>
-          <button className="x-tendance" onClick={() => setOnglet('explorer')}><span className="x-tendance-cat">Direction sportive</span><b>#Départs</b><span className="x-tendance-vol">{manager.ventes.length} dossier(s) ouvert(s)</span></button>
-          <button className="x-tendance" onClick={() => retournerAuManager('marche')}><span className="x-tendance-cat">Base mondiale</span><b>#Recrutement</b><span className="x-tendance-vol">tous les championnats</span></button>
+          <h3>{t("ov.tendanceMercato")}</h3>
+          <button className="x-tendance" onClick={() => setOnglet('messages')}><span className="x-tendance-cat">{t("mgr.negociations")}</span><b>{t("ui.58cbd93e843f")}</b><span className="x-tendance-vol">{t("ui.e0154698ce57", { v0: dossiers.length, v1: nonLusMessages })}</span></button>
+          <button className="x-tendance" onClick={() => setOnglet('explorer')}><span className="x-tendance-cat">{t("ui.2d430bce73d0")}</span><b>{t("ui.d43010658f9a")}</b><span className="x-tendance-vol">{t("ui.05366b422037", { v0: manager.ventes.length })}</span></button>
+          <button className="x-tendance" onClick={() => retournerAuManager('marche')}><span className="x-tendance-cat">{t("ui.cc8a040ef74a")}</span><b>{t("ui.a148d50b5b99")}</b><span className="x-tendance-vol">{t("ui.542df5c87923")}</span></button>
         </div>
-        <div className="x-bloc manager-x-budget"><h3>Budget transferts</h3><b>{nombre(manager.budgetTransferts)} €</b><span>Marge salariale : {nombre(situationSalariale(manager).disponible)} € / an</span></div>
+        <div className="x-bloc manager-x-budget"><h3>{t("mgr.budgetTransferts")}</h3><b>{nombre(manager.budgetTransferts)} €</b><span>{t("ui.a3aca502f7ff", { v0: nombre(situationSalariale(manager).disponible) })}</span></div>
       </aside>
     </motion.section>
   );
@@ -2028,7 +2024,7 @@ function SocialJoueur() {
               <div key={n.id} className="x-notif">
                 <span className="x-notif-emoji">{n.emoji}</span>
                 <div>
-                  <b>{n.titre}</b>
+                  <b>{texteTraduit(n.titre)}</b>
                   <p>{n.texte}</p>
                   {dateEtHeure(n) && <time className="x-notif-date">{dateEtHeure(n)}</time>}
                 </div>

@@ -80,6 +80,7 @@
     "verify:calendrier-carriere": "vite-node scripts/verifierCalendrierCarriere.ts",
     "verify:laboratoire": "vite-node scripts/verifierLaboratoireLigue.ts",
     "verify:mobile-carriere": "vite-node scripts/verifierCorrectifsMobile.ts",
+    "verify:traductions": "vite-node scripts/verifierTraductions.ts",
     "verify:paiements": "vite-node scripts/verifierPaiementsStripe.ts"
   },
   "dependencies": {

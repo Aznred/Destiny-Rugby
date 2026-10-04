@@ -10,7 +10,7 @@
 // bissextiles ni les décalages réels d'un exercice à l'autre — le but est de
 // donner un fil crédible, pas un almanach.
 
-import { locale, t } from '../lib/i18n.js';
+import { locale, t, texteTraduit } from '../lib/i18n.js';
 
 export type TypeSemaine =
   | 'championnat'
@@ -130,8 +130,7 @@ export function libelleSemaine(s: Semaine, saison?: number): string {
   if (s.type === 'phaseFinale') {
     return t(`cal.${s.tourFinal ?? 'phaseFinale'}`);
   }
-  if (s.type === 'treve') return s.libelle;
-  return s.libelle;
+  return texteTraduit(s.libelle);
 }
 
 // Une saison civile de rugby : juillet → juin. Le type décrit UNIQUEMENT

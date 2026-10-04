@@ -577,7 +577,7 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, embleme
         viewBox={vue?.viewBox ?? `0 0 ${LONGUEUR} ${LARGEUR}`}
         preserveAspectRatio="xMidYMid slice"
         role="img"
-        aria-label={`${nomDomicile} contre ${nomExterieur} : positions réelles des joueurs et du ballon`}
+        aria-label={t("ui.918058ea4915", { v0: nomDomicile, v1: nomExterieur })}
       >
         <g ref={groupeTerrain} transform={vue?.transform}>
           <PelouseMemo />
@@ -672,29 +672,29 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, embleme
         )}
         {conquete && (
           <div className={`cel-conquete cel-conquete-${conquete.type}`} role="status">
-            <strong>{conquete.type === 'melee' ? 'MÊLÉE · POUSSÉE' : 'TOUCHE · COMBINAISON'}</strong>
+            <strong>{conquete.type === 'melee' ? t("ui.fe2bbb4358b2") : t("ui.93c53a1c1630")}</strong>
             <span>{conquete.type === 'melee'
-              ? conquete.progression < 0.32 ? 'Les packs se placent' : conquete.progression < 0.52 ? 'Liaison' : conquete.pousseVers ? 'Un pack prend l’ascendant' : 'Mêlée stable au centre'
-              : conquete.horsAlignement ? 'Lancer après le troisième bloc' : LIBELLES_COMBINAISON[conquete.combinaison ?? 'milieu']}</span>
+              ? conquete.progression < 0.32 ? t("ui.db5b2408f8eb") : conquete.progression < 0.52 ? t("ui.8bc13e79d11c") : conquete.pousseVers ? t("ui.22867856c9bd") : t("ui.20ba09e777ef")
+              : conquete.horsAlignement ? t("ui.924ca96d67f2") : LIBELLES_COMBINAISON[conquete.combinaison ?? 'milieu']}</span>
             <i><b style={{ width: `${Math.round(conquete.progression * 100)}%` }} /></i>
           </div>
         )}
         {affiche.aplatissage && (
           <div className="cel-aplatissage" role="status">
-            <strong>ESSAI EN COURS</strong>
-            <span>Contrôle et aplatissage du ballon</span>
+            <strong>{t("ui.96f49aacc6b4")}</strong>
+            <span>{t("ui.5b4dc9016110")}</span>
           </div>
         )}
         {!affiche.tmo?.actif && affiche.phase !== 'tmo' && (
           <div className={`cel-scenario cel-scenario-${scenario.intensite}`} aria-live="polite">
-            {scenario.momentFort && <b>MOMENT FORT</b>}
+            {scenario.momentFort && <b>{t("ui.9cb33e318761")}</b>}
             <span>{LIBELLES_SCENARIO[scenario.type]}</span>
-            <small>{scenario.sequence}<sup>e</sup> phase · {LIBELLES_ZONE[scenario.zone]}</small>
+            <small>{scenario.sequence}<sup>e</sup>{t("ui.112b98f1b9a5", { v0: LIBELLES_ZONE[scenario.zone] })}</small>
           </div>
         )}
         <div className="cel-hud-haut">
-          <span className="cel-tag"><i style={{ background: couleurs.domicile }} />{nomDomicile}{monCote === 'domicile' ? ' · toi' : ''}</span>
-          <span className="cel-tag"><i style={{ background: couleurs.exterieur }} />{nomExterieur}{monCote === 'exterieur' ? ' · toi' : ''}</span>
+          <span className="cel-tag"><i style={{ background: couleurs.domicile }} />{nomDomicile}{monCote === 'domicile' ? t("online.market.you") : ''}</span>
+          <span className="cel-tag"><i style={{ background: couleurs.exterieur }} />{nomExterieur}{monCote === 'exterieur' ? t("online.market.you") : ''}</span>
           <span className="cel-tag" style={{ borderColor: couleurs[affiche.possession] }}>
             <Icone nom="ballon" taille={13} />{affiche.possession === 'domicile' ? nomDomicile : nomExterieur}
           </span>
@@ -715,7 +715,7 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, embleme
             onClick={() => setModeCamera(modeCamera === 'auto' ? 'large' : modeCamera === 'large' ? 'suivi' : 'auto')}
           >
             <Icone nom="oeil" taille={15} />
-            {modeCamera === 'auto' ? 'Caméra auto' : modeCamera === 'large' ? 'Vue terrain' : 'Suivre le ballon'}
+            {modeCamera === 'auto' ? t("ui.60fdc84e948b") : modeCamera === 'large' ? t("ui.9deda7bc43dd") : t("ui.c45c58b1bb9b")}
           </button>
         )}
       </div>

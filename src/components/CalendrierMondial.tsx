@@ -1,3 +1,4 @@
+import { tn, t } from '../lib/i18n';
 import { useEffect, useRef, useState } from 'react';
 import { useGame } from '../store/useGame';
 import { CALENDRIER, semaine, libelleDate, libelleSemaine, SEMAINES_PAR_SAISON } from '../data/calendrier';
@@ -18,13 +19,13 @@ export function QualificationsMondial({ saison, numero }: { saison: number; nume
   const jouee = (id: string, total: number) => saison > anneeQualif || (saison === anneeQualif
     && numero > (datesCompetitionInternationale(id, 'tournoi', total, anneeQualif).at(-1) ?? SEMAINES_PAR_SAISON));
   return <details className="carte manager-cal-commandes">
-    <summary>Qualifications · Mondial {2025 + edition} · 24 nations</summary>
-    <p>12 places automatiques : {cycle.automatiques.join(', ')}.</p>
-    <p>Dans le jeu : 11 places régionales et 1 place au repêchage. Les deux premiers de chaque poule du Mondial précédent conservent leur place.</p>
-    {cycle.regions.map((r) => <p key={r.competition.id}><b>{r.competition.nom.replace('Qualifications Mondial · ', '')} · {r.places} place{r.places > 1 ? 's' : ''}</b><br />
-      {jouee(r.competition.id, r.competition.journees) ? r.qualifies.join(', ') : 'Qualifications en cours ou à venir · résultats au fil du calendrier'}</p>)}
-    <p><b>Repêchage final · quatre nations · mai</b><br />{jouee('repechageMondial',3)
-      ? 'Qualifié : ' + cycle.vainqueurRepechage : 'Une dernière place se joue sur trois journées.'}</p>
+    <summary>{t("ui.977486d12822", { v0: 2025 + edition })}</summary>
+    <p>{t("ui.4fc5b31cf2de", { v0: cycle.automatiques.join(', ') })}</p>
+    <p>{t("ui.3da9933e3db3")}</p>
+    {cycle.regions.map((r) => <p key={r.competition.id}><b>{tn("ui.c5afadfbfbda", r.places, { v0: r.competition.nom.replace('Qualifications Mondial · ', ''), v1: r.places })}</b><br />
+      {jouee(r.competition.id, r.competition.journees) ? r.qualifies.join(', ') : t("ui.8122791d7b66")}</p>)}
+    <p><b>{t("ui.513baec929f2")}</b><br />{jouee('repechageMondial',3)
+      ? t("ui.77fa525147bc") + cycle.vainqueurRepechage : t("ui.22666cf1ac96")}</p>
   </details>;
 }
 
@@ -54,7 +55,7 @@ export function CalendrierMondial({ onFermer }: { onFermer: () => void }) {
         : s.type === 'coupe' || s.type === 'phaseFinale' ? 'Selon qualification' : 'Vie du club',
       titre: championnat ? repere : libelleSemaine(s, joueur.saison),
       contenu: <span>{affiche ? `${affiche.match.domicile} – ${affiche.match.exterieur}`
-        : s.type === 'coupe' || s.type === 'phaseFinale' ? 'Selon qualification · adversaire à confirmer' : 'Repos, préparation et vie du club'}</span>,
+        : s.type === 'coupe' || s.type === 'phaseFinale' ? t("ui.8b851ce2a16d") : t("ui.43d81e2853df")}</span>,
       selections: programmeInternational(s.numero, joueur.saison),
     };
   });
@@ -63,18 +64,17 @@ export function CalendrierMondial({ onFermer }: { onFermer: () => void }) {
     saison: 'Nouvelle saison commencée.', contrat: 'Ton contrat demande une décision.', fin: 'Carrière terminée.' };
   return <dialog ref={dialogue} className="calendrier-mondial-dialog" aria-labelledby="titre-calendrier-mondial" onCancel={onFermer}>
     <div className="manager-cal-commandes manager-cal-principal">
-      <div className="comp-tete"><h2 id="titre-calendrier-mondial">Calendrier mondial · {2025 + joueur.saison}–{2026 + joueur.saison}</h2>
-        <button autoFocus className="btn fantome" onClick={onFermer}>Fermer</button></div>
-      <p className="manager-cal-present">Aujourd’hui : {libelleDate(semaine(numero))} · {joueur.club}</p>
+      <div className="comp-tete"><h2 id="titre-calendrier-mondial">{t("ui.e19bb3be835f", { v0: 2025 + joueur.saison, v1: 2026 + joueur.saison })}</h2>
+        <button autoFocus className="btn fantome" onClick={onFermer}>{t("ov.fermer")}</button></div>
+      <p className="manager-cal-present">{t("ui.83e4186bebf6", { v0: libelleDate(semaine(numero)), v1: joueur.club })}</p>
       <FriseCalendrier saison={joueur.saison} numero={numero} selection={destination}
         onSelection={(n) => setChoix({ saison: joueur.saison, numero: n })} etapes={etapes} actions={<>
           <button className="btn primaire" disabled={destination <= numero} onClick={() => setBilan(avancer(destination))}>
-            {destination <= numero ? 'Choisis une date à venir' : `Avancer jusqu’à ${dateCible}`} <Icone nom="fleche-droite" taille={16} /></button>
-          <small>Rencontres simulées, statistiques conservées. Arrêt sur une décision ou un contrat à régler.</small>
+            {destination <= numero ? t("ui.d7a079a9a62f") : t("ui.c2ae6be294dd", { v0: dateCible })} <Icone nom="fleche-droite" taille={16} /></button>
+          <small>{t("ui.37660d91ca87")}</small>
         </>} />
-      {bilan && <p role="status">{bilan.semaines} semaine(s) avancée(s). {motifs[bilan.arret]}</p>}
-      {situation.annonce && <p><b>{situation.camp ? 'En sélection' : 'Convocation annoncée'} · {situation.annonce.nation}</b><br />
-        {situation.annonce.nom} · groupe de 34 · du {libelleDate(semaine(situation.annonce.debut))} au {libelleDate(semaine(situation.annonce.fin))}.</p>}
+      {bilan && <p role="status">{t("ui.55a2d6dd5ddc", { v0: bilan.semaines, v1: motifs[bilan.arret] })}</p>}
+      {situation.annonce && <p><b>{situation.camp ? t("compo.badge.international") : t("ui.6e0e01d6c13c")} · {situation.annonce.nation}</b><br />{t("ui.059f611af840", { v0: situation.annonce.nom, v1: libelleDate(semaine(situation.annonce.debut)), v2: libelleDate(semaine(situation.annonce.fin)) })}</p>}
     </div>
     <QualificationsMondial saison={joueur.saison} numero={numero} />
   </dialog>;

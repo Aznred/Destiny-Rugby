@@ -94,9 +94,9 @@ export function CollectionSolo() {
     {bilan && <p className="solo-bilan" role="status"><Icone nom="ok" taille={17} /> {bilan}</p>}
 
     <button type="button" className="btn fantome solo-bouton-echanges" onClick={() => setEchangesOuverts(ouvert => !ouvert)}>
-      {echangesOuverts ? 'Masquer les échanges' : 'Échanger mes doublons avec les autres joueurs'}
+      {echangesOuverts ? t("ui.ad2d61675932") : t("ui.5c8f1fe771de")}
     </button>
-    {echangesOuverts && <Suspense fallback={<p>Chargement des échanges…</p>}><EchangesCollectionSolo /></Suspense>}
+    {echangesOuverts && <Suspense fallback={<p>{t("ui.f433895f5136")}</p>}><EchangesCollectionSolo /></Suspense>}
 
     <section className="solo-rayon" aria-labelledby="solo-packs-titre">
       <div className="solo-titre-ligne"><div><div className="eyebrow">{t('solo.allPacks')}</div><h2 id="solo-packs-titre">{t('solo.choosePack')}</h2></div><span>{categoriePacks === 'gratuits' ? t('solo.freePacksHelp') : t('solo.paidPacksHelp')}</span></div>
@@ -145,7 +145,7 @@ export function CollectionSolo() {
         {visibles.map(({ carte, trouvee, quantite }) => <div className="solo-carte-conteneur" key={carte.sourceId}>{quantite > 1 && <span className="solo-quantite" aria-label={t('solo.copiesCount', { count: quantite })}>×{quantite}</span>}<CarteJoueurEnLigne carte={carteDepuisSource(carte, 'solo', 'collection', 1)} compacte etatCollection={trouvee ? 'decouverte' : 'inconnue'} /></div>)}
       </div>
       {!visibles.length && <div className="solo-vide"><Icone nom="cadeau" taille={28} /><b>{statut === 'trouvees' ? t('solo.emptyOwned') : t('solo.emptyFiltered')}</b></div>}
-      {pages > 1 && <nav className="solo-pagination" aria-label="Pages du catalogue"><button type="button" className="btn fantome" disabled={pageSure === 0} onClick={() => setPage(Math.max(0, pageSure - 1))}>{t('solo.pagination.prev')}</button><span>{t('solo.pagination.page', { page: pageSure + 1, pages })}</span><button type="button" className="btn fantome" disabled={pageSure >= pages - 1} onClick={() => setPage(Math.min(pages - 1, pageSure + 1))}>{t('solo.pagination.next')}</button></nav>}
+      {pages > 1 && <nav className="solo-pagination" aria-label={t("ui.4730b31bdedb")}><button type="button" className="btn fantome" disabled={pageSure === 0} onClick={() => setPage(Math.max(0, pageSure - 1))}>{t('solo.pagination.prev')}</button><span>{t('solo.pagination.page', { page: pageSure + 1, pages })}</span><button type="button" className="btn fantome" disabled={pageSure >= pages - 1} onClick={() => setPage(Math.min(pages - 1, pageSure + 1))}>{t('solo.pagination.next')}</button></nav>}
     </section>
 
     {ouverture && <OuverturePack

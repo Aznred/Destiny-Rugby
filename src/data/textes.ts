@@ -27,6 +27,8 @@ import { TEXTES_MATCH } from './textesMatch.js';
 import { TEXTES_MANAGER } from './textesManager.js';
 import { TEXTES_EN_LIGNE } from './textesEnLigne.js';
 import { TEXTES_SOLO_AMICAL } from './textesSoloEtAmical.js';
+import { TEXTES_INTERFACE } from './textesInterface.js';
+import { TEXTES_INTERFACE_CORRECTIONS } from './textesInterfaceCorrections.js';
 
 // ⚠️ LA TRADUCTION AUTOMATIQUE PASSE EN DERNIER — c'est-à-dire qu'elle est
 // écrasée par tout le reste. `scripts/traduire.ts` remplit les langues
@@ -68,6 +70,7 @@ const ECRIT_A_LA_MAIN: Record<string, Traduction> = {
   ...TEXTES_MANAGER,
   ...TEXTES_EN_LIGNE,
   ...TEXTES_SOLO_AMICAL,
+  ...TEXTES_INTERFACE,
 
   // --- NAVIGATION ---------------------------------------------------------
   'nav.accueil': { fr: 'Accueil', en: 'Home', es: 'Inicio', it: 'Home', de: 'Start', pt: 'Início', ja: 'ホーム' },
@@ -895,4 +898,7 @@ const ECRIT_A_LA_MAIN: Record<string, Traduction> = {
 
 };
 
-export const TEXTES: Record<string, Traduction> = fusionner(ECRIT_A_LA_MAIN);
+export const TEXTES: Record<string, Traduction> = {
+  ...fusionner(ECRIT_A_LA_MAIN),
+  ...TEXTES_INTERFACE_CORRECTIONS,
+};
