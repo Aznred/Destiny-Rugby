@@ -476,7 +476,7 @@ titre('5. LES PACKS : LE VIVIER MONDIAL, ET L’UNICITÉ PAR LIGUE');
   const bandes = catalogueParRarete();
   console.log(`     catalogue mondial : ${nb(catalogue.length)} joueurs`);
   console.log(`     bronze ${nb(bandes.bronze.length)} · argent ${nb(bandes.argent.length)} · or ${nb(bandes.or.length)} · élite ${nb(bandes.elite.length)} · star ${nb(bandes.star.length)}`);
-  dire(catalogue.length > 20_000, 'le vivier contient tout le monde réel du jeu', nb(catalogue.length));
+  dire(catalogue.length >= 78_000, 'le vivier contient tout le monde réel du jeu', nb(catalogue.length));
   dire(new Set(catalogue.map((c) => c.sourceId)).size === catalogue.length, 'aucun doublon dans le catalogue');
   dire(bandes.star.length < bandes.elite.length && bandes.elite.length < bandes.or.length
     && bandes.or.length < bandes.argent.length && bandes.argent.length < bandes.bronze.length,

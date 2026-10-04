@@ -26,7 +26,7 @@ for (const club of Object.values(CLUBS_AMATEURS).flat()) {
   const effectif = effectifDuClub(club.nom, 1);
   for (const j of liste) {
     const i = j.indexSource;
-    assert.ok(j.poste || j.photo, `${club.nom}: profil sans poste observé ni portrait retenu`);
+    assert.ok(j.nom.trim(), `${club.nom}: licencié sans identité`);
     const reel = effectif.find(p => p.id === `${club.nom}-am-${i}`);
     assert.ok(reel, `${club.nom}: identité du licencié ${j.nom} modifiée`);
     if (!j.ffrId) ajouts++;

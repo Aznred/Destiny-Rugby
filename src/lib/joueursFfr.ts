@@ -11,7 +11,7 @@ export const normaliserNomFfr = (nom: string): string => nom.normalize('NFD')
   .replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 
 export interface JoueurFfr {
-  /** Rang dans l'export complet, conservé même après sélection des seniors. */
+  /** Rang dans l'export complet, stable pour les effectifs et sauvegardes. */
   indexSource: number;
   nom: string;
   famille: FamillePoste | null;
@@ -23,7 +23,7 @@ export interface JoueurFfr {
 const cache = new Map<string, JoueurFfr[]>();
 const structures = new Map(Object.values(CLUBS_AMATEURS).flat().map(c => [c.nom, c.structureId]));
 
-/** Seuls les profils documentés (poste FFR observé ou portrait) sont jouables. */
+/** Tous les licenciés de l'export sont disponibles, même sans poste ni portrait. */
 export function joueursFfrDuClub(club: string): readonly JoueurFfr[] {
   const connus = cache.get(club); if (connus) return connus;
   const supplement = PHOTOS_FFR_SUPPLEMENTAIRES[structures.get(club) ?? ''] ?? {};
@@ -48,9 +48,9 @@ export function joueursFfrDuClub(club: string): readonly JoueurFfr[] {
     liste.push({ indexSource: liste.length, nom: j.nom, famille: null, postesSecondaires: [], photo: j.photo });
     noms.add(cle);
   }
-  // Une ancienne famille estimée n'est pas une observation de poste FFR.
-  const seniors = liste.filter(j => j.poste || j.photo);
-  cache.set(club, seniors); return seniors;
+  // Les effectifs et le catalogue attribuent un poste de jeu déterministe
+  // aux profils non renseignés, sans modifier leur identité dans la source.
+  cache.set(club, liste); return liste;
 }
 
 let profilsParNom: Map<string, JoueurFfr | null> | undefined;
