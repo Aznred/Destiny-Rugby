@@ -366,13 +366,15 @@ export async function creerScene3D(conteneur,options={}){
     return {clip,time};
   }
   function orient(a,target,dt,rate=9){
-    if(target===null||target===undefined||!Number.isFinite(target))return;
+    // ⚠️ Les TROIS angles, pas seulement le lacet : un ralenti écrit le quaternion du groupe, et three en redéduit
+    // des angles où un demi-tour devient (π, π−θ, π). Ne reposer que y laissait le joueur retourné après chaque essai.
+    if(target===null||target===undefined||!Number.isFinite(target)){a.group.rotation.set(0,a.heading,0);return;}
     const delta=Math.atan2(Math.sin(target-a.heading),Math.cos(target-a.heading));
     // Rotation bornée : un joueur ne pivote pas d'un demi-tour en une image.
     // Un vrai demi-tour se fait d'un appui : le corps rattrape vite sa course au lieu de la suivre à reculons.
     const plafond=dt*(Math.abs(delta)>1.75&&rate>=9?13:7.5);
     a.heading+=snap?delta:clamp(delta*Math.min(1,dt*rate),-plafond,plafond);
-    a.group.rotation.y=a.heading;
+    a.group.rotation.set(0,a.heading,0);
   }
   /** Place l'acteur : corps physique, ou geste ancré (racine du clip, place de formation). */
   function placePlayer(a,p,m,played,base,simDt,still){

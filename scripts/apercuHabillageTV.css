@@ -1,0 +1,11 @@
+.apercu-tv { max-width:1200px; margin:20px auto; padding:0 20px; }
+.apercu-tv>header { display:flex; justify-content:space-between; align-items:center; margin-bottom:18px; }
+.apercu-tv h1 { margin:4px 0; font-size:30px; }.apercu-tv header small { letter-spacing:.18em; color:#d8bb72; }
+.apercu-tv header p { margin:0; font-size:12px; color:#a9b9b0; }.apercu-tv header a { color:#d8bb72; }
+.apercu-tv>nav { display:flex; gap:7px; flex-wrap:wrap; margin-bottom:18px; font-size:12px; }
+.apercu-tv>nav button,.apercu-tv select { background:#1b3027; color:#fff; border:1px solid #496152; padding:8px; border-radius:3px; cursor:pointer; }
+.apercu-tv>nav label { display:flex; align-items:center; gap:5px; }
+.apercu-tv .dc-ecran { aspect-ratio:16/9; }
+.apercu-tv .dc .cel-scene { height:100%; min-height:0; max-height:none; aspect-ratio:auto; }
+.apercu-tv.format-mobile { max-width:707px; }.apercu-tv.format-tablette { max-width:1064px; }
+@media(max-height:500px) and (orientation:landscape) { .apercu-tv { margin-top:8px; padding:0 8px; }.apercu-tv>header { margin-bottom:8px; }.apercu-tv h1 { font-size:18px; } }

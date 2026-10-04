@@ -78,6 +78,8 @@ export type Role =
 export interface Pion {
   /** Numéro affiché lorsque le poste tactique est repris par un remplaçant. */
   numeroMaillot?: number;
+  /** Pourquoi il a pris son carton : lu par l'habillage TV, jamais par le jeu. */
+  motifCarton?: string;
   remplace?: boolean;
   corps?: import('./dynamique.js').CorpsMatch;
   poidsKg?: number;

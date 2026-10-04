@@ -1,5 +1,15 @@
 # Destiny Rugby 🏉
 
+- **Habillage TV du match** : score compact incrusté en haut à gauche, blocs
+  jointifs comme sur la référence Top 14, sigles réduits, rouge franc et chrono
+  doré soutenu. Logo de la compétition (Destiny Rugby en secours), palette issue
+  du logo, portraits du XV par lignes pendant l’entrée 3D, bandeaux d’ouverture,
+  de deuxième période et de cartons. Les jaunes affichent les minutes et secondes
+  restantes sous leur équipe ; les rouges restent affichés. Les exclusions
+  suivent l’horloge du film, y compris après reconnexion. Vérification :
+  `npm run verify:habillage-tv`. Aperçu local avec scénarios de cartons,
+  compositions et formats : `/scripts/apercuHabillageTV.html`.
+
 ### Carrière en ligne — le troisième mode, jouable de bout en bout
 
 - **Cahier de combinaisons, en bêta privée Kiri** : onglet « Combinaisons · bêta »,

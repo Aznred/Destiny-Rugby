@@ -70,6 +70,7 @@ import { PACKS_CARRIERE, packsBoutiqueDuJour } from '../lib/ligue/catalogueCarri
 import { tn, texteTraduit, locale, nombre, t } from '../lib/i18n';
 import { fusionnerDeltaDirect, fusionnerVueLigue } from '../lib/ligue/fusionDirect';
 import { reperesFilm } from '../lib/ligue/filmDirect';
+import { photoReelle } from '../lib/avatars';
 import type { AfficheDirect } from '../components/match/TerrainEnDirect';
 
 type Onglet = 'club' | 'calendrier' | 'composition' | 'effectif' | 'collection' | 'packs' | 'marche' | 'competitions' | 'histoire' | 'wiki' | 'laboratoire' | 'secret' | 'administration' | 'atelier' | 'combinaisons';
@@ -1284,6 +1285,14 @@ function Direct({ vue, rencontre: r, agir, occupe, fermer }: { vue: VueCarriereE
   // serveur) : le score et le chrono du tableau s'y calent, pour ne pas annoncer
   // un essai avant qu'on ne le voie.
   const [affiche, setAffiche] = useState<AfficheDirect | null>(null);
+  // Le portrait de chaque joueur vient de SA CARTE ; sans photo, la silhouette grise des cartes.
+  const portraits = useMemo(() => {
+    const p: Record<string, string | null> = {};
+    for (const c of vue.cartes) {
+      if (c.proprietaire === r.domicile || c.proprietaire === r.exterieur) p[c.nom] = c.photo ?? photoReelle(c.nom, c.clubReel) ?? null;
+    }
+    return p;
+  }, [vue.cartes, r.domicile, r.exterieur]);
   const horlogeServeur = m?.horloge ?? 0;
   const ancre = useRef({ horloge: horlogeServeur, recu: Date.now() });
   useEffect(() => { ancre.current = { horloge: horlogeServeur, recu: Date.now() }; }, [horlogeServeur]);
@@ -1337,28 +1346,29 @@ function Direct({ vue, rencontre: r, agir, occupe, fermer }: { vue: VueCarriereE
       {m.signalAdverse && <p className="cel-signal"><Icone nom="oeil" taille={17} />{signalTexte(m.signalAdverse)}</p>}
     </div>
 
-    <DirectCinema match={m} domicile={nomClub(vue,r.domicile)} exterieur={nomClub(vue,r.exterieur)} couleurs={couleurs}
-      emblemes={{ domicile: emblemeDomicile, exterieur: emblemeExterieur }} surAffiche={setAffiche} />
+    <DirectCinema key={`${m.id}:${m.instance ?? ''}`} match={m} domicile={nomClub(vue,r.domicile)} exterieur={nomClub(vue,r.exterieur)} couleurs={couleurs}
+      identite={{ nom: vue.competitions.find(c => c.id === r.competitionId)?.nom ?? vue.nom,
+        logo: vue.competitions.find(c => c.id === r.competitionId)?.logo ?? vue.logo, journee: r.journee }}
+      portraits={portraits} emblemes={{ domicile: emblemeDomicile, exterieur: emblemeExterieur }} surAffiche={setAffiche}
+      /* ⚠️ ON N'EST RÉVEILLÉ QUE DANS LES 50 MÈTRES ADVERSES (`METRES_DECISION`).
+         Le serveur ne propose plus une décision sur chacune des vingt-quatre
+         pénalités d'un match — à soixante-dix mètres des poteaux, « je prends
+         les points ? » n'est pas une question — mais sur les six ou sept qui se
+         jouent dans la zone où le choix compte vraiment. Le panneau se pose SUR
+         l'image : on n'a pas à le chercher sous le direct, ni à quitter le plein écran. */
+      panneauDecision={decisionVue && m.decision ? <div className="cel-decision" role="alertdialog" aria-label={t('online.match.penaltyDecision')}>
+        <div className="eyebrow">{t('online.decision.penaltyAtMeters', { dist: m.decision.distance })} · {t('online.decision.clockStopped')}</div>
+        <p>{t('online.decision.kickerStats', { name: m.decision.buteur, pct: m.decision.probabilite })}{m.decision.aPortee ? '' : t('online.decision.beyondRange')}</p>
+        <div className="cel-decision-choix">
+          <button className="btn primaire" disabled={occupe} onClick={() => { void agir({ type: 'match', matchId, action: { type: 'decision', choix: 'points' } }); }}><Icone nom="cible" taille={19} />{t('online.penalties.points')}</button>
+          <button className="btn" disabled={occupe} onClick={() => { void agir({ type: 'match', matchId, action: { type: 'decision', choix: 'touche' } }); }}><Icone nom="drapeau" taille={19} />{t('online.penalties.touche')}</button>
+          <button className="btn" disabled={occupe} onClick={() => { void agir({ type: 'match', matchId, action: { type: 'decision', choix: 'rapide' } }); }}><Icone nom="eclair" taille={19} />{t('online.penalties.rapide')}</button>
+          <button className="btn" disabled={occupe} onClick={() => { void agir({ type: 'match', matchId, action: { type: 'decision', choix: 'melee' } }); }}><Icone nom="pousse" taille={19} />{t('online.penalties.melee')}</button>
+        </div>
+        <div className="cel-sablier" aria-hidden><i style={{ width: `${(resteDecision / 20) * 100}%` }} /></div>
+        <small>{t('online.decision.secondsLeft', { sec: resteDecision })}</small>
+      </div> : undefined} />
     {!vue.observateur && <details><summary>{t('online.match.alerts')}</summary><NotificationsMatch ligue={vue.id} /></details>}
-
-    {/* ⚠️ ON N'EST RÉVEILLÉ QUE DANS LES 50 MÈTRES ADVERSES (`METRES_DECISION`).
-        Le serveur ne propose plus une décision sur chacune des vingt-quatre
-        pénalités d'un match — à soixante-dix mètres des poteaux, « je prends
-        les points ? » n'est pas une question — mais sur les six ou sept qui se
-        jouent dans la zone où le choix compte vraiment. */}
-    {decisionVue && m.decision && <div className="cel-decision" role="alertdialog" aria-label={t('online.match.penaltyDecision')}>
-      <div className="eyebrow">{m.decision.horloge >= 1 ? t("ui.36fecb80df82", { v0: Math.floor(m.decision.horloge) }) : t("ui.f0979ebc3a11")} · {m.score.domicile} – {m.score.exterieur} · {t('online.decision.clockStopped')}</div>
-      <h2>{t('online.decision.penaltyAtMeters', { dist: m.decision.distance })}</h2>
-      <p>{t('online.decision.kickerStats', { name: m.decision.buteur, pct: m.decision.probabilite })}{m.decision.aPortee ? '' : t('online.decision.beyondRange')}</p>
-      <div className="cel-decision-choix">
-        <button className="btn primaire" disabled={occupe} onClick={() => { void agir({ type: 'match', matchId, action: { type: 'decision', choix: 'points' } }); }}><Icone nom="cible" taille={19} />{t('online.penalties.points')}</button>
-        <button className="btn" disabled={occupe} onClick={() => { void agir({ type: 'match', matchId, action: { type: 'decision', choix: 'touche' } }); }}><Icone nom="drapeau" taille={19} />{t('online.penalties.touche')}</button>
-        <button className="btn" disabled={occupe} onClick={() => { void agir({ type: 'match', matchId, action: { type: 'decision', choix: 'rapide' } }); }}><Icone nom="eclair" taille={19} />{t('online.penalties.rapide')}</button>
-        <button className="btn" disabled={occupe} onClick={() => { void agir({ type: 'match', matchId, action: { type: 'decision', choix: 'melee' } }); }}><Icone nom="pousse" taille={19} />{t('online.penalties.melee')}</button>
-      </div>
-      <div className="cel-sablier" aria-hidden><i style={{ width: `${(resteDecision / 20) * 100}%` }} /></div>
-      <small>{t('online.decision.secondsLeft', { sec: resteDecision })}</small>
-    </div>}
 
     <nav className="cel-onglets secondaires">{([['fil', t('online.match.log')], ['consignes', t('online.lineup.instructions')], ['banc', t('online.match.bench')], ['stats', t('online.match.stats')]] as const).map(([id, label]) =>
       <button key={id} className={ongletDirect === id ? 'actif' : ''} onClick={() => setOngletDirect(id)}>{label}</button>)}</nav>

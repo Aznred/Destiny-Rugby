@@ -73,6 +73,7 @@ import {
   ecussonPourToile, preferenceMatch3D, preferencesTele, retenirPreferenceMatch3D, type OptionsScene3D, type Scene3D,
 } from '../../lib/match3D';
 import { OutilsTele } from './PresentationTV';
+import { logoTV } from '../../lib/habillageTV';
 import { creerMemoireEtat3D, etat3DDepuisDirect } from '../../lib/ligue/etat3DDepuisDirect';
 
 /**
@@ -118,6 +119,8 @@ export interface AfficheDirect {
 }
 
 interface Props {
+  identite?: import('../../lib/habillageTV').IdentiteTV;
+  scoreMatch?: { domicile: number; exterieur: number };
   /** Le relevé du terrain (atelier, laboratoire, ou serveur sans film). */
   terrain?: TerrainDirect;
   /** Le dernier envoi du film du match : voir `lib/ligue/filmDirect.ts`. */
@@ -202,7 +205,9 @@ function tracerTrajectoires(vol: NonNullable<TerrainDirect['vol']>) {
   return { vol: pointsVol.join(' '), ombre: pointsOmbre.join(' '), anticipe: cheminAnticipe };
 }
 
-function TerrainEnDirect({ terrain = TERRAIN_VIDE, film, matchId, surAffiche, nomDomicile, nomExterieur, couleurs, emblemes, monCote, carton, modeDemo, pause, vitesseDemo }: Props) {
+function TerrainEnDirect({ terrain = TERRAIN_VIDE, film, matchId, surAffiche, nomDomicile, nomExterieur, couleurs, emblemes, monCote, carton, modeDemo, pause, vitesseDemo, identite, scoreMatch }: Props) {
+  const scoreCourant = useRef(scoreMatch);
+  useEffect(() => { scoreCourant.current = scoreMatch; }, [scoreMatch]);
   const scene = useRef<HTMLDivElement>(null);
   const svg = useRef<SVGSVGElement>(null);
   const groupeTerrain = useRef<SVGGElement>(null);
@@ -544,11 +549,11 @@ function TerrainEnDirect({ terrain = TERRAIN_VIDE, film, matchId, surAffiche, no
         `translate(${(ballon.current.x - ballonDessine.origine.x).toFixed(2)} ${(ballon.current.y - ballonDessine.origine.y).toFixed(2)})`);
       // Score, chrono et bandeaux suivent ce que l'écran MONTRE, pas ce que le
       // serveur sait déjà : trois fois par seconde suffisent.
-      if (imageFilm && maintenant >= prochainAffiche) {
+      if ((imageFilm || scoreCourant.current) && maintenant >= prochainAffiche) {
         prochainAffiche = maintenant + 1 / 3;
         rappelAffiche.current?.({
-          terrain: courant, seconde: lec.etat.t,
-          score: { domicile: lec.etat.scoreA, exterieur: lec.etat.scoreB },
+          terrain: courant, seconde: imageFilm ? lec.etat.t : courant.instantJeu ?? courant.horloge * 60,
+          score: imageFilm ? { domicile: lec.etat.scoreA, exterieur: lec.etat.scoreB } : scoreCourant.current!,
         });
       }
       if (maintenant >= prochainRenduReact) {
@@ -594,8 +599,9 @@ function TerrainEnDirect({ terrain = TERRAIN_VIDE, film, matchId, surAffiche, no
     ],
     camera: 'tv',
     television: { ralentis: preferencesTele().ralentis },
+    habillage: { nom: identite?.nom, logo: logoTV(identite?.logo) },
     textes: { ralenti: t('ml.ralenti') },
-  }), [nomDomicile, nomExterieur, maillots, emblemes?.domicile, emblemes?.exterieur]);
+  }), [nomDomicile, nomExterieur, maillots, emblemes?.domicile, emblemes?.exterieur, identite?.nom, identite?.logo]);
   const brancherScene = useCallback((s: Scene3D | null) => {
     scene3D.current = s;
     if (!s) return;

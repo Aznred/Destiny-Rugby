@@ -4676,6 +4676,7 @@ function siffler(e: EtatMatch, pour: Cote, lieu: Vec, motif: string, fautif?: Pi
     fautif.surLeTerrain = false;
     fautif.sanction = rouge ? 99_999 : 600; // dix minutes, ou le reste du match
     if (rouge) fautif.stats.cartonsRouges += 1; else fautif.stats.cartonsJaunes += 1;
+    fautif.motifCarton = motif;
     if (fautif.moi) {
       if (rouge) e.discipline.rouges += 1; else e.discipline.jaunes += 1;
       e.discipline.motif = motif;
@@ -4776,9 +4777,43 @@ export function infoPenalite(e: EtatMatch): PenaliteEnCours | null {
 export function choisirPenalite(e: EtatMatch, cote: Cote, choix: NonNullable<EtatMatch['choixPenalite']>): boolean {
   if (e.fini || e.phase !== 'penalite' || e.penalite?.pour !== cote) return false;
   e.choixPenalite = choix;
+  e.attenteDecision = 0;
   e.minuteur = 0;
   phasePenalite(e);
   return true;
+}
+
+/**
+ * Un pas d'ATTENTE pendant qu'un entraîneur choisit : le chrono est arrêté, le
+ * jeu aussi, mais trente joueurs figés en pleine foulée pendant vingt secondes
+ * ne ressemblent à rien. La défense recule à dix mètres, l'attaque se regroupe
+ * derrière la marque, le buteur vient au ballon.
+ *
+ * ⚠️ NI TIRAGE, NI HORLOGE, NI PHASE : seulement des déplacements, et un
+ * compteur (`attenteDecision`). Le serveur l'inscrit au journal avec la
+ * décision, pour qu'une rejoue à froid refasse exactement le même nombre de pas.
+ */
+export function patienter(e: EtatMatch): void {
+  if (e.fini || e.phase !== 'penalite' || !e.penalite) return;
+  const { pour, lieu } = e.penalite;
+  e.sim += DT;
+  e.attenteDecision = (e.attenteDecision ?? 0) + 1;
+  const buteur = surLeTerrain(e, pour).find((p) => p.buteur);
+  for (const p of e.pions) {
+    if (!p.surLeTerrain || p.sanction > 0) continue;
+    const attaque = p.cote === pour, n = p.numero;
+    let recul: number, y: number;
+    if (attaque && p === buteur) { recul = 1.4; y = lieu.y; }
+    else if (n <= 8) { recul = attaque ? 3.5 + (n > 5 ? 1.6 : 0) : 10.5; y = lieu.y + (n - 4.5) * (attaque ? 1.5 : 2.1); }
+    else if (n === 9) { recul = attaque ? 1.8 : 10.5; y = lieu.y + (lieu.y < AXE ? 2.4 : -2.4); }
+    else if (n === 15) { recul = attaque ? 14 : 24; y = AXE + (p.pos.y - AXE) * 0.5; }
+    else { recul = attaque ? 6 + (n - 10) * 0.9 : 11.5; y = p.pos.y; }
+    p.cible.x = borner(lieu.x - sens(p.cote) * recul, LIGNE_A + 0.5, LIGNE_B - 0.5);
+    p.cible.y = borner(y, 3, LARGEUR - 3);
+    p.effort = Math.hypot(p.cible.x - p.pos.x, p.cible.y - p.pos.y) > 9 ? 0.5 : 0.32;
+    deplacer(p, DT, true);
+  }
+  e.apresPas?.(e);
 }
 
 function phasePenalite(e: EtatMatch): void {

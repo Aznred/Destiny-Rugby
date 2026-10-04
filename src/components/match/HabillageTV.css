@@ -1,0 +1,106 @@
+/* Trois blocs francs, comme le score incrusté d'une retransmission de rugby. */
+.btv { --tv-principale:#123e32; --tv-secondaire:#f7f6f0; --tv-fond:#101613; --tv-accent:#d8bb72; --tv-texte:#fff;
+  position:absolute; inset:0; z-index:7; pointer-events:none; container-type:inline-size;
+  font-family:Arial,Helvetica,sans-serif; color:var(--tv-texte); line-height:1.15; }
+.btv * { box-sizing:border-box; }
+.btv-score { position:absolute; top:max(22px,3.5%); left:max(14px,3.5%,env(safe-area-inset-left));
+  display:flex; align-items:flex-start; --bloc:clamp(58px,7.4cqw,81px); }
+.btv-logo { display:grid; place-items:center; width:var(--bloc,72px); height:var(--bloc,72px); background:var(--tv-fond); flex:none; }
+.btv-logo img { width:100%; height:100%; object-fit:contain; }
+/* Dans le score, le logo de la ligue tient dans un carré exact : un visuel plus haut que large est recadré. */
+.btv-marque .btv-logo { overflow:hidden; aspect-ratio:1; height:auto; }
+.btv-marque .btv-logo img { display:block; min-width:0; min-height:0; max-width:none; max-height:none; object-fit:cover; }
+.btv-marque { width:var(--bloc); }
+.btv-marque>time { display:grid; place-items:center; height:calc(var(--bloc)/3.4); background:var(--tv-accent); color:var(--tv-accent-texte,#101613);
+  font:600 calc(var(--bloc)*.215)/1 Archivo,'Arial Narrow',Arial,sans-serif; font-variant-numeric:tabular-nums; letter-spacing:.02em; }
+.btv-marque>time.sirene { background:#c81e30; color:#fff; }
+.btv-marque>small { text-transform:uppercase; display:block; padding:4px 1px; font-size:9px; text-align:center; background:var(--tv-fond); color:#fff; }
+.btv-score-camp { width:calc(var(--bloc)*.876543); position:relative; }
+/* Carton rouge : un petit rectangle au-dessus du score de l'équipe, jusqu'à la fin du match. */
+.btv-dessus { position:absolute; left:0; right:0; bottom:100%; display:flex; align-items:flex-end; justify-content:flex-end; gap:2px; }
+/* Un petit carton, légèrement penché, qui porte le nombre d'exclus. */
+.btv-rouge { position:absolute; z-index:1; left:calc(var(--bloc)*-.02); top:calc(100% - var(--bloc)*.1); display:grid; place-items:center;
+  width:calc(var(--bloc)*.2); height:calc(var(--bloc)*.24); background:#e11d2e; color:#fff; border-radius:1.5px;
+  transform:rotate(-8deg); box-shadow:0 1px 2px #0007; font:700 calc(var(--bloc)*.15)/1 Arial,sans-serif; }
+.btv-essais { padding:calc(var(--bloc)*.035) calc(var(--bloc)*.08); background:var(--tv-accent); color:var(--tv-accent-texte,#101613);
+  font:400 calc(var(--bloc)*.2)/1 Anton,Impact,'Arial Narrow',sans-serif; letter-spacing:.02em; }
+.btv-score-equipe { height:var(--bloc); display:flex; flex-direction:column; align-items:center; justify-content:flex-start; padding-top:calc(var(--bloc)*.045); gap:calc(var(--bloc)*.04); }
+.btv-score-equipe abbr { font:800 calc(var(--bloc)*.285)/1 Archivo,Arial,sans-serif; text-decoration:none; letter-spacing:.015em; }
+.btv-score-equipe strong { font:400 calc(var(--bloc)*.60)/1 Anton,Impact,'Arial Narrow',sans-serif; letter-spacing:0; font-variant-numeric:tabular-nums; }
+.btv-exclusions { display:flex; flex-direction:column; gap:2px; }
+.btv-exclusion { display:flex; justify-content:center; align-items:center; min-height:calc(var(--bloc)/3.4); padding:2px;
+  background:#ffe32c; color:#111; font:600 calc(var(--bloc)*.205)/1 Archivo,'Arial Narrow',Arial,sans-serif; letter-spacing:.02em; font-variant-numeric:tabular-nums; }
+
+.btv-affiche { position:absolute; left:7%; right:7%; bottom:12%; display:flex; flex-direction:column; align-items:center;
+  filter:drop-shadow(0 5px 10px #0004); animation:btv-entree .3s ease-out both; }
+.btv-affiche-etiquette { text-transform:uppercase; background:var(--tv-secondaire); color:#101613; padding:7px 22px; font-size:clamp(12px,2.3cqw,25px); font-weight:900; letter-spacing:.025em; text-align:center; }
+.btv-affiche-etiquette b { color:var(--tv-principale); }
+.btv-affiche-corps { display:grid; grid-template-columns:1fr auto 1fr; width:100%; --bloc:clamp(48px,8cqw,90px); }
+.btv-affiche-equipe { display:flex; align-items:center; justify-content:space-between; min-width:0; overflow:hidden; }
+.btv-ecusson { width:var(--bloc,64px); height:var(--bloc,64px); object-fit:contain; padding:6px; flex:none; }
+.btv-affiche-equipe strong { flex:1; text-align:center; padding:8px; font-size:clamp(12px,2.4cqw,29px); text-transform:uppercase; overflow-wrap:anywhere; }
+.btv-affiche-equipe>b { font-size:clamp(22px,3.4cqw,40px); padding:8px; }
+.btv-affiche-ligue { background:var(--tv-fond); color:#fff; padding:5px 20px; font-size:clamp(9px,1.2cqw,13px); text-align:center; letter-spacing:.08em; text-transform:uppercase; }
+.btv-composition { position:absolute; bottom:12%; left:3.5%; width:min(60%,560px); margin:0; background:var(--tv-fond); color:#fff;
+  filter:drop-shadow(0 5px 10px #0005); animation:btv-entree .3s ease-out both; }
+.btv-composition>header { display:flex; align-items:center; gap:12px; --bloc:52px; padding-right:10px; }
+.btv-composition>header>div { flex:1; min-width:0; }
+.btv-composition header small { text-transform:uppercase; font-size:9px; font-weight:700; letter-spacing:.13em; }
+.btv-composition h3 { font:900 clamp(13px,2.2cqw,22px)/1.2 Arial,sans-serif; text-transform:uppercase; margin:3px 0 0; overflow-wrap:anywhere; }
+.btv-composition-ligne { display:flex; justify-content:space-between; padding:8px 12px; background:var(--tv-secondaire); color:#101613; font-size:11px; text-transform:uppercase; letter-spacing:.06em; }
+.btv-composition-ligne span { opacity:.6; font-variant-numeric:tabular-nums; }
+.btv-portraits { display:flex; justify-content:center; gap:2px; padding:10px 10px 12px; animation:btv-entree .25s ease-out both; }
+.btv-portraits figure { width:33.333%; min-width:0; margin:0; }
+.btv-portrait { height:clamp(65px,12cqw,128px); position:relative; background:linear-gradient(0deg,color-mix(in srgb,var(--tv-principale) 60%,transparent),transparent); }
+.btv-portrait img { width:100%; height:100%; object-fit:contain; object-position:bottom; }
+.btv-portrait>b { position:absolute; bottom:0; left:0; background:var(--tv-accent); color:var(--tv-accent-texte,#101613); min-width:26px; padding:3px; font:bold 19px/1 Arial,sans-serif; text-align:center; }
+.btv-portraits figcaption { padding:7px 3px 0; text-align:center; }
+.btv-portraits figcaption strong { display:block; font-size:clamp(10px,1.4cqw,14px); text-transform:uppercase; overflow-wrap:anywhere; }
+.btv-portraits figcaption small { display:block; font-size:clamp(9px,1.1cqw,11px); color:#d2d8d5; margin-top:4px; }
+.btv-composition footer { display:flex; justify-content:space-between; gap:12px; padding:6px 12px; font-size:9px; letter-spacing:.04em; border-top:2px solid var(--tv-accent); }
+.btv-composition footer span { opacity:.65; text-transform:uppercase; }
+.btv-passer { pointer-events:auto; position:absolute; bottom:3.5%; right:3.5%; background:var(--tv-fond); color:#fff;
+  border:1px solid var(--tv-accent); border-radius:0; padding:9px 12px; cursor:pointer; font-size:11px; }
+.btv-passer:focus-visible { outline:3px solid #fff; outline-offset:3px; }
+.btv-carton { position:absolute; left:7%; bottom:12%; display:flex; align-items:center; gap:16px; max-width:86%;
+  background:var(--tv-fond); color:#fff; border-bottom:4px solid #ffe32c; padding-right:24px; --bloc:78px; animation:btv-entree .3s ease-out both; }
+.btv-carton.rouge { border-bottom-color:#f43143; }
+.btv-grande-carte { display:block; width:23px; height:35px; background:#ffe32c; flex:none; transform:rotate(-8deg); }
+.btv-carton.rouge .btv-grande-carte { background:#f43143; }
+.btv-carton>div { display:grid; gap:5px; padding:10px 0; }
+.btv-carton small { text-transform:uppercase; font-size:11px; letter-spacing:.12em; font-weight:900; color:#ffe32c; }
+.btv-carton.rouge small { color:#ff6570; }
+.btv-carton strong { font-size:clamp(14px,2cqw,22px); }
+.btv-carton span:not(.btv-logo) { font-size:11px; opacity:.8; }
+@keyframes btv-entree { from { opacity:0; transform:translateY(9px); } to { opacity:1; transform:translateY(0); } }
+@container (max-width:650px) {
+  .btv-score { top:10px; left:10px; }
+  .btv-composition { width:72%; }
+  .btv-composition>header { --bloc:40px; gap:7px; }
+  .btv-affiche { left:4%; right:4%; }
+  .btv-affiche .btv-ecusson { display:none; }
+  .btv-carton { left:4%; max-width:92%; gap:9px; padding-right:12px; --bloc:54px; }
+  .btv-carton small,.btv-carton span:not(.btv-logo) { font-size:9px; }
+}
+@media (max-height:500px) and (orientation:landscape) {
+  .btv-score { --bloc:58px; top:10px; left:max(10px,env(safe-area-inset-left)); }
+  .btv-composition { left:auto; right:3.5%; bottom:14%; width:min(58%,450px); }
+  .btv-composition>header { --bloc:34px; }
+  .btv-composition header small { font-size:8px; }.btv-composition h3 { font-size:14px; }
+  .btv-composition-ligne { padding:5px 9px; font-size:9px; }
+  .btv-portraits { padding:6px 8px; }.btv-portrait { height:65px; }
+  .btv-portraits figcaption { padding-top:4px; }.btv-portraits figcaption strong { font-size:10px; }
+  .btv-portraits figcaption small { font-size:9px; margin-top:2px; }
+  .btv-composition footer { padding:4px 9px; font-size:8px; }
+}
+@media (prefers-reduced-motion:reduce) { .btv-affiche,.btv-composition,.btv-portraits,.btv-carton { animation:none; } }
+/* Les informations secondaires ne passent pas sous le score incrusté. */
+.dc-ecran:has(.btv) .cel-scenario { display:none; }
+.dc-ecran:has(.btv) .cel-sifflet { top:auto; bottom:12%; }
+.ml-scene:has(.btv) .ml-hud-haut { padding-top:120px; }
+/* Le fil de commentaire commence à droite du score incrusté, pas dessous. */
+.ml-scene:has(.btv) .ml-ticker { left:calc(max(14px,3.5%) + clamp(58px,7.4cqw,81px) * 2.76 + 10px); }
+@container (max-width:650px) { .ml-scene:has(.btv) .ml-ticker { left:185px; } }
+@media (max-height:500px) and (orientation:landscape) {
+  .ml-scene:has(.btv) .ml-hud-haut { padding-top:80px; }
+}

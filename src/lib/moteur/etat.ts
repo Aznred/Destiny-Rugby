@@ -708,6 +708,8 @@ export interface EtatMatch {
   placementJoue?: boolean;
   /** L'attente de placement de la phase arrêtée en cours (voir `placementJoue`). */
   attentePlacement?: { phase: Phase; depuis: number; pret?: boolean } | null;
+  /** Pas d'attente joués sur la pénalité en cours pendant qu'un entraîneur choisit (`patienter`). */
+  attenteDecision?: number;
   /**
    * Resserrement de la défense, de 0 (aucun) à 1 : étalonne le nombre d'essais
    * de la cadence détaillée sur celui des matchs de ligue (voir `probaPlaquage`).

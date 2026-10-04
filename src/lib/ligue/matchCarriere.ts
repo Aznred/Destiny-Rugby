@@ -1,4 +1,5 @@
 import { momentsDepuisFil } from './momentsForts.js';
+import { exclusionsDepuisEtat, type ExclusionTV } from '../habillageTV.js';
 // LE MATCH DE LA CARRIÈRE EN LIGNE — 80 minutes de rugby arbitrées par le serveur
 //
 // ═══════════════════════════════════════════════════════════════════════════
@@ -67,7 +68,7 @@ import { momentsDepuisFil } from './momentsForts.js';
 
 import {
   appliquerTactiqueEquipe, avancer, bilan, choisirPenalite, creerMatch,
-  demanderRemplacement, facteurHorloge, infoPenalite, type PenaliteEnCours,
+  demanderRemplacement, facteurHorloge, infoPenalite, patienter, type PenaliteEnCours,
 } from '../moteur/moteur.js';
 import type { EtatMatch, IntentionPied, Phase, TypeLancement, Vol, VolRecent } from '../moteur/etat.js';
 import { combinaisonsValides, type Combinaison } from './combinaisons.js';
@@ -264,6 +265,12 @@ export interface EvenementMatchEnLigne {
    * « Tu prends les trois points » à quelqu'un qui n'a rien touché.
    */
   auto?: true;
+  /**
+   * Pas d'attente joués avant cette décision (`patienter`) : les joueurs se
+   * replacent pendant que l'entraîneur réfléchit. Inscrit ici pour qu'une
+   * rejoue à froid en refasse exactement autant.
+   */
+  attente?: number;
 }
 
 /** Un ordre de manager, tel que le fil le montre à CELUI QUI L'A DONNÉ. */
@@ -325,6 +332,9 @@ export interface VolDirect {
 }
 
 export interface TerrainDirect {
+  /** Discipline de tous les joueurs, y compris ceux sortis de la pelouse. */
+  exclusionsTV?: ExclusionTV[];
+  periode?: 1 | 2;
   simulation?: number;
   gestes?: import('../moteur/dynamique.js').GesteMatch[];
   arbitre?: { x: number; y: number; vx: number; vy: number; regard: number };
@@ -761,6 +771,18 @@ function penaliteADecider(e: EtatMatch, camps: readonly Cote[]): PenaliteEnCours
   return info && info.distance <= METRES_DECISION ? info : null;
 }
 
+/** Vingt secondes de décision, au pas du moteur. */
+const PAS_ATTENTE_MAX = Math.round(DELAI_DECISION / 150);
+/** Où en est l'attente d'une décision à l'heure qu'il est, en pas du moteur. */
+function pasAttendus(d: DecisionEnAttente, maintenant: number): number {
+  return Math.max(0, Math.min(PAS_ATTENTE_MAX, Math.floor((maintenant - (d.jusqua - DELAI_DECISION)) / 150)));
+}
+/** Joue l'attente jusqu'au pas demandé : elle n'avance que les joueurs, jamais le match. */
+function attendre(e: EtatMatch, pas: number): void {
+  let garde = 0;
+  while ((e.attenteDecision ?? 0) < pas && e.phase === 'penalite' && !e.fini && garde++ <= PAS_ATTENTE_MAX) patienter(e);
+}
+
 /** Avance le moteur, en s'arrêtant sur une pénalité si un manager doit trancher. */
 function pousser(e: EtatMatch, jusqua: number, arretSur: readonly Cote[]): void {
   // ⚠️ UN PAS DE 0,6 SECONDE, TOUJOURS LE MÊME, ET POUR DEUX RAISONS.
@@ -878,6 +900,7 @@ function rejouer(etat: EtatMatchEnLigne, jusqua: number, arretSur: readonly Cote
   const cle = cleCache(etat);
   const garde = CACHE.get(cle);
   let e: EtatMatch;
+  let froid: EtatMatch | undefined;
   let depart = 0;
   if (garde && garde.minute <= jusqua + 1e-9) {
     // Le match est déjà calculé jusqu'ici : on repart de là, sans rien rejouer.
@@ -888,13 +911,24 @@ function rejouer(etat: EtatMatchEnLigne, jusqua: number, arretSur: readonly Cote
     CACHE.delete(cle);
     CACHE.set(cle, garde);
   } else {
-    e = monter(etat);
+    e = froid = monter(etat);
   }
   cadrerFilm(e, jusqua * 60);
   for (let i = depart; i < etat.journal.length; i++) {
     const ev = etat.journal[i];
     if (ev.horloge > jusqua) break;
     pousserAvecBascules(e, etat, ev.horloge, []);
+    if (ev.commande.type === 'decision') {
+      // Un moteur gardé en mémoire qui aurait attendu PLUS que le journal ne le
+      // dit (deux instances, deux horloges) ne peut pas reculer : on le remonte.
+      if ((e.attenteDecision ?? 0) > (ev.attente ?? 0) && e !== froid) {
+        e = froid = monter(etat);
+        cadrerFilm(e, jusqua * 60);
+        i = -1; depart = 0;
+        continue;
+      }
+      attendre(e, ev.attente ?? 0);
+    }
     appliquerAuMoteur(e, ev);
     depart = i + 1;
   }
@@ -1064,6 +1098,8 @@ export function extraireTerrain(
   corps: (p: EtatMatch['pions'][number]) => PionDirect['corps'] = corpsPourAffichage,
 ): TerrainDirect {
   const terrain: TerrainDirect = {
+    exclusionsTV: exclusionsDepuisEtat(e),
+    periode: e.periode,
     pions: e.pions.filter((p) => p.surLeTerrain).map((p) => ({
       id: p.id, numero: p.numeroMaillot ?? p.numero, numeroRole: p.numero, nom: p.nom, poste: p.poste,
       cote: MOTEUR_VERS_COTE[p.cote],
@@ -1282,16 +1318,21 @@ export function avancerMatchEnLigne(etat: EtatMatchEnLigne, maintenant: number):
   if (suivant.decision) {
     const limite = suivant.decision.jusqua;
     if (maintenant < limite) {
+      // Le chrono est gelé, pas les joueurs : ils se replacent pendant le choix.
+      attendre(rejouer(suivant, suivant.decision.horloge, []), pasAttendus(suivant.decision, maintenant));
       suivant.gel = gelJusqua(etat, maintenant);
       return suivant;
     }
     const d = suivant.decision;
+    const arrete = rejouer(suivant, d.horloge, []);
+    attendre(arrete, PAS_ATTENTE_MAX);
+    const attente = arrete.attenteDecision ?? 0;
     const ecart = suivant.score[d.cote] - suivant.score[autre(d.cote)];
     const choix = decisionIA(
       strategieA(suivant, d.cote, d.horloge), d.distance,
       d.distance < 52 && d.angle < 30, Math.round(d.horloge), ecart,
     );
-    suivant.journal.push({ horloge: d.horloge, cote: d.cote, commande: { type: 'decision', choix }, auto: true });
+    suivant.journal.push({ horloge: d.horloge, cote: d.cote, commande: { type: 'decision', choix }, auto: true, ...(attente ? { attente } : {}) });
     suivant.gel = gelJusqua(etat, limite);
     delete suivant.decision;
   }
@@ -1366,6 +1407,10 @@ export function commanderMatchEnLigne(
   }
 
   const evenement: EvenementMatchEnLigne = { horloge, cote, commande };
+  if (commande.type === 'decision' && marque.decision) {
+    attendre(moteur, pasAttendus(marque.decision, maintenant));
+    if (moteur.attenteDecision) evenement.attente = moteur.attenteDecision;
+  }
   const suivant: EtatMatchEnLigne = { ...marque, journal: [...marque.journal, evenement] };
   // La base reste celle du coup d'envoi. La remplacer ici appliquerait les
   // nouvelles combinaisons dans le passé lors d'une reconstruction à froid.

@@ -274,9 +274,16 @@ titre('3. LA REJOUE EST DÉTERMINISTE, ET LE DIRECT S’ARRÊTE SUR LES DÉCISIO
   let decisions = 0;
   let prises = 0;
   let horlogeReelle = T0;
-  for (let pas = 1; pas <= 600 && !direct.termine; pas++) {
-    horlogeReelle += MS_PAR_MINUTE / 2;
-    direct = commanderMatchEnLigne(direct, 'A', { type: 'presence' }, horlogeReelle);
+  // ⚠️ AU RYTHME DE L'ÉCRAN : un sondage toutes les deux secondes, la présence
+  // redite toutes les vingt-quatre. À un pas de trente secondes avec la présence
+  // datée de l'instant même, le match n'était arrêté que si le sondage tombait
+  // PILE dans les quelques secondes d'une pénalité : le contrôle passait ou non
+  // selon la graine (zéro appel avec les règles 2, huit au rythme réel).
+  for (let pas = 1; pas <= 9000 && !direct.termine; pas++) {
+    horlogeReelle += 2_000;
+    direct = pas % 12 === 1
+      ? commanderMatchEnLigne(direct, 'A', { type: 'presence' }, horlogeReelle)
+      : avancerMatchEnLigne(direct, horlogeReelle);
     if (direct.decision) {
       decisions++;
       if (decisions % 2 === 0) {

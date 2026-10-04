@@ -99,3 +99,16 @@
 .dc-cahier { display: flex; align-items: center; gap: 8px; padding: 10px 16px; color: #e0c68e; background: #46351c40; border-top: 1px solid #8c713b; font-size: 12px; line-height: 1.5; }
 .dc-cahier.actif { background: #25473150; border-color: #5e8062; color: #cce2bd; }
 .dc-cahier svg { flex: 0 0 auto; }
+/* L'image ne porte que l'habillage TV : les étiquettes de phase, de scénario et de sifflet du terrain sont retirées. */
+.dc-ecran .cel-conquete,.dc-ecran .cel-aplatissage,.dc-ecran .cel-scenario,.dc-ecran .cel-hud-haut,.dc-ecran .cel-sifflet{display:none!important}
+/* La décision se prend sur l'image, plein écran compris : un bandeau bas, large pour le pouce. */
+.dc-decision{position:absolute;z-index:9;left:50%;bottom:clamp(8px,3%,26px);transform:translateX(-50%);width:min(94%,720px);animation:dc-decision-entree .22s ease-out}
+.dc-decision .cel-decision{padding:.7rem .85rem;gap:.4rem;background:rgba(13,20,16,.93);backdrop-filter:blur(6px);animation:none;box-shadow:0 10px 30px #000a}
+.dc-decision .cel-decision p{font-size:.86rem;color:#e2ebe4}
+.dc-decision .cel-decision-choix{grid-template-columns:repeat(4,minmax(0,1fr));gap:.4rem}
+.dc-decision .cel-decision-choix .btn{padding:.6rem .4rem;font-size:.82rem;min-height:44px;justify-content:center}
+.dc-decision .cel-decision small{font-size:.72rem}
+@keyframes dc-decision-entree{from{opacity:0;transform:translate(-50%,10px)}to{opacity:1;transform:translate(-50%,0)}}
+@media(max-width:650px){.dc-decision{width:calc(100% - 12px);bottom:6px}.dc-decision .cel-decision-choix{grid-template-columns:repeat(2,minmax(0,1fr))}.dc-decision .cel-decision p{font-size:.78rem}}
+@media(prefers-reduced-motion:reduce){.dc-decision{animation:none}}
+.dc-ecran:has(.dc-decision) .cel-cadrage{display:none}

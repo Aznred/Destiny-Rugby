@@ -128,8 +128,10 @@ import {
   type Camera3D, type OptionsScene3D, type Scene3D,
 } from '../lib/match3D';
 import {
-  AvantMatch, BandeauRemplacements, CartonsEquipe, HommeDuMatch, OutilsTele, PanneauMiTemps,
+  BandeauRemplacements, HommeDuMatch, OutilsTele, PanneauMiTemps,
 } from './match/PresentationTV';
+import { HabillageTV } from './match/HabillageTV';
+import { couleursEquipeTV, DUREE_EQUIPE_TV, exclusionsDepuisEtat, logoTV, type IdentiteTV } from '../lib/habillageTV';
 import { changementsRecents } from '../lib/presentationTV';
 import { urlLogoEquipe } from '../lib/logoEquipe';
 import { PelouseMemo } from './match/Pelouse';
@@ -325,12 +327,13 @@ function vibrer(ms: number): void {
 
 // ---------------------------------------------------------------------------
 export function MatchLive({
-  match, saison, cle, titre, onFermer, onTermine, joueur, selection, manager,
+  match, saison, cle, titre, onFermer, onTermine, joueur, selection, manager, habillage,
 }: {
   match: MatchChampionnat;
   saison: number;
   cle: string;
   titre: string;
+  habillage?: IdentiteTV;
   /** Match de sélection : les « clubs » sont des nations, et leurs effectifs
    *  sont les meilleurs joueurs réels du pays (lib/international.ts). */
   selection?: boolean;
@@ -376,7 +379,11 @@ export function MatchLive({
   // tunnel. ⚠️ LE MOTEUR ATTEND : rien n'est joué tant que la présentation
   // dure, et « Passer » (ou le réglage) rend la main tout de suite.
   const [avantMatch, setAvantMatch] = useState<'affiche' | 'A' | 'B' | null>(null);
-  const presentation = useRef<{ t: number; etape: 'affiche' | 'A' | 'B' } | null>(null);
+  const [tempsPresentation, setTempsPresentation] = useState(0);
+  const presentation = useRef<{ t: number; etape: 'affiche' | 'A' | 'B'; attente?: number } | null>(null);
+  const presentationDecidee = useRef(false);
+  const vue3DVoulue = useRef(vue3D);
+  vue3DVoulue.current = vue3D;
   const tmoRevu = useRef<unknown>(null);
   const [pleinEcran, setPleinEcran] = useState(false);
   /** Dernier rendu React demandé par la boucle, quand la scène 3D dessine le terrain. */
@@ -449,6 +456,15 @@ export function MatchLive({
     );
   }
   const e = moteur.current;
+  // ⚠️ L'AVANT-MATCH SE DÉCIDE À L'OUVERTURE DU MATCH, PAS AU BRANCHEMENT DE LA
+  // SCÈNE 3D. Décidé là-bas, il suffisait que le moteur ait joué une demi-seconde
+  // pendant le chargement du stade — ou que le match soit vu de haut — pour que
+  // les compositions ne passent jamais : on ne les voyait qu'en carrière d'entraîneur.
+  if (!presentationDecidee.current) {
+    presentationDecidee.current = true;
+    if (e.sim < 0.5 && e.t === 0 && !e.fini && preferencesTele().presentation) presentation.current = { t: 0, etape: 'affiche' };
+  }
+  useEffect(() => { if (presentation.current) setAvantMatch(presentation.current.etape); }, []);
   const monPion = e.pions.find((p) => p.moi);
   const blessuresManager = useRef<{ joueurId: string; minute: number; activite: string }[]>([]);
   const minuteMedicale = useRef(-1);
@@ -858,24 +874,29 @@ export function MatchLive({
 
       // ── 📺 L'AVANT-MATCH : le moteur attend, la scène fait entrer les équipes ──
       const intro = presentation.current;
-      if (intro && scene) {
+      if (intro) {
+        // Le stade se charge encore : on l'attend quelques secondes plutôt que de présenter sur une image vide.
+        if (!scene && vue3DVoulue.current && (intro.attente = (intro.attente ?? 0) + dtReel) < 8 && tempo !== 'accelere' && tempo !== 'fin') return;
         intro.t += enPause ? 0 : dtReel;
         // Accélérer ou aller à la fin, c'est dire qu'on ne veut pas de l'avant-match.
         if (tempo === 'accelere' || tempo === 'fin') intro.t = 99;
-        const etape = intro.t < 3 ? 'affiche' : intro.t < 9.6 ? 'A' : 'B';
+        const etape = intro.t < 3 ? 'affiche' : intro.t < 3 + DUREE_EQUIPE_TV ? 'A' : 'B';
+        setTempsPresentation(Math.floor(intro.t));
         if (etape !== intro.etape) {
           intro.etape = etape;
           setAvantMatch(etape);
-          if (etape === 'A') scene.son?.evenement('entree', { gain: 0.8 });
+          if (etape === 'A') scene?.son?.evenement('entree', { gain: 0.8 });
         }
-        if (intro.t < 16.2) {
-          scene.camera = intro.t < 3 ? 'wide' : 'tv';
-          scene.entrer(Math.max(0, (intro.t - 3) / 12.6), dtReel);
-          scene.image(dtReel, { vitesse: 1 });
+        if (intro.t < 3 + DUREE_EQUIPE_TV * 2) {
+          if (scene) {
+            scene.camera = intro.t < 3 ? 'wide' : 'tv';
+            scene.entrer(Math.max(0, (intro.t - 3) / (DUREE_EQUIPE_TV * 2)), enPause ? 0 : dtReel);
+            scene.image(dtReel, { vitesse: 1 });
+          }
           return;
         }
         presentation.current = null;
-        scene.entrer(null);
+        scene?.entrer(null);
         setAvantMatch(null);
       }
 
@@ -1324,6 +1345,11 @@ export function MatchLive({
   // ⚠️ LA SCÈNE NE DÉCIDE DE RIEN : elle lit `e`, l'état que le moteur fait
   // avancer dans la boucle ci-dessus, et le met en images. Décisions, cartons,
   // remplacements, consignes : tout passe par le moteur, comme avant.
+  const identiteTV = useMemo<IdentiteTV>(() => {
+    const competition = selection ? undefined : competitionEffective(e.clubA);
+    return { nom: titre || competition?.nom, logo: competition?.id,
+      journee: Number(titre.match(/(?:journée|\bJ)\s*(\d+)/i)?.[1]) || undefined, ...habillage };
+  }, [titre, selection, e.clubA, habillage]);
   const options3D = useMemo<OptionsScene3D>(() => ({
     equipes: [
       { nom: e.clubA, maillot: tenueDepuisCouleurs(couleurA, couleurA2, e.clubA), blason: ecussonPourToile(clubA?.logo ?? urlLogoEquipe(e.clubA)) },
@@ -1333,23 +1359,21 @@ export function MatchLive({
     moi: monPion?.id,
     camera: 'tv',
     television: { ralentis: preferencesTele().ralentis },
-    habillage: { nom: titre },
+    habillage: { nom: identiteTV.nom, logo: logoTV(identiteTV.logo) },
     textes: { ralenti: t('ml.ralenti') },
-  }), [e, couleurA, couleurA2, couleurB, couleurB2, clubA, clubB, monPion, titre]);
+  }), [e, couleurA, couleurA2, couleurB, couleurB2, clubA, clubB, monPion, identiteTV]);
   const brancherScene = useCallback((scene: Scene3D | null) => {
     scene3D.current = scene;
     if (!scene) return;
     scene.brancher(e);
-    // Coup d'envoi pas encore donné : les équipes entrent, sauf si le joueur a coupé l'avant-match.
-    if (e.sim < 0.5 && e.t === 0 && !e.fini && preferencesTele().presentation) {
-      presentation.current = { t: 0, etape: 'affiche' };
-      setAvantMatch('affiche');
-    }
     redessiner((n) => n + 1);
   }, [e]);
   const passerAvantMatch = () => { if (presentation.current) presentation.current.t = 99; };
   const couleursTV = useMemo(() => ({ A: couleurA, B: couleurB }), [couleurA, couleurB]);
-  const abandonner3D = useCallback(() => { scene3D.current = null; setVue3D(false); }, []);
+  const abandonner3D = useCallback(() => {
+    // Sans la 3D, la présentation continue sur le terrain vu de haut.
+    scene3D.current = null; setVue3D(false);
+  }, []);
   // La caméra choisie est poussée à la scène dès qu'elle existe, puis à chaque changement.
   useEffect(() => { if (scene3D.current) scene3D.current.camera = camera3D; });
   const basculerVue = () => {
@@ -1399,7 +1423,6 @@ export function MatchLive({
           <div className="ml-equipe">
             {clubA ? <Blason club={clubA} taille={26} /> : <LogoEquipe nom={e.clubA} taille={26} />}
             <b>{e.clubA}</b>
-            <CartonsEquipe pions={e.pions} cote="A" />
           </div>
           <div className="ml-score">
             <span>{e.scoreA}</span>
@@ -1407,7 +1430,6 @@ export function MatchLive({
             <span>{e.scoreB}</span>
           </div>
           <div className="ml-equipe droite">
-            <CartonsEquipe pions={e.pions} cote="B" />
             <b>{e.clubB}</b>
             {clubB ? <Blason club={clubB} taille={26} /> : <LogoEquipe nom={e.clubB} taille={26} />}
           </div>
@@ -1578,9 +1600,16 @@ export function MatchLive({
                 )}
 
                 {/* ---------- 📺 L'HABILLAGE TÉLÉVISION ---------- */}
-                {vue3D && avantMatch && (
-                  <AvantMatch e={e} etape={avantMatch} couleurs={couleursTV} competition={titre} surPasser={passerAvantMatch} />
-                )}
+                <HabillageTV identite={identiteTV} seconde={e.t} periode={e.periode} phase={e.phase} termine={e.fini}
+                  equipes={[
+                    { nom: e.clubA, ...couleursEquipeTV(couleurA), logo: clubA?.logo ?? urlLogoEquipe(e.clubA), score: e.scoreA, essais: e.essaisA },
+                    { nom: e.clubB, ...couleursEquipeTV(couleurB, true), logo: clubB?.logo ?? urlLogoEquipe(e.clubB), score: e.scoreB, essais: e.essaisB },
+                  ]}
+                  exclusions={exclusionsDepuisEtat(e)} pause={enPause}
+                  joueurs={e.pions.filter(p => (p.numeroMaillot ?? p.numero) <= 15).map(p => ({
+                    id: p.id, nom: p.nom, numero: p.numeroMaillot ?? p.numero, poste: p.poste, cote: p.cote, capitaine: p.capitaine,
+                  }))}
+                  presentation={avantMatch ? tempsPresentation : undefined} surPasser={passerAvantMatch} />
                 {vue3D && !avantMatch && e.phase === 'miTemps' && <PanneauMiTemps e={e} couleurs={couleursTV} />}
                 {!avantMatch && <BandeauRemplacements changements={changementsRecents(e, couleursTV)} />}
 
@@ -1604,10 +1633,9 @@ export function MatchLive({
                       </button>
                     </div>
                   )}
-                  {actionImportante && (
+                  {actionImportante && actionImportante.type !== 'carton' && (
                     <div className={`ml-evenement-terrain ml-evenement-${actionImportante.type}`} role="status">
                       <b><IconeEmoji emoji={EMOJI[actionImportante.type] ?? '⚡'} /> {actionImportante.type === 'essai' ? t("ui.1eb3a59bf5f9")
-                        : actionImportante.type === 'carton' ? (/rouge/i.test(actionImportante.texte) ? t("sifflet.cartonRouge") : t("sifflet.cartonJaune"))
                           : actionImportante.type === 'penalite' || actionImportante.type === 'faute' ? t("sifflet.penalite")
                             : actionImportante.type === 'but' ? t("ui.fcf7ac0edb73") : actionImportante.type === 'butRate' ? t("ui.7a76058c02fe") : t("ui.a2ffe5ba4631")}</b>
                       <span><TexteIcones texte={actionImportante.texte} /></span>
@@ -1738,7 +1766,7 @@ export function MatchLive({
                       l'adversaire — c'est mesuré — mais ça passait dans une
                       ligne du fil, réduite à une seule au-dessus du terrain, et
                       défilant à seize fois la vitesse réelle. */}
-                  {e.sifflet && !decision && !e.bagarre && (
+                  {e.sifflet && !e.sifflet.cle.includes('carton') && !decision && !e.bagarre && (
                     <div className={`ml-sifflet${e.sifflet.maFaute ? ' faute' : ''}`} role="status">
                       <b>{t(e.sifflet.cle)}</b>
                       <span>
@@ -1771,16 +1799,6 @@ export function MatchLive({
                       action={`Essai de ${e.dernierReplayEssai.marqueurNom}`}
                       decision="Essai accordé"
                       cadreCamera="CAM 1 · LIGNE D'EN-BUT"
-                      horloge={`${Math.floor(e.minute)}:${String(Math.floor(e.t % 60)).padStart(2, '0')}`}
-                    />
-                  )}
-
-                  {/* ---------- 📺 CARTON JAUNE / ROUGE : CADRE TV BROADCAST ---------- */}
-                  {e.sifflet && !e.tmo && (e.sifflet.cle.includes('cartonJaune') || e.sifflet.cle.includes('cartonRouge')) && (
-                    <CadreTmoReplay
-                      action={`Sanction disciplinaire contre ${e.sifflet.fautif}`}
-                      decision={e.sifflet.cle.includes('cartonRouge') ? 'Carton rouge' : 'Carton jaune'}
-                      cadreCamera="CAM 2 · GROS PLAN"
                       horloge={`${Math.floor(e.minute)}:${String(Math.floor(e.t % 60)).padStart(2, '0')}`}
                     />
                   )}

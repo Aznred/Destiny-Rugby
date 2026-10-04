@@ -59,6 +59,7 @@
     "verify:direct-push": "vite-node scripts/verifierDirectPush.ts",
     "verify:direct-3d": "vite-node scripts/verifierDirect3D.ts",
     "verify:film-direct": "vite-node scripts/verifierFilmDirect.ts",
+    "verify:habillage-tv": "vite-node scripts/verifierHabillageTV.ts",
     "verify:structure": "vite-node scripts/verifierStructureAttaque.ts",
     "verify:pied": "vite-node scripts/verifierJeuAuPied.ts",
     "mesure:regles-ligue": "vite-node scripts/mesurerReglesLigue.ts",

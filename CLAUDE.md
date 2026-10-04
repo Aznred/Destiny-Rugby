@@ -510,6 +510,29 @@ accélérer le match passe l'avant-match.
 - **Avant-match** (`MatchLive`, `AvantMatch`) : l'affiche, puis les deux
   compositions par lignes pendant que les équipes sortent du tunnel
   (`scene.entrer(k)`). ⚠️ Le moteur ATTEND : rien n'est joué tant qu'il dure.
+  ⚠️ Il se décide À L'OUVERTURE DU MATCH, pas au branchement de la scène 3D :
+  décidé là-bas, on ne voyait les compositions qu'en carrière d'entraîneur. Vu
+  de haut, la présentation passe aussi. En ligne le match n'attend personne :
+  `DirectCinema` joue la présentation sur sa propre horloge, pour qui ouvre le
+  direct dans le premier quart d'heure, le jeu continuant derrière.
+- **Habillage TV** (`components/match/HabillageTV.tsx`, `lib/habillageTV.ts`,
+  aperçu `/scripts/apercuHabillageTV.html`, banc `npm run verify:habillage-tv`) :
+  score incrusté en haut à gauche aux couleurs et au logo de la ligue (logo
+  recadré dans un carré), onglet des essais au-dessus de chaque équipe, carton
+  rouge penché avec le nombre d'exclus, compte à rebours des jaunes dessous,
+  chrono rouge et corne (`sons.js`) dans le temps additionnel, compositions par
+  lignes avec le portrait de la carte (sans photo : la silhouette grise des
+  cartes), bandeaux de carton avec motif, de coup d'envoi et de seconde période.
+  Textes : clés `tv.*`, sept langues. ⚠️ Dans le direct de ligue, l'image ne
+  porte QUE cet habillage : les étiquettes de phase, de scénario et de sifflet
+  sont masquées (`.dc-ecran` dans `DirectCinema.css`).
+- **Décision de pénalité en ligne** : le panneau se pose SUR l'image
+  (`panneauDecision` de `DirectCinema`), donc visible en plein écran, et les
+  joueurs se replacent pendant le choix. ⚠️ `patienter(e)` (moteur) ne fait que
+  des déplacements — ni tirage, ni horloge, ni phase — et le nombre de pas joués
+  est inscrit au journal avec la décision (`EvenementMatchEnLigne.attente`) :
+  une rejoue à froid en refait exactement autant. Un moteur gardé en mémoire qui
+  aurait attendu plus que le journal est remonté de zéro.
 - **Mi-temps et fin de match** : `PanneauMiTemps` (possession, essais, mètres,
   franchissements, passes, plaquages) et `HommeDuMatch` en tête de la feuille.
 - **Cartons** à côté du nom de l'équipe, avec les minutes restantes.

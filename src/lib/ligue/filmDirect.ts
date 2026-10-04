@@ -33,6 +33,7 @@ import { corpsPourAffichage, type GesteMatch } from '../moteur/dynamique.js';
 import { apparenceJoueurMatch, type ApparenceMatch } from '../moteur/apparenceMatch.js';
 import type { Cote, Vec } from '../moteur/terrain.js';
 import type { PosteId } from '../../types.js';
+import { exclusionsDepuisEtat } from '../habillageTV.js';
 
 /** Le pas de simulation du moteur (`DT`), en secondes. */
 export const PAS_FILM = 0.15;
@@ -93,7 +94,7 @@ export interface FilmDirect {
 
 const SCALAIRES = [
   'phase', 'possession', 'dureeArret', 'fini', 'scoreA', 'scoreB', 'essaisA', 'essaisB', 'systeme',
-  'phasesDepuisArret', 'ligneAvantage', 'metresGagnesPhase', 'ballonLent', 'ouvert', 'periode', 'placementJoue',
+  'phasesDepuisArret', 'ligneAvantage', 'metresGagnesPhase', 'ballonLent', 'ouvert', 'periode', 'sirene', 'placementJoue',
 ] as const;
 /**
  * ⚠️ LES OBJETS DONT L'IDENTITÉ COMPTE. L'affichage reconnaît un nouveau ruck,
@@ -214,6 +215,12 @@ function photographier(e: EtatMatch, camera: Camera): PhotoFilm {
     pions[p.id] = j;
   }
   d.pions = pions;
+  // Échéances absolues stables : pas de compteur à retransmettre à chaque image.
+  d.exclusionsTV = exclusionsDepuisEtat(e).map(p => ({
+    id: p.id, nom: p.nom, numero: p.numero, poste: p.poste, cote: p.cote, type: p.type,
+    ...(p.retour !== undefined ? { retour: p.retour } : {}),
+    ...(p.motif ? { motif: p.motif } : {}),
+  }));
   return { n, sur, q, d, g: e.gestes ?? SANS_GESTE };
 }
 const SANS_GESTE: GesteMatch[] = [];

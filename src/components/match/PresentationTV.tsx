@@ -1,7 +1,7 @@
 import { useState, type MutableRefObject } from 'react';
 import { Icone } from '../Icone';
 import { t } from '../../lib/i18n';
-import { avatarInitiales, photoReelle } from '../../lib/avatars';
+import { photoReelle } from '../../lib/avatars';
 import {
   CAMERAS_3D, preferencesTele, retenirPreferencesTele, type Camera3D, type Scene3D,
 } from '../../lib/match3D';
@@ -22,7 +22,7 @@ import './PresentationTV.css';
 // imposé : ralentis, avant-match et son se coupent d'un bouton, et le choix est
 // retenu d'un match à l'autre.
 
-const portrait = (nom: string, club?: string) => photoReelle(nom, club) ?? avatarInitiales(nom);
+const portrait = (nom: string, club?: string) => photoReelle(nom, club) ?? '/photos/silhouette.webp';
 /** « Antoine DUPONT » → « DUPONT » : ce qu'on lit sur un bandeau de télévision. */
 const nomCourt = (nom: string) => {
   const mots = nom.trim().split(/\s+/);

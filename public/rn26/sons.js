@@ -247,9 +247,11 @@ export function creerSons(options={}){
       if(vu.match!==match){
         // Un nouveau match : on repart de son état, sans rejouer ce qui a précédé.
         vu.match=match;vu.scoreA=e.scoreA||0;vu.scoreB=e.scoreB||0;vu.phase=e.phase;vu.vol=e.vol;vu.sifflet=e.sifflet;vu.ruck=e.ruck;vu.impact=e.grosImpact;
-        vu.fini=!!e.fini;vu.jaunes=e.discipline?.jaunes??0;vu.rouges=e.discipline?.rouges??0;vu.echappee=e.echappee;vu.etapeTir=e.tir?.etape||'';attente=[];
+        vu.fini=!!e.fini;vu.sirene=!!e.sirene;vu.jaunes=e.discipline?.jaunes??0;vu.rouges=e.discipline?.rouges??0;vu.echappee=e.echappee;vu.etapeTir=e.tir?.etape||'';attente=[];
       }
       if(!fige){
+        // La sirène : la corne retentit quand le temps réglementaire est écoulé (40e et 80e).
+        if(!!e.sirene!==vu.sirene){vu.sirene=!!e.sirene;if(vu.sirene)jouer('corne',{gain:.7});}
         reagir(e,vitesse);
         for(const a of attente)a.dans-=dt*vitesse;
         const mures=attente.filter(a=>a.dans<=0);attente=attente.filter(a=>a.dans>0);for(const a of mures)a.action();

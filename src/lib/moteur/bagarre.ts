@@ -504,6 +504,7 @@ function sanctionner(
   p.surLeTerrain = false;
   p.sanction = rouge ? 99_999 : 600; // dix minutes d'horloge, ou le reste du match
   if (rouge) p.stats.cartonsRouges += 1; else p.stats.cartonsJaunes += 1;
+  p.motifCarton = motif;
   if (p.moi) {
     if (rouge) e.discipline.rouges += 1; else e.discipline.jaunes += 1;
     e.discipline.motif = motif;

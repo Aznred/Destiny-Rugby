@@ -12,6 +12,8 @@
 //   ?latence=900   réponses lentes, jusqu'à ce nombre de millisecondes ;
 //   ?regles=1      le moteur de ligue d'origine (joueurs installés d'un coup) ;
 //   ?releve=1      l'ancien chemin : un relevé du terrain, interpolé par l'écran ;
+//   ?decision=0    sans les décisions de pénalité (par défaut, celles de l'équipe
+//                  à domicile s'arrêtent vingt secondes, comme devant son banc) ;
 //   ?pilote=1      les images ne sont plus cadencées par le navigateur mais par
 //                  `__pomper(n)` — pour mesurer dans un onglet caché, où
 //                  `requestAnimationFrame` ne tourne pas.
@@ -20,7 +22,7 @@ import { createRoot } from 'react-dom/client';
 import { DirectCinema } from '../src/components/match/DirectCinema';
 import { extraireTerrain, RESSERREMENT_REGLES_2, type VueMatchEnLigne } from '../src/lib/ligue/matchCarriere';
 import { cadrerFilm, extraireFilm, filmer, reperesFilm, type FilmDirect } from '../src/lib/ligue/filmDirect';
-import { avancer, creerMatch } from '../src/lib/moteur/moteur';
+import { avancer, choisirPenalite, creerMatch, infoPenalite, patienter } from '../src/lib/moteur/moteur';
 import { effectifDuClub } from '../src/lib/effectif';
 import { clubParNom } from '../src/data/clubs';
 import { tenueDepuisCouleurs } from '../src/lib/match3D';
@@ -35,6 +37,13 @@ const latence = Number(reglages.get('latence')) || 0;
 const regles2 = reglages.get('regles') !== '1';
 const ancienChemin = reglages.get('releve') === '1';
 const INTERVALLE_RELEVE = 2000;
+const avecDecisions = reglages.get('decision') !== '0';
+/** La décision en attente du « serveur » de l'aperçu : même arrêt, même attente jouée que sur le vrai. */
+const attente: { debut?: number; horloge?: number } = {};
+function penaliteATrancher(e: ReturnType<typeof creerMatch>) {
+  const info = avecDecisions ? infoPenalite(e) : null;
+  return info && info.cote === 'A' && info.distance <= 50 ? info : null;
+}
 if (reglages.get('pilote') === '1') {
   const file: FrameRequestCallback[] = [];
   let horloge = performance.now();
@@ -47,6 +56,7 @@ if (reglages.get('pilote') === '1') {
 function vue(e: ReturnType<typeof creerMatch>): VueMatchEnLigne {
   // Le film remplace le relevé, comme sur le serveur ; avant le premier pas, la caméra n'a rien.
   const film = ancienChemin ? undefined : extraireFilm(e, reperesFilm.get('apercu-3d'));
+  const decision = penaliteATrancher(e);
   // La caméra ne filme que ce qui est regardé : la demande ci-dessus l'allume, on la cadre pour la suite.
   if (!ancienChemin) cadrerFilm(e, 0);
   const stats = (cote: 'A' | 'B') => {
@@ -67,6 +77,11 @@ function vue(e: ReturnType<typeof creerMatch>): VueMatchEnLigne {
     stats: { domicile: stats('A'), exterieur: stats('B') },
     terrain: film ? undefined : extraireTerrain(e, Date.now()),
     film: film ? JSON.parse(JSON.stringify(film)) as FilmDirect : undefined, moments: [],
+    monCote: 'domicile', gele: !!decision,
+    decision: decision && attente.debut !== undefined ? {
+      cote: 'domicile', distance: decision.distance, angle: decision.angle, probabilite: Math.round(decision.probabilite * 100),
+      buteur: decision.buteur, aPortee: decision.aPortee, horloge: attente.horloge ?? e.t / 60, jusqua: Date.now() + 20_000 - (performance.now() - attente.debut),
+    } : undefined,
   };
 }
 
@@ -86,7 +101,16 @@ function Apercu() {
     // Le « serveur » : le moteur avance en continu, sans rien montrer.
     const horloge = window.setInterval(() => {
       const maintenant = performance.now();
-      avancer(e, Math.min(1, (maintenant - dernier) / 1000) * vitesse);
+      if (penaliteATrancher(e)) {
+        // Le chrono est arrêté ; les joueurs, eux, se replacent — et l'adjoint tranche au bout de vingt secondes.
+        if (attente.debut === undefined) { attente.debut = maintenant; attente.horloge = e.t / 60; }
+        const pas = Math.min(133, Math.floor((maintenant - attente.debut) / 150));
+        while ((e.attenteDecision ?? 0) < pas) patienter(e);
+        if (maintenant - attente.debut > 20_000) { choisirPenalite(e, 'A', 'points'); attente.debut = undefined; }
+      } else {
+        attente.debut = undefined;
+        avancer(e, Math.min(1, (maintenant - dernier) / 1000) * vitesse);
+      }
       dernier = maintenant;
     }, 100);
     // Le « réseau » : un relevé toutes les deux secondes, rien d'autre.
@@ -112,7 +136,15 @@ function Apercu() {
         · règles {regles2 ? 2 : 1} · vitesse ×{vitesse}{latence ? ` · latence jusqu'à ${latence} ms` : ''}
       </p>
       <DirectCinema match={m} domicile={DOMICILE} exterieur={EXTERIEUR} couleurs={couleurs}
-        emblemes={{ domicile: a?.logo, exterieur: b?.logo }} />
+        emblemes={{ domicile: a?.logo, exterieur: b?.logo }}
+        panneauDecision={m.decision ? <div className="cel-decision" role="alertdialog">
+          <div className="eyebrow">Pénalité à {m.decision.distance} m · chrono arrêté</div>
+          <p>{m.decision.buteur} : {m.decision.probabilite} % de réussite</p>
+          <div className="cel-decision-choix">
+            {(['points', 'touche', 'rapide', 'melee'] as const).map((choix) => <button key={choix} className={`btn ${choix === 'points' ? 'primaire' : ''}`}
+              onClick={() => { choisirPenalite(e, 'A', choix); attente.debut = undefined; setM(vue(e)); }}>{{ points: 'Les points', touche: 'La touche', rapide: 'Jouer vite', melee: 'La mêlée' }[choix]}</button>)}
+          </div>
+        </div> : undefined} />
     </main>
   );
 }
