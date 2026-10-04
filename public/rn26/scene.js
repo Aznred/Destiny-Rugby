@@ -21,7 +21,17 @@ import { creerTelevision } from './television.js';
 const smooth=k=>{const u=clamp(k,0,1);return u*u*(3-2*u);};
 const RACINE_MODELES='/rn26/modeles/',RACINE_DECOR='/rn26/decor/';
 // Pose des casques et crampons allégés (repère : voir alleger_equipement.mjs).
-const CASQUE={taille:.3,haut:.03,recul:0},CRAMPON={taille:1.04};
+// ⚠️ LE CASQUE SE RÈGLE SUR LA TÊTE, PAS SUR UNE TAILLE FIXE : posé à 30 cm de haut,
+// son sommet flottait six centimètres au-dessus du crâne. Sa largeur suit celle de
+// la tête (oreilles comprises) et son sommet affleure le haut du crâne.
+const CASQUE={largeur:1.06,dessus:.012,recul:.004},CRAMPON={taille:1.04};
+const ballons=new Map();
+/** Le ballon équipé en boutique, allégé pour le match (alleger_equipement.mjs) ; `null` s'il manque. */
+function chargerBallon(nom){
+  if(!/^[a-z0-9-]+$/i.test(nom||''))return Promise.resolve(null);
+  if(!ballons.has(nom))ballons.set(nom,new GLTFLoader().loadAsync(RACINE_DECOR+'equipement/ballon-'+nom+'.glb').then(g=>{let m=null;g.scene.traverse(o=>{if(o.isMesh)m=o;});return m;}).catch(()=>null));
+  return ballons.get(nom);
+}
 let ressources=null;
 const peintComme=(canvas,avant)=>{const t=texture(canvas,null);if(avant){t.wrapS=avant.wrapS;t.wrapT=avant.wrapT;t.repeat.copy(avant.repeat);t.offset.copy(avant.offset);t.flipY=avant.flipY;}return t;};
 /** Joueurs, ballon, coiffures, équipement et mouvements : chargés une fois, partagés par tous les matchs de la session. */
@@ -174,6 +184,21 @@ export async function creerScene3D(conteneur,options={}){
   }
 
   const ballMesh=clone(r.ball);scene.add(ballMesh);
+  // Le ballon du joueur : celui qu'il a équipé en boutique prend la place du ballon de la scène,
+  // à la même taille et sur le même axe — tout ce qui le lance, le pose ou le fait tourner n'y voit rien.
+  const skinBallon=options.ballon?await chargerBallon(options.ballon):null;
+  if(skinBallon){
+    let cuir=null;ballMesh.traverse(o=>{if(o.isMesh&&!cuir&&!/shadow/i.test(o.material?.name||''))cuir=o;});
+    if(cuir){
+      cuir.geometry.computeBoundingBox();
+      const taille=cuir.geometry.boundingBox.getSize(new THREE.Vector3()),centre=cuir.geometry.boundingBox.getCenter(new THREE.Vector3());
+      const axe=taille.x>=taille.y&&taille.x>=taille.z?'x':taille.y>=taille.z?'y':'z';
+      const neuf=new THREE.Mesh(skinBallon.geometry,skinBallon.material);neuf.name='BallonBoutique';
+      neuf.scale.setScalar(taille[axe]);neuf.position.copy(centre);
+      if(axe==='x')neuf.rotation.y=Math.PI/2;else if(axe==='y')neuf.rotation.x=Math.PI/2;
+      cuir.add(neuf);cuir.material=new THREE.MeshBasicMaterial({visible:false});jetables.push(cuir.material);
+    }
+  }
   const teeMesh=clone(r.tee);teeMesh.rotation.x=Math.PI/2;teeMesh.visible=false;scene.add(teeMesh);
   teeMesh.updateMatrixWorld(true);const teeBounds=new THREE.Box3().setFromObject(teeMesh);teeMesh.userData.floor=-teeBounds.min.y;teeMesh.userData.top=teeBounds.max.y-teeBounds.min.y;
   const anneau=(interieur,exterieur,teinte,opacite)=>{const m=new THREE.Mesh(new THREE.RingGeometry(interieur,exterieur,40),new THREE.MeshBasicMaterial({color:teinte,side:THREE.DoubleSide,transparent:true,opacity:opacite,depthWrite:false}));m.rotation.x=-Math.PI/2;m.visible=false;scene.add(m);return m;};
@@ -210,7 +235,10 @@ export async function creerScene3D(conteneur,options={}){
       if(modele){
         const box=new THREE.Box3().setFromBufferAttribute(headMesh.geometry.attributes.position);
         const mesh=new THREE.Mesh(modele.geometry,modele.material);mesh.name='Casque';
-        mesh.scale.setScalar(CASQUE.taille);mesh.position.set(0,box.max.y-.118+CASQUE.haut,(box.min.z+box.max.z)/2+.012+CASQUE.recul);
+        modele.geometry.computeBoundingBox();
+        const forme=modele.geometry.boundingBox,echelle=(box.max.x-box.min.x)*CASQUE.largeur/(forme.max.x-forme.min.x);
+        mesh.scale.setScalar(echelle);
+        mesh.position.set(-(forme.min.x+forme.max.x)/2*echelle,box.max.y+CASQUE.dessus-forme.max.y*echelle,(box.min.z+box.max.z)/2+CASQUE.recul-(forme.min.z+forme.max.z)/2*echelle);
         model.add(mesh);model.updateMatrixWorld(true);head.attach(mesh);
       }else attach(r.hair.getObjectByName('Helmet_LOD2'),look.bandColor,.012,.6);
     }

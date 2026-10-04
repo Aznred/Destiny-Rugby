@@ -53,6 +53,8 @@ export interface OptionsScene3D {
   television?: { ralentis?: boolean };
   /** La compétition, montrée sur le volet des ralentis. */
   habillage?: { nom?: string; logo?: string };
+  /** Le ballon équipé en boutique (identifiant du skin) ; absent ou inconnu : le ballon Destiny Rugby de la scène. */
+  ballon?: string;
   /** Le décor, selon le niveau du club qui reçoit (`lib/stade3D.ts`) ; absent : la grande enceinte. */
   stade?: 'campagne' | 'village' | 'moyen' | 'grand' | 'international';
   /** Libellés de la scène, dans la langue du joueur. */

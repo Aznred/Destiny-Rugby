@@ -347,6 +347,8 @@ export function MatchLive({
   };
 }) {
   const iaActivee = useGame((s) => s.iaActivee);
+  // Le ballon du match est celui qu'on a équipé en boutique.
+  const skinActif = useGame((s) => s.skinActif);
   const tutoMatchVu = useGame((s) => s.tutoMatchVu);
   const setTutoMatchVu = useGame((s) => s.setTutoMatchVu);
   const enregistrerMatchVecu = useGame((s) => s.enregistrerMatchVecu);
@@ -1345,8 +1347,9 @@ export function MatchLive({
     television: { ralentis: preferencesTele().ralentis },
     habillage: { nom: identiteTV.nom, logo: logoTV(identiteTV.logo) },
     stade: stadePourClub(e.clubA),
+    ballon: skinActif,
     textes: { ralenti: t('ml.ralenti') },
-  }), [e, couleurA, couleurA2, couleurB, couleurB2, clubA, clubB, monPion, identiteTV]);
+  }), [e, couleurA, couleurA2, couleurB, couleurB2, clubA, clubB, monPion, identiteTV, skinActif]);
   const brancherScene = useCallback((scene: Scene3D | null) => {
     scene3D.current = scene;
     if (!scene) return;

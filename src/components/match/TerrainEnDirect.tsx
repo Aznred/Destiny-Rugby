@@ -66,6 +66,7 @@ import {
   type ImageDirect,
 } from '../../lib/ligue/interpolationDirect';
 import { t } from '../../lib/i18n';
+import { useGame } from '../../store/useGame';
 import { maillotDeSecours, type MaillotMatch } from '../../lib/moteur/apparenceMatch';
 import { SpriteArbitre, SpriteRugbymanMemo } from './SpriteRugbyman';
 import { Terrain3D } from './Terrain3D';
@@ -208,6 +209,8 @@ function tracerTrajectoires(vol: NonNullable<TerrainDirect['vol']>) {
 }
 
 function TerrainEnDirect({ terrain = TERRAIN_VIDE, film, matchId, surAffiche, nomDomicile, nomExterieur, couleurs, emblemes, monCote, carton, modeDemo, pause, vitesseDemo, identite, scoreMatch, stade }: Props) {
+  // Le ballon du direct est celui qu'on a équipé en boutique : chacun voit le sien.
+  const skinActif = useGame((s) => s.skinActif);
   const scoreCourant = useRef(scoreMatch);
   useEffect(() => { scoreCourant.current = scoreMatch; }, [scoreMatch]);
   const scene = useRef<HTMLDivElement>(null);
@@ -603,8 +606,9 @@ function TerrainEnDirect({ terrain = TERRAIN_VIDE, film, matchId, surAffiche, no
     television: { ralentis: preferencesTele().ralentis },
     habillage: { nom: identite?.nom, logo: logoTV(identite?.logo) },
     stade,
+    ballon: skinActif,
     textes: { ralenti: t('ml.ralenti') },
-  }), [nomDomicile, nomExterieur, maillots, emblemes?.domicile, emblemes?.exterieur, identite?.nom, identite?.logo, stade]);
+  }), [nomDomicile, nomExterieur, maillots, emblemes?.domicile, emblemes?.exterieur, identite?.nom, identite?.logo, stade, skinActif]);
   const brancherScene = useCallback((s: Scene3D | null) => {
     scene3D.current = s;
     if (!s) return;

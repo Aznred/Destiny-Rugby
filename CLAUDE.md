@@ -490,6 +490,13 @@ que l'affichage lise exactement la version du moteur qui joue.
   sommets quand la texture ne survit pas à la simplification). Un à trois
   casques par équipe, surtout des avants ou un ailier (`porteCasque`) ; un
   joueur sur deux garde les crampons d'origine.
+  ⚠️ Le casque se règle sur la TÊTE (largeur du crâne, sommet affleurant) : posé à
+  une taille fixe, il flottait six centimètres au-dessus.
+- **Le ballon du match est celui équipé en boutique** (`skinActif` → option
+  `ballon` de la scène) : les cinq skins sont allégés par le même script
+  (`decor/equipement/ballon-<skin>.glb`) et prennent la place du ballon de la
+  scène, à la même taille et sur le même axe. En ligne, chacun voit le sien.
+  Aperçu : `/rn26/index.html?ballon=tricolore`.
 - **Apparence** : `apparenceJoueurMatch(nom, poste)` — peau, cheveux, coupe et
   barbe lus sur le portrait de la carte (`apparencesMatch.generated.ts`), tirés
   du nom sinon. Un champ manquant n'est jamais « chauve » par défaut.
