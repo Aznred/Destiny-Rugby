@@ -67,6 +67,9 @@
 .btv-carton.rouge { border-bottom-color:#f43143; }
 .btv-grande-carte { display:block; width:23px; height:35px; background:#ffe32c; flex:none; transform:rotate(-8deg); }
 .btv-carton.rouge .btv-grande-carte { background:#f43143; }
+.btv-carton.sifflet { border-bottom-color:var(--tv-accent); }
+.btv-carton.sifflet small { color:var(--tv-accent); }
+.btv-coup-sifflet { display:grid; place-items:center; flex:none; color:var(--tv-accent); }
 .btv-carton>div { display:grid; gap:5px; padding:10px 0; }
 .btv-carton small { text-transform:uppercase; font-size:11px; letter-spacing:.12em; font-weight:900; color:#ffe32c; }
 .btv-carton.rouge small { color:#ff6570; }

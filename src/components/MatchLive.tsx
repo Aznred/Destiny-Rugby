@@ -161,19 +161,6 @@ const EMOJI: Record<TypeCommentaire, string> = {
   carton: '🟨', remplacement: '🔄', jalon: '🔔', faute: '🫴', jeu: '•',
 };
 
-const CLE_PHASE: Record<string, string> = {
-  coupEnvoi: 'ml.phase.coupEnvoi', renvoi22: 'ml.phase.renvoi22', ruck: 'ml.phase.ruck',
-  melee: 'ml.phase.melee', touche: 'ml.phase.touche', maul: 'ml.phase.maul',
-  ballonEnLAir: 'ml.phase.ballonEnLAir', tirAuBut: 'ml.phase.tirAuBut',
-  transformation: 'ml.phase.transformation', penalite: 'ml.phase.penalite',
-  apresEssai: 'ml.phase.apresEssai', miTemps: 'ml.phase.miTemps',
-  tmo: 'ml.phase.tmo',
-};
-
-const CLE_SYSTEME: Record<string, string> = {
-  blitz: 'ml.systeme.blitz', glissee: 'ml.systeme.glissee', repli: 'ml.systeme.repli',
-};
-
 // ---------------------------------------------------------------------------
 // LE FIL DE COMMENTAIRE — reconstruit seulement quand une ligne s'ajoute
 // ---------------------------------------------------------------------------
@@ -1309,10 +1296,6 @@ export function MatchLive({
 
   // Le ballon : porté, en vol, ou au sol. En vol on l'agrandit et on garde son
   // ombre au sol — c'est ce qui donne la sensation de hauteur.
-  const possession = e.compteurs.tempsA + e.compteurs.tempsB > 0
-    ? Math.round((e.compteurs.tempsA / (e.compteurs.tempsA + e.compteurs.tempsB)) * 100)
-    : 50;
-  const derniere = e.commentaires[e.commentaires.length - 1];
   const actionImportante = [...e.commentaires].reverse().find((c) => {
     const age = e.t - (c.seconde ?? c.minute * 60);
     return age >= 0 && age <= 45 && ['essai', 'but', 'butRate', 'penalite', 'faute', 'carton'].includes(c.type);
@@ -1606,6 +1589,7 @@ export function MatchLive({
                     { nom: e.clubB, ...couleursEquipeTV(couleurB, true), logo: clubB?.logo ?? urlLogoEquipe(e.clubB), score: e.scoreB, essais: e.essaisB },
                   ]}
                   exclusions={exclusionsDepuisEtat(e)} pause={enPause}
+                  sifflet={e.sifflet && !decision && !e.bagarre ? { cle: e.sifflet.cle, club: e.sifflet.club, fautif: e.sifflet.fautif, motif: e.penalite?.motif } : null}
                   joueurs={e.pions.filter(p => (p.numeroMaillot ?? p.numero) <= 15).map(p => ({
                     id: p.id, nom: p.nom, numero: p.numeroMaillot ?? p.numero, poste: p.poste, cote: p.cote, capitaine: p.capitaine,
                   }))}
@@ -1633,24 +1617,6 @@ export function MatchLive({
                       </button>
                     </div>
                   )}
-                  {actionImportante && actionImportante.type !== 'carton' && (
-                    <div className={`ml-evenement-terrain ml-evenement-${actionImportante.type}`} role="status">
-                      <b><IconeEmoji emoji={EMOJI[actionImportante.type] ?? '⚡'} /> {actionImportante.type === 'essai' ? t("ui.1eb3a59bf5f9")
-                          : actionImportante.type === 'penalite' || actionImportante.type === 'faute' ? t("sifflet.penalite")
-                            : actionImportante.type === 'but' ? t("ui.fcf7ac0edb73") : actionImportante.type === 'butRate' ? t("ui.7a76058c02fe") : t("ui.a2ffe5ba4631")}</b>
-                      <span><TexteIcones texte={actionImportante.texte} /></span>
-                    </div>
-                  )}
-                  <div className="ml-hud-haut">
-                    <span className="ml-tag" style={{ borderColor: e.possession === 'A' ? couleurA : couleurB }}>
-                      <Icone nom="ballon" taille={13} /> {e.possession === 'A' ? e.clubA : e.clubB} · {possession}%
-                    </span>
-                    {e.phase !== 'jeuCourant' && (
-                      <span className="ml-tag">{CLE_PHASE[e.phase] ? t(CLE_PHASE[e.phase]) : e.phase}</span>
-                    )}
-                    {!enJeu && <span className="ml-tag"><Icone nom="bouclier" taille={12} /> {t(CLE_SYSTEME[e.systeme] ?? `ml.systeme.${e.systeme}`)}</span>}
-                  </div>
-
                   {/* ---------- LE SOUFFLE ----------
                       ⚠️ UNE BARRE, PLUS UN POURCENTAGE. L'endurance décide de
                       la fin de match — mais « 🫁 62 % » perdu au milieu de
@@ -1690,16 +1656,6 @@ export function MatchLive({
                     <div className="ml-retombee" role="status">
                       <b><Icone nom="cadeau" taille={14} /> <TexteIcones texte={echo.texte} /></b>
                     </div>
-                  )}
-
-                  {/* Le fil réduit à sa dernière ligne : on garde le
-                      commentaire sans lui donner un tiers de l'écran. */}
-                  {derniere && (
-                    <button type="button" className="ml-ticker" onClick={() => setTiroir('fil')}>
-                      <span className="ml-minute">{derniere.minute}′</span>
-                      <span className="ml-emoji"><IconeEmoji emoji={EMOJI[derniere.type] ?? '🏉'} /></span>
-                      <span className="ml-texte"><TexteIcones texte={derniere.texte} /></span>
-                    </button>
                   )}
 
                   {/* ---------- 🪑 QUAND ON NE PEUT PAS JOUER ----------
@@ -1766,15 +1722,6 @@ export function MatchLive({
                       l'adversaire — c'est mesuré — mais ça passait dans une
                       ligne du fil, réduite à une seule au-dessus du terrain, et
                       défilant à seize fois la vitesse réelle. */}
-                  {e.sifflet && !e.sifflet.cle.includes('carton') && !decision && !e.bagarre && (
-                    <div className={`ml-sifflet${e.sifflet.maFaute ? ' faute' : ''}`} role="status">
-                      <b>{t(e.sifflet.cle)}</b>
-                      <span>
-                        {t('ml.sifflet.pour', { club: e.sifflet.club })}
-                        {e.sifflet.maFaute ? ` · ${t('ml.sifflet.maFaute')}` : ''}
-                      </span>
-                    </div>
-                  )}
 
                   {/* ---------- 📺 TMO : ARBITRAGE VIDÉO BROADCAST (L'ACTION RESTE VISIBLE AU CENTRE) ---------- */}
                   {e.phase === 'tmo' && e.tmo && (

@@ -526,6 +526,10 @@ accélérer le match passe l'avant-match.
   Textes : clés `tv.*`, sept langues. ⚠️ Dans le direct de ligue, l'image ne
   porte QUE cet habillage : les étiquettes de phase, de scénario et de sifflet
   sont masquées (`.dc-ecran` dans `DirectCinema.css`).
+  Possession, commentaire d'action et étiquettes de phase ne s'affichent plus,
+  ni en carrière ni en ligne (le fil et les statistiques gardent leurs onglets) ;
+  une pénalité, un en-avant ou une passe en avant s'annoncent par le MÊME bandeau
+  qu'un carton (`BandeauSiffletTV`, nourri par `e.sifflet`).
 - **Décision de pénalité en ligne** : le panneau se pose SUR l'image
   (`panneauDecision` de `DirectCinema`), donc visible en plein écran, et les
   joueurs se replacent pendant le choix. ⚠️ `patienter(e)` (moteur) ne fait que

@@ -1342,7 +1342,6 @@ function Direct({ vue, rencontre: r, agir, occupe, fermer }: { vue: VueCarriereE
         <div className="cel-chrono"><strong>{scoreVu.domicile} <em>–</em> {scoreVu.exterieur}</strong><span className={m.termine ? '' : gele ? 'gele' : 'bat'}>{m.termine ? t('online.match.finished') : chrono(minuteVue)}</span></div>
         <div className={`cel-camp${m.monCote === 'exterieur' ? ' moi' : ''}`}><Ecusson nom={nomClub(vue, r.exterieur)} logo={vue.clubs.find(c => c.id === r.exterieur)?.embleme} /><b>{nomClub(vue, r.exterieur)}</b><small>{m.essais.exterieur} {t('ml.essais')}</small></div>
       </div>
-      <div className="cel-jauge-possession" title={t('online.stats.possession')}><i style={{ width: `${m.stats.domicile.possession}%` }} /><span>{m.stats.domicile.possession}% {t('online.stats.possession').toLowerCase()} {m.stats.exterieur.possession}%</span></div>
       {m.signalAdverse && <p className="cel-signal"><Icone nom="oeil" taille={17} />{signalTexte(m.signalAdverse)}</p>}
     </div>
 

@@ -1,11 +1,9 @@
 import { tn, t } from '../../lib/i18n';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { VueMatchEnLigne } from '../../lib/ligue/matchCarriere';
-import { creerScenarioDirect } from '../../lib/ligue/scenarioDirect';
 import TerrainEnDirect, { type AfficheDirect, type CouleursDirect } from './TerrainEnDirect';
 import { CadreTmoReplay } from './CadreTmoReplay';
 import { Icone } from '../Icone';
-import { TexteIcones } from '../TexteIcones';
 import { HabillageTV } from './HabillageTV';
 import { couleursEquipeTV, DUREE_EQUIPE_TV, type IdentiteTV } from '../../lib/habillageTV';
 import { preferencesTele } from '../../lib/match3D';
@@ -44,7 +42,6 @@ export function DirectCinema({
   pause?: boolean;
   vitesseDemo?: number;
 }) {
-  const [selection, setSelection] = useState<string | null>(null);
   const [presentationPassee, setPresentationPassee] = useState(false);
   // ⚠️ L'ENTRÉE DES ÉQUIPES SE VOIT TANT QU'ELLE DURE, pas seulement à la première
   // seconde : il fallait ouvrir le direct À L'INSTANT du coup d'envoi pour voir
@@ -97,12 +94,8 @@ export function DirectCinema({
   const moments = m.moments ?? [];
   const cahier = m.maStrategie;
   const combinaisonsActives = cahier?.combinaisons?.filter(c => c.active).length ?? 0;
-  const momentSelectionne = moments.find((v) => v.id === selection);
   const secondeCourante = affiche ? affiche.seconde : (m.terrain?.horloge ?? m.horloge) * 60;
   const presentation = ouverture.current && !presentationPassee ? tempsPresentation : undefined;
-  const ligneDirect = [...(m.fil ?? [])]
-    .reverse()
-    .find((v) => !v.ordre && v.texte && (v.seconde ?? v.minute * 60) <= secondeCourante + 2);
   const momentsVus = affiche ? moments.filter((v) => v.seconde <= secondeCourante + 0.5) : moments;
   const dernierMoment = momentsVus.at(-1);
   const ageMoment = dernierMoment ? secondeCourante - dernierMoment.seconde : Infinity;
@@ -111,33 +104,9 @@ export function DirectCinema({
     : terrain?.sifflet?.cle?.includes('cartonJaune') ? 'jaune'
     : momentVif?.type === 'carton' ? (/rouge/i.test(momentVif.texte) ? 'rouge' : 'jaune')
     : undefined;
-  const scenario = terrain ? creerScenarioDirect(terrain) : undefined;
-  const prep = terrain?.preparationTir;
   // La décision n'apparaît qu'une fois la pénalité sifflée À L'ÉCRAN.
   const decision = m.decision && (!affiche || affiche.seconde >= m.decision.horloge * 60 - 1.5) ? m.decision : undefined;
   const montrerTerrain = Boolean(m.terrain || m.film || (vu && !filmFini));
-  const commentaire =
-    momentSelectionne?.texte ??
-    momentVif?.texte ??
-    ligneDirect?.texte ??
-    (prep
-      ? 'Concentration maximale du buteur face aux poteaux.'
-      : scenario?.ballonLent
-        ? 'La sortie est ralentie. La défense a le temps de se replacer.'
-        : scenario?.intensite === 'forte'
-          ? 'La défense recule, l’action peut basculer à tout instant.'
-          : scenario?.intensite === 'active'
-            ? 'Le ballon circule et l’attaque cherche l’intervalle.'
-            : 'Les deux équipes se replacent et construisent la séquence suivante.');
-  const bandeau = decision
-    ? 'DÉCISION DU MANAGER'
-    : momentSelectionne
-      ? 'ACTION DU MATCH'
-      : prep
-        ? (prep.transformation ? 'TRANSFORMATION' : 'TIR AU BUT')
-        : momentVif || scenario?.momentFort
-          ? 'MOMENT FORT'
-          : 'COMMENTAIRE EN DIRECT';
 
   const isTmo = Boolean((terrain?.phase === 'tmo' || (terrain?.tmo?.actif && !carton)) && terrain?.tmo);
 
@@ -160,7 +129,7 @@ export function DirectCinema({
           ]}
           exclusions={terrain?.exclusionsTV ?? (m.termine ? dernieresExclusions.current : undefined)} pause={pause}
           joueurs={(terrain?.pions ?? []).map(p => ({ ...p, cote: p.cote === 'domicile' ? 'A' : 'B', photo: portraits ? portraits[p.nom] ?? null : undefined }))}
-          presentation={presentation} surPasser={() => setPresentationPassee(true)} />
+          sifflet={decision ? null : terrain?.sifflet} presentation={presentation} surPasser={() => setPresentationPassee(true)} />
         {montrerTerrain ? (
           <TerrainEnDirect
             key={m.id}
@@ -200,61 +169,6 @@ export function DirectCinema({
 
         {/* L'image ne porte que l'habillage TV ; seule la décision à prendre s'y pose, là où l'on regarde. */}
         {decision && panneauDecision && <div className="dc-decision">{panneauDecision}</div>}
-      </div>
-      <div className={`dc-commentaire ${momentVif || scenario?.momentFort ? 'fort' : ''}`} aria-live="polite">
-        <span>
-          {bandeau}
-          {terrain?.lancement?.combinaison && ` · ${terrain.lancement.combinaison}`}
-          {momentSelectionne
-            ? ` · ${heure(momentSelectionne.seconde)} · ${momentSelectionne.score.domicile}–${momentSelectionne.score.exterieur}`
-            : scenario
-              ? t("ui.466408d4ea15", { v0: scenario.sequence })
-              : ''}
-        </span>
-        <p>
-          {decision
-            ? t("ui.0b0e23e2076f")
-            : <TexteIcones texte={commentaire} />}
-        </p>
-        {selection && <button onClick={() => setSelection(null)}>{t("ui.4f00a5d0128e")}</button>}
-      </div>
-      <div className="dc-chiffres">
-        {[
-          ['Possession', `${m.stats.domicile.possession}%`, `${m.stats.exterieur.possession}%`],
-          ['Mètres gagnés', m.stats.domicile.metres, m.stats.exterieur.metres],
-          ['Plaquages', m.stats.domicile.plaquages, m.stats.exterieur.plaquages],
-        ].map(([label, a, b]) => (
-          <div key={label}>
-            <span>{label}</span>
-            <b>
-              {a} <i>–</i> {b}
-            </b>
-          </div>
-        ))}
-      </div>
-      <div className="dc-moments">
-        <div className="dc-titre">
-          <h3>{t("ui.0bc62a01f8cc")}</h3>
-          <span>{t("ui.545a48fc341f", { v0: momentsVus.length })}</span>
-        </div>
-        <div className="dc-liste">
-          {[...momentsVus].reverse().map((v) => (
-            <button key={v.id} aria-pressed={selection === v.id} onClick={() => setSelection(v.id)}>
-              <time>{heure(v.seconde)}</time>
-              <span>
-                <b>
-                  {v.cote === 'domicile' ? domicile : v.cote === 'exterieur' ? exterieur : t("ui.4f3619d26a09")}
-                  {v.points ? t("ui.bc26b8a2ad14", { v0: v.points }) : ''}
-                </b>
-                <small><TexteIcones texte={v.texte} /></small>
-              </span>
-              <strong>
-                {v.score.domicile}–{v.score.exterieur}
-              </strong>
-            </button>
-          ))}
-        </div>
-        {!momentsVus.length && <p className="dc-attente">{t("ui.01e3902d4152")}</p>}
       </div>
     </section>
   );

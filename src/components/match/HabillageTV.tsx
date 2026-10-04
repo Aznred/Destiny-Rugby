@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { photoReelle } from '../../lib/avatars';
 import { t } from '../../lib/i18n';
+import { Icone } from '../Icone';
 import { nomPoste, POSTES } from '../../data/rugby';
 import { sourceEcusson } from '../../lib/ecussons';
 import {
@@ -163,9 +164,21 @@ export function CartonTV({ identite, joueur, motif }: { identite: IdentiteTV; jo
   </aside>;
 }
 
+/** Ce que l'arbitre vient de siffler (pénalité, en-avant, passe en avant) : même bandeau qu'un carton, sans le carton. */
+export interface SiffletTV { cle: string; club: string; fautif?: string; motif?: string }
+export function BandeauSiffletTV({ identite, sifflet }: { identite: IdentiteTV; sifflet: SiffletTV }) {
+  return <aside className="btv-carton sifflet" role="status">
+    <LogoLigueTV identite={identite} /><i className="btv-coup-sifflet" aria-hidden="true"><Icone nom="sifflet" taille={22} /></i>
+    <div><small>{t(sifflet.cle)}</small><strong>{t('ml.sifflet.pour', { club: sifflet.club })}</strong>
+      {(sifflet.motif || sifflet.fautif) && <span>{[sifflet.motif, sifflet.fautif].filter((texte): texte is string => !!texte).map(majuscule).join(' · ')}</span>}</div>
+  </aside>;
+}
+
 /** La même couche TV pour le moteur local et le film du direct en ligne. */
 export function HabillageTV({ identite = {}, equipes, seconde, periode = 1, phase, exclusions, joueurs = [],
-  presentation, surPasser, termine = false, motifCarton, pause = false }: {
+  presentation, surPasser, termine = false, motifCarton, pause = false, sifflet }: {
+  /** Le coup de sifflet en cours, tel que le moteur le porte ; un carton a son propre bandeau. */
+  sifflet?: (SiffletTV & { restant?: number }) | null;
   identite?: IdentiteTV; equipes: [EquipeTV, EquipeTV]; seconde: number; periode?: number; phase?: string;
   exclusions?: ExclusionTV[]; joueurs?: JoueurTV[]; presentation?: number; surPasser?: () => void;
   termine?: boolean; motifCarton?: string; pause?: boolean;
@@ -188,6 +201,20 @@ export function HabillageTV({ identite = {}, equipes, seconde, periode = 1, phas
     const timer = window.setTimeout(() => setCartons(file => file.slice(1)), 5500);
     return () => window.clearTimeout(timer);
   }, [carton, pause]);
+  // Un coup de sifflet s'annonce une fois, quand il arrive : la clé ne change pas tant qu'il dure.
+  const cleSifflet = sifflet && !sifflet.cle.includes('carton') && !sifflet.cle.includes('tmo')
+    ? `${sifflet.cle}|${sifflet.club}|${sifflet.fautif ?? ''}` : null;
+  const [annonce, setAnnonce] = useState<SiffletTV | null>(null);
+  const dernierSifflet = useRef<SiffletTV | null>(null);
+  if (cleSifflet && sifflet) dernierSifflet.current = { cle: sifflet.cle, club: sifflet.club, fautif: sifflet.fautif, motif: sifflet.motif };
+  useEffect(() => {
+    if (cleSifflet) setAnnonce(dernierSifflet.current);
+  }, [cleSifflet]);
+  useEffect(() => {
+    if (!annonce || pause) return;
+    const timer = window.setTimeout(() => setAnnonce(null), 4200);
+    return () => window.clearTimeout(timer);
+  }, [annonce, pause]);
   const dernierPeriode = useRef(periode);
   const repriseAttendue = useRef(false);
   const enPresentation = presentation !== undefined;
@@ -216,7 +243,8 @@ export function HabillageTV({ identite = {}, equipes, seconde, periode = 1, phas
     {carton ? <CartonTV key={`${carton.id}:${carton.type}`} identite={identite} joueur={carton} motif={motifCarton} />
       : etape === 'affiche' ? <AfficheTV identite={identite} equipes={equipes} avant />
       : etape ? <CompositionTV identite={identite} equipe={equipes[cote === 'A' ? 0 : 1]} joueurs={compo} ligne={ligne} />
-      : bandeau !== null && <AfficheTV identite={identite} equipes={equipes} periode={bandeau} />}
+      : bandeau !== null ? <AfficheTV identite={identite} equipes={equipes} periode={bandeau} />
+      : annonce && <BandeauSiffletTV key={`${annonce.cle}|${annonce.club}|${annonce.fautif ?? ''}`} identite={identite} sifflet={annonce} />}
     {etape && surPasser && <button className="btv-passer" onClick={surPasser}>{t('tv.passer')} <span aria-hidden="true">→</span></button>}
   </div>;
 }
