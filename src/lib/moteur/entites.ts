@@ -244,8 +244,11 @@ export function vitesseDisponible(p: Pion): number {
   return p.vitesseMax * (0.58 + 0.42 * (p.endurance / 100));
 }
 
+/** Freinage d'un joueur qui arrive sur un regroupement, en m/s². */
+const FREIN_REGROUPEMENT = 7.5;
+
 // DÉPLACEMENT À INERTIE. Renvoie les mètres parcourus pendant ce pas.
-export function deplacer(p: Pion, dt: number): number {
+export function deplacer(p: Pion, dt: number, vif = false): number {
   if (p.corps) return 0;
   const dx = p.cible.x - p.pos.x;
   const dy = p.cible.y - p.pos.y;
@@ -254,8 +257,16 @@ export function deplacer(p: Pion, dt: number): number {
   const vMax = vitesseDisponible(p) * p.effort;
   // On freine à l'approche de la cible : sans ça les pions oscillent autour
   // (et un replacement d'un mètre ne mérite pas un sprint).
-  const precision = p.role === 'ruck' ? .18 : .7;
-  const vVoulue = d < precision ? 0 : Math.min(vMax, Math.max(0, d - precision * .55) / .35);
+  const precision = ['ruck', 'maul', 'melee', 'alignement'].includes(p.role) ? .08 : .7;
+  // `vif` : le joueur vient se lier à un regroupement. ⚠️ IL DOIT POUVOIR S'Y
+  // ARRÊTER. Avec la seule inertie de course (≈ 3 m/s²), un soutien lancé à
+  // 8 m/s dépassait sa place de trois à treize mètres avant de faire demi-tour
+  // — mesuré : une image de ruck sur deux montrait un joueur lié en train de
+  // glisser. Sa vitesse voulue suit donc sa distance de freinage (v² = 2·a·d),
+  // et il freine comme on freine en arrivant sur un regroupement : fort.
+  const vVoulue = d < precision ? 0
+    : vif ? Math.min(vMax, Math.sqrt(2 * FREIN_REGROUPEMENT * .8 * Math.max(0, d - precision * .5)))
+      : Math.min(vMax, Math.max(0, d - precision * .55) / .35);
   const cibleVx = d < 1e-6 ? 0 : (dx / d) * vVoulue;
   const cibleVy = d < 1e-6 ? 0 : (dy / d) * vVoulue;
 
@@ -263,7 +274,8 @@ export function deplacer(p: Pion, dt: number): number {
   let ay = cibleVy - p.vitesse.y;
   const norme = Math.sqrt(ax * ax + ay * ay);
   const vivacite = 0.65 + 0.35 * (p.endurance / 100);
-  const maxDv = p.acceleration * vivacite * dt;
+  let maxDv = p.acceleration * vivacite * dt;
+  if (vif && ax * p.vitesse.x + ay * p.vitesse.y < 0) maxDv = Math.max(maxDv, FREIN_REGROUPEMENT * dt);
   if (norme > maxDv && norme > 1e-6) { ax = (ax / norme) * maxDv; ay = (ay / norme) * maxDv; }
   p.vitesse.x += ax;
   p.vitesse.y += ay;

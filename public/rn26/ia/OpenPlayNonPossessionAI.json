@@ -1,0 +1,2053 @@
+{
+  "EntryTask": {
+    "Type": "BehaviorDesigner.Runtime.Tasks.EntryTask",
+    "NodeData": {
+      "Offset": "(-39705,-1450.63831)"
+    },
+    "ID": 0,
+    "Name": "Entry",
+    "Instant": true
+  },
+  "RootTask": {
+    "Type": "BehaviorDesigner.Runtime.Tasks.Sequence",
+    "NodeData": {
+      "Offset": "(3.5,107.361694)",
+      "ColorIndex": 6
+    },
+    "ID": 1,
+    "Name": "Sequence",
+    "Instant": true,
+    "AbortTypeabortType": "None",
+    "Children": [
+      {
+        "Type": "RugbyBase.MatchBehavior.CompareMatchState",
+        "NodeData": {
+          "Offset": "(-4.08984375,112.808716)",
+          "ColorIndex": 6
+        },
+        "ID": 2,
+        "Name": "Is Open Play?",
+        "Instant": true,
+        "SharedMatchMatch": {
+          "Type": "RugbyBase.SharedMatch",
+          "Name": "Match",
+          "IsShared": true
+        },
+        "MatchStateState": "OpenPlay"
+      },
+      {
+        "Type": "BehaviorDesigner.Runtime.Tasks.ParallelSelector",
+        "NodeData": {
+          "Offset": "(160,110)",
+          "ColorIndex": 6
+        },
+        "ID": 3,
+        "Name": "Open Play Non-Possession AI",
+        "Instant": true,
+        "AbortTypeabortType": "None",
+        "Children": [
+          {
+            "Type": "BehaviorDesigner.Runtime.Tasks.Repeater",
+            "NodeData": {
+              "Offset": "(0.57421875,105.262451)",
+              "ColorIndex": 6
+            },
+            "ID": 4,
+            "Name": "Repeater",
+            "Instant": true,
+            "SharedIntcount": {
+              "Type": "BehaviorDesigner.Runtime.SharedInt",
+              "Name": null,
+              "Int32mValue": 1
+            },
+            "SharedBoolrepeatForever": {
+              "Type": "BehaviorDesigner.Runtime.SharedBool",
+              "Name": null,
+              "BooleanmValue": true
+            },
+            "SharedBoolendOnFailure": {
+              "Type": "BehaviorDesigner.Runtime.SharedBool",
+              "Name": null,
+              "BooleanmValue": false
+            },
+            "Children": [
+              {
+                "Type": "RugbyBase.PlayerBehavior.GetPossessionPlayer",
+                "NodeData": {
+                  "Offset": "(3.57421875,105.262451)",
+                  "ColorIndex": 6
+                },
+                "ID": 5,
+                "Name": "Get Possession Player",
+                "Instant": true,
+                "SharedMatchMatch": {
+                  "Type": "RugbyBase.SharedMatch",
+                  "Name": "Match",
+                  "IsShared": true
+                },
+                "SharedPlayerTargetVariable": {
+                  "Type": "RugbyBase.SharedPlayer",
+                  "Name": "PossessionPlayer",
+                  "IsShared": true
+                }
+              }
+            ]
+          },
+          {
+            "Type": "BehaviorDesigner.Runtime.Tasks.Selector",
+            "NodeData": {
+              "Offset": "(165.000031,110)",
+              "ColorIndex": 6
+            },
+            "ID": 6,
+            "Name": "",
+            "Instant": true,
+            "AbortTypeabortType": "None",
+            "Children": [
+              {
+                "Type": "BehaviorDesigner.Runtime.Tasks.Sequence",
+                "NodeData": {
+                  "Offset": "(-0.5145931,107.540039)",
+                  "ColorIndex": 6
+                },
+                "ID": 7,
+                "Name": "No Possession Player",
+                "Instant": true,
+                "AbortTypeabortType": "Both",
+                "Children": [
+                  {
+                    "Type": "BehaviorDesigner.Runtime.Tasks.Selector",
+                    "NodeData": {
+                      "Offset": "(-1.54296875,113.977539)",
+                      "ColorIndex": 6
+                    },
+                    "ID": 8,
+                    "Name": "Selector",
+                    "Instant": true,
+                    "AbortTypeabortType": "None",
+                    "Children": [
+                      {
+                        "Type": "RugbyBase.PlayerBehavior.CompareSharedPlayer",
+                        "NodeData": {
+                          "Offset": "(4.72619629,114.56134)",
+                          "ColorIndex": 6
+                        },
+                        "ID": 9,
+                        "Name": "Is Possession Player Null?",
+                        "Instant": true,
+                        "SharedPlayerValue": {
+                          "Type": "RugbyBase.SharedPlayer",
+                          "Name": null
+                        },
+                        "SharedPlayerVariable": {
+                          "Type": "RugbyBase.SharedPlayer",
+                          "Name": "PossessionPlayer",
+                          "IsShared": true
+                        }
+                      },
+                      {
+                        "Type": "BehaviorDesigner.Runtime.Tasks.Inverter",
+                        "NodeData": {
+                          "Offset": "(145.065613,109.847778)",
+                          "ColorIndex": 6
+                        },
+                        "ID": 10,
+                        "Name": "Inverter",
+                        "Instant": true,
+                        "Children": [
+                          {
+                            "Type": "RugbyBase.PlayerBehavior.IsInPossessionOfBall",
+                            "NodeData": {
+                              "Offset": "(-3.4050293,113.160583)",
+                              "ColorIndex": 6
+                            },
+                            "ID": 11,
+                            "Name": "Is In Possession Of Ball",
+                            "Instant": true,
+                            "SharedPlayerPlayer": {
+                              "Type": "RugbyBase.SharedPlayer",
+                              "Name": "PossessionPlayer",
+                              "IsShared": true
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "Type": "RugbyBase.PlayerBehavior.ClearEventOnPlayer",
+                    "NodeData": {
+                      "Offset": "(139.337387,108.09523)"
+                    },
+                    "ID": 12,
+                    "Name": "Clear Event On Player",
+                    "Instant": true,
+                    "SharedPlayerPlayer": {
+                      "Type": "RugbyBase.SharedPlayer",
+                      "Name": "Player",
+                      "IsShared": true
+                    },
+                    "SharedStringCompareEventName": {
+                      "Type": "BehaviorDesigner.Runtime.SharedString",
+                      "Name": null,
+                      "StringmValue": "ChasePlayer"
+                    }
+                  },
+                  {
+                    "Type": "RugbyBase.PlayerBehavior.ClearEventOnPlayer",
+                    "NodeData": {
+                      "Offset": "(296.972656,106.550537)"
+                    },
+                    "ID": 13,
+                    "Name": "Clear Event On Player",
+                    "Instant": true,
+                    "SharedPlayerPlayer": {
+                      "Type": "RugbyBase.SharedPlayer",
+                      "Name": "PreviousPlayer",
+                      "IsShared": true
+                    },
+                    "SharedStringCompareEventName": {
+                      "Type": "BehaviorDesigner.Runtime.SharedString",
+                      "Name": null,
+                      "StringmValue": "DiveOnBall"
+                    }
+                  },
+                  {
+                    "Type": "RugbyBase.PlayerBehavior.ClearEventOnPlayer",
+                    "NodeData": {
+                      "Offset": "(460.7461,109.9386)"
+                    },
+                    "ID": 14,
+                    "Name": "Clear Event On Player",
+                    "Instant": true,
+                    "SharedPlayerPlayer": {
+                      "Type": "RugbyBase.SharedPlayer",
+                      "Name": "PreviousPlayer",
+                      "IsShared": true
+                    },
+                    "SharedStringCompareEventName": {
+                      "Type": "BehaviorDesigner.Runtime.SharedString",
+                      "Name": null,
+                      "StringmValue": "RunOnKick"
+                    }
+                  },
+                  {
+                    "Type": "BehaviorDesigner.Runtime.Tasks.Repeater",
+                    "NodeData": {
+                      "Offset": "(625.490356,107.002304)",
+                      "Collapsed": true,
+                      "ColorIndex": 6
+                    },
+                    "ID": 15,
+                    "Name": "Non-Possession Control",
+                    "Instant": true,
+                    "SharedIntcount": {
+                      "Type": "BehaviorDesigner.Runtime.SharedInt",
+                      "Name": "",
+                      "Int32mValue": 1
+                    },
+                    "SharedBoolrepeatForever": {
+                      "Type": "BehaviorDesigner.Runtime.SharedBool",
+                      "Name": "",
+                      "BooleanmValue": true
+                    },
+                    "SharedBoolendOnFailure": {
+                      "Type": "BehaviorDesigner.Runtime.SharedBool",
+                      "Name": "",
+                      "BooleanmValue": false
+                    },
+                    "Children": [
+                      {
+                        "Type": "BehaviorDesigner.Runtime.Tasks.UtilitySelector",
+                        "NodeData": {
+                          "Offset": "(2.34375,105.695313)",
+                          "ColorIndex": 6
+                        },
+                        "ID": 16,
+                        "Name": "Utility Selector",
+                        "Instant": true,
+                        "SharedBoolreevaluate": {
+                          "Type": "BehaviorDesigner.Runtime.SharedBool",
+                          "Name": null,
+                          "BooleanmValue": false
+                        },
+                        "AbortTypeabortType": "None",
+                        "Children": [
+                          {
+                            "Type": "BehaviorDesigner.Runtime.Tasks.Sequence",
+                            "NodeData": {
+                              "Offset": "(-3.07593536,105.238281)",
+                              "ColorIndex": 6
+                            },
+                            "ID": 17,
+                            "Name": "Dive On Ball Under Pressure?",
+                            "Instant": true,
+                            "AbortTypeabortType": "None",
+                            "Children": [
+                              {
+                                "Type": "RugbyBase.PlayerBehavior.DiveOnBallPressureUtility",
+                                "NodeData": {
+                                  "Offset": "(-1.98828125,114.385742)",
+                                  "ColorIndex": 6
+                                },
+                                "ID": 18,
+                                "Name": "Dive On Ball Pressure Utility",
+                                "Instant": true,
+                                "SharedFloatOffsetFromTryLine": {
+                                  "Type": "BehaviorDesigner.Runtime.SharedFloat",
+                                  "Name": null,
+                                  "SinglemValue": 3
+                                },
+                                "SharedFloatBreakthroughTestOffset": {
+                                  "Type": "BehaviorDesigner.Runtime.SharedFloat",
+                                  "Name": null,
+                                  "SinglemValue": 6
+                                },
+                                "SharedFloatBreakthroughDistanceScale": {
+                                  "Type": "BehaviorDesigner.Runtime.SharedFloat",
+                                  "Name": null,
+                                  "SinglemValue": 10
+                                },
+                                "SharedFloatThreatValue": {
+                                  "Type": "BehaviorDesigner.Runtime.SharedFloat",
+                                  "Name": "Threat",
+                                  "IsShared": true,
+                                  "SinglemValue": 0
+                                },
+                                "SharedFloatMinimumThreat": {
+                                  "Type": "BehaviorDesigner.Runtime.SharedFloat",
+                                  "Name": null,
+                                  "SinglemValue": 0.4
+                                },
+                                "SharedFloatThreatMultiplier": {
+                                  "Type": "BehaviorDesigner.Runtime.SharedFloat",
+                                  "Name": null,
+                                  "SinglemValue": 2
+                                },
+                                "SharedPlayerPlayer": {
+                                  "Type": "RugbyBase.SharedPlayer",
+                                  "Name": "Player",
+                                  "IsShared": true
+                                },
+                                "SharedPlayerAnimatorManagerPlayerAnimatorManager": {
+                                  "Type": "RugbyBase.SharedPlayerAnimatorManager",
+                                  "Name": "AnimatorManager",
+                                  "IsShared": true
+                                },
+                                "MinMaxRangeFloatUtilityVariableRange": {
+                                  "SingleMinimumValue": -0.1,
+                                  "SingleMaximumValue": 0
+                                },
+                                "SharedFloatUtilityBoost": {
+                                  "Type": "BehaviorDesigner.Runtime.SharedFloat",
+                                  "Name": null,
+                                  "SinglemValue": 0
+                                }
+                              },
+                              {
+                                "Type": "RugbyBase.PlayerBehavior.FireTackleEventOnPlayer",
+                                "NodeData": {
+                                  "Offset": "(177.5,107.5)",
+                                  "ColorIndex": 6
+                                },
+                                "ID": 19,
+                                "Name": "Fire Dive On Ball Event",
+                                "Instant": true,
+                                "SharedMatchMatch": {
+                                  "Type": "RugbyBase.SharedMatch",
+                                  "Name": "Match",
+                                  "IsShared": true
+                                },
+                                "SharedBoolDangerous": {
+                                  "Type": "BehaviorDesigner.Runtime.SharedBool",
+                                  "Name": null,
+                                  "BooleanmValue": false
+                                },
+                                "TackleEventEventValues": {
+                                  "BooleanSecondTackler": false,
+                                  "BooleanDangerous": false,
+                                  "StringEventName": "DiveOnBall"
+                                },
+                                "SharedPlayerTargetPlayer": {
+                                  "Type": "RugbyBase.SharedPlayer",
+                                  "Name": "Player",
+                                  "IsShared": true
+                                },
+                                "BooleanSubEvent": false,
+                                "BooleanThisEvent": true
+                              },
+                              {
+                                "Type": "RugbyBase.PlayerBehavior.SetSharedPlayer",
+                                "NodeData": {
+                                  "Offset": "(329.1914,107.724243)",
+                                  "ColorIndex": 3
+                                },
+                                "ID": 20,
+                                "Name": "Set Shared Player",
+                                "Instant": true,
+                                "SharedPlayerTargetValue": {
+                                  "Type": "RugbyBase.SharedPlayer",
+                                  "Name": "Player",
+                                  "IsShared": true
+                                },
+                                "SharedPlayerTargetVariable": {
+                                  "Type": "RugbyBase.SharedPlayer",
+                                  "Name": "PreviousPlayer",
+                                  "IsShared": true
+                                }
+                              },
+                              {
+                                "Type": "BehaviorDesigner.Runtime.Tasks.UntilSuccess",
+                                "NodeData": {
+                                  "Offset": "(464.722656,107.724243)",
+                                  "ColorIndex": 3
+                                },
+                                "ID": 21,
+                                "Name": "Until Success",
+                                "Instant": true,
+                                "Children": [
+                                  {
+                                    "Type": "BehaviorDesigner.Runtime.Tasks.Inverter",
+                                    "NodeData": {
+                                      "Offset": "(1.7890625,106.889572)",
+                                      "ColorIndex": 3
+                                    },
+                                    "ID": 22,
+                                    "Name": "Inverter",
+                                    "Instant": true,
+                                    "Children": [
+                                      {
+                                        "Type": "RugbyBase.PlayerBehavior.CompareSharedPlayer",
+                                        "NodeData": {
+                                          "Offset": "(-1.9609375,106.611748)",
+                                          "ColorIndex": 3
+                                        },
+                                        "ID": 23,
+                                        "Name": "Compare Shared Player",
+                                        "Instant": true,
+                                        "SharedPlayerValue": {
+                                          "Type": "RugbyBase.SharedPlayer",
+                                          "Name": "Player",
+                                          "IsShared": true
+                                        },
+                                        "SharedPlayerVariable": {
+                                          "Type": "RugbyBase.SharedPlayer",
+                                          "Name": "PreviousPlayer",
+                                          "IsShared": true
+                                        }
+                                      }
+                                    ]
+                                  }
+                                ]
+                              },
+                              {
+                                "Type": "RugbyBase.PlayerBehavior.ClearEventOnPlayer",
+                                "NodeData": {
+                                  "Offset": "(601.851563,114.651337)"
+                                },
+                                "ID": 24,
+                                "Name": "Clear Event On Player",
+                                "Instant": true,
+                                "SharedPlayerPlayer": {
+                                  "Type": "RugbyBase.SharedPlayer",
+                                  "Name": "PreviousPlayer",
+                                  "IsShared": true
+                                },
+                                "SharedStringCompareEventName": {
+                                  "Type": "BehaviorDesigner.Runtime.SharedString",
+                                  "Name": null,
+                                  "StringmValue": "DiveOnBall"
+                                }
+                              }
+                            ]
+                          },
+                          {
+                            "Type": "BehaviorDesigner.Runtime.Tasks.Sequence",
+                            "NodeData": {
+                              "Offset": "(745.1925,108.095215)",
+                              "ColorIndex": 6
+                            },
+                            "ID": 25,
+                            "Name": "Run On Kick?",
+                            "Instant": true,
+                            "AbortTypeabortType": "None",
+                            "Children": [
+                              {
+                                "Type": "RugbyBase.PlayerBehavior.RunOnKickUtility",
+                                "NodeData": {
+                                  "Offset": "(-3.87890625,114.623779)",
+                                  "ColorIndex": 6
+                                },
+                                "ID": 26,
+                                "Name": "Run On Kick Utility",
+                                "Instant": true,
+                                "SharedFloatBreakthroughTestOffset": {
+                                  "Type": "BehaviorDesigner.Runtime.SharedFloat",
+                                  "Name": null,
+                                  "SinglemValue": 6
+                                },
+                                "SharedFloatBreakthroughDistanceScale": {
+                                  "Type": "BehaviorDesigner.Runtime.SharedFloat",
+                                  "Name": null,
+                                  "SinglemValue": 10
+                                },
+                                "SharedFloatThreatValue": {
+                                  "Type": "BehaviorDesigner.Runtime.SharedFloat",
+                                  "Name": "Threat",
+                                  "IsShared": true,
+                                  "SinglemValue": 0
+                                },
+                                "SharedFloatMinimumThreat": {
+                                  "Type": "BehaviorDesigner.Runtime.SharedFloat",
+                                  "Name": null,
+                                  "SinglemValue": 0.4
+                                },
+                                "SharedFloatThreatMultiplier": {
+                                  "Type": "BehaviorDesigner.Runtime.SharedFloat",
+                                  "Name": null,
+                                  "SinglemValue": 2
+                                },
+                                "SharedPlayerPlayer": {
+                                  "Type": "RugbyBase.SharedPlayer",
+                                  "Name": "Player",
+                                  "IsShared": true
+                                },
+                                "SharedPlayerAnimatorManagerPlayerAnimatorManager": {
+                                  "Type": "RugbyBase.SharedPlayerAnimatorManager",
+                                  "Name": "AnimatorManager",
+                                  "IsShared": true
+                                },
+                                "MinMaxRangeFloatUtilityVariableRange": {
+                                  "SingleMinimumValue": -0.1,
+                                  "SingleMaximumValue": 0
+                                },
+                                "SharedFloatUtilityBoost": {
+                                  "Type": "BehaviorDesigner.Runtime.SharedFloat",
+                                  "Name": null,
+                                  "SinglemValue": 0
+                                }
+                              },
+                              {
+                                "Type": "RugbyBase.PlayerBehavior.FireTackleEventOnPlayer",
+                                "NodeData": {
+                                  "Offset": "(157.5,107.5)",
+                                  "ColorIndex": 6
+                                },
+                                "ID": 27,
+                                "Name": "Fire Run On Kick Event",
+                                "Instant": true,
+                                "SharedMatchMatch": {
+                                  "Type": "RugbyBase.SharedMatch",
+                                  "Name": "Match",
+                                  "IsShared": true
+                                },
+                                "SharedBoolDangerous": {
+                                  "Type": "BehaviorDesigner.Runtime.SharedBool",
+                                  "Name": null,
+                                  "BooleanmValue": false
+                                },
+                                "TackleEventEventValues": {
+                                  "BooleanSecondTackler": false,
+                                  "BooleanDangerous": false,
+                                  "StringEventName": "RunOnKick"
+                                },
+                                "SharedPlayerTargetPlayer": {
+                                  "Type": "RugbyBase.SharedPlayer",
+                                  "Name": "Player",
+                                  "IsShared": true
+                                },
+                                "BooleanSubEvent": false,
+                                "BooleanThisEvent": true
+                              },
+                              {
+                                "Type": "RugbyBase.PlayerBehavior.SetSharedPlayer",
+                                "NodeData": {
+                                  "Offset": "(310.9336,108.3721)",
+                                  "ColorIndex": 3
+                                },
+                                "ID": 28,
+                                "Name": "Set Shared Player",
+                                "Instant": true,
+                                "SharedPlayerTargetValue": {
+                                  "Type": "RugbyBase.SharedPlayer",
+                                  "Name": "Player",
+                                  "IsShared": true
+                                },
+                                "SharedPlayerTargetVariable": {
+                                  "Type": "RugbyBase.SharedPlayer",
+                                  "Name": "PreviousPlayer",
+                                  "IsShared": true
+                                }
+                              },
+                              {
+                                "Type": "BehaviorDesigner.Runtime.Tasks.UntilSuccess",
+                                "NodeData": {
+                                  "Offset": "(440.9336,108.3721)",
+                                  "ColorIndex": 3
+                                },
+                                "ID": 29,
+                                "Name": "Until Success",
+                                "Instant": true,
+                                "Children": [
+                                  {
+                                    "Type": "BehaviorDesigner.Runtime.Tasks.Inverter",
+                                    "NodeData": {
+                                      "Offset": "(0,110)",
+                                      "ColorIndex": 3
+                                    },
+                                    "ID": 30,
+                                    "Name": "Inverter",
+                                    "Instant": true,
+                                    "Children": [
+                                      {
+                                        "Type": "RugbyBase.PlayerBehavior.CompareSharedPlayer",
+                                        "NodeData": {
+                                          "Offset": "(0,110)",
+                                          "ColorIndex": 3
+                                        },
+                                        "ID": 31,
+                                        "Name": "Compare Shared Player",
+                                        "Instant": true,
+                                        "SharedPlayerValue": {
+                                          "Type": "RugbyBase.SharedPlayer",
+                                          "Name": "Player",
+                                          "IsShared": true
+                                        },
+                                        "SharedPlayerVariable": {
+                                          "Type": "RugbyBase.SharedPlayer",
+                                          "Name": "PreviousPlayer",
+                                          "IsShared": true
+                                        }
+                                      }
+                                    ]
+                                  }
+                                ]
+                              },
+                              {
+                                "Type": "RugbyBase.PlayerBehavior.ClearEventOnPlayer",
+                                "NodeData": {
+                                  "Offset": "(580.9336,108.3721)"
+                                },
+                                "ID": 32,
+                                "Name": "Clear Event On Player",
+                                "Instant": true,
+                                "SharedPlayerPlayer": {
+                                  "Type": "RugbyBase.SharedPlayer",
+                                  "Name": "PreviousPlayer",
+                                  "IsShared": true
+                                },
+                                "SharedStringCompareEventName": {
+                                  "Type": "BehaviorDesigner.Runtime.SharedString",
+                                  "Name": null,
+                                  "StringmValue": "RunOnKick"
+                                }
+                              }
+                            ]
+                          },
+                          {
+                            "Type": "BehaviorDesigner.Runtime.Tasks.Sequence",
+                            "NodeData": {
+                              "Offset": "(1515.84216,112.3728)",
+                              "ColorIndex": 6
+                            },
+                            "ID": 33,
+                            "Name": "Dive On Ball No Pressure?",
+                            "Instant": true,
+                            "AbortTypeabortType": "None",
+                            "Children": [
+                              {
+                                "Type": "RugbyBase.PlayerBehavior.DiveOnBallNoPressureUtility",
+                                "NodeData": {
+                                  "Offset": "(0.611701965,111.989639)",
+                                  "ColorIndex": 6
+                                },
+                                "ID": 34,
+                                "Name": "Dive On Ball No Pressure Utility",
+                                "Instant": true,
+                                "SharedFloatThreatValue": {
+                                  "Type": "BehaviorDesigner.Runtime.SharedFloat",
+                                  "Name": "Threat",
+                                  "IsShared": true,
+                                  "SinglemValue": 0
+                                },
+                                "SharedFloatMinimumThreat": {
+                                  "Type": "BehaviorDesigner.Runtime.SharedFloat",
+                                  "Name": null,
+                                  "SinglemValue": 1
+                                },
+                                "SharedFloatThreatMultiplier": {
+                                  "Type": "BehaviorDesigner.Runtime.SharedFloat",
+                                  "Name": null,
+                                  "SinglemValue": -0.7
+                                },
+                                "SharedPlayerPlayer": {
+                                  "Type": "RugbyBase.SharedPlayer",
+                                  "Name": "Player",
+                                  "IsShared": true
+                                },
+                                "SharedPlayerAnimatorManagerPlayerAnimatorManager": {
+                                  "Type": "RugbyBase.SharedPlayerAnimatorManager",
+                                  "Name": "AnimatorManager",
+                                  "IsShared": true
+                                },
+                                "MinMaxRangeFloatUtilityVariableRange": {
+                                  "SingleMinimumValue": -0.1,
+                                  "SingleMaximumValue": 0
+                                },
+                                "SharedFloatUtilityBoost": {
+                                  "Type": "BehaviorDesigner.Runtime.SharedFloat",
+                                  "Name": null,
+                                  "SinglemValue": 0
+                                }
+                              },
+                              {
+                                "Type": "RugbyBase.PlayerBehavior.FireTackleEventOnPlayer",
+                                "NodeData": {
+                                  "Offset": "(187.804688,107.80481)",
+                                  "ColorIndex": 6
+                                },
+                                "ID": 35,
+                                "Name": "Fire Dive On Ball Event",
+                                "Instant": true,
+                                "SharedMatchMatch": {
+                                  "Type": "RugbyBase.SharedMatch",
+                                  "Name": "Match",
+                                  "IsShared": true
+                                },
+                                "SharedBoolDangerous": {
+                                  "Type": "BehaviorDesigner.Runtime.SharedBool",
+                                  "Name": null,
+                                  "BooleanmValue": false
+                                },
+                                "TackleEventEventValues": {
+                                  "BooleanSecondTackler": false,
+                                  "BooleanDangerous": false,
+                                  "StringEventName": "DiveOnBall"
+                                },
+                                "SharedPlayerTargetPlayer": {
+                                  "Type": "RugbyBase.SharedPlayer",
+                                  "Name": "Player",
+                                  "IsShared": true
+                                },
+                                "BooleanSubEvent": false,
+                                "BooleanThisEvent": true
+                              },
+                              {
+                                "Type": "RugbyBase.PlayerBehavior.SetSharedPlayer",
+                                "NodeData": {
+                                  "Offset": "(343.238281,108.372162)",
+                                  "ColorIndex": 3
+                                },
+                                "ID": 36,
+                                "Name": "Set Shared Player",
+                                "Instant": true,
+                                "SharedPlayerTargetValue": {
+                                  "Type": "RugbyBase.SharedPlayer",
+                                  "Name": "Player",
+                                  "IsShared": true
+                                },
+                                "SharedPlayerTargetVariable": {
+                                  "Type": "RugbyBase.SharedPlayer",
+                                  "Name": "PreviousPlayer",
+                                  "IsShared": true
+                                }
+                              },
+                              {
+                                "Type": "BehaviorDesigner.Runtime.Tasks.UntilSuccess",
+                                "NodeData": {
+                                  "Offset": "(473.238281,108.372162)",
+                                  "ColorIndex": 3
+                                },
+                                "ID": 37,
+                                "Name": "Until Success",
+                                "Instant": true,
+                                "Children": [
+                                  {
+                                    "Type": "BehaviorDesigner.Runtime.Tasks.Inverter",
+                                    "NodeData": {
+                                      "Offset": "(0,110)",
+                                      "ColorIndex": 3
+                                    },
+                                    "ID": 38,
+                                    "Name": "Inverter",
+                                    "Instant": true,
+                                    "Children": [
+                                      {
+                                        "Type": "RugbyBase.PlayerBehavior.CompareSharedPlayer",
+                                        "NodeData": {
+                                          "Offset": "(0,110)",
+                                          "ColorIndex": 3
+                                        },
+                                        "ID": 39,
+                                        "Name": "Compare Shared Player",
+                                        "Instant": true,
+                                        "SharedPlayerValue": {
+                                          "Type": "RugbyBase.SharedPlayer",
+                                          "Name": "Player",
+                                          "IsShared": true
+                                        },
+                                        "SharedPlayerVariable": {
+                                          "Type": "RugbyBase.SharedPlayer",
+                                          "Name": "PreviousPlayer",
+                                          "IsShared": true
+                                        }
+                                      }
+                                    ]
+                                  }
+                                ]
+                              },
+                              {
+                                "Type": "RugbyBase.PlayerBehavior.ClearEventOnPlayer",
+                                "NodeData": {
+                                  "Offset": "(613.2383,108.372162)"
+                                },
+                                "ID": 40,
+                                "Name": "Clear Event On Player",
+                                "Instant": true,
+                                "SharedPlayerPlayer": {
+                                  "Type": "RugbyBase.SharedPlayer",
+                                  "Name": "PreviousPlayer",
+                                  "IsShared": true
+                                },
+                                "SharedStringCompareEventName": {
+                                  "Type": "BehaviorDesigner.Runtime.SharedString",
+                                  "Name": null,
+                                  "StringmValue": "DiveOnBall"
+                                }
+                              }
+                            ]
+                          },
+                          {
+                            "Type": "BehaviorDesigner.Runtime.Tasks.Sequence",
+                            "NodeData": {
+                              "Offset": "(2310.16016,107.337646)",
+                              "ColorIndex": 6
+                            },
+                            "ID": 41,
+                            "Name": "Do Nothing",
+                            "Instant": true,
+                            "AbortTypeabortType": "None",
+                            "Children": [
+                              {
+                                "Type": "RugbyBase.PlayerBehavior.BaselineUtility",
+                                "NodeData": {
+                                  "Offset": "(-0.70703125,106.666748)",
+                                  "ColorIndex": 6,
+                                  "WatchedFields": [
+                                    "BaselineUtilityValue"
+                                  ]
+                                },
+                                "ID": 42,
+                                "Name": "Baseline Utility (Do Nothing)",
+                                "Instant": true,
+                                "SharedFloatBaselineUtilityValue": {
+                                  "Type": "BehaviorDesigner.Runtime.SharedFloat",
+                                  "Name": "",
+                                  "SinglemValue": 0.85
+                                },
+                                "SharedFloatBoostValue": {
+                                  "Type": "BehaviorDesigner.Runtime.SharedFloat",
+                                  "Name": null,
+                                  "SinglemValue": 0
+                                }
+                              },
+                              {
+                                "Type": "BehaviorDesigner.Runtime.Tasks.Wait",
+                                "NodeData": {
+                                  "Offset": "(340.410156,109.130432)",
+                                  "ColorIndex": 3
+                                },
+                                "ID": 43,
+                                "Name": "Wait",
+                                "Instant": true,
+                                "SharedFloatwaitTime": {
+                                  "Type": "BehaviorDesigner.Runtime.SharedFloat",
+                                  "Name": null,
+                                  "SinglemValue": 0.2
+                                },
+                                "SharedBoolrandomWait": {
+                                  "Type": "BehaviorDesigner.Runtime.SharedBool",
+                                  "Name": null,
+                                  "BooleanmValue": false
+                                },
+                                "SharedFloatrandomWaitMin": {
+                                  "Type": "BehaviorDesigner.Runtime.SharedFloat",
+                                  "Name": null,
+                                  "SinglemValue": 0
+                                },
+                                "SharedFloatrandomWaitMax": {
+                                  "Type": "BehaviorDesigner.Runtime.SharedFloat",
+                                  "Name": null,
+                                  "SinglemValue": 0
+                                },
+                                "SharedBoolunscaledTime": {
+                                  "Type": "BehaviorDesigner.Runtime.SharedBool",
+                                  "Name": null,
+                                  "BooleanmValue": false
+                                }
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "Type": "BehaviorDesigner.Runtime.Tasks.Sequence",
+                "NodeData": {
+                  "Offset": "(816.86554,113.804764)",
+                  "ColorIndex": 6
+                },
+                "ID": 44,
+                "Name": "Possession Downed",
+                "Instant": true,
+                "AbortTypeabortType": "Both",
+                "Children": [
+                  {
+                    "Type": "RugbyBase.PlayerBehavior.IsPossessionPlayerDowned",
+                    "NodeData": {
+                      "Offset": "(-1.5,106.361694)",
+                      "ColorIndex": 6
+                    },
+                    "ID": 45,
+                    "Name": "Is Possession Player Downed",
+                    "Instant": true,
+                    "SharedMatchMatch": {
+                      "Type": "RugbyBase.SharedMatch",
+                      "Name": "Match",
+                      "IsShared": true
+                    }
+                  },
+                  {
+                    "Type": "RugbyBase.PlayerBehavior.ClearEventOnPlayer",
+                    "NodeData": {
+                      "Offset": "(180,110)"
+                    },
+                    "ID": 46,
+                    "Name": "Clear Event On Player",
+                    "Instant": true,
+                    "SharedPlayerPlayer": {
+                      "Type": "RugbyBase.SharedPlayer",
+                      "Name": "Player",
+                      "IsShared": true
+                    },
+                    "SharedStringCompareEventName": {
+                      "Type": "BehaviorDesigner.Runtime.SharedString",
+                      "Name": null,
+                      "StringmValue": "ChasePlayer"
+                    }
+                  },
+                  {
+                    "Type": "RugbyBase.PlayerBehavior.ClearEventOnPlayer",
+                    "NodeData": {
+                      "Offset": "(337.216461,111.111206)"
+                    },
+                    "ID": 47,
+                    "Name": "Clear Event On Player",
+                    "Instant": true,
+                    "SharedPlayerPlayer": {
+                      "Type": "RugbyBase.SharedPlayer",
+                      "Name": "Player",
+                      "IsShared": true
+                    },
+                    "SharedStringCompareEventName": {
+                      "Type": "BehaviorDesigner.Runtime.SharedString",
+                      "Name": null,
+                      "StringmValue": "RunOnKick"
+                    }
+                  },
+                  {
+                    "Type": "RugbyBase.PlayerBehavior.ClearEventOnPlayer",
+                    "NodeData": {
+                      "Offset": "(503.341919,114.999939)"
+                    },
+                    "ID": 48,
+                    "Name": "Clear Event On Player",
+                    "Instant": true,
+                    "SharedPlayerPlayer": {
+                      "Type": "RugbyBase.SharedPlayer",
+                      "Name": "Player",
+                      "IsShared": true
+                    },
+                    "SharedStringCompareEventName": {
+                      "Type": "BehaviorDesigner.Runtime.SharedString",
+                      "Name": null,
+                      "StringmValue": "DiveOnBall"
+                    }
+                  },
+                  {
+                    "Type": "BehaviorDesigner.Runtime.Tasks.Idle",
+                    "NodeData": {
+                      "Offset": "(641.0612,112.233734)",
+                      "ColorIndex": 6
+                    },
+                    "ID": 49,
+                    "Name": "Idle",
+                    "Instant": true
+                  }
+                ]
+              },
+              {
+                "Type": "BehaviorDesigner.Runtime.Tasks.Sequence",
+                "NodeData": {
+                  "Offset": "(1610.84009,109.244431)",
+                  "ColorIndex": 6
+                },
+                "ID": 50,
+                "Name": "Possession Player Not-Downed",
+                "Instant": true,
+                "AbortTypeabortType": "Both",
+                "Children": [
+                  {
+                    "Type": "BehaviorDesigner.Runtime.Tasks.Repeater",
+                    "NodeData": {
+                      "Offset": "(0,110)",
+                      "ColorIndex": 6
+                    },
+                    "ID": 51,
+                    "Name": "Non-Possession Control",
+                    "Instant": true,
+                    "SharedIntcount": {
+                      "Type": "BehaviorDesigner.Runtime.SharedInt",
+                      "Name": "",
+                      "Int32mValue": 1
+                    },
+                    "SharedBoolrepeatForever": {
+                      "Type": "BehaviorDesigner.Runtime.SharedBool",
+                      "Name": "",
+                      "BooleanmValue": true
+                    },
+                    "SharedBoolendOnFailure": {
+                      "Type": "BehaviorDesigner.Runtime.SharedBool",
+                      "Name": "",
+                      "BooleanmValue": false
+                    },
+                    "Children": [
+                      {
+                        "Type": "BehaviorDesigner.Runtime.Tasks.Sequence",
+                        "NodeData": {
+                          "Offset": "(-1.33691406,109.557373)",
+                          "ColorIndex": 6
+                        },
+                        "ID": 52,
+                        "Name": "Sequence",
+                        "Instant": true,
+                        "AbortTypeabortType": "None",
+                        "Children": [
+                          {
+                            "Type": "BehaviorDesigner.Runtime.Tasks.ReturnSuccess",
+                            "NodeData": {
+                              "Offset": "(-131.420334,114.134933)",
+                              "ColorIndex": 6
+                            },
+                            "ID": 53,
+                            "Name": "Return Success",
+                            "Instant": true,
+                            "Children": [
+                              {
+                                "Type": "BehaviorDesigner.Runtime.Tasks.Sequence",
+                                "NodeData": {
+                                  "Offset": "(-0.0078125,105.9093)",
+                                  "ColorIndex": 6
+                                },
+                                "ID": 54,
+                                "Name": "Sequence",
+                                "Instant": true,
+                                "AbortTypeabortType": "None",
+                                "Children": [
+                                  {
+                                    "Type": "BehaviorDesigner.Runtime.Tasks.Inverter",
+                                    "NodeData": {
+                                      "Offset": "(-743.1662,114.090942)",
+                                      "ColorIndex": 6
+                                    },
+                                    "ID": 55,
+                                    "Name": "Inverter",
+                                    "Instant": true,
+                                    "Children": [
+                                      {
+                                        "Type": "RugbyBase.PlayerBehavior.CompareEventNameOnPlayer",
+                                        "NodeData": {
+                                          "Offset": "(0,110)",
+                                          "ColorIndex": 6
+                                        },
+                                        "ID": 56,
+                                        "Name": "Is Chasing Player?",
+                                        "Instant": true,
+                                        "SharedPlayerPlayer": {
+                                          "Type": "RugbyBase.SharedPlayer",
+                                          "Name": "Player",
+                                          "IsShared": true
+                                        },
+                                        "SharedStringCompare": {
+                                          "Type": "BehaviorDesigner.Runtime.SharedString",
+                                          "Name": null,
+                                          "StringmValue": "ChasePlayer"
+                                        },
+                                        "BooleanCurrentEvent": true
+                                      }
+                                    ]
+                                  },
+                                  {
+                                    "Type": "BehaviorDesigner.Runtime.Tasks.Inverter",
+                                    "NodeData": {
+                                      "Offset": "(-596.6253,109.361694)",
+                                      "ColorIndex": 6
+                                    },
+                                    "ID": 57,
+                                    "Name": "Inverter",
+                                    "Instant": true,
+                                    "Children": [
+                                      {
+                                        "Type": "RugbyBase.PlayerBehavior.CompareEventNameOnPlayer",
+                                        "NodeData": {
+                                          "Offset": "(0,110)",
+                                          "ColorIndex": 6
+                                        },
+                                        "ID": 58,
+                                        "Name": "Is Standing Tackling?",
+                                        "Instant": true,
+                                        "SharedPlayerPlayer": {
+                                          "Type": "RugbyBase.SharedPlayer",
+                                          "Name": "Player",
+                                          "IsShared": true
+                                        },
+                                        "SharedStringCompare": {
+                                          "Type": "BehaviorDesigner.Runtime.SharedString",
+                                          "Name": null,
+                                          "StringmValue": "StandingTackle"
+                                        },
+                                        "BooleanCurrentEvent": true
+                                      }
+                                    ]
+                                  },
+                                  {
+                                    "Type": "BehaviorDesigner.Runtime.Tasks.Inverter",
+                                    "NodeData": {
+                                      "Offset": "(-451.938019,109.361694)",
+                                      "ColorIndex": 6
+                                    },
+                                    "ID": 59,
+                                    "Name": "Inverter",
+                                    "Instant": true,
+                                    "Children": [
+                                      {
+                                        "Type": "RugbyBase.PlayerBehavior.CompareEventNameOnPlayer",
+                                        "NodeData": {
+                                          "Offset": "(0,110)",
+                                          "ColorIndex": 6
+                                        },
+                                        "ID": 60,
+                                        "Name": "Is Dive Tackling?",
+                                        "Instant": true,
+                                        "SharedPlayerPlayer": {
+                                          "Type": "RugbyBase.SharedPlayer",
+                                          "Name": "Player",
+                                          "IsShared": true
+                                        },
+                                        "SharedStringCompare": {
+                                          "Type": "BehaviorDesigner.Runtime.SharedString",
+                                          "Name": null,
+                                          "StringmValue": "DiveTackle"
+                                        },
+                                        "BooleanCurrentEvent": true
+                                      }
+                                    ]
+                                  },
+                                  {
+                                    "Type": "BehaviorDesigner.Runtime.Tasks.Inverter",
+                                    "NodeData": {
+                                      "Offset": "(-331.411346,110)",
+                                      "ColorIndex": 6
+                                    },
+                                    "ID": 61,
+                                    "Name": "Inverter",
+                                    "Instant": true,
+                                    "Children": [
+                                      {
+                                        "Type": "RugbyBase.PlayerBehavior.CompareEventNameOnPlayer",
+                                        "NodeData": {
+                                          "Offset": "(0,110)",
+                                          "ColorIndex": 6
+                                        },
+                                        "ID": 62,
+                                        "Name": "Is Exiting Maul?",
+                                        "Instant": true,
+                                        "SharedPlayerPlayer": {
+                                          "Type": "RugbyBase.SharedPlayer",
+                                          "Name": "Player",
+                                          "IsShared": true
+                                        },
+                                        "SharedStringCompare": {
+                                          "Type": "BehaviorDesigner.Runtime.SharedString",
+                                          "Name": null,
+                                          "StringmValue": "ExitMaul"
+                                        },
+                                        "BooleanCurrentEvent": true
+                                      }
+                                    ]
+                                  },
+                                  {
+                                    "Type": "BehaviorDesigner.Runtime.Tasks.Inverter",
+                                    "NodeData": {
+                                      "Offset": "(-147.747147,109.7959)",
+                                      "ColorIndex": 6
+                                    },
+                                    "ID": 63,
+                                    "Name": "Inverter",
+                                    "Instant": true,
+                                    "Children": [
+                                      {
+                                        "Type": "RugbyBase.PlayerBehavior.CompareEventNameOnPlayer",
+                                        "NodeData": {
+                                          "Offset": "(0,110)",
+                                          "ColorIndex": 6
+                                        },
+                                        "ID": 64,
+                                        "Name": "Is Entering Play The Ball (Half-Back)?",
+                                        "Instant": true,
+                                        "SharedPlayerPlayer": {
+                                          "Type": "RugbyBase.SharedPlayer",
+                                          "Name": "Player",
+                                          "IsShared": true
+                                        },
+                                        "SharedStringCompare": {
+                                          "Type": "BehaviorDesigner.Runtime.SharedString",
+                                          "Name": null,
+                                          "StringmValue": "EnterPlayTheBallHalfBack"
+                                        },
+                                        "BooleanCurrentEvent": true
+                                      }
+                                    ]
+                                  },
+                                  {
+                                    "Type": "RugbyBase.PlayerBehavior.FirePossessionBaseEventOnPlayer",
+                                    "NodeData": {
+                                      "Offset": "(4.904752,110)",
+                                      "ColorIndex": 6
+                                    },
+                                    "ID": 65,
+                                    "Name": "Fire Chase Event",
+                                    "Instant": true,
+                                    "SharedMatchMatch": {
+                                      "Type": "RugbyBase.SharedMatch",
+                                      "Name": "Match",
+                                      "IsShared": true
+                                    },
+                                    "BaseEventEventValues": {
+                                      "StringEventName": "ChasePlayer"
+                                    },
+                                    "SharedPlayerTargetPlayer": {
+                                      "Type": "RugbyBase.SharedPlayer",
+                                      "Name": "Player",
+                                      "IsShared": true
+                                    },
+                                    "BooleanSubEvent": false,
+                                    "BooleanThisEvent": true
+                                  }
+                                ]
+                              }
+                            ]
+                          },
+                          {
+                            "Type": "BehaviorDesigner.Runtime.Tasks.UtilitySelector",
+                            "NodeData": {
+                              "Offset": "(3.046771,108.63636)",
+                              "ColorIndex": 6
+                            },
+                            "ID": 66,
+                            "Name": "Utility Selector",
+                            "Instant": true,
+                            "SharedBoolreevaluate": {
+                              "Type": "BehaviorDesigner.Runtime.SharedBool",
+                              "Name": null,
+                              "BooleanmValue": false
+                            },
+                            "AbortTypeabortType": "None",
+                            "Children": [
+                              {
+                                "Type": "BehaviorDesigner.Runtime.Tasks.Sequence",
+                                "NodeData": {
+                                  "Offset": "(0,107.777832)",
+                                  "ColorIndex": 6
+                                },
+                                "ID": 67,
+                                "Name": "Dive Tackle?",
+                                "Instant": true,
+                                "AbortTypeabortType": "None",
+                                "Children": [
+                                  {
+                                    "Type": "RugbyBase.PlayerBehavior.DiveTackleUtility",
+                                    "NodeData": {
+                                      "Offset": "(-1.387207,112.349)",
+                                      "ColorIndex": 6
+                                    },
+                                    "ID": 68,
+                                    "Name": "Dive Tackle Utility",
+                                    "Instant": true,
+                                    "BooleanAllowAutoTacklePossessionPlayer": false,
+                                    "BooleanImmediateUtility": false,
+                                    "SharedPlayerPlayer": {
+                                      "Type": "RugbyBase.SharedPlayer",
+                                      "Name": "Player",
+                                      "IsShared": true
+                                    },
+                                    "SharedPlayerAnimatorManagerPlayerAnimatorManager": {
+                                      "Type": "RugbyBase.SharedPlayerAnimatorManager",
+                                      "Name": "AnimatorManager",
+                                      "IsShared": true
+                                    },
+                                    "MinMaxRangeFloatUtilityVariableRange": {
+                                      "SingleMinimumValue": -0.1,
+                                      "SingleMaximumValue": 0
+                                    },
+                                    "SharedFloatUtilityBoost": {
+                                      "Type": "BehaviorDesigner.Runtime.SharedFloat",
+                                      "Name": null,
+                                      "SinglemValue": 0
+                                    }
+                                  },
+                                  {
+                                    "Type": "RugbyBase.PlayerBehavior.GetIsDangerousTackle",
+                                    "NodeData": {
+                                      "Offset": "(159.726563,112.215149)",
+                                      "ColorIndex": 6
+                                    },
+                                    "ID": 69,
+                                    "Name": "Get Is Dangerous Tackle",
+                                    "Instant": true,
+                                    "SharedPlayerPlayer": {
+                                      "Type": "RugbyBase.SharedPlayer",
+                                      "Name": "Player",
+                                      "IsShared": true
+                                    },
+                                    "SharedBoolDangerousTackle": {
+                                      "Type": "BehaviorDesigner.Runtime.SharedBool",
+                                      "Name": "DangerousTackle",
+                                      "IsShared": true,
+                                      "BooleanmValue": false
+                                    },
+                                    "BooleanDiveTackle": true
+                                  },
+                                  {
+                                    "Type": "RugbyBase.PlayerBehavior.FireTackleEventOnPlayer",
+                                    "NodeData": {
+                                      "Offset": "(334.993134,105.663513)",
+                                      "ColorIndex": 6
+                                    },
+                                    "ID": 70,
+                                    "Name": "Fire Dive Tackle Event",
+                                    "Instant": true,
+                                    "SharedMatchMatch": {
+                                      "Type": "RugbyBase.SharedMatch",
+                                      "Name": "Match",
+                                      "IsShared": true
+                                    },
+                                    "SharedBoolDangerous": {
+                                      "Type": "BehaviorDesigner.Runtime.SharedBool",
+                                      "Name": "DangerousTackle",
+                                      "IsShared": true,
+                                      "BooleanmValue": false
+                                    },
+                                    "TackleEventEventValues": {
+                                      "BooleanSecondTackler": false,
+                                      "BooleanDangerous": false,
+                                      "StringEventName": "DiveTackle"
+                                    },
+                                    "SharedPlayerTargetPlayer": {
+                                      "Type": "RugbyBase.SharedPlayer",
+                                      "Name": "Player",
+                                      "IsShared": true
+                                    },
+                                    "BooleanSubEvent": false,
+                                    "BooleanThisEvent": true
+                                  },
+                                  {
+                                    "Type": "BehaviorDesigner.Runtime.Tasks.Wait",
+                                    "NodeData": {
+                                      "Offset": "(465.192352,109.583313)",
+                                      "ColorIndex": 3
+                                    },
+                                    "ID": 71,
+                                    "Name": "Wait",
+                                    "Instant": true,
+                                    "SharedFloatwaitTime": {
+                                      "Type": "BehaviorDesigner.Runtime.SharedFloat",
+                                      "Name": null,
+                                      "SinglemValue": 2
+                                    },
+                                    "SharedBoolrandomWait": {
+                                      "Type": "BehaviorDesigner.Runtime.SharedBool",
+                                      "Name": null,
+                                      "BooleanmValue": false
+                                    },
+                                    "SharedFloatrandomWaitMin": {
+                                      "Type": "BehaviorDesigner.Runtime.SharedFloat",
+                                      "Name": null,
+                                      "SinglemValue": 0
+                                    },
+                                    "SharedFloatrandomWaitMax": {
+                                      "Type": "BehaviorDesigner.Runtime.SharedFloat",
+                                      "Name": null,
+                                      "SinglemValue": 0
+                                    },
+                                    "SharedBoolunscaledTime": {
+                                      "Type": "BehaviorDesigner.Runtime.SharedBool",
+                                      "Name": null,
+                                      "BooleanmValue": false
+                                    }
+                                  }
+                                ]
+                              },
+                              {
+                                "Type": "BehaviorDesigner.Runtime.Tasks.Sequence",
+                                "NodeData": {
+                                  "Offset": "(610,113.414612)",
+                                  "ColorIndex": 6
+                                },
+                                "ID": 72,
+                                "Name": "Standing Tackle?",
+                                "Instant": true,
+                                "AbortTypeabortType": "None",
+                                "Children": [
+                                  {
+                                    "Type": "RugbyBase.PlayerBehavior.StandingTackleUtility",
+                                    "NodeData": {
+                                      "Offset": "(0,110)",
+                                      "ColorIndex": 6
+                                    },
+                                    "ID": 73,
+                                    "Name": "Standing Tackle Utility",
+                                    "Instant": true,
+                                    "BooleanAllowAutoTacklePossessionPlayer": false,
+                                    "BooleanImmediateUtility": true,
+                                    "SingleTryLineOffset": 0,
+                                    "SharedPlayerPlayer": {
+                                      "Type": "RugbyBase.SharedPlayer",
+                                      "Name": "Player",
+                                      "IsShared": true
+                                    },
+                                    "SharedPlayerAnimatorManagerPlayerAnimatorManager": {
+                                      "Type": "RugbyBase.SharedPlayerAnimatorManager",
+                                      "Name": "AnimatorManager",
+                                      "IsShared": true
+                                    },
+                                    "MinMaxRangeFloatUtilityVariableRange": {
+                                      "SingleMinimumValue": -0.1,
+                                      "SingleMaximumValue": 0
+                                    },
+                                    "SharedFloatUtilityBoost": {
+                                      "Type": "BehaviorDesigner.Runtime.SharedFloat",
+                                      "Name": null,
+                                      "SinglemValue": 0
+                                    }
+                                  },
+                                  {
+                                    "Type": "RugbyBase.PlayerBehavior.GetIsDangerousTackle",
+                                    "NodeData": {
+                                      "Offset": "(174.085754,107.209351)",
+                                      "ColorIndex": 6
+                                    },
+                                    "ID": 74,
+                                    "Name": "Get Is Dangerous Tackle",
+                                    "Instant": true,
+                                    "SharedPlayerPlayer": {
+                                      "Type": "RugbyBase.SharedPlayer",
+                                      "Name": "Player",
+                                      "IsShared": true
+                                    },
+                                    "SharedBoolDangerousTackle": {
+                                      "Type": "BehaviorDesigner.Runtime.SharedBool",
+                                      "Name": "DangerousTackle",
+                                      "IsShared": true,
+                                      "BooleanmValue": false
+                                    },
+                                    "BooleanDiveTackle": false
+                                  },
+                                  {
+                                    "Type": "RugbyBase.PlayerBehavior.FireTackleEventOnPlayer",
+                                    "NodeData": {
+                                      "Offset": "(353.95343,110)",
+                                      "ColorIndex": 6
+                                    },
+                                    "ID": 75,
+                                    "Name": "Fire Standing Tackle Event",
+                                    "Instant": true,
+                                    "SharedMatchMatch": {
+                                      "Type": "RugbyBase.SharedMatch",
+                                      "Name": "Match",
+                                      "IsShared": true
+                                    },
+                                    "SharedBoolDangerous": {
+                                      "Type": "BehaviorDesigner.Runtime.SharedBool",
+                                      "Name": "DangerousTackle",
+                                      "IsShared": true,
+                                      "BooleanmValue": false
+                                    },
+                                    "TackleEventEventValues": {
+                                      "BooleanSecondTackler": false,
+                                      "BooleanDangerous": false,
+                                      "StringEventName": "StandingTackle"
+                                    },
+                                    "SharedPlayerTargetPlayer": {
+                                      "Type": "RugbyBase.SharedPlayer",
+                                      "Name": "Player",
+                                      "IsShared": true
+                                    },
+                                    "BooleanSubEvent": false,
+                                    "BooleanThisEvent": true
+                                  },
+                                  {
+                                    "Type": "BehaviorDesigner.Runtime.Tasks.Wait",
+                                    "NodeData": {
+                                      "Offset": "(502.7113,110.833313)",
+                                      "ColorIndex": 3
+                                    },
+                                    "ID": 76,
+                                    "Name": "Wait",
+                                    "Instant": true,
+                                    "SharedFloatwaitTime": {
+                                      "Type": "BehaviorDesigner.Runtime.SharedFloat",
+                                      "Name": null,
+                                      "SinglemValue": 2
+                                    },
+                                    "SharedBoolrandomWait": {
+                                      "Type": "BehaviorDesigner.Runtime.SharedBool",
+                                      "Name": null,
+                                      "BooleanmValue": false
+                                    },
+                                    "SharedFloatrandomWaitMin": {
+                                      "Type": "BehaviorDesigner.Runtime.SharedFloat",
+                                      "Name": null,
+                                      "SinglemValue": 0
+                                    },
+                                    "SharedFloatrandomWaitMax": {
+                                      "Type": "BehaviorDesigner.Runtime.SharedFloat",
+                                      "Name": null,
+                                      "SinglemValue": 0
+                                    },
+                                    "SharedBoolunscaledTime": {
+                                      "Type": "BehaviorDesigner.Runtime.SharedBool",
+                                      "Name": null,
+                                      "BooleanmValue": false
+                                    }
+                                  }
+                                ]
+                              },
+                              {
+                                "Type": "BehaviorDesigner.Runtime.Tasks.Sequence",
+                                "NodeData": {
+                                  "Offset": "(1240,106.19043)",
+                                  "ColorIndex": 6
+                                },
+                                "ID": 77,
+                                "Name": "Tap Tackle?",
+                                "Instant": true,
+                                "AbortTypeabortType": "None",
+                                "Children": [
+                                  {
+                                    "Type": "RugbyBase.PlayerBehavior.TapTackleUtility",
+                                    "NodeData": {
+                                      "Offset": "(-4.64139366,112.579605)",
+                                      "ColorIndex": 6
+                                    },
+                                    "ID": 78,
+                                    "Name": "Tap Tackle Utility",
+                                    "Instant": true,
+                                    "BooleanAllowAutoTacklePossessionPlayer": false,
+                                    "BooleanImmediateUtility": true,
+                                    "SharedPlayerPlayer": {
+                                      "Type": "RugbyBase.SharedPlayer",
+                                      "Name": "Player",
+                                      "IsShared": true
+                                    },
+                                    "SharedPlayerAnimatorManagerPlayerAnimatorManager": {
+                                      "Type": "RugbyBase.SharedPlayerAnimatorManager",
+                                      "Name": "AnimatorManager",
+                                      "IsShared": true
+                                    },
+                                    "MinMaxRangeFloatUtilityVariableRange": {
+                                      "SingleMinimumValue": -0.15,
+                                      "SingleMaximumValue": -0.05
+                                    },
+                                    "SharedFloatUtilityBoost": {
+                                      "Type": "BehaviorDesigner.Runtime.SharedFloat",
+                                      "Name": null,
+                                      "SinglemValue": 0
+                                    }
+                                  },
+                                  {
+                                    "Type": "RugbyBase.PlayerBehavior.FireTackleEventOnPlayer",
+                                    "NodeData": {
+                                      "Offset": "(148.095245,110)",
+                                      "ColorIndex": 6
+                                    },
+                                    "ID": 79,
+                                    "Name": "Fire Tap Tackle Event",
+                                    "Instant": true,
+                                    "SharedMatchMatch": {
+                                      "Type": "RugbyBase.SharedMatch",
+                                      "Name": "Match",
+                                      "IsShared": true
+                                    },
+                                    "SharedBoolDangerous": {
+                                      "Type": "BehaviorDesigner.Runtime.SharedBool",
+                                      "Name": null,
+                                      "BooleanmValue": false
+                                    },
+                                    "TackleEventEventValues": {
+                                      "BooleanSecondTackler": false,
+                                      "BooleanDangerous": false,
+                                      "StringEventName": "TapTackle"
+                                    },
+                                    "SharedPlayerTargetPlayer": {
+                                      "Type": "RugbyBase.SharedPlayer",
+                                      "Name": "Player",
+                                      "IsShared": true
+                                    },
+                                    "BooleanSubEvent": false,
+                                    "BooleanThisEvent": true
+                                  },
+                                  {
+                                    "Type": "BehaviorDesigner.Runtime.Tasks.Wait",
+                                    "NodeData": {
+                                      "Offset": "(294.285736,110)",
+                                      "ColorIndex": 3
+                                    },
+                                    "ID": 80,
+                                    "Name": "Wait",
+                                    "Instant": true,
+                                    "SharedFloatwaitTime": {
+                                      "Type": "BehaviorDesigner.Runtime.SharedFloat",
+                                      "Name": null,
+                                      "SinglemValue": 2
+                                    },
+                                    "SharedBoolrandomWait": {
+                                      "Type": "BehaviorDesigner.Runtime.SharedBool",
+                                      "Name": null,
+                                      "BooleanmValue": false
+                                    },
+                                    "SharedFloatrandomWaitMin": {
+                                      "Type": "BehaviorDesigner.Runtime.SharedFloat",
+                                      "Name": null,
+                                      "SinglemValue": 0
+                                    },
+                                    "SharedFloatrandomWaitMax": {
+                                      "Type": "BehaviorDesigner.Runtime.SharedFloat",
+                                      "Name": null,
+                                      "SinglemValue": 0
+                                    },
+                                    "SharedBoolunscaledTime": {
+                                      "Type": "BehaviorDesigner.Runtime.SharedBool",
+                                      "Name": null,
+                                      "BooleanmValue": false
+                                    }
+                                  }
+                                ]
+                              },
+                              {
+                                "Type": "BehaviorDesigner.Runtime.Tasks.Sequence",
+                                "NodeData": {
+                                  "Offset": "(1664.28149,105.714294)",
+                                  "ColorIndex": 6
+                                },
+                                "ID": 81,
+                                "Name": "Charge Down?",
+                                "Instant": true,
+                                "AbortTypeabortType": "None",
+                                "Children": [
+                                  {
+                                    "Type": "RugbyBase.PlayerBehavior.ChargeDownUtility",
+                                    "NodeData": {
+                                      "Offset": "(0,110)",
+                                      "ColorIndex": 6
+                                    },
+                                    "ID": 82,
+                                    "Name": "Charge Down Utility",
+                                    "Instant": true,
+                                    "BooleanCanEarlyChargeDown": false,
+                                    "SingleMaxLateChargeDownTime": 10,
+                                    "SharedPlayerPlayer": {
+                                      "Type": "RugbyBase.SharedPlayer",
+                                      "Name": "Player",
+                                      "IsShared": true
+                                    },
+                                    "SharedPlayerAnimatorManagerPlayerAnimatorManager": {
+                                      "Type": "RugbyBase.SharedPlayerAnimatorManager",
+                                      "Name": "AnimatorManager",
+                                      "IsShared": true
+                                    },
+                                    "MinMaxRangeFloatUtilityVariableRange": {
+                                      "SingleMinimumValue": 1.5,
+                                      "SingleMaximumValue": 2.5
+                                    },
+                                    "SharedFloatUtilityBoost": {
+                                      "Type": "BehaviorDesigner.Runtime.SharedFloat",
+                                      "Name": null,
+                                      "SinglemValue": 0
+                                    }
+                                  },
+                                  {
+                                    "Type": "RugbyBase.PlayerBehavior.WaitForChargeDownReaction",
+                                    "NodeData": {
+                                      "Offset": "(175.40625,107.4228)",
+                                      "ColorIndex": 3
+                                    },
+                                    "ID": 83,
+                                    "Name": "Wait For Charge Down Reaction",
+                                    "Instant": true,
+                                    "SharedPlayerPlayer": {
+                                      "Type": "RugbyBase.SharedPlayer",
+                                      "Name": "Player",
+                                      "IsShared": true
+                                    }
+                                  },
+                                  {
+                                    "Type": "RugbyBase.PlayerBehavior.FireTackleEventOnPlayer",
+                                    "NodeData": {
+                                      "Offset": "(365.986328,110)",
+                                      "ColorIndex": 6
+                                    },
+                                    "ID": 84,
+                                    "Name": "Fire Charge Down Event",
+                                    "Instant": true,
+                                    "SharedMatchMatch": {
+                                      "Type": "RugbyBase.SharedMatch",
+                                      "Name": "Match",
+                                      "IsShared": true
+                                    },
+                                    "SharedBoolDangerous": {
+                                      "Type": "BehaviorDesigner.Runtime.SharedBool",
+                                      "Name": null,
+                                      "BooleanmValue": false
+                                    },
+                                    "TackleEventEventValues": {
+                                      "BooleanSecondTackler": false,
+                                      "BooleanDangerous": false,
+                                      "StringEventName": "ChargeDown"
+                                    },
+                                    "SharedPlayerTargetPlayer": {
+                                      "Type": "RugbyBase.SharedPlayer",
+                                      "Name": "Player",
+                                      "IsShared": true
+                                    },
+                                    "BooleanSubEvent": false,
+                                    "BooleanThisEvent": true
+                                  },
+                                  {
+                                    "Type": "BehaviorDesigner.Runtime.Tasks.Wait",
+                                    "NodeData": {
+                                      "Offset": "(505.986328,110)",
+                                      "ColorIndex": 3
+                                    },
+                                    "ID": 85,
+                                    "Name": "Wait",
+                                    "Instant": true,
+                                    "SharedFloatwaitTime": {
+                                      "Type": "BehaviorDesigner.Runtime.SharedFloat",
+                                      "Name": null,
+                                      "SinglemValue": 1
+                                    },
+                                    "SharedBoolrandomWait": {
+                                      "Type": "BehaviorDesigner.Runtime.SharedBool",
+                                      "Name": null,
+                                      "BooleanmValue": false
+                                    },
+                                    "SharedFloatrandomWaitMin": {
+                                      "Type": "BehaviorDesigner.Runtime.SharedFloat",
+                                      "Name": null,
+                                      "SinglemValue": 0
+                                    },
+                                    "SharedFloatrandomWaitMax": {
+                                      "Type": "BehaviorDesigner.Runtime.SharedFloat",
+                                      "Name": null,
+                                      "SinglemValue": 0
+                                    },
+                                    "SharedBoolunscaledTime": {
+                                      "Type": "BehaviorDesigner.Runtime.SharedBool",
+                                      "Name": null,
+                                      "BooleanmValue": false
+                                    }
+                                  }
+                                ]
+                              },
+                              {
+                                "Type": "BehaviorDesigner.Runtime.Tasks.Sequence",
+                                "NodeData": {
+                                  "Offset": "(2329.01172,110)",
+                                  "ColorIndex": 6
+                                },
+                                "ID": 86,
+                                "Name": "Do Nothing",
+                                "Instant": true,
+                                "AbortTypeabortType": "None",
+                                "Children": [
+                                  {
+                                    "Type": "RugbyBase.PlayerBehavior.BaselineUtility",
+                                    "NodeData": {
+                                      "Offset": "(0,110)",
+                                      "ColorIndex": 6,
+                                      "WatchedFields": [
+                                        "BaselineUtilityValue"
+                                      ]
+                                    },
+                                    "ID": 87,
+                                    "Name": "Baseline Utility (Do Nothing)",
+                                    "Instant": true,
+                                    "SharedFloatBaselineUtilityValue": {
+                                      "Type": "BehaviorDesigner.Runtime.SharedFloat",
+                                      "Name": "",
+                                      "SinglemValue": 0.85
+                                    },
+                                    "SharedFloatBoostValue": {
+                                      "Type": "BehaviorDesigner.Runtime.SharedFloat",
+                                      "Name": null,
+                                      "SinglemValue": 0
+                                    }
+                                  },
+                                  {
+                                    "Type": "RugbyBase.PlayerBehavior.GetDiveTackleWaitTime",
+                                    "NodeData": {
+                                      "Offset": "(417.3828,105.055542)"
+                                    },
+                                    "ID": 88,
+                                    "Name": "Get Dive Tackle Wait Time",
+                                    "Instant": true,
+                                    "SharedPlayerPlayer": {
+                                      "Type": "RugbyBase.SharedPlayer",
+                                      "Name": "Player",
+                                      "IsShared": true
+                                    },
+                                    "SharedPlayerAnimatorManagerPlayerAnimatorManager": {
+                                      "Type": "RugbyBase.SharedPlayerAnimatorManager",
+                                      "Name": "AnimatorManager",
+                                      "IsShared": true
+                                    },
+                                    "SharedFloatActionThinkTime": {
+                                      "Type": "BehaviorDesigner.Runtime.SharedFloat",
+                                      "Name": "ActionThinkTime",
+                                      "IsShared": true,
+                                      "SinglemValue": 0.37
+                                    },
+                                    "SharedFloatFullBackMaximumThinkTime": {
+                                      "Type": "BehaviorDesigner.Runtime.SharedFloat",
+                                      "Name": null,
+                                      "SinglemValue": 0.02
+                                    },
+                                    "SharedFloatIntersectThinkTime": {
+                                      "Type": "BehaviorDesigner.Runtime.SharedFloat",
+                                      "Name": "IntersectThinkTime",
+                                      "IsShared": true,
+                                      "SinglemValue": 0
+                                    }
+                                  },
+                                  {
+                                    "Type": "BehaviorDesigner.Runtime.Tasks.ParallelSelector",
+                                    "NodeData": {
+                                      "Offset": "(581.5,108.361694)"
+                                    },
+                                    "ID": 89,
+                                    "Name": "Wait Until...",
+                                    "Instant": true,
+                                    "AbortTypeabortType": "None",
+                                    "Children": [
+                                      {
+                                        "Type": "RugbyBase.PlayerBehavior.WaitUntilCollision",
+                                        "NodeData": {
+                                          "Offset": "(-1.5,107.361694)",
+                                          "ColorIndex": 3
+                                        },
+                                        "ID": 90,
+                                        "Name": "Wait Until Collision",
+                                        "Instant": true,
+                                        "SharedPlayerPlayer": {
+                                          "Type": "RugbyBase.SharedPlayer",
+                                          "Name": "Player",
+                                          "IsShared": true
+                                        }
+                                      },
+                                      {
+                                        "Type": "BehaviorDesigner.Runtime.Tasks.Wait",
+                                        "NodeData": {
+                                          "Offset": "(150,110)",
+                                          "ColorIndex": 3
+                                        },
+                                        "ID": 91,
+                                        "Name": "'Action Think' Wait",
+                                        "Instant": true,
+                                        "SharedFloatwaitTime": {
+                                          "Type": "BehaviorDesigner.Runtime.SharedFloat",
+                                          "Name": "IntersectThinkTime",
+                                          "IsShared": true,
+                                          "SinglemValue": 0
+                                        },
+                                        "SharedBoolrandomWait": {
+                                          "Type": "BehaviorDesigner.Runtime.SharedBool",
+                                          "Name": null,
+                                          "BooleanmValue": false
+                                        },
+                                        "SharedFloatrandomWaitMin": {
+                                          "Type": "BehaviorDesigner.Runtime.SharedFloat",
+                                          "Name": null,
+                                          "SinglemValue": 0
+                                        },
+                                        "SharedFloatrandomWaitMax": {
+                                          "Type": "BehaviorDesigner.Runtime.SharedFloat",
+                                          "Name": null,
+                                          "SinglemValue": 0
+                                        },
+                                        "SharedBoolunscaledTime": {
+                                          "Type": "BehaviorDesigner.Runtime.SharedBool",
+                                          "Name": null,
+                                          "BooleanmValue": false
+                                        }
+                                      }
+                                    ]
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "Variables": [
+    {
+      "Type": "RugbyBase.SharedMatch",
+      "Name": "Match",
+      "IsShared": true
+    },
+    {
+      "Type": "RugbyBase.SharedPlayer",
+      "Name": "Player",
+      "IsShared": true
+    },
+    {
+      "Type": "RugbyBase.SharedPlayerAnimatorManager",
+      "Name": "AnimatorManager",
+      "IsShared": true
+    },
+    {
+      "Type": "RugbyBase.SharedPlayerMovementController",
+      "Name": "MovementController",
+      "IsShared": true
+    },
+    {
+      "Type": "BehaviorDesigner.Runtime.SharedBool",
+      "Name": "Possession",
+      "IsShared": true,
+      "BooleanmValue": false
+    },
+    {
+      "Type": "BehaviorDesigner.Runtime.SharedBool",
+      "Name": "AnimationTrigger",
+      "IsShared": true,
+      "BooleanmValue": false
+    },
+    {
+      "Type": "BehaviorDesigner.Runtime.SharedBool",
+      "Name": "UserControlled",
+      "IsShared": true,
+      "BooleanmValue": false
+    },
+    {
+      "Type": "BehaviorDesigner.Runtime.SharedBool",
+      "Name": "AIControlled",
+      "IsShared": true,
+      "BooleanmValue": false
+    },
+    {
+      "Type": "BehaviorDesigner.Runtime.SharedBool",
+      "Name": "ProcessingEvent",
+      "IsShared": true,
+      "BooleanmValue": false
+    },
+    {
+      "Type": "BehaviorDesigner.Runtime.SharedVector2",
+      "Name": "InputAxes",
+      "IsShared": true,
+      "Vector2mValue": "(0,0)"
+    },
+    {
+      "Type": "BehaviorDesigner.Runtime.SharedFloat",
+      "Name": "InputIntensity",
+      "IsShared": true,
+      "SinglemValue": 0
+    },
+    {
+      "Type": "BehaviorDesigner.Runtime.SharedFloat",
+      "Name": "InputSprint",
+      "IsShared": true,
+      "SinglemValue": 0
+    },
+    {
+      "Type": "RugbyBase.SharedPlayer",
+      "Name": "PossessionPlayer",
+      "IsShared": true
+    },
+    {
+      "Type": "BehaviorDesigner.Runtime.SharedVector2",
+      "Name": "TemporaryVector",
+      "IsShared": true,
+      "Vector2mValue": "(0,0)"
+    },
+    {
+      "Type": "BehaviorDesigner.Runtime.SharedVector2",
+      "Name": "OldInputAxes",
+      "IsShared": true,
+      "Vector2mValue": "(0,0)"
+    },
+    {
+      "Type": "BehaviorDesigner.Runtime.SharedVector2",
+      "Name": "Avoidance",
+      "IsShared": true,
+      "Vector2mValue": "(0,0)"
+    },
+    {
+      "Type": "BehaviorDesigner.Runtime.SharedFloat",
+      "Name": "Threat",
+      "IsShared": true,
+      "SinglemValue": 0
+    },
+    {
+      "Type": "BehaviorDesigner.Runtime.SharedFloat",
+      "Name": "ActionThinkTime",
+      "IsShared": true,
+      "SinglemValue": 0.37
+    },
+    {
+      "Type": "BehaviorDesigner.Runtime.SharedFloat",
+      "Name": "MovementThinkTime",
+      "IsShared": true,
+      "SinglemValue": 0.1
+    },
+    {
+      "Type": "BehaviorDesigner.Runtime.SharedFloat",
+      "Name": "IntersectThinkTime",
+      "IsShared": true,
+      "SinglemValue": 0
+    },
+    {
+      "Type": "RugbyBase.SharedPlayer",
+      "Name": "PreviousPlayer",
+      "IsShared": true
+    },
+    {
+      "Type": "BehaviorDesigner.Runtime.SharedBool",
+      "Name": "DangerousTackle",
+      "IsShared": true,
+      "BooleanmValue": false
+    }
+  ]
+}

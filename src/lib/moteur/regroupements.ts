@@ -12,19 +12,117 @@ export interface OrganisationRuck {
   animations: Record<string, number>;
   chenilleEssayee?: boolean;
   chenille?: { neufId: string; debut: number; pretDepuis?: number };
+  /** Celui qui sortira le ballon : le demi de mêlée, ou son remplaçant du moment. */
+  relayeurId?: string;
+  /** Secondes passées, ballon sorti, à attendre un relayeur encore en chemin. */
+  attenteSortie?: number;
 }
 
 export function organiserRuck(e: EtatMatch): void {
   if (!e.ruck) return;
+  const detaille = !!e.cadenceDetaillee;
+  // ⚠️ CADENCE DÉTAILLÉE : ON PREND CEUX QUI PEUVENT VRAIMENT ARRIVER. Le plus
+  // proche à l'instant du plaquage est souvent le soutien lancé qui a déjà
+  // dépassé le ballon : il lui faut freiner, faire demi-tour et rentrer par
+  // l'axe. On compte donc là où sa course l'emmène, et chaque mètre au-delà du
+  // ballon coûte double. Un joueur au sol ne vient pas se lier.
+  const cout = (p: Pion) => {
+    if (!detaille) return distance(p.pos, e.ballon);
+    const futur = { x: p.pos.x + p.vitesse.x * .45, y: p.pos.y + p.vitesse.y * .45 };
+    return distance(futur, e.ballon) + Math.max(0, (futur.x - e.ballon.x) * sens(p.cote)) * 1.2;
+  };
   const choisir = (attaque: boolean) => e.pions.filter(p => p.surLeTerrain && p.sanction <= 0 && p.avant
+    && (!detaille || !p.corps)
     && (p.cote === e.possession) === attaque && p.id !== e.ruck?.porteurId && p.id !== e.ruck?.plaqueurId)
-    .sort((a, b) => distance(a.pos, e.ballon) - distance(b.pos, e.ballon)).slice(0, attaque ? 3 : 2).map(p => p.id);
+    .map(p => ({ p, c: cout(p) }))
+    .sort((a, b) => a.c - b.c).slice(0, attaque ? 3 : 2).map(x => x.p.id);
   e.ruck.organisation = { debut: e.sim, origine: { ...e.ballon }, attaque: choisir(true), defense: choisir(false), contacts: [], animations: {} };
+}
+
+/** Distance au-delà de laquelle le demi de mêlée n'arrivera pas à temps au ruck. */
+const PORTEE_DU_NEUF = 20;
+const PORTEE_DETAILLEE = 9;
+
+/**
+ * QUI SORT LE BALLON DU RUCK.
+ *
+ * ⚠️ LE NUMÉRO 9 N'EST PAS TOUJOURS LÀ. Plaqué, encore au sol, exclu ou parti
+ * trente mètres plus loin, il ne peut pas jouer ce ballon. Le regroupement
+ * l'attendait pourtant : sa cible était posée au pied du ruck, il n'y arrivait
+ * jamais, et l'équipe finissait par lier une chenille autour d'un demi absent.
+ * Sur un terrain, le premier joueur disponible prend le relais — un avant de la
+ * cellule proche, l'ouvreur, celui qui est là.
+ *
+ * Le choix reste STABLE pendant tout le ruck : en changer à chaque image ferait
+ * converger deux joueurs vers la même place. Il n'est refait que si le relayeur
+ * désigné tombe, sort ou se retrouve lié au regroupement.
+ */
+export function designerRelayeur(e: EtatMatch): Pion | undefined {
+  const ruck = e.ruck;
+  if (!ruck) return undefined;
+  if (!ruck.organisation) organiserRuck(e);
+  const o = ruck.organisation!;
+  const lies = new Set([...o.attaque, ...o.defense, ruck.porteurId, ruck.plaqueurId]);
+  const disponible = (p: Pion) => p.surLeTerrain && p.sanction <= 0 && !p.corps
+    && p.cote === e.possession && !lies.has(p.id);
+  const actuel = o.relayeurId ? e.pions.find(p => p.id === o.relayeurId) : undefined;
+  const neuf = e.pions.find(p => p.numero === 9 && p.cote === e.possession);
+  // En cadence détaillée, le demi n'est le relayeur que s'il peut vraiment y
+  // être : au-delà de neuf mètres, quelqu'un d'autre est déjà sur le ballon.
+  const neufPret = !!neuf && disponible(neuf)
+    && distance(neuf.pos, e.ballon) <= (e.cadenceDetaillee ? PORTEE_DETAILLEE : PORTEE_DU_NEUF);
+  // Le demi de mêlée reprend sa place dès qu'il redevient disponible, sauf si
+  // son remplaçant est déjà au pied du ruck, prêt à sortir le ballon.
+  if (neufPret && !(actuel && actuel !== neuf && disponible(actuel) && distance(actuel.pos, e.ballon) < 2.5)) {
+    o.relayeurId = neuf!.id;
+    return neuf;
+  }
+  if (actuel && disponible(actuel)) return actuel;
+  const s = sens(e.possession);
+  const candidats = e.pions.filter(p => disponible(p) && p.numero !== 9);
+  let choisi: Pion | undefined; let meilleur = Infinity;
+  for (const p of candidats) {
+    // Le plus proche l'emporte ; à distance égale, celui qui passe le mieux et
+    // qui arrive par l'arrière du ruck plutôt que par le camp adverse.
+    const devant = Math.max(0, (p.pos.x - e.ballon.x) * s);
+    const note = distance(p.pos, e.ballon) + devant * 0.8 - p.passe * 0.03;
+    if (note < meilleur) { meilleur = note; choisi = p; }
+  }
+  if (e.cadenceDetaillee && (!choisi || distance(choisi.pos, e.ballon) > 6)) {
+    // Personne de libre à portée : le dernier avant lié se détache du
+    // regroupement et ramassera lui-même.
+    const liesDuCamp = (e.possession === ruck.attaque ? o.attaque : o.defense)
+      .map(id => e.pions.find(p => p.id === id))
+      .filter((p): p is Pion => !!p && p.surLeTerrain && p.sanction <= 0 && !p.corps);
+    const dernier = liesDuCamp[liesDuCamp.length - 1];
+    if (dernier) choisi = dernier;
+  }
+  o.relayeurId = choisi?.id;
+  return choisi;
+}
+
+/**
+ * Le joueur debout, du camp qui a le ballon, le plus proche du ballon au sol.
+ * C'est lui qui joue quand le relayeur attendu n'est pas au pied du ruck.
+ */
+export function ramasseurAuRuck(e: EtatMatch, rayon = 3.2): Pion | undefined {
+  const ruck = e.ruck;
+  let choisi: Pion | undefined; let meilleure = rayon;
+  for (const p of e.pions) {
+    if (!p.surLeTerrain || p.sanction > 0 || p.corps || p.cote !== e.possession || p.id === ruck?.porteurId) continue;
+    const d = distance(p.pos, e.ballon);
+    if (d < meilleure) { meilleure = d; choisi = p; }
+  }
+  if (choisi && ruck?.organisation) ruck.organisation.relayeurId = choisi.id;
+  return choisi;
 }
 
 export function preparerChenille(e: EtatMatch, neuf: Pion): boolean {
   if (e.phase !== 'ruck' || !e.ruck || neuf.numero !== 9 || neuf.cote !== e.possession) return false;
   if (!e.ruck.organisation) organiserRuck(e);
+  // La chenille protège la boîte au pied du demi de mêlée : sans lui au pied
+  // du ruck, on ne la forme pas, le relayeur du moment sort le ballon.
+  if (designerRelayeur(e) !== neuf) return false;
   const o = e.ruck.organisation!;
   if (o.attaque.length < 2) return false;
   o.chenille ??= { neufId: neuf.id, debut: e.sim };
@@ -53,8 +151,23 @@ export function placerRegroupement(e: EtatMatch): void {
     ? { x: lieu.x - s * (.7 + i * .85), y: lieu.y + (i % 2 ? .12 : -.12) }
     : { x: lieu.x - s * (i < 2 ? .5 : 1.25), y: lieu.y + (i === 0 ? -.42 : i === 1 ? .42 : 0) }));
   o.defense.forEach((id, i) => placer(id, { x: lieu.x + s * .5, y: lieu.y + (i === 0 ? -.42 : .42) }));
-  const neuf = e.pions.find(p => p.surLeTerrain && p.cote === e.possession && p.numero === 9);
-  if (neuf) placer(neuf.id, { x: lieu.x - s * (o.chenille ? 3.45 : 1.65), y: lieu.y - .35 });
+  const ancien = o.relayeurId;
+  const relayeur = designerRelayeur(e);
+  // Celui qui cède le relais retourne dans la ligne au lieu de rester planté
+  // derrière le ruck avec un rôle de regroupement.
+  if (ancien && ancien !== relayeur?.id) {
+    delete e.placement[ancien];
+    const p = e.pions.find(q => q.id === ancien);
+    if (p && p.role === 'ruck') p.role = 'ligne';
+  }
+  if (relayeur) {
+    // En cadence détaillée, il se tient derrière le dernier avant lié, là où
+    // le ballon est présenté — sans se superposer à lui.
+    placer(relayeur.id, e.cadenceDetaillee && !o.chenille
+      ? { x: lieu.x - s * 2.05, y: lieu.y - .25 }
+      : { x: lieu.x - s * (o.chenille ? 3.45 : 1.65), y: lieu.y - .35 });
+    relayeur.effort = Math.max(relayeur.effort, .95);
+  }
 }
 
 export function animerRegroupement(e: EtatMatch, dt: number): void {
@@ -96,7 +209,8 @@ export function animerRegroupement(e: EtatMatch, dt: number): void {
   }
   if (o.chenille) {
     const neuf = actif(o.chenille.neufId);
-    if (!neuf) { delete o.chenille; return; }
+    // Le demi tombé ou sorti ne commande plus de chenille : sortie normale.
+    if (!neuf || neuf.corps) { delete o.chenille; return; }
     const lies = o.attaque.map(actif).filter((p): p is Pion => !!p);
     const prets = lies.length >= 2 && lies.every(p => !p.corps && distance(p.pos, p.cible) < .95)
       && distance(neuf.pos, neuf.cible) < .8;

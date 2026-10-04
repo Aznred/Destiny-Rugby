@@ -1,30 +1,7 @@
 import type { Club } from '../types';
-import { LOGO_PAR_EQUIPE } from '../data/mondeReel';
-import { COMPETITIONS_NATIONS_NOUVELLES } from '../data/nouvellesLigues';
-import {
-  LOGO_SELECTION_CATALOGUE, LOGO_SELECTION_NATIONS, LOGO_SELECTION_PRINCIPALE,
-} from '../data/logosSelections';
 import { aDrapeau, nomNation } from '../lib/nations';
+import { urlLogoEquipe } from '../lib/logoEquipe';
 import { Drapeau } from './Drapeau';
-
-// ⚠️ DEUX SOURCES D'ÉCUSSONS DE SÉLECTION. Les compétitions historiques
-// viennent de `mondeReel.ts`, les treize nouvelles (Rugby Europe Conference,
-// Oceania Cup, Americas Championship…) de `nouvellesLigues.ts` — elles
-// apportent 86 équipes nationales de plus, dont l'Andorre, le Kosovo ou les
-// Îles Salomon, qui n'existaient nulle part ailleurs.
-const LOGOS_EQUIPE: Record<string, string> = { ...LOGO_PAR_EQUIPE };
-for (const comp of COMPETITIONS_NATIONS_NOUVELLES) {
-  for (const e of comp.equipes) if (e.logo && !LOGOS_EQUIPE[e.nom]) LOGOS_EQUIPE[e.nom] = e.logo;
-}
-// Le moteur emploie les noms canoniques (« Écosse », « Pays de Galles »,
-// « États-Unis ») alors que certaines sources de logos écrivent Ecosse, Galles
-// ou USA. On indexe donc chaque logo aussi sous sa nation canonique.
-for (const [nom, logo] of Object.entries({ ...LOGOS_EQUIPE })) {
-  const canonique = nomNation(nom);
-  if (canonique && !/\s+(?:U20|A|B|C|XV|-20)$/i.test(nom) && !LOGOS_EQUIPE[canonique]) {
-    LOGOS_EQUIPE[canonique] = logo;
-  }
-}
 
 // Écusson d'un club. Les clubs couverts par la base réelle (Top 14, Pro D2,
 // Nationale et championnats du monde) affichent leur VRAI logo ; les autres
@@ -101,22 +78,7 @@ export function Blason({ club, taille = 40 }: { club: Club; taille?: number }) {
 // toutes les équipes des compétitions de nations — on s'en sert par défaut, et
 // à défaut on retombe sur les initiales plutôt que sur du vide.
 export function LogoEquipe({ nom, logo, taille = 28 }: { nom: string; logo?: string; taille?: number }) {
-  // Les 39 écussons principaux sont la référence absolue. Le catalogue ne
-  // prend le relais que pour une sélection absente du lot principal.
-  //
-  // ⚠️ ET `LOGO_SELECTION_NATIONS` PASSE EN DERNIER, APRÈS le logo fourni par
-  // l'appelant. C'est le bouche-trou : avant lui, **41 des 114 nations
-  // classées** n'avaient aucune image et retombaient sur leurs initiales. Il ne
-  // doit jamais passer devant un écusson officiel — d'où sa place en fin de
-  // chaîne (voir `scripts/copierLogosSelections.cjs`, lot « nations »).
-  const src = LOGO_SELECTION_PRINCIPALE[nom]
-    ?? LOGO_SELECTION_PRINCIPALE[nomNation(nom)]
-    ?? LOGO_SELECTION_CATALOGUE[nom]
-    ?? LOGO_SELECTION_CATALOGUE[nomNation(nom)]
-    ?? logo
-    ?? LOGOS_EQUIPE[nom]
-    ?? LOGO_SELECTION_NATIONS[nom]
-    ?? LOGO_SELECTION_NATIONS[nomNation(nom)];
+  const src = urlLogoEquipe(nom, logo);
   if (!src) {
     // ⚠️ LE DRAPEAU AVANT LES INITIALES (demande explicite : « si tu n'as pas
     // le pays comme logo, mets le drapeau au lieu d'une lettre »). Il reste

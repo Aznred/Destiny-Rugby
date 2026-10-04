@@ -44,7 +44,9 @@ export type NomIcone =
   | 'bouclier' | 'eclair' | 'calendrier' | 'image' | 'dossier' | 'cadeau'
   | 'contrat' | 'porte' | 'plein-ecran' | 'mallette' | 'repost' | 'lien' | 'partage'
   // ── Les listes déroulantes ───────────────────────────────────────────────
-  | 'chevron' | 'lecture' | 'pause' | 'moins';
+  | 'chevron' | 'lecture' | 'pause' | 'moins'
+  // ── Le match à la télévision ─────────────────────────────────────────────
+  | 'son' | 'son-coupe' | 'ralenti' | 'camera';
 
 interface Props {
   nom: NomIcone;
@@ -559,6 +561,32 @@ const TRACES: Record<NomIcone, React.ReactNode> = {
       <path d="M14.4 3.6H5.6v16.8h8.8" />
       <path d="M18.4 12H10" />
       <path d="m14.2 8.2 4.2 3.8-4.2 3.8" />
+    </>
+  ),
+  // Un haut-parleur et deux ondes.
+  son: (
+    <>
+      <path d="M4 9.6v4.8h3.4L12 18.2V5.8L7.4 9.6z" />
+      <path d="M15.4 9.2a4 4 0 0 1 0 5.6M17.8 6.6a7.6 7.6 0 0 1 0 10.8" />
+    </>
+  ),
+  'son-coupe': (
+    <>
+      <path d="M4 9.6v4.8h3.4L12 18.2V5.8L7.4 9.6z" />
+      <path d="M16 9.6l4.4 4.8M20.4 9.6 16 14.4" />
+    </>
+  ),
+  // Deux chevrons vers l'arrière : on revoit l'action.
+  ralenti: (
+    <>
+      <path d="M11.4 6.4 5 12l6.4 5.6zM19 6.4 12.6 12l6.4 5.6z" />
+    </>
+  ),
+  // Une caméra de plateau, objectif à gauche.
+  camera: (
+    <>
+      <rect x="7.6" y="7.4" width="13" height="9.2" rx="1.8" />
+      <path d="M7.6 10.6 3.2 8.4v7.2l4.4-2.2" />
     </>
   ),
   'plein-ecran': (

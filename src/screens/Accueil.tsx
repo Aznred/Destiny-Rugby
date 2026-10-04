@@ -196,6 +196,9 @@ export function Accueil() {
         <div className="hero-canvas"><Suspense fallback={<div className="hero-canvas-skel" />}><Hero3D skinId={skinActif} /></Suspense></div>
       </section>}
 
+      <div style={{ margin: '16px 0', textAlign: 'center' }}>
+        <a className="btn fantome" href="/rn26/index.html"><Icone nom="stade" taille={18} /> Essayer le match 3D · Aperçu</a>
+      </div>
       {partiesOuvertes && <FenetreParties onFermer={() => setPartiesOuvertes(false)} />}
 
       {/* ⚠️ DE VRAIS LIENS, PAS DES BOUTONS. Ces pages sont du HTML

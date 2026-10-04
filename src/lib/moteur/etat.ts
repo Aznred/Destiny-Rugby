@@ -285,6 +285,8 @@ export interface Vol {
   intention: IntentionPied | 'passe' | 'offload';
   auteur: Pion;
   receveur: Pion | null;
+  /** La façon de donner (cadence détaillée) : chistera, passe au contact, offload à une main, dans le dos… */
+  variante?: string;
 }
 
 /**
@@ -297,15 +299,61 @@ export interface Vol {
  */
 export type VolRecent = Omit<Vol, 'ecoule'> & { debut: number };
 
+/**
+ * La mêlée jouée temps par temps (cadence détaillée) : liaison, impact,
+ * introduction, poussée puis sortie du ballon.
+ *
+ * Le duel est tranché AU DÉBUT de la poussée, pour que ce qu'on regarde —
+ * un pack qui avance, recule, tourne ou s'écroule — soit le résultat réel et
+ * non un habillage posé sur un tirage fait après coup.
+ */
+export interface MeleeDetaillee {
+  etape: 'placement' | 'liaison' | 'impact' | 'introduction' | 'poussee' | 'sortie';
+  /** Instant de simulation où l'étape en cours a commencé. */
+  etapeDepuis: number;
+  /** Instant où la formation est installée (les étapes partent de là). */
+  debut: number;
+  /** Milieu du tunnel à la mise en place. */
+  centre: Vec;
+  introducteur: Cote;
+  /** Secondes de poussée avant que le pack dominé ne s'écroule ou ne se relève. */
+  ruptureApres?: number;
+  /** Durée de la poussée, fixée avec l'issue. */
+  dureePoussee: number;
+  /** Camp qui talonne le ballon : ses pieds le ramènent vers son numéro 8. */
+  talonneur?: Cote;
+  /**
+   * Ce que la poussée donne à voir. « ecroulee » et « relevee » précèdent une
+   * pénalité ; « tourne » un ballon lent ; les autres une sortie normale.
+   */
+  issue?: 'stable' | 'avance' | 'recule' | 'tourne' | 'ecroulee' | 'relevee';
+  /** Mètres gagnés par l'introducteur en fin de poussée (négatif s'il recule). */
+  avanceFinale: number;
+  /** Rotation finale de l'ensemble autour du tunnel, en radians. */
+  angleFinal: number;
+  /** Pack sanctionné ou dominé : c'est lui qui s'écroule ou se relève. */
+  perdant?: Cote;
+  /** Décision conservée pour la conclusion, sans nouveau tirage. */
+  duel?: number;
+  penalite?: { pour: Cote; motif: string };
+  contre?: boolean;
+  depart8?: boolean;
+}
+
 /** Animation et appel annoncés pendant une phase de conquête. */
 export interface ConqueteAnimee {
   type: 'melee' | 'touche';
   progression: number;
   combinaison?: 'premierBloc' | 'milieu' | 'fond' | 'leurreDevant';
+  /** Sortie annoncée avec la combinaison (cadence détaillée) : déviation pour le 9, ou peel d'un avant. */
+  sortie?: 'deviation' | 'peel';
+  /** L'avant qui contourne l'alignement pour recevoir du sauteur. */
+  peelId?: string;
   cibleId?: string;
   horsAlignement?: boolean;
   reception?: Vec;
   pousseVers?: Cote;
+  melee?: MeleeDetaillee;
 }
 
 /** Ballon vivant après un rebond : personne ne le possède encore. */
@@ -334,6 +382,8 @@ export interface RuckEnCours {
   vitesseDefense: number;
   /** Instant de l'impact, pour rejouer ensemble le plaquage et la chute. */
   debut?: number;
+  /** Comment le plaquage s'est fait (cadence détaillée) : voir `duels.ts`. */
+  plaquage?: { type: import('./duels').TypePlaquage; angle: import('./duels').AnglePlaquage };
 }
 
 /** Bref temps de contrôle du ballon dans l'en-but avant validation de l'essai. */
@@ -361,7 +411,18 @@ export interface Lancement {
   intention?: IntentionPied;
   botteur?: Pion;
   libelle: string;
+  /** Structure d'attaque jouée (cadence détaillée) : voir `structureAvancee`. */
+  structure?: 'ecran' | 'croisee' | 'redoublee';
+  /** Ceux qui courent comme s'ils allaient recevoir, sans recevoir. */
+  leurres?: Pion[];
+  /** La défense a déjà réagi au leurre de cette structure. */
+  fixe?: boolean;
+  /** Décalage latéral (m) que prend le premier porteur : départ du 8 petit côté, grand côté ou dans l'axe. */
+  couloir?: number;
 }
+
+/** L'identité de jeu d'une équipe sans consigne d'entraîneur (cadence détaillée). */
+export type StyleJeu = 'equilibre' | 'avants' | 'large' | 'pied' | 'leurres';
 
 // Le plan de marque d'une équipe : combien d'essais transformés, d'essais secs
 // et de pénalités il lui reste à inscrire (voir `plan.ts`).
@@ -388,6 +449,33 @@ export interface EtatMatch {
   /** Défense du bot renforcée uniquement pour le match de collection. */
   defenseArcadeCote?: Cote;
   dropEnCours?: { auteurId: string; reussi: boolean };
+  /**
+   * Les phases se jouent à leur rythme de terrain : mêlée complète, passes à
+   * vitesse réelle, célébration puis rituel entier du buteur. Réservé au match
+   * en trois dimensions ; les autres écrans gardent leur cadence resserrée et
+   * l'étalonnage qui va avec.
+   */
+  cadenceDetaillee?: boolean;
+  /** Le ballon porté en cours : qui a capté le lancer, et depuis quand. */
+  maul?: { receveurId: string; debut: number } | null;
+  /**
+   * La cellule d'avants de la phase (cadence détaillée) : le porteur — ou
+   * l'avant qui va recevoir — et les deux coéquipiers qui se lient à lui.
+   */
+  cellule?: {
+    porteurId: string;
+    soutiens: string[];
+    /** Ceux qui sont assez près pour être entraînés par le porteur. */
+    accroches?: string[];
+    /** Les deux soutiens sont à leur place, épaule contre le porteur. */
+    lie: boolean;
+    depuis: number;
+    /** La cellule se forme autour d'un avant qui n'a pas encore le ballon. */
+    approche?: boolean;
+    /** Plaquage engagé mais le trio avance encore : poussée au contact. */
+    pousse?: { defenseurId: string; jusqua: number; vitesse: number; debut: number };
+    pousseFaite?: boolean;
+  } | null;
   arbitre?: import('./dynamique.js').ArbitreMatch;
   gestes?: import('./dynamique.js').GesteMatch[];
   incidentApres?: number;
@@ -427,6 +515,14 @@ export interface EtatMatch {
   // Structure de jeu
   lancement: Lancement | null;
   ouvert: 1 | -1;            // côté ouvert choisi pour la phase
+  /** Camp pour lequel le côté de la phase suivante a déjà été décidé, pendant le ruck. */
+  coteDecidePour?: Cote;
+  /** Combien de temps de jeu de suite vers le même côté : au-delà de trois, on renverse. */
+  serieCote?: { cote: 1 | -1; n: number };
+  /** Les trois avants qui se préparent à percuter près du ruck : la pointe, puis ses deux soutiens. */
+  blocPrepare?: { cote: Cote; ids: string[] } | null;
+  /** Identité de jeu de chaque équipe (cadence détaillée). */
+  styles?: Record<Cote, StyleJeu>;
   phasesDepuisArret: number; // nombre de temps de jeu depuis la dernière phase arrêtée
   ligneAvantage: number;     // X où la phase a démarré : les mètres se comptent AU-DELÀ
   origine: Vec;              // ⚠️ le point de départ de la phase (ruck, mêlée, touche).
@@ -527,12 +623,29 @@ export interface EtatMatch {
     reussi?: boolean;
     /** Le rituel est fini et le ballon est actuellement en vol. */
     volLance?: boolean;
+    /** Armé unique au contact du tee, puis instant exact de libération. */
+    frappeDepuis?: number;
+    departSim?: number;
     /** Joueur ayant contré la transformation lors de sa charge. */
     contre?: Pion | null;
     /** Routine / rituel de préparation au tee du buteur. */
     routine?: import('./routinesButeur').RoutineButeur;
     /** Le ballon a terminé son vol et a atterri au sol derrière les poteaux. */
     retombe?: boolean;
+    /**
+     * Cadence détaillée : où en est le buteur. Il rejoint le ballon, le
+     * ramasse, le porte jusqu'au point du tir, le pose, recule, se concentre
+     * puis s'élance — sans jamais être déplacé d'un coup.
+     */
+    etape?: 'celebration' | 'approche' | 'ramassage' | 'transport' | 'pose' | 'pret' | 'elan';
+    etapeDepuis?: number;
+    /** Où repose le ballon tant que le buteur ne l'a pas ramassé. */
+    ballonAuSol?: Vec;
+    /** Marqueur fêté par ses coéquipiers avant la transformation. */
+    marqueurId?: string;
+    celebrationJusqua?: number;
+    /** Coéquipiers qui viennent entourer le marqueur. */
+    feteurs?: string[];
   } | null;
   penalite: { pour: Cote; lieu: Vec; motif: string } | null;
 
@@ -660,6 +773,8 @@ export interface EtatMatch {
   tension: number;
   /** La bagarre en cours : tant qu'elle est là, le jeu attend un ordre. */
   bagarre: Bagarre | null;
+  /** Altercation sifflée : ceux qui viennent séparer, et jusqu'à quand (cadence détaillée). */
+  attroupement?: { lieu: Vec; jusqua: number; ids: string[]; arrives: string[] } | null;
   /** Les bulles de dialogue visibles en ce moment sur le terrain. */
   bulles: Bulle[];
   /**

@@ -122,6 +122,16 @@ import { nomNation } from '../lib/nations';
 import { clubParNom } from '../data/clubs';
 import { useGame } from '../store/useGame';
 import { Blason, LogoEquipe } from './Blason';
+import { Terrain3D } from './match/Terrain3D';
+import {
+  apparencesDesJoueurs, ecussonPourToile, preferenceMatch3D, preferencesTele, retenirPreferenceMatch3D, tenueDepuisCouleurs,
+  type Camera3D, type OptionsScene3D, type Scene3D,
+} from '../lib/match3D';
+import {
+  AvantMatch, BandeauRemplacements, CartonsEquipe, HommeDuMatch, OutilsTele, PanneauMiTemps,
+} from './match/PresentationTV';
+import { changementsRecents } from '../lib/presentationTV';
+import { urlLogoEquipe } from '../lib/logoEquipe';
 import { PelouseMemo } from './match/Pelouse';
 import { SpriteArbitre, SpriteRugbymanMemo } from './match/SpriteRugbyman';
 import type { PionDirect, TerrainDirect } from '../lib/ligue/matchCarriere';
@@ -352,6 +362,25 @@ export function MatchLive({
   const appliquerSanctionMatch = useGame((s) => s.appliquerSanctionMatch);
   const { overlayRef, dialogRef } = useModalDialog(onFermer);
   const large = useLarge();
+  // ⚠️ LA VUE EST CHOISIE AVANT LE COUP D'ENVOI, parce qu'elle règle la cadence
+  // du moteur. En trois dimensions, chaque phase se joue à son rythme de
+  // terrain (`cadenceDetaillee`) : une mêlée expédiée en six secondes se lit vue
+  // de haut, pas à hauteur d'homme. Revenir au terrain plat en cours de match
+  // ne change donc que le dessin — le match, lui, garde la cadence qu'il a prise.
+  const [vue3D, setVue3D] = useState(preferenceMatch3D);
+  const cadenceInitiale = useRef(vue3D);
+  const scene3D = useRef<Scene3D | null>(null);
+  const [camera3D, setCamera3D] = useState<Camera3D>('tv');
+  // --- 📺 L'AVANT-MATCH ------------------------------------------------------
+  // L'affiche, puis les deux compositions pendant que les équipes sortent du
+  // tunnel. ⚠️ LE MOTEUR ATTEND : rien n'est joué tant que la présentation
+  // dure, et « Passer » (ou le réglage) rend la main tout de suite.
+  const [avantMatch, setAvantMatch] = useState<'affiche' | 'A' | 'B' | null>(null);
+  const presentation = useRef<{ t: number; etape: 'affiche' | 'A' | 'B' } | null>(null);
+  const tmoRevu = useRef<unknown>(null);
+  const [pleinEcran, setPleinEcran] = useState(false);
+  /** Dernier rendu React demandé par la boucle, quand la scène 3D dessine le terrain. */
+  const dernierRendu = useRef(0);
 
   // Le moteur vit dans une ref : c'est un objet muté sept fois par seconde de
   // jeu, le passer par l'état de React ferait des centaines de rendus.
@@ -405,6 +434,7 @@ export function MatchLive({
       // impitoyable chez les professionnels (voir `moteur/bagarre.ts`).
       {
         niveau: niveauDuMatch(joueur, selection), controle: true,
+        cadenceDetaillee: cadenceInitiale.current,
         ...(coteManager === 'A' && feuilleManager && compoManager && manager ? {
           compositionA: feuilleManager, tactiqueA: manager.tactique,
           capitaineAId: compoManager.capitaineId, buteurAId: compoManager.buteurId,
@@ -496,9 +526,11 @@ export function MatchLive({
    */
   const tailleBulle = useRef({ l: 180, h: 62 });
   const roBulle = useRef<ResizeObserver | null>(null);
+  const noeudBulle = useRef<HTMLDivElement | null>(null);
   const mesurerBulle = useCallback((n: HTMLDivElement | null) => {
     roBulle.current?.disconnect();
     roBulle.current = null;
+    noeudBulle.current = n;
     if (!n) return;
     const lire = () => { tailleBulle.current = { l: n.offsetWidth, h: n.offsetHeight }; };
     lire();
@@ -802,9 +834,57 @@ export function MatchLive({
         }
       }
       vueRef.current = camera.current.suivre(cible, cadrage, ratio, angle, dtReel);
+      // La caméra 3D reçoit la même consigne : rester entre mon pion et le
+      // ballon, et ne regarder que lui pendant le plan qui suit un choix.
+      const scene = scene3D.current;
+      if (scene) {
+        scene.suivreMoi = enJeu && moi && moi.surLeTerrain && moi.sanction <= 0
+          ? (rejeu.current.plan > 0 ? 1 : enMoment ? 0.5 : 0.38) : false;
+      }
+      /** Le verdict reste au-dessus de la tête du pion, image par image, sans passer par React. */
+      const suivreBulle = () => {
+        const n = noeudBulle.current;
+        const q = scene && moi ? scene.ecran(moi.id) : null;
+        if (!n || !q) return;
+        const { l, h } = tailleBulle.current;
+        n.style.left = `${borner(q.x, l / 2 + 4, Math.max(l / 2 + 4, largeur - l / 2 - 4))}px`;
+        n.style.top = `${borner(q.y, h + 22, Math.max(h + 22, hauteur - 6))}px`;
+      };
 
       // Match terminé : on arrête la boucle, plus rien ne bouge.
       if (e.fini) { redessiner((n) => n + 1); actif = false; cancelAnimationFrame(brut); return; }
+
+      // ── 📺 L'AVANT-MATCH : le moteur attend, la scène fait entrer les équipes ──
+      const intro = presentation.current;
+      if (intro && scene) {
+        intro.t += enPause ? 0 : dtReel;
+        // Accélérer ou aller à la fin, c'est dire qu'on ne veut pas de l'avant-match.
+        if (tempo === 'accelere' || tempo === 'fin') intro.t = 99;
+        const etape = intro.t < 3 ? 'affiche' : intro.t < 9.6 ? 'A' : 'B';
+        if (etape !== intro.etape) {
+          intro.etape = etape;
+          setAvantMatch(etape);
+          if (etape === 'A') scene.son?.evenement('entree', { gain: 0.8 });
+        }
+        if (intro.t < 16.2) {
+          scene.camera = intro.t < 3 ? 'wide' : 'tv';
+          scene.entrer(Math.max(0, (intro.t - 3) / 12.6), dtReel);
+          scene.image(dtReel, { vitesse: 1 });
+          return;
+        }
+        presentation.current = null;
+        scene.entrer(null);
+        setAvantMatch(null);
+      }
+
+      // ── 📺 L'ARBITRAGE VIDÉO : on revoit vraiment l'action, sous un autre angle ──
+      if (scene && e.tmo !== tmoRevu.current) {
+        if (e.tmo && e.phase === 'tmo' && e.tmo.etape !== 'appel') {
+          tmoRevu.current = e.tmo;
+          if (scene.television.ralentis) scene.revoir({ depuis: 7.5, jusqua: 0.4, vitesse: 0.45 });
+        } else if (!e.tmo) tmoRevu.current = null;
+      }
+      if (scene?.ralenti && e.tmo?.etape === 'decision' && tmoRevu.current === e.tmo) scene.passerRalenti();
 
       // ── ⏸️ LA CARTE DE DÉCISION ──────────────────────────────────────────
       // ⚠️ LE MATCH EST FIGÉ TANT QU'ELLE EST OUVERTE, et le compte à rebours
@@ -830,6 +910,8 @@ export function MatchLive({
         // « les boutons de choix ne fonctionnent pas ». La barre est désormais
         // une animation CSS (voir `.ml-dec-chrono`), et l'ouverture comme la
         // fermeture de la carte déclenchent déjà leur propre rendu.
+        scene?.image(dtReel, { fige: true });
+        suivreBulle();
         if (planAChange) redessiner((n) => n + 1);
         return;
       }
@@ -862,12 +944,17 @@ export function MatchLive({
       // — on lisait trois lignes pendant que le jeu défilait à seize fois la
       // vitesse réelle derrière le voile.
       if (enPause || tutoRef.current) {
+        scene?.image(dtReel, { fige: true });
+        suivreBulle();
         if (planAChange) redessiner((n) => n + 1);
         return;
       }
 
       e.carriereDixMinutes = true;
-      avancer(e, dtReel * (tempo === 'accelere' ? 2 : tempo === 'fin' ? 4 : 1));
+      const allure = tempo === 'accelere' ? 2 : tempo === 'fin' ? 4 : 1;
+      // Les packs rejoignent une mêlée ou un alignement avant qu'il ne commence.
+      scene?.retenir(dtReel * allure);
+      avancer(e, dtReel * allure);
       // Une blessure du groupe du manager se produit pendant le match : le
       // joueur reste au sol, le banc est appelé et le premier diagnostic ne
       // sera connu qu'après la sirène. Le tirage est séparé du RNG sportif afin
@@ -886,9 +973,20 @@ export function MatchLive({
           const activite = touche.avant ? 'contacts' : touche.poste.includes('ailier') || touche.poste === 'arriere' ? 'sprint' : 'match';
           blessuresManager.current.push({ joueurId: touche.sourceId, minute, activite });
           ajouterCommentaire(e, 'jeu', coteManager, `${touche.nom} reste au sol. Le staff médical demande sa sortie.`, 0, true);
+          // La scène et le bandeau de remplacement lisent ce drapeau : il sort en boitant.
+          (touche as typeof touche & { blesse?: boolean }).blesse = true;
           if (entrant) demanderRemplacement(e, coteManager, entrant.sourceId, touche.sourceId);
           else touche.surLeTerrain = false;
         }
+      }
+      if (scene) {
+        scene.image(dtReel, { vitesse: allure });
+        suivreBulle();
+        // ⚠️ REACT N'A PLUS TRENTE PIONS À DÉPLACER. La scène dessine le terrain
+        // toute seule ; le score, le fil et les bandeaux se contentent de dix
+        // rendus par seconde, ce qui rend le fil principal aux taps sur un téléphone.
+        if (ms - dernierRendu.current < 100 && !e.fini) return;
+        dernierRendu.current = ms;
       }
       redessiner((n) => n + 1);
     };
@@ -1147,6 +1245,7 @@ export function MatchLive({
   // — et le rapport est exact, parce que la caméra construit son cadre avec le
   // ratio du conteneur (le `slice` du SVG ne rogne donc rien).
   const perso = (() => {
+    if (vue3D && scene3D.current) return monPion && surLeTerrain.includes(monPion) ? scene3D.current.ecran(monPion.id) : null;
     if (!vue || !monPion || !surLeTerrain.includes(monPion)) return null;
     const q = vue.versEcran({
       x: monPion.pos.x + monPion.vitesse.x * r,
@@ -1193,7 +1292,7 @@ export function MatchLive({
   const derniere = e.commentaires[e.commentaires.length - 1];
   const actionImportante = [...e.commentaires].reverse().find((c) => {
     const age = e.t - (c.seconde ?? c.minute * 60);
-    return age >= 0 && age <= 45 && ['essai', 'but', 'butRate', 'penalite', 'faute', 'carton', 'remplacement'].includes(c.type);
+    return age >= 0 && age <= 45 && ['essai', 'but', 'butRate', 'penalite', 'faute', 'carton'].includes(c.type);
   });
   const cartonArbitre = actionImportante?.type === 'carton'
     ? (/rouge/i.test(actionImportante.texte) ? 'rouge' : 'jaune') as 'rouge' | 'jaune'
@@ -1218,6 +1317,61 @@ export function MatchLive({
   })();
 
   const pelouse = useMemo(() => <PelouseMemo />, []);
+
+  // --- 🏟️ LE TERRAIN EN TROIS DIMENSIONS ------------------------------------
+  // ⚠️ LA SCÈNE NE DÉCIDE DE RIEN : elle lit `e`, l'état que le moteur fait
+  // avancer dans la boucle ci-dessus, et le met en images. Décisions, cartons,
+  // remplacements, consignes : tout passe par le moteur, comme avant.
+  const options3D = useMemo<OptionsScene3D>(() => ({
+    equipes: [
+      { nom: e.clubA, maillot: tenueDepuisCouleurs(couleurA, couleurA2, e.clubA), blason: ecussonPourToile(clubA?.logo ?? urlLogoEquipe(e.clubA)) },
+      { nom: e.clubB, maillot: tenueDepuisCouleurs(couleurB, couleurB2, e.clubB), blason: ecussonPourToile(clubB?.logo ?? urlLogoEquipe(e.clubB)) },
+    ],
+    apparences: apparencesDesJoueurs(e.pions),
+    moi: monPion?.id,
+    camera: 'tv',
+    television: { ralentis: preferencesTele().ralentis },
+    habillage: { nom: titre },
+    textes: { ralenti: t('ml.ralenti') },
+  }), [e, couleurA, couleurA2, couleurB, couleurB2, clubA, clubB, monPion, titre]);
+  const brancherScene = useCallback((scene: Scene3D | null) => {
+    scene3D.current = scene;
+    if (!scene) return;
+    scene.brancher(e);
+    // Coup d'envoi pas encore donné : les équipes entrent, sauf si le joueur a coupé l'avant-match.
+    if (e.sim < 0.5 && e.t === 0 && !e.fini && preferencesTele().presentation) {
+      presentation.current = { t: 0, etape: 'affiche' };
+      setAvantMatch('affiche');
+    }
+    redessiner((n) => n + 1);
+  }, [e]);
+  const passerAvantMatch = () => { if (presentation.current) presentation.current.t = 99; };
+  const couleursTV = useMemo(() => ({ A: couleurA, B: couleurB }), [couleurA, couleurB]);
+  const abandonner3D = useCallback(() => { scene3D.current = null; setVue3D(false); }, []);
+  // La caméra choisie est poussée à la scène dès qu'elle existe, puis à chaque changement.
+  useEffect(() => { if (scene3D.current) scene3D.current.camera = camera3D; });
+  const basculerVue = () => {
+    const suivante = !vue3D;
+    retenirPreferenceMatch3D(suivante);
+    setVue3D(suivante);
+  };
+  // Le plein écran porte sur la fenêtre du match entière : cartes de décision,
+  // bandeaux et commandes y restent, sinon on ne pourrait plus jouer.
+  useEffect(() => {
+    const suivre = () => setPleinEcran(document.fullscreenElement === dialogRef.current);
+    document.addEventListener('fullscreenchange', suivre);
+    return () => document.removeEventListener('fullscreenchange', suivre);
+  }, [dialogRef]);
+  const basculerPleinEcran = () => {
+    const fenetre = dialogRef.current;
+    if (!fenetre) return;
+    if (document.fullscreenElement) { void document.exitFullscreen(); return; }
+    fenetre.requestFullscreen?.({ navigationUI: 'hide' })
+      // Un téléphone se tourne : en plein écran, le match se regarde en paysage.
+      .then(() => (screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> }).lock?.('landscape'))
+      .catch(() => { /* refusé par le navigateur : le match reste dans sa fenêtre */ });
+  };
+  const pleinEcranPossible = typeof document !== 'undefined' && !!document.fullscreenEnabled;
   const montrerTuto = enJeu && jePeuxJouer && !tutoMatchVu && !e.fini;
   // ⚠️ LA BOUCLE LE LIT DANS UNE REF, comme la carte de décision : la poser en
   // dépendance de `useEffect` relancerait la boucle et remettrait `dernierTemps`
@@ -1243,6 +1397,7 @@ export function MatchLive({
           <div className="ml-equipe">
             {clubA ? <Blason club={clubA} taille={26} /> : <LogoEquipe nom={e.clubA} taille={26} />}
             <b>{e.clubA}</b>
+            <CartonsEquipe pions={e.pions} cote="A" />
           </div>
           <div className="ml-score">
             <span>{e.scoreA}</span>
@@ -1250,6 +1405,7 @@ export function MatchLive({
             <span>{e.scoreB}</span>
           </div>
           <div className="ml-equipe droite">
+            <CartonsEquipe pions={e.pions} cote="B" />
             <b>{e.clubB}</b>
             {clubB ? <Blason club={clubB} taille={26} /> : <LogoEquipe nom={e.clubB} taille={26} />}
           </div>
@@ -1283,7 +1439,10 @@ export function MatchLive({
         <div className="ml-corps">
           <div className="ml-colonne">
             {e.fini && stats ? (
-              <FeuilleMatch e={e} stats={stats} maNote={maNote} />
+              <>
+                <HommeDuMatch e={e} />
+                <FeuilleMatch e={e} stats={stats} maNote={maNote} />
+              </>
             ) : (
               /* ═══ LA SCÈNE — terrain plein cadre, HUD posé dessus ═══════
                  ⚠️ ELLE N'ÉCOUTE PLUS AUCUN GESTE. Elle portait le joystick
@@ -1291,6 +1450,20 @@ export function MatchLive({
                  bloquait le menu contextuel pour le clic droit du coup de pied.
                  On ne pilote plus : c'est une image, et on regarde. */
               <div className="ml-scene" ref={sceneRef}>
+                {vue3D ? (
+                  <Terrain3D
+                    options={options3D}
+                    surPrete={brancherScene}
+                    surEchec={abandonner3D}
+                    enfants={e.bulles.map((b, i) => {
+                      const q = scene3D.current?.ecran(b.pion.id, 2.25);
+                      return q && (
+                        <span key={`${b.pion.id}-${i}`} className="ml-bulle-3d"
+                          style={{ left: q.x, top: q.y, opacity: Math.min(1, b.restant * 2.5) }}>{b.texte}</span>
+                      );
+                    })}
+                  />
+                ) : (
                 <svg
                   className="ml-terrain"
                   viewBox={vue?.viewBox ?? `0 0 ${LONGUEUR} ${LARGEUR}`}
@@ -1400,9 +1573,35 @@ export function MatchLive({
                     </g>
                   )}
                 </svg>
+                )}
+
+                {/* ---------- 📺 L'HABILLAGE TÉLÉVISION ---------- */}
+                {vue3D && avantMatch && (
+                  <AvantMatch e={e} etape={avantMatch} couleurs={couleursTV} competition={titre} surPasser={passerAvantMatch} />
+                )}
+                {vue3D && !avantMatch && e.phase === 'miTemps' && <PanneauMiTemps e={e} couleurs={couleursTV} />}
+                {!avantMatch && <BandeauRemplacements changements={changementsRecents(e, couleursTV)} />}
 
                 {/* ---------- LE HUD ---------- */}
-                <div className="ml-hud">
+                <div className="ml-hud" style={avantMatch ? { visibility: 'hidden' } : undefined}>
+                  {/* Les commandes de la vue : plein écran, caméra, terrain plat. */}
+                  {!e.fini && (
+                    <div className="ml-vue-outils">
+                      {pleinEcranPossible && (
+                        <button type="button" onClick={basculerPleinEcran}
+                          className={pleinEcran ? 'actif' : undefined}
+                          title={t(pleinEcran ? 'ml.quitterPleinEcran' : 'ml.pleinEcran')}
+                          aria-label={t(pleinEcran ? 'ml.quitterPleinEcran' : 'ml.pleinEcran')}>
+                          <Icone nom="plein-ecran" taille={17} />
+                        </button>
+                      )}
+                      {vue3D && <OutilsTele scene={scene3D} camera={camera3D} surCamera={setCamera3D} />}
+                      <button type="button" onClick={basculerVue}
+                        title={t(vue3D ? 'ml.vue2D' : 'ml.vue3D')} aria-label={t(vue3D ? 'ml.vue2D' : 'ml.vue3D')}>
+                        <b>{vue3D ? '2D' : '3D'}</b>
+                      </button>
+                    </div>
+                  )}
                   {actionImportante && (
                     <div className={`ml-evenement-terrain ml-evenement-${actionImportante.type}`} role="status">
                       <b><IconeEmoji emoji={EMOJI[actionImportante.type] ?? '⚡'} /> {actionImportante.type === 'essai' ? 'ESSAI'
@@ -1565,7 +1764,7 @@ export function MatchLive({
                   )}
 
                   {/* ---------- 📺 REPLAY ESSAI (PENDANT LA PRÉPARATION DU BOTTEUR) ---------- */}
-                  {e.dernierReplayEssai && e.dernierReplayEssai.restant > 0 && e.phase === 'transformation' && (
+                  {e.dernierReplayEssai && e.dernierReplayEssai.restant > 0 && e.phase === 'transformation' && !vue3D && (
                     <CadreTmoReplay
                       action={`Essai de ${e.dernierReplayEssai.marqueurNom}`}
                       decision="Essai accordé"

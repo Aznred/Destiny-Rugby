@@ -4,6 +4,8 @@ import { AXE, MILIEU, LONGUEUR, LARGEUR, borner, sens, type Vec } from './terrai
 
 export interface GesteMatch {
   id: string; joueurId: string; clip: string; debut: number; duree: number;
+  /** Nuance du geste pour l'affichage (« bousculade » plutôt que coup porté). */
+  variante?: string;
 }
 export interface ArbitreMatch { pos: Vec; vitesse: Vec; regard: number }
 export interface CorpsMatch {
@@ -29,10 +31,10 @@ export function corpsPourAffichage(p: Pion, avance = 0) {
   return { age: c.age + avance, duree: c.duree, direction: c.direction, intensite: c.intensite, appuis, bras };
 }
 
-export function jouerGeste(e: EtatMatch, p: Pion, clip: string, duree = 1.2): void {
+export function jouerGeste(e: EtatMatch, p: Pion, clip: string, duree = 1.2, variante?: string): void {
   const debut = e.sim;
   e.gestes = (e.gestes ?? []).filter((g) => debut - g.debut < 8).slice(-63);
-  e.gestes.push({ id: `${p.id}:${debut.toFixed(3)}:${clip}`, joueurId: p.id, clip, debut, duree });
+  e.gestes.push({ id: `${p.id}:${debut.toFixed(3)}:${clip}`, joueurId: p.id, clip, debut, duree, ...(variante ? { variante } : {}) });
 }
 
 export function creerArbitre(): ArbitreMatch {
@@ -189,7 +191,9 @@ export function incidentDeContact(e: EtatMatch): { fautif: Pion; victime: Pion; 
     const rouge = (coupDePiedGrave && e.rng() < 0.40) || (coupDePoingGrave && e.rng() < 0.35);
 
     const clip = auSol ? 'foul_kick' : poursuite ? 'foul_trip' : 'foul_punch';
-    jouerGeste(e, fautif, clip, 1.2);
+    // Une bousculade n'est pas un coup de poing : même geste pour le terrain
+    // vu de haut, mais la scène 3D sait faire la différence.
+    jouerGeste(e, fautif, clip, 1.2, motif === 'bousculade sans ballon' ? 'bousculade' : undefined);
     jouerGeste(e, victime, !auSol && poursuite ? 'reaction_trip' : 'reaction_hit', 1.4);
     declencherChute(victime, { x: (victime.pos.x - fautif.pos.x) * 2, y: (victime.pos.y - fautif.pos.y) * 2 }, 1.7);
     e.incidentApres = e.sim + 90;

@@ -1,0 +1,121 @@
+/* Le terrain en trois dimensions : la toile occupe tout le cadre de la scène. */
+.terrain-3d {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: #0b2b1a;
+}
+.terrain-3d-toile { position: absolute; inset: 0; }
+.terrain-3d canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Le temps que le stade arrive : une pelouse dans la pénombre et un ballon qui
+   tourne. Pas de barre de progression — on ne sait pas mesurer honnêtement le
+   temps qu'il reste, et une barre qui ment agace plus qu'elle ne rassure. */
+.terrain-3d-attente {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 14px;
+  background:
+    radial-gradient(120% 90% at 50% 105%, rgba(74, 140, 82, 0.34), transparent 62%),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.022) 0 54px, transparent 54px 108px),
+    #0b2b1a;
+  color: #e9e2c8;
+  font-family: var(--police-forte);
+  letter-spacing: 0.04em;
+}
+.terrain-3d-attente b { font-size: 0.86rem; font-weight: 700; text-transform: uppercase; opacity: 0.86; }
+.terrain-3d-ballon {
+  width: 46px;
+  height: 28px;
+  border-radius: 50%;
+  background: linear-gradient(160deg, #f6ecd2 0 46%, #d9c79b 46% 54%, #f1e4c2 54%);
+  box-shadow: inset 0 0 0 2px rgba(58, 36, 16, 0.55), 0 14px 18px -10px rgba(0, 0, 0, 0.7);
+  animation: terrain-3d-vrille 1.5s cubic-bezier(0.45, 0.05, 0.3, 1) infinite;
+}
+@keyframes terrain-3d-vrille {
+  0% { transform: translateY(0) rotate(-18deg); }
+  50% { transform: translateY(-13px) rotate(162deg); }
+  100% { transform: translateY(0) rotate(342deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .terrain-3d-ballon { animation: none; transform: rotate(-18deg); }
+}
+
+/* Ce que les joueurs se disent, posé au-dessus de leur tête. */
+.ml-bulle-3d {
+  position: absolute;
+  z-index: 1;
+  transform: translate(-50%, -100%);
+  max-width: 220px;
+  padding: 3px 8px;
+  border-radius: 9px;
+  background: rgba(12, 18, 14, 0.78);
+  color: #fff6d8;
+  font: 600 0.74rem/1.25 var(--police-forte);
+  text-align: center;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+/* Plein écran : la fenêtre du match prend tout l'écran, bords compris. */
+.match-live:fullscreen {
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  max-width: none;
+  max-height: none;
+  border: 0;
+  border-radius: 0;
+}
+.match-live:fullscreen::backdrop { background: #06150d; }
+
+/* Les commandes de la vue, posées dans le coin de la scène : plein écran,
+   caméra, retour au terrain plat. Trois pastilles, hors du chemin des bandeaux. */
+.ml-vue-outils {
+  position: absolute;
+  top: 44px;
+  right: 8px;
+  z-index: 3;
+  display: grid;
+  gap: 6px;
+}
+.ml-vue-outils button {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(9, 22, 15, 0.62);
+  color: var(--craie, #f1ead6);
+  cursor: pointer;
+  backdrop-filter: blur(3px);
+}
+.ml-vue-outils button b { font: 800 0.72rem/1 var(--police-forte); letter-spacing: 0.03em; }
+.ml-vue-outils button:hover, .ml-vue-outils button.actif { border-color: var(--or-clair, #e7c65c); color: var(--or-clair, #e7c65c); }
+@media (pointer: coarse) {
+  .ml-vue-outils button { width: 42px; height: 42px; }
+}
+
+/* Le direct d'une ligue en plein écran : le cadre du terrain prend tout l'écran. */
+.dc-ecran:fullscreen { padding: 0; display: grid; background: #06150d; }
+.dc-ecran:fullscreen .cel-scene {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: auto;
+  min-height: 0;
+  max-height: none;
+  border: 0;
+  border-radius: 0;
+}

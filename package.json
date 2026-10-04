@@ -56,6 +56,8 @@
     "horloge:matchs": "node --env-file-if-exists=.env scripts/horlogeMatchs.mjs",
     "verify:atelier": "vite-node scripts/verifierAtelier.ts",
     "verify:direct-push": "vite-node scripts/verifierDirectPush.ts",
+    "verify:direct-3d": "vite-node scripts/verifierDirect3D.ts",
+    "verify:tirs": "vite-node scripts/verifierTirsAuBut.ts",
     "verify:scenarios-match": "vite-node scripts/verifierScenariosMatch.ts",
     "verify:fluidite-direct": "vite-node scripts/verifierFluiditeDirect.ts",
     "verify:animations-match": "vite-node scripts/verifierAnimationsMatch.ts",

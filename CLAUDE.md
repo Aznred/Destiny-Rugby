@@ -367,6 +367,241 @@ voisins du passeur conservent leur glissée et l'arrière ferme le couloir menac
 Les autres rencontres de la poule sont rejouées sans rendu, dans une **file
 sérialisée** : une avance calendrier ne peut pas écraser un cumul concurrent.
 
+### Le match en trois dimensions
+
+Les matchs de carrière (`MatchLive`) et le direct d'une ligue en ligne
+(`TerrainEnDirect`, dans `DirectCinema`) s'affichent en trois dimensions :
+stade, joueurs, coiffures et animations récupérés, mis en scène par
+`public/rn26/` (sources du lecteur : `../analyse-rn26/apercu/match/`). Le
+terrain vu de haut reste disponible — bouton 2D/3D de la scène, préférence
+retenue dans `localStorage`, et repli automatique si WebGL ou un fichier manque.
+
+⚠️ **LA SCÈNE NE DÉCIDE DE RIEN.** Elle LIT un état de match et le met en
+images ; décisions, cartons, remplacements, consignes et scores restent ceux du
+moteur. `lib/match3D.ts` la charge à la demande et lui remet les fonctions
+pures du moteur (`positionVol`, `geometrieMelee`, `porteurPourAffichage`), pour
+que l'affichage lise exactement la version du moteur qui joue.
+
+- **Elle n'est pas dans le bundle.** Ses modules (three compris) sont servis
+  tels quels depuis `public/rn26/`. ⚠️ Un fichier de `public/` ne s'importe pas
+  depuis le code empaqueté (Vite réécrit l'`import()` et refuse de le servir) :
+  `match3D.ts` pose une balise `<script type="module" src="/rn26/chargeur.js">`,
+  qui dépose la scène sur `globalThis.__destinyRugbyScene3D`.
+- **`components/match/Terrain3D.tsx` ne fait que monter la scène.** C'est
+  l'écran hôte qui la nourrit, dans SA boucle : `scene.retenir(dt)` puis
+  `avancer(e, dt)` puis `scene.image(dt, { vitesse, fige })`. Une seconde
+  boucle se désaccorderait de la première. React ne redessine plus trente pions :
+  dix rendus par seconde suffisent au score et aux bandeaux.
+- **Carrière** : la scène lit `e`, l'état vivant du moteur. La vue est choisie
+  AVANT le coup d'envoi parce qu'elle règle `cadenceDetaillee` (voir plus bas).
+- **Ligue en ligne** : ⚠️ **ni le serveur ni la base ne changent.** Le direct
+  reçoit déjà un relevé du terrain toutes les deux secondes (~8 Ko) ; l'écran
+  l'interpole, et `lib/ligue/etat3DDepuisDirect.ts` traduit chaque image en un
+  état « à la manière du moteur ». Ce que le relevé ne porte pas est DÉDUIT côté
+  client : qui est lié dans un ruck, qui est dans l'alignement, où en est la
+  mêlée (découpée en étapes d'après sa progression), le rituel du buteur, et le
+  résultat d'un tir — lu sur sa trajectoire. Aucune position n'est envoyée ni
+  stockée pour la 3D. Banc : `npm run verify:direct-3d` ; aperçu local qui
+  rejoue la chaîne serveur → relevés → scène : `/scripts/apercu-direct-3d.html`.
+- **Habillage** (`habillage.js`) : tenues repeintes pixel par pixel depuis
+  l'atlas d'origine aux couleurs du club (motifs uni, cerceaux, rayures,
+  épaules, bande, diagonale), écusson cousu sur la poitrine, numéro dans le dos ;
+  `departagerTenues` fait jouer le visiteur en tenue extérieure quand les deux
+  couleurs se confondent. Panneaux aux annonceurs inventés de Destiny Rugby
+  (dont `@destiny.rugby2`), poteaux blancs, protections à la couleur et à
+  l'écusson du club qui reçoit, six tribunes sur huit aux couleurs du club à
+  domicile. Un écusson distant passe par le relais (`ecussonPourToile`) : dessiné
+  tel quel, il salirait la toile.
+- **Apparence** : `apparenceJoueurMatch(nom, poste)` — peau, cheveux, coupe et
+  barbe lus sur le portrait de la carte (`apparencesMatch.generated.ts`), tirés
+  du nom sinon. Un champ manquant n'est jamais « chauve » par défaut.
+- **Nom du porteur** dans une flamme sous ses appuis ; il disparaît dès que
+  personne ne tient le ballon.
+- **Attentes vivantes** : pendant un arrêt de jeu, chaque joueur immobile
+  enchaîne ses propres gestes (appuis, mains sur les hanches, bras croisés,
+  quelques pas), pris en cours de route et tirés joueur par joueur, et regarde
+  le buteur, les poteaux, le ballon ou un coéquipier.
+- ⚠️ **Chaque scène clone le décor et les matériaux qu'elle repeint.** Le stade
+  chargé est partagé par la session ; repeint en place, une scène détruite
+  (React monte deux fois en développement) rendait à l'autre ses panneaux d'origine.
+
+#### La présentation télévisée
+
+Tout ce qui entoure le match à l'image. ⚠️ **Rien ici ne décide, et rien n'est
+imposé** : son, ralentis et avant-match se coupent d'un bouton, le choix est
+retenu (`preferencesTele`, `destiny-rugby:tele` et `destiny-rugby:son`), et
+accélérer le match passe l'avant-match.
+
+- **Son** (`public/rn26/sons.js`, 40 clips de l'APK copiés par
+  `node exporter_sons.mjs` depuis `../analyse-rn26`, 3 Mo, chargés seulement si
+  le son est ouvert). Il ÉCOUTE l'état du match : un lit de foule à trois
+  boucles mélangées selon la tension (ballon près de la ligne, percée), les
+  réactions du stade — qui est celui du club qui reçoit : essai, tir, carton et
+  pénalité ne font pas le même bruit selon le camp —, et le terrain (sifflet,
+  chocs, efforts, « flexion, liez, jeu »). L'APK n'a aucun bruit de frappe :
+  elles sont synthétisées, une variante par type de coup de pied.
+- **Caméras** (`television.js`, `Camera3D`) : `tv` est le défaut — la
+  réalisation choisit ses plans (dos du buteur, puis derrière les poteaux quand
+  le ballon part ; en-but à moins de neuf mètres de la ligne ; ras de la pelouse
+  en mêlée ; vue aérienne sur un engagement ou un long coup de pied ; plan serré
+  sur le marqueur ; la touche sur un remplacement). On passe d'un point de vue à
+  l'autre par une COUPE ; un plan tient au moins 2,5 s. Les sept plans restent
+  choisissables à la main.
+- ⚠️ **UN RALENTI REJOUE DES IMAGES, PAS LA SIMULATION.** La scène garde 9,5 s
+  de ce qu'elle a affiché (positions et os des trente corps, ballon — 8 Mo, 3 Mo
+  sur téléphone) et les rejoue en contre-champ, interpolées, derrière un volet.
+  Le moteur continue dessous ; une carte de décision, une reprise du jeu ou un
+  appui coupent le ralenti. Déclenché après un essai, et par l'écran pendant
+  l'arbitrage vidéo (`scene.revoir`). Aucun effet sur le serveur des ligues :
+  la bande est locale.
+- **Remplacements** : instantanés pour le moteur, mis en scène par
+  `DestinyMatch.scenographie` — le sortant regagne son banc à pied (lentement
+  s'il est blessé), l'entrant arrive en courant ; ce ne sont que des positions
+  AFFICHÉES. `BandeauRemplacements` montre les portraits et groupe un banc entier.
+- **Avant-match** (`MatchLive`, `AvantMatch`) : l'affiche, puis les deux
+  compositions par lignes pendant que les équipes sortent du tunnel
+  (`scene.entrer(k)`). ⚠️ Le moteur ATTEND : rien n'est joué tant qu'il dure.
+- **Mi-temps et fin de match** : `PanneauMiTemps` (possession, essais, mètres,
+  franchissements, passes, plaquages) et `HommeDuMatch` en tête de la feuille.
+- **Cartons** à côté du nom de l'équipe, avec les minutes restantes.
+- ⚠️ **TESTER UN MATCH SANS LE FINIR.** Un match mené à son terme débloque un
+  succès et crédite un Ova, synchronisés avec le coffre du compte : restaurer
+  la sauvegarde ne suffit plus.
+
+⚠️ **`cadenceDetaillee` EST UNE OPTION DE `creerMatch`, PAS UN SECOND MOTEUR.**
+Vue de haut, une mêlée expédiée en six secondes se lit ; à hauteur d'homme les
+corps n'ont le temps ni de se lier ni de pousser. Les matchs de carrière joués
+en 3D et l'aperçu de l'accueil la demandent ; le serveur des ligues, non.
+
+- **Mêlée par étapes** (`conquete.melee`, ~11,5 s) : placement → liaison → impact →
+  introduction → poussée → sortie. ⚠️ Le duel est tranché **à l'introduction**
+  (`deciderMeleeDetaillee`), pas à la fin : la mêlée qu'on regarde avancer,
+  reculer, tourner, s'écrouler ou se relever EST le résultat. `geometrieMelee`
+  est une fonction pure du temps, lue par le moteur ET par l'affichage.
+- **Passes à vitesse de terrain** (`dureePasseDetaillee` : ~9 m/s courte, jusqu'à
+  18 m/s longue). ⚠️ **Une passe lente change le rapport de force** : la viser le
+  long de la vitesse du receveur et laisser le rideau monter pendant tout le
+  vol faisait PERDRE 1,4 m par temps de jeu. Le ballon est visé DEVANT le
+  receveur, et les deux défenseurs ne se jettent que dans les 0,4 dernière seconde.
+- **Rucks** : ⚠️ **un soutien doit pouvoir S'ARRÊTER à sa place.** Avec la seule
+  inertie de course il dépassait le regroupement de trois à treize mètres avant
+  de revenir (`deplacer(p, dt, vif)` suit donc sa distance de freinage). Les
+  soutiens choisis sont ceux qui peuvent arriver, pas les plus proches à
+  l'instant du plaquage. La scène ne lie un joueur qu'ARRIVÉ, puis l'ancre.
+  Le ballon n'est joué que par un joueur présent au ruck (2,6 m) : le 9 s'il
+  est là, sinon le joueur debout le plus proche, qui écarte ou repart au ras
+  (**pick and go**).
+- **Cellules d'avants** (`e.cellule`) : deux avants s'accrochent au porteur,
+  le trio pousse encore une seconde au contact (`lancerPoussee`) et aspire
+  deux défenseurs.
+- **Après l'essai** (`tir.etape`) : célébration, puis le buteur rejoint le
+  ballon, le ramasse, le porte, le pose, recule, se concentre et s'élance. Il
+  n'est JAMAIS posé d'un coup sur le tee.
+- En match de dix minutes, un arrêt consomme son temps de jeu prévu réparti
+  sur sa durée d'écran (`facteurArretDetaille`), pas huit fois cette durée.
+- **Identité et structures d'attaque** (`styleDuClub`, `structureAvancee`,
+  `majStructure`) : équilibre, avants, large, pied ou leurres. Le côté du
+  prochain temps de jeu est décidé DÈS LE PLAQUAGE (`coteDeLaPhaseSuivante`),
+  et trois avants libres forment un bloc à cinq mètres du ruck pendant qu'il se
+  joue (`preparerBloc`). Écran d'avants (le ballon passe dans leur dos pour
+  l'ouvreur), croisée, redoublée. Les leurres courent AVANT la passe, et chaque
+  défenseur placé devant eux mord ou non selon sa `vision` (`fixerLaDefense`) :
+  la défense ne sait pas d'avance qui recevra.
+- ⚠️ **LA LIGNE REÇOIT LANCÉE** (`lancerLaLigne`). Servi à l'arrêt à sa
+  profondeur de placement, un receveur rendait quatre mètres par passe. Les
+  deux prochains receveurs partent avant le ballon, en gardant la profondeur
+  que demande la LONGUEUR de la passe (ce que leur course couvre pendant le
+  vol) ; le relayeur lâche quand cette course les amène à sa hauteur.
+- ⚠️ **UNE PASSE SE VISE LÀ OÙ LE RECEVEUR SERA** (`menerLeReceveur`, passe ET
+  offload). Trois erreurs faisaient tomber une passe sur six dans le vide : la
+  durée du vol était calculée pour une autre distance que celle du tir ; un
+  receveur lancé vers son camp était supposé s'arrêter net ; rien ne bornait la
+  course demandée. Et pendant le vol, un receveur déjà sur le point visait
+  trois mètres plus loin. Mesuré : 16,3 % de passes sans receveur → moins de 4 %.
+- **Mêlée** : le 9 introduit puis passe DERRIÈRE son 8. Départ du 8 petit
+  côté, grand côté ou dans l'axe (`Lancement.couloir`), seul ou avec le 9 dans
+  sa roue. ⚠️ Ce départ était décidé mais jamais joué : le ballon était donné
+  au 8 sans ouvrir le jeu courant, et la mêlée était tranchée une SECONDE fois
+  à l'image suivante. Toute sortie de phase arrêtée passe par `reprendreJeu`.
+- **Touche** : la sortie s'annonce avec la combinaison (`conquete.sortie`),
+  parce qu'elle se prépare — déviation du haut du saut pour le 9, peel d'un
+  avant qui contourne l'alignement PENDANT le saut, descente classique, ou
+  maul selon le style. Devant, lancer sûr et ballon lent ; au fond, lancer
+  risqué. ⚠️ À forces égales le duel rendait une touche sur trois à
+  l'adversaire : l'équipe qui lance garde l'avantage de l'annonce (16 lancers
+  proprement gagnés sur 39 → 21 sur 28).
+- **Fautes visibles** : chaque motif sifflé a son geste (`GESTES_DE_FAUTE`,
+  joué par `siffler`), avec une `variante` quand un même clip sert deux
+  situations. Coup de poing et bousculade n'existent pas dans les animations
+  récupérées : la scène les construit. Un plaquage manqué laisse le défenseur
+  2,3 s au sol (variante « manque »).
+
+- ⚠️ **UN CONTACT SE LIT AVANT DE SE JOUER** (`moteur/duels.ts`, fonctions pures,
+  sans tirage). Angle d'arrivée, vitesse de fermeture, rapport de force
+  (technique, puissance, poids) décident du plaquage : aux jambes, à la taille,
+  haut, de côté, par-derrière, cuillère en poursuite, **dominant** (le porteur
+  recule, le ruck se forme en retrait), porteur **tenu debout**, ou porteur qui
+  emmène son plaqueur. Le type est écrit dans `e.ruck.plaquage` et dans la
+  `variante` des gestes ; la scène joue la suite de clips correspondante.
+  ⚠️ Un « énorme tampon » sur cinq était TIRÉ AU SORT, entre deux joueurs
+  parfois à l'arrêt, et un raffut asseyait le défenseur quatre fois sur dix quel
+  que soit le gabarit. Il faut maintenant de la vitesse ET l'ascendant : 2,3 gros
+  impacts par match (un contact sur vingt). Banc : `node verifier_duels.mjs`.
+- **Duels gagnés par le porteur** (`duelGagne`) : crochet intérieur, extérieur,
+  double appui ou feinte de corps — défenseur simplement éliminé ou pris à
+  contre-pied ; raffut à l'épaule ou au torse, percussion épaule en avant —
+  défenseur repoussé debout, déséquilibré ou assis. Le porteur ne s'arrête
+  jamais : il garde sa course et peut enchaîner.
+- **Offloads, chistera, passe au contact** : la chance d'un offload dépend des
+  mains du porteur, du plaquage subi (bras libres ou non), d'un soutien LANCÉ
+  et du nombre de défenseurs ; il peut se perdre (en-avant, ballon au sol, passe
+  mal assurée) et les deux hommes vont au sol après le geste. ⚠️ Réglé une
+  première fois trop haut (dix par match au lieu de cinq), le jeu ne passait
+  plus par le sol : 3,8 essais par match. La passe au contact n'est pas un
+  tirage : c'est une passe donnée avec le défenseur sur soi, qui finit son geste
+  sur un homme sans ballon. Chistera : rare, réservée aux bonnes mains.
+- **Orientation** : on ne court plus à reculons (au-delà de 1,9 m/s on se
+  retourne, la tête seule suit le ballon) ; un botteur se tourne vers sa cible à
+  l'armé ; un receveur ouvre le buste vers le ballon pendant le vol puis le
+  referme sur sa course ; un avant arrive à la mêlée déjà tourné vers elle ;
+  un geste de ruck ne se joue plus en courant. Mesuré : 3,0 % d'images où le
+  corps tournait le dos à sa course → 0,6 %.
+
+⚠️ **TOUT CE QUI PRÉCÈDE NE VAUT QU'EN CADENCE DÉTAILLÉE, ET LE JEU Y EST PLUS
+OUVERT.** Sur les mêmes graines : 2,3 essais et 17 points par match de dix
+minutes, contre 1,1 et 9 en cadence normale (percées 3,0 contre 1,6). Un
+match de carrière regardé en 3D marque donc plus qu'un match vu de haut, et
+plus que les rencontres rejouées sans rendu — à savoir avant de comparer des
+statistiques de saison. Le serveur des ligues joue la cadence normale : sa 3D
+montre le jeu du serveur, sans ces structures. Les y activer demanderait une
+passe d'équilibrage côté serveur.
+
+Des corrections valent pour **tous** les écrans, parce que ce sont des règles :
+
+- ⚠️ **LE BALLON PASSE OÙ LE SCORE LE DIT** (`viseeTir`, `moteur/trajectoire.ts`).
+  Le moteur décidait du résultat d'un tir puis visait un point de chute derrière
+  les poteaux : depuis un tee excentré, la droite qui y mène coupait la ligne de
+  but jusqu'à six mètres à côté — points comptés, ballon vu dehors. On vise
+  maintenant la TRAVERSÉE du plan des poteaux : entre les deux et au-dessus de
+  la barre si le tir est réussi ; à gauche, à droite ou trop court sinon. Drops
+  compris (un drop « réussi » arrivait sous la barre). Banc : `npm run verify:tirs`
+  (20 000 tirs tirés au hasard, puis matchs entiers dans les deux cadences).
+- **L'origine d'un coup de pied est une COPIE.** `lancerVol` recevait `auteur.pos`,
+  que `deplacer` modifie en place : l'origine du vol suivait le botteur.
+- **La touche se joue où le ballon COUPE la ligne** (`pointDeSortie`).
+- **Le relayeur** (`designerRelayeur`, `regroupements.ts`) : demi de mêlée plaqué,
+  au sol, exclu ou trop loin → le joueur disponible le mieux placé sort le
+  ballon. **Pas de chenille sans le vrai 9.**
+- **Le receveur d'un lancer long** n'est plus bloqué par les contacts de l'alignement.
+
+Reconstruire : `node scripts/construireMoteur3D.mjs` recompile la passerelle de
+l'aperçu et réinstalle le lecteur ; `node installer_apercu.mjs` (depuis
+`../analyse-rn26`) réinstalle le lecteur seul. Bancs du lecteur, depuis
+`../analyse-rn26` : `node verifier_poses.mjs`, `node verifier_realisme.mjs`,
+`node verifier_destiny.mjs` (trois matchs complets, puis un en cadence normale),
+`node verifier_duels.mjs` (chaque lecture du contact trouve son animation).
+Détail et limites : `../analyse-rn26/SIMULATION.md`.
+
 ---
 
 ## ⚠️ Équilibrage : ce qui ne se retouche pas sans mesurer

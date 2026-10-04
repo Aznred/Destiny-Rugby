@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { VueMatchEnLigne } from '../../lib/ligue/matchCarriere';
 import { creerScenarioDirect } from '../../lib/ligue/scenarioDirect';
 import TerrainEnDirect, { type CouleursDirect } from './TerrainEnDirect';
@@ -45,6 +45,12 @@ export function DirectCinema({
   vitesseDemo?: number;
 }) {
   const [selection, setSelection] = useState<string | null>(null);
+  // Une pénalité attend la décision du manager : ses boutons sont dans la page,
+  // sous le direct. On quitte donc le plein écran pour qu'il puisse trancher.
+  const decisionEnAttente = !!m.decision;
+  useEffect(() => {
+    if (decisionEnAttente && document.fullscreenElement) void document.exitFullscreen();
+  }, [decisionEnAttente]);
   const cahier = m.maStrategie;
   const combinaisonsActives = cahier?.combinaisons?.filter(c => c.active).length ?? 0;
   const moments = m.moments ?? [];

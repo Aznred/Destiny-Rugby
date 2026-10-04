@@ -134,7 +134,8 @@ export function structurerAttaque(e: Pick<EtatMatch, 'ouvert' | 'porteur' | 'bal
   const rangDansChaine = new Map<Pion, number>();
   if (lancement && porteur) {
     for (let i = lancement.index + 1; i < lancement.chaine.length; i++) {
-      rangDansChaine.set(lancement.chaine[i], i - lancement.index);
+      // Une redoublée repasse par le même joueur : c'est son prochain ballon qui compte.
+      if (!rangDansChaine.has(lancement.chaine[i])) rangDansChaine.set(lancement.chaine[i], i - lancement.index);
     }
   }
 
@@ -479,6 +480,11 @@ function poursuite(p: Pion, porteur: Pion): Vec {
 // ---------------------------------------------------------------------------
 
 export function placerEquipes(e: EtatMatch): void {
+  // Le placement tactique ne doit pas effacer les rôles de la conquête :
+  // animerArret les utilise ensuite pour la liaison et le levage du sauteur.
+  const rolesConquete = (e.phase === 'melee' || e.phase === 'touche')
+    ? new Map(e.pions.filter(p => p.role === 'melee' || p.role === 'alignement').map(p => [p.id, p.role]))
+    : null;
   // Le porteur couché et son plaqueur doivent rester dans le regroupement
   // jusqu'à la sortie du ballon. La structure générale recalculée ci-dessous
   // ne doit pas leur rendre un rôle de ligne au milieu du ruck.
@@ -490,6 +496,12 @@ export function placerEquipes(e: EtatMatch): void {
   structurerAttaque(e, attaque, e.possession);
   structurerDefense(e, defense, adverse(e.possession));
   placerCombinaison(e);
+  if (rolesConquete) {
+    for (const p of e.pions) {
+      const role = rolesConquete.get(p.id);
+      if (role) p.role = role;
+    }
+  }
   if (engagesRuck) {
     for (const p of e.pions) if (engagesRuck.has(p.id)) p.role = 'ruck';
   }
@@ -595,6 +607,9 @@ function separer(e: EtatMatch, arret: boolean): void {
   const libres: Pion[] = [];
   for (const p of e.pions) {
     if (!p.surLeTerrain || p.sanction > 0) continue;
+    // Le botteur pose son pied d'appui. La charge est arbitrée au tee, sans
+    // que la séparation de formation le repousse et redémarre sa frappe.
+    if (e.tir?.buteur === p && !e.tir.volLance) continue;
     if (p.role === 'ruck' || p.role === 'melee' || p.role === 'alignement' || p.role === 'maul') continue;
     if (arret && (e.phase === 'melee' || e.phase === 'touche')) continue;
     libres.push(p);

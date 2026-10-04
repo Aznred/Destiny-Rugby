@@ -41,7 +41,7 @@
 // Le prix est un léger retard sur le direct. Personne ne le voit :
 // il n'y a rien à côté pour le comparer.
 
-import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Icone } from '../Icone';
 import { PelouseMemo } from './Pelouse';
 import { Camera, angleDeVue, type Cadrage, type Vue } from '../../lib/moteur/camera';
@@ -55,6 +55,12 @@ import {
 import { t } from '../../lib/i18n';
 import { maillotDeSecours, type MaillotMatch } from '../../lib/moteur/apparenceMatch';
 import { SpriteArbitre, SpriteRugbymanMemo } from './SpriteRugbyman';
+import { Terrain3D } from './Terrain3D';
+import {
+  ecussonPourToile, preferenceMatch3D, preferencesTele, retenirPreferenceMatch3D, type OptionsScene3D, type Scene3D,
+} from '../../lib/match3D';
+import { OutilsTele } from './PresentationTV';
+import { creerMemoireEtat3D, etat3DDepuisDirect } from '../../lib/ligue/etat3DDepuisDirect';
 
 /**
  * Le retard de rendu, en secondes réelles.
@@ -162,7 +168,7 @@ function tracerTrajectoires(vol: NonNullable<TerrainDirect['vol']>) {
   return { vol: pointsVol.join(' '), ombre: pointsOmbre.join(' '), anticipe: cheminAnticipe };
 }
 
-function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote, carton, modeDemo, pause, vitesseDemo }: Props) {
+function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, emblemes, monCote, carton, modeDemo, pause, vitesseDemo }: Props) {
   const scene = useRef<HTMLDivElement>(null);
   const svg = useRef<SVGSVGElement>(null);
   const groupeTerrain = useRef<SVGGElement>(null);
@@ -180,6 +186,16 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
   const [modeCamera, setModeCamera] = useState<ModeCamera>('auto');
   const [scenario, setScenario] = useState(() => creerScenarioDirect(terrain));
   const [, redessiner] = useState(0);
+  // --- 🏟️ LE DIRECT EN TROIS DIMENSIONS -------------------------------------
+  // ⚠️ RIEN NE CHANGE CÔTÉ SERVEUR. La scène lit la même image que le terrain
+  // plat : le relevé reçu toutes les deux secondes, interpolé ici, puis traduit
+  // pour elle par `etat3DDepuisDirect`. Aucune requête ni écriture de plus.
+  // (L'atelier et le laboratoire rejouent de courtes boucles : ils gardent le
+  // terrain vu de haut, fait pour ça.)
+  const [vue3D, setVue3D] = useState(() => !modeDemo && preferenceMatch3D());
+  const scene3D = useRef<Scene3D | null>(null);
+  const memoire3D = useRef(creerMemoireEtat3D());
+  const [pleinEcran, setPleinEcran] = useState(false);
 
   const tempsSimulationDemo = useRef(0);
   const demoOptions = useRef({ modeDemo, pause, vitesseDemo });
@@ -383,6 +399,16 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
         : { ...a.terrain, simulation: (a.terrain.simulation ?? a.terrain.instantJeu ?? 0) + dtSim };
       afficheRef.current = courant;
 
+      // La scène 3D reçoit exactement ce que le terrain plat dessinerait à cette image.
+      const scene3 = scene3D.current;
+      if (scene3) {
+        etat3DDepuisDirect(memoire3D.current, courant, pions.current, ballon.current);
+        const mode3 = reglages.current.modeCamera;
+        // « Caméra auto » laisse faire la réalisation : buteur, poteaux, en-but, vue aérienne.
+        scene3.camera = mode3 === 'large' ? 'wide' : mode3 === 'suivi' ? 'close' : 'tv';
+        scene3.image(dtReel, { vitesse: vit, fige: isPause });
+      }
+
       const prochainScenario = creerScenarioDirect(courant);
       if (prochainScenario.id !== scenarioCourant.current.id) {
         scenarioCourant.current = prochainScenario;
@@ -415,7 +441,8 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
         `translate(${(ballon.current.x - ballonDessine.origine.x).toFixed(2)} ${(ballon.current.y - ballonDessine.origine.y).toFixed(2)})`);
       if (maintenant >= prochainRenduReact) {
         redessiner((n) => n + 1);
-        prochainRenduReact = Math.max(prochainRenduReact + 1 / 24, maintenant + 1 / 120);
+        // En 3D, React ne dessine plus les trente joueurs : huit rendus par seconde suffisent aux bandeaux.
+        prochainRenduReact = Math.max(prochainRenduReact + (scene3 ? 1 / 8 : 1 / 24), maintenant + 1 / 120);
       }
       image = requestAnimationFrame(avancer);
     };
@@ -447,6 +474,41 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
     exterieur: maillotDeSecours(couleurs.exterieur, nomExterieur),
   }), [couleurs.maillots, couleurs.domicile, couleurs.exterieur, nomDomicile, nomExterieur]);
   const porteurPosition = affiche.porteurId ? pions.current.get(affiche.porteurId) : undefined;
+
+  const options3D = useMemo<OptionsScene3D>(() => ({
+    equipes: [
+      { nom: nomDomicile, maillot: maillots.domicile, blason: ecussonPourToile(emblemes?.domicile) },
+      { nom: nomExterieur, maillot: maillots.exterieur, blason: ecussonPourToile(emblemes?.exterieur) },
+    ],
+    camera: 'tv',
+    television: { ralentis: preferencesTele().ralentis },
+    textes: { ralenti: t('ml.ralenti') },
+  }), [nomDomicile, nomExterieur, maillots, emblemes?.domicile, emblemes?.exterieur]);
+  const brancherScene = useCallback((s: Scene3D | null) => {
+    scene3D.current = s;
+    if (!s) return;
+    etat3DDepuisDirect(memoire3D.current, afficheRef.current, pions.current, ballon.current);
+    s.brancher(memoire3D.current.etat, { direct: true });
+  }, []);
+  const abandonner3D = useCallback(() => { scene3D.current = null; setVue3D(false); }, []);
+  const basculerVue = () => {
+    retenirPreferenceMatch3D(!vue3D);
+    setVue3D(!vue3D);
+  };
+  // Le plein écran prend le cadre du direct entier : l'alerte de décision y reste visible.
+  const cadrePleinEcran = () => scene.current?.closest<HTMLElement>('.dc-ecran') ?? scene.current;
+  useEffect(() => {
+    const suivre = () => setPleinEcran(!!document.fullscreenElement && document.fullscreenElement === cadrePleinEcran());
+    document.addEventListener('fullscreenchange', suivre);
+    return () => document.removeEventListener('fullscreenchange', suivre);
+  }, []);
+  const basculerPleinEcran = () => {
+    if (document.fullscreenElement) { void document.exitFullscreen(); return; }
+    cadrePleinEcran()?.requestFullscreen?.({ navigationUI: 'hide' })
+      .then(() => (screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> }).lock?.('landscape'))
+      .catch(() => { /* refusé par le navigateur : le direct reste dans la page */ });
+  };
+  const pleinEcranPossible = typeof document !== 'undefined' && !!document.fullscreenEnabled;
 
   const dessiner = (p: TerrainDirect['pions'][number]) => {
     const pos = pions.current.get(p.id);
@@ -506,6 +568,9 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
 
   return (
     <div className="cel-scene" ref={scene}>
+      {vue3D ? (
+        <Terrain3D options={options3D} surPrete={brancherScene} surEchec={abandonner3D} />
+      ) : (
       <svg
         ref={svg}
         className="cel-pelouse"
@@ -586,8 +651,25 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, monCote
           </g>
         )}
       </svg>
+      )}
 
       <div className="cel-hud">
+        {!modeDemo && (
+          <div className="ml-vue-outils">
+            {pleinEcranPossible && (
+              <button type="button" onClick={basculerPleinEcran} className={pleinEcran ? 'actif' : undefined}
+                title={t(pleinEcran ? 'ml.quitterPleinEcran' : 'ml.pleinEcran')}
+                aria-label={t(pleinEcran ? 'ml.quitterPleinEcran' : 'ml.pleinEcran')}>
+                <Icone nom="plein-ecran" taille={17} />
+              </button>
+            )}
+            {vue3D && <OutilsTele scene={scene3D} />}
+            <button type="button" onClick={basculerVue}
+              title={t(vue3D ? 'ml.vue2D' : 'ml.vue3D')} aria-label={t(vue3D ? 'ml.vue2D' : 'ml.vue3D')}>
+              <b>{vue3D ? '2D' : '3D'}</b>
+            </button>
+          </div>
+        )}
         {conquete && (
           <div className={`cel-conquete cel-conquete-${conquete.type}`} role="status">
             <strong>{conquete.type === 'melee' ? 'MÊLÉE · POUSSÉE' : 'TOUCHE · COMBINAISON'}</strong>
