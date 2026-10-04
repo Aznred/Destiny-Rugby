@@ -492,6 +492,9 @@ que l'affichage lise exactement la version du moteur qui joue.
   joueur sur deux garde les crampons d'origine.
   ⚠️ Le casque se règle sur la TÊTE (largeur du crâne, sommet affleurant) : posé à
   une taille fixe, il flottait six centimètres au-dessus.
+  ⚠️ Et il regarde du même côté que le visage : les modèles allégés ont le visage
+  vers −Z, la tête du joueur vers +Z — posés tels quels, les cinq casques étaient
+  devant-derrière. `scene.js` les retourne d'un demi-tour.
 - **Le ballon du match est celui équipé en boutique** (`skinActif` → option
   `ballon` de la scène) : les cinq skins sont allégés par le même script
   (`decor/equipement/ballon-<skin>.glb`) et prennent la place du ballon de la
@@ -647,6 +650,16 @@ en 3D et l'aperçu de l'accueil la demandent ; le serveur des ligues, non.
   situations. Coup de poing et bousculade n'existent pas dans les animations
   récupérées : la scène les construit. Un plaquage manqué laisse le défenseur
   2,3 s au sol (variante « manque »).
+- ⚠️ **UN EXCLU NE DISPARAÎT PLUS.** Il écoute l'arbitre le temps du carton, puis
+  quitte la pelouse en marchant : au bord de la touche devant son banc pour dix
+  minutes (il rentrera de là en courant), vers le tunnel pour un rouge. Avec
+  l'IA par poste, le moteur le fait rentrer de ce même point.
+- **Gestes de l'IA par poste** : touche rapide (ramassage, armé à deux mains,
+  remise en jeu), faux saut désigné, maul simulé, capitaine appelé par
+  l'arbitre sont des clips de l'APK ; le par-dessus, le bras levé de celui qui
+  réclame le ballon, le bras tendu du 9 qui annonce son côté et les mains
+  levées du joueur sifflé hors-jeu n'y existent pas : la scène les construit
+  (`construire`). Tableau complet : `../analyse-rn26/SIMULATION.md`.
 
 - ⚠️ **UN CONTACT SE LIT AVANT DE SE JOUER** (`moteur/duels.ts`, fonctions pures,
   sans tirage). Angle d'arrivée, vitesse de fermeture, rapport de force
@@ -725,6 +738,119 @@ plus que les rencontres rejouées sans rendu — à savoir avant de comparer des
 statistiques de saison. Le serveur des ligues joue la cadence normale : sa 3D
 montre le jeu du serveur, sans ces structures. Les y activer demanderait une
 passe d'équilibrage côté serveur.
+
+#### L'IA par poste (`EtatMatch.ia` = 2, `src/lib/moteur/ia/`)
+
+« Qui je suis → où je suis → ce que mon poste doit faire → ce que fait mon
+équipe → ce que fait la défense → où en est le match. » Les matchs de carrière
+(3D et vue de haut) et l'aperçu la demandent (`IA_MATCH_DE_CARRIERE`, dans
+`ia/reglages.ts` : la remettre à 1 rend le moteur d'origine).
+
+⚠️ **TOUT EST DERRIÈRE `iaParPoste(e)`, ET LE NIVEAU EST FIGÉ À LA CRÉATION DU
+MATCH.** Sans lui, le moteur rejoue exactement comme avant (vérifié : mêmes
+scores et mêmes statistiques sur les graines de référence, `verify:film-direct`
+identique). ⚠️ **LA LIGUE EN LIGNE NE LA REÇOIT PAS** : ses matchs se jouent en
+temps réel et l'IA par poste n'y est pas étalonnée (mesuré : 11,6 essais et
+81 points par match). L'y activer demande une règle 3 et sa propre mesure.
+
+- **Lire avant de décider** (`ia/lecture.ts`, fonctions pures, aucun tirage).
+  `lireLaDefense` compte, couloir par couloir (ras, milieu, large, petit
+  côté), ceux qui peuvent attaquer et ceux qui peuvent VRAIMENT défendre : un
+  défenseur au sol, lié au regroupement, battu ou pas encore replié ne ferme
+  rien (`defenseurPresent`). Elle donne aussi les gardes du ruck, le plus
+  grand intervalle, la couverture du fond et la place derrière le rideau.
+  `situer` donne la zone et la POSTURE : `prudent` dans ses 22, `gestion`
+  devant en fin de match, `troisPoints` à portée d'une pénalité ou d'un drop,
+  `urgence` quand il faut un essai.
+- **Le 9 choisit son jeu** (`ia/jeu.ts` → `choisirLeJeu`). Seize options —
+  pick and go, départ du 9, cellule, relais entre avants, seconde cellule
+  servie par le 10, écran, ouvreur, large, sautée, arrière intercalé, croisée,
+  redoublée, petit côté, coup de pied du 9, occupation, drop — chacune avec un
+  POIDS : zone × identité de l'équipe (ou consigne du manager) × lecture ×
+  vitesse du ballon × posture. Un seul tirage, au prorata.
+- **Le 10 relit en recevant** (`relireLeJeu`, une fois par ballon) : rideau
+  qui monte et dos vide → petit par-dessus ou rasant ; ailier adverse monté →
+  passe au pied ; premier soutien marqué → sautée ; intervalle devant lui → il
+  le prend ; rien d'ouvert dans son camp → occupation. Le 12 et le 15 relisent
+  de même quand ils jouent à sa place. Un ballon capté au fond du terrain passe
+  par `choisirLaRelance` (relance, réponse au pied, ou reconstruction).
+- **Chaque numéro a un métier** (`ia/postes.ts`) : place dans la structure
+  (première ligne près du ruck, deuxième ligne et 8 dans la seconde cellule,
+  flankers au bord), goût du ballon, priorité au regroupement, au grattage, au
+  soutien d'une percée, au saut en touche. ⚠️ Ce sont des préférences : un
+  pilier isolé au large y défend ; il ne va plus s'y ranger de lui-même. Un
+  trois-quarts plaqué loin du pack est protégé par celui qui est à côté (seuls
+  les avants pouvaient nettoyer : tout ruck au large sortait lent).
+- ⚠️ **LES ESSAIS VIENNENT DES SITUATIONS, PAS D'UN TIRAGE.**
+  - **Ruck rapide → défense en retard** (`poserLesRetards`) : ceux qui
+    étaient au sol ou liés manquent au rideau, et la ligne se reforme avec les
+    présents (`structurerDefense`) — plus courte sur l'extérieur. Un « ruck
+    éclair » (collision gagnée, soutiens à l'épaule) sort avant que le plaqueur
+    se relève ; ⚠️ le ballon attend qu'un joueur soit dessus, sinon il était
+    donné à sept mètres.
+  - **Le même plaquage ne vaut pas partout** (`avantageDuPorteur`) : porteur
+    lancé, défenseur qui recule ou pris de travers, duel de vitesse contre un
+    avant, défenseur en retard ; à l'inverse deux défenseurs sur le même homme.
+    Face à un rideau en place et un receveur arrêté, rien ne change.
+  - **Soutien de la percée** (`soutenirLaPercee`, `soutienLibre`) : trois
+    joueurs viennent à hauteur ; le porteur fixe le dernier défenseur et donne
+    quand celui-ci est ENGAGÉ (à 3,8 m, pas à 6,5 : il glissait sur le receveur).
+  - **La défense se trompe** : montée solitaire sur un blitz
+    (`deciderLaMontee`), leurre mordu, interception tentée et manquée.
+  - Le ballon bien soutenu ne se perd pas : deux soutiens arrivés divisent par
+    2,5 la chance de grattage (un ruck sur cinq changeait de camp).
+- **Jeu au pied** : par-dessus (`parDessus`, nouvelle intention), rasant visé
+  dans l'espace le plus vide, passe au pied dans la course de l'ailier, 50/22
+  sur rebond (`BallonLibre.depuis`). Le drop n'est plus un tirage : il se
+  tente quand trois points changent le match (posture `troisPoints`). ⚠️ Un
+  tir au but vole avec l'intention `drop` : le banc les compte à part
+  (`tirAuBut`), sinon on lit quatre « drops » par match. ⚠️ Le coup de pied annoncé part dès
+  que le botteur a le ballon, et un avant qui sort le ballon à la place du 9
+  écarte comme lui : un dégagement sur trois finissait en ruck dans ses 22.
+- **Touches** (`annoncerLaTouche`) : l'annonce se choisit selon la zone et le
+  style — devant ou milieu + maul près de la ligne adverse, fond + déviation au
+  milieu du terrain, lancer sûr dans ses 22, faux saut devant ou au fond
+  (`conquete.leurreId`), maul simulé, peel, lancer long pour le 12. Le maul
+  s'annonce (`sortie: 'maul'`), il ne se tire plus après coup. **Touche jouée
+  vite** (`conquete.rapide`) : après un coup de pied, si un joueur atteint le
+  ballon avant qu'un adversaire soit revenu et qu'un partenaire se propose à
+  plus de cinq mètres ; si l'adversaire revient, l'alignement se forme.
+- **L'arbitre a une mémoire** (`ia/arbitrage.ts`, `e.arbitrage`) : chaque
+  pénalité est notée (horloge, zone, famille). Deux fautes dans sa zone ou de
+  la même famille en un quart d'heure (trois en temps réel) → il appelle le
+  capitaine ; la suivante vaut jaune (« fautes répétées »). Trois degrés par
+  faute (`graviteDeLaFaute`) : simple, jaune, rouge. Fautes de situation au
+  ruck selon la `tentation` de la défense (devant sa ligne, ballon rapide) :
+  plaqueur qui ne se relève pas, mains dans le ruck, hors-jeu, soutien qui
+  plonge ; et celles du jeu : obstruction du leurre, plaquage sans ballon,
+  en-avant volontaire, plaquage dangereux à la tête. **Pénalités selon le
+  score** : à trois points près on tire, à plus on va en touche, devant on
+  prend les points.
+- **Règle ajoutée** : plaqué dans son propre en-but → renvoi si le ballon y est
+  venu d'un coup de pied adverse, mêlée à cinq mètres sinon (le ruck était
+  ramené sur la ligne, le plaqué restait neuf mètres derrière).
+- ⚠️ **LE MATCH CONDENSÉ** (`condense(e)`, `carriereDixMinutes`). Dix minutes
+  d'écran ne contiennent qu'un quart des temps de jeu d'un vrai match (34 rucks
+  contre 195). Ce qui se compte PAR MATCH y est ramené à l'échelle de
+  l'horloge : la fatigue (`fatigueCondensee` — les titulaires finissaient à 96
+  de fraîcheur, ils sont à 76 à l'heure de jeu, comme en 80 minutes), les
+  fautes de situation (`fautesCondense`), le poids des situations favorables
+  au porteur (`condense`), et l'occupation au pied hors de ses 22.
+- **Tous les réglages sont dans `ia/reglages.ts`** (`REGLAGES_IA`), et se
+  mesurent avant d'être touchés.
+
+Mesuré sur 120 matchs de carrière 3D (`npm run mesure:rugby -- 120 carriere3d 2`),
+moteur d'origine → IA par poste : **essais 2,9 → 4,4 par match**, points
+21,2 → 31,9 (médiane 20 → 31), matchs sans essai 10 → 2 sur 120, pénalités
+sifflées 4,7 → 7,3, **cartons jaunes 0,19 → 0,90** (dont 0,43 pour fautes
+répétées), **rouges 0 → 0,07** (9 matchs sur 120), ballons perdus au sol
+7,8 → 3,3, essais des ailiers 0,15 → 0,68, passes au pied 0 → 1,0, rasants
+0,03 → 0,7, par-dessus 0 → 0,3, touches rapides 0,5, durée 14,3 → 15,8 min.
+Vue de haut (cadence normale) : essais 1,8 → 2,6. ⚠️ Les essais viennent encore
+surtout tôt dans la possession (81 % en première main ou après un ou deux
+rucks) : les longues séquences restent le point faible. `horlogeCondensee`
+(8 par défaut) allonge le ballon vivant si l'on veut davantage de jeu — à 7,
+4,6 essais et 16,8 min ; ce n'est pas activé.
 
 Des corrections valent pour **tous** les écrans, parce que ce sont des règles :
 
@@ -980,6 +1106,19 @@ npm run verify:triche             # 40 tentatives de triche, toutes refusées
 
 npx vite-node scripts/verif.ts    # banc général : divisions, effectifs, 8 saisons
 ```
+
+Le rugby que produit le moteur (essais, pénalités, cartons, mêlées, touches,
+turnovers, jeu au pied par type, cassures, offloads, qui porte et qui marque) :
+
+```bash
+npm run mesure:rugby -- 120 carriere3d 2      # matchs, modes (carriere3d, carriere2d, fond, ligue), niveau d'IA
+npm run mesure:rugby -- 72 carriere3d 2 --reglages=condense:1.5,retardRapide:2.4   # essayer un réglage
+npx vite-node scripts/mesurerJeux.ts 96 2     # ce que rapporte chaque jeu, d'où partent les essais
+```
+
+⚠️ **Aucun réglage de `ia/reglages.ts` ne se touche sans ces deux relevés**,
+avant et après. Il faut au moins 72 matchs : l'écart type est de deux essais
+par match, douze matchs ne distinguent rien.
 
 ⚠️ **`verifDifficulte.ts` et `verifHonneurs.ts` mesurent des saisons sans
 match** — ne pas s'en servir pour retoucher la difficulté tant qu'ils n'ont pas

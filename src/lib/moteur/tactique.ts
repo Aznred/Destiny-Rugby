@@ -24,6 +24,8 @@
 import type { Pion } from './entites.js';
 import { placerCombinaison } from './combinaisons.js';
 import { PHASES_ARRETEES, type EtatMatch, type SystemeDefensif } from './etat.js';
+import { defenseurPresent, iaParPoste } from './ia/lecture.js';
+import { coutDeLaPlace, profilDe, type PlaceAvant } from './ia/postes.js';
 import {
   AXE, LARGEUR, LONGUEUR, LIGNE_A, LIGNE_B, adverse, borner, coteOuvert, dansSes22, distance, distance2,
   ligneDefendue, melanger, metresAvantLaLigne, sens, type Cote, type Vec,
@@ -112,7 +114,10 @@ const PROFONDEUR: Record<number, number> = {
 };
 
 type EtatAttaque = Pick<EtatMatch, 'ouvert' | 'porteur' | 'ballon' | 'origine' | 'lancement'>
-  & Partial<Pick<EtatMatch, 'cadenceDetaillee' | 'phasesDepuisArret' | 'structureAttaque'>>;
+  & Partial<Pick<EtatMatch, 'cadenceDetaillee' | 'phasesDepuisArret' | 'structureAttaque' | 'ia'>>;
+
+/** La cellule de chacune des huit places de la structure (voir `structurerEnCouloirs`). */
+const GENRE_DES_PLACES: PlaceAvant[] = ['proche', 'proche', 'proche', 'bord', 'lointaine', 'lointaine', 'lointaine', 'bord'];
 
 /** Une place de la structure : `cote` 1 = côté ouvert, -1 = côté fermé ; `d` mètres depuis le regroupement ; `dx` mètres derrière le ballon. */
 interface PlaceStructure { cote: 1 | -1; d: number; dx: number; role: Pion['role'] }
@@ -184,10 +189,32 @@ function structurerEnCouloirs(
   let memo = e.structureAttaque;
   if (!memo || memo.cle !== cle || libres.some((p) => memo!.places[p.id] === undefined)) {
     const n = Math.min(libres.length, places.length);
-    const choisies = places.slice(0, n).map((pl, i) => ({ i, lateral: pl.cote * pl.d })).sort((a, b) => a.lateral - b.lateral);
-    const ranges = [...libres].sort((a, b) => (a.pos.y - yb) * ouvert - (b.pos.y - yb) * ouvert).slice(0, n);
     memo = { cle, places: {} };
-    ranges.forEach((p, k) => { memo!.places[p.id] = choisies[k].i; });
+    if (iaParPoste(e)) {
+      // ⚠️ IA PAR POSTE : CHACUN SA CELLULE. Les places n'étaient données qu'à
+      // la proximité — un pilier pouvait tenir le couloir de l'ailier et un
+      // flanker rester planté dans le bloc du ras. La première ligne se range
+      // près du regroupement, la deuxième ligne et le 8 dans la seconde
+      // cellule, les flankers au bord : garde du petit côté d'un bord, lien
+      // avec les trois-quarts de l'autre. Les plus contraints choisissent
+      // d'abord ; la distance ne départage qu'entre deux places de leur métier.
+      const prises = new Set<number>();
+      const ordre = [...libres].sort((a, b) => profilDe(a).largeurMax - profilDe(b).largeurMax);
+      for (const p of ordre.slice(0, n)) {
+        const lat = (p.pos.y - yb) * ouvert;
+        let choix = -1, cout = Infinity;
+        for (let i = 0; i < n; i++) {
+          if (prises.has(i)) continue;
+          const c = coutDeLaPlace(p, GENRE_DES_PLACES[i], places[i].d, Math.abs(lat - places[i].cote * places[i].d));
+          if (c < cout) { cout = c; choix = i; }
+        }
+        if (choix >= 0) { prises.add(choix); memo.places[p.id] = choix; }
+      }
+    } else {
+      const choisies = places.slice(0, n).map((pl, i) => ({ i, lateral: pl.cote * pl.d })).sort((a, b) => a.lateral - b.lateral);
+      const ranges = [...libres].sort((a, b) => (a.pos.y - yb) * ouvert - (b.pos.y - yb) * ouvert).slice(0, n);
+      ranges.forEach((p, k) => { memo!.places[p.id] = choisies[k].i; });
+    }
     e.structureAttaque = memo;
   }
   for (const p of avants) {
@@ -481,7 +508,22 @@ function structurerDefense(e: EtatMatch, liste: Pion[], cote: Cote): void {
   }
 
   // ── LE PREMIER RIDEAU ────────────────────────────────────────────────────
-  const ligne = dispo.filter((p) => !rideau2.has(p));
+  let ligne = dispo.filter((p) => !rideau2.has(p));
+  if (iaParPoste(e)) {
+    // ⚠️ IA PAR POSTE : LA LIGNE SE FORME AVEC CEUX QUI SONT LÀ. Un défenseur au
+    // sol, lié au regroupement ou pas encore replié gardait sa place dans le
+    // rideau — une place vide à l'endroit où il était tombé, et une ligne qui
+    // couvrait toujours toute la largeur. Les présents se répartissent
+    // maintenant entre eux, du regroupement vers l'extérieur : quand il en
+    // manque, c'est le bord qui reste découvert. Les autres reviennent à
+    // hauteur de la ligne, là où ils sont, et reprennent une place en arrivant.
+    for (const p of ligne) {
+      if (defenseurPresent(e, p)) continue;
+      p.role = 'rideau1';
+      p.cible = { x: bornerX(e.ligneDef), y: bornerY(p.pos.y) };
+    }
+    ligne = ligne.filter((p) => defenseurPresent(e, p));
+  }
   if (!ligne.length) return;
 
   const espaceOuvert = ouvert === 1 ? LARGEUR - ancre.y : ancre.y;
@@ -524,6 +566,9 @@ function structurerDefense(e: EtatMatch, liste: Pion[], cote: Cote): void {
       x: bornerX(e.ligneDef + forme),
       y: (cibles[i] ?? ancre.y) + ouvert * glisse,
     };
+    // Sorti seul de sa ligne : il arrive plus tôt sur son vis-à-vis, et laisse
+    // sa place vide si le ballon passe dans son dos (voir `deciderLaMontee`).
+    if (e.monteeSeul?.id === p.id && e.sim < e.monteeSeul.jusqua) p.cible.x = bornerX(e.ligneDef - sa * 3.4);
   }
   // ⚠️ LE RIDEAU EST ÉTALÉ, PAS RABOTÉ. Quand le ballon sort à trois mètres de
   // la touche, la moitié des cibles calculées ci-dessus tombent hors du terrain :

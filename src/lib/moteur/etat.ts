@@ -118,6 +118,11 @@ export interface CoupDeSifflet {
   maFaute: boolean;
   /** Ce qu'il reste à l'afficher, en secondes SIMULÉES. */
   restant: number;
+  /**
+   * L'arbitre appelle un capitaine (IA par poste) : son identifiant. La
+   * prochaine faute de son équipe vaudra carton — voir `ia/arbitrage.ts`.
+   */
+  avertissement?: string;
 }
 
 export type ActionJoueur =
@@ -270,6 +275,7 @@ export type IntentionPied =
   | 'cinquanteVingtDeux'
   | 'rasant'       // grubber derrière la défense
   | 'transversale' // par-dessus vers l'ailier
+  | 'parDessus'    // petit coup de pied par-dessus un rideau qui monte vite
   | 'drop'
   | 'penaltouche'
   | 'renvoi';
@@ -345,8 +351,24 @@ export interface ConqueteAnimee {
   type: 'melee' | 'touche';
   progression: number;
   combinaison?: 'premierBloc' | 'milieu' | 'fond' | 'leurreDevant';
-  /** Sortie annoncée avec la combinaison (cadence détaillée) : déviation pour le 9, ou peel d'un avant. */
-  sortie?: 'deviation' | 'peel';
+  /** Celui qui feint le saut pendant que le ballon va ailleurs (IA par poste) : un faux saut au fond, puis prise au milieu. */
+  leurreId?: string;
+  /**
+   * Sortie annoncée avec la combinaison (cadence détaillée) : déviation pour le
+   * 9, peel d'un avant, maul annoncé, ou maul simulé puis ballon rapide.
+   */
+  sortie?: 'deviation' | 'peel' | 'maul' | 'mauleSimule';
+  /**
+   * Touche jouée vite (IA par poste) : pas d'alignement. Celui qui est au
+   * ballon le ramasse et le remet en jeu pour un partenaire à cinq mètres.
+   */
+  rapide?: {
+    lanceurId: string; receveurId: string;
+    /** Où en est le lanceur : il court au ballon, le ramasse, arme sa remise en jeu. */
+    etape?: 'aller' | 'ramasse' | 'arme';
+    /** Instant de simulation où l'étape en cours a commencé. */
+    depuis?: number;
+  };
   /** L'avant qui contourne l'alignement pour recevoir du sauteur. */
   peelId?: string;
   cibleId?: string;
@@ -375,6 +397,8 @@ export interface BallonLibre {
   orientation?: number;
   vitesseRotation?: number;
   dernierRebondSim?: number;
+  /** D'où le coup de pied est parti : un ballon qui rebondit avant de sortir peut valoir un 50/22. */
+  depuis?: Vec;
   intention: IntentionPied | 'touche';
   auteurCote: Cote;
   auteur?: Pion;
@@ -392,6 +416,8 @@ export interface RuckEnCours {
   vitesseDefense: number;
   /** Instant de l'impact, pour rejouer ensemble le plaquage et la chute. */
   debut?: number;
+  /** Ruck éclair (IA par poste) : collision gagnée, soutiens déjà là — le ballon sort avant que la défense se relève. */
+  eclair?: boolean;
   /** Comment le plaquage s'est fait (cadence détaillée) : voir `duels.ts`. */
   plaquage?: { type: import('./duels').TypePlaquage; angle: import('./duels').AnglePlaquage };
 }
@@ -429,6 +455,35 @@ export interface Lancement {
   fixe?: boolean;
   /** Décalage latéral (m) que prend le premier porteur : départ du 8 petit côté, grand côté ou dans l'axe. */
   couloir?: number;
+  /** Le jeu choisi par le demi de mêlée (IA par poste) : sert au commentaire, aux mesures et aux courses. */
+  jeu?: string;
+  /** « Les mains » : chaque porteur donne dès que son partenaire est prêt, sans attendre le contact. */
+  tempo?: 'vite';
+  /** L'organisateur relit la défense en recevant, et peut changer le plan (IA par poste). */
+  relecture?: boolean;
+  /** La relecture a eu lieu : elle ne se refait pas à chaque image. */
+  relu?: boolean;
+}
+
+/**
+ * LA MÉMOIRE DE L'ARBITRE (IA par poste) : chaque pénalité concédée, avec
+ * l'instant, la zone et la famille de faute. C'est elle qui transforme une
+ * série de fautes en avertissement au capitaine, puis en carton.
+ */
+export type FamilleFaute = 'ruck' | 'horsJeu' | 'plaquage' | 'maul' | 'melee' | 'antijeu' | 'brutalite' | 'divers';
+export interface FauteNotee {
+  /** Instant de l'horloge du match, en secondes. */
+  t: number;
+  /** Mètres entre la faute et la ligne du camp fautif. */
+  deSaLigne: number;
+  famille: FamilleFaute;
+}
+export interface ArdoiseArbitre {
+  fautes: FauteNotee[];
+  /** Horloge du dernier avertissement donné au capitaine : la faute suivante vaut carton. */
+  avertiA?: number;
+  /** Cartons déjà sortis pour fautes répétées. */
+  cartonsRepetes: number;
 }
 
 /** L'identité de jeu d'une équipe sans consigne d'entraîneur (cadence détaillée). */
@@ -466,6 +521,29 @@ export interface EtatMatch {
    * l'étalonnage qui va avec.
    */
   cadenceDetaillee?: boolean;
+  /**
+   * NIVEAU DE L'IA DE JEU. Absent ou 1 : le moteur d'origine. 2 : l'IA par
+   * poste — le demi de mêlée lit la défense et choisit son jeu, l'ouvreur
+   * relit en recevant, les avants se rangent selon leur numéro, la défense se
+   * reforme avec ceux qui sont réellement disponibles, l'arbitre a une mémoire.
+   *
+   * ⚠️ FIGÉ À LA CRÉATION DU MATCH, comme `placementJoue` : le changer en cours
+   * de rencontre donnerait une autre rejoue, donc un autre score que celui déjà
+   * annoncé. Un match de ligue en cours garde le niveau avec lequel il a commencé.
+   */
+  ia?: number;
+  /** La mémoire de l'arbitre, par camp fautif (IA par poste). */
+  arbitrage?: Record<Cote, ArdoiseArbitre>;
+  /**
+   * La défense prise de vitesse (IA par poste) : après un ruck rapide, ceux qui
+   * étaient au sol ou liés ne sont pas dans la ligne. Instant de simulation, par
+   * joueur, jusqu'auquel il ne compte pas dans le rideau.
+   */
+  retards?: Record<string, number>;
+  /** Le défenseur sorti seul de sa ligne sur ce temps de jeu, et jusqu'à quand. */
+  monteeSeul?: { id: string; jusqua: number } | null;
+  /** Ceux qui accompagnent une percée : épaule intérieure, épaule extérieure, relais. */
+  soutiensPercee?: string[];
   /**
    * La place de chaque avant dans la structure d'attaque du temps de jeu en
    * cours (cadence détaillée). Gardée tant que la phase dure : une cellule se

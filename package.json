@@ -63,6 +63,7 @@
     "verify:structure": "vite-node scripts/verifierStructureAttaque.ts",
     "verify:pied": "vite-node scripts/verifierJeuAuPied.ts",
     "mesure:regles-ligue": "vite-node scripts/mesurerReglesLigue.ts",
+    "mesure:rugby": "vite-node scripts/mesurerRugby.ts",
     "verify:tirs": "vite-node scripts/verifierTirsAuBut.ts",
     "verify:scenarios-match": "vite-node scripts/verifierScenariosMatch.ts",
     "verify:fluidite-direct": "vite-node scripts/verifierFluiditeDirect.ts",

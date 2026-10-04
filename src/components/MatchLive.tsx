@@ -95,6 +95,7 @@ import {
   demanderRemplacement, DT, ordonner,
   resoudreChoix, type EtatMatch,
 } from '../lib/moteur/moteur';
+import { IA_MATCH_DE_CARRIERE } from '../lib/moteur/ia/reglages';
 import { ACTION_PAR_ID } from '../lib/moteur/controle';
 import { ORDRES } from '../lib/moteur/bagarre';
 import { ajouterCommentaire, type ActionJoueur, type Commentaire, type NiveauMatch, type TypeCommentaire } from '../lib/moteur/etat';
@@ -434,6 +435,9 @@ export function MatchLive({
         cadenceDetaillee: cadenceInitiale.current,
         // Le placement se joue : personne n'est installé d'un coup, la phase attend ses joueurs.
         placementJoue: cadenceInitiale.current,
+        // L'IA par poste : le 9 lit la défense, le 10 relit, chaque numéro tient son rôle,
+        // l'arbitre a une mémoire (voir « L'IA par poste » dans CLAUDE.md).
+        ia: IA_MATCH_DE_CARRIERE,
         ...(coteManager === 'A' && feuilleManager && compoManager && manager ? {
           compositionA: feuilleManager, tactiqueA: manager.tactique,
           capitaineAId: compoManager.capitaineId, buteurAId: compoManager.buteurId,

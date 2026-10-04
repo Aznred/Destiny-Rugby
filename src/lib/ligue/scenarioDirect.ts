@@ -7,7 +7,7 @@ export type TypeScenarioDirect =
   | 'penalite' | 'tirAuBut' | 'transformation' | 'aplatissage' | 'tmo' | 'apresEssai' | 'miTemps'
   | 'jeuRas' | 'pod' | 'jeuLarge' | 'passeSautee' | 'pickAndGo'
   | 'passe' | 'offload' | 'degagement' | 'occupation' | 'chandelle'
-  | 'cinquanteVingtDeux' | 'rasant' | 'transversale' | 'drop' | 'penaltouche'
+  | 'cinquanteVingtDeux' | 'rasant' | 'transversale' | 'parDessus' | 'drop' | 'penaltouche'
   | 'renvoi' | 'franchissement' | 'ballonLibre' | 'jeuCourant' | 'fini';
 
 export type ZoneScenarioDirect =

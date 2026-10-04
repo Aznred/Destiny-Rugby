@@ -22,9 +22,12 @@ const SEQUENCES={
   jackal:[['jackal_engage',.57],['jackal_struggle',1.07],['jackal_success_standup',1]],
   reaction_hit:[['bumped_hit',.6],['standing_tackled_going_down',1.6]],
 };
-const gestures={pickup:'pick_up_ball',restart:'kick_restart',grubber:'kick_grubber',punt:'kick_running',box_kick:'kick_box',chip:'kick_box',drop:'kick_restart',conversion:'kick_conversion_a_kick',penalty:'kick_conversion_a_kick',tackle_low:'standing_tackle_front_grab',tackle_drive:'standing_tackle_front_grab',fall_forward:'standing_tackled_going_down',fall_back:'standing_tackled_going_down',contact_brace:'ruck_struggle_middle_front',clearout_drive:'ruck_engage_middle',ruck_bind:'ruck_engage_middle',ruck_push:'ruck_struggle_middle_front',try:'try_touchdown',dive_try:'try_dive',foul_knockon:'jumping_catch_fail',reaction_hit:'standing_tackled_going_down',charge_down:'jumping_catch_start_immediate',tap:'pick_up_ball'};
+const gestures={pickup:'pick_up_ball',restart:'kick_restart',grubber:'kick_grubber',punt:'kick_running',box_kick:'kick_box',chip:'kick_box',drop:'kick_restart',conversion:'kick_conversion_a_kick',penalty:'kick_conversion_a_kick',tackle_low:'standing_tackle_front_grab',tackle_drive:'standing_tackle_front_grab',fall_forward:'standing_tackled_going_down',fall_back:'standing_tackled_going_down',contact_brace:'ruck_struggle_middle_front',clearout_drive:'ruck_engage_middle',ruck_bind:'ruck_engage_middle',ruck_push:'ruck_struggle_middle_front',try:'try_touchdown',dive_try:'try_dive',foul_knockon:'jumping_catch_fail',reaction_hit:'standing_tackled_going_down',charge_down:'jumping_catch_start_immediate',tap:'pick_up_ball',
+  // IA par poste : les avants qui se lient pour un maul simulé, la remise en jeu armée d'une touche rapide.
+  maul_bind:'maul_push_engage',quick_throw:'lout_throw_pull_back'};
 // Gestes superposés à la course : seuls le buste et les bras les jouent.
-const hauts={handoff:'handoff_left',bump:'drive_with_ball',intercept:'pass_catch_from_left'};
+// « scoop » : le ballon ramassé au sol sans s'arrêter — le buste plonge, les jambes continuent.
+const hauts={handoff:'handoff_left',bump:'drive_with_ball',intercept:'pass_catch_from_left',scoop:'pick_up_ball'};
 // ── Plaquages : ce que le moteur a LU du contact (`duels.ts`) décide des gestes ──
 // Une suite est une liste [clip, durée jouée, départ dans le clip, cadence].
 // `c` : d'où vient le plaqueur, vu du porteur — −1 à sa gauche, 1 à sa droite, 0 de face, 2 dans son dos.
@@ -61,7 +64,7 @@ const VARIANTES={
   'tackle_low:apres-passe':[['standing_tackle_front_grab',.4],['standing_tackle_front_struggle',.8]],
 };
 /** Gestes de contact qu'on ne joue plus dès que le joueur est reparti en courant. */
-const STATIQUES=new Set(['contact_brace','clearout_drive','ruck_bind','ruck_push']);
+const STATIQUES=new Set(['contact_brace','clearout_drive','ruck_bind','ruck_push','maul_bind']);
 const jouerSuite=(clip,suite,t)=>{
   let reste=t;
   for(let k=0;k<suite.length;k++){const [nom,duree,depart=0,cadence=1]=suite[k];if(reste<duree||k===suite.length-1){clip(nom,depart+Math.min(reste,duree)*cadence);return;}reste-=duree;}
@@ -128,6 +131,9 @@ export class DestinyMatch {
     // Les bancs : devant la tribune principale, de part et d'autre de la ligne médiane.
     const banc=equipe=>({x:37,z:equipe===0?-5:5});
     for(const p of this.players){
+      // Retour d'un exclu temporaire : il repart du bord du terrain où il attendait et rejoint sa place en courant.
+      const banni=!this.presents.has(p.id)&&this.changements.find(c=>c.carton&&!c.rouge&&c.id===p.id);
+      if(banni){const d=Math.hypot(p.x-banni.vers.x,p.z-banni.vers.z);this.changements.push({type:'entree',id:p.id,debut:now,duree:clamp(d/5.6,1.2,9),de:banni.vers,equipe:p.team,retour:true});continue;}
       if(this.presents.has(p.id)||this.recent.get(p.id)?.clip!=='substitution')continue;
       const b=banc(p.team),d=Math.hypot(p.x-b.x,p.z-b.z);
       this.changements.push({type:'entree',id:p.id,debut:now,duree:clamp(d/5.6,1.2,7),de:b,equipe:p.team});
@@ -136,27 +142,40 @@ export class DestinyMatch {
     for(const id of this.presents){
       if(ici.has(id))continue;
       const src=e.pions.find(q=>q.id===id);
-      // Un exclu ne « sort » pas ainsi : seul un joueur remplacé regagne son banc.
-      if(!src?.remplace)continue;
+      // ⚠️ UN EXCLU NE DISPARAÎT PLUS. Il reste face à l'arbitre le temps que le
+      // carton sorte, tête basse, puis quitte la pelouse en marchant : vers son
+      // banc pour dix minutes, vers le tunnel pour un rouge.
+      if(!src?.remplace){
+        if(!(src?.sanction>0))continue;
+        const equipe=src.cote==='A'?0:1,de=this.dernieres.get(id)||xyz(src.pos),rouge=src.sanction>9000;
+        // Dix minutes : il attend debout au bord de la touche, devant son banc, et c'est de là qu'il rentrera.
+        const vers=rouge?{x:38.5,z:equipe===0?-1.6:1.6}:{x:35.4,z:equipe===0?-9:9},d=Math.hypot(de.x-vers.x,de.z-vers.z);
+        this.changements.push({type:'sortie',id,debut:now,attente:4.8,duree:4.8+clamp(d/1.85,2,34),de,vers,equipe,src,allure:1.85,carton:true,rouge});
+        // Son corps physique est oublié : à son retour il repart du bord du terrain, pas de l'endroit de la faute.
+        this.physics.bodies.delete(id);
+        continue;
+      }
       const equipe=src.cote==='A'?0:1,de=this.dernieres.get(id)||xyz(src.pos),b=banc(equipe);
       const blesse=!!(src.blessure||src.blesse),allure=blesse?1.3:2.6,d=Math.hypot(de.x-b.x,de.z-b.z);
       this.changements.push({type:'sortie',id,debut:now,duree:clamp(d/allure,1.5,24),de,vers:b,equipe,src,allure,blesse});
     }
     this.presents=ici;
-    this.changements=this.changements.filter(c=>now>=c.debut-.01&&now-c.debut<c.duree);
+    // Un exclu temporaire reste visible au bord du terrain jusqu'à son retour.
+    this.changements=this.changements.filter(c=>now>=c.debut-.01&&(c.carton&&!c.rouge?!ici.has(c.id):now-c.debut<c.duree));
     const ouvert=['jeuCourant','ballonEnLAir','ballonLibre'].includes(e.phase);
     for(const c of this.changements){
       // Le jeu a repris : on ne laisse personne traîner hors de sa place.
-      if(ouvert&&c.type==='entree')c.duree=Math.min(c.duree,now-c.debut+.5);
-      const k=clamp((now-c.debut)/c.duree,0,1);
+      if(ouvert&&c.type==='entree'&&!c.retour)c.duree=Math.min(c.duree,now-c.debut+.5);
+      const attente=c.attente||0,k=clamp((now-c.debut-attente)/(c.duree-attente),0,1);
       if(c.type==='entree'){
         const p=this.players.find(q=>q.id===c.id);if(!p)continue;
         const dx=p.x-c.de.x,dz=p.z-c.de.z,d=Math.hypot(dx,dz)||1,v=Math.min(6.2,d/c.duree);
         p.x=c.de.x+dx*k;p.z=c.de.z+dz*k;p.vx=dx/d*v;p.vz=dz/d*v;p.entrant=true;
       }else{
         const dx=c.vers.x-c.de.x,dz=c.vers.z-c.de.z,d=Math.hypot(dx,dz)||1;
-        const vx=dx/d*c.allure,vz=dz/d*c.allure,x=c.de.x+dx*k,z=c.de.z+dz*k;
-        this.players.push({x,z,id:c.id,team:c.equipe,number:c.src.numero,shirt:c.src.numeroMaillot??c.src.numero,vx,vz,visible:true,arrival:0,fantome:true,boite:c.blesse,
+        // Tant que l'arbitre n'a pas fini, il ne bouge pas.
+        const part=now-c.debut>=attente&&k<1,vx=part?dx/d*c.allure:0,vz=part?dz/d*c.allure:0,x=c.de.x+dx*k,z=c.de.z+dz*k;
+        this.players.push({x,z,id:c.id,team:c.equipe,number:c.src.numero,shirt:c.src.numeroMaillot??c.src.numero,vx,vz,visible:true,arrival:0,fantome:true,boite:c.blesse,exclu:c.carton?now-c.debut:undefined,
           // Une copie neutre : aucune formation ne doit lui redonner une place.
           source:{...c.src,role:'sortie',corps:null,sanction:0,pos:{x:z+61,y:x+35},vitesse:{x:vz,y:vx}}});
       }
@@ -219,6 +238,14 @@ export class DestinyMatch {
     }
     this.ball={...xyz(sol),y:e.ballonLibre?.hauteur??(v?this.outils.positionVol(v).hauteur:e.porteur||e.piedPrepare?1.02:.14)};
     if(this.conquest!==e.conquete){this.conquest=e.conquete;this.liftGroups=lineoutGroups(this.players,e.conquete);this.leurre=null;}
+    // Faux saut annoncé ailleurs que devant : celui que l'annonce désigne, porté pour de faux par ses deux voisins.
+    if(e.phase==='touche'&&e.conquete?.leurreId&&!this.leurre){
+      const pris=new Set(this.liftGroups.flatMap(g=>[g.jumper,...g.lifters])),faux=this.players.find(p=>p.id===e.conquete.leurreId);
+      if(faux&&!pris.has(faux.id)){
+        const voisins=this.players.filter(p=>p.team===faux.team&&p.source.role==='alignement'&&p.id!==faux.id&&!pris.has(p.id)).sort((a,b)=>Math.hypot(a.x-faux.x,a.z-faux.z)-Math.hypot(b.x-faux.x,b.z-faux.z)).slice(0,2);
+        this.leurre={sauteur:faux.id,lifteurs:voisins.map(p=>p.id)};
+      }
+    }
     // Faux saut : le premier bloc de l'équipe qui lance monte pour de faux, le ballon part derrière.
     if(e.phase==='touche'&&e.conquete?.combinaison==='leurreDevant'&&!this.leurre){
       const pris=new Set(this.liftGroups.flatMap(g=>[g.jumper,...g.lifters])),bord=p=>Math.min(p.source.pos.y,70-p.source.pos.y);
@@ -226,7 +253,7 @@ export class DestinyMatch {
       if(devant.length===3){const tri=[...devant].sort((a,b)=>a.source.pos.y-b.source.pos.y);this.leurre={sauteur:tri[1].id,lifteurs:[tri[0].id,tri[2].id]};}
     }
     if(e.aplatissage&&this.aplatissage!==e.aplatissage){this.aplatissage=e.aplatissage;const g=(e.gestes||[]).filter(g=>g.joueurId===e.aplatissage.marqueur.id).pop();this.essai={id:e.aplatissage.marqueur.id,start:e.sim,plonge:g?.clip==='dive_try',maul:e.aplatissage.origine==='maul'};}
-    if(e.sifflet!==this.lastWhistle){this.lastWhistle=e.sifflet;if(e.sifflet)this.whistle={start:e.sim,cle:e.sifflet.cle||''};if(/carton/.test(e.sifflet?.cle||''))this.card={start:e.sim,red:/Rouge/.test(e.sifflet.cle)};}
+    if(e.sifflet!==this.lastWhistle){this.lastWhistle=e.sifflet;if(e.sifflet)this.whistle={start:e.sim,cle:e.sifflet.cle||'',avertissement:e.sifflet.avertissement};if(/carton/.test(e.sifflet?.cle||''))this.card={start:e.sim,red:/Rouge/.test(e.sifflet.cle)};}
     this.slots=this.formation(0);
     this.players=this.physics.update(this.players,dt,this);
     this.scenographie(dt);
@@ -362,6 +389,13 @@ export class DestinyMatch {
     };
     // Remplacé qui regagne son banc, remplaçant qui entre, cortège d'avant-match : une course, rien d'autre.
     if(p.fantome||p.entrant||p.cortege){
+      // L'exclu, pendant que le carton sort : il écoute l'arbitre, puis baisse la tête.
+      if(p.exclu!==undefined&&p.exclu<4.9&&speed<.3){
+        const arb=e.arbitre?xyz(e.arbitre.pos):null;
+        clip('PlayerIdleSpotDisappointed01_002',Math.max(0,p.exclu-1.2));d.fondu=.4;
+        if(arb)d.heading=cap(arb.x-p.x,arb.z-p.z);
+        return done();
+      }
       // Un blessé regagne son banc en boitant.
       if(p.boite&&speed>.3){clip('walking_fast_limp',now*.95,true);d.heading=cap(p.vx,p.vz);return done();}
       if(speed<.3){d.vivant=true;d.regard=this.regard(p,now);}
@@ -472,7 +506,18 @@ export class DestinyMatch {
     }
 
     // ── Touche ────────────────────────────────────────────────────────────────
-    if(e.phase==='touche'){
+    if(e.phase==='touche'&&e.conquete?.rapide){
+      // Pas d'alignement : celui qui est au ballon le ramasse, arme à deux mains
+      // au-dessus de la tête, et remet en jeu. Les autres courent se replacer.
+      const r=e.conquete.rapide;
+      if(r.lanceurId===p.id&&r.etape&&r.etape!=='aller'){
+        const depuis=now-(r.depuis??now),vers=this.byId?.get(r.receveurId);
+        if(r.etape==='ramasse'){clip('pick_up_ball',depuis);d.heading=cap(this.ball.x-p.x,this.ball.z-p.z);d.pivot=7;}
+        else{clip('lout_throw_pull_back',Math.min(.45+depuis*1.5,1.25));if(vers)d.heading=cap(vers.x-p.x,vers.z-p.z);d.pivot=9;}
+        d.anchor={...this.remember('remise:'+r.depuis,()=>({x:p.x,z:p.z,heading:d.heading??(p.team===0?Math.PI:0)})),heading:d.heading??0,mode:'rel',fondu:.25};
+        return done();
+      }
+    }else if(e.phase==='touche'){
       const c=e.conquete;
       if(p.number===2&&s.cote===e.possession){
         // Le lanceur va chercher le ballon : il court jusqu'à lui les mains libres,
@@ -576,7 +621,15 @@ export class DestinyMatch {
           d.heading=face;return done();
         }
         const reste=e.minuteur-offset;
-        if(reste<COLLECTE&&!this.direct)clip('ruck_pass_short_left_collect',COLLECTE-reste);else d.watch=true;
+        if(reste<COLLECTE&&!this.direct)clip('ruck_pass_short_left_collect',COLLECTE-reste);
+        else{
+          d.watch=true;
+          // Il annonce le côté d'un bras tendu (geste construit) avant de se baisser sur le ballon.
+          if(recent?.clip==='direct_play'&&now-recent.debut<recent.duree){
+            const cote=recent.variante==='d'?1:-1;
+            d.proc={type:'pointer',point:{x:p.x+cote*4,z:p.z+(p.team===0?-1.5:1.5)},t:now-recent.debut,duree:recent.duree};
+          }
+        }
         return done();
       }
       if(o?.chenille&&o.attaque.includes(p.id)){
@@ -610,16 +663,28 @@ export class DestinyMatch {
     if(pied&&pied.pretDepuis===undefined&&viseePied)d.regard={x:viseePied.x,y:2.2,z:viseePied.z};
     if(pied&&pied.pretDepuis!==undefined){
       d.heading=cap(viseePied.x-p.x,viseePied.z-p.z);d.pivot=5;
-      const name=pied.intention==='renvoi'||pied.intention==='drop'?'kick_restart':pied.intention==='rasant'?'kick_grubber':pied.intention==='chandelle'||p.number===9?'kick_box':'kick_running';
+      // Le petit par-dessus n'existe pas dans l'APK : c'est le coup de pied en course, le buste
+      // en arrière et les bras écartés (construit par la scène), sur une frappe plus courte.
+      const chip=pied.intention==='parDessus';
+      const name=pied.intention==='renvoi'||pied.intention==='drop'?'kick_restart':pied.intention==='rasant'?'kick_grubber':chip?'kick_running':pied.intention==='chandelle'||p.number===9?'kick_box':'kick_running';
       const delai=pied.intention==='drop'?1.12:pied.intention==='renvoi'?1.05:p.number===9?.84:.7;
       clip(name,Math.max(0,now-pied.pretDepuis+FRAPPES[name]-delai));
-      this.memo.set('pied:'+p.id,{name,debut:pied.pretDepuis+delai-FRAPPES[name]});
+      this.memo.set('pied:'+p.id,{name,debut:pied.pretDepuis+delai-FRAPPES[name],chip});
+      if(chip)d.proc={type:'parDessus',t:now-pied.pretDepuis,duree:delai+.55};
       return done();
     }
     const frappe=this.memo.get('pied:'+p.id);
     if(frappe&&e.vol?.type==='pied'&&e.vol.auteur?.id===p.id&&now-frappe.debut<FRAPPES[frappe.name]+.7){
       clip(frappe.name,now-frappe.debut);
       const ou=xyz(e.vol.vers);d.heading=cap(ou.x-p.x,ou.z-p.z);d.pivot=5;
+      if(frappe.chip)d.proc={type:'parDessus',t:now-frappe.debut-FRAPPES[frappe.name]+.7,duree:1.25};
+      return done();
+    }
+    // Remise en jeu d'une touche rapide : le ballon part à deux mains, au-dessus de la tête.
+    if(recent?.variante==='remise'&&/^pass/.test(recent.clip)&&now-recent.debut<1.15&&!s.corps){
+      const vol=this.flights.get('de:'+p.id);
+      clip('lout_throw_release',now-recent.debut+.12);
+      d.anchor={...this.remember('remise:lacher:'+recent.id,()=>({x:p.x,z:p.z,heading:vol?cap(vol.vers.x-p.x,vol.vers.z-p.z):p.team===0?Math.PI:0})),mode:'rel',fondu:.12};
       return done();
     }
     // Filet : quelle que soit la façon dont le coup de pied est parti, celui qui
@@ -686,6 +751,14 @@ export class DestinyMatch {
         const haut=e.vol.hauteur>5;
         clip(haut?'jumping_catch_success':'catch_kick',(haut?.55:.5)-reste);d.air=haut;return done();
       }
+      // ⚠️ LANCÉ, ON LE CAPTE AUSSI. Un ailier qui arrivait à pleine vitesse sur une
+      // passe au pied n'avait aucun geste : le ballon apparaissait dans ses bras.
+      // Les bras et le buste montent vers lui, les jambes gardent leur course.
+      if(loin<3.6&&reste<.6&&reste>-.2&&speed>=3.2){
+        const haut=e.vol.hauteur>5;
+        d.upper={name:haut?'jumping_catch_success':'catch_kick',time:Math.max(0,(haut?.55:.5)-reste),weight:clamp((.6-reste)/.22,0,1)};
+        d.ouvre={x:this.ball.x,y:Math.max(1.4,this.ball.y),z:this.ball.z,poids:clamp((.7-reste)/.3,0,1)};
+      }
       if(loin<14)d.watch=true;
     }
 
@@ -703,6 +776,13 @@ export class DestinyMatch {
         // Le corps suit : il s'avance d'un pas sur l'adversaire, à portée de bras.
         clip(bouscule?'bump':'fend',Math.min(t*1.05,1.2));
         if(cible){const dx=cible.x-p.x,dz=cible.z-p.z,dd=Math.hypot(dx,dz)||1;const portee=bouscule?1.02:.8;d.anchor={x:cible.x-dx/dd*portee,z:cible.z-dz/dd*portee,heading:cap(dx,dz),mode:'slot',fondu:.22};}
+        return done();
+      }
+      if(recent.clip==='foul_offside'&&!s.corps){
+        // Pas de geste de hors-jeu dans l'APK : il s'arrête net et lève les deux mains (construit).
+        d.proc={type:'mainsLevees',t,duree:recent.duree};
+        const arb=e.arbitre?xyz(e.arbitre.pos):null;
+        if(speed<1&&arb)d.heading=cap(arb.x-p.x,arb.z-p.z);
         return done();
       }
       const perdu=recent.variante&&VARIANTES[recent.clip+':'+recent.variante];
@@ -745,6 +825,8 @@ export class DestinyMatch {
       else{clip(nom,.15+t*1.05);d.heading=speed>.6?cap(p.vx,p.vz):null;d.fondu=.14;return done();}
     }
     donner();
+    // Le bras levé de celui qui réclame le ballon : l'ailier avant une passe au pied, le soutien d'une percée.
+    if(recent?.clip==='call_ball'&&now-recent.debut<recent.duree&&p.id!==this.carrier)d.proc={type:'appel',cote:recent.variante==='d'?1:-1,t:now-recent.debut,duree:recent.duree};
     if(d.upper){/* la passe prime */}
     else if(recent?.clip==='catch'){
       const vol=this.flights.get(p.id);
@@ -762,6 +844,8 @@ export class DestinyMatch {
     }else if(recent&&hauts[recent.clip]&&now-recent.debut<Math.min(recent.duree,1.2)){
       const t=now-recent.debut,fin=Math.min(recent.duree,1.2),poids=clamp(t/.1,0,1)*clamp((fin-t)/.25,0,1);
       let nom=hauts[recent.clip],depart=0;
+      // Ramassé dans la course : le buste plonge vers le ballon, puis se redresse.
+      if(recent.clip==='scoop'){depart=.3;d.raise=-.5*poids;}
       if(recent.clip==='handoff'){
         // Le bras se tend du côté du défenseur : à l'épaule d'un geste bref, au torse d'un vrai raffut.
         const adv=proche(2.8),c=adv?this.side(p,null,adv):1;
@@ -774,6 +858,10 @@ export class DestinyMatch {
       d.upper={name:nom,time:depart+t,weight:poids};
     }
     if(p.id===this.carrier&&!d.upper)d.carry=speed<.8&&!['jeuCourant'].includes(e.phase)?'deux':'bras';
+    // Le capitaine appelé par l'arbitre : il vient à lui, puis l'écoute, tourné vers lui.
+    if(this.whistle?.avertissement===p.id&&now-this.whistle.start<9&&e.phase==='penalite'&&e.arbitre&&speed<.5){
+      const arb=xyz(e.arbitre.pos);d.heading=cap(arb.x-p.x,arb.z-p.z);d.regard={x:arb.x,y:1.6,z:arb.z};return done();
+    }
     // Le jeu est arrêté : personne ne reste planté comme une statue.
     if(ARRETS.has(e.phase)||tir)return attendre();
     return done();

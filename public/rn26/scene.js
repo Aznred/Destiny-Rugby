@@ -238,7 +238,12 @@ export async function creerScene3D(conteneur,options={}){
         modele.geometry.computeBoundingBox();
         const forme=modele.geometry.boundingBox,echelle=(box.max.x-box.min.x)*CASQUE.largeur/(forme.max.x-forme.min.x);
         mesh.scale.setScalar(echelle);
-        mesh.position.set(-(forme.min.x+forme.max.x)/2*echelle,box.max.y+CASQUE.dessus-forme.max.y*echelle,(box.min.z+box.max.z)/2+CASQUE.recul-(forme.min.z+forme.max.z)/2*echelle);
+        // ⚠️ LE CASQUE REGARDE DU MÊME CÔTÉ QUE LE VISAGE. Les modèles allégés ont le
+        // visage vers −Z (alleger_equipement.mjs), la tête du joueur vers +Z : posé
+        // tel quel, il était devant-derrière — la nuque du casque sur les yeux.
+        // Il est donc retourné d'un demi-tour, et ses décalages changent de signe.
+        mesh.rotation.y=Math.PI;
+        mesh.position.set((forme.min.x+forme.max.x)/2*echelle,box.max.y+CASQUE.dessus-forme.max.y*echelle,(box.min.z+box.max.z)/2-CASQUE.recul+(forme.min.z+forme.max.z)/2*echelle);
         model.add(mesh);model.updateMatrixWorld(true);head.attach(mesh);
       }else attach(r.hair.getObjectByName('Helmet_LOD2'),look.bandColor,.012,.6);
     }
@@ -554,6 +559,39 @@ export async function creerScene3D(conteneur,options={}){
   // brefs vers la tête, ou les deux mains qui repoussent la poitrine.
   const gestesConstruits=[],cloche=(t,centre,largeur)=>Math.exp(-(((t-centre)/largeur)**2));
   function construire(a,proc){
+    if(['appel','mainsLevees','pointer','parDessus'].includes(proc.type)){
+      // Bras levé pour réclamer le ballon, mains levées du joueur sifflé hors-jeu,
+      // bras tendu du demi de mêlée qui annonce son côté, équilibre d'un petit
+      // par-dessus : aucun n'existe dans l'APK. Les mains vont chercher un point
+      // repéré depuis les épaules ; le reste du corps garde le geste en cours.
+      const epaules=a.model.getObjectByName('CC_Base_Spine02');if(!epaules)return;
+      epaules.getWorldPosition(gripR);gripL.copy(gripR);
+      const fx=-Math.sin(a.heading),fz=-Math.cos(a.heading),dx=-fz,dz=fx;
+      const u=clamp(proc.t/Math.max(.3,proc.duree),0,1),g=smooth(u/.22)*smooth((1-u)/.28);
+      if(g<.02)return;
+      if(proc.type==='appel'){
+        const c=proc.cote>=0?1:-1,agite=.05*Math.sin(proc.t*11);
+        gripR.x+=dx*(.26+agite)*c+fx*.16;gripR.z+=dz*(.26+agite)*c+fz*.16;gripR.y+=.66;
+        grip(a,gripR,c>0?'right':'left',Math.min(1,g*1.1));
+      }else if(proc.type==='mainsLevees'){
+        raiseTorso(a,.07*g,0);
+        gripR.x+=dx*.34+fx*.24;gripR.z+=dz*.34+fz*.24;gripR.y+=.3;
+        gripL.x+=-dx*.34+fx*.24;gripL.z+=-dz*.34+fz*.24;gripL.y+=.3;
+        grip(a,gripR,'right',g);grip(a,gripL,'left',g);
+      }else if(proc.type==='pointer'){
+        const px=proc.point.x-gripR.x,pz=proc.point.z-gripR.z,n=Math.hypot(px,pz)||1,aDroite=dx*px+dz*pz>=0;
+        raiseTorso(a,.12*g,(aDroite?-1:1)*.22*g);
+        gripR.x+=px/n*.7;gripR.z+=pz/n*.7;gripR.y+=.04;
+        grip(a,gripR,aDroite?'right':'left',g);
+      }else{
+        // Petit par-dessus : buste en arrière au moment de la frappe, bras ouverts pour l'équilibre.
+        raiseTorso(a,.2*g,0);
+        gripR.x+=dx*.52-fx*.12;gripR.z+=dz*.52-fz*.12;gripR.y+=.06;
+        gripL.x+=-dx*.44+fx*.24;gripL.z+=-dz*.44+fz*.24;gripL.y+=.14;
+        grip(a,gripR,'right',g*.85);grip(a,gripL,'left',g*.85);
+      }
+      a.group.updateMatrixWorld(true);return;
+    }
     if(proc.point){
       // Chistera et offload à une main : aucune animation dans l'APK. Le bras
       // va chercher le soutien — dans le dos pour la chistera, tendu sur le
@@ -678,7 +716,14 @@ export async function creerScene3D(conteneur,options={}){
         const card=match.card&&visualTime-match.card.start<5.8,age=visualTime-(match.card?.start||0);
         const sifflet=match.whistle&&visualTime-match.whistle.start<2.4?match.whistle:null;
         const m=e.conquete?.melee;
+        // Avertissement : il appelle le capitaine d'un geste et lui parle, tourné vers lui.
+        const appel=match.whistle?.avertissement&&e.phase==='penalite'&&clips.RefereeCallOverPlayer01_001?visualTime-match.whistle.start-1.2:-1;
         if(card)full={name:'RefereeCard01_002',time:clamp(age/5.8,0,1)*clips.RefereeCard01_002.duration};
+        else if(appel>=0&&appel<7.4){
+          full={name:'RefereeCallOverPlayer01_001',time:appel};
+          const cap=actors.get(match.whistle.avertissement);
+          if(cap)heading=Math.atan2(cap.group.position.x-st.x,cap.group.position.z-st.z)+Math.PI;
+        }
         else if(tir?.etape==='celebration'&&visualTime-tir.etapeDepuis<2)upper={name:'try',time:visualTime-tir.etapeDepuis};
         else if(sifflet){
           const t=visualTime-sifflet.start;
@@ -785,6 +830,15 @@ export async function creerScene3D(conteneur,options={}){
         // Introduit au milieu du tunnel, puis talonné jusqu'aux pieds du numéro 8.
         const centre=match.scrum?.centre||match.ball,sous=m.etape==='introduction'?centre:match.ball;
         t.set(sous.x,SOL,sous.z);key='sol:melee';st.spin+=simDt*(m.etape==='introduction'?5:1.5);
+      }
+    }else if(e.phase==='touche'&&e.conquete?.rapide){
+      const r=e.conquete.rapide,lanceur=actors.get(r.lanceurId);
+      if(lanceur&&r.etape==='arme'){hands(lanceur,t);key='main:'+r.lanceurId;heading=lanceur.heading;orientation='main';}
+      else{
+        key='sol:touche';
+        // Il monte du sol à ses mains pendant qu'il se baisse.
+        const k=lanceur&&r.etape==='ramasse'?clamp((visualTime-(r.depuis??visualTime)-.42)/.3,0,1):0;
+        if(k>0){hands(lanceur,handA);t.lerp(handA,k);}
       }
     }else if(e.phase==='touche'){
       const progress=match.progress(offset),thrower=match.players.find(p=>p.number===2&&p.team===match.team),target=actors.get(e.conquete?.cibleId),lanceur=actors.get(thrower?.id);

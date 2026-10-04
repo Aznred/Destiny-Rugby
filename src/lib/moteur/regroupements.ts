@@ -2,6 +2,8 @@ import type { EtatMatch } from './etat.js';
 import type { Pion } from './entites.js';
 import { declencherChute, jouerGeste } from './dynamique.js';
 import { borner, distance, sens, LARGEUR, LIGNE_A, LIGNE_B, type Vec } from './terrain.js';
+import { iaParPoste } from './ia/lecture.js';
+import { profilDe } from './ia/postes.js';
 
 export interface OrganisationRuck {
   debut: number;
@@ -16,6 +18,8 @@ export interface OrganisationRuck {
   relayeurId?: string;
   /** Secondes passées, ballon sorti, à attendre un relayeur encore en chemin. */
   attenteSortie?: number;
+  /** Le demi de mêlée a déjà montré le côté où il va jouer (IA par poste). */
+  annonce?: boolean;
 }
 
 export function organiserRuck(e: EtatMatch): void {
@@ -31,10 +35,20 @@ export function organiserRuck(e: EtatMatch): void {
     const futur = { x: p.pos.x + p.vitesse.x * .45, y: p.pos.y + p.vitesse.y * .45 };
     return distance(futur, e.ballon) + Math.max(0, (futur.x - e.ballon.x) * sens(p.cote)) * 1.2;
   };
-  const choisir = (attaque: boolean) => e.pions.filter(p => p.surLeTerrain && p.sanction <= 0 && p.avant
+  // IA PAR POSTE : LE REGROUPEMENT SE FORME AVEC CEUX DONT C'EST LE MÉTIER.
+  // Les troisièmes lignes et le talonneur y arrivent les premiers ; un pilier
+  // n'y court pas depuis trente mètres. Et un trois-quarts plaqué au large
+  // n'attend plus ses avants : le centre ou l'ailier qui est à côté protège le
+  // ballon (sinon tout ruck loin du pack sortait lent, quoi qu'il arrive).
+  const ia = iaParPoste(e);
+  const eligible = (p: typeof e.pions[number], attaque: boolean) => p.avant
+    || (ia && p.numero !== 9 && p.numero !== 10 && distance(p.pos, e.ballon) < (attaque ? 6 : 3.5));
+  const priorite = (p: typeof e.pions[number], attaque: boolean) => !ia ? 0
+    : attaque ? profilDe(p).soutienRuck : profilDe(p).gratte * 0.5;
+  const choisir = (attaque: boolean) => e.pions.filter(p => p.surLeTerrain && p.sanction <= 0 && eligible(p, attaque)
     && (!detaille || !p.corps)
     && (p.cote === e.possession) === attaque && p.id !== e.ruck?.porteurId && p.id !== e.ruck?.plaqueurId)
-    .map(p => ({ p, c: cout(p) }))
+    .map(p => ({ p, c: cout(p) - priorite(p, attaque) }))
     .sort((a, b) => a.c - b.c).slice(0, attaque ? 3 : 2).map(x => x.p.id);
   e.ruck.organisation = { debut: e.sim, origine: { ...e.ballon }, attaque: choisir(true), defense: choisir(false), contacts: [], animations: {} };
 }

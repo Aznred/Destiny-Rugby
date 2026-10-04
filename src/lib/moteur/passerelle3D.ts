@@ -3,6 +3,7 @@ import { ORDRE_MAILLOTS } from './entites';
 import type { Coequipier } from '../effectif';
 import type { EtatMatch } from './etat';
 import { porteurPourAffichage } from './dynamique';
+import { IA_MATCH_DE_CARRIERE } from './ia/reglages';
 
 // Des noms de démonstration, tous inventés : l'aperçu affiche le nom du porteur.
 const NOMS_APERCU: Record<string, string[]> = {
@@ -22,7 +23,7 @@ export function creerApercuDestiny(cle = 'rn26-destiny-26', cadenceDetaillee = t
   // Cadence détaillée : en trois dimensions, chaque phase se joue à son rythme
   // de terrain (mêlée complète, passes à vitesse réelle, rituel du buteur).
   return creerMatch('France', 'Angleterre', equipe('France'), equipe('Angleterre'), 0, 0,
-    cle, undefined, { scoreSurTerrain: true, tempsReel: false, niveau: 'pro', cadenceDetaillee, placementJoue: cadenceDetaillee });
+    cle, undefined, { scoreSurTerrain: true, tempsReel: false, niveau: 'pro', cadenceDetaillee, placementJoue: cadenceDetaillee, ia: IA_MATCH_DE_CARRIERE });
 }
 export { avancer, porteurPourAffichage, geometrieMelee, TEMPS_MELEE, RITUEL_TIR };
 export { preparerChenille, designerRelayeur } from './regroupements';

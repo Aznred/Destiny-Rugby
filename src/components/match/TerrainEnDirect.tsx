@@ -162,7 +162,7 @@ const LIBELLES_SCENARIO: Record<ScenarioDirect['type'], string> = {
   passeSautee: 'Passe sautée', pickAndGo: 'Pick-and-go', passe: 'Passe', offload: 'Passe après contact',
   degagement: 'Dégagement', occupation: 'Jeu d’occupation', chandelle: 'Chandelle',
   cinquanteVingtDeux: 'Tentative de 50:22', rasant: 'Coup de pied rasant',
-  transversale: 'Transversale', drop: 'Drop', penaltouche: 'Pénaltouche', renvoi: 'Renvoi',
+  transversale: 'Transversale', parDessus: 'Par-dessus', drop: 'Drop', penaltouche: 'Pénaltouche', renvoi: 'Renvoi',
   franchissement: 'Franchissement', ballonLibre: 'Ballon libre', jeuCourant: 'Jeu courant', fini: 'Fin du match',
 };
 

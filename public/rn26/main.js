@@ -9,10 +9,12 @@ import * as moteur from './moteur-destiny.js';
 // Ici, la page crée un France – Angleterre et le fait avancer toute seule.
 const $=s=>document.querySelector(s);
 const outils={porteurPourAffichage:moteur.porteurPourAffichage,positionVol:moteur.positionVol,geometrieMelee:moteur.geometrieMelee,TEMPS_MELEE:moteur.TEMPS_MELEE,RITUEL_TIR:moteur.RITUEL_TIR,preparerChenille:moteur.preparerChenille};
-const EQUIPES=[
+let EQUIPES=[
   {nom:'France',maillot:{principal:'#0a2459',secondaire:'#1b3d9e',accent:'#ffffff',short:'#f1f1ee',chaussettes:'#d00000',motif:'epaules'}},
   {nom:'Angleterre',maillot:{principal:'#f2f4f3',secondaire:'#dfe5e8',accent:'#c8102e',short:'#f2f4f3',chaussettes:'#0b1f44',motif:'uni'}},
 ];
+// ?equipes=<JSON> : deux équipes au choix ({nom, maillot, blason}), pour une affiche ou une capture.
+try{const perso=new URLSearchParams(location.search).get('equipes');if(perso)EQUIPES=JSON.parse(perso);}catch{}
 function nouveauMatch(){const etat=moteur.creerApercuDestiny();etat.carriereDixMinutes=true;return new DestinyMatch({etat,outils,avancer:moteur.avancer});}
 let scene,match,paused=false,last=0,frames=0,fps=0,fpsStart=0,previousEvents='',hudAt=0;
 const speedFactor=()=>Number($('#speed').value);
