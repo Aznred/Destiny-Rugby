@@ -461,6 +461,35 @@ que l'affichage lise exactement la version du moteur qui joue.
   l'écusson du club qui reçoit, six tribunes sur huit aux couleurs du club à
   domicile. Un écusson distant passe par le relais (`ecussonPourToile`) : dessiné
   tel quel, il salirait la toile.
+- **Le stade dépend du niveau de celui qui reçoit** (`lib/stade3D.ts`, option
+  `stade` de la scène) : terrain de campagne en Régionale, stade de village en
+  Fédérale, stade moyen en Nationale, grande enceinte en Pro D2, enceinte
+  internationale pour le Top 14, les premières divisions étrangères et les
+  sélections. En carrière c'est la division RÉELLE du club (montées comprises) ;
+  en ligue, la moyenne des quinze meilleures cartes de celui qui reçoit. Les
+  décors `public/rn26/decor/stade-club-*.glb` sortent des scènes de club de
+  l'APK (`../analyse-rn26/exporter_stades.py`, qui lit les maillages Unity à la
+  main, compression comprise) ; ils portent les MÊMES noms de matériaux que le
+  Stade de France, donc public, réclames et abords s'habillent sans cas
+  particulier. Chaque décor n'est téléchargé que s'il sert, et un décor absent
+  retombe sur l'enceinte internationale. Aperçu : `/rn26/index.html?stade=campagne`.
+- ⚠️ **AUCUNE MARQUE DE L'ÉDITEUR D'ORIGINE NE RESTE À L'IMAGE.** Le maillot
+  (zone `MARQUES` de `habillage.js`, trop courte : le nom restait lisible sur
+  chaque poitrine), le ballon (`creerBallon`), le panneau bleu du stade
+  (`nettoyerStade`), la banderole des abords et les réclames portent Destiny
+  Rugby, le TikTok du jeu ou des annonceurs inventés. Tout nouveau décor se
+  relit texture par texture avant d'être livré.
+- **Coiffures et barbes** : ce sont des cartes de mèches découpées par
+  transparence. ⚠️ Exportées sans leur masque, les vingt-trois coupes
+  ressemblaient toutes à un bloc de cheveux longs. `exporter_masques_coiffures.py`
+  tire le masque du canal alpha des « supportmaps » d'origine, `exporter_coiffures.mjs`
+  l'embarque avec les UV, et les familles (`COIFFURES` dans `corps.js`) sont
+  rangées d'après ce qu'on VOIT une fois le masque appliqué (`mesurer_coiffures.py`).
+- **Casques et crampons** : ceux de la boutique (`public/m3d/`), allégés par
+  `alleger_equipement.mjs` (de 150 000 sommets à un millier, couleur cuite aux
+  sommets quand la texture ne survit pas à la simplification). Un à trois
+  casques par équipe, surtout des avants ou un ailier (`porteCasque`) ; un
+  joueur sur deux garde les crampons d'origine.
 - **Apparence** : `apparenceJoueurMatch(nom, poste)` — peau, cheveux, coupe et
   barbe lus sur le portrait de la carte (`apparencesMatch.generated.ts`), tirés
   du nom sinon. Un champ manquant n'est jamais « chauve » par défaut.

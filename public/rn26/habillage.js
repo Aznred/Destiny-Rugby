@@ -52,7 +52,11 @@ export function departagerTenues(domicile,exterieur){
   return [domicile,e];
 }
 // Emplacements des marques de l'atlas d'origine (repère 2048) : on les fond dans le tissu.
-const MARQUES=[[340,1405,105,70],[572,1380,105,115]];
+// ⚠️ La marque de l'éditeur d'origine descend jusqu'à y = 1517 : la zone s'arrêtait
+// à 1475 et laissait son nom lisible sur chaque poitrine.
+const MARQUES=[[340,1405,115,125],[572,1380,105,115]];
+/** Où se coud la marque Destiny Rugby, à la place de celle de l'atlas d'origine. */
+const MARQUE_DESTINY={x:403,y:1486};
 const MARQUE_SHORT=[395,295,60,70];
 const ECUSSON={x:622,y:1437,taille:118};
 /**
@@ -96,6 +100,10 @@ export function creerTenue(source,maillot,ecusson,taille=1024){
     ctx.drawImage(ecusson,ECUSSON.x/k-l/2,ECUSSON.y/k-h/2,l,h);
   }
   c.encre=luminance(m.motif==='cerceaux'?melange(P,S,.5):P)>.56?'#151b22':'#ffffff';
+  // La marque du maillot : la nôtre, dans l'encre de la tenue.
+  ctx.save();ctx.fillStyle=c.encre;ctx.globalAlpha=.9;ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.font=`900 ${Math.max(6,Math.round(21/k))}px ${TITRE}`;ctx.fillText('DESTINY',MARQUE_DESTINY.x/k,MARQUE_DESTINY.y/k-9/k);
+  ctx.font=`800 ${Math.max(5,Math.round(13/k))}px ${FORTE}`;ctx.fillText('RUGBY',MARQUE_DESTINY.x/k,MARQUE_DESTINY.y/k+10/k);ctx.restore();
   c.lisere=c.encre==='#ffffff'?'rgba(10,14,18,.55)':'rgba(255,255,255,.6)';
   return c;
 }
@@ -174,11 +182,51 @@ export function creerAbords(source,teinte,ecusson){
   ctx.fillStyle='#f6f6f2';ctx.fillRect(1500,500,548,268);
   ctx.fillStyle=css(fond);ctx.fillRect(1913,520,135,126);ctx.fillRect(1545,645,162,123);
   ctx.fillStyle=g;ctx.fillRect(1545,767,503,248);
+  // La banderole verticale des abords portait le nom de l'éditeur d'origine.
+  const bande=ctx.createLinearGradient(1243,0,1350,0);bande.addColorStop(0,'#0b1f18');bande.addColorStop(1,'#123527');
+  ctx.fillStyle=bande;ctx.fillRect(1240,1376,114,320);
+  ctx.save();ctx.translate(1297,1536);ctx.rotate(-Math.PI/2);ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillStyle='#f4e7b0';ctx.font=`400 58px ${TITRE}`;ctx.fillText('DESTINY RUGBY',0,2,300);ctx.restore();
   if(ecusson)for(const y of [829,951]){
     const t=96,ratio=ecusson.width/ecusson.height||1,l=ratio>1?t:t*ratio,h=ratio>1?t/ratio:t;
     // Les faces des protections sont retournées dans l'atlas.
     ctx.save();ctx.translate(1795,y);ctx.rotate(Math.PI);ctx.drawImage(ecusson,-l/2,-h/2,l,h);ctx.restore();
   }
+  return c;
+}
+
+// ---------------------------------------------------------------------------
+// BALLON ET PANNEAU DU STADE : nos marques à la place de celles d'origine
+// ---------------------------------------------------------------------------
+/**
+ * Le ballon : les deux quartiers de l'atlas d'origine portaient une marque
+ * d'équipementier. Même découpe (un quartier par moitié d'image), aux couleurs
+ * et au nom de Destiny Rugby.
+ */
+export function creerBallon(taille=512){
+  const c=toile(taille),ctx=c.getContext('2d'),k=taille/512;
+  const quartier=(x0,fond,ovale,encre,texte,trait)=>{
+    ctx.fillStyle=fond;ctx.fillRect(x0,0,256*k,taille);
+    ctx.fillStyle=ovale;ctx.beginPath();ctx.ellipse(x0+128*k,256*k,98*k,214*k,0,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle=trait;ctx.lineWidth=7*k;ctx.beginPath();ctx.ellipse(x0+128*k,256*k,78*k,190*k,0,0,Math.PI*2);ctx.stroke();
+    ctx.save();ctx.translate(x0+128*k,256*k);ctx.rotate(-Math.PI/2);ctx.scale(-1,1);/* le quartier est cousu en miroir sur le ballon */ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillStyle=encre;ctx.font=`400 ${Math.round(74*k)}px ${TITRE}`;ctx.fillText(texte,0,4*k,330*k);ctx.restore();
+  };
+  quartier(0,'#123527','#f6f3e8','#0b1f18','DESTINY','#e7b53c');
+  quartier(256*k,'#0b1f18','#f6f3e8','#123527','RUGBY','#e7b53c');
+  return c;
+}
+/**
+ * L'atlas du stade : un panneau bleu portait l'adresse et le logo de l'éditeur
+ * d'origine. Le panneau reste, le marquage devient le nôtre.
+ */
+export function nettoyerStade(source){
+  const c=toile(source.width,source.height),ctx=c.getContext('2d'),k=source.width/2048;
+  ctx.drawImage(source,0,0);
+  const g=ctx.createLinearGradient(925*k,0,1058*k,0);g.addColorStop(0,'#0d2a6e');g.addColorStop(1,'#123a92');
+  ctx.fillStyle=g;ctx.fillRect(925*k,893*k,133*k,314*k);
+  ctx.save();ctx.translate(990*k,1050*k);ctx.rotate(Math.PI/2);ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillStyle='#f4f6ff';ctx.font=`400 ${Math.round(54*k)}px ${TITRE}`;ctx.fillText('DESTINY RUGBY',0,2*k,290*k);ctx.restore();
   return c;
 }
 

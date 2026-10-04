@@ -120,6 +120,8 @@ export interface AfficheDirect {
 
 interface Props {
   identite?: import('../../lib/habillageTV').IdentiteTV;
+  /** Le décor 3D du match, choisi par l'écran hôte d'après le niveau de celui qui reçoit. */
+  stade?: import('../../lib/stade3D').Stade3D;
   scoreMatch?: { domicile: number; exterieur: number };
   /** Le relevé du terrain (atelier, laboratoire, ou serveur sans film). */
   terrain?: TerrainDirect;
@@ -205,7 +207,7 @@ function tracerTrajectoires(vol: NonNullable<TerrainDirect['vol']>) {
   return { vol: pointsVol.join(' '), ombre: pointsOmbre.join(' '), anticipe: cheminAnticipe };
 }
 
-function TerrainEnDirect({ terrain = TERRAIN_VIDE, film, matchId, surAffiche, nomDomicile, nomExterieur, couleurs, emblemes, monCote, carton, modeDemo, pause, vitesseDemo, identite, scoreMatch }: Props) {
+function TerrainEnDirect({ terrain = TERRAIN_VIDE, film, matchId, surAffiche, nomDomicile, nomExterieur, couleurs, emblemes, monCote, carton, modeDemo, pause, vitesseDemo, identite, scoreMatch, stade }: Props) {
   const scoreCourant = useRef(scoreMatch);
   useEffect(() => { scoreCourant.current = scoreMatch; }, [scoreMatch]);
   const scene = useRef<HTMLDivElement>(null);
@@ -600,8 +602,9 @@ function TerrainEnDirect({ terrain = TERRAIN_VIDE, film, matchId, surAffiche, no
     camera: 'tv',
     television: { ralentis: preferencesTele().ralentis },
     habillage: { nom: identite?.nom, logo: logoTV(identite?.logo) },
+    stade,
     textes: { ralenti: t('ml.ralenti') },
-  }), [nomDomicile, nomExterieur, maillots, emblemes?.domicile, emblemes?.exterieur, identite?.nom, identite?.logo]);
+  }), [nomDomicile, nomExterieur, maillots, emblemes?.domicile, emblemes?.exterieur, identite?.nom, identite?.logo, stade]);
   const brancherScene = useCallback((s: Scene3D | null) => {
     scene3D.current = s;
     if (!s) return;

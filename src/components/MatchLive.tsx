@@ -120,6 +120,7 @@ import { effectifDuClub } from '../lib/effectif';
 import { effectifNational } from '../lib/international';
 import { nomNation } from '../lib/nations';
 import { clubParNom } from '../data/clubs';
+import { stadePourClub } from '../lib/stade3D';
 import { useGame } from '../store/useGame';
 import { Blason, LogoEquipe } from './Blason';
 import { Terrain3D } from './match/Terrain3D';
@@ -1343,6 +1344,7 @@ export function MatchLive({
     camera: 'tv',
     television: { ralentis: preferencesTele().ralentis },
     habillage: { nom: identiteTV.nom, logo: logoTV(identiteTV.logo) },
+    stade: stadePourClub(e.clubA),
     textes: { ralenti: t('ml.ralenti') },
   }), [e, couleurA, couleurA2, couleurB, couleurB2, clubA, clubB, monPion, identiteTV]);
   const brancherScene = useCallback((scene: Scene3D | null) => {

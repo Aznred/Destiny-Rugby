@@ -6,7 +6,7 @@ import { DestinyMatch,xyz,clamp,TICK } from './destiny.mjs';
 import { armChain } from './liaisons.js';
 import { appearance,souhaitDepuisCarte,tirage,prepareBody,groundBody,grip,trackBall,bindLift,findHairMesh,fitToHead,raiseTorso,COIFFURES,BARBES } from './corps.js';
 import { prepareGaits,locomotion } from './allures.js';
-import { creerTenue,numeroter,creerPanneaux,creerAbords,creerPublic,creerEtiquette,chargerImage,texture,departagerTenues,nomCourt,luminance,hexa,MAILLOT_DEFAUT } from './habillage.js';
+import { creerTenue,numeroter,creerPanneaux,creerAbords,creerPublic,creerEtiquette,creerBallon,nettoyerStade,chargerImage,texture,departagerTenues,nomCourt,luminance,hexa,MAILLOT_DEFAUT } from './habillage.js';
 import { creerSons } from './sons.js';
 import { creerTelevision } from './television.js';
 
@@ -20,24 +20,52 @@ import { creerTelevision } from './television.js';
 
 const smooth=k=>{const u=clamp(k,0,1);return u*u*(3-2*u);};
 const RACINE_MODELES='/rn26/modeles/',RACINE_DECOR='/rn26/decor/';
+// Pose des casques et crampons allégés (repère : voir alleger_equipement.mjs).
+const CASQUE={taille:.3,haut:.03,recul:0},CRAMPON={taille:1.04};
 let ressources=null;
-/** Stade, joueurs, ballon et mouvements : chargés une fois, partagés par tous les matchs de la session. */
+const peintComme=(canvas,avant)=>{const t=texture(canvas,null);if(avant){t.wrapS=avant.wrapS;t.wrapT=avant.wrapT;t.repeat.copy(avant.repeat);t.offset.copy(avant.offset);t.flipY=avant.flipY;}return t;};
+/** Joueurs, ballon, coiffures, équipement et mouvements : chargés une fois, partagés par tous les matchs de la session. */
 function charger(){
   ressources??=(async()=>{
     const loader=new GLTFLoader(),image=nom=>chargerImage(RACINE_DECOR+nom);
-    const [motions,forward,back,stadium,ball,hair,tee,kit]=await Promise.all([
+    const [motions,forward,back,ball,hair,tee,kit]=await Promise.all([
       loadMotions('catalogue-match-poses.json'),loader.loadAsync(RACINE_MODELES+'player_male_forward_LOD2.glb'),loader.loadAsync(RACINE_MODELES+'player_male_back_LOD2.glb'),
-      loader.loadAsync(RACINE_DECOR+'stade-france.glb'),loader.loadAsync(RACINE_DECOR+'ballon.glb'),loader.loadAsync(RACINE_DECOR+'coiffures.glb'),
+      loader.loadAsync(RACINE_DECOR+'ballon.glb'),loader.loadAsync(RACINE_DECOR+'coiffures.glb'),
       loader.loadAsync(RACINE_DECOR+'tee.glb'),image('kit_france_home.png'),
     ]);
+    // Casques et crampons de la boutique, allégés pour le match (alleger_equipement.mjs).
+    // Un fichier manquant n'empêche rien : le joueur garde l'équipement d'origine.
+    const equipement=async noms=>(await Promise.all(noms.map(n=>loader.loadAsync(RACINE_DECOR+'equipement/'+n+'.glb').then(g=>{let m=null;g.scene.traverse(o=>{if(o.isMesh)m=o;});return m;}).catch(()=>null)))).filter(Boolean);
+    const [casques,crampons]=await Promise.all([equipement(['casque','casque-rouge','casque-australie','casque-tribal','casque-rose']),equipement(['crampons','crampons-bleus','crampons-dupont','crampons-graffiti','crampons-roses'])]);
     const gaits={};for(const [key,rig] of Object.entries(motions.rigs))gaits[key]=prepareGaits(motions.clips,rig.scale);
-    const decor=stadium.scene,origine={},materiaux={},tribunes=[];
+    // ⚠️ AUCUNE MARQUE DE L'ÉDITEUR D'ORIGINE NE RESTE À L'IMAGE : le ballon est
+    // repeint une fois pour la session, le panneau du stade à son chargement (le
+    // maillot, les réclames et les abords le sont par scène, dans habillage.js).
+    try{
+      await document.fonts?.load?.('40px Anton').catch(()=>{});
+      ball.scene.traverse(o=>{if(o.isMesh&&o.material?.map&&/ball/i.test(o.material.name)&&!/shadow/i.test(o.material.name))o.material.map=peintComme(creerBallon(512),o.material.map);});
+    }catch(e){console.warn('Marquage Destiny Rugby :',e);}
+    return {motions,gaits,forward:forward.scene,back:back.scene,hair:hair.scene,casques,crampons,ball:ball.scene,tee:tee.scene,kit};
+  })();
+  return ressources;
+}
+// ── LE STADE DÉPEND DU NIVEAU DU CLUB QUI REÇOIT ────────────────────────────
+// Du terrain de campagne (une tribune, des clôtures, des arbres) à l'enceinte
+// internationale. Chaque décor est chargé à la demande et gardé pour la session.
+// Tous partagent les mêmes noms de matériaux (public, réclames, abords, pelouse) :
+// l'habillage aux couleurs du club s'applique donc à chacun sans cas particulier.
+export const STADES={campagne:'stade-club-1.glb',village:'stade-club-2.glb',moyen:'stade-club-3.glb',grand:'stade-club-5.glb',international:'stade-france.glb'};
+const decors=new Map();
+function chargerStade(nom){
+  const fichier=STADES[nom]||STADES.international;
+  if(!decors.has(fichier))decors.set(fichier,(async()=>{
+    const stadium=await new GLTFLoader().loadAsync(RACINE_DECOR+fichier);
+    const decor=stadium.scene,origine={},materiaux={};
     decor.traverse(o=>{if(!o.isMesh)return;
-      if(/CrowdSection/.test(o.name))tribunes.push(o);
       for(const m of Array.isArray(o.material)?o.material:[o.material]){
         materiaux[m.name]=m;
         if(m.map){m.map.wrapS=m.map.wrapT=THREE.RepeatWrapping;origine[m.name]??=m.map;}
-        if(/alpha|Crowd/.test(m.name)){m.alphaTest=.45;m.transparent=false;}
+        if(/alpha|Crowd|Leaves|recolour|FENCE/i.test(m.name)){m.alphaTest=.45;m.transparent=false;}
         if(m.name==='CrowdMaterial'){m.vertexColors=false;m.map.repeat.set(.25,.06);m.color.set('#ffffff');}
         if(m.name==='union_pitch_normal_01'){m.color.set('#abc697');m.roughness=1;}
         // ⚠️ Les couleurs de sommets des abords codaient le vent des fanions dans
@@ -45,9 +73,20 @@ function charger(){
         if(m.name==='surround_objects_2021'){m.vertexColors=false;m.metalness=0;m.roughness=.55;m.color.set('#ffffff');}
       }
     });
-    return {motions,gaits,forward:forward.scene,back:back.scene,hair:hair.scene,ball:ball.scene,tee:tee.scene,kit,decor,origine,materiaux,tribunes:tribunes.map(o=>o.name)};
-  })();
-  return ressources;
+    try{
+      await document.fonts?.load?.('40px Anton').catch(()=>{});
+      if(origine.stadedefrance?.image){
+        const propre=peintComme(nettoyerStade(origine.stadedefrance.image),origine.stadedefrance);
+        for(const n of ['stadedefrance','stadedefrance_alpha'])if(materiaux[n]?.map?.image===origine.stadedefrance.image){materiaux[n].map=propre;origine[n]=propre;}
+      }
+    }catch(e){console.warn('Marquage Destiny Rugby :',e);}
+    return {decor,origine,materiaux};
+  })().catch(e=>{
+    // Un décor absent ou illisible : on retombe sur l'enceinte d'origine, jamais sur un terrain vide.
+    decors.delete(fichier);if(fichier===STADES.international)throw e;
+    console.warn('Stade « '+nom+' » indisponible :',e);return chargerStade('international');
+  }));
+  return decors.get(fichier);
 }
 /** Remplace la texture d'un matériau du stade en gardant son cadrage. */
 function repeindre(materiau,canvas,renderer){
@@ -75,7 +114,7 @@ function repeindre(materiau,canvas,renderer){
  *  - `son` : `false` pour une scène muette (vignettes, aperçus).
  */
 export async function creerScene3D(conteneur,options={}){
-  const r=await charger();
+  const [r,stade]=await Promise.all([charger(),chargerStade(options.stade)]);
   const {motions,gaits}=r,leger=!!options.leger;
   const scene=new THREE.Scene();
   scene.background=new THREE.Color('#b6d4e4');scene.fog=new THREE.Fog('#b6d4e4',180,420);
@@ -94,7 +133,9 @@ export async function creerScene3D(conteneur,options={}){
   // chargé est partagé par toute la session ; repeindre ses matériaux en place
   // faisait qu'une scène détruite (React monte deux fois en développement, et
   // deux matchs peuvent s'enchaîner) rendait à l'autre les panneaux d'origine.
-  const decor=clone(r.decor);scene.add(decor);
+  const decor=clone(stade.decor);scene.add(decor);
+  // Autour d'un petit stade il n'y a pas de ville modélisée : un sol jusqu'à l'horizon évite le vide sous le ciel.
+  const alentours=new THREE.Mesh(new THREE.PlaneGeometry(1600,1600),new THREE.MeshStandardMaterial({color:'#7d9160',roughness:1,metalness:0}));alentours.rotation.x=-Math.PI/2;alentours.position.y=-.12;scene.add(alentours);
   const jetables=[],propres={};
   decor.traverse(o=>{
     if(!o.isMesh||Array.isArray(o.material)||!['banners','banners_noscroll','surround_objects_2021'].includes(o.material.name))return;
@@ -112,23 +153,23 @@ export async function creerScene3D(conteneur,options={}){
   });
   const teintePad=luminance(tenueA.principal)>.82?tenueA.secondaire:tenueA.principal;
   const peindre=(nom,fabrique)=>{try{const t=repeindre(propres[nom],fabrique(),renderer);if(t)jetables.push(t);}catch(e){console.warn('Habillage du stade ('+nom+') :',e);}};
-  peindre('banners',creerPanneaux);
-  if(propres.banners_noscroll&&propres.banners?.map)propres.banners_noscroll.map=propres.banners.map;
-  if(r.origine.surround_objects_2021)peindre('surround_objects_2021',()=>{
-    try{return creerAbords(r.origine.surround_objects_2021.image,teintePad,blasons[0]);}
-    catch{return creerAbords(r.origine.surround_objects_2021.image,teintePad,null);}
+  // Les stades de club n'ont que des panneaux fixes : ils portent les mêmes réclames.
+  if(propres.banners){peindre('banners',creerPanneaux);if(propres.banners_noscroll&&propres.banners.map)propres.banners_noscroll.map=propres.banners.map;}
+  else peindre('banners_noscroll',creerPanneaux);
+  if(stade.origine.surround_objects_2021)peindre('surround_objects_2021',()=>{
+    try{return creerAbords(stade.origine.surround_objects_2021.image,teintePad,blasons[0]);}
+    catch{return creerAbords(stade.origine.surround_objects_2021.image,teintePad,null);}
   });
   // Le public : six tribunes pour le club qui reçoit, deux pour les visiteurs.
-  if(r.origine.CrowdMaterial&&r.materiaux.CrowdMaterial){
+  if(stade.origine.CrowdMaterial&&stade.materiaux.CrowdMaterial){
     try{
-      const foule=r.origine.CrowdMaterial.image,taille=leger?512:1024;
+      const foule=stade.origine.CrowdMaterial.image,taille=leger?512:1024;
       const publics=[[tenueA.principal,tenueA.secondaire],[tenueB.principal,tenueB.secondaire]].map(([p,s])=>{
-        const m=r.materiaux.CrowdMaterial.clone();m.map=r.origine.CrowdMaterial;repeindre(m,creerPublic(foule,p,s,taille),renderer);jetables.push(m.map,m);return m;
+        const m=stade.materiaux.CrowdMaterial.clone();m.map=stade.origine.CrowdMaterial;repeindre(m,creerPublic(foule,p,s,taille),renderer);jetables.push(m.map,m);return m;
       });
-      for(const nom of r.tribunes){
-        const cible=decor.getObjectByName(nom);
-        if(cible)cible.material=publics[/SectionNorth-|SectionNorthEast-/.test(nom)?1:0];
-      }
+      decor.traverse(cible=>{const nom=cible.name;if(!cible.isMesh||!/CrowdSection/.test(nom))return;
+        cible.material=publics[/SectionNorth-|SectionNorthEast-/.test(nom)?1:0];
+      });
     }catch(e){console.warn('Habillage des tribunes :',e);}
   }
 
@@ -155,13 +196,46 @@ export async function creerScene3D(conteneur,options={}){
     if(!head||!headMesh)return;
     const attach=(source,color,marge,roughness=.82)=>{
       if(!source)return;
-      const mesh=new THREE.Mesh(fitToHead(source,headMesh,kind,marge),new THREE.MeshStandardMaterial({color,roughness,metalness:0,side:THREE.DoubleSide}));
+      // Le masque de la planche découpe les mèches : sans lui, chaque coupe est un bloc plein.
+      const masque=source.material?.map||null;
+      const mesh=new THREE.Mesh(fitToHead(source,headMesh,kind,marge),new THREE.MeshStandardMaterial({color,roughness,metalness:0,side:THREE.DoubleSide,map:masque,alphaTest:masque?.38:0}));
       mesh.name=source.name;model.add(mesh);model.updateMatrixWorld(true);head.attach(mesh);
     };
     const casque=look.accessory==='casque';
     if(look.hair&&!casque)attach(findHairMesh(r.hair,'Hair',look.hair,COIFFURES),look.color,.007);
     if(look.beard)attach(findHairMesh(r.hair,'Beard',look.beard,BARBES),new THREE.Color(look.color).multiplyScalar(.85),.004);
-    if(casque)attach(r.hair.getObjectByName('Helmet_LOD2'),look.bandColor,.012,.6);
+    if(casque){
+      // Un des casques de la boutique, tiré par joueur ; à défaut, le casque d'origine teinté.
+      const modele=r.casques.length?r.casques[Math.floor(tirage(look.graine??0,9)*r.casques.length)%r.casques.length]:null;
+      if(modele){
+        const box=new THREE.Box3().setFromBufferAttribute(headMesh.geometry.attributes.position);
+        const mesh=new THREE.Mesh(modele.geometry,modele.material);mesh.name='Casque';
+        mesh.scale.setScalar(CASQUE.taille);mesh.position.set(0,box.max.y-.118+CASQUE.haut,(box.min.z+box.max.z)/2+.012+CASQUE.recul);
+        model.add(mesh);model.updateMatrixWorld(true);head.attach(mesh);
+      }else attach(r.hair.getObjectByName('Helmet_LOD2'),look.bandColor,.012,.6);
+    }
+    // Les crampons : la paire d'origine pour un joueur sur deux, un modèle de la boutique pour les autres.
+    if(r.crampons.length&&look.graine!==undefined&&tirage(look.graine,10)<.55){
+      const modele=r.crampons[Math.floor(tirage(look.graine,11)*r.crampons.length)%r.crampons.length];
+      let bottes=null;model.traverse(o=>{if(o.isSkinnedMesh&&/boot/.test(o.name))bottes=o;});
+      const pieds=['L','R'].map(c=>model.getObjectByName('CC_Base_'+c+'_Foot')).filter(Boolean);
+      if(bottes&&pieds.length===2){
+        const p=bottes.geometry.attributes.position,poses=[];
+        for(const pied of pieds){
+          const ou=model.worldToLocal(pied.getWorldPosition(new THREE.Vector3())),cote=Math.sign(ou.x)||1,b=new THREE.Box3();
+          for(let i=0;i<p.count;i++)if(p.getX(i)*cote>0)b.expandByPoint(tmp.set(p.getX(i),p.getY(i),p.getZ(i)));
+          if(!b.isEmpty())poses.push({pied,b});
+        }
+        if(poses.length===2){
+          bottes.visible=false;
+          for(const {pied,b} of poses){
+            const mesh=new THREE.Mesh(modele.geometry,modele.material);mesh.name='Crampon';
+            mesh.scale.setScalar((b.max.z-b.min.z)*CRAMPON.taille);mesh.position.set((b.min.x+b.max.x)/2,b.min.y,(b.min.z+b.max.z)/2);
+            model.add(mesh);model.updateMatrixWorld(true);pied.attach(mesh);
+          }
+        }
+      }
+    }
     if(look.accessory==='bandeau')attach(r.hair.getObjectByName('Headband_LOD2'),look.bandColor,.014,.7);
   }
   function buildActor(template,kind,kit,index,number,ref=false,wish={}){
@@ -177,7 +251,7 @@ export async function creerScene3D(conteneur,options={}){
       }
     });
     group.add(model);scene.add(group);group.updateMatrixWorld(true);
-    dress(model,kind,ref?{...look,accessory:''}:look);
+    dress(model,kind,ref?{...look,accessory:''}:{...look,graine:index});
     group.add(shadow());
     const pose=preparePose(model,motions.rigs[kind]);
     const actor={group,model,kind,pose,look,kit,heading:Math.PI,ref,number,graine:index,
@@ -189,12 +263,27 @@ export async function creerScene3D(conteneur,options={}){
   /** Ce que la carte du joueur sait de son apparence, traduit pour le modèle. */
   const souhait=p=>{const a=options.apparences?.[p.id]??p.source.apparence;return a&&(a.coiffure!==undefined||a.cheveux!==undefined||a.barbe!==undefined||typeof a.peau==='string')?souhaitDepuisCarte(a):a||{};};
   function graine(texte){let h=2166136261;for(let i=0;i<texte.length;i++)h=Math.imul(h^texte.charCodeAt(i),16777619);return (h>>>0)%9973;}
+  // ⚠️ UN, DEUX OU TROIS CASQUES PAR ÉQUIPE, PAS UN SUR SEPT AU HASARD : surtout des
+  // avants, parfois un ailier, rarement quelqu'un d'autre. Tiré une fois par équipe,
+  // sur les postes — le remplaçant d'un casqué n'hérite pas du casque.
+  const casquesParEquipe=new Map();
+  function porteCasque(p){
+    let porteurs=casquesParEquipe.get(p.team);
+    if(!porteurs){
+      const cle=graine((options.equipes?.[p.team]?.nom||'equipe')+':casques')+p.team*17;
+      const combien=1+Math.floor(tirage(cle,1)*3),poids=n=>n<=8?1:n===11||n===14?.7:.1,rangs=[];
+      for(let n=1;n<=15;n++)rangs.push([n,tirage(cle,20+n)/poids(n)]);
+      rangs.sort((x,y)=>x[1]-y[1]);porteurs=new Set(rangs.slice(0,combien).map(x=>x[0]));casquesParEquipe.set(p.team,porteurs);
+    }
+    return p.shirt<=15&&porteurs.has(p.shirt);
+  }
   function actorFor(p){
     let a=actors.get(p.id);
     if(!a){
       const kind=p.number<=8?'male_forward':'male_back',kit=numeroter(tenues[p.team],p.shirt,renderer,tailleTenue);
       // Le tirage des traits manquants suit le nom : un joueur garde la même tête d'un match à l'autre.
-      a=buildActor(p.number<=8?r.forward:r.back,kind,kit,p.source.nom?graine(p.source.nom)+p.team*31:p.shirt+p.team*31,p.shirt,false,souhait(p));
+      const index=p.source.nom?graine(p.source.nom)+p.team*31:p.shirt+p.team*31;
+      a=buildActor(p.number<=8?r.forward:r.back,kind,kit,index,p.shirt,false,{...souhait(p),accessoire:porteCasque(p)?'casque':tirage(index,7)>.93?'bandeau':''});
       a.nom=nomCourt(p.source.nom||'');actors.set(p.id,a);
     }
     return a;

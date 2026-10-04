@@ -19,7 +19,7 @@ const speedFactor=()=>Number($('#speed').value);
 
 async function boot(){
   $('#loading').textContent='Chargement du stade, des équipements et des mouvements…';
-  scene=await creerScene3D($('#scene'),{outils,equipes:EQUIPES,capture:true,camera:'tv',habillage:{nom:'Destiny Rugby'}});
+  scene=await creerScene3D($('#scene'),{outils,equipes:EQUIPES,capture:true,camera:'tv',habillage:{nom:'Destiny Rugby'},stade:new URLSearchParams(location.search).get('stade')||undefined});
   majSon();
   match=scene.brancher(nouveauMatch());
   $('#loading').remove();requestAnimationFrame(frame);

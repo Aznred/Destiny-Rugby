@@ -7,6 +7,7 @@ import { Icone } from '../Icone';
 import { HabillageTV } from './HabillageTV';
 import { couleursEquipeTV, DUREE_EQUIPE_TV, type IdentiteTV } from '../../lib/habillageTV';
 import { preferencesTele } from '../../lib/match3D';
+import type { Stade3D } from '../../lib/stade3D';
 import './DirectCinema.css';
 
 const heure = (s: number) =>
@@ -25,7 +26,10 @@ export function DirectCinema({
   identite,
   portraits,
   panneauDecision,
+  stade,
 }: {
+  /** Le décor 3D : il grandit avec le niveau du club qui reçoit. */
+  stade?: Stade3D;
   /** Les choix d'une pénalité à trancher : posés SUR l'image, donc visibles aussi en plein écran. */
   panneauDecision?: ReactNode;
   /** Ce que le terrain montre réellement (film rejoué avec retard) : l'écran hôte y cale son score et son chrono. */
@@ -139,6 +143,7 @@ export function DirectCinema({
             surAffiche={noterAffiche}
             scoreMatch={m.score}
             identite={identite}
+            stade={stade}
             nomDomicile={domicile}
             nomExterieur={exterieur}
             couleurs={couleurs}

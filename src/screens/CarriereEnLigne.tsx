@@ -44,6 +44,7 @@ import type { OrdreFil, StrategieEnLigne } from '../lib/ligue/matchCarriere';
 import type { CouleursDirect } from '../components/match/TerrainEnDirect';
 import { NotificationsMatch } from '../components/NotificationsMatch';
 import { DirectCinema } from '../components/match/DirectCinema';
+import { stadePourEffectif } from '../lib/stade3D';
 import { maillotDeSecours, maillotDepuisBlason } from '../lib/moteur/apparenceMatch';
 import {
   chargerSessionCarriere, chargerLigueCarriere, chargerDirectCarriere, identifierCarriere, identifierGoogleCarriere, configurationCarriere, deconnecterCarriere, supprimerLigueCarriere, INCHANGE,
@@ -1285,6 +1286,11 @@ function Direct({ vue, rencontre: r, agir, occupe, fermer }: { vue: VueCarriereE
   // serveur) : le score et le chrono du tableau s'y calent, pour ne pas annoncer
   // un essai avant qu'on ne le voie.
   const [affiche, setAffiche] = useState<AfficheDirect | null>(null);
+  // Le stade grandit avec l'effectif de celui qui reçoit : campagne au départ, grande enceinte au sommet.
+  const stadeDomicile = useMemo(
+    () => stadePourEffectif(vue.cartes.filter(c => c.proprietaire === r.domicile).map(c => c.note)),
+    [vue.cartes, r.domicile],
+  );
   // Le portrait de chaque joueur vient de SA CARTE ; sans photo, la silhouette grise des cartes.
   const portraits = useMemo(() => {
     const p: Record<string, string | null> = {};
@@ -1348,7 +1354,7 @@ function Direct({ vue, rencontre: r, agir, occupe, fermer }: { vue: VueCarriereE
     <DirectCinema key={`${m.id}:${m.instance ?? ''}`} match={m} domicile={nomClub(vue,r.domicile)} exterieur={nomClub(vue,r.exterieur)} couleurs={couleurs}
       identite={{ nom: vue.competitions.find(c => c.id === r.competitionId)?.nom ?? vue.nom,
         logo: vue.competitions.find(c => c.id === r.competitionId)?.logo ?? vue.logo, journee: r.journee }}
-      portraits={portraits} emblemes={{ domicile: emblemeDomicile, exterieur: emblemeExterieur }} surAffiche={setAffiche}
+      stade={stadeDomicile} portraits={portraits} emblemes={{ domicile: emblemeDomicile, exterieur: emblemeExterieur }} surAffiche={setAffiche}
       /* ⚠️ ON N'EST RÉVEILLÉ QUE DANS LES 50 MÈTRES ADVERSES (`METRES_DECISION`).
          Le serveur ne propose plus une décision sur chacune des vingt-quatre
          pénalités d'un match — à soixante-dix mètres des poteaux, « je prends

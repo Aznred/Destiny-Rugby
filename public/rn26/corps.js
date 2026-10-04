@@ -10,12 +10,14 @@ export const skins=['#e2b99a','#d3a17c','#c99168','#ad7651','#875333','#623b29',
 // Les 23 coiffures et 15 barbes de l'APK, rangées par famille. Une donnée
 // absente ne rend jamais un joueur chauve par défaut : la coupe est alors tirée
 // dans une famille cohérente, et un maillage manquant est remplacé par un voisin.
+// Rangées d'après ce qu'on VOIT une fois le masque appliqué (mesurer_coiffures.py) :
+// surface opaque et hauteur où la coupe s'arrête, pas l'encombrement du maillage.
 export const COIFFURES={
-  ras:['18','19'],
-  court:['09','10','12','13','14','16','21','23','01','06','02'],
-  miLong:['08','11','03'],
-  long:['05','07'],
-  boucle:['15','17','22','24','25'],
+  ras:['19','18','16'],
+  court:['09','13','14','21','23','12'],
+  miLong:['01','02','10'],
+  long:['03','05','06','07','08','25','11'],
+  boucle:['22','15','17','24','12','10'],
 };
 export const BARBES={moustache:['01'],bouc:['02','03','04'],courte:['05','06','07','08','09','10'],longue:['11','12','13','14','15']};
 const TEINTES_CLAIRES=['#2a211c','#3b2a1f','#4a3324','#5d4129','#7a5a34','#a07c48','#c2a063','#8a4a25','#6e6a66','#231c19'];
