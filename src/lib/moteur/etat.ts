@@ -354,6 +354,16 @@ export interface ConqueteAnimee {
   reception?: Vec;
   pousseVers?: Cote;
   melee?: MeleeDetaillee;
+  /**
+   * Le lanceur va chercher le ballon (placement joué) : il rejoint l'endroit où
+   * il est sorti, le ramasse, puis gagne sa place de lancer — derrière la ligne.
+   * « tenu » : il l'a en main. La touche ne se joue pas avant.
+   */
+  ramassage?: 'aller' | 'ramasse' | 'tenu';
+  ramassageDepuis?: number;
+  lanceurId?: string;
+  /** Où repose le ballon sorti, juste derrière la ligne de touche. */
+  ballonAuSol?: Vec;
 }
 
 /** Ballon vivant après un rebond : personne ne le possède encore. */
@@ -456,6 +466,18 @@ export interface EtatMatch {
    * l'étalonnage qui va avec.
    */
   cadenceDetaillee?: boolean;
+  /**
+   * La place de chaque avant dans la structure d'attaque du temps de jeu en
+   * cours (cadence détaillée). Gardée tant que la phase dure : une cellule se
+   * forme et tient, au lieu d'être redistribuée à chaque recalcul.
+   */
+  structureAttaque?: { cle: string; places: Record<string, number> } | null;
+  /**
+   * La ligne d'avantage, gagnée ou perdue (cadence détaillée) : nombre de
+   * collisions de suite gagnées (positif) ou perdues (négatif) par l'équipe
+   * qui tient le ballon, de -3 à 3. Voir `formerRuck`.
+   */
+  avantage?: number;
   /** Le ballon porté en cours : qui a capté le lancer, et depuis quand. */
   maul?: { receveurId: string; debut: number } | null;
   /**
@@ -672,6 +694,31 @@ export interface EtatMatch {
    * ainsi fluides et cohérentes avec l'horloge affichée.
    */
   tempsReel?: boolean;
+  /**
+   * ⚠️ LE PLACEMENT SE JOUE (ligue en ligne, règles 2). Personne n'est installé
+   * d'un coup dans une mêlée, une touche ou un renvoi : chacun y court, et la
+   * phase ATTEND que les joueurs essentiels soient à leur place avant de
+   * décompter son temps. Sans cela le moteur déplaçait près de deux mille
+   * joueurs par match d'un seul pas — des téléportations que l'écran du direct
+   * ne pouvait que maquiller.
+   *
+   * ⚠️ FIGÉ À LA CRÉATION DU MATCH. Le changer en cours de rencontre donnerait
+   * une rejoue différente, donc un autre score que celui déjà annoncé.
+   */
+  placementJoue?: boolean;
+  /** L'attente de placement de la phase arrêtée en cours (voir `placementJoue`). */
+  attentePlacement?: { phase: Phase; depuis: number; pret?: boolean } | null;
+  /**
+   * Resserrement de la défense, de 0 (aucun) à 1 : étalonne le nombre d'essais
+   * de la cadence détaillée sur celui des matchs de ligue (voir `probaPlaquage`).
+   */
+  resserrement?: number;
+  /**
+   * Appelé après chaque pas de simulation. ⚠️ OBSERVATION SEULE : ce crochet
+   * ne doit rien modifier, sinon deux rejoues du même match divergent. Il sert
+   * au film du direct (`lib/ligue/filmDirect.ts`).
+   */
+  apresPas?: (e: EtatMatch) => void;
   /** Options serveur : aucune incidence sur les carrières locales existantes. */
   scoreSurTerrain?: boolean;
   meteoTir?: 'sec' | 'pluie' | 'vent';

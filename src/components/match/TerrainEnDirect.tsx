@@ -40,13 +40,26 @@
 //
 // Le prix est un léger retard sur le direct. Personne ne le voit :
 // il n'y a rien à côté pour le comparer.
+//
+// ═══ DEPUIS LE FILM, ON NE DEVINE PLUS RIEN ══════════════════════════════════
+//
+// Ce qui précède décrit le chemin d'ORIGINE, gardé pour l'atelier, le
+// laboratoire et un serveur qui n'enverrait que des relevés. Un direct reçoit
+// maintenant le FILM du match (`lib/ligue/filmDirect.ts`) : les pas du moteur
+// eux-mêmes, que `LecteurFilm` rejoue avec quelques secondes de retard. Entre
+// deux pas, la position d'un joueur est une simple interpolation entre deux
+// positions VRAIES distantes de 0,15 s — plus de spline tirée sur deux secondes,
+// plus de prédiction, donc plus de retour en arrière. La scène 3D lit alors
+// l'état rejoué exactement comme elle lit un match de carrière.
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Icone } from '../Icone';
 import { PelouseMemo } from './Pelouse';
 import { Camera, angleDeVue, type Cadrage, type Vue } from '../../lib/moteur/camera';
 import { LARGEUR, LONGUEUR, borner, type Vec } from '../../lib/moteur/terrain';
-import type { CoteEnLigne, TerrainDirect } from '../../lib/ligue/matchCarriere';
+import { extraireTerrain, type CoteEnLigne, type TerrainDirect } from '../../lib/ligue/matchCarriere';
+import { LecteurFilm, PAS_FILM, reperesFilm, type FilmDirect, type PionFilm } from '../../lib/ligue/filmDirect';
+import type { EtatMatch } from '../../lib/moteur/etat';
 import { creerScenarioDirect, type ScenarioDirect } from '../../lib/ligue/scenarioDirect';
 import {
   amortirImageDirect, interpolerImageDirect, interpolerEtatDirect, projeterImageDirect, ballonAuReleve, type BallonAfficheDirect,
@@ -90,8 +103,29 @@ export interface CouleursDirect {
   maillots?: Record<CoteEnLigne, MaillotMatch>;
 }
 
-interface Props {
+/** Tant qu'aucune image n'est arrivée : une pelouse vide plutôt qu'un écran qui refuse de se monter. */
+const TERRAIN_VIDE: TerrainDirect = {
+  pions: [], ballon: { x: LONGUEUR / 2, y: LARGEUR / 2 }, phase: 'coupEnvoi', systeme: 'blitz',
+  possession: 'domicile', cadence: 1, horloge: 0,
+};
+
+/** Ce que l'écran montre À CET INSTANT — en retard de quelques secondes sur le serveur. */
+export interface AfficheDirect {
   terrain: TerrainDirect;
+  /** Secondes de jeu affichées. */
+  seconde: number;
+  score: { domicile: number; exterieur: number };
+}
+
+interface Props {
+  /** Le relevé du terrain (atelier, laboratoire, ou serveur sans film). */
+  terrain?: TerrainDirect;
+  /** Le dernier envoi du film du match : voir `lib/ligue/filmDirect.ts`. */
+  film?: FilmDirect;
+  /** Identifiant du match : le sondage y retrouve le dernier pas connu du film. */
+  matchId?: string;
+  /** Appelé quelques fois par seconde avec ce que l'écran montre réellement. */
+  surAffiche?: (affiche: AfficheDirect) => void;
   nomDomicile: string;
   nomExterieur: string;
   couleurs: CouleursDirect;
@@ -168,7 +202,7 @@ function tracerTrajectoires(vol: NonNullable<TerrainDirect['vol']>) {
   return { vol: pointsVol.join(' '), ombre: pointsOmbre.join(' '), anticipe: cheminAnticipe };
 }
 
-function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, emblemes, monCote, carton, modeDemo, pause, vitesseDemo }: Props) {
+function TerrainEnDirect({ terrain = TERRAIN_VIDE, film, matchId, surAffiche, nomDomicile, nomExterieur, couleurs, emblemes, monCote, carton, modeDemo, pause, vitesseDemo }: Props) {
   const scene = useRef<HTMLDivElement>(null);
   const svg = useRef<SVGSVGElement>(null);
   const groupeTerrain = useRef<SVGGElement>(null);
@@ -196,6 +230,24 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, embleme
   const scene3D = useRef<Scene3D | null>(null);
   const memoire3D = useRef(creerMemoireEtat3D());
   const [pleinEcran, setPleinEcran] = useState(false);
+  // --- 🎞️ LE FILM DU MATCH ---------------------------------------------------
+  const lecteur = useRef<LecteurFilm | null>(null);
+  lecteur.current ??= new LecteurFilm();
+  // En développement, le lecteur se laisse interroger depuis la console.
+  if (import.meta.env.DEV) (window as unknown as { __lecteurFilm?: LecteurFilm }).__lecteurFilm = lecteur.current;
+  /** Le terrain tiré du pas rejoué en cours ; refait à chaque nouveau pas. */
+  const terrainFilm = useRef<TerrainDirect | null>(null);
+  /** Sur quoi la scène 3D est branchée : -1 le relevé interpolé, sinon la reprise du film. */
+  const brancheSur = useRef(-1);
+  const rappelAffiche = useRef(surAffiche);
+  useEffect(() => { rappelAffiche.current = surAffiche; }, [surAffiche]);
+  useEffect(() => {
+    const lec = lecteur.current!;
+    lec.recevoir(film);
+    // Le sondage annonce ce pas au serveur, qui n'envoie que la suite.
+    if (matchId && lec.dernier !== undefined) reperesFilm.set(matchId, lec.dernier);
+  }, [film, matchId]);
+  useEffect(() => () => { if (matchId) reperesFilm.delete(matchId); }, [matchId]);
 
   const tempsSimulationDemo = useRef(0);
   const demoOptions = useRef({ modeDemo, pause, vitesseDemo });
@@ -259,6 +311,7 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, embleme
     let image = 0;
     let precedent = performance.now() / 1000;
     let prochainRenduReact = precedent;
+    let prochainAffiche = precedent;
     let actif = true;
     let imageAffichee: ImageDirect | null = null;
     const avancer = (brut: number) => {
@@ -277,8 +330,45 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, embleme
         tempsSimulationDemo.current += dt;
       }
 
+      // ── Le film : on rejoue les pas du moteur, on n'interpole plus de relevés ──
+      const lec = lecteur.current!;
+      const filmActif = !isDemo && lec.pret;
+      let imageFilm: { courant: TerrainDirect; pions: Map<string, Vec>; ballon: BallonAfficheDirect } | null = null;
+      if (filmActif) {
+        const nouveauPas = lec.avancer(dtReel);
+        const etat = lec.etat;
+        if (nouveauPas || !terrainFilm.current) {
+          terrainFilm.current = extraireTerrain(etat as unknown as EtatMatch, Date.now(), (p) => (p as unknown as PionFilm).corps);
+        }
+        const base = terrainFilm.current;
+        // L'image se situe entre le pas précédent et le pas courant.
+        const alpha = lec.alpha;
+        const retard = etat.reliquat - PAS_FILM;
+        const carte = new Map<string, Vec>();
+        for (const p of etat.pions) {
+          if (!p.surLeTerrain) continue;
+          const a = lec.avant(p.id) ?? p.pos;
+          carte.set(p.id, { x: a.x + (p.pos.x - a.x) * alpha, y: a.y + (p.pos.y - a.y) * alpha });
+        }
+        const avantBallon = lec.ballonPrecedent;
+        const courant: TerrainDirect = {
+          ...base,
+          simulation: (base.simulation ?? 0) + retard,
+          instantJeu: (base.instantJeu ?? 0) + retard,
+          ballon: {
+            x: avantBallon.x + (etat.ballon.x - avantBallon.x) * alpha,
+            y: avantBallon.y + (etat.ballon.y - avantBallon.y) * alpha,
+            hauteur: base.ballon.hauteur,
+          },
+          vol: base.vol ? { ...base.vol, ecoule: Math.max(0, base.vol.ecoule + retard) } : undefined,
+        };
+        imageFilm = { courant, pions: carte, ballon: ballonAuReleve(courant, carte, 0) };
+      }
+
       const file = tampon.current;
-      if (isDemo) {
+      if (filmActif) {
+        // Rien à régler : le lecteur tient son propre retard.
+      } else if (isDemo) {
         retardRendu.current = 0;
         retardCible.current = 0;
       } else {
@@ -316,7 +406,9 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, embleme
       }
 
       let imageDirecte: ImageDirect;
-      if (b) {
+      if (imageFilm) {
+        imageDirecte = imageFilm;
+      } else if (b) {
         imageDirecte = interpolerImageDirect(a.terrain, b.terrain, u, dtSim);
       } else if (isDemo) {
         const DUREE_CYCLE = 4.0;
@@ -355,7 +447,8 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, embleme
       const fonduDebut = Math.min(1, tCycle / 0.35); // ease-in sur 0.35s
       const fonduFin = Math.min(1, (4.0 - tCycle) / 0.35); // ease-out sur 0.35s
       const poidsFondu = Math.min(fonduDebut, fonduFin);
-      if (isDemo && tCycle < 0.08) {
+      if (imageFilm || (isDemo && tCycle < 0.08)) {
+        // Le film donne des positions vraies : les amortir les mettrait en retard sur l'action.
         imageAffichee = imageDirecte;
       } else {
         imageAffichee = amortirImageDirect(imageAffichee, imageDirecte, dtReel * (0.4 + poidsFondu * 0.6));
@@ -371,7 +464,8 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, embleme
       };
 
       // Le bandeau et le porteur ne changent qu'au terme de la trajectoire.
-      const courant = b ? interpolerEtatDirect(a.terrain, b.terrain, u)
+      const courant = imageFilm ? imageFilm.courant
+        : b ? interpolerEtatDirect(a.terrain, b.terrain, u)
         : isDemo
         ? {
             ...a.terrain,
@@ -401,7 +495,16 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, embleme
 
       // La scène 3D reçoit exactement ce que le terrain plat dessinerait à cette image.
       const scene3 = scene3D.current;
-      if (scene3) {
+      if (scene3 && imageFilm) {
+        // ⚠️ LA SCÈNE LIT L'ÉTAT REJOUÉ COMME CELUI D'UN MATCH DE CARRIÈRE : mêmes
+        // champs, même interpolation entre deux pas. Une reprise à zéro du film
+        // (onglet resté caché) la rebranche pour qu'aucun corps ne traverse le terrain.
+        if (brancheSur.current !== lec.coupes) { scene3.brancher(lec.etat, { direct: false }); brancheSur.current = lec.coupes; }
+        const mode3 = reglages.current.modeCamera;
+        scene3.camera = mode3 === 'large' ? 'wide' : mode3 === 'suivi' ? 'close' : 'tv';
+        scene3.image(dtReel, { vitesse: 1, fige: false });
+      } else if (scene3) {
+        if (brancheSur.current !== -1) { scene3.brancher(memoire3D.current.etat, { direct: true }); brancheSur.current = -1; }
         etat3DDepuisDirect(memoire3D.current, courant, pions.current, ballon.current);
         const mode3 = reglages.current.modeCamera;
         // « Caméra auto » laisse faire la réalisation : buteur, poteaux, en-but, vue aérienne.
@@ -439,6 +542,15 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, embleme
       const ballonDessine = noeudBallon.current;
       if (ballonDessine) ballonDessine.noeud.setAttribute('transform',
         `translate(${(ballon.current.x - ballonDessine.origine.x).toFixed(2)} ${(ballon.current.y - ballonDessine.origine.y).toFixed(2)})`);
+      // Score, chrono et bandeaux suivent ce que l'écran MONTRE, pas ce que le
+      // serveur sait déjà : trois fois par seconde suffisent.
+      if (imageFilm && maintenant >= prochainAffiche) {
+        prochainAffiche = maintenant + 1 / 3;
+        rappelAffiche.current?.({
+          terrain: courant, seconde: lec.etat.t,
+          score: { domicile: lec.etat.scoreA, exterieur: lec.etat.scoreB },
+        });
+      }
       if (maintenant >= prochainRenduReact) {
         redessiner((n) => n + 1);
         // En 3D, React ne dessine plus les trente joueurs : huit rendus par seconde suffisent aux bandeaux.
@@ -487,8 +599,15 @@ function TerrainEnDirect({ terrain, nomDomicile, nomExterieur, couleurs, embleme
   const brancherScene = useCallback((s: Scene3D | null) => {
     scene3D.current = s;
     if (!s) return;
+    const lec = lecteur.current!;
+    if (lec.pret && !demoOptions.current.modeDemo) {
+      s.brancher(lec.etat, { direct: false });
+      brancheSur.current = lec.coupes;
+      return;
+    }
     etat3DDepuisDirect(memoire3D.current, afficheRef.current, pions.current, ballon.current);
     s.brancher(memoire3D.current.etat, { direct: true });
+    brancheSur.current = -1;
   }, []);
   const abandonner3D = useCallback(() => { scene3D.current = null; setVue3D(false); }, []);
   const basculerVue = () => {

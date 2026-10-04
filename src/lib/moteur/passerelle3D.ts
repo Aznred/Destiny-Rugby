@@ -22,7 +22,7 @@ export function creerApercuDestiny(cle = 'rn26-destiny-26', cadenceDetaillee = t
   // Cadence détaillée : en trois dimensions, chaque phase se joue à son rythme
   // de terrain (mêlée complète, passes à vitesse réelle, rituel du buteur).
   return creerMatch('France', 'Angleterre', equipe('France'), equipe('Angleterre'), 0, 0,
-    cle, undefined, { scoreSurTerrain: true, tempsReel: false, niveau: 'pro', cadenceDetaillee });
+    cle, undefined, { scoreSurTerrain: true, tempsReel: false, niveau: 'pro', cadenceDetaillee, placementJoue: cadenceDetaillee });
 }
 export { avancer, porteurPourAffichage, geometrieMelee, TEMPS_MELEE, RITUEL_TIR };
 export { preparerChenille, designerRelayeur } from './regroupements';

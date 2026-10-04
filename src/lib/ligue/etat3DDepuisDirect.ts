@@ -1,5 +1,10 @@
 // LE MATCH EN LIGNE VU EN TROIS DIMENSIONS — sans rien demander de plus au serveur.
 //
+// ⚠️ CHEMIN D'ORIGINE, GARDÉ POUR L'ATELIER ET LE LABORATOIRE. Un direct reçoit
+// maintenant le FILM du match (`filmDirect.ts`) : les pas du moteur eux-mêmes,
+// que la scène lit comme un match de carrière. Ce module ne sert plus qu'à
+// montrer un relevé isolé du terrain, ou à un serveur qui n'enverrait pas de film.
+//
 // ⚠️ LE SERVEUR NE CHANGE PAS, LA BASE NON PLUS. Le direct d'une ligue reçoit
 // déjà, toutes les deux secondes, un relevé du terrain (`TerrainDirect`) :
 // positions, vols, gestes datés, conquête, contact, tir en préparation. L'écran

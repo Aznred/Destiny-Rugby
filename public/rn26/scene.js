@@ -486,7 +486,10 @@ export async function creerScene3D(conteneur,options={}){
     for(const p of match.players){
       const a=actorFor(p);vus.add(p.id);
       const m=match.motion(p,offset);a.group.visible=p.visible;a.motion=m;
-      if(m.vivant)vivre(a,m);else a.vivait=false;
+      // À la première image d'un état qu'on vient de brancher, l'acteur n'a pas
+      // encore été posé : sa dernière place connue est celle d'un autre match
+      // (ou le centre du terrain). On ne l'y ancre pas.
+      if(m.vivant&&!snap)vivre(a,m);else a.vivait=false;
       const previous=match.previous.get(p.id);
       tmp2.set(previous?THREE.MathUtils.lerp(previous.x,p.x,alpha):p.x,0,previous?THREE.MathUtils.lerp(previous.z,p.z,alpha):p.z);
       const base=tmp2.clone(),speedNow=Math.hypot(p.vx,p.vz);
@@ -666,7 +669,14 @@ export async function creerScene3D(conteneur,options={}){
       }
     }else if(e.phase==='touche'){
       const progress=match.progress(offset),thrower=match.players.find(p=>p.number===2&&p.team===match.team),target=actors.get(e.conquete?.cibleId),lanceur=actors.get(thrower?.id);
-      if(lanceur){
+      const ram=e.conquete?.ramassage,sol=e.conquete?.ballonAuSol;
+      if(ram&&ram!=='tenu'&&sol){
+        // Le ballon attend derrière la ligne de touche ; il monte dans les mains
+        // du lanceur pendant qu'il le ramasse.
+        const k=ram==='ramasse'&&lanceur?clamp((visualTime-(e.conquete.ramassageDepuis??visualTime)-.42)/.3,0,1):0;
+        t.set(sol.y-35,SOL,sol.x-61);key='sol:touche';
+        if(k>0){hands(lanceur,handA);t.lerp(handA,k);if(k>=1){key='main:'+thrower.id;heading=lanceur.heading;orientation='main';}}
+      }else if(lanceur){
         hands(lanceur,t);key='main:'+thrower.id;heading=lanceur.heading;orientation='main';
         if(progress>=.6&&target){
           target.leftHand.getWorldPosition(handA);target.rightHand.getWorldPosition(handB);handA.add(handB).multiplyScalar(.5);
@@ -811,7 +821,7 @@ export async function creerScene3D(conteneur,options={}){
     /** Branche un état de match. `direct` : état déjà interpolé (relevés du direct en ligne). */
     brancher(etat,{direct=false}={}){
       match=etat instanceof DestinyMatch?etat:new DestinyMatch({etat,outils:options.outils,direct});
-      for(const a of actors.values())a.group.visible=false;
+      for(const a of actors.values()){a.group.visible=false;a.vivait=false;a.anchorBlend=0;}
       snap=true;ballState.key='';return match;
     },
     /** Une image. `fige` : le match est arrêté (carte de décision, pause), la scène reste affichée. */

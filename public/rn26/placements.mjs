@@ -119,9 +119,20 @@ export class PhysicalPlayers {
         const b=this.bodies.get(p.id);
         if(this.pins.has(p.id))continue;
         const t=targets.get(p.id),dx=t.x-b.x,dz=t.z-b.z,d=Math.hypot(dx,dz);
+        // ⚠️ QUAND LE MOTEUR JOUE CHAQUE DÉPLACEMENT (`placementJoue`), LE CORPS COLLE
+        // À SA COURSE. La poursuite ci-dessous laisse un corps lancé un mètre derrière
+        // sa place : un plaqueur et un porteur qui convergent semblaient donc encore à
+        // deux pas l'un de l'autre quand le moteur les avait déjà au contact — le
+        // « plaquage à distance ». Elle ne reste utile qu'au joueur que la scène place
+        // elle-même (mêlée, ruck, alignement) ou qui revient de loin.
+        // Le trajet du pas est réparti sur ses sous-pas : la vitesse du corps reste
+        // celle de sa course (c'est elle qui choisit l'allure et le cap à l'image).
+        if(match.e.placementJoue&&!slots.has(p.id)&&d<1.6){const k=1/(steps-tick);b.x+=dx*k;b.z+=dz*k;b.vx=h?dx*k/h:0;b.vz=h?dz*k/h:0;continue;}
         let vx=dx*9,vz=dz*9;
         // On rejoint une phase arrêtée en trottinant : seul un chasseur sprinte.
-        const plafond=arret&&p.source.role!=='chasseur'?(d>18?6.2:4.8):Infinity;
+        // Quand le moteur joue lui-même le placement (`placementJoue`), le corps
+        // suit sa course : le freiner ici le laisserait en retard sur la phase.
+        const plafond=arret&&!match.e.placementJoue&&p.source.role!=='chasseur'?(d>18?6.2:4.8):Infinity;
         const max=Math.min(plafond,Math.max(3.5,p.source.vitesseMax||8.5)),speed=Math.hypot(vx,vz);
         if(speed>max){vx*=max/speed;vz*=max/speed;}
         // Anticipate a crossing and walk around a standing body.

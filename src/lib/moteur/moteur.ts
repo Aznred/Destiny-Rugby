@@ -365,6 +365,10 @@ export interface OptionsMatch {
   tempsReel?: boolean;
   /** Phases jouées à leur rythme de terrain : voir `EtatMatch.cadenceDetaillee`. */
   cadenceDetaillee?: boolean;
+  /** Personne n'est installé d'un coup, la phase attend : voir `EtatMatch.placementJoue`. */
+  placementJoue?: boolean;
+  /** Défense resserrée, de 0 à 1 : voir `EtatMatch.resserrement`. */
+  resserrement?: number;
 }
 
 function planVide(total: number, rng: () => number): PlanDeScore {
@@ -499,6 +503,8 @@ export function creerMatch(
     commentaires: [], fini: false, rng,
     tempsReel: options.tempsReel,
     cadenceDetaillee: options.cadenceDetaillee,
+    placementJoue: options.placementJoue,
+    resserrement: options.resserrement,
     styles: options.cadenceDetaillee ? { A: styleDuClub(clubA), B: styleDuClub(clubB) } : undefined,
     scoreSurTerrain: options.scoreSurTerrain ?? true, meteoTir: options.meteoTir,
     niveau: options.niveau ?? 'pro',
@@ -561,6 +567,7 @@ export function avancer(e: EtatMatch, secondesSimulees: number): void {
         p.effort = 0.55;
       }
     }
+    e.apresPas?.(e);
   }
 }
 
@@ -685,6 +692,17 @@ function tick(e: EtatMatch): void {
     // On rejoint un coup d'envoi ou un renvoi en trottinant, pas au sprint.
     if (e.phase === 'coupEnvoi' || e.phase === 'renvoi22') {
       for (const p of e.pions) if (p.surLeTerrain) p.effort = Math.min(p.effort, .66);
+    }
+    if (e.phase === 'touche' && e.placementJoue) conduireLanceur(e);
+    // Son tir parti, le buteur regagne sa place en trottinant : il repartait au sprint.
+    if (e.tir?.volLance && e.tir.buteur.surLeTerrain) e.tir.buteur.effort = Math.min(e.tir.buteur.effort, .6);
+    // Idem pour une mêlée ou une touche qui attend ses joueurs : on s'y rend au
+    // petit trot, un peu plus vite quand on vient de loin.
+    if (e.placementJoue && e.attentePlacement && !e.attentePlacement.pret && (e.phase === 'melee' || e.phase === 'touche')) {
+      for (const p of e.pions) {
+        // Allures d'un replacement : 4,8 m/s, 6,2 m/s quand il reste plus de quatorze mètres.
+        if (p.surLeTerrain) p.effort = Math.min(p.effort, (distance2(p.pos, p.cible) > 196 ? 6.2 : 4.8) / Math.max(4, p.vitesseMax));
+      }
     }
   }
 
@@ -865,7 +883,12 @@ function tick(e: EtatMatch): void {
     }
     const frappe = attente.rapideArcade ? .28 : attente.intention === 'drop' ? 1.12 : attente.intention === 'renvoi' ? 1.05
       : auteur.numero === 9 ? .84 : .7;
-    if (!forceFrappe && e.sim - attente.pretDepuis < frappe) return;
+    // ⚠️ MÊME FORCÉE, LA FRAPPE ATTEND SON ARMÉ (cadence détaillée). Un botteur
+    // gêné qui n'atteignait pas sa marque tapait à l'instant où l'attente
+    // expirait : le ballon partait avant que le geste ait commencé, donc sans
+    // que le corps se soit tourné — un coup de pied sur vingt-cinq partait dans
+    // le dos du botteur (mesuré sur 45 coups de pied).
+    if ((!forceFrappe || e.cadenceDetaillee) && e.sim - attente.pretDepuis < frappe) return;
     delete e.piedPrepare;
     if (e.placement) {
       delete e.placement[auteur.id];
@@ -875,7 +898,7 @@ function tick(e: EtatMatch): void {
     return;
   }
 
-  e.minuteur -= dt;
+  if (!retenirLePlacement(e)) e.minuteur -= dt;
   switch (e.phase) {
     case 'coupEnvoi': return phaseCoupEnvoi(e);
     case 'renvoi22': return phaseRenvoi22(e);
@@ -1021,6 +1044,16 @@ function dire(
 // naturel à vitesse de course.
 function installerPlacement(e: EtatMatch, placement: Record<string, Vec>, seuil = 20): void {
   e.placement = placement;
+  if (e.placementJoue) {
+    // Le placement se joue : chacun reçoit sa marque et y court. La phase,
+    // elle, attend qu'ils y soient (`retenirLePlacement`).
+    for (const p of e.pions) {
+      const c = placement[p.id];
+      if (c && p.surLeTerrain && p.sanction <= 0) p.cible = c;
+    }
+    e.attentePlacement = { phase: e.phase, depuis: e.sim };
+    return;
+  }
   const instantane = e.phase === 'melee' || e.phase === 'touche';
   if (!instantane && e.phase !== 'coupEnvoi') seuil = Infinity;
   // En cadence détaillée, chacun regagne sa marque en courant : le coup
@@ -1037,6 +1070,75 @@ function installerPlacement(e: EtatMatch, placement: Record<string, Vec>, seuil 
       stopper(p);
     }
   }
+}
+
+/**
+ * LE LANCEUR VA CHERCHER LE BALLON (placement joué). Il court jusqu'à l'endroit
+ * où il est sorti, se baisse, le ramasse, puis rejoint sa place de lancer.
+ * Avant, il « apparaissait » sur la ligne avec le ballon déjà en main.
+ */
+function conduireLanceur(e: EtatMatch): void {
+  const c = e.conquete;
+  if (!c || c.type !== 'touche' || !c.ramassage || c.ramassage === 'tenu' || !c.ballonAuSol) return;
+  const lanceur = e.pions.find((p) => p.id === c.lanceurId && p.surLeTerrain && p.sanction <= 0);
+  // Remplacé ou exclu entre-temps : le ballon est donné à celui qui lance à sa place.
+  if (!lanceur) { c.ramassage = 'tenu'; return; }
+  if (c.ramassage === 'aller') {
+    // Il s'arrête à un demi-pas du ballon, côté terrain : on ne ramasse pas en courant dessus.
+    const versTerrain = c.ballonAuSol.y < AXE ? 1 : -1;
+    lanceur.cible = { x: c.ballonAuSol.x, y: c.ballonAuSol.y + versTerrain * 0.45 };
+    if (!lanceur.corps && distance(lanceur.pos, lanceur.cible) < 0.5) {
+      c.ramassage = 'ramasse'; c.ramassageDepuis = e.sim;
+      stopper(lanceur);
+      jouerGeste(e, lanceur, 'pickup', 1.15);
+    }
+    return;
+  }
+  lanceur.cible = { ...lanceur.pos };
+  if (e.sim - (c.ramassageDepuis ?? e.sim) >= 1.1) c.ramassage = 'tenu';
+}
+
+/** Au-delà, la phase part quand même : un match ne se bloque jamais sur un joueur gêné. */
+const ATTENTE_PLACEMENT_MAX = 24;
+
+/**
+ * LA PHASE ATTEND SES JOUEURS (`placementJoue`). Tant que ceux dont elle a
+ * besoin ne sont pas à leur marque, son temps ne se décompte pas : la mêlée
+ * reste à l'étape « placement », l'alignement ne se resserre pas, le renvoi ne
+ * part pas. Une fois prête, elle ne se retient plus : la suite lui appartient.
+ *
+ * Le coup d'envoi a sa propre attente (`phaseCoupEnvoi`), plus ancienne.
+ */
+function retenirLePlacement(e: EtatMatch): boolean {
+  const a = e.attentePlacement;
+  if (!e.placementJoue || !a) return false;
+  if (a.phase !== e.phase) { e.attentePlacement = null; return false; }
+  if (a.pret || !(e.phase === 'melee' || e.phase === 'touche' || e.phase === 'renvoi22')) return false;
+  if (e.sim - a.depuis > ATTENTE_PLACEMENT_MAX) {
+    a.pret = true;
+    if (e.conquete?.ramassage) e.conquete.ramassage = 'tenu';
+    return false;
+  }
+  // Pas de lancer sans ballon : le talonneur doit l'avoir ramassé.
+  if (e.phase === 'touche' && e.conquete?.ramassage && e.conquete.ramassage !== 'tenu') return true;
+  for (const p of e.pions) {
+    if (!p.surLeTerrain || p.sanction > 0) continue;
+    const lie = p.role === 'melee' || p.role === 'alignement';
+    const essentiel = e.phase === 'melee' ? lie || p.numero === 9
+      : e.phase === 'touche' ? lie || p.numero === 9 || (p.numero === 2 && p.cote === e.possession)
+        : true;
+    if (!essentiel) continue;
+    // Mêlée et touche déplacent la cible de leurs joueurs liés (écart avant la
+    // liaison, alignement d'abord espacé) : c'est elle, la marque à atteindre.
+    const marque = e.phase === 'renvoi22' ? e.placement?.[p.id] : p.cible;
+    if (!marque) continue;
+    // Deux alignements se font face à un mètre : leurs épaules se repoussent,
+    // et aucun sauteur ne tient au centimètre sur sa marque.
+    const tolerance = e.phase === 'renvoi22' ? 2 : p.role === 'melee' ? 0.8 : p.role === 'alignement' ? 1.3 : 1.8;
+    if (p.corps || distance(p.pos, marque) > tolerance) return true;
+  }
+  a.pret = true;
+  return false;
 }
 
 function nomClub(e: EtatMatch, cote: Cote): string { return cote === 'A' ? e.clubA : e.clubB; }
@@ -1085,6 +1187,22 @@ function resoudreContactsPhysiques(e: EtatMatch, balayage = true, passages = 3):
   const regroupement = !!e.cadenceDetaillee
     && (e.phase === 'ruck' || e.phase === 'maul' || e.phase === 'melee' || e.phase === 'touche');
   const meleeDetaillee = !!e.cadenceDetaillee && e.phase === 'melee';
+  // ⚠️ ON SE CROISE EN REJOIGNANT UNE PHASE ARRÊTÉE (`placementJoue`). Le
+  // balayage ci-dessous ramène deux adversaires à leur point de départ quand
+  // leurs trajets se coupent : dans le jeu, leurs cibles changent aussitôt ;
+  // en route vers une touche, elles ne changent pas, et les deux hommes
+  // restaient face à face jusqu'à l'expiration de l'attente (mesuré : sept
+  // touches sur trente-trois). On s'y frôle donc, épaule contre épaule.
+  const enPlacement = !!e.placementJoue && !!e.attentePlacement && !e.attentePlacement.pret
+    && e.attentePlacement.phase === e.phase;
+  if (enPlacement) balayage = false;
+  // ⚠️ ON SE DÉGAGE D'UN PAQUET, ON N'EN EST PAS EXPULSÉ (`placementJoue`). Quand
+  // une mêlée ou un ruck se défait, seize corps emboîtés redeviennent des
+  // adversaires qui ne doivent plus se toucher : les trois passages les
+  // écartaient d'un coup, de trois à quatre mètres en un pas. On borne ce que
+  // la séparation peut déplacer un joueur par pas ; le reste se résorbe aux
+  // pas suivants, à l'allure d'un homme qui s'extrait.
+  const departs = e.placementJoue ? actifs.map((p) => ({ x: p.pos.x, y: p.pos.y })) : null;
   for (let passage = 0; passage < passages; passage++) {
     for (let i = 0; i < actifs.length; i++) {
       const a = actifs[i]!;
@@ -1107,7 +1225,7 @@ function resoudreContactsPhysiques(e: EtatMatch, balayage = true, passages = 3):
         if (meleeDetaillee && ((a.numero === 9 && b.role === 'melee') || (b.numero === 9 && a.role === 'melee'))) continue;
         const opposants = a.cote !== b.cote;
         const lie = ['ruck', 'maul', 'melee', 'alignement'].includes(a.role) && a.role === b.role;
-        const rayon = lie ? .62 : opposants ? 1.18 : .94;
+        const rayon = lie ? .62 : enPlacement ? .78 : opposants ? 1.18 : .94;
         let dx = b.pos.x - a.pos.x;
         let dy = b.pos.y - a.pos.y;
         let d2 = dx * dx + dy * dy;
@@ -1171,6 +1289,14 @@ function resoudreContactsPhysiques(e: EtatMatch, balayage = true, passages = 3):
         }
       }
     }
+  }
+  if (departs) {
+    const MAX = 0.42;
+    actifs.forEach((p, i) => {
+      const dx = p.pos.x - departs[i].x, dy = p.pos.y - departs[i].y;
+      const d = Math.hypot(dx, dy);
+      if (d > MAX) { p.pos.x = departs[i].x + dx / d * MAX; p.pos.y = departs[i].y + dy / d * MAX; }
+    });
   }
 }
 
@@ -2029,6 +2155,31 @@ function ligneDeCourse(e: EtatMatch, p: Pion): Vec {
     // Fixer : courir sur l'épaule intérieure du vis-à-vis pour l'aspirer.
     return { x: p.pos.x + s * 14, y: borner(marqueur.pos.y + ouvert * 0.6, 2.5, LARGEUR - 2.5) };
   }
+  if (e.cadenceDetaillee && p.avant) {
+    // ⚠️ UN AVANT NE COURT PAS « VERS L'EXTÉRIEUR » : IL ATTAQUE LA LIGNE. Il vise
+    // l'intervalle entre son vis-à-vis et le défenseur voisin s'il est assez
+    // ouvert, sinon l'épaule du plus léger des deux — droit, pour gagner la
+    // collision. Sa lecture (la vision) décide s'il trouve l'un ou l'autre.
+    let voisin: Pion | null = null;
+    let dVoisin = Infinity;
+    for (const d of defense) {
+      if (d === marqueur || d.battu > 0 || d.sanction > 0 || d.corps) continue;
+      if ((d.pos.x - p.pos.x) * s < -1.5) continue;
+      const dd = distance2(d.pos, marqueur.pos);
+      if (dd < dVoisin) { dVoisin = dd; voisin = d; }
+    }
+    const lit = p.vision >= 52;
+    if (voisin && lit) {
+      const ecart = Math.abs(voisin.pos.y - marqueur.pos.y);
+      if (ecart > 3.2 && ecart < 9) {
+        return { x: p.pos.x + s * 12, y: borner((marqueur.pos.y + voisin.pos.y) / 2, 2.5, LARGEUR - 2.5) };
+      }
+      const faible = voisin.puissance + (voisin.poidsKg ?? 95) * 0.25 < marqueur.puissance + (marqueur.poidsKg ?? 95) * 0.25 && Math.sqrt(dVoisin) < 4 ? voisin : marqueur;
+      const versLautre = Math.sign((faible === marqueur ? voisin.pos.y : marqueur.pos.y) - faible.pos.y) || 1;
+      return { x: p.pos.x + s * 12, y: borner(faible.pos.y - versLautre * 0.55, 2.5, LARGEUR - 2.5) };
+    }
+    return { x: p.pos.x + s * 12, y: borner(marqueur.pos.y + (p.pos.y < marqueur.pos.y ? -0.5 : 0.5), 2.5, LARGEUR - 2.5) };
+  }
   // Attaquer l'intervalle extérieur.
   return { x: p.pos.x + s * 15, y: borner(marqueur.pos.y + ouvert * 5.5, 2.5, LARGEUR - 2.5) };
 }
@@ -2412,7 +2563,11 @@ function coteDeLaPhaseSuivante(e: EtatMatch): 1 | -1 {
 /** À quelle distance du ruck, et à quelle profondeur, se tient le bloc d'avants prêt à percuter. */
 // Le demi de mêlée joue le ballon deux mètres derrière le ruck : le bloc attend derrière LUI,
 // puis monte à sa hauteur quand il arme — une passe à plat, prise lancé.
-const BLOC = { lateral: 4.8, attente: 4.3, lance: 2.3, epaule: 1.2, soutien: 0.9 };
+// ⚠️ L'ÉLAN SE PREND SUR QUATRE MÈTRES, PAS SUR DEUX. Le bloc attendait à 4,3 m
+// et « montait » à 2,3 m : deux mètres de course, puis l'arrêt en attendant la
+// passe — un avant sur trois recevait encore à l'arrêt (mesuré : 27 réceptions
+// sur 79 servies par le 9). Il attend plus bas et vise la hauteur du ballon.
+const BLOC = { lateral: 4.8, attente: 5.2, lance: 0.9, epaule: 1.2, soutien: 0.9 };
 
 /**
  * LE BLOC D'AVANTS SE FORME PENDANT LE RUCK.
@@ -2454,7 +2609,11 @@ function placerBloc(e: EtatMatch): void {
   if (enAttente && l!.structure === 'ecran') return; // l'écran a sa propre course
   const s = sens(bloc.cote);
   const ancre = enRuck ? e.ballon : e.origine;
-  const lance = enAttente && e.gardeRuck < 0.85;
+  // ⚠️ LA POINTE PART AVANT LA PASSE. Elle ne montait que lorsque le demi armait,
+  // ballon déjà sorti : une réception sur cinq se faisait encore à l'arrêt.
+  // Elle s'élance désormais dans la dernière demi-seconde du ruck, pour
+  // prendre le ballon lancée.
+  const lance = (enAttente && e.gardeRuck < 0.85) || (enRuck && e.minuteur < 0.6);
   bloc.ids.forEach((id, i) => {
     const p = e.pions.find((q) => q.id === id);
     if (!p || !p.surLeTerrain || p.sanction > 0 || p.corps || p.role === 'ruck' || p === e.porteur) return;
@@ -2465,7 +2624,7 @@ function placerBloc(e: EtatMatch): void {
       x: bornerLong(ancre.x - s * ((lance ? BLOC.lance : BLOC.attente) + (i === 0 ? 0 : BLOC.soutien))),
       y: borner(ancre.y + e.ouvert * BLOC.lateral + cote * BLOC.epaule, 2, LARGEUR - 2),
     };
-    p.effort = lance ? 1.1 : 0.9;
+    p.effort = lance ? 0.96 : 0.9;
   });
 }
 
@@ -2709,7 +2868,12 @@ const CELLULE = { recul: 0.5, ecart: 0.62, portee: 8, accroche: 2.2 };
 /** Choisit la cellule de la phase et place ses deux soutiens. Appelée à chaque image. */
 function majCellule(e: EtatMatch): void {
   const ancienne = e.cellule;
-  if (ancienne?.pousse) return; // au contact, la cellule ne se recompose pas
+  // Au contact, la cellule ne se recompose pas. ⚠️ TANT QUE SON PORTEUR POUSSE :
+  // un coup de sifflet en pleine poussée la laissait « en poussée » pour
+  // toujours, et ses deux avants accrochés, exclus des déplacements, restaient
+  // plantés là jusqu'à la sirène (mesuré : un deuxième ligne immobile vingt
+  // secondes à quarante mètres de sa touche).
+  if (ancienne?.pousse && e.phase === 'jeuCourant' && e.porteur?.id === ancienne.porteurId) return;
   if (e.phase !== 'jeuCourant') { e.cellule = null; return; }
   const p = e.porteur;
   let centre: Pion | null = p && p.avant && p.sanction <= 0 && e.echappee?.pion !== p ? p : null;
@@ -3111,10 +3275,13 @@ export function probaPlaquage(
   // Le geste retranche donc DIRECTEMENT de la chance de plaquage, et il est
   // indexé sur l’attribut qui le porte : un ailier rapide sprinte, un pilier
   // raffute, et aucun des deux ne fait le métier de l’autre.
-  return borner(
+  const chance = borner(
     0.93 + (force - resistance) / 380 + elan + bonusLigne + bonusBotArcade - bonusDuGeste(porteur, geste) * efficaciteGeste,
     0.45, 0.99,
   );
+  // Défense resserrée (ligue en ligne, règles 2) : une part des plaquages
+  // manqués ne l'est plus. Voir `EtatMatch.resserrement`.
+  return e.resserrement ? 1 - (1 - chance) * (1 - 0.6 * borner(e.resserrement, 0, 1)) : chance;
 }
 
 /**
@@ -3540,9 +3707,22 @@ function formerRuck(
   };
   // La vitesse de sortie vient de la course des soutiens et du placement du
   // plaqueur. L'aléatoire ne fait plus que départager deux arrivées proches.
-  const lent = vitesseDefense + (e.rng() - 0.5) * 12 > vitesseAttaque - 3;
+  // ⚠️ LA LIGNE D'AVANTAGE (cadence détaillée). Un ruck formé au-delà de la
+  // ligne d'où la phase est partie, c'est une collision GAGNÉE : la défense
+  // recule pour se replacer, le ballon sort vite, et la phase suivante arrive
+  // sur une ligne désorganisée. En deçà, c'est l'attaque qui subit : ballon
+  // lent, rideau en place. Le compteur garde la série — trois collisions
+  // gagnées de suite pèsent plus qu'une.
+  let avantage = 0;
+  if (e.cadenceDetaillee) {
+    const gain = (e.ballon.x - e.ligneAvantage) * sens(attaque);
+    const serie = e.avantage ?? 0;
+    avantage = gain >= 1.5 ? Math.min(3, Math.max(0, serie) + 1) : gain <= -1 ? Math.max(-3, Math.min(0, serie) - 1) : 0;
+    e.avantage = avantage;
+  }
+  const lent = vitesseDefense + (e.rng() - 0.5) * 12 > vitesseAttaque - 3 + avantage * 2.2;
   e.ballonLent = lent;
-  e.minuteur = (lent ? 4.0 : 2.25) + e.rng() * (lent ? 1.5 : 0.9);
+  e.minuteur = ((lent ? 4.0 : 2.25) + e.rng() * (lent ? 1.5 : 0.9)) * (1 - 0.07 * avantage);
   e.placement = placementRuck(e.pions, e.ballon, e.possession);
   if (contact) {
     // Au contact, le ballon ET les deux joueurs s'arrêtent ensemble. Avant,
@@ -3761,7 +3941,9 @@ function phaseRuck(e: EtatMatch): void {
   // En cadence détaillée, le relayeur garde le ballon un demi-temps de plus :
   // assez pour que son premier receveur arrive lancé au lieu d'être servi à
   // l'arrêt, sept mètres derrière le ruck.
-  e.gardeRuck = (e.ballonLent ? 0.45 : 0.6) + (e.cadenceDetaillee ? 0.45 : 0);
+  // Une défense qui vient de reculer met plus longtemps à remonter ; celle qui a
+  // gagné la collision est déjà en place.
+  e.gardeRuck = (e.ballonLent ? 0.45 : 0.6) + (e.cadenceDetaillee ? 0.45 + 0.12 * (e.avantage ?? 0) : 0);
 
   // ⚠️ LES AVANTS QUI ÉTAIENT DANS LE RUCK NE PEUVENT PAS PLAQUER IMMÉDIATEMENT.
   // Au rugby, les joueurs engagés dans le regroupement doivent se remettre sur
@@ -3813,7 +3995,12 @@ function phaseMaul(e: EtatMatch, dt: number): void {
   });
 
   if (franchieLigne(e.ballon, cote)) {
-    const marqueur = mien.find((p) => p.numero === 2) ?? mien[0];
+    // Placement joué : c'est l'avant qui tient le ballon au cœur du maul qui
+    // aplatit. Le talonneur était posé sur le ballon d'où qu'il vienne —
+    // mesuré : dix mètres parcourus en un pas quand il venait de lancer.
+    const marqueur = e.placementJoue
+      ? [...mien].sort((a, b) => distance2(a.pos, e.ballon) - distance2(b.pos, e.ballon))[0]
+      : mien.find((p) => p.numero === 2) ?? mien[0];
     if (marqueur) {
       marqueur.pos = { x: e.ballon.x, y: e.ballon.y };
       return tenterEssai(e, marqueur, 'maul');
@@ -3880,6 +4067,20 @@ function arret(e: EtatMatch, quoi: Phase, pour: Cote, lieu: Vec, enAvant = false
       cibleId: alignes[Math.max(0, indexCible)]?.id,
     };
     if (e.cadenceDetaillee) Object.assign(e.conquete, choisirSortieDeTouche(e, pour, combinaison, alignes, e.conquete.cibleId));
+    if (e.placementJoue) {
+      // Le ballon est sorti : il attend derrière la ligne, là où il l'a coupée.
+      // Le talonneur va le chercher, puis se place pour lancer — les deux pieds
+      // HORS du terrain, pas soixante-dix centimètres à l'intérieur.
+      const dehors = e.ballon.y < AXE ? -1 : 1;
+      const bord = dehors < 0 ? 0 : LARGEUR;
+      const lanceur = surLeTerrain(e, pour).find((p) => p.numero === 2);
+      if (lanceur) {
+        e.conquete.lanceurId = lanceur.id;
+        e.conquete.ballonAuSol = { x: e.ballon.x, y: bord + dehors * 0.9 };
+        e.conquete.ramassage = 'aller';
+        if (e.placement) e.placement[lanceur.id] = { x: e.ballon.x, y: bord + dehors * 0.55 };
+      }
+    }
     e.compteurs.touches += 1;
   } else if (quoi === 'melee') {
     e.ballon.y = borner(e.ballon.y, 12, LARGEUR - 12);
@@ -4642,13 +4843,24 @@ function phasePenalite(e: EtatMatch): void {
   if (choix === 'touche' || (!choix && metresAvantLaLigne(info.lieu, cote) > 8 && e.rng() < chanceTouche)) {
     // Pénaltouche : on gagne le terrain ET on garde le ballon.
     const gain = borner(28 + buteur.pied / 3, 20, 48);
-    const arrivee = {
+    let arrivee = {
       x: borner(info.lieu.x + s * gain, LIGNE_A + 5, LIGNE_B - 5),
       y: info.lieu.y < AXE ? -1 : LARGEUR + 1,
     };
+    let trouvee = true, vol = 2.4;
+    if (e.cadenceDetaillee) {
+      // Sans personne pour le gêner, le buteur trouve presque toujours — mais
+      // pas toujours aussi loin, et il lui arrive de la manquer.
+      const depuis = { ...buteur.pos };
+      buteur.pos = { ...info.lieu };
+      const v = viserLaTouche(e, buteur, gain + 6, true);
+      buteur.pos = depuis;
+      trouvee = v.trouve; vol = v.duree;
+      arrivee = { x: borner(v.arrivee.x, LIGNE_A + 5, LIGNE_B - 5), y: v.arrivee.y };
+    }
     buteur.stats.coupsDePied += 1;
     e.placement = null;
-    lancerVol(e, buteur, arrivee, 'penaltouche', 2.4, 0.4, info.lieu);
+    lancerVol(e, buteur, arrivee, trouvee ? 'penaltouche' : 'occupation', vol, 0.4, info.lieu);
     dire(e, 'pied', cote, C.texteMatch('penaltouche', {
       nom: buteur.nom, distance: Math.round(metresAvantLaLigne(arrivee, cote)),
     }), 0, buteur.moi);
@@ -5745,6 +5957,73 @@ function intentionDePied(e: EtatMatch, p: Pion): IntentionPied {
   return p.numero === 9 ? 'chandelle' : 'occupation';
 }
 
+/**
+ * CHERCHER LA TOUCHE (cadence détaillée) — un résultat, pas une certitude.
+ *
+ * Un dégagement trouvait la touche neuf fois sur dix, toujours à la même
+ * distance pour un même botteur. La frappe a maintenant une QUALITÉ, tirée
+ * autour du niveau du pied et rabotée par la fatigue et par le défenseur qui
+ * monte ; c'est elle qui décide de tout :
+ *   - dévissée, le ballon retombe court et à l'intérieur : la défense relance ;
+ *   - sans assez d'angle, il retombe à deux mètres de la ligne et c'est le
+ *     rebond qui tranche ;
+ *   - trouvée, le gain est ce qu'il RESTE de la longueur une fois la largeur
+ *     traversée : du milieu du terrain, on gagne dix mètres ; du couloir, quarante ;
+ *   - sous la pression, elle peut être contrée dans les pieds du botteur.
+ * Un 9 qui tape dans la foulée de son ruck frappe plus court qu'un arrière lancé.
+ */
+function viserLaTouche(
+  e: EtatMatch, p: Pion, portee: number, penalite = false,
+): { arrivee: Vec; trouve: boolean; duree: number; hauteur: number; contre: boolean; longueur: number } {
+  const s = sens(p.cote);
+  const bord = p.pos.y < AXE ? 0 : LARGEUR;
+  const versInterieur = bord === 0 ? 1 : -1;
+  const lateral = Math.abs(p.pos.y - bord);
+  const pression = penalite ? 99 : pressionSur(e, p);
+  const pied = borner((p.pied - 40) / 50, 0, 1);
+  const fraicheur = 0.82 + 0.18 * p.endurance / 100;
+  const gene = pression < 2.2 ? 0.26 : pression < 4 ? 0.13 : pression < 7 ? 0.05 : 0;
+  // Trois tirages : une frappe est le plus souvent ordinaire, parfois ratée, parfois parfaite.
+  const alea = (e.rng() + e.rng() + e.rng()) / 3;
+  const frappe = borner((0.38 + 0.47 * pied) * fraicheur + (alea - 0.5) * (1.05 - 0.35 * pied) - gene + (penalite ? 0.14 : 0), 0, 1);
+  const contre = !penalite && pression < 2.2 && e.rng() < 0.10 + (0.5 - frappe) * 0.12;
+  const base = p.numero === 9 && !penalite ? Math.min(portee, 20 + p.pied / 5) : portee;
+  const longueur = base * (0.32 + 0.72 * frappe);
+  const duree = borner(1.3 + longueur / 24, 1.5, 3.1);
+  const hauteur = 0.25 + 0.4 * frappe;
+  if (contre) {
+    return {
+      arrivee: { x: borner(p.pos.x + s * (2 + e.rng() * 4), LIGNE_A + 1, LIGNE_B - 1), y: borner(p.pos.y + (e.rng() * 6 - 3), 2, LARGEUR - 2) },
+      trouve: false, duree: 0.55, hauteur: 0.1, contre: true, longueur,
+    };
+  }
+  // La touche manquée : un pied sûr la rate une fois sur huit, un pied moyen une
+  // fois sur cinq, et bien plus souvent avec un défenseur sur le dos ou les
+  // jambes lourdes. Un buteur qui tape une pénalité, sans personne, presque jamais.
+  const rate = borner((penalite ? 0.05 : 0.3) - 0.2 * pied + gene * 0.9 + (1 - p.endurance / 100) * 0.12, penalite ? 0.02 : 0.06, 0.6);
+  const tirage = e.rng();
+  if (tirage < rate * 0.4) {
+    const reste = lateral * (0.3 + 0.4 * e.rng());
+    return {
+      arrivee: { x: borner(p.pos.x + s * longueur * 0.85, LIGNE_A + 2, LIGNE_B - 2), y: borner(bord + versInterieur * Math.max(5, reste), 3, LARGEUR - 3) },
+      trouve: false, duree, hauteur, contre: false, longueur,
+    };
+  }
+  if (tirage < rate || lateral > longueur * 0.92) {
+    const travers = Math.max(0, lateral - 1 - e.rng() * 3);
+    const avance = Math.sqrt(Math.max(longueur * longueur - travers * travers, (longueur * 0.35) ** 2));
+    return {
+      arrivee: { x: borner(p.pos.x + s * avance, LIGNE_A + 2, LIGNE_B - 2), y: borner(p.pos.y + (bord === 0 ? -1 : 1) * travers, 1, LARGEUR - 1) },
+      trouve: false, duree, hauteur, contre: false, longueur,
+    };
+  }
+  const avance = Math.sqrt(Math.max(longueur * longueur - lateral * lateral, (longueur * 0.25) ** 2));
+  return {
+    arrivee: { x: borner(p.pos.x + s * avance, LIGNE_A - 3, LIGNE_B + 3), y: bord === 0 ? -1 : LARGEUR + 1 },
+    trouve: true, duree, hauteur, contre: false, longueur,
+  };
+}
+
 function taperAuPied(e: EtatMatch, p: Pion, intention: IntentionPied): void {
   const s = sens(p.cote);
   p.stats.coupsDePied += 1;
@@ -5772,6 +6051,11 @@ function taperAuPied(e: EtatMatch, p: Pion, intention: IntentionPied): void {
       return lancerVol(e, p, visee.vers, 'drop', visee.duree, .7);
     }
     case 'degagement': {
+      if (e.cadenceDetaillee) {
+        const v = viserLaTouche(e, p, portee);
+        dire(e, 'pied', p.cote, v.contre ? `Le coup de pied de ${p.nom} est contré !` : C.phrase(e.rng, C.PIED_DEGAGEMENT, { nom: p.nom }), 0, p.moi);
+        return lancerVol(e, p, v.arrivee, v.contre ? 'rasant' : v.trouve ? 'degagement' : 'occupation', v.duree, v.hauteur);
+      }
       // Un dégagement trouve généralement la touche : ~85-90 % chez les pros.
       const trouve = e.rng() < 0.85 + p.pied / 500;
       const arrivee = trouve
@@ -5821,6 +6105,11 @@ function taperAuPied(e: EtatMatch, p: Pion, intention: IntentionPied): void {
     }
     default: {
       const versTouche = e.rng() < 0.65;
+      if (versTouche && e.cadenceDetaillee) {
+        const v = viserLaTouche(e, p, portee);
+        dire(e, 'pied', p.cote, v.contre ? `Le coup de pied de ${p.nom} est contré !` : C.phrase(e.rng, C.PIED_OCCUPATION, { nom: p.nom }), 0, p.moi);
+        return lancerVol(e, p, v.arrivee, v.contre ? 'rasant' : v.trouve ? 'degagement' : 'occupation', v.duree, v.hauteur);
+      }
       const arrivee = {
         x: borner(p.pos.x + s * portee, LIGNE_A + 2, LIGNE_B - 2),
         y: versTouche
@@ -5948,6 +6237,9 @@ function gererRemplacements(e: EtatMatch): void {
 
 function clorePeriode(e: EtatMatch): void {
   delete e.piedPrepare;
+  // Un tir interrompu par la fin de la période ne reste pas « en cours » : son
+  // buteur gardait le rituel du tee en plein jeu à la reprise (cadence détaillée).
+  if (e.cadenceDetaillee) e.tir = null;
   if (e.periode === 1) {
     e.periode = 2;
     e.sirene = false;

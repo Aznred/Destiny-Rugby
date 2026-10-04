@@ -1,8 +1,8 @@
 import { tn, t } from '../../lib/i18n';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { VueMatchEnLigne } from '../../lib/ligue/matchCarriere';
 import { creerScenarioDirect } from '../../lib/ligue/scenarioDirect';
-import TerrainEnDirect, { type CouleursDirect } from './TerrainEnDirect';
+import TerrainEnDirect, { type AfficheDirect, type CouleursDirect } from './TerrainEnDirect';
 import { CadreTmoReplay } from './CadreTmoReplay';
 import { Icone, type NomIcone } from '../Icone';
 import { TexteIcones } from '../TexteIcones';
@@ -35,7 +35,10 @@ export function DirectCinema({
   modeDemo,
   pause,
   vitesseDemo,
+  surAffiche,
 }: {
+  /** Ce que le terrain montre réellement (film rejoué avec retard) : l'écran hôte y cale son score et son chrono. */
+  surAffiche?: (affiche: AfficheDirect | null) => void;
   match: VueMatchEnLigne;
   domicile: string;
   exterieur: string;
@@ -46,29 +49,51 @@ export function DirectCinema({
   vitesseDemo?: number;
 }) {
   const [selection, setSelection] = useState<string | null>(null);
+  // ⚠️ L'ÉCRAN A QUELQUES SECONDES DE RETARD SUR LE SERVEUR, ET TOUT DOIT L'AVOIR.
+  // Le film se rejoue derrière le direct : afficher le score et le fil du
+  // serveur annonçait l'essai avant qu'on ne le voie. Tout ce qui entoure le
+  // terrain lit donc l'instant MONTRÉ, tant qu'un film est en cours.
+  const [vu, setVu] = useState<AfficheDirect | null>(null);
+  const rappel = useRef(surAffiche);
+  useEffect(() => { rappel.current = surAffiche; }, [surAffiche]);
+  const noterAffiche = useCallback((a: AfficheDirect) => { setVu(a); rappel.current?.(a); }, []);
+  // À la sirène le serveur n'envoie plus rien : on laisse le film finir ce qu'il a, puis on rend la main.
+  const [filmFini, setFilmFini] = useState(false);
+  useEffect(() => {
+    if (!m.termine) { setFilmFini(false); return; }
+    const attente = setTimeout(() => { setFilmFini(true); setVu(null); rappel.current?.(null); }, 4500);
+    return () => clearTimeout(attente);
+  }, [m.termine]);
+  const affiche = filmFini ? null : vu;
+  const terrain = affiche?.terrain ?? m.terrain;
+  const score = affiche?.score ?? m.score;
   // Une pénalité attend la décision du manager : ses boutons sont dans la page,
   // sous le direct. On quitte donc le plein écran pour qu'il puisse trancher.
   const decisionEnAttente = !!m.decision;
+  const moments = m.moments ?? [];
   useEffect(() => {
     if (decisionEnAttente && document.fullscreenElement) void document.exitFullscreen();
   }, [decisionEnAttente]);
   const cahier = m.maStrategie;
   const combinaisonsActives = cahier?.combinaisons?.filter(c => c.active).length ?? 0;
-  const moments = m.moments ?? [];
   const momentSelectionne = moments.find((v) => v.id === selection);
-  const secondeCourante = (m.terrain?.horloge ?? m.horloge) * 60;
+  const secondeCourante = affiche ? affiche.seconde : (m.terrain?.horloge ?? m.horloge) * 60;
   const ligneDirect = [...(m.fil ?? [])]
     .reverse()
     .find((v) => !v.ordre && v.texte && (v.seconde ?? v.minute * 60) <= secondeCourante + 2);
-  const dernierMoment = moments.at(-1);
+  const momentsVus = affiche ? moments.filter((v) => v.seconde <= secondeCourante + 0.5) : moments;
+  const dernierMoment = momentsVus.at(-1);
   const ageMoment = dernierMoment ? secondeCourante - dernierMoment.seconde : Infinity;
   const momentVif = dernierMoment && ageMoment >= -2 && ageMoment <= 15 ? dernierMoment : undefined;
-  const carton = m.terrain?.sifflet?.cle?.includes('cartonRouge') ? 'rouge'
-    : m.terrain?.sifflet?.cle?.includes('cartonJaune') ? 'jaune'
+  const carton = terrain?.sifflet?.cle?.includes('cartonRouge') ? 'rouge'
+    : terrain?.sifflet?.cle?.includes('cartonJaune') ? 'jaune'
     : momentVif?.type === 'carton' ? (/rouge/i.test(momentVif.texte) ? 'rouge' : 'jaune')
     : undefined;
-  const scenario = m.terrain ? creerScenarioDirect(m.terrain) : undefined;
-  const prep = m.terrain?.preparationTir;
+  const scenario = terrain ? creerScenarioDirect(terrain) : undefined;
+  const prep = terrain?.preparationTir;
+  // La décision n'apparaît qu'une fois la pénalité sifflée À L'ÉCRAN.
+  const decision = m.decision && (!affiche || affiche.seconde >= m.decision.horloge * 60 - 1.5) ? m.decision : undefined;
+  const montrerTerrain = Boolean(m.terrain || m.film || (vu && !filmFini));
   const commentaire =
     momentSelectionne?.texte ??
     momentVif?.texte ??
@@ -82,7 +107,7 @@ export function DirectCinema({
           : scenario?.intensite === 'active'
             ? 'Le ballon circule et l’attaque cherche l’intervalle.'
             : 'Les deux équipes se replacent et construisent la séquence suivante.');
-  const bandeau = m.decision
+  const bandeau = decision
     ? 'DÉCISION DU MANAGER'
     : momentSelectionne
       ? 'ACTION DU MATCH'
@@ -92,10 +117,10 @@ export function DirectCinema({
           ? 'MOMENT FORT'
           : 'COMMENTAIRE EN DIRECT';
 
-  const isTmo = Boolean((m.terrain?.phase === 'tmo' || m.terrain?.tmo?.actif) && m.terrain?.tmo);
+  const isTmo = Boolean((terrain?.phase === 'tmo' || terrain?.tmo?.actif) && terrain?.tmo);
   const alerteVif = Boolean(momentVif && ageMoment <= 6.5 && !isTmo);
-  const alertePrep = Boolean(prep && !m.decision && (!momentVif || ageMoment > 6.5));
-  const hasAlerte = Boolean(m.decision || alerteVif || alertePrep);
+  const alertePrep = Boolean(prep && !decision && (!momentVif || ageMoment > 6.5));
+  const hasAlerte = Boolean(decision || alerteVif || alertePrep);
 
   return (
     <section className="dc" aria-label={t("ui.a223eeb07f09")}>
@@ -107,19 +132,22 @@ export function DirectCinema({
         <span>{t("ui.f3ba155271f1")}</span>
       </header>
       <div className="dc-score">
-        <time>{heure(m.horloge * 60)}</time>
+        <time>{heure(affiche ? affiche.seconde : m.horloge * 60)}</time>
         <span style={{ borderColor: couleurs.domicile }}>{domicile}</span>
         <strong>
-          {m.score.domicile} – {m.score.exterieur}
+          {score.domicile} – {score.exterieur}
         </strong>
         <span style={{ borderColor: couleurs.exterieur }}>{exterieur}</span>
       </div>
       {m.monCote && cahier && (cahier.modeCombinaisons === 'configure' || !!cahier.combinaisons?.length) && <div className={`dc-cahier ${cahier.modeCombinaisons === 'configure' && combinaisonsActives ? 'actif' : ''}`}><Icone nom="sifflet" taille={16} /><span>{cahier.modeCombinaisons === 'automatique' ? t("ui.89b87c5d09fc") : combinaisonsActives ? tn("ui.13ebe03563fd", combinaisonsActives, { v0: combinaisonsActives }) : t("ui.c2b2701297f3")}</span></div>}
       <div className={`dc-ecran ${isTmo ? 'dc-ecran-tmo' : ''} ${hasAlerte ? 'dc-ecran-alerte' : ''}`}>
-        {m.terrain ? (
+        {montrerTerrain ? (
           <TerrainEnDirect
             key={m.id}
             terrain={m.terrain}
+            film={m.film}
+            matchId={modeDemo ? undefined : m.id}
+            surAffiche={noterAffiche}
             nomDomicile={domicile}
             nomExterieur={exterieur}
             couleurs={couleurs}
@@ -138,21 +166,21 @@ export function DirectCinema({
           </p>
         )}
         {/* ---------- 📺 TMO : CADRE TÉLÉ REPLAY BROADCAST (L'ACTION RESTE VISIBLE AU CENTRE) ---------- */}
-        {isTmo && m.terrain?.tmo && (
+        {isTmo && terrain?.tmo && (
           <CadreTmoReplay
-            action={m.terrain.tmo.action}
-            decision={m.terrain.tmo.decision}
-            explication={m.terrain.tmo.explication}
-            cadreCamera={m.terrain.tmo.cadreCamera}
-            horloge={heure(m.horloge * 60)}
+            action={terrain.tmo.action}
+            decision={terrain.tmo.decision}
+            explication={terrain.tmo.explication}
+            cadreCamera={terrain.tmo.cadreCamera}
+            horloge={heure(secondeCourante)}
           />
         )}
 
-        {(m.decision || alerteVif) && (
-          <div className={`dc-alerte-terrain dc-alerte-${m.decision ? 'penalite' : momentVif?.type}`} role="status">
-            <b><Icone nom={m.decision ? 'sifflet' : iconeMoment(momentVif!.type)} taille={16} /> {m.decision ? t("ui.229b9ae7b57f") : libelleMoment(momentVif!.type, momentVif!.texte)}</b>
+        {(decision || alerteVif) && (
+          <div className={`dc-alerte-terrain dc-alerte-${decision ? 'penalite' : momentVif?.type}`} role="status">
+            <b><Icone nom={decision ? 'sifflet' : iconeMoment(momentVif!.type)} taille={16} /> {decision ? t("ui.229b9ae7b57f") : libelleMoment(momentVif!.type, momentVif!.texte)}</b>
             <span>
-              {m.decision
+              {decision
                 ? t("ui.be54646015c1")
                 : <TexteIcones texte={momentVif!.texte} />}
             </span>
@@ -169,7 +197,7 @@ export function DirectCinema({
       <div className={`dc-commentaire ${momentVif || scenario?.momentFort ? 'fort' : ''}`} aria-live="polite">
         <span>
           {bandeau}
-          {m.terrain?.lancement?.combinaison && ` · ${m.terrain.lancement.combinaison}`}
+          {terrain?.lancement?.combinaison && ` · ${terrain.lancement.combinaison}`}
           {momentSelectionne
             ? ` · ${heure(momentSelectionne.seconde)} · ${momentSelectionne.score.domicile}–${momentSelectionne.score.exterieur}`
             : scenario
@@ -177,7 +205,7 @@ export function DirectCinema({
               : ''}
         </span>
         <p>
-          {m.decision
+          {decision
             ? t("ui.0b0e23e2076f")
             : <TexteIcones texte={commentaire} />}
         </p>
@@ -200,10 +228,10 @@ export function DirectCinema({
       <div className="dc-moments">
         <div className="dc-titre">
           <h3>{t("ui.0bc62a01f8cc")}</h3>
-          <span>{t("ui.545a48fc341f", { v0: moments.length })}</span>
+          <span>{t("ui.545a48fc341f", { v0: momentsVus.length })}</span>
         </div>
         <div className="dc-liste">
-          {[...moments].reverse().map((v) => (
+          {[...momentsVus].reverse().map((v) => (
             <button key={v.id} aria-pressed={selection === v.id} onClick={() => setSelection(v.id)}>
               <time>{heure(v.seconde)}</time>
               <span>
@@ -219,7 +247,7 @@ export function DirectCinema({
             </button>
           ))}
         </div>
-        {!moments.length && <p className="dc-attente">{t("ui.01e3902d4152")}</p>}
+        {!momentsVus.length && <p className="dc-attente">{t("ui.01e3902d4152")}</p>}
       </div>
     </section>
   );

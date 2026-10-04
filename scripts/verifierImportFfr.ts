@@ -81,7 +81,7 @@ const parId = new Map(catalogue.map(c => [c.sourceId, c]));
 assert.equal(dotation.length, 30);
 for (const carte of dotation) assert.equal(carte.poste, parId.get(carte.sourceId)!.poste, 'La dotation a changé le vrai poste');
 
-// Une ancienne carte reçoit son poste et sa photo, en gardant sa progression et son histoire.
+// Une ancienne carte reçoit les corrections du catalogue, en gardant son histoire.
 const maintenant = Date.parse('2026-09-07T10:00:00Z');
 const etat = creerCarriere({ id: 'test-ffr', nom: 'Test FFR', code: 'DR-FFR', compteId: 'compte', pseudo: 'Test', clubNom: 'Test Rugby', rythme: 1, maxClubs: 4 }, maintenant, 'ffr');
 const carte = carteDepuisSource(pierre, etat.id, etat.clubs[0].id, 1);
@@ -93,6 +93,8 @@ const nouvelle = actualise.cartes.find(c => c.id === carte.id)!;
 assert.equal(nouvelle.poste, pierre.poste);
 assert.equal(nouvelle.photo, pierre.photo);
 assert.deepEqual(nouvelle.postesSecondaires, pierre.postesSecondaires);
-for (const champ of ['id', 'sourceId', 'proprietaire', 'note', 'potentiel', 'age', 'fatigue', 'matchs', 'essais', 'favori', 'blesseJusqua', 'clubs'] as const) assert.deepEqual(nouvelle[champ], carte[champ], champ);
+assert.equal(nouvelle.note, pierre.note);
+assert.equal(nouvelle.potentiel, pierre.potentiel);
+for (const champ of ['id', 'sourceId', 'proprietaire', 'age', 'fatigue', 'matchs', 'essais', 'favori', 'blesseJusqua', 'clubs'] as const) assert.deepEqual(nouvelle[champ], carte[champ], champ);
 assert.deepEqual(etat, avant, 'La lecture a muté la sauvegarde d’origine');
 console.log(`OK FFR enrichi : ${postes} postes, ${polyvalents} profils polyvalents, ${portraits} portraits dans les effectifs, ${ajouts} joueurs supplémentaires, 1466 images valides, ${homonymes} groupes d’homonymes protégés. Cartes existantes et dotations vérifiées.`);

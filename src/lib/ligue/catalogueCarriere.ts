@@ -8,6 +8,7 @@ import { CLUBS_AMATEURS, EFFECTIFS_AMATEURS, POSTES_AMATEURS } from '../../data/
 import { joueursFfrDuClub, profilJoueurFfr } from '../joueursFfr.js';
 import { photoReelle } from '../avatars.js';
 import { photoDetoureeCatalogue } from '../photosDetourees.js';
+import { recalibrerNoteFfr, echelleFfrDuClub } from '../echelleNotesFfr.js';
 import { noteJoueurRevalorisee, postesJoueurReel } from '../evaluationJoueurReel.js';
 import { COMPETITIONS } from '../../data/clubs.js';
 import { LOGO_COMPETITION } from '../../data/logosCompetitions.js';
@@ -295,7 +296,10 @@ export function catalogueBaseCarriere(): readonly SourceCarte[] {
   if (catalogue) return catalogue;
   const joueurs = new Map<string, SourceCarte>();
   const clubs = new Map(COMPETITIONS.flatMap(c => c.clubs.map(club => [club.nom, c] as const)));
-  const ajouter = (source: SourceCarte) => {
+  const ajouter = (brut: SourceCarte) => {
+    const note = recalibrerNoteFfr(brut.clubReel, brut.note);
+    const potentiel = echelleFfrDuClub(brut.clubReel) ? Math.max(note, recalibrerNoteFfr(brut.clubReel, brut.potentiel, false)) : brut.potentiel;
+    const source = { ...brut, note, potentiel, rarete: rareteCarriere(note), statistiques: statistiquesCarte(note, brut.famille, brut.sourceId) };
     const cle = normaliser(source.nom);
     const existant = joueurs.get(cle);
     if (!existant || source.note > existant.note) joueurs.set(cle, source);

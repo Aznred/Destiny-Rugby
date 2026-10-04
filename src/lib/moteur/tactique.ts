@@ -25,7 +25,7 @@ import type { Pion } from './entites.js';
 import { placerCombinaison } from './combinaisons.js';
 import { PHASES_ARRETEES, type EtatMatch, type SystemeDefensif } from './etat.js';
 import {
-  AXE, LARGEUR, LONGUEUR, LIGNE_A, LIGNE_B, adverse, borner, coteOuvert, distance, distance2,
+  AXE, LARGEUR, LONGUEUR, LIGNE_A, LIGNE_B, adverse, borner, coteOuvert, dansSes22, distance, distance2,
   ligneDefendue, melanger, metresAvantLaLigne, sens, type Cote, type Vec,
 } from './terrain.js';
 
@@ -111,7 +111,143 @@ const PROFONDEUR: Record<number, number> = {
   9: 1.2, 10: 5.5, 12: 6.8, 13: 8, 11: 9.2, 14: 9.2, 15: 12.5,
 };
 
-export function structurerAttaque(e: Pick<EtatMatch, 'ouvert' | 'porteur' | 'ballon' | 'origine' | 'lancement'>, liste: Pion[], cote: Cote): void {
+type EtatAttaque = Pick<EtatMatch, 'ouvert' | 'porteur' | 'ballon' | 'origine' | 'lancement'>
+  & Partial<Pick<EtatMatch, 'cadenceDetaillee' | 'phasesDepuisArret' | 'structureAttaque'>>;
+
+/** Une place de la structure : `cote` 1 = côté ouvert, -1 = côté fermé ; `d` mètres depuis le regroupement ; `dx` mètres derrière le ballon. */
+interface PlaceStructure { cote: 1 | -1; d: number; dx: number; role: Pion['role'] }
+
+/**
+ * L'ATTAQUE RANGÉE PAR COULOIRS (cadence détaillée).
+ *
+ * ⚠️ CE QUI N'ALLAIT PAS. Chaque place était un DÉCALAGE depuis le ballon —
+ * cellule à 12 m, cellule à 24 m, ouvreur à 11 m, centres à 21 et 30 m — puis
+ * ramenée dans le terrain. Dès que le ballon approchait d'une touche, tous ces
+ * décalages butaient sur la même ligne : six avants, l'ouvreur et les centres
+ * empilés dans le couloir (mesuré : un paquet de six attaquants ou plus dans un
+ * rayon de cinq mètres 34 % du temps, jusqu'à onze). Et comme les places étaient
+ * redonnées « au plus proche » à chaque recalcul, une cellule changeait de
+ * joueurs trois fois par seconde.
+ *
+ * Ici l'équipe se range dans la LARGEUR QU'ELLE A :
+ *   - une cellule de trois avants au grand côté, près du regroupement ; la
+ *     seconde plus loin du même côté s'il y a la place, sinon côté fermé ;
+ *   - un garde au ras, un avant au large ;
+ *   - derrière elles, la deuxième vague : l'ouvreur dans le dos de la première
+ *     cellule, les centres étagés, l'arrière en profondeur (ou intercalé) ;
+ *   - les deux ailiers tiennent leur ligne de touche, quoi qu'il arrive.
+ * Elle se range autour du point d'où part la phase et n'accompagne le ballon
+ * que d'un tiers : ceux qui ne jouent pas ce temps préparent le suivant au
+ * lieu de courir derrière le ballon. Près de la ligne les cellules se
+ * resserrent ; dans ses 22 la ligne recule.
+ */
+function structurerEnCouloirs(
+  e: EtatAttaque, cote: Cote, ancre: Vec,
+  avants: Pion[], arrieres: Pion[], rangDansChaine: Map<Pion, number>,
+): void {
+  const s = sens(cote);
+  const yb = melanger((e.origine ?? ancre).y, ancre.y, 0.3);
+  // Le ballon a filé jusqu'au couloir : il n'y a plus de « grand côté » devant
+  // lui. L'équipe se range de l'autre, là où le jeu reviendra — sinon deux
+  // cellules et la ligne se disputeraient dix mètres.
+  const annonce = e.ouvert as 1 | -1;
+  const ouvert = ((annonce === 1 ? LARGEUR - yb : yb) < 14 ? -annonce : annonce) as 1 | -1;
+  const So = ouvert === 1 ? LARGEUR - yb : yb;
+  const Sc = LARGEUR - So;
+  const y = (c: 1 | -1, d: number) => bornerY(yb + ouvert * c * Math.min(d, Math.max(2, (c === 1 ? So : Sc) - MARGE - 1)));
+  const restant = metresAvantLaLigne(ancre, cote);
+  const pres = restant < 15;
+  const prof = pres ? 0.6 : dansSes22(ancre, cote) ? 1.25 : 1;
+
+  // ── Les avants : deux cellules de trois, un garde au ras, un homme au large ──
+  const d1 = pres ? Math.min(4.5, So * 0.4) : borner(So * 0.22, 6.5, 12);
+  const deuxOuvert = So >= 34 && !pres;
+  const d2 = deuxOuvert ? borner(So * 0.5, d1 + 9, 27) : borner(Sc * 0.32, 4.5, 12);
+  const c2: 1 | -1 = deuxOuvert ? 1 : -1;
+  const E = 1.7;
+  const places: PlaceStructure[] = [
+    { cote: 1, d: d1, dx: 2.4, role: 'podRas' },
+    { cote: 1, d: d1 - E, dx: 3.2, role: 'podRas' },
+    { cote: 1, d: d1 + E, dx: 3.2, role: 'podRas' },
+    deuxOuvert ? { cote: -1, d: Math.min(6, Sc * 0.3), dx: 2, role: 'aileFerme' } : { cote: 1, d: Math.min(So * 0.7, 28), dx: 5.5, role: 'podLarge' },
+    { cote: c2, d: d2, dx: 3.8, role: 'podMilieu' },
+    { cote: c2, d: d2 - E, dx: 4.6, role: 'podMilieu' },
+    { cote: c2, d: d2 + E, dx: 4.6, role: 'podMilieu' },
+    deuxOuvert ? { cote: 1, d: Math.min(So * 0.78, 34), dx: 6, role: 'podLarge' } : { cote: -1, d: Math.min(Sc * 0.62, 30), dx: 5.5, role: 'aileFerme' },
+  ];
+  // ⚠️ UNE CELLULE TIENT SES JOUEURS LE TEMPS DE LA PHASE. Ceux qui sont liés
+  // au regroupement n'en font pas partie : les cellules se reforment avec les
+  // avants disponibles, et les places se donnent dans l'ordre où ils sont déjà
+  // rangés sur la largeur — personne ne se croise pour gagner la sienne.
+  const libres = avants.filter((p) => !rangDansChaine.has(p) && p.role !== 'ruck');
+  const cle = `${cote}:${e.phasesDepuisArret ?? 0}:${ouvert}:${deuxOuvert ? 1 : 0}:${pres ? 1 : 0}:${libres.length}`;
+  let memo = e.structureAttaque;
+  if (!memo || memo.cle !== cle || libres.some((p) => memo!.places[p.id] === undefined)) {
+    const n = Math.min(libres.length, places.length);
+    const choisies = places.slice(0, n).map((pl, i) => ({ i, lateral: pl.cote * pl.d })).sort((a, b) => a.lateral - b.lateral);
+    const ranges = [...libres].sort((a, b) => (a.pos.y - yb) * ouvert - (b.pos.y - yb) * ouvert).slice(0, n);
+    memo = { cle, places: {} };
+    ranges.forEach((p, k) => { memo!.places[p.id] = choisies[k].i; });
+    e.structureAttaque = memo;
+  }
+  for (const p of avants) {
+    const r = rangDansChaine.get(p);
+    if (r != null) { ligneDeSoutien(p, ancre, s, annonce, r); continue; }
+    if (p.role === 'ruck') continue;
+    const pl = places[memo.places[p.id] ?? places.length - 1];
+    p.role = pl.role;
+    p.cible = { x: bornerX(ancre.x - s * pl.dx * prof), y: y(pl.cote, pl.d) };
+  }
+
+  // ── La deuxième vague, les ailiers sur leur ligne, l'arrière en profondeur ──
+  const lancement = e.lancement;
+  const intercale = !!lancement && (lancement.type === 'large' || lancement.type === 'saute');
+  const etroit = So < 16;
+  const ligne: Pion[] = [];
+  const poser = (p: Pion, c: 1 | -1, d: number, dx: number, etage = true) => {
+    p.cible = { x: bornerX(ancre.x - s * dx * prof), y: y(c, d) };
+    if (etage && c === 1) ligne.push(p);
+  };
+  for (const p of arrieres) {
+    switch (p.numero) {
+      case 9:
+        p.role = 'demi';
+        p.cible = { x: bornerX(ancre.x - s * 1.4), y: bornerY(ancre.y - ouvert * 1.6) };
+        break;
+      case 10:
+        // Dans le dos de la première cellule : la passe « derrière » est une option du 9.
+        p.role = 'ouvreur';
+        poser(p, 1, etroit ? So * 0.5 : d1 + 2.6, 6.2);
+        break;
+      case 12:
+        p.role = 'ligne';
+        if (etroit) poser(p, -1, Sc * 0.22, 6.8); else poser(p, 1, Math.max(d1 + 9, So * 0.42), 7.4);
+        break;
+      case 13:
+        p.role = 'ligne';
+        if (So < 30) poser(p, -1, Sc * (etroit ? 0.45 : 0.36), 7.6); else poser(p, 1, Math.max(d1 + 16, So * 0.6), 8.6);
+        break;
+      case 15:
+        // L'arrière couvre en profondeur, du côté où le jeu peut aller ; il ne
+        // vient dans la ligne que lorsqu'on écarte.
+        p.role = intercale ? 'ligne' : 'arriere';
+        if (intercale && So >= 30) poser(p, 1, So * 0.8, 9.6);
+        else poser(p, So >= 22 ? 1 : -1, Math.min((So >= 22 ? So : Sc) * 0.3, 16), dansSes22(ancre, cote) ? 20 : 15, false);
+        break;
+      default: {
+        // ⚠️ LES AILIERS TIENNENT LEUR LIGNE. Celui du grand côté étire la
+        // défense, celui du côté fermé couvre son couloir un peu plus bas.
+        const sonBord = p.numero === 11 ? 0 : LARGEUR;
+        const grandCote = (sonBord === 0 ? -1 : 1) === ouvert;
+        p.role = grandCote ? 'ligne' : 'aileFerme';
+        p.cible = { x: bornerX(ancre.x - s * (grandCote ? 9.5 : 12) * prof), y: bornerY(sonBord + (sonBord === 0 ? 4.5 : -4.5)) };
+      }
+    }
+  }
+  repartirY(ligne, 5);
+}
+
+export function structurerAttaque(e: EtatAttaque, liste: Pion[], cote: Cote): void {
   const s = sens(cote);
   const ouvert = e.ouvert;
   const porteur = e.porteur && e.porteur.cote === cote ? e.porteur : null;
@@ -177,6 +313,9 @@ export function structurerAttaque(e: Pick<EtatMatch, 'ouvert' | 'porteur' | 'bal
     avantsAStructurer = avants.filter(p => !soutiensDirects.includes(p));
   }
 
+  if (e.cadenceDetaillee) {
+    structurerEnCouloirs(e, cote, ancre, avantsAStructurer, arrieres, rangDansChaine);
+  } else {
   // Structure des 8 avants en 2 cellules de 3 + 2 sentinelles :
   // Pod 1 (axe / ras)     : 1 chargeur + 2 soutiens immédiats (±1.8m)
   // Pod 2 (milieu / large): 1 chargeur + 2 soutiens immédiats (±1.8m)
@@ -256,6 +395,7 @@ export function structurerAttaque(e: Pick<EtatMatch, 'ouvert' | 'porteur' | 'bal
   // La ligne de trois-quarts s'étage vraiment : cinq mètres au minimum entre
   // deux joueurs, même quand le ballon sort d'un ruck collé à la touche.
   repartirY(ligneTroisQuarts, 5);
+  }
 
   // Dernier garde-fou collectif : hors porteur, chaque cible offensive reste
   // en retrait de la ligne du ballon. Les répartitions de largeur et les
@@ -614,6 +754,10 @@ function separer(e: EtatMatch, arret: boolean): void {
     if (arret && (e.phase === 'melee' || e.phase === 'touche')) continue;
     libres.push(p);
   }
+  // Placement joué : un joueur qui sort d'un regroupement redevient « libre »
+  // au milieu de dix autres, et les deux passes l'en chassaient de deux à
+  // quatre mètres d'un seul coup. Il s'écarte désormais à l'allure d'un pas.
+  const departs = e.placementJoue ? libres.map((p) => ({ x: p.pos.x, y: p.pos.y })) : null;
   for (let passe = 0; passe < 2; passe++) {
     for (let i = 0; i < libres.length; i++) {
       const a = libres[i];
@@ -631,6 +775,14 @@ function separer(e: EtatMatch, arret: boolean): void {
         a.pos.y = bornerY(a.pos.y); b.pos.y = bornerY(b.pos.y);
       }
     }
+  }
+  if (departs) {
+    const MAX = 0.5;
+    libres.forEach((p, i) => {
+      const dx = p.pos.x - departs[i].x, dy = p.pos.y - departs[i].y;
+      const d = Math.hypot(dx, dy);
+      if (d > MAX) { p.pos.x = departs[i].x + dx / d * MAX; p.pos.y = departs[i].y + dy / d * MAX; }
+    });
   }
 }
 

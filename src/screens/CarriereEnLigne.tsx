@@ -69,6 +69,8 @@ import { ModaleMarche } from '../components/ModaleMarche';
 import { PACKS_CARRIERE, packsBoutiqueDuJour } from '../lib/ligue/catalogueCarriere';
 import { tn, texteTraduit, locale, nombre, t } from '../lib/i18n';
 import { fusionnerDeltaDirect, fusionnerVueLigue } from '../lib/ligue/fusionDirect';
+import { reperesFilm } from '../lib/ligue/filmDirect';
+import type { AfficheDirect } from '../components/match/TerrainEnDirect';
 
 type Onglet = 'club' | 'calendrier' | 'composition' | 'effectif' | 'collection' | 'packs' | 'marche' | 'competitions' | 'histoire' | 'wiki' | 'laboratoire' | 'secret' | 'administration' | 'atelier' | 'combinaisons';
 const EditeurCombinaisons = lazy(() => import('../components/EditeurCombinaisons').then(m => ({ default: m.EditeurCombinaisons })));
@@ -581,7 +583,8 @@ export function CarriereEnLigne() {
         const suivi = directOuvert.current;
         const directActif = suivi && derniereVue.current?.rencontres.some(r => r.id === suivi && r.match && !r.match.termine);
         if (directActif) {
-          const delta = await chargerDirectCarriere(ligueId, suivi, controleur.signal, connue);
+          // On annonce le dernier pas du film déjà reçu : le serveur n'envoie que la suite.
+          const delta = await chargerDirectCarriere(ligueId, suivi, controleur.signal, connue, reperesFilm.get(suivi) ?? null);
           echecs = 0;
           if (actif && version === versionRequete.current) {
             // La fusion refuse aussi une réponse de direct plus ancienne ayant
@@ -771,13 +774,13 @@ function Connexion({ onConnexion, onGoogle, occupe }: { occupe: boolean; onGoogl
   }, [inscription, onGoogle]);
   const soumettre = (e: FormEvent) => { e.preventDefault(); if (inscription && motDePasse !== confirmation) return; void onConnexion(inscription ? 'inscription' : 'connexion', identifiant, motDePasse, pseudo, confirmation); };
   return <div className="cel-entree">
-    <div className="cel-promesse"><div className="eyebrow">{t('online.auth.eyebrow')}</div><h1>{t('online.auth.title')}</h1><p>{t('online.auth.starterPackDesc')}</p><div className="cel-billet"><b>{t('online.season', { n: '01' })}</b><span>{t('online.portal.initialSquad')}</span><strong>35 <small>GEN</small></strong><p>{t('online.auth.features')}</p></div></div>
+    <div className="cel-promesse"><div className="eyebrow">{t('online.auth.eyebrow')}</div><h1>{t('online.auth.title')}</h1><p>{t('online.auth.starterPackDesc')}</p><div className="cel-billet"><b>{t('online.season', { n: '01' })}</b><span>{t('online.portal.initialSquad')}</span><strong>35 <small>{t('pj.noteCourte')}</small></strong><p>{t('online.auth.features')}</p></div></div>
     <form className="cel-panneau cel-auth" onSubmit={soumettre}>
       {invitation && <p className="cel-invite"><Icone nom="cadeau" taille={18} />{t('online.auth.invited')}</p>}
       <div className="eyebrow">{t('online.auth.account')}</div><h2>{inscription ? t('online.auth.create') : t('online.auth.find')}</h2>
       <div className={`cel-google${occupe ? ' occupe' : ''}${googleDisponible ? '' : ' indisponible'}`} ref={googleRef} />
       {googleDisponible && <div className="cel-separateur"><span>{t('online.auth.orWithId')}</span></div>}
-      <Champ label={t('online.auth.id')}><input autoComplete="username" required minLength={3} maxLength={60} value={identifiant} onChange={e => setIdentifiant(e.target.value)} placeholder="username" /></Champ>
+      <Champ label={t('online.auth.id')}><input autoComplete="username" required minLength={3} maxLength={60} value={identifiant} onChange={e => setIdentifiant(e.target.value)} placeholder={t('online.auth.id')} /></Champ>
       {inscription && <Champ label={t('online.auth.manager')}><input required minLength={2} maxLength={32} value={pseudo} onChange={e => setPseudo(e.target.value)} /></Champ>}
       <Champ label={t('online.auth.password')}><input type="password" autoComplete={inscription ? 'new-password' : 'current-password'} required minLength={inscription ? 10 : 1} maxLength={128} value={motDePasse} onChange={e => setMotDePasse(e.target.value)} /></Champ>
       {inscription && <><Champ label={t('online.auth.password')}><input type="password" autoComplete="new-password" required minLength={10} maxLength={128} value={confirmation} onChange={e => setConfirmation(e.target.value)} /></Champ>{confirmation && confirmation !== motDePasse && <p className="cel-erreur-champ">{t('online.auth.passwordMismatch')}</p>}</>}
@@ -1277,6 +1280,10 @@ function Direct({ vue, rencontre: r, agir, occupe, fermer }: { vue: VueCarriereE
   // la décision tourne sur le même battement.
   const [, battement] = useState(0);
   useEffect(() => { const t = setInterval(() => battement(n => n + 1), 1000); return () => clearInterval(t); }, []);
+  // Ce que le terrain MONTRE (le film se rejoue quelques secondes derrière le
+  // serveur) : le score et le chrono du tableau s'y calent, pour ne pas annoncer
+  // un essai avant qu'on ne le voie.
+  const [affiche, setAffiche] = useState<AfficheDirect | null>(null);
   const horlogeServeur = m?.horloge ?? 0;
   const ancre = useRef({ horloge: horlogeServeur, recu: Date.now() });
   useEffect(() => { ancre.current = { horloge: horlogeServeur, recu: Date.now() }; }, [horlogeServeur]);
@@ -1312,13 +1319,18 @@ function Direct({ vue, rencontre: r, agir, occupe, fermer }: { vue: VueCarriereE
   const resteDecision = m.decision
     ? Math.max(0, Math.min(20, Math.ceil((m.decision.jusqua - Date.now()) / 1000)))
     : 0;
+  const vu = m.termine ? null : affiche;
+  const scoreVu = vu?.score ?? m.score;
+  const minuteVue = vu ? vu.seconde / 60 : minuteVive;
+  // La décision s'ouvre quand la pénalité est sifflée À L'ÉCRAN, pas avant.
+  const decisionVue = m.decision && (!vu || vu.seconde >= m.decision.horloge * 60 - 1.5) ? m.decision : undefined;
 
   return <div className="cel-direct cel-direct-cinema">
     <div className="cel-tableau-bord">
       <button className="btn fantome cel-quitter" onClick={fermer}><Icone nom="croix" taille={15} /> {t('online.common.close')}</button>
       <div className="cel-score-direct">
         <div className={`cel-camp${m.monCote === 'domicile' ? ' moi' : ''}`}><Ecusson nom={nomClub(vue, r.domicile)} logo={vue.clubs.find(c => c.id === r.domicile)?.embleme} /><b>{nomClub(vue, r.domicile)}</b><small>{m.essais.domicile} {t('ml.essais')}</small></div>
-        <div className="cel-chrono"><strong>{m.score.domicile} <em>–</em> {m.score.exterieur}</strong><span className={m.termine ? '' : gele ? 'gele' : 'bat'}>{m.termine ? t('online.match.finished') : chrono(minuteVive)}</span></div>
+        <div className="cel-chrono"><strong>{scoreVu.domicile} <em>–</em> {scoreVu.exterieur}</strong><span className={m.termine ? '' : gele ? 'gele' : 'bat'}>{m.termine ? t('online.match.finished') : chrono(minuteVue)}</span></div>
         <div className={`cel-camp${m.monCote === 'exterieur' ? ' moi' : ''}`}><Ecusson nom={nomClub(vue, r.exterieur)} logo={vue.clubs.find(c => c.id === r.exterieur)?.embleme} /><b>{nomClub(vue, r.exterieur)}</b><small>{m.essais.exterieur} {t('ml.essais')}</small></div>
       </div>
       <div className="cel-jauge-possession" title={t('online.stats.possession')}><i style={{ width: `${m.stats.domicile.possession}%` }} /><span>{m.stats.domicile.possession}% {t('online.stats.possession').toLowerCase()} {m.stats.exterieur.possession}%</span></div>
@@ -1326,7 +1338,7 @@ function Direct({ vue, rencontre: r, agir, occupe, fermer }: { vue: VueCarriereE
     </div>
 
     <DirectCinema match={m} domicile={nomClub(vue,r.domicile)} exterieur={nomClub(vue,r.exterieur)} couleurs={couleurs}
-      emblemes={{ domicile: emblemeDomicile, exterieur: emblemeExterieur }} />
+      emblemes={{ domicile: emblemeDomicile, exterieur: emblemeExterieur }} surAffiche={setAffiche} />
     {!vue.observateur && <details><summary>{t('online.match.alerts')}</summary><NotificationsMatch ligue={vue.id} /></details>}
 
     {/* ⚠️ ON N'EST RÉVEILLÉ QUE DANS LES 50 MÈTRES ADVERSES (`METRES_DECISION`).
@@ -1334,7 +1346,7 @@ function Direct({ vue, rencontre: r, agir, occupe, fermer }: { vue: VueCarriereE
         pénalités d'un match — à soixante-dix mètres des poteaux, « je prends
         les points ? » n'est pas une question — mais sur les six ou sept qui se
         jouent dans la zone où le choix compte vraiment. */}
-    {m.decision && <div className="cel-decision" role="alertdialog" aria-label={t('online.match.penaltyDecision')}>
+    {decisionVue && m.decision && <div className="cel-decision" role="alertdialog" aria-label={t('online.match.penaltyDecision')}>
       <div className="eyebrow">{m.decision.horloge >= 1 ? t("ui.36fecb80df82", { v0: Math.floor(m.decision.horloge) }) : t("ui.f0979ebc3a11")} · {m.score.domicile} – {m.score.exterieur} · {t('online.decision.clockStopped')}</div>
       <h2>{t('online.decision.penaltyAtMeters', { dist: m.decision.distance })}</h2>
       <p>{t('online.decision.kickerStats', { name: m.decision.buteur, pct: m.decision.probabilite })}{m.decision.aPortee ? '' : t('online.decision.beyondRange')}</p>
@@ -2041,7 +2053,7 @@ function Calendrier({ vue, agir, occupe, suivre, proprietaire, notifier }: { vue
         return <button key={r.id} className={`cel-agenda-ligne${ouverte ? ' ouverte' : ''}`} onClick={() => suivre(r.id)} disabled={!r.match}>
           <span className="cel-agenda-jour">
             <b>{new Date(rendezVous).getDate()}</b>
-            <small>{new Date(rendezVous).toLocaleDateString('fr-FR', { month: 'short' })}</small>
+            <small>{new Date(rendezVous).toLocaleDateString(locale(), { month: 'short' })}</small>
           </span>
           <Ecusson nom={nomClub(vue, adversaire)} logo={vue.clubs.find(c => c.id === adversaire)?.embleme} />
           <span className="cel-agenda-corps">
@@ -2174,7 +2186,7 @@ function TableauCoupe({ vue, competition, rencontres, suivre }: {
               ) : rencontre.resultat?.ap ? (
                 <span className="cel-tag-fin ap">A.P.</span>
               ) : enDirect ? (
-                <span className="cel-tag-fin live">DIRECT {rencontre.match?.minute}′</span>
+                <span className="cel-tag-fin live">{t('ui.directCourt')}{rencontre.match?.minute}′</span>
               ) : null}
             </div>
 

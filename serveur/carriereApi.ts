@@ -963,9 +963,15 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
           if (!autorisation || (!accesObservateurKiri && !autorisation.comptes.includes(compte.id))) throw new ErreurHttp(404, 'Ligue introuvable.');
           const observateur = accesObservateurKiri && !autorisation.comptes.includes(compte.id);
           const e = await actualiserDirect(id, direct, maintenant, autorisation);
+          // L'écran qui sait rejouer le film annonce son dernier pas connu
+          // (`film=` vide : il n'en a aucun). Les anciens écrans n'annoncent
+          // rien et reçoivent le relevé du terrain, comme avant.
+          const annonce = url.searchParams.get('film');
+          const pas = annonce === null ? NaN : Number(annonce);
+          const film = annonce === null ? undefined : { depuis: annonce !== '' && Number.isInteger(pas) && pas >= 0 ? pas : undefined };
           const rencontre = observateur
-            ? vueRencontreCarriereObservateur(e, direct)
-            : vueRencontreCarriere(e, compte.id, direct);
+            ? vueRencontreCarriereObservateur(e, direct, film)
+            : vueRencontreCarriere(e, compte.id, direct, film);
           if (!rencontre) throw new ErreurHttp(404, 'Match introuvable.');
           return res.status(200).json({ id: e.id, version: e.version, rencontre });
         }

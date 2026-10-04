@@ -402,15 +402,56 @@ que l'affichage lise exactement la version du moteur qui joue.
   dix rendus par seconde suffisent au score et aux bandeaux.
 - **Carrière** : la scène lit `e`, l'état vivant du moteur. La vue est choisie
   AVANT le coup d'envoi parce qu'elle règle `cadenceDetaillee` (voir plus bas).
-- **Ligue en ligne** : ⚠️ **ni le serveur ni la base ne changent.** Le direct
-  reçoit déjà un relevé du terrain toutes les deux secondes (~8 Ko) ; l'écran
-  l'interpole, et `lib/ligue/etat3DDepuisDirect.ts` traduit chaque image en un
-  état « à la manière du moteur ». Ce que le relevé ne porte pas est DÉDUIT côté
-  client : qui est lié dans un ruck, qui est dans l'alignement, où en est la
-  mêlée (découpée en étapes d'après sa progression), le rituel du buteur, et le
-  résultat d'un tir — lu sur sa trajectoire. Aucune position n'est envoyée ni
-  stockée pour la 3D. Banc : `npm run verify:direct-3d` ; aperçu local qui
-  rejoue la chaîne serveur → relevés → scène : `/scripts/apercu-direct-3d.html`.
+- **Ligue en ligne — LE FILM DU MATCH** (`lib/ligue/filmDirect.ts`).
+  ⚠️ **L'ÉCRAN NE DEVINE PLUS RIEN, IL REJOUE.** Il recevait une photo du
+  terrain toutes les deux secondes et inventait le reste (trajectoires tirées
+  entre deux positions, porteur deviné, mêlée découpée d'après sa progression) :
+  de là les retours en arrière — il prolongeait une course que la photo suivante
+  contredisait —, les plaquages à distance et les phases jouées avant que les
+  joueurs y soient.
+  - **Serveur** : une caméra (`filmer`) observe chaque pas du moteur rejoué en
+    mémoire (0,15 s) et garde les douze dernières secondes. Au sondage, l'écran
+    annonce le dernier pas qu'il connaît (`&film=<n>`) et ne reçoit que la
+    suite, sous forme de DIFFÉRENCES : déplacements en centimètres, et les seuls
+    champs de l'état qui ont changé. Un ruck, une passe, un coup de sifflet sont
+    donc des événements datés au pas près. **Rien n'est écrit en base, le nombre
+    de requêtes ne change pas**, et la réponse pèse 4,6 Ko au lieu de 8,4
+    (1,4 Ko compressés contre 2,2).
+  - **Client** : `LecteurFilm` range les pas et les rejoue avec trois à quatre
+    secondes de retard. Sa lecture ne recule jamais et ne dépasse jamais la
+    dernière image reçue ; un envoi en retard se rattrape par la VITESSE (−12 %
+    à +15 %), jamais par un saut. Il règle son retard sur le CREUX de son
+    tampon, pas sur sa moyenne. L'état rejoué a la forme de celui du moteur :
+    la scène 3D le lit comme un match de carrière (`brancher(etat, { direct:
+    false })`), le terrain vu de haut passe par `extraireTerrain`.
+  - **Score, chrono, fil et décision** suivent l'instant MONTRÉ (`AfficheDirect`),
+    pas celui du serveur : sinon l'essai s'annonce avant qu'on ne le voie.
+  - ⚠️ **L'IDENTITÉ DES OBJETS VOYAGE AVEC EUX.** La scène reconnaît un nouveau
+    ruck ou une nouvelle passe à ce que l'OBJET a changé. Chaque objet filmé
+    porte donc une marque de génération (`#`) : inchangée, l'écran met à jour
+    le sien ; changée, il en crée un neuf. La recréer à chaque pas relancerait
+    le sifflet et l'animation du ruck six fois par seconde.
+  - ⚠️ **`e.apresPas` N'OBSERVE QUE.** Ce crochet du moteur ne modifie rien,
+    sinon deux rejoues du même match divergent.
+  - ⚠️ **LE CLIENT NE REÇOIT TOUJOURS NI LA GRAINE NI LE PLAN ADVERSE.** Faire
+    tourner le moteur dans le navigateur aurait livré la suite du match ; le
+    film ne donne que le passé.
+  - Un écran d'avant (sans `film=`) reçoit toujours le relevé. L'ancien chemin
+    (`interpolationDirect`, `etat3DDepuisDirect`) ne sert plus qu'à l'atelier
+    et au laboratoire.
+  - Bancs : `npm run verify:film-direct` (5 500 pas rejoués identiques au
+    moteur, réponses lentes, coupure, rechargement), `npm run verify:direct-3d`
+    (ce que la scène montre : plaquages au contact, phases qui attendent).
+    Aperçu local : `/scripts/apercu-direct-3d.html` (`?latence=900`,
+    `?regles=1`, `?releve=1`, `?pilote=1` pour un onglet caché).
+- ⚠️ **LES RÈGLES D'UN MATCH DE LIGUE SONT GELÉES AU COUP D'ENVOI**
+  (`EtatMatchEnLigne.regles`). Absent ou 1 : le moteur d'origine. 2 : cadence
+  détaillée, `placementJoue` et défense resserrée. Un match en cours au moment
+  d'une mise en ligne garde donc son moteur — et son score. Remettre
+  `REGLES_MATCH_EN_LIGNE` à 1 suffit à revenir en arrière pour les suivants.
+  ⚠️ Toute retouche du moteur détaillé change la rejoue des matchs en règles 2
+  DÉJÀ COMMENCÉS : la passer sous une règle 3, ou la mettre en ligne quand aucun
+  match ne se joue.
 - **Habillage** (`habillage.js`) : tenues repeintes pixel par pixel depuis
   l'atlas d'origine aux couleurs du club (motifs uni, cerceaux, rayures,
   épaules, bande, diagonale), écusson cousu sur la poitrine, numéro dans le dos ;
@@ -574,6 +615,44 @@ en 3D et l'aperçu de l'accueil la demandent ; le serveur des ligues, non.
   referme sur sa course ; un avant arrive à la mêlée déjà tourné vers elle ;
   un geste de ruck ne se joue plus en courant. Mesuré : 3,0 % d'images où le
   corps tournait le dos à sa course → 0,6 %.
+
+- ⚠️ **LE PLACEMENT SE JOUE** (`placementJoue` : ligue en règles 2, carrière en
+  3D, aperçu). Le moteur INSTALLAIT d'un coup mêlées et touches, posait le
+  botteur au centre et tranchait sur minuterie : 2 800 joueurs déplacés d'un
+  pas par match, que la scène maquillait en les faisant courir et en retenant
+  la phase — ce qu'un direct en ligne ne peut pas faire. Désormais chacun court
+  à sa marque (4,8 m/s, 6,2 de loin) et la phase ATTEND (`retenirLePlacement`,
+  24 s au plus) : mêlée à l'étape « placement », alignement pas encore
+  resserré, renvoi pas encore tapé. Zéro joueur déplacé d'un coup.
+  Trois pièges trouvés en chemin : une cellule restée « en poussée » après un
+  coup de sifflet plantait ses deux avants jusqu'à la sirène ; le balayage des
+  contacts ramenait à leur départ deux adversaires dont les trajets se
+  coupaient (sept touches sur trente-trois n'arrivaient jamais à se former) ;
+  `separer` et la résolution des contacts expulsaient de trois à quatre mètres
+  les joueurs d'un regroupement qui se défait — leur poussée est bornée par pas.
+- **Le lanceur va chercher le ballon** (`conduireLanceur`) : il rejoint
+  l'endroit où il est sorti, le ramasse (`pick_up_ball`), puis lance les deux
+  pieds HORS du terrain. La touche ne part pas sans ballon en main.
+- **Chercher la touche est un résultat, plus une certitude** (`viserLaTouche`) :
+  la qualité de la frappe (pied, fatigue, défenseur qui monte) décide ; le gain
+  est ce qu'il reste de la longueur une fois la largeur traversée (de 13 à
+  55 m) ; touches manquées, ballons qui restent en jeu, coups de pied contrés.
+  ⚠️ Même « forcée », une frappe attend son armé : sinon le ballon part avant
+  que le corps se soit tourné (un coup de pied sur vingt-cinq dans le dos).
+- **L'attaque se range par COULOIRS** (`structurerEnCouloirs`). Les places
+  étaient des décalages depuis le ballon, rabotés sur la ligne de touche : six
+  avants et la ligne empilés dans le couloir (cinq places ou plus près d'une
+  touche 9,3 % du temps → 4 %). Deux cellules de trois dans la largeur
+  DISPONIBLE, gardées le temps de la phase, la deuxième vague derrière, les
+  ailiers sur leur ligne (7,3 m → 5,1 m), l'arrière en profondeur ; resserré
+  près de la ligne, reculé dans ses 22. L'équipe se range autour du point de
+  départ de la phase et n'accompagne le ballon que d'un tiers.
+- **La ligne d'avantage** (`e.avantage`, de −3 à 3) : un ruck formé au-delà de
+  la ligne de départ de la phase est une collision gagnée — ballon plus rapide,
+  défense plus longue à remonter ; en deçà, l'inverse. Un avant vise
+  l'intervalle ou l'épaule du plus léger (`ligneDeCourse`), et la pointe du
+  bloc s'élance avant la sortie du ballon (34 % de réceptions à l'arrêt → 8 %).
+  Bancs : `npm run verify:structure`, `npm run verify:pied`.
 
 ⚠️ **TOUT CE QUI PRÉCÈDE NE VAUT QU'EN CADENCE DÉTAILLÉE, ET LE JEU Y EST PLUS
 OUVERT.** Sur les mêmes graines : 2,3 essais et 17 points par match de dix

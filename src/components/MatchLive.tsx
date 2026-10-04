@@ -435,6 +435,8 @@ export function MatchLive({
       {
         niveau: niveauDuMatch(joueur, selection), controle: true,
         cadenceDetaillee: cadenceInitiale.current,
+        // Le placement se joue : personne n'est installé d'un coup, la phase attend ses joueurs.
+        placementJoue: cadenceInitiale.current,
         ...(coteManager === 'A' && feuilleManager && compoManager && manager ? {
           compositionA: feuilleManager, tactiqueA: manager.tactique,
           capitaineAId: compoManager.capitaineId, buteurAId: compoManager.buteurId,

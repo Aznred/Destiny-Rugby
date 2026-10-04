@@ -79,6 +79,7 @@ import { adequationAuPoste, facteurDePerformance } from '../carteJoueur.js';
 import type { CompositionManager, PosteId, TactiqueManager } from '../../types.js';
 import type { Coequipier } from '../effectif.js';
 import { graine } from './aleatoire.js';
+import { cadrerFilm, extraireFilm, filmer, poidsFilm, type FilmDirect } from './filmDirect.js';
 
 /** Les deux camps, nommés comme la rencontre les nomme. */
 export type CoteEnLigne = 'domicile' | 'exterieur';
@@ -495,7 +496,31 @@ export interface EtatMatchEnLigne {
   fil: LigneFil[];
   stats: Record<CoteEnLigne, StatsEquipeMatch>;
   feuille?: LigneFeuilleMatch[];
+  /**
+   * Les règles du moteur pour CETTE rencontre, gelées au coup d'envoi.
+   *
+   * ⚠️ UN MATCH SE REJOUE AVEC LES RÈGLES QUI L'ONT VU NAÎTRE. Absent (ou 1) :
+   * le moteur d'origine — mêlées et touches installées d'un coup, phases sur
+   * minuterie. 2 : le placement se joue (personne n'est déplacé d'un coup, la
+   * phase attend ses joueurs) et le match suit la cadence détaillée des matchs
+   * en trois dimensions. Une rencontre en cours au moment d'une mise en ligne
+   * garde donc son moteur, et son score déjà annoncé.
+   */
+  regles?: number;
 }
+
+/**
+ * Les règles données aux rencontres créées à partir de maintenant.
+ * ⚠️ LA REMETTRE À 1 SUFFIT À REVENIR EN ARRIÈRE pour les prochains matchs :
+ * ceux déjà créés gardent les leurs.
+ */
+export const REGLES_MATCH_EN_LIGNE = 2;
+/**
+ * Défense resserrée des règles 2 : la cadence détaillée marque davantage, ce
+ * réglage ramène le nombre d'essais à celui des matchs de ligue d'avant
+ * (mesuré : voir `scripts/mesurerReglesLigue.ts`).
+ */
+export const RESSERREMENT_REGLES_2 = 1;
 
 /** Ce que le client reçoit : jamais la graine, jamais le plan d'en face. */
 export interface VueMatchEnLigne {
@@ -505,6 +530,11 @@ export interface VueMatchEnLigne {
   /** Identite du coup d'envoi : distingue une vraie relance d'une vieille reponse. */
   instance?: number;
   terrain?: TerrainDirect;
+  /**
+   * Les pas du moteur depuis le dernier que l'écran connaît (`filmDirect.ts`).
+   * Envoyé À LA PLACE du relevé `terrain` quand l'écran le demande.
+   */
+  film?: FilmDirect;
   minute: number;
   /** La même, au centième : l'écran fait avancer son chrono entre deux relevés. */
   horloge: number;
@@ -689,7 +719,7 @@ function poidsMoteur(moteur: EtatMatch): number {
   // Estimation volontairement prudente et O(1), pour ne pas sérialiser trente
   // joueurs à chacun des ticks du direct. Les fermetures et références du RNG
   // ne sont de toute façon pas mesurables par JSON.stringify.
-  return 48 * 1024 + moteur.pions.length * 2_048 + moteur.commentaires.length * 320;
+  return 48 * 1024 + moteur.pions.length * 2_048 + moteur.commentaires.length * 320 + poidsFilm(moteur);
 }
 
 function ranger(cle: string, moteur: EtatMatch, ordresAppliques: number): void {
@@ -812,6 +842,7 @@ function monter(etat: EtatMatchEnLigne): EtatMatch {
   if (!equipes) throw new Error('Ce match est terminé : ses feuilles ont été archivées.');
   const strategieD = strategieA(etat, 'domicile', 0);
   const strategieE = strategieA(etat, 'exterieur', 0);
+  const regles2 = (etat.regles ?? 1) >= 2;
   const e = creerMatch(
     equipes.domicile.nom, equipes.exterieur.nom,
     equipes.domicile.feuille, equipes.exterieur.feuille,
@@ -822,6 +853,9 @@ function monter(etat: EtatMatchEnLigne): EtatMatch {
       // chaque arrêt utilise sa durée directe, courte mais lisible.
       tempsReel: true,
       scoreSurTerrain: true,
+      // Règles 2 : voir `EtatMatchEnLigne.regles`.
+      cadenceDetaillee: regles2, placementJoue: regles2,
+      resserrement: regles2 ? RESSERREMENT_REGLES_2 : undefined,
       compositionA: equipes.domicile.feuille, compositionB: equipes.exterieur.feuille,
       tactiqueA: tactiqueDepuisStrategie(strategieD), tactiqueB: tactiqueDepuisStrategie(strategieE),
       capitaineAId: equipes.domicile.capitaineId, capitaineBId: equipes.exterieur.capitaineId,
@@ -834,6 +868,8 @@ function monter(etat: EtatMatchEnLigne): EtatMatch {
     A: strategieD.modeCombinaisons === 'configure' ? strategieD.combinaisons ?? [] : [],
     B: strategieE.modeCombinaisons === 'configure' ? strategieE.combinaisons ?? [] : [],
   };
+  // La caméra du direct : elle observe, et ne filme que les dernières secondes.
+  filmer(e);
   return e;
 }
 
@@ -854,6 +890,7 @@ function rejouer(etat: EtatMatchEnLigne, jusqua: number, arretSur: readonly Cote
   } else {
     e = monter(etat);
   }
+  cadrerFilm(e, jusqua * 60);
   for (let i = depart; i < etat.journal.length; i++) {
     const ev = etat.journal[i];
     if (ev.horloge > jusqua) break;
@@ -1021,13 +1058,17 @@ function extraireVolDirect(vol: Vol | VolRecent, debut: number, ecoule: number):
   };
 }
 
-export function extraireTerrain(e: EtatMatch, emisLe: number): TerrainDirect {
+export function extraireTerrain(
+  e: EtatMatch, emisLe: number,
+  /** Le film rejoué côté client porte déjà la chute sous sa forme d'affichage. */
+  corps: (p: EtatMatch['pions'][number]) => PionDirect['corps'] = corpsPourAffichage,
+): TerrainDirect {
   const terrain: TerrainDirect = {
     pions: e.pions.filter((p) => p.surLeTerrain).map((p) => ({
       id: p.id, numero: p.numeroMaillot ?? p.numero, numeroRole: p.numero, nom: p.nom, poste: p.poste,
       cote: MOTEUR_VERS_COTE[p.cote],
       x: r2(p.pos.x), y: r2(p.pos.y), vx: r2(p.vitesse.x), vy: r2(p.vitesse.y),
-      corps: corpsPourAffichage(p),
+      corps: corps(p),
       force: p.puissance, tailleCm: p.tailleCm, poidsKg: p.poidsKg,
     })),
     ballon: {
@@ -1203,7 +1244,7 @@ export function creerMatchEnLigne(p: ParametresCreationMatch): EtatMatchEnLigne 
   const equipes = { domicile: geler(p.domicile), exterieur: geler(p.exterieur) };
   const cle = `${p.id}#${p.graine >>> 0}`;
   return {
-    id: p.id, cle, debut: p.debut, gel: 0, horloge: 0,
+    id: p.id, cle, debut: p.debut, gel: 0, horloge: 0, regles: REGLES_MATCH_EN_LIGNE,
     cibles: cibleDeScore(
       forceFeuille(equipes.domicile.feuille), forceFeuille(equipes.exterieur.feuille), cle,
       equipes.domicile.collectif ?? 50, equipes.exterieur.collectif ?? 50,
@@ -1452,7 +1493,11 @@ function mesOrdres(etat: EtatMatchEnLigne, monCote: CoteEnLigne): LigneFil[] {
   return lignes;
 }
 
-export function vueMatchEnLigne(etat: EtatMatchEnLigne, clubId: string, emisLe = Date.now()): VueMatchEnLigne {
+export function vueMatchEnLigne(
+  etat: EtatMatchEnLigne, clubId: string, emisLe = Date.now(),
+  /** L'écran sait rejouer le film : `depuis` est le dernier pas qu'il connaît. */
+  film?: { depuis?: number },
+): VueMatchEnLigne {
   const monCote = etat.equipes ? COTES.find((c) => etat.equipes![c].clubId === clubId) : undefined;
   const vue: VueMatchEnLigne = {
     id: etat.id, instance: etat.debut, minute: Math.floor(etat.horloge), horloge: r2(etat.horloge), termine: etat.termine,
@@ -1468,7 +1513,11 @@ export function vueMatchEnLigne(etat: EtatMatchEnLigne, clubId: string, emisLe =
   // image — et, sur un démarrage à froid où le cache est vide, deux rejoues
   // complètes du match à chaque sondage.
   const e = rejouer(etat, etat.horloge, []);
-  vue.terrain = extraireTerrain(e, emisLe);
+  // ⚠️ LE FILM REMPLACE LE RELEVÉ, IL NE S'Y AJOUTE PAS : envoyer les deux
+  // doublerait le transfert pour un écran qui n'en lit qu'un. Sans film à
+  // donner (caméra vide), le relevé reste le filet.
+  if (film) vue.film = extraireFilm(e, film.depuis);
+  if (!vue.film) vue.terrain = extraireTerrain(e, emisLe);
   if (!monCote) return vue;
 
   vue.monCote = monCote;

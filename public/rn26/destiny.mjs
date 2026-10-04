@@ -22,7 +22,7 @@ const SEQUENCES={
   jackal:[['jackal_engage',.57],['jackal_struggle',1.07],['jackal_success_standup',1]],
   reaction_hit:[['bumped_hit',.6],['standing_tackled_going_down',1.6]],
 };
-const gestures={restart:'kick_restart',grubber:'kick_grubber',punt:'kick_running',box_kick:'kick_box',chip:'kick_box',drop:'kick_restart',conversion:'kick_conversion_a_kick',penalty:'kick_conversion_a_kick',tackle_low:'standing_tackle_front_grab',tackle_drive:'standing_tackle_front_grab',fall_forward:'standing_tackled_going_down',fall_back:'standing_tackled_going_down',contact_brace:'ruck_struggle_middle_front',clearout_drive:'ruck_engage_middle',ruck_bind:'ruck_engage_middle',ruck_push:'ruck_struggle_middle_front',try:'try_touchdown',dive_try:'try_dive',foul_knockon:'jumping_catch_fail',reaction_hit:'standing_tackled_going_down',charge_down:'jumping_catch_start_immediate',tap:'pick_up_ball'};
+const gestures={pickup:'pick_up_ball',restart:'kick_restart',grubber:'kick_grubber',punt:'kick_running',box_kick:'kick_box',chip:'kick_box',drop:'kick_restart',conversion:'kick_conversion_a_kick',penalty:'kick_conversion_a_kick',tackle_low:'standing_tackle_front_grab',tackle_drive:'standing_tackle_front_grab',fall_forward:'standing_tackled_going_down',fall_back:'standing_tackled_going_down',contact_brace:'ruck_struggle_middle_front',clearout_drive:'ruck_engage_middle',ruck_bind:'ruck_engage_middle',ruck_push:'ruck_struggle_middle_front',try:'try_touchdown',dive_try:'try_dive',foul_knockon:'jumping_catch_fail',reaction_hit:'standing_tackled_going_down',charge_down:'jumping_catch_start_immediate',tap:'pick_up_ball'};
 // Gestes superposés à la course : seuls le buste et les bras les jouent.
 const hauts={handoff:'handoff_left',bump:'drive_with_ball',intercept:'pass_catch_from_left'};
 // ── Plaquages : ce que le moteur a LU du contact (`duels.ts`) décide des gestes ──
@@ -475,9 +475,20 @@ export class DestinyMatch {
     if(e.phase==='touche'){
       const c=e.conquete;
       if(p.number===2&&s.cote===e.possession){
+        // Le lanceur va chercher le ballon : il court jusqu'à lui les mains libres,
+        // se baisse pour le ramasser, puis gagne sa place en le tenant.
+        const ram=c?.ramassage;
+        if(ram==='ramasse'){
+          clip('pick_up_ball',Math.max(0,now-(c.ramassageDepuis??now)));
+          if(c.ballonAuSol){const b=xyz(c.ballonAuSol);d.heading=cap(b.x-p.x,b.z-p.z);d.pivot=7;}
+          return done();
+        }
+        if(ram==='aller')return done();
+        // ⚠️ EN ROUTE, IL REGARDE OÙ IL VA. Son cap était fixé vers le terrain dès
+        // le début de la phase : il rejoignait la ligne de touche en crabe.
+        if(p.arrival>.5||speed>1.2){d.carry='deux';return done();}
         clip(progress<.42?'lout_throw_hold':progress<.6?'lout_throw_pull_back':'lout_throw_release',progress<.42?now:progress<.6?(progress-.42)/.18:(progress-.6)/.4,progress<.42,progress>=.42);
-        d.heading=Math.atan2((c?.reception?.y??35)-s.pos.y,(c?.reception?.x??s.pos.x)-s.pos.x)+Math.PI;
-        if(p.arrival>.5||speed>1.2){d.loco=true;d.name=null;d.carry='deux';}
+        d.heading=Math.atan2((c?.reception?.y??35)-s.pos.y,(c?.reception?.x??s.pos.x)-s.pos.x)+Math.PI;d.pivot=5;
         return done();
       }
       if(s.role==='alignement'){
@@ -587,6 +598,33 @@ export class DestinyMatch {
         d.anchor={x:lie.place.x,z:lie.place.z,heading:face,mode:'slot',fondu:.35};d.lie=true;return done();
       }
     }
+    // ⚠️ LE COUP DE PIED PASSE AVANT LE RELAIS. Le 9 qui tape derrière son ruck
+    // restait dans sa posture de relayeur, tourné vers le regroupement : le
+    // ballon partait dans son dos, sans geste de frappe.
+    // ── Jeu au pied dans le jeu courant : l'armé précède la frappe ──────────
+    const pied=e.piedPrepare?.auteurId===p.id&&!e.vol?e.piedPrepare:null;
+    // ⚠️ ON FRAPPE DANS L'AXE OÙ L'ON REGARDE. Le botteur gardait le cap de sa
+    // course et le ballon partait ailleurs. Pendant qu'il se place il regarde sa
+    // cible ; à l'armé, bassin et épaules se tournent vers elle.
+    const viseePied=pied?xyz(pied.arrivee):null;
+    if(pied&&pied.pretDepuis===undefined&&viseePied)d.regard={x:viseePied.x,y:2.2,z:viseePied.z};
+    if(pied&&pied.pretDepuis!==undefined){
+      d.heading=cap(viseePied.x-p.x,viseePied.z-p.z);d.pivot=5;
+      const name=pied.intention==='renvoi'||pied.intention==='drop'?'kick_restart':pied.intention==='rasant'?'kick_grubber':pied.intention==='chandelle'||p.number===9?'kick_box':'kick_running';
+      const delai=pied.intention==='drop'?1.12:pied.intention==='renvoi'?1.05:p.number===9?.84:.7;
+      clip(name,Math.max(0,now-pied.pretDepuis+FRAPPES[name]-delai));
+      this.memo.set('pied:'+p.id,{name,debut:pied.pretDepuis+delai-FRAPPES[name]});
+      return done();
+    }
+    const frappe=this.memo.get('pied:'+p.id);
+    if(frappe&&e.vol?.type==='pied'&&e.vol.auteur?.id===p.id&&now-frappe.debut<FRAPPES[frappe.name]+.7){
+      clip(frappe.name,now-frappe.debut);
+      const ou=xyz(e.vol.vers);d.heading=cap(ou.x-p.x,ou.z-p.z);d.pivot=5;
+      return done();
+    }
+    // Filet : quelle que soit la façon dont le coup de pied est parti, celui qui
+    // vient de frapper est tourné vers là où va le ballon.
+    if(e.vol?.type==='pied'&&e.vol.auteur?.id===p.id&&e.vol.ecoule<.9){const ou=xyz(e.vol.vers);d.heading=cap(ou.x-p.x,ou.z-p.z);d.pivot=9;}
     // Sortie de ruck ou de mêlée : accroupi sur le ballon, puis la passe du relayeur.
     const relais=this.relay?.id===p.id&&now-this.relay.since<2.6?this.relay:this.scrumEnd&&p.number===9&&now-this.scrumEnd.time<2.6?{id:p.id,since:this.scrumEnd.time}:null;
     if(relais&&!s.corps){
@@ -640,27 +678,6 @@ export class DestinyMatch {
       return done();
     }
 
-    // ── Jeu au pied dans le jeu courant : l'armé précède la frappe ──────────
-    const pied=e.piedPrepare?.auteurId===p.id&&!e.vol?e.piedPrepare:null;
-    // ⚠️ ON FRAPPE DANS L'AXE OÙ L'ON REGARDE. Le botteur gardait le cap de sa
-    // course et le ballon partait ailleurs. Pendant qu'il se place il regarde sa
-    // cible ; à l'armé, bassin et épaules se tournent vers elle.
-    const viseePied=pied?xyz(pied.arrivee):null;
-    if(pied&&pied.pretDepuis===undefined&&viseePied)d.regard={x:viseePied.x,y:2.2,z:viseePied.z};
-    if(pied&&pied.pretDepuis!==undefined){
-      d.heading=cap(viseePied.x-p.x,viseePied.z-p.z);d.pivot=5;
-      const name=pied.intention==='renvoi'||pied.intention==='drop'?'kick_restart':pied.intention==='rasant'?'kick_grubber':pied.intention==='chandelle'||p.number===9?'kick_box':'kick_running';
-      const delai=pied.intention==='drop'?1.12:pied.intention==='renvoi'?1.05:p.number===9?.84:.7;
-      clip(name,Math.max(0,now-pied.pretDepuis+FRAPPES[name]-delai));
-      this.memo.set('pied:'+p.id,{name,debut:pied.pretDepuis+delai-FRAPPES[name]});
-      return done();
-    }
-    const frappe=this.memo.get('pied:'+p.id);
-    if(frappe&&e.vol?.type==='pied'&&e.vol.auteur?.id===p.id&&now-frappe.debut<FRAPPES[frappe.name]+.7){
-      clip(frappe.name,now-frappe.debut);
-      const ou=xyz(e.vol.vers);d.heading=cap(ou.x-p.x,ou.z-p.z);d.pivot=5;
-      return done();
-    }
     // Réception d'un coup de pied.
     if(e.vol?.type==='pied'&&['jeuCourant','ballonEnLAir'].includes(e.phase)){
       const chute=xyz(e.vol.vers),loin=Math.hypot(p.x-chute.x,p.z-chute.z),reste=e.vol.duree-e.vol.ecoule-offset;

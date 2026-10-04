@@ -107,9 +107,13 @@ export const chargerAdministrationCarriere = (signal?: AbortSignal) =>
 export const chargerLigueCarriere = (id: string, signal?: AbortSignal, version?: number) =>
   requete<VueCarriereEnLigne>(undefined, undefined, signal,
     `?ligue=${encodeURIComponent(id)}${version ? `&v=${version}` : ''}`);
-export const chargerDirectCarriere = (id: string, matchId: string, signal?: AbortSignal, version?: number) =>
+/**
+ * `film` : le dernier pas du film que l'écran connaît (`null` : aucun). Le
+ * serveur ne renvoie alors que les pas suivants, à la place du relevé du terrain.
+ */
+export const chargerDirectCarriere = (id: string, matchId: string, signal?: AbortSignal, version?: number, film?: number | null) =>
   requete<MiseAJourDirectCarriere>(undefined, undefined, signal,
-    `?ligue=${encodeURIComponent(id)}&direct=${encodeURIComponent(matchId)}${version ? `&v=${version}` : ''}`);
+    `?ligue=${encodeURIComponent(id)}&direct=${encodeURIComponent(matchId)}${version ? `&v=${version}` : ''}${film === undefined ? '' : `&film=${film ?? ''}`}`);
 const notifierCompte = (type: 'connecte' | 'deconnecte') => {
   if (typeof window !== 'undefined') window.dispatchEvent(new Event(`destiny-compte-${type}`));
 };

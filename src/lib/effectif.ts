@@ -4,6 +4,7 @@ import { COMPETITIONS, competitionDuClub, NOTE_PAR_NIVEAU } from '../data/clubs.
 import { EFFECTIFS_REELS, NOTE_CLUB_REEL } from '../data/effectifsReels.js';
 import { EFFECTIFS_AMATEURS } from '../data/amateurs.js';
 import { joueursFfrDuClub } from './joueursFfr.js';
+import { recalibrerNoteFfr, echelleFfrDuClub, bornerNoteInitialeFfr } from './echelleNotesFfr.js';
 import {
   effectifNouveau, NOTE_CLUB_NOUVEAU, type JoueurNouveau,
 } from '../data/nouvellesLigues.js';
@@ -169,7 +170,8 @@ function genJoueur(club: string, slot: number, generation: number, saison: numbe
   age = Math.min(age, retraite);
 
   // Note « au pic » du joueur, puis note effective à son âge actuel.
-  const potentielBase = Math.max(30, Math.min(94, noteBase + talent + courbeAge(AGE_PIC)));
+  const minimum = echelleFfrDuClub(club) ? 20 : 35;
+  const potentielBase = Math.max(30, Math.min(94, recalibrerNoteFfr(club, noteBase + talent, true, NOTE_PAR_NIVEAU[niveau]) + courbeAge(AGE_PIC)));
   const vitesseDeclin = rng();
   const prime = bonusPepite(club + '#' + slot + '#g' + generation, ageDebut);
   const potentiel = prime > 0
@@ -190,10 +192,10 @@ function genJoueur(club: string, slot: number, generation: number, saison: numbe
   // branche n'existe que pour rendre l'intention lisible.
   let note: number;
   if (prime > 0) {
-    const noteDepart = noteALAge(potentielBase, AGE_PIC, potentielBase, ageDebut, vitesseDeclin);
-    note = noteALAge(noteDepart, ageDebut, potentiel, age, vitesseDeclin);
+    const noteDepart = noteALAge(potentielBase, AGE_PIC, potentielBase, ageDebut, vitesseDeclin, minimum);
+    note = noteALAge(noteDepart, ageDebut, potentiel, age, vitesseDeclin, minimum);
   } else {
-    note = noteALAge(potentiel, AGE_PIC, potentiel, age, vitesseDeclin);
+    note = noteALAge(potentiel, AGE_PIC, potentiel, age, vitesseDeclin, minimum);
   }
 
   return {
@@ -237,10 +239,11 @@ export function noteALAge(
   potentiel: number,
   age: number,
   vitesseDeclin: number,
+  minimum = 35,
 ): number {
   let note: number;
   if (age >= AGE_PIC) {
-    note = Math.max(noteRef, potentiel);
+    note = ageRef < AGE_PIC ? Math.max(noteRef, potentiel) : noteRef;
   } else if (ageRef >= AGE_PIC) {
     // Cas rare (on remonte le temps) : on redescend linéairement vers -1/an.
     note = noteRef - (AGE_PIC - age);
@@ -252,7 +255,7 @@ export function noteALAge(
   }
 
   note -= declin(age, vitesseDeclin) - declin(ageRef, vitesseDeclin);
-  return Math.round(Math.max(35, Math.min(97, note)));
+  return Math.round(Math.max(minimum, Math.min(97, note)));
 }
 
 // Courbe d'âge simple, conservée pour la génération procédurale.
@@ -381,8 +384,9 @@ function effectifReel(nomClub: string, saison: number, niveau: number): Coequipi
     const retraite = Math.max(reel.age, 33 + Math.floor(rngRetraite() * 5));
     const vitesseDeclin = rngRetraite();
     const age = reel.age + (saison - 1);
-    const noteReference = noteJoueurRevalorisee(reel.nom, reel.note);
-    const potentielReference = Math.max(noteReference, reel.potentiel);
+    const ancienneNote = noteJoueurRevalorisee(reel.nom, reel.note);
+    const noteReference = recalibrerNoteFfr(nomClub, ancienneNote);
+    const potentielReference = echelleFfrDuClub(nomClub) ? noteReference + Math.max(0, reel.potentiel - ancienneNote) : Math.max(noteReference, reel.potentiel);
     const profilPostes = postesJoueurReel(reel.nom, reel.poste);
 
     if (age <= retraite) {
@@ -394,7 +398,7 @@ function effectifReel(nomClub: string, saison: number, niveau: number): Coequipi
         age,
         // La note de l'export est celle de 2025-26 : le joueur progresse vers
         // son potentiel jusqu'à 27 ans, puis décline.
-        note: noteALAge(noteReference, reel.age, potentielReference, age, vitesseDeclin),
+        note: noteALAge(noteReference, reel.age, potentielReference, age, vitesseDeclin, echelleFfrDuClub(nomClub) ? 20 : 35),
         potentiel: potentielReference,
         nation: reel.nation,
         regen: false,
@@ -498,7 +502,8 @@ function effectifAmateur(nomClub: string, saison: number, niveau: number): Coequ
     const retraite = Math.max(ageRef, 32 + Math.floor(rng() * 6));
     const vitesseDeclin = rng();
     const talent = Math.floor(rng() * 15) - 7; // −7..+7 autour de la division
-    const potentielBase = Math.max(28, Math.min(80, noteBase + talent + courbeAge(AGE_PIC)));
+    const noteInitiale = recalibrerNoteFfr(nomClub, Math.max(28, noteBase + talent), true, NOTE_PAR_NIVEAU[niveau]);
+    const potentielBase = Math.max(30, Math.min(80, noteInitiale + courbeAge(AGE_PIC)));
     // ⚠️ ICI ON PEUT ÉCRIRE LE POTENTIEL DIRECTEMENT, sans réancrer la courbe,
     // et la démonstration tient en deux lignes. Une pépite a `ageRef ≤ 23`,
     // donc `Math.min(ageRef, AGE_PIC)` vaut `ageRef` : `noteRef` est calculée
@@ -513,7 +518,7 @@ function effectifAmateur(nomClub: string, saison: number, niveau: number): Coequ
       ? Math.max(potentielBase, Math.min(plafondPepite(niveau), potentielBase + prime))
       : potentielBase;
     const noteRef = noteALAge(
-      Math.max(28, noteBase + talent), Math.min(ageRef, AGE_PIC), potentiel, ageRef, vitesseDeclin,
+      noteInitiale, Math.min(ageRef, AGE_PIC), potentiel, ageRef, vitesseDeclin, 20,
     );
     const age = ageRef + (saison - 1);
 
@@ -525,7 +530,7 @@ function effectifAmateur(nomClub: string, saison: number, niveau: number): Coequ
         postesSecondaires: [...brut.postesSecondaires],
         photo: brut.photo,
         age,
-        note: noteALAge(noteRef, ageRef, potentiel, age, vitesseDeclin),
+        note: noteALAge(noteRef, ageRef, potentiel, age, vitesseDeclin, 20),
         potentiel,
         nation: '🇫🇷 France',
         regen: false,
@@ -604,10 +609,13 @@ export function effectifDuClub(nomClub: string, saison: number): Coequipier[] {
   // montre bien des joueurs meilleurs. L'appliquer sur `forceEffectif` seul
   // aurait donné un club qui joue comme 82 avec un effectif affiché à 75.
   const { bonus } = generationDuClub(nomClub, saison, noteDuClub(nomClub));
+  const bornerInitial = (joueurs: Coequipier[]) => saison === 1 ? joueurs.map(j => j.horsGeneration || j.duCentre ? j : {
+    ...j, note: bornerNoteInitialeFfr(nomClub, j.note),
+  }) : joueurs;
   if (Math.abs(bonus) < 0.05) {
-    return appliquerProgres(nomClub, saison, distinguerLesHomonymes(liste));
+    return appliquerProgres(nomClub, saison, distinguerLesHomonymes(bornerInitial(liste)));
   }
-  return appliquerProgres(nomClub, saison, distinguerLesHomonymes(liste.map((j) => (
+  return appliquerProgres(nomClub, saison, distinguerLesHomonymes(bornerInitial(liste.map((j) => (
     // ⚠️ UNE RECRUE NE SUIT PAS LA GÉNÉRATION DE SON NOUVEAU CLUB. Elle arrive
     // avec la note sur laquelle on l'a achetée ; lui appliquer le cycle du club
     // acheteur, c'est faire mentir la fiche du marché de plusieurs points.
@@ -618,7 +626,7 @@ export function effectifDuClub(nomClub: string, saison: number): Coequipier[] {
       // dépassent ce qu'on attendait d'eux, pas seulement une bonne saison.
       potentiel: Math.max(20, Math.min(99, Math.round(j.potentiel + bonus * 0.6))),
     }
-  ))));
+  )))));
 }
 
 // Un groupe doit pouvoir aligner un XV et son banc. Quand une source publique

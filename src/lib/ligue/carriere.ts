@@ -1,5 +1,7 @@
 import { catalogueAdmin } from './atelierCatalogue.js';
 import { statistiquesCarte } from './statistiquesCarte.js';
+import { rareteCarriere } from './catalogueCarriere.js';
+import { echelleFfrDuClub } from '../echelleNotesFfr.js';
 /** Règles exécutées exclusivement par le serveur ; chaque commande travaille sur une copie. */
 import { POSTE_PAR_ID } from '../../data/rugby.js';
 import type { CompositionManager } from '../../types.js';
@@ -48,8 +50,11 @@ function actualiserCartesCatalogue(cartes: CarteCarriere[]): void {
     const source = sourcesParId!.get(carte.sourceId);
     if (!source) continue;
     if (source.origine === 'ffr' && !catalogueAdmin().joueurs[carte.sourceId]) {
-      // Les corrections FFR portent sur les rôles et le portrait. La progression
-      // et toute l'histoire sportive d'une carte déjà distribuée sont conservées.
+      // L'échelle FFR est aussi corrigée sur les cartes déjà possédées.
+      // La propriété et toute l'histoire sportive restent intactes.
+      carte.note = source.note;
+      carte.potentiel = source.potentiel;
+      carte.rarete = rareteCarriere(source.note);
       carte.poste = source.poste;
       carte.famille = source.famille;
       carte.postesSecondaires = source.postesSecondaires ? [...source.postesSecondaires] : undefined;
@@ -66,7 +71,7 @@ function actualiserCartesCatalogue(cartes: CarteCarriere[]): void {
     carte.poste = source.poste;
     carte.famille = source.famille;
     carte.postesSecondaires = source.postesSecondaires ? [...source.postesSecondaires] : undefined;
-    carte.potentiel = catalogueAdmin().joueurs[carte.sourceId] ? source.potentiel : Math.max(carte.potentiel, source.potentiel);
+    carte.potentiel = catalogueAdmin().joueurs[carte.sourceId] || echelleFfrDuClub(source.clubReel) ? source.potentiel : Math.max(carte.potentiel, source.potentiel);
     carte.rarete = source.rarete;
     carte.photo = source.photo;
     carte.statistiques = { ...source.statistiques };
@@ -1720,17 +1725,31 @@ export function vueCarriereObservateur(etat: EtatCarriereEnLigne): VueCarriereEn
 }
 
 /** Vue minimale d'un direct : quelques dizaines de Ko au lieu de toute la ligue. */
-export function vueRencontreCarriere(etat: EtatCarriereEnLigne, compteId: string, matchId: string): VueCarriereEnLigne['rencontres'][number] | null {
-  return vueRencontreInterne(etat, matchId, monClub(etat, compteId).id);
+export function vueRencontreCarriere(
+  etat: EtatCarriereEnLigne, compteId: string, matchId: string,
+  /** L'écran rejoue le film du match : voir `filmDirect.ts`. */
+  film?: { depuis?: number },
+): VueCarriereEnLigne['rencontres'][number] | null {
+  return vueRencontreInterne(etat, matchId, monClub(etat, compteId).id, film);
 }
 
-function vueRencontreInterne(etat: EtatCarriereEnLigne, matchId: string, clubId: string): VueCarriereEnLigne['rencontres'][number] | null {
+function vueRencontreInterne(
+  etat: EtatCarriereEnLigne, matchId: string, clubId: string, film?: { depuis?: number },
+): VueCarriereEnLigne['rencontres'][number] | null {
   const rencontre = etat.rencontres.find(r => r.id === matchId);
   if (!rencontre) return null;
   const { match, ...publics } = rencontre;
-  return copier(match ? { ...publics, match: vueMatchEnLigne(match, clubId) } : publics);
+  // ⚠️ PAS DE `copier` SUR LE FILM : il est déjà fait de valeurs neuves, et le
+  // recopier doublerait le coût de chaque sondage du direct.
+  if (!match) return copier(publics);
+  const { film: pas, ...vue } = vueMatchEnLigne(match, clubId, undefined, film);
+  const copie = copier({ ...publics, match: vue as ReturnType<typeof vueMatchEnLigne> });
+  if (pas && copie.match) copie.match.film = pas;
+  return copie;
 }
 
-export function vueRencontreCarriereObservateur(etat: EtatCarriereEnLigne, matchId: string): VueCarriereEnLigne['rencontres'][number] | null {
-  return vueRencontreInterne(etat, matchId, '');
+export function vueRencontreCarriereObservateur(
+  etat: EtatCarriereEnLigne, matchId: string, film?: { depuis?: number },
+): VueCarriereEnLigne['rencontres'][number] | null {
+  return vueRencontreInterne(etat, matchId, '', film);
 }
