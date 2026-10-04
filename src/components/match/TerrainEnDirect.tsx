@@ -74,6 +74,7 @@ import {
   ecussonPourToile, preferenceMatch3D, preferencesTele, retenirPreferenceMatch3D, type OptionsScene3D, type Scene3D,
 } from '../../lib/match3D';
 import { OutilsTele } from './PresentationTV';
+import { useNomPorteur } from './useNomPorteur';
 import { logoTV } from '../../lib/habillageTV';
 import { creerMemoireEtat3D, etat3DDepuisDirect } from '../../lib/ligue/etat3DDepuisDirect';
 
@@ -227,6 +228,7 @@ function TerrainEnDirect({ terrain = TERRAIN_VIDE, film, matchId, surAffiche, no
   /** Le relevé effectivement montré : c'est lui qui commande le bandeau. */
   const afficheRef = useRef<TerrainDirect>(terrain);
   const affiche = afficheRef.current;
+  const nomPorteurVisible = useNomPorteur(affiche.porteurId);
   const [modeCamera, setModeCamera] = useState<ModeCamera>('auto');
   const [scenario, setScenario] = useState(() => creerScenarioDirect(terrain));
   const [, redessiner] = useState(0);
@@ -648,7 +650,8 @@ function TerrainEnDirect({ terrain = TERRAIN_VIDE, film, matchId, surAffiche, no
     const porte = affiche.porteurId === p.id;
     const mien = monCote !== undefined && p.cote === monCote;
     const nomCourt = p.nom.split(' ').at(-1) ?? p.nom;
-    const largeurNom = Math.max(tailleTexte * 3.2, nomCourt.length * tailleTexte * 0.64);
+    const tailleNom = tailleTexte * .7;
+    const largeurNom = Math.max(tailleNom * 3.2, nomCourt.length * tailleNom * 0.64);
     return <g key={p.id} className={mien ? 'rg-joueur-moi' : undefined}
       ref={noeud => {
         if (noeud) noeudsPions.current.set(p.id, { noeud, origine: pos });
@@ -657,11 +660,11 @@ function TerrainEnDirect({ terrain = TERRAIN_VIDE, film, matchId, surAffiche, no
       <SpriteRugbymanMemo pion={p} position={pos} terrain={affiche} maillot={maillots[p.cote]}
         porteur={porte} positionPorteur={porteurPosition} redresser={vue?.redresser}
         hauteurMetres={hauteurSprite} temps={tempsAnimation} angleVue={vue?.angle ?? 0} />
-      {porte && (
+      {porte && nomPorteurVisible && (
         <g transform={`translate(${pos.x.toFixed(2)} ${pos.y.toFixed(2)})`}>
           <g className="cel-nom-porteur" transform={vue?.redresser}>
-            <rect x={-largeurNom / 2} y={-hauteurSprite * .98} width={largeurNom} height={tailleTexte * 1.35} rx={tailleTexte * 0.35} />
-            <text y={-hauteurSprite * .98 + tailleTexte * .86} textAnchor="middle" fontSize={tailleTexte * 0.76}>{nomCourt}</text>
+            <rect x={-largeurNom / 2} y={-hauteurSprite * .98} width={largeurNom} height={tailleNom * 1.35} rx={tailleNom * 0.35} />
+            <text y={-hauteurSprite * .98 + tailleNom * .86} textAnchor="middle" fontSize={tailleNom * 0.76}>{nomCourt}</text>
           </g>
         </g>
       )}

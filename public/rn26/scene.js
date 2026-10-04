@@ -8,6 +8,7 @@ import { appearance,souhaitDepuisCarte,tirage,prepareBody,groundBody,grip,trackB
 import { prepareGaits,locomotion } from './allures.js';
 import { creerTenue,numeroter,creerPanneaux,creerAbords,creerPublic,creerEtiquette,creerBallon,nettoyerStade,chargerImage,texture,departagerTenues,nomCourt,luminance,hexa,MAILLOT_DEFAUT } from './habillage.js';
 import { creerSons } from './sons.js';
+import { creerDureeNomPorteur } from './nomPorteur.js';
 import { creerTelevision } from './television.js';
 
 // ---------------------------------------------------------------------------
@@ -204,6 +205,7 @@ export async function creerScene3D(conteneur,options={}){
   const anneau=(interieur,exterieur,teinte,opacite)=>{const m=new THREE.Mesh(new THREE.RingGeometry(interieur,exterieur,40),new THREE.MeshBasicMaterial({color:teinte,side:THREE.DoubleSide,transparent:true,opacity:opacite,depthWrite:false}));m.rotation.x=-Math.PI/2;m.visible=false;scene.add(m);return m;};
   const halo=anneau(.48,.58,'#f5efb9',.7),aura=anneau(.62,.74,'#ffd257',.85);
   const etiquette=creerEtiquette(renderer);scene.add(etiquette.sprite);
+  const dureeNomPorteur=creerDureeNomPorteur();
   // Le halo du porteur prend la couleur de son équipe, éclaircie si elle est trop sombre pour la pelouse.
   const teintesHalo=[tenueA,tenueB].map(t=>luminance(t.principal)<.3?'#f5efb9':hexa(t.principal));
 
@@ -691,9 +693,10 @@ export async function creerScene3D(conteneur,options={}){
     aura.visible=!!moi&&moi.group.visible;if(aura.visible){aura.position.set(moi.group.position.x,.03,moi.group.position.z);aura.material.opacity=.6+.25*Math.sin(visualTime*4);}
     renderCamera(dt,visualTime);
     // Le nom du porteur, dans sa flamme, sous ses appuis.
-    if(porteur&&porteur.nom&&options.noms!==false){
+    const nomVisible=dureeNomPorteur(match.carrier,performance.now());
+    if(porteur&&porteur.nom&&options.noms!==false&&nomVisible){
       etiquette.ecrire(porteur.nom,match.team===0?tenueA.principal:tenueB.principal);
-      const sp=etiquette.sprite,d=camera.position.distanceTo(porteur.group.position),h=d*Math.tan(camera.fov*Math.PI/360)*2*(leger?.062:.05)*clamp(900/hauteur,.75,1.6);
+      const sp=etiquette.sprite,d=camera.position.distanceTo(porteur.group.position),h=d*Math.tan(camera.fov*Math.PI/360)*2*(leger?.037:.03)*clamp(900/hauteur,.75,1.6);
       sp.position.set(porteur.group.position.x,-.06,porteur.group.position.z);sp.scale.set(h*4,h,1);sp.visible=true;
     }else etiquette.sprite.visible=false;
     if(!still&&!fige)tele.enregistrer(visualTime);

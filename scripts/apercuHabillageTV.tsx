@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { DirectCinema } from '../src/components/match/DirectCinema';
 import { MatchLive } from '../src/components/MatchLive';
 import { creerMatch, avancer } from '../src/lib/moteur/moteur';
+import { ajouterCommentaire } from '../src/lib/moteur/etat';
 import { effectifDuClub } from '../src/lib/effectif';
 import { extraireTerrain, type VueMatchEnLigne } from '../src/lib/ligue/matchCarriere';
 import { chargerTextes } from '../src/lib/i18n';
@@ -41,12 +42,14 @@ function Apercu() {
     p.surLeTerrain = false;
     if (type === 'rouge') p.stats.cartonsRouges++;
     else p.stats.cartonsJaunes++;
+    ajouterCommentaire(e, 'carton', 'B', `Carton ${type} pour ${p.nom}.`, 0);
     redessiner(n => n + 1);
   };
   const m: VueMatchEnLigne = {
     id: `habillage-${logo}`, minute: e.minute, horloge: e.t / 60, termine: false,
     score: { domicile: e.scoreA, exterieur: e.scoreB }, essais: { domicile: 2, exterieur: 1 }, penalites: { domicile: 1, exterieur: 1 },
-    fil: [], moments: [], remplacementsFaits: 0, surLeTerrain: [], surLeBanc: [],
+    fil: e.commentaires.map(c => ({ ...c, cote: c.cote === 'A' ? 'domicile' : c.cote === 'B' ? 'exterieur' : undefined })),
+    moments: [], remplacementsFaits: 0, surLeTerrain: [], surLeBanc: [],
     stats: { domicile: stats, exterieur: stats }, terrain: extraireTerrain(e, Date.now()),
   };
   return <main className={`apercu-tv cel format-${format}`} data-revision={revision}>
@@ -62,7 +65,7 @@ function Apercu() {
       <label>Ligue <select value={logo} onChange={ev => setLogo(ev.target.value)}><option value="top14">Top 14</option><option value="urc">United Rugby Championship</option><option value="">Ligue des Copains</option></select></label>
       <label>Format <select value={format} onChange={ev => setFormat(ev.target.value)}><option value="pc">Ordinateur</option><option value="mobile">Téléphone paysage</option><option value="tablette">Tablette paysage</option></select></label>
     </nav>
-    <DirectCinema key={logo} match={m} domicile={A} exterieur={B} pause={pause}
+    <DirectCinema key={logo} match={m} domicile={A} exterieur={B} pause={pause || intro}
       couleurs={{ domicile: '#d5001c', exterieur: '#f3f5f6' }} emblemes={{ domicile: '/logos/toulouse.png', exterieur: '/logos/montpellier.png' }}
       identite={{ nom: logo === 'top14' ? 'Top 14' : logo === 'urc' ? 'United Rugby Championship' : 'Ligue des Copains', logo, journee: 5 }} />
     {intro && <MatchLive match={{ domicile: A, exterieur: B, scoreD: 17, scoreE: 12, essaisD: 2, essaisE: 1 }} saison={1}

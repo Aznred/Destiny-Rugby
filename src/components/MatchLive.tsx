@@ -99,6 +99,7 @@ import { IA_MATCH_DE_CARRIERE } from '../lib/moteur/ia/reglages';
 import { ACTION_PAR_ID } from '../lib/moteur/controle';
 import { ORDRES } from '../lib/moteur/bagarre';
 import { ajouterCommentaire, type ActionJoueur, type Commentaire, type NiveauMatch, type TypeCommentaire } from '../lib/moteur/etat';
+import { CommentateursMatch } from './match/CommentateursMatch';
 import { competitionEffective } from '../lib/divisions';
 import { LARGEUR, LONGUEUR, borner, type Vec } from '../lib/moteur/terrain';
 import { corpsPourAffichage, porteurPourAffichage } from '../lib/moteur/dynamique';
@@ -1592,6 +1593,7 @@ export function MatchLive({
                 )}
 
                 {/* ---------- 📺 L'HABILLAGE TÉLÉVISION ---------- */}
+                <CommentateursMatch lignes={e.commentaires} seconde={e.t} pause={enPause || !!avantMatch} />
                 <HabillageTV identite={identiteTV} seconde={e.t} periode={e.periode} phase={e.phase} termine={e.fini}
                   equipes={[
                     { nom: e.clubA, ...couleursEquipeTV(couleurA), logo: clubA?.logo ?? urlLogoEquipe(e.clubA), score: e.scoreA, essais: e.essaisA },

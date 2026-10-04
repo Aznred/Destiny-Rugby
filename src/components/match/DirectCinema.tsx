@@ -5,6 +5,7 @@ import TerrainEnDirect, { type AfficheDirect, type CouleursDirect } from './Terr
 import { CadreTmoReplay } from './CadreTmoReplay';
 import { Icone } from '../Icone';
 import { HabillageTV } from './HabillageTV';
+import { CommentateursMatch } from './CommentateursMatch';
 import { couleursEquipeTV, DUREE_EQUIPE_TV, type IdentiteTV } from '../../lib/habillageTV';
 import { preferencesTele } from '../../lib/match3D';
 import type { Stade3D } from '../../lib/stade3D';
@@ -125,6 +126,7 @@ export function DirectCinema({
       </header>
       {m.monCote && cahier && (cahier.modeCombinaisons === 'configure' || !!cahier.combinaisons?.length) && <div className={`dc-cahier ${cahier.modeCombinaisons === 'configure' && combinaisonsActives ? 'actif' : ''}`}><Icone nom="sifflet" taille={16} /><span>{cahier.modeCombinaisons === 'automatique' ? t("ui.89b87c5d09fc") : combinaisonsActives ? tn("ui.13ebe03563fd", combinaisonsActives, { v0: combinaisonsActives }) : t("ui.c2b2701297f3")}</span></div>}
       <div className={`dc-ecran ${isTmo ? 'dc-ecran-tmo' : ''}`}>
+        <CommentateursMatch key={`voix:${m.id}:${m.instance ?? ''}`} lignes={m.fil ?? []} seconde={secondeCourante} pause={pause} />
         <HabillageTV key={`${m.id}:${m.instance ?? ''}`} identite={identite} seconde={secondeCourante}
           periode={terrain?.periode ?? (secondeCourante >= 2400 ? 2 : 1)} phase={terrain?.phase} termine={m.termine && filmFini}
           equipes={[

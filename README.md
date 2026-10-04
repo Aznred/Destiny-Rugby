@@ -9,6 +9,15 @@
   suivent l’horloge du film, y compris après reconnexion. Vérification :
   `npm run verify:habillage-tv`. Aperçu local avec scénarios de cartons,
   compositions et formats : `/scripts/apercuHabillageTV.html`.
+- **Effectifs solo et commentaires vocaux** : les clubs solo utilisent le catalogue
+  des joueurs de la carrière en ligne, avec ses éditions publiques. Les identifiants
+  des joueurs réels déjà présents sont conservés ; les carrières continuent à gérer
+  vieillissement, transferts et formation. Les noms des porteurs sont plus petits et
+  disparaissent après 2,5 secondes réelles. Le bouton « Commentateurs » active les
+  voix originales anglaises extraites de l'APK, en solo comme en direct : 270 clips,
+  chargés à la demande et sélectionnés selon l'action visible. Les voix s'arrêtent
+  en pause ou à la fermeture du match. Vérification : `npm run verify:catalogue-solo-match`.
+  Réimport des fichiers locaux : `node scripts/importerCommentairesAudio.mjs`.
 
 ### Carrière en ligne — le troisième mode, jouable de bout en bout
 

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { catalogueBaseCarriere, catalogueMondialCarriere } from './ligue/catalogueCarriere';
 import type { SourceCarte } from './ligue/catalogueCarriere';
 import type { EditionJoueur } from './ligue/atelierCatalogue';
+import { fournirCatalogueEffectifs } from './catalogueEffectifs';
 
 let revision = -1;
 let courant: readonly SourceCarte[] = catalogueBaseCarriere();
@@ -21,6 +22,7 @@ export function synchroniserCatalogueSolo(): Promise<readonly SourceCarte[]> {
       if (Number.isInteger(donnees.revision) && donnees.joueurs && typeof donnees.joueurs === 'object') {
         revision = donnees.revision!;
         courant = catalogueMondialCarriere({ revision, joueurs: donnees.joueurs, packs: {}, rotationPacks: false });
+        fournirCatalogueEffectifs(courant);
         if (typeof window !== 'undefined') window.dispatchEvent(new Event('destiny-catalogue-solo-actualise'));
       }
       return courant;

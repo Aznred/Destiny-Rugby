@@ -1,0 +1,5 @@
+.commentateurs-match { position:absolute; z-index:32; top:8px; right:8px; display:flex; align-items:center; gap:6px; padding:6px 9px; min-height:30px; border:1px solid #ffffff50; border-radius:5px; background:#091610dc; color:#fff; font:600 11px/1.2 Arial,sans-serif; cursor:pointer; pointer-events:auto; }
+.commentateurs-match.actif { color:#e0bc54; border-color:#b99a42; }
+.commentateurs-match:disabled { opacity:.6; cursor:default; }
+.commentateurs-match:focus-visible { outline:2px solid white; outline-offset:2px; }
+@media(max-width:480px) { .commentateurs-match { font-size:10px; padding:5px 6px; } }

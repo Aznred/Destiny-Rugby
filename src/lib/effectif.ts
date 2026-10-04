@@ -11,6 +11,7 @@ import {
 import { mercatoReel, type RecrueReelle } from './mercato.js';
 import { generationDuClub } from './generations.js';
 import { noteJoueurRevalorisee, postesJoueurReel } from './evaluationJoueurReel.js';
+import { joueursCatalogueDuClub, sourceCatalogueEffectifs } from './catalogueEffectifs.js';
 
 // Génération DÉTERMINISTE de l'effectif d'un club : même club + même saison
 // => même équipe. Les joueurs vieillissent d'un an par saison ; passé leur âge
@@ -680,8 +681,18 @@ function completerEffectif(
 
 // Effectif « de base » : celui que le club aurait sans aucun transfert.
 const cacheBrut = new Map<string, Coequipier[]>();
+let sourceEffectifs: ReturnType<typeof sourceCatalogueEffectifs> | undefined;
+function actualiserSourceEffectifs() {
+  const source = sourceCatalogueEffectifs();
+  if (source === sourceEffectifs) return;
+  sourceEffectifs = source;
+  cacheBrut.clear();
+  cacheForce.clear();
+  cacheReference.clear();
+}
 
 function effectifBrut(nomClub: string, saison: number): Coequipier[] {
+  actualiserSourceEffectifs();
   const cle = `${nomClub}#${saison}`;
   const memo = cacheBrut.get(cle);
   if (memo) return memo;
@@ -694,6 +705,36 @@ function effectifBrut(nomClub: string, saison: number): Coequipier[] {
 function construireEffectif(nomClub: string, saison: number): Coequipier[] {
   const division = competitionDuClub(nomClub);
   const niveau = division?.niveau ?? 6;
+  const catalogue = joueursCatalogueDuClub(nomClub);
+  if (catalogue.length) {
+    // Conserver les identifiants des feuilles, contrats et statistiques existants.
+    const anciens = new Map<string, string>();
+    if (EFFECTIFS_AMATEURS[nomClub]) {
+      for (const j of joueursFfrDuClub(nomClub)) anciens.set(normaliser(j.nom), `${nomClub}-am-${j.indexSource}`);
+    } else {
+      EFFECTIFS_REELS[nomClub]?.forEach((j, i) => anciens.set(normaliser(j.nom), `${nomClub}-reel-${i}`));
+    }
+    return catalogue.map(source => {
+      const id = anciens.get(normaliser(source.nom)) ?? `${nomClub}-catalogue-${source.sourceId}`;
+      const rng = graine(`catalogue#${source.sourceId}`);
+      const retraite = Math.max(source.age, 33 + Math.floor(rng() * 5));
+      const declin = rng();
+      const age = source.age + saison - 1;
+      if (age > retraite) {
+        const generation = Math.ceil((age - retraite) / 15);
+        const slot = Math.floor(rng() * 1_000_000);
+        const regen = genJoueur(nomClub, slot, generation, (age - retraite - 1) % 15 + 1, noteDuClub(nomClub), niveau);
+        return { ...regen, id: `${id}-succession-${generation}`, poste: source.poste };
+      }
+      return {
+        id, nom: source.nom, poste: source.poste, postesSecondaires: source.postesSecondaires ? [...source.postesSecondaires] : undefined,
+        photo: source.photo, nation: source.nation, age, potentiel: source.potentiel,
+        note: saison === 1 ? source.note : noteALAge(source.note, source.age, source.potentiel, age, declin, 20),
+        jeuAuPied: source.statistiques.JDP, clubReel: source.clubReel, championnat: source.championnat,
+        regen: false, horsGeneration: saison === 1,
+      };
+    });
+  }
   // Les données FFR 2026-2027 passent avant l'ancienne base 2025-2026 pour les
   // clubs de Nationale qui viennent de monter, descendre ou changer d'effectif.
   if (EFFECTIFS_AMATEURS[nomClub]) return effectifAmateur(nomClub, saison, niveau);
@@ -772,7 +813,7 @@ function appliquerMercato(nomClub: string, saison: number, base: Coequipier[]): 
     liste = liste.filter((j) => !partis.has(normaliser(j.nom)));
     liste = [
       ...liste,
-      ...reel.arrivees.map((r, i) => recrue(nomClub, r, saison, noteBase, i)),
+      ...reel.arrivees.flatMap((r, i) => liste.some(j => normaliser(j.nom) === normaliser(r.nom)) ? [] : [recrue(nomClub, r, saison, noteBase, i)]),
     ];
   }
 
@@ -1020,6 +1061,7 @@ const TAILLE_GROUPE = 23; // le groupe qui joue réellement les matchs
 const cacheForce = new Map<string, number>();
 
 export function forceEffectif(nomClub: string, saison: number): number {
+  actualiserSourceEffectifs();
   const cle = `${nomClub}#${saison}`;
   const memo = cacheForce.get(cle);
   if (memo !== undefined) return memo;
@@ -1048,6 +1090,7 @@ export function forceEffectif(nomClub: string, saison: number): number {
 const cacheReference = new Map<string, number>();
 
 export function forceMoyenneDivision(divisionId: string, saison: number): number {
+  actualiserSourceEffectifs();
   const cle = `${divisionId}#${saison}`;
   const memo = cacheReference.get(cle);
   if (memo !== undefined) return memo;

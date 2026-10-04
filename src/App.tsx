@@ -17,6 +17,7 @@ import { Accueil } from './screens/Accueil';
 import { Creation } from './screens/Creation';
 import { Carriere } from './screens/Carriere';
 import { Profil } from './screens/Profil';
+import { useCatalogueSolo } from './lib/catalogueSoloCommun';
 // ---------------------------------------------------------------------------
 // ⚠️ CE QUI N'EST PAS SUR LE CHEMIN D'ARRIVÉE EST CHARGÉ À LA DEMANDE
 // ---------------------------------------------------------------------------
@@ -60,6 +61,7 @@ function EcranEnRoute() {
 }
 
 export default function App() {
+  useCatalogueSolo();
   useEffect(() => { if (new URLSearchParams(location.search).has('paiement')) useGame.getState().setEcran('boutique'); }, []);
   const animationsMenus = usePreferencesInterface(s => s.animationsMenus);
   useEffect(() => { document.documentElement.classList.toggle('interface-fluide', !animationsMenus); }, [animationsMenus]);
