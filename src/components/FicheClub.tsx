@@ -11,6 +11,7 @@ import { Blason } from './Blason';
 import { Drapeau } from './Drapeau';
 import type { Club } from '../types';
 import { Icone } from './Icone';
+import { useCatalogueSolo } from '../lib/catalogueSoloCommun';
 
 // Fiche d'un club : son effectif complet, poste par poste. Ouverte au clic sur
 // un club dans l'écran Championnats.
@@ -27,7 +28,8 @@ export function FicheClub({
   saison: number;
   onFermer: () => void;
 }) {
-  const effectif = useMemo(() => effectifDuClub(club.nom, saison), [club.nom, saison]);
+  const catalogue = useCatalogueSolo();
+  const effectif = useMemo(() => effectifDuClub(club.nom, saison), [club.nom, saison, catalogue]);
   const noteClub = noteDuClub(club.nom);
   const force = Math.round(forceEffectif(club.nom, saison));
   const reel = aEffectifReel(club.nom) || club.nom in EFFECTIFS_AMATEURS;

@@ -10,6 +10,7 @@ import { Selecteur } from '../components/Selecteur';
 import type { OptionSelecteur } from '../components/Selecteur';
 import { COMPETITIONS, clubParNom } from '../data/clubs';
 import { effectifDuClub, forceEffectif } from '../lib/effectif';
+import { useCatalogueSolo } from '../lib/catalogueSoloCommun';
 import { classementManagerEnDirect } from '../lib/tableauManager';
 import { semaine, libelleDate, libelleSemaine, SEMAINES_PAR_SAISON } from '../data/calendrier';
 import { CalendrierManager } from '../components/CalendrierManager';
@@ -111,6 +112,7 @@ function initiales(nom: string): string {
 }
 
 export function Manager() {
+  const catalogue = useCatalogueSolo();
   const manager = useGame((s) => s.manager);
   const setEcran = useGame((s) => s.setEcran);
   const semaineManager = useGame((s) => s.semaineManager);
@@ -240,7 +242,7 @@ export function Manager() {
   }, [vivierMarche, poste, rechercheDifferee, ageMarche]);
   const effectifBrut = useMemo(
     () => manager?.club ? effectifDuClub(manager.club, manager.saison) : [],
-    [manager],
+    [manager, catalogue],
   );
   const avancee = useMemo(
     () => manager ? assurerEtatCarriereAvancee(manager, effectifBrut) : null,

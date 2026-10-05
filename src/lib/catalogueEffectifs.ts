@@ -1,4 +1,5 @@
 import { catalogueMondialCarriere, type SourceCarte } from './ligue/catalogueCarriere.js';
+import { cleClub } from './cleClub.js';
 
 let publicSolo: readonly SourceCarte[] | undefined;
 let indexSource: readonly SourceCarte[] | undefined;
@@ -13,10 +14,11 @@ export function joueursCatalogueDuClub(club: string): readonly SourceCarte[] {
     indexSource = source;
     clubs = new Map();
     for (const joueur of source) {
-      const liste = clubs.get(joueur.clubReel) ?? [];
+      const cle = cleClub(joueur.clubReel);
+      const liste = clubs.get(cle) ?? [];
       liste.push(joueur);
-      clubs.set(joueur.clubReel, liste);
+      clubs.set(cle, liste);
     }
   }
-  return clubs.get(club) ?? [];
+  return clubs.get(cleClub(club)) ?? [];
 }

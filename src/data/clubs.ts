@@ -11,6 +11,7 @@ import { COMPETITIONS_REELLES } from './mondeReel.js';
 import { CLUBS_AMATEURS, CLUBS_REGIONAUX, LOGO_AMATEUR, type ClubAmateurFfr } from './amateurs.js';
 import { COMPETITIONS_NOUVELLES } from './nouvellesLigues.js';
 import { CODE_PAR_NATION } from './nations.js';
+import { cleClub } from '../lib/cleClub.js';
 
 export type { Club, Competition };
 
@@ -507,13 +508,15 @@ export const CLUBS_FRANCE_PAR_DIVISION = DIVISIONS_FRANCE;
 
 // Retrouve la division française d'un club (par nom exact).
 export function divisionDuClub(nomClub: string): Competition | undefined {
-  return DIVISIONS_FRANCE.find((d) => d.clubs.some((c) => c.nom === nomClub));
+  const nom = clubParNom(nomClub)?.nom ?? nomClub;
+  return DIVISIONS_FRANCE.find((d) => d.clubs.some((c) => c.nom === nom));
 }
 
 // Idem, mais sans se limiter à la France (les clubs du monde ont eux aussi un
 // effectif réel : Leinster, les Crusaders, Kubota…).
 export function competitionDuClub(nomClub: string): Competition | undefined {
-  return COMPETITIONS.find((d) => d.clubs.some((c) => c.nom === nomClub));
+  const nom = clubParNom(nomClub)?.nom ?? nomClub;
+  return COMPETITIONS.find((d) => d.clubs.some((c) => c.nom === nom));
 }
 
 // Fiche d'un club (nom, ville, logo, couleurs), toutes compétitions confondues.
@@ -522,7 +525,13 @@ export function clubParNom(nomClub: string): Club | undefined {
     const trouve = comp.clubs.find((c) => c.nom === nomClub);
     if (trouve) return trouve;
   }
-  return undefined;
+  return clubsParIdentite.get(cleClub(nomClub));
+}
+
+const clubsParIdentite = new Map<string, Club>();
+for (const comp of COMPETITIONS) for (const club of comp.clubs) {
+  const cle = cleClub(club.nom);
+  if (!clubsParIdentite.has(cle)) clubsParIdentite.set(cle, club);
 }
 
 // Niveau de jeu moyen d'une division (note générale des joueurs générés).

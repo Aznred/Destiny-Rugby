@@ -1,6 +1,6 @@
 import type { FamillePoste, JeuneForme, Joueur, PosteId, TransfertAnnonce } from '../types.js';
 import { POSTE_PAR_ID, posteDepuisFamille } from '../data/rugby.js';
-import { COMPETITIONS, competitionDuClub, NOTE_PAR_NIVEAU } from '../data/clubs.js';
+import { COMPETITIONS, clubParNom, competitionDuClub, NOTE_PAR_NIVEAU } from '../data/clubs.js';
 import { EFFECTIFS_REELS, NOTE_CLUB_REEL } from '../data/effectifsReels.js';
 import { EFFECTIFS_AMATEURS } from '../data/amateurs.js';
 import { joueursFfrDuClub } from './joueursFfr.js';
@@ -363,6 +363,7 @@ export function noteAmateur(nomClub: string, niveau: number): number {
 // Note générale d'un club : la vraie note issue des stats 25-26 si on l'a
 // (Top 14), celle des nouvelles ligues ensuite, sinon celle qu'on lui tire.
 export function noteDuClub(nomClub: string): number {
+  nomClub = clubParNom(nomClub)?.nom ?? nomClub;
   const reelle = NOTE_CLUB_REEL[nomClub];
   if (reelle !== undefined) return reelle;
   // Les nouvelles ligues ont leur propre table, calculée sur leur classement
@@ -594,6 +595,7 @@ function romain(n: number): string {
 }
 
 export function effectifDuClub(nomClub: string, saison: number): Coequipier[] {
+  nomClub = clubParNom(nomClub)?.nom ?? nomClub;
   // ⚠️ Les transferts annoncés sur L'Ovale s'appliquent APRÈS le mercato, et
   // dès la saison 1 (le mercato, lui, ne démarre qu'en saison 2).
   // ⚠️ ET LES JEUNES DU CENTRE ARRIVENT ENCORE APRÈS : un joueur formé au club
@@ -697,7 +699,11 @@ function effectifBrut(nomClub: string, saison: number): Coequipier[] {
   const memo = cacheBrut.get(cle);
   if (memo) return memo;
   const niveau = competitionDuClub(nomClub)?.niveau ?? 6;
-  const liste = completerEffectif(nomClub, saison, niveau, construireEffectif(nomClub, saison));
+  const construit = construireEffectif(nomClub, saison);
+  // Un export réel peut être partiel : ses joueurs gardent leurs identités.
+  // Les renforts inventés restent réservés aux clubs sans joueurs dans le catalogue.
+  const liste = joueursCatalogueDuClub(nomClub).length
+    ? construit : completerEffectif(nomClub, saison, niveau, construit);
   cacheBrut.set(cle, liste);
   return liste;
 }

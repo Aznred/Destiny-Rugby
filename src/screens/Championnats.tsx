@@ -38,7 +38,7 @@ export function Championnats() {
   // Club dont on affiche l'effectif (clic sur une carte).
   const [fiche, setFiche] = useState<{ club: Club; competition: string } | null>(null);
   // L'effectif est celui de la saison en cours si une carrière tourne.
-  const saison = useGame((s) => s.joueur?.saison ?? 1);
+  const saison = useGame((s) => s.joueur?.saison ?? s.manager?.saison ?? 1);
   const comps = COMPETITIONS.filter((c) => c.zone === zone);
 
   return (

@@ -3,7 +3,7 @@ import { COMPETITIONS, clubParNom } from '../src/data/clubs';
 import { positionDuClub, distanceKm } from '../src/data/geographie';
 import { effectifDuClub } from '../src/lib/effectif';
 import { poulesDe } from '../src/lib/championnat';
-import { joueursFfrDuClub } from '../src/lib/joueursFfr';
+import { joueursCatalogueDuClub } from '../src/lib/catalogueEffectifs';
 
 let echecs = 0;
 function verifier(nom: string, ok: boolean, detail = ''): void {
@@ -46,17 +46,18 @@ let completionsAttendues = 0;
 let completionsObservees = 0;
 let taillesExactes = true;
 for (const club of clubs) {
-  const source = joueursFfrDuClub(club.nom).length;
+  const source = joueursCatalogueDuClub(club.nom);
   const jeu = effectifDuClub(club.nom, 1);
-  completionsAttendues += Math.max(0, 26 - source);
-  completionsObservees += jeu.filter((joueur) => !joueur.id.includes('-am-')).length;
-  if (jeu.length !== Math.max(26, source)) taillesExactes = false;
+  const nomsSource = new Set(source.map(j => j.nom));
+  completionsAttendues += source.length ? 0 : 26;
+  completionsObservees += jeu.filter(j => !nomsSource.has(j.nom)).length;
+  if (jeu.length !== (source.length || 26)) taillesExactes = false;
 }
-verifier('aucun joueur inventé n’est ajouté à un effectif déjà suffisant',
+verifier('aucun joueur inventé n’est ajouté à un effectif du catalogue, même partiel',
   taillesExactes && completionsObservees === completionsAttendues,
   `${completionsObservees} compléments strictement nécessaires`);
 
-const tyrosse = joueursFfrDuClub('US Tyrosse').length;
+const tyrosse = joueursCatalogueDuClub('US Tyrosse').length;
 const tyrosseJeu = effectifDuClub('US Tyrosse', 1);
 verifier('un effectif FFR complet ne reçoit aucun joueur généré',
   tyrosseJeu.length === tyrosse && tyrosseJeu.every((joueur) => !joueur.id.includes('-complement-')),

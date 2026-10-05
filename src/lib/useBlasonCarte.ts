@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { chargerEmblemesCarriere } from './carriereEnLigneClient';
 import { clubParNom } from '../data/clubs';
+import { cleClub } from './cleClub';
 const cle = (nom: string) => nom.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
 /**
@@ -11,21 +12,8 @@ const cle = (nom: string) => nom.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowe
  * Biarritz, Grenoble, Oyonnax et Valence Romans, soit 151 cartes du catalogue,
  * et un quart des cartes d'un marché rempli de Pro D2.
  */
-const ALIASES = new Map([
-  ['asmclermont', 'asmclermontauvergne'],
-  ['colomiersrugby', 'uscolomiers'],
-  ['lourugby', 'lyonou'],
-  ['montpellierheraultrugby', 'montpellierhr'],
-  ['nissarugby', 'stadenicois'],
-  ['rcnarbonnais', 'rcnarbonne'],
-  ['biarritzolympiquepb', 'biarritzolympique'],
-  ['fcgrenoblerugby', 'fcgrenoble'],
-  ['oyonnaxrugby', 'usoyonnax'],
-  ['valenceromans', 'valenceromansdromerugby'],
-]);
-
 /** Ramène les appellations LNR récentes vers les noms canoniques du jeu. */
-export const cleBlasonCarte = (nom: string) => ALIASES.get(cle(nom)) ?? cle(nom);
+export const cleBlasonCarte = cleClub;
 
 /**
  * ⚠️ ET UN FILET, PARCE QUE LA LISTE CI-DESSUS SERA TOUJOURS EN RETARD. Elle

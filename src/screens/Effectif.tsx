@@ -17,6 +17,7 @@ import { Drapeau } from '../components/Drapeau';
 // l’écran montrerait un effectif et le match en alignerait un autre.
 import { effectifNational } from '../lib/international';
 import { maSelection } from '../lib/selection';
+import { useCatalogueSolo } from '../lib/catalogueSoloCommun';
 
 import { Icone } from '../components/Icone';
 /**
@@ -38,6 +39,7 @@ function forceDuGroupe(groupe: { note: number }[]): number {
 }
 
 export function Effectif() {
+  const catalogue = useCatalogueSolo();
   const joueur = useGame((s) => s.joueur);
   const manager = useGame((s) => s.manager);
   // ⚠️ LES BLESSURES ÉTAIENT INVISIBLES. Le dossier médical existe depuis le
@@ -86,7 +88,7 @@ export function Effectif() {
       const carriere = joueur ?? manager;
       return carriere?.club ? effectifDuClub(carriere.club, carriere.saison) : [];
     },
-    [joueur, manager],
+    [joueur, manager, catalogue],
   );
   const internationaux = useMemo(
     () => (joueur && selection ? effectifNational(selection.equipe, joueur.saison) : []),
