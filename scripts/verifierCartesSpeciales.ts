@@ -291,14 +291,20 @@ try {
   const lot = await appel(idKiri, '/api/carriere?atelier=1&section=imports&lot=mlr-championship-npc');
   egal(lot.statut, 200, 'lot MLR · Championship · NPC analysé');
   ok(lot.donnees.analyses.length > 900, 'près de mille joueurs dans le lot');
-  ok(lot.donnees.compteurs.douteux >= 10, `entrées douteuses repérées (${lot.donnees.compteurs.douteux})`);
-  const douteux = lot.donnees.analyses.find((a: any) => a.verdict === 'douteux' && a.ligne.club === 'Waikato');
-  ok(douteux, 'Andrew Smith (Waikato) : homonyme du joueur du Munster');
+  egal(lot.donnees.compteurs.nouveau, 0, 'aucun nom du lot absent');
+  ok(lot.donnees.analyses.filter((a: any) => a.ligne.fichesSource > 1).every((a: any) => a.verdict === 'present'), 'tous les homonymes source sont intégrés');
+  const andrew = lot.donnees.analyses.find((a: any) => a.ligne.nom === 'Andrew SMITH' && a.ligne.club === 'Waikato');
+  ok(andrew?.verdict === 'present', 'Andrew Smith (Waikato) existe séparément du joueur du Munster');
+  const analyseManuelle = await appel(idKiri, '/api/carriere?atelier=1', { action: 'atelier', operation: 'analyserImport', lignes: [{ ...andrew.ligne, club: 'Club de vérification' }] });
+  const douteux = analyseManuelle.donnees.analyses[0];
+  egal(douteux.verdict, 'douteux', 'une nouvelle identité incertaine nécessite toujours une décision');
   egal((await ecrire('deciderImport', { decisions: [{ ligne: douteux.ligne, decision: 'ajouter' }] })).donnees.ajoutes, 1, 'validation manuelle : ajouté');
   const config = await db.atelier!.lire();
-  ok(Object.keys(config.ajouts ?? {}).some(id => id.startsWith('import:andrew-smith:waikato')), 'un identifiant propre, distinct de l’homonyme');
-  const relu = await appel(idKiri, '/api/carriere?atelier=1&section=imports&lot=mlr-championship-npc');
+  ok(Object.keys(config.ajouts ?? {}).some(id => id.startsWith('import:andrew-smith:club-de-verification')), 'un identifiant propre, distinct de l’homonyme');
+  const relu = await appel(idKiri, '/api/carriere?atelier=1', { action: 'atelier', operation: 'analyserImport', lignes: [douteux.ligne] });
   ok(relu.donnees.analyses.find((a: any) => a.cle === douteux.cle).decision?.decision === 'ajouter', 'la décision est retenue');
+  const apresImport = await appel('', '/api/carriere?catalogueSolo=1&revision=-1');
+  egal(Object.keys(apresImport.donnees.ajouts), Object.keys(config.ajouts ?? {}), 'les ajouts du Labo sont transmis au solo');
   const manuel = await appel(idKiri, '/api/carriere?atelier=1', { action: 'atelier', operation: 'analyserImport', lignes: [
     { prenom: 'Antoine', nom: 'Dupont', club: 'Stade Toulousain', ligue: 'Top 14' },
     { prenom: 'Joueur', nom: 'Inventé', club: 'Seattle', ligue: 'MLR', poste: 'Pilier' },

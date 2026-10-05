@@ -686,13 +686,13 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
       if (req.method === 'GET' && url.searchParams.get('catalogueSolo') === '1') {
         const config = catalogueAdmin();
         const connue = Number(url.searchParams.get('revision'));
-        // Le gros catalogue de base est déjà dans le jeu. Seules les éditions
-        // de joueurs de la base en ligne traversent le réseau — et les cartes
+        // Le gros catalogue de base est déjà dans le jeu. Les éditions et
+        // ajouts de joueurs de la base en ligne traversent le réseau — et les cartes
         // spéciales PUBLIÉES, avec leurs événements (pack Halloween compris) :
         // jamais un brouillon ni une carte sans image.
         return res.status(200).json(connue === config.revision
           ? { revision: config.revision }
-          : { revision: config.revision, joueurs: config.joueurs, speciales: specialesPubliques(config) });
+          : { revision: config.revision, joueurs: config.joueurs, ajouts: config.ajouts ?? {}, speciales: specialesPubliques(config) });
       }
       // ⚠️ Les écussons se demandent à part, PAS dans la vue de la ligue :
       // 1 353 entrées, soit 80 Ko qui repartiraient toutes les deux secondes

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { catalogueBaseCarriere, catalogueMondialCarriere } from './ligue/catalogueCarriere';
 import type { SourceCarte } from './ligue/catalogueCarriere';
 import type { EditionJoueur } from './ligue/atelierCatalogue';
+import type { AjoutJoueur } from './ligue/importsJoueurs';
 import { assemblerCatalogueSpecial, type CatalogueSpecial, type DefinitionCarteSpeciale, type EvenementSpecial } from './ligue/cartesSpeciales';
 import { fournirCatalogueEffectifs } from './catalogueEffectifs';
 
@@ -34,12 +35,12 @@ export function synchroniserCatalogueSolo(): Promise<readonly SourceCarte[]> {
   attente = fetch(`/api/carriere?catalogueSolo=1&revision=${revision}`, { cache: 'no-store' })
     .then(async reponse => {
       if (!reponse.ok) throw new Error('Catalogue indisponible');
-      const donnees = await reponse.json() as { revision?: number; joueurs?: Record<string, EditionJoueur>;
+      const donnees = await reponse.json() as { revision?: number; joueurs?: Record<string, EditionJoueur>; ajouts?: Record<string, AjoutJoueur>;
         speciales?: { definitions?: DefinitionCarteSpeciale[]; evenements?: EvenementSpecial[] } };
       dernierChargement = Date.now();
       if (Number.isInteger(donnees.revision) && donnees.joueurs && typeof donnees.joueurs === 'object') {
         revision = donnees.revision!;
-        const mondial = catalogueMondialCarriere({ revision, joueurs: donnees.joueurs, packs: {}, rotationPacks: false });
+        const mondial = catalogueMondialCarriere({ revision, joueurs: donnees.joueurs, ajouts: donnees.ajouts, packs: {}, rotationPacks: false });
         fournirCatalogueEffectifs(mondial);
         const definitions = Array.isArray(donnees.speciales?.definitions) ? donnees.speciales!.definitions : [];
         const evenements = Array.isArray(donnees.speciales?.evenements) ? donnees.speciales!.evenements : [];

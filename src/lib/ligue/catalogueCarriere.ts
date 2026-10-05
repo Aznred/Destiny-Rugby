@@ -4,6 +4,7 @@ import { catalogueAdmin, type CatalogueAdmin } from './atelierCatalogue.js';
 import { JOUEURS_NEW_MAJ } from '../../data/photosNewMaj.js';
 import { LNR_MAJ } from '../../data/lnrMaj.js';
 import { EFFECTIFS_REELS } from '../../data/effectifsReels.js';
+import { IDENTITES_JOUEURS_MONDIAUX } from '../../data/identitesJoueursMondiaux.js';
 import { CLUBS_AMATEURS, EFFECTIFS_AMATEURS, POSTES_AMATEURS } from '../../data/amateurs.js';
 import { joueursFfrDuClub, profilJoueurFfr } from '../joueursFfr.js';
 import { photoReelle } from '../avatars.js';
@@ -279,9 +280,19 @@ export function catalogueMondialCarriere(config: CatalogueAdmin = catalogueAdmin
   // ⚠️ LES AJOUTS PASSENT APRÈS LA BASE, triés : l'ordre du catalogue doit
   // rester le même d'une instance serveur à l'autre, sinon un même tirage de
   // pack ne donnerait pas la même carte.
+  const base = catalogueBaseCarriere();
+  const idsBase = new Set(base.map(s => s.sourceId));
+  const ajoutsParId = new Map(ajouts.map(a => [a.sourceId, a]));
   const sources = ajouts.length
-    ? [...catalogueBaseCarriere(), ...ajouts.sort((a, b) => a.sourceId < b.sourceId ? -1 : 1).map(sourceDepuisAjout)]
-    : catalogueBaseCarriere();
+    ? [
+      ...base.map(s => {
+        const ajout = ajoutsParId.get(s.sourceId);
+        return ajout ? sourceDepuisAjout(ajout) : s;
+      }),
+      ...ajouts.filter(a => !idsBase.has(a.sourceId))
+        .sort((a, b) => a.sourceId < b.sourceId ? -1 : 1).map(sourceDepuisAjout),
+    ]
+    : base;
   const resultat = sources.map(source => {
     const edition = config.joueurs[source.sourceId];
     if (!edition) return source;
@@ -317,22 +328,27 @@ export function catalogueBaseCarriere(): readonly SourceCarte[] {
     const note = recalibrerNoteFfr(brut.clubReel, brut.note);
     const potentiel = echelleFfrDuClub(brut.clubReel) ? Math.max(note, recalibrerNoteFfr(brut.clubReel, brut.potentiel, false)) : brut.potentiel;
     const source = { ...brut, note, potentiel, rarete: rareteCarriere(note), statistiques: statistiquesCarte(note, brut.famille, brut.sourceId) };
-    const cle = normaliser(source.nom);
+    const cle = source.sourceId;
     const existant = joueurs.get(cle);
     if (!existant || source.note > existant.note) joueurs.set(cle, source);
   };
   for (const [club, effectif] of Object.entries(EFFECTIFS_REELS)) {
     const competition = clubs.get(club);
     for (const j of effectif) {
-      const sourceId = `reel:${normaliser(j.nom)}`;
-      const lnr = LNR_MAJ[normaliser(j.nom)];
-      const maj = JOUEURS_NEW_MAJ[normaliser(j.nom)];
+      const identite = IDENTITES_JOUEURS_MONDIAUX[`${normaliser(j.nom)}|${club}`];
+      const sourceId = identite?.sourceId ?? `reel:${normaliser(j.nom)}`;
+      // Les corrections indexées par nom concernent la carte historique,
+      // jamais l'autre personne portant le même nom.
+      const lnr = identite?.distinct ? undefined : LNR_MAJ[normaliser(j.nom)];
+      const maj = identite?.distinct ? undefined : JOUEURS_NEW_MAJ[normaliser(j.nom)];
       // Chaque source est un PLANCHER : une saison pleine et productive peut
       // enfin revaloriser un joueur oublié, sans faire baisser une vedette déjà
       // calibrée par un classement éditorial.
-      const note = noteJoueurRevalorisee(j.nom, j.note);
+      const note = identite?.distinct ? j.note : noteJoueurRevalorisee(j.nom, j.note);
       const profilFfr = profilJoueurFfr(j.nom, club);
-      const profilPostes = profilFfr?.poste ? { poste: profilFfr.poste, postesSecondaires: [...profilFfr.postesSecondaires] } : postesJoueurReel(j.nom, j.poste);
+      const profilPostes = identite?.distinct
+        ? { poste: posteDepuisFamille(j.poste, 0), postesSecondaires: [] }
+        : profilFfr?.poste ? { poste: profilFfr.poste, postesSecondaires: [...profilFfr.postesSecondaires] } : postesJoueurReel(j.nom, j.poste);
       const famille = POSTE_PAR_ID[profilPostes.poste].famille;
       ajouter({ sourceId, nom: j.nom, famille, poste: profilPostes.poste,
         postesSecondaires: profilPostes.postesSecondaires, note,
@@ -340,7 +356,7 @@ export function catalogueBaseCarriere(): readonly SourceCarte[] {
         clubReel: maj?.club ?? lnr?.club ?? club, championnat: maj ? 'Gallagher Premiership' : lnr?.championnat ?? competition?.nom ?? 'Championnat professionnel', pays: competition?.pays ?? 'France',
         // L'index consolidé corrige aussi les variantes de prénom et les URL
         // LNR devenues obsolètes ; l'URL brute ne sert qu'en dernier recours.
-        photo: photoReelle(j.nom, club) ?? profilFfr?.photo ?? lnr?.photo, origine: 'professionnel', rarete: rareteCarriere(note),
+        photo: identite?.distinct ? undefined : photoReelle(j.nom, club) ?? profilFfr?.photo ?? lnr?.photo, origine: 'professionnel', rarete: rareteCarriere(note),
         statistiques: statistiquesCarte(note, famille, sourceId) });
     }
   }
@@ -370,7 +386,8 @@ export function catalogueBaseCarriere(): readonly SourceCarte[] {
         photo: j.photo ?? photoReelle(nom, club), origine: 'ffr', rarete: rareteCarriere(note), statistiques: statistiquesCarte(note, famille, sourceId) });
     }
   }
-  catalogue = [...joueurs.values()].map(j => ({ ...j, photo: photoDetoureeCatalogue(j.nom, j.clubReel) ?? j.photo }))
+  const homonymes = new Set(Object.values(IDENTITES_JOUEURS_MONDIAUX).filter(i => i.distinct).map(i => i.sourceId));
+  catalogue = [...joueurs.values()].map(j => ({ ...j, photo: homonymes.has(j.sourceId) ? j.photo : photoDetoureeCatalogue(j.nom, j.clubReel) ?? j.photo }))
     .sort((a, b) => a.sourceId < b.sourceId ? -1 : 1);
   return catalogue;
 }

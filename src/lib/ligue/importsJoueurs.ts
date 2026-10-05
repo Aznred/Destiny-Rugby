@@ -1,10 +1,10 @@
 // IMPORTS JOUEURS — faire entrer des joueurs sans créer de doublons
 //
 // ⚠️ LE NOM SEUL NE SUFFIT PAS, ET C'EST TOUT LE SUJET. Le catalogue fusionne
-// deux joueurs de même nom (`catalogueBaseCarriere`, clé = nom normalisé) :
-// mesuré sur la MLR, la RFU Championship et le NPC, seize homonymes — deux
-// personnes différentes, deux fiches allrugby — n'existaient qu'une fois dans
-// le jeu. L'inverse est aussi faux : un joueur prêté ou transféré change de
+// deux joueurs de même nom : les homonymes documentés dans la MLR, la RFU
+// Championship et le NPC sont maintenant distingués dans le catalogue de base
+// grâce aux fiches source. Pour les nouveaux imports, le nom reste insuffisant.
+// L'inverse est aussi faux : un joueur prêté ou transféré change de
 // club sans changer d'identité.
 //
 // La règle tient donc en trois étages, du plus sûr au plus fragile :

@@ -69,7 +69,7 @@ export function LaboImportsJoueurs() {
     <div className="li-sources">
       <div className="li-source">
         <h3>MLR · Championship · NPC</h3>
-        <p className="ak-note">Les effectifs de la Major League Rugby, de la RFU Championship (et sa coupe) et du Bunnings NPC déjà présents dans les données du jeu, confrontés au catalogue des ligues. Les homonymes que le catalogue fusionnait apparaissent en « douteux ».</p>
+        <p className="ak-note">Les effectifs de la Major League Rugby, de la RFU Championship (et sa coupe) et du Bunnings NPC sont intégrés au catalogue de tous les modes. Ce contrôle vérifie leur présence, y compris les homonymes distingués grâce à leurs fiches source.</p>
         <button type="button" className="btn primaire" disabled={occupe} onClick={() => { void analyser({ lot: 'mlr-championship-npc' }); }}>Analyser le lot</button>
       </div>
       <div className="li-source">

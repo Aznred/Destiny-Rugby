@@ -49,6 +49,8 @@
     "verify:objectifs-match": "vite-node scripts/verifierObjectifsParMatch.ts",
     "verify:equipes-echanges": "vite-node scripts/verifierEquipesEtEchanges.ts",
     "verify:collection": "vite-node scripts/verifierCollection.ts",
+    "data:identites-monde": "vite-node scripts/genIdentitesJoueursMondiaux.ts",
+    "verify:joueurs-monde": "vite-node scripts/verifierJoueursMondiaux.ts",
     "verify:photos": "vite-node scripts/verifPhotosCartes.ts",
     "verify:assets": "vite-node scripts/verifAssets.ts",
     "verify:triche": "vite-node scripts/verifTriche.ts",
