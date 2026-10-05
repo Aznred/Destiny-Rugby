@@ -4,12 +4,12 @@ import { catalogueAdmin, CATALOGUE_ADMIN_VIDE, type CatalogueAdmin } from '../sr
 import { createHash, randomBytes, randomUUID, scrypt, timingSafeEqual } from 'node:crypto';
 import { isDeepStrictEqual, promisify } from 'node:util';
 import { configurationPush, envoyerPush, idPush, notifierMatchs, validerAbonnement } from './notificationsPush.js';
-import { agirCarriere, avancerCarriere as actualiserCarriere, avancerCarrierePourDirect, creerCarriere, creerDivisionPublique, creerLaboratoireCarriere, empreinteEcriture, vueCarriere, vueCarriereObservateur, vueRencontreCarriere, vueRencontreCarriereObservateur } from '../src/lib/ligue/carriere.js';
+import { agirCarriere, avancerCarriere as actualiserCarriere, avancerCarrierePourDirect, creerCarriere, creerDivisionPublique, creerLaboratoireCarriere, memeEtatDurable, vueCarriere, vueCarriereObservateur, vueRencontreCarriere, vueRencontreCarriereObservateur } from '../src/lib/ligue/carriere.js';
 import { planifierDivisionsPubliques } from './divisionsPubliques.js';
 import { echeanceLigue } from '../src/lib/ligue/echeanceCarriere.js';
 import type { CommandeCarriere, EtatCarriereEnLigne } from '../src/lib/ligue/typesCarriere.js';
 import { DELAI_PRESENCE } from '../src/lib/ligue/matchCarriere.js';
-import type { CompteStocke, LigueStockee, ResumeDivisionPublique, SalonAmicalStocke, StockageCarriere } from './carriereStockage.js';
+import type { CompteStocke, LigueStockee, PresenceMatchStockee, ResumeDivisionPublique, SalonAmicalStocke, StockageCarriere } from './carriereStockage.js';
 import { OAuth2Client } from 'google-auth-library';
 import { appliquerModificationsBoutiqueCompte, validerEtatBoutiqueCompte, validerModificationsBoutiqueCompte } from '../src/lib/boutiqueCompte.js';
 import { catalogueBaseCarriere, MEZE_RUGBY_EMBLEME } from '../src/lib/ligue/catalogueCarriere.js';
@@ -97,6 +97,57 @@ function protegerOrigine(req: RequeteCarriere) {
   }
 }
 
+/**
+ * Les parties d'un direct qui changent rarement : le fil, les temps forts, les
+ * deux listes du banc, la consigne, la feuille. Elles pesaient les deux tiers
+ * de chaque réponse et repartaient à l'identique toutes les deux secondes.
+ */
+const PARTIES_LENTES = ['fil', 'moments', 'surLeTerrain', 'surLeBanc', 'maStrategie', 'feuille', 'signalAdverse'] as const;
+function hacher(h: number, texte: string): number {
+  for (let i = 0; i < texte.length; i++) { h ^= texte.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return h;
+}
+const empreinteCourte = (texte: string): string => (hacher(2166136261, texte) >>> 0).toString(36);
+/**
+ * Retire de la réponse ce que l'écran tient déjà. `annonce` : les repères qu'il
+ * a reçus la dernière fois (`null` : un écran d'avant, qui reçoit tout).
+ *
+ * Le fil ne fait que s'allonger : quand le début que l'écran connaît est
+ * intact, seules les lignes nouvelles partent (`filSuite`).
+ */
+function allegerDirect(rencontre: { match?: unknown }, annonce: string | null): { reperes?: string; gardes?: string[]; filSuite?: unknown[] } {
+  const match = rencontre.match as Record<string, unknown> | undefined;
+  if (annonce === null || !match || match.termine) return {};
+  const connus = new Map(annonce.split('.').map(x => { const i = x.indexOf('-'); return [x.slice(0, i), x.slice(i + 1)] as const; }));
+  const reperes: string[] = [], gardes: string[] = [];
+  let filSuite: unknown[] | undefined;
+  PARTIES_LENTES.forEach((cle, i) => {
+    const valeur = match[cle];
+    if (valeur === undefined) return;
+    if (cle === 'fil' && Array.isArray(valeur)) {
+      // Une seule passe : l'empreinte du fil entier, et au passage celle du
+      // début que l'écran dit connaître.
+      const [longueur, marque] = (connus.get(String(i)) ?? '').split('_');
+      const n = Number(longueur);
+      let h = 2166136261, debut: string | undefined;
+      for (let k = 0; k < valeur.length; k++) {
+        h = hacher(hacher(h, JSON.stringify(valeur[k])), '\n');
+        if (k + 1 === n) debut = (h >>> 0).toString(36);
+      }
+      reperes.push(`${i}-${valeur.length}_${(h >>> 0).toString(36)}`);
+      if (marque && debut === marque) {
+        delete match.fil; gardes.push(cle);
+        if (n < valeur.length) filSuite = valeur.slice(n);
+      }
+      return;
+    }
+    const marque = empreinteCourte(JSON.stringify(valeur));
+    reperes.push(`${i}-${marque}`);
+    if (connus.get(String(i)) === marque) { delete match[cle]; gardes.push(cle); }
+  });
+  return { reperes: reperes.join('.'), ...(gardes.length ? { gardes } : {}), ...(filSuite ? { filSuite } : {}) };
+}
+
 /** Aucune empreinte, graine ou identité privée ne part dans la vue. */
 const publicCompte = (c: CompteStocke) => ({ id: c.id, pseudo: c.pseudo, administrateur: c.identifiant === 'kiri' });
 const comptesEtat = (e: EtatCarriereEnLigne) => e.clubs.map(c => c.compteId);
@@ -105,10 +156,32 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
   const googleClientId = process.env.GOOGLE_CLIENT_ID?.trim() ?? '';
   const google = googleClientId ? new OAuth2Client(googleClientId) : null;
   let catalogueCache: CatalogueAdmin = CATALOGUE_ADMIN_VIDE;
-  async function avecAtelier<T>(operation: () => Promise<T>): Promise<T> {
-    const config = await stockage.atelier?.lire() ?? CATALOGUE_ADMIN_VIDE;
-    if(config.revision !== catalogueCache.revision) catalogueCache = config;
-    return contexteAtelier.run(catalogueCache, operation);
+  let catalogueLuLe = -Infinity;
+  /**
+   * ⚠️ LA RÉVISION DU CATALOGUE N'EST PLUS RELUE À CHAQUE REQUÊTE. C'était un
+   * SELECT de plus par sondage — un tiers des requêtes d'un direct, pour une
+   * valeur qui ne change que lorsque l'administrateur enregistre l'atelier.
+   * Elle est relue toutes les trente secondes, tout de suite pour l'atelier
+   * lui-même, et sur-le-champ dès qu'une ligue se présente avec une révision
+   * PLUS RÉCENTE que la nôtre (`exigerCatalogue`) : sans cela, deux instances
+   * se renverraient la ligue, chacune la réécrivant avec son catalogue.
+   */
+  const FRAICHEUR_CATALOGUE_MS = 30_000;
+  class CatalogueDepasse extends Error {}
+  const exigerCatalogue = (revision?: number | null) => {
+    if ((revision ?? 0) > catalogueCache.revision) throw new CatalogueDepasse();
+  };
+  async function avecAtelier<T>(operation: () => Promise<T>, frais = false): Promise<T> {
+    for (let essai = 0; ; essai++) {
+      const maintenant = Date.now();
+      if (frais || essai > 0 || maintenant - catalogueLuLe >= FRAICHEUR_CATALOGUE_MS || maintenant < catalogueLuLe) {
+        const config = await stockage.atelier?.lire() ?? CATALOGUE_ADMIN_VIDE;
+        if (config.revision !== catalogueCache.revision) catalogueCache = config;
+        catalogueLuLe = maintenant;
+      }
+      try { return await contexteAtelier.run(catalogueCache, operation); }
+      catch (erreur) { if (!(erreur instanceof CatalogueDepasse) || essai > 0) throw erreur; }
+    }
   }
   const notifier = async (etat: EtatCarriereEnLigne) => {
     await programmer?.(etat);
@@ -126,12 +199,93 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
    */
   const ticksDirects = new Map<string, { tick: number; etat: Promise<EtatCarriereEnLigne> }>();
   const PAS_DIRECT_MS = 200; // 5 Hz serveur ; le navigateur, lui, dessine à 60 Hz.
+  /**
+   * ⚠️ 32 LIGUES, C'ÉTAIT LA FALAISE. Au-delà, chaque sondage d'un direct
+   * chassait une ligue du cache et la suivante la relisait EN ENTIER dans la
+   * base : mesuré à 50 matchs simultanés, une lecture complète par sondage
+   * (18 Mo par match en quatre minutes). Le cache tient maintenant la charge
+   * visée ; il reste borné en octets.
+   */
+  const LIGUES_CHAUDES_MAX = 384;
+  const OCTETS_LIGUES_MAX = 160 * 1024 * 1024;
   let octetsLigues = 0;
+  /**
+   * L'en-tête d'une ligue en direct (et les présences de ses managers), lu UNE
+   * fois toutes les trois secondes par instance, quel que soit le nombre
+   * d'écrans et de matchs de la ligue. Il ne sert qu'à apprendre ce qu'une
+   * AUTRE instance a écrit ; nos propres écritures l'effacent aussitôt.
+   */
+  const PAS_SONDAGE_DIRECT_MS = 3_000;
+  type EnteteLigue = { version: number; comptes: string[]; echeance: number | null; catalogueRevision?: number };
+  type SondageDirect = { entete: EnteteLigue; presences?: PresenceMatchStockee[] | null } | null;
+  const sondagesDirects = new Map<string, { lu: number; resultat: Promise<SondageDirect> }>();
+  let sondageGroupeIndisponible = false;
+  /** Ce que la base disait des présences d'une ligue, et quand on le lui a demandé. */
+  const presencesLues = new Map<string, { lu: number; lignes: PresenceMatchStockee[] | null }>();
+  /**
+   * Les managers que CETTE instance voit sonder leur propre direct. Un sondage
+   * toutes les deux secondes est la meilleure preuve de présence : plus besoin
+   * d'un battement à part. La base n'en reçoit qu'un rappel toutes les trente
+   * secondes, pour les autres instances.
+   */
+  const presencesLocales = new Map<string, Map<string, PresenceMatchStockee>>();
+  const presencesEcrites = new Map<string, number>();
+  const PAS_PRESENCE_DURABLE_MS = 30_000;
+  /** `false` : la table des présences manque, l'ancien battement reste nécessaire. */
+  let tablePresences: boolean | undefined;
   const oublierLigue = (id: string) => {
     octetsLigues -= poidsLigues.get(id) ?? 0;
-    poidsLigues.delete(id); liguesChaudes.delete(id);
+    poidsLigues.delete(id); liguesChaudes.delete(id); sondagesDirects.delete(id);
   };
-  const sessionsChaudes = new Map<string, { compte: CompteStocke; jusqua: number }>();
+  async function lireSondageDirect(id: string, maintenant: number): Promise<SondageDirect> {
+    if (stockage.sondageDirect && !sondageGroupeIndisponible) {
+      try {
+        const r = await stockage.sondageDirect(id, maintenant - DELAI_PRESENCE);
+        if (r?.presences) presencesLues.set(id, { lu: maintenant, lignes: r.presences });
+        return r;
+      } catch {
+        // La requête groupée est un confort : à la moindre surprise on revient
+        // aux deux lectures séparées, pour la vie de l'instance.
+        sondageGroupeIndisponible = true;
+        console.warn('[direct] Sondage groupé indisponible, retour aux lectures séparées');
+      }
+    }
+    const entete = await stockage.entete(id);
+    return entete ? { entete } : null;
+  }
+  function sonderDirect(id: string, maintenant: number): Promise<SondageDirect> {
+    const garde = sondagesDirects.get(id);
+    if (garde && maintenant >= garde.lu && maintenant - garde.lu < PAS_SONDAGE_DIRECT_MS) return garde.resultat;
+    const resultat = lireSondageDirect(id, maintenant);
+    sondagesDirects.delete(id);
+    sondagesDirects.set(id, { lu: maintenant, resultat });
+    while (sondagesDirects.size > 1024) sondagesDirects.delete(sondagesDirects.keys().next().value!);
+    void resultat.catch(() => { if (sondagesDirects.get(id)?.resultat === resultat) sondagesDirects.delete(id); });
+    return resultat;
+  }
+  /** Le manager qui regarde son propre match est présent : on le retient, et on le dit à la base de loin en loin. */
+  async function noterPresenceDirecte(etat: EtatCarriereEnLigne, matchId: string, compte: string, maintenant: number): Promise<boolean> {
+    const rencontre = etat.rencontres.find(r => r.id === matchId);
+    const club = etat.clubs.find(c => c.compteId === compte);
+    if (!rencontre?.match || rencontre.match.termine || !club || (rencontre.domicile !== club.id && rencontre.exterieur !== club.id)) return false;
+    let locales = presencesLocales.get(etat.id);
+    if (!locales) { locales = new Map(); presencesLocales.set(etat.id, locales); }
+    const cle = `${matchId}|${compte}`;
+    locales.delete(cle); locales.set(cle, { match: matchId, compte, vu: maintenant });
+    while (presencesLocales.size > 1024) presencesLocales.delete(presencesLocales.keys().next().value!);
+    const durable = `${etat.id}|${cle}`;
+    const ecrite = presencesEcrites.get(durable);
+    if (tablePresences !== false && (ecrite === undefined || maintenant - ecrite >= PAS_PRESENCE_DURABLE_MS || maintenant < ecrite)) {
+      presencesEcrites.delete(durable); presencesEcrites.set(durable, maintenant);
+      while (presencesEcrites.size > 4096) presencesEcrites.delete(presencesEcrites.keys().next().value!);
+      try { tablePresences = await stockage.marquerPresence(etat.id, matchId, compte, maintenant); }
+      catch { presencesEcrites.delete(durable); }
+    }
+    return tablePresences === true;
+  }
+  const sessionsChaudes = new Map<string, { compte: CompteStocke; jusqua: number; toucheLe: number }>();
+  /** `comptes.vu_le` sert à repérer les comptes inactifs depuis deux semaines : dix minutes de précision suffisent. */
+  const PAS_VU_LE_MS = 10 * 60_000;
   const lireSalonAmical = async (code: string): Promise<SalonAmicalServeur | null> => {
     const durable = await stockage.salonAmical?.(code);
     if (durable?.donnees) return structuredClone(durable.donnees) as SalonAmicalServeur;
@@ -192,14 +346,18 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
           },
         }
       : recue;
+    // ⚠️ ON NE REPÈSE PAS UN ÉTAT DONT SEUL LE DIRECT A BOUGÉ. Sérialiser la
+    // ligue à chaque tick pour connaître sa taille coûtait autant que le
+    // moteur ; à version égale, le poids connu reste le bon à quelques octets.
+    const connu = precedente && precedente.etat.version === ligne.etat.version ? poidsLigues.get(id) : undefined;
     octetsLigues -= poidsLigues.get(id) ?? 0;
     poidsLigues.delete(id);
     liguesChaudes.delete(id);
-    const poids = Buffer.byteLength(JSON.stringify(ligne.etat));
+    const poids = connu ?? Buffer.byteLength(JSON.stringify(ligne.etat));
     if (poids > 32 * 1024 * 1024) return ligne;
     liguesChaudes.set(id, ligne);
     poidsLigues.set(id, poids); octetsLigues += poids;
-    while (liguesChaudes.size > 32 || octetsLigues > 32 * 1024 * 1024) {
+    while (liguesChaudes.size > LIGUES_CHAUDES_MAX || octetsLigues > OCTETS_LIGUES_MAX) {
       const ancien = liguesChaudes.keys().next().value!;
       octetsLigues -= poidsLigues.get(ancien) ?? 0;
       poidsLigues.delete(ancien); liguesChaudes.delete(ancien);
@@ -210,28 +368,47 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
     const cache = liguesChaudes.get(id);
     if (!cache) {
       const ligne = await stockage.ligue(id);
+      if (ligne) exigerCatalogue(ligne.etat.catalogueRevision);
       return ligne ? memoriserLigue(id, ligne) : ligne;
     }
     const entete = connue ?? await stockage.entete(id);
+    exigerCatalogue((entete as EnteteLigue | null)?.catalogueRevision);
     if (entete && entete.version === cache.etat.version) {
       const ligne = { ...cache, comptes: entete.comptes, echeance: entete.echeance };
       return memoriserLigue(id, ligne);
     }
     const ligne = await stockage.ligue(id);
-    if (ligne) return memoriserLigue(id, ligne);
+    if (ligne) { exigerCatalogue(ligne.etat.catalogueRevision); return memoriserLigue(id, ligne); }
     oublierLigue(id);
     return ligne;
   }
-  async function avecPresences(etat: EtatCarriereEnLigne, maintenant: number) {
+  /**
+   * `fraicheur` : l'âge accepté pour ce que la base a dit des présences. Un
+   * tick du direct se contente de la lecture groupée des dernières secondes ;
+   * une commande ou un réveil relisent (0).
+   */
+  async function avecPresences(etat: EtatCarriereEnLigne, maintenant: number, fraicheur = 0) {
     if (!etat.rencontres.some(r => r.match && !r.match.termine)) return { etat, externes: false };
-    const lignes = await stockage.presencesActives(etat.id, maintenant - DELAI_PRESENCE);
+    const garde = presencesLues.get(etat.id);
+    let lignes: PresenceMatchStockee[] | null;
+    if (garde && maintenant >= garde.lu && maintenant - garde.lu < fraicheur) lignes = garde.lignes;
+    else {
+      lignes = await stockage.presencesActives(etat.id, maintenant - DELAI_PRESENCE);
+      presencesLues.delete(etat.id); presencesLues.set(etat.id, { lu: maintenant, lignes });
+      while (presencesLues.size > 1024) presencesLues.delete(presencesLues.keys().next().value!);
+    }
     if (lignes === null) return { etat, externes: false };
     const clubs = new Map(etat.clubs.map(c => [c.compteId, c.id]));
     const parMatch = new Map<string, Record<string, number>>();
-    for (const p of lignes) {
+    const retenir = (p: PresenceMatchStockee) => {
       let presences = parMatch.get(p.match);
       if (!presences) { presences = {}; parMatch.set(p.match, presences); }
-      presences[p.compte] = p.vu;
+      presences[p.compte] = Math.max(presences[p.compte] ?? 0, p.vu);
+    };
+    for (const p of lignes) retenir(p);
+    const locales = presencesLocales.get(etat.id);
+    if (locales) for (const [cle, p] of locales) {
+      if (maintenant - p.vu >= DELAI_PRESENCE) locales.delete(cle); else retenir(p);
     }
     return {
       externes: true,
@@ -259,7 +436,8 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
   async function appliquer(id: string, compte: string, requete: string,
     operation: (etat: EtatCarriereEnLigne, maintenant: number, graine: string) => EtatCarriereEnLigne,
     autoriserInscription = false, verifierRecu = true,
-    enteteConnue?: { version: number; comptes: string[]; echeance: number | null }) {
+    enteteConnue?: { version: number; comptes: string[]; echeance: number | null },
+    fraicheurPresences = 0) {
     for (let tentative = 0; tentative < 8; tentative++) {
       const cache = liguesChaudes.get(id);
       const controle = verifierRecu && stockage.verifierCommande ? await stockage.verifierCommande(id, compte, requete,
@@ -271,7 +449,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
       }
       if (verifierRecu && (controle ? controle.dejaTraitee : await stockage.dejaTraitee(id, compte, requete))) return ligne.etat;
       const maintenant = Date.now();
-      const presence = await avecPresences(ligne.etat, maintenant);
+      const presence = await avecPresences(ligne.etat, maintenant, fraicheurPresences);
       const suivant = operation(presence.etat, maintenant, randomBytes(24).toString('hex'));
       // Une présence extérieure sert au calcul de la décision, puis disparaît
       // du gros agrégat. Sa petite ligne dédiée reste la seule source durable.
@@ -296,7 +474,9 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
        * l'échéance resterait éternellement dans le passé et chaque sondage
        * relirait l'état entier — exactement ce qu'on cherche à éviter.
        */
-      const memeEtat = empreinteEcriture(durable, ligne.etat.version) === empreinteEcriture(ancienDurable, ligne.etat.version);
+      // `memeEtatDurable` répond à la même question que deux `empreinteEcriture`,
+      // sans sérialiser deux fois la ligue à chaque tick.
+      const memeEtat = memeEtatDurable(durable, ancienDurable);
       if (memeEtat) {
         const echeance = echeanceLigue(ligne.etat, maintenant);
         // En direct `echeanceLigue` vaut « maintenant » afin de laisser passer
@@ -326,6 +506,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
       }
       const maj: LigueStockee = { ...ligne, etat: durable, comptes: comptesEtat(durable) };
       if (await stockage.comparerEtEcrire(maj, ligne.version, verifierRecu ? { compte, requete } : undefined)) {
+        sondagesDirects.delete(id);
         memoriserLigue(id, { ...maj, version: ligne.version + 1, echeance: echeanceLigue(durable, maintenant) });
         await notifier(durable);
         return durable;
@@ -343,7 +524,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
     if (existant) ticksDirects.delete(cleDirect);
     const etat = appliquer(
       id, 'horloge', `direct-${tick}`,
-      (e, n, g) => avancerCarrierePourDirect(e, matchId, n, g), false, false, enteteConnue,
+      (e, n, g) => avancerCarrierePourDirect(e, matchId, n, g), false, false, enteteConnue, PAS_SONDAGE_DIRECT_MS * 2,
     );
     ticksDirects.set(cleDirect, { tick, etat });
     while (ticksDirects.size > 512) ticksDirects.delete(ticksDirects.keys().next().value!);
@@ -626,9 +807,14 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
       const jeton = lireJeton(req);
       const empreinteSession = jeton ? empreinteJeton(jeton) : '';
       const sessionChaude = empreinteSession ? sessionsChaudes.get(empreinteSession) : undefined;
+      // La session est revérifiée chaque minute ; `vu_le` n'est réécrit que
+      // toutes les dix minutes (une UPDATE par minute et par écran, sinon).
+      const toucher = !sessionChaude || maintenant - sessionChaude.toucheLe >= PAS_VU_LE_MS || maintenant < sessionChaude.toucheLe;
       const compte = sessionChaude && sessionChaude.jusqua > maintenant ? sessionChaude.compte
-        : empreinteSession ? await stockage.session(empreinteSession, maintenant) : null;
-      if (compte && (!sessionChaude || sessionChaude.jusqua <= maintenant)) sessionsChaudes.set(empreinteSession, { compte, jusqua: maintenant + 60_000 });
+        : empreinteSession ? await stockage.session(empreinteSession, maintenant, toucher) : null;
+      if (compte && (!sessionChaude || sessionChaude.jusqua <= maintenant)) {
+        sessionsChaudes.set(empreinteSession, { compte, jusqua: maintenant + 60_000, toucheLe: toucher ? maintenant : sessionChaude!.toucheLe });
+      }
       if (!compte) throw new ErreurHttp(401, 'Connectez-vous pour retrouver vos ligues.');
       if (['creerSalonAmical', 'rejoindreSalonAmical', 'syncSalonAmical', 'quitterSalonAmical'].includes(action)) {
         throw new ErreurHttp(410, 'Les matchs amicaux sont désactivés.');
@@ -640,6 +826,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         if (compte.identifiant !== 'kiri') throw new ErreurHttp(404, 'Page introuvable.');
         if (req.method === 'GET') return res.status(200).json(vueAtelier(url.searchParams.get('q') ?? ''));
         if (!stockage.atelier) throw new ErreurHttp(503, 'Atelier indisponible sur ce serveur.');
+        catalogueLuLe = -Infinity;
         return res.status(200).json(await enregistrerAtelier(stockage.atelier, corps));
       }
       if (action === 'deconnexion') {
@@ -928,6 +1115,42 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         const connue = Number(url.searchParams.get('v'));
         let enteteConnue: { version: number; comptes: string[]; echeance: number | null } | undefined;
         const accesObservateurKiri = compte.identifiant === 'kiri';
+        const direct = url.searchParams.get('direct');
+        if (direct && (direct.length > 250 || /[\p{Cc}]/u.test(direct))) throw new ErreurHttp(400, 'Match invalide.');
+        if (direct) {
+          /**
+           * ⚠️ LE DIRECT NE COÛTE PLUS UNE REQUÊTE PAR ÉCRAN. Chaque sondage
+           * relisait la révision du catalogue, l'en-tête de la ligue et les
+           * présences : trois SELECT toutes les deux secondes et par
+           * spectateur. L'en-tête et les présences arrivent maintenant
+           * ensemble, une fois toutes les trois secondes et par LIGUE ; les
+           * écrans suivants sont servis de mémoire. Le calcul partagé utilise
+           * l'identité « horloge » : l'autorisation du spectateur est donc
+           * vérifiée AVANT, sur cet en-tête.
+           */
+          const sonde = await sonderDirect(id, maintenant);
+          const autorisation = sonde?.entete;
+          if (!autorisation || (!accesObservateurKiri && !autorisation.comptes.includes(compte.id))) throw new ErreurHttp(404, 'Ligue introuvable.');
+          exigerCatalogue(autorisation.catalogueRevision);
+          const observateur = accesObservateurKiri && !autorisation.comptes.includes(compte.id);
+          const e = await actualiserDirect(id, direct, maintenant, autorisation);
+          // Le manager qui sonde son propre match est présent : plus de battement à part.
+          const present = observateur ? false : await noterPresenceDirecte(e, direct, compte.id, maintenant);
+          // L'écran qui sait rejouer le film annonce son dernier pas connu
+          // (`film=` vide : il n'en a aucun). Les anciens écrans n'annoncent
+          // rien et reçoivent le relevé du terrain, comme avant.
+          const annonce = url.searchParams.get('film');
+          const pas = annonce === null ? NaN : Number(annonce);
+          const film = annonce === null ? undefined : { depuis: annonce !== '' && Number.isInteger(pas) && pas >= 0 ? pas : undefined };
+          const rencontre = observateur
+            ? vueRencontreCarriereObservateur(e, direct, film, true)
+            : vueRencontreCarriere(e, compte.id, direct, film, true);
+          if (!rencontre) throw new ErreurHttp(404, 'Match introuvable.');
+          // `r=` : les repères des parties lentes que l'écran tient déjà (fil,
+          // temps forts, banc). Ce qui n'a pas changé ne repart pas.
+          const allege = allegerDirect(rencontre, url.searchParams.get('r'));
+          return res.status(200).json({ id: e.id, version: e.version, rencontre, ...allege, ...(present ? { presence: true } : {}) });
+        }
         if (Number.isInteger(connue) && connue > 0) {
           // Kiri peut observer une ligue sans en devenir membre. Le sondage SQL
           // normal confond volontairement « non-membre » et « ligue absente » ;
@@ -953,27 +1176,6 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
           if ((entete.catalogueRevision ?? liguesChaudes.get(id)?.etat.catalogueRevision ?? 0) === catalogueAdmin().revision && entete.version === connue && entete.echeance !== null && maintenant < entete.echeance) {
             return res.status(200).json({ inchange: true });
           }
-        }
-        const direct = url.searchParams.get('direct');
-        if (direct && (direct.length > 250 || /[\p{Cc}]/u.test(direct))) throw new ErreurHttp(400, 'Match invalide.');
-        if (direct) {
-          // Le calcul partagé utilise l'identité « horloge ». L'autorisation du
-          // spectateur est donc vérifiée AVANT, sur l'en-tête minuscule.
-          const autorisation = enteteConnue ?? await stockage.entete(id);
-          if (!autorisation || (!accesObservateurKiri && !autorisation.comptes.includes(compte.id))) throw new ErreurHttp(404, 'Ligue introuvable.');
-          const observateur = accesObservateurKiri && !autorisation.comptes.includes(compte.id);
-          const e = await actualiserDirect(id, direct, maintenant, autorisation);
-          // L'écran qui sait rejouer le film annonce son dernier pas connu
-          // (`film=` vide : il n'en a aucun). Les anciens écrans n'annoncent
-          // rien et reçoivent le relevé du terrain, comme avant.
-          const annonce = url.searchParams.get('film');
-          const pas = annonce === null ? NaN : Number(annonce);
-          const film = annonce === null ? undefined : { depuis: annonce !== '' && Number.isInteger(pas) && pas >= 0 ? pas : undefined };
-          const rencontre = observateur
-            ? vueRencontreCarriereObservateur(e, direct, film)
-            : vueRencontreCarriere(e, compte.id, direct, film);
-          if (!rencontre) throw new ErreurHttp(404, 'Match introuvable.');
-          return res.status(200).json({ id: e.id, version: e.version, rencontre });
         }
         const autorisationKiri = accesObservateurKiri ? enteteConnue ?? await stockage.entete(id) : undefined;
         if (accesObservateurKiri && !autorisationKiri) throw new ErreurHttp(404, 'Ligue introuvable.');
@@ -1079,6 +1281,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
       }
       throw new ErreurHttp(400, 'Action inconnue.');
     } catch (erreur) {
+      if (erreur instanceof CatalogueDepasse) throw erreur;
       if (erreur instanceof ErreurHttp) return res.status(erreur.statut).json({ erreur: erreur.message });
       // Les erreurs de règles sont lisibles ; ne jamais exposer une erreur SQL ou une pile.
       if (erreur instanceof Error && erreur.name === 'ErreurCarriere') return res.status(400).json({ erreur: erreur.message });
@@ -1103,10 +1306,19 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
     }
   }
   return { handler: async (req: RequeteCarriere, res: ReponseCarriere) => {
-    try { return await avecAtelier(() => handler(req,res)); }
+    // L'atelier lui-même lit toujours la révision du moment : son écriture est un CAS dessus.
+    const atelier = /[?&]atelier\b/.test(req.url ?? '')
+      || Boolean(req.body && typeof req.body === 'object' && (req.body as { action?: unknown }).action === 'atelier')
+      || (typeof req.body === 'string' && req.body.includes('"atelier"'));
+    try { return await avecAtelier(() => handler(req,res), atelier); }
     catch { return res.status(503).json({erreur:'Le catalogue est momentanément indisponible. Réessaie dans un instant.'}); }
   }, avancerLigues: () => avecAtelier(avancerLigues), actualiserLigue: (id: string) => avecAtelier(async () => {
-    if (!await stockage.entete(id)) return;
-    return appliquer(id, 'horloge', `queue-${randomUUID()}`, (e,n,g) => actualiserCarriere(e,n,g), false, false);
+    // Le réveil lit l'en-tête et les présences d'un seul trait, et les confie à
+    // `appliquer` : il relisait l'en-tête deux fois, puis les présences.
+    const maintenant = Date.now();
+    const sonde = await lireSondageDirect(id, maintenant);
+    if (!sonde) return;
+    return appliquer(id, 'horloge', `queue-${randomUUID()}`, (e,n,g) => actualiserCarriere(e,n,g), false, false,
+      sonde.entete, sonde.presences === undefined ? 0 : 1_000);
   }) };
 }

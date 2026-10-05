@@ -129,7 +129,9 @@ export class DestinyMatch {
     const e=this.e,now=e.sim,ici=new Set(this.players.map(p=>p.id));
     this.changements??=[];this.presents??=ici;this.dernieres??=new Map();
     // Les bancs : devant la tribune principale, de part et d'autre de la ligne médiane.
-    const banc=equipe=>({x:37,z:equipe===0?-5:5});
+    // ⚠️ Ce sont des lieux du STADE : après le changement de côté, ils sont en face (`inv`).
+    const inv=e.cotesInverses?-1:1;
+    const banc=equipe=>({x:37*inv,z:(equipe===0?-5:5)*inv});
     for(const p of this.players){
       // Retour d'un exclu temporaire : il repart du bord du terrain où il attendait et rejoint sa place en courant.
       const banni=!this.presents.has(p.id)&&this.changements.find(c=>c.carton&&!c.rouge&&c.id===p.id);
@@ -149,7 +151,7 @@ export class DestinyMatch {
         if(!(src?.sanction>0))continue;
         const equipe=src.cote==='A'?0:1,de=this.dernieres.get(id)||xyz(src.pos),rouge=src.sanction>9000;
         // Dix minutes : il attend debout au bord de la touche, devant son banc, et c'est de là qu'il rentrera.
-        const vers=rouge?{x:38.5,z:equipe===0?-1.6:1.6}:{x:35.4,z:equipe===0?-9:9},d=Math.hypot(de.x-vers.x,de.z-vers.z);
+        const vers=rouge?{x:38.5*inv,z:(equipe===0?-1.6:1.6)*inv}:{x:35.4*inv,z:(equipe===0?-9:9)*inv},d=Math.hypot(de.x-vers.x,de.z-vers.z);
         this.changements.push({type:'sortie',id,debut:now,attente:4.8,duree:4.8+clamp(d/1.85,2,34),de,vers,equipe,src,allure:1.85,carton:true,rouge});
         // Son corps physique est oublié : à son retour il repart du bord du terrain, pas de l'endroit de la faute.
         this.physics.bodies.delete(id);

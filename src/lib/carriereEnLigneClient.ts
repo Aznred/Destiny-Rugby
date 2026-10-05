@@ -13,6 +13,7 @@ export interface SessionCarriere {
 }
 export interface MiseAJourDirectCarriere {
   id: string; version: number; rencontre: VueCarriereEnLigne['rencontres'][number];
+  reperes?: string; gardes?: string[]; filSuite?: unknown[]; presence?: boolean;
 }
 export class ErreurCarriere extends Error {
   statut: number;
@@ -111,9 +112,11 @@ export const chargerLigueCarriere = (id: string, signal?: AbortSignal, version?:
  * `film` : le dernier pas du film que l'écran connaît (`null` : aucun). Le
  * serveur ne renvoie alors que les pas suivants, à la place du relevé du terrain.
  */
-export const chargerDirectCarriere = (id: string, matchId: string, signal?: AbortSignal, version?: number, film?: number | null) =>
+export const chargerDirectCarriere = (id: string, matchId: string, signal?: AbortSignal, version?: number, film?: number | null,
+  /** Repères des parties lentes déjà tenues (`''` : aucune) ; le serveur ne renvoie que celles qui ont changé. */
+  reperes?: string) =>
   requete<MiseAJourDirectCarriere>(undefined, undefined, signal,
-    `?ligue=${encodeURIComponent(id)}&direct=${encodeURIComponent(matchId)}${version ? `&v=${version}` : ''}${film === undefined ? '' : `&film=${film ?? ''}`}`);
+    `?ligue=${encodeURIComponent(id)}&direct=${encodeURIComponent(matchId)}${version ? `&v=${version}` : ''}${film === undefined ? '' : `&film=${film ?? ''}`}${reperes === undefined ? '' : `&r=${encodeURIComponent(reperes)}`}`);
 const notifierCompte = (type: 'connecte' | 'deconnecte') => {
   if (typeof window !== 'undefined') window.dispatchEvent(new Event(`destiny-compte-${type}`));
 };

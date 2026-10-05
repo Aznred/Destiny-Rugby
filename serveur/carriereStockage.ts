@@ -61,7 +61,8 @@ export interface StockageCarriere {
   compteParGoogle(sujet: string): Promise<CompteStocke | null>;
   lierCompteGoogle(id: string, sujet: string, courriel: string): Promise<boolean>;
   creerCompte(compte: CompteStocke): Promise<boolean>;
-  session(empreinte: string, maintenant: number): Promise<CompteStocke | null>;
+  /** `toucher: false` : vérifier la session sans réécrire `vu_le` (dix minutes de précision suffisent). */
+  session(empreinte: string, maintenant: number, toucher?: boolean): Promise<CompteStocke | null>;
   ouvrirSession(empreinte: string, compte: string, expiration: number): Promise<void>;
   fermerSession(empreinte: string): Promise<void>;
   achatCredite?(session: string, compte: string): Promise<boolean>;
@@ -107,6 +108,15 @@ export interface StockageCarriere {
   verifierSondage?(ligue: string, compte: string, version: number, catalogue: number, maintenant: number): Promise<
     { statut: 'absente' | 'inchange' } | { statut: 'lire'; entete: { version: number; comptes: string[]; echeance: number | null; catalogueRevision?: number } }
   >;
+  /**
+   * L'en-tête d'une ligue ET les présences de ses managers, en UN aller-retour :
+   * c'est tout ce qu'un direct demande à la base, une fois toutes les deux
+   * secondes et par ligue. `presences: null` : la table n'existe pas encore.
+   */
+  sondageDirect?(ligue: string, presencesDepuis: number): Promise<{
+    entete: { version: number; comptes: string[]; echeance: number | null; catalogueRevision?: number };
+    presences: PresenceMatchStockee[] | null;
+  } | null>;
   /** Le nouvel état et, pour une commande utilisateur, son reçu sont écrits indivisiblement. */
   comparerEtEcrire(ligue: LigueStockee, version: number, recu?: { compte: string; requete: string }): Promise<boolean>;
   /** Battement minuscule du direct, séparé du gros JSON de la ligue. `false`/`null` = migration pas encore appliquée. */
@@ -313,7 +323,12 @@ export function stockageNeon(url: string): StockageCarriere {
       );
       return r.length === 1;
     },
-    async session(empreinte, maintenant) {
+    async session(empreinte, maintenant, toucher = true) {
+      if (!toucher) {
+        const lue = await sql`select c.id,c.identifiant,c.pseudo from sessions s join comptes c on c.id=s.compte
+          where s.empreinte=${empreinte} and s.expire_le>${new Date(maintenant).toISOString()}`;
+        return lue[0] ? { ...lue[0], empreinte: '' } as CompteStocke : null;
+      }
       const r = await sql`with active as (
           select c.id from sessions s join comptes c on c.id=s.compte
           where s.empreinte=${empreinte} and s.expire_le>${new Date(maintenant).toISOString()}
@@ -659,6 +674,20 @@ export function stockageNeon(url: string): StockageCarriere {
       if (!r || r.r[0] === -1) return { statut: 'absente' };
       if (r.r[0] === 1) return { statut: 'inchange' };
       return { statut: 'lire', entete: { version: Number(r.r[1]), comptes: r.r[2], echeance: r.r[3] == null ? null : Number(r.r[3]), catalogueRevision: r.r[4] == null ? undefined : Number(r.r[4]) } };
+    },
+    async sondageDirect(ligue, presencesDepuis) {
+      const [r] = await sql`select l.etat_version as version, l.comptes, l.catalogue_revision,
+          extract(epoch from l.echeance) * 1000 as echeance,
+          (select coalesce(jsonb_agg(jsonb_build_array(p.match, p.compte, extract(epoch from p.vu_le) * 1000)), '[]'::jsonb)
+             from carriere_presences p where p.ligue = l.id and p.vu_le >= to_timestamp(${presencesDepuis / 1000})) as presences
+        from carriere_ligues l where l.id = ${ligue}`;
+      if (!r) return null;
+      const e = r.echeance == null ? NaN : Number(r.echeance);
+      return {
+        entete: { version: Number(r.version), comptes: r.comptes as string[], echeance: Number.isFinite(e) ? e : null,
+          catalogueRevision: r.catalogue_revision == null ? undefined : Number(r.catalogue_revision) },
+        presences: (r.presences as [string, string, number][]).map(([match, compte, vu]) => ({ match: String(match), compte: String(compte), vu: Number(vu) })),
+      };
     },
     async comparerEtEcrire(l, version, recu) {
       // ⚠️ L'ÉCRITURE DOIT PASSER MÊME SANS LA COLONNE. C'est celle qui enregistre

@@ -988,3 +988,24 @@ npm run verify:ligue      # ⚠️ le socle du premier lot — voir la dette ci-
 npm run dev               # /api/carriere tourne sur un fichier JSON local
 npm run build             # tsc -b && vite build
 ```
+
+
+## Ce qu'un direct demande à la base (Correctif 11)
+
+Mesure : `npm run mesure:conso-direct -- 10 --minutes=80` (ou `50,100,300 --minutes=4`). Le banc joue de vrais directs à travers `carriereApi.ts` devant `scripts/baseQuiCompte.ts`, une base en mémoire qui répond comme celle de Neon et compte chaque requête SQL par nature, avec les octets partis et revenus, le calcul et la mémoire.
+
+| Par match de 80 min, deux managers | Avant | Après |
+|---|---|---|
+| Requêtes SQL | 16 680 | 1 959 |
+| SELECT / UPDATE / INSERT | 15 833 / 438 / 409 | 1 545 / 73 / 341 |
+| Écritures de l'état entier | 113 | 41 |
+| Octets vers la base / depuis la base | 14,0 Mo / 5,3 Mo | 4,7 Mo / 3,0 Mo |
+| Octets vers les écrans (compressés) | 253 Mo (33 Mo) | 49 Mo (10 Mo) |
+
+| Par match, tranche de 4 min | 50 matchs | 100 matchs | 300 matchs |
+|---|---|---|---|
+| Requêtes SQL avant → après | 1 041 → 96 | 1 048 → 96 | 1 051 → 95 |
+| Octets lus en base avant → après | 18,2 Mo → 0,19 Mo | 19,1 Mo → 0,18 Mo | 19,6 Mo → 0,18 Mo |
+| Calcul par requête HTTP avant → après | 4,6 → 4,7 ms | 4,8 → 4,3 ms | 30,2 → 2,7 ms |
+
+Règles à tenir : le direct lit l'en-tête et les présences d'un seul trait (`sondageDirect`), une fois toutes les 3 s et par ligue ; le sondage d'un manager vaut présence ; rien ne s'écrit tant que seuls l'horloge, le fil ou le gel d'une décision ont bougé (`memeEtatDurable`) ; les parties lentes d'une réponse ne repartent que si elles ont changé (`&r=`). Garde-fou : `npm run verify:ecriture-direct`. Explications : `CLAUDE.md`.

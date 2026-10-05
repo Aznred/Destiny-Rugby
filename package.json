@@ -66,6 +66,7 @@
     "mesure:regles-ligue": "vite-node scripts/mesurerReglesLigue.ts",
     "mesure:rugby": "vite-node scripts/mesurerRugby.ts",
     "mesure:conso-direct": "vite-node scripts/mesurerConsommationDirect.ts",
+    "verify:ecriture-direct": "vite-node scripts/verifierEcritureDirect.ts",
     "verify:tirs": "vite-node scripts/verifierTirsAuBut.ts",
     "verify:scenarios-match": "vite-node scripts/verifierScenariosMatch.ts",
     "verify:fluidite-direct": "vite-node scripts/verifierFluiditeDirect.ts",

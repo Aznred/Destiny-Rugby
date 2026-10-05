@@ -22,6 +22,8 @@ import { avancer, creerMatch, DT } from '../src/lib/moteur/moteur';
 import type { EtatMatch } from '../src/lib/moteur/etat';
 import { effectifDuClub } from '../src/lib/effectif';
 import { extraireTerrain } from '../src/lib/ligue/matchCarriere';
+
+const IA_DU_BANC = Number(process.argv.find((a) => a.startsWith('--ia='))?.split('=')[1] ?? 0);
 import { cadrerFilm, extraireFilm, filmer, LecteurFilm, PAS_FILM, type FilmDirect } from '../src/lib/ligue/filmDirect';
 
 assert.equal(PAS_FILM, DT, 'Le film avance au pas du moteur');
@@ -67,7 +69,9 @@ function lire(e: LecteurFilm['etat']): Omit<Verite, 'pos' | 'ballon' | 'objets' 
 
 function jouer(cle: string, minutes: number) {
   const e = creerMatch('Stade Toulousain', 'RC Toulon', effectifDuClub('Stade Toulousain', 1), effectifDuClub('RC Toulon', 1),
-    24, 20, cle, undefined, { tempsReel: true, niveau: 'pro', scoreSurTerrain: true, cadenceDetaillee: true, placementJoue: true, resserrement: 1 });
+    24, 20, cle, undefined, { tempsReel: true, niveau: 'pro', scoreSurTerrain: true, cadenceDetaillee: true, placementJoue: true, resserrement: 1,
+      // --ia=2 : les règles 3 de la ligue (IA par poste), dont le film doit porter les nouveaux états.
+      ...(IA_DU_BANC ? { ia: IA_DU_BANC } : {}) });
   filmer(e);
   const camera = e.apresPas!;
   const verites = new Map<number, Verite>();

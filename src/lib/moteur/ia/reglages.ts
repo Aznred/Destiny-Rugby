@@ -76,10 +76,30 @@ export const REGLAGES_IA = {
   fautesCondense: 3.2,
   fautesTempsReel: 0.35,
   /** Chance par plaquage lancé (plus de 8 m/s de fermeture) que l'épaule arrive à la tête, avant échelle. */
-  contactDangereux: 0.014,
+  contactDangereux: 0.009,
   /** Nombre de fautes dans la même zone (ou de la même famille) avant l'avertissement : condensé, temps réel. */
   serieCondense: 2,
-  serieTempsReel: 3,
+  serieTempsReel: 5,
+
+  // ── Le match en temps réel (ligue en ligne, règles 3) ─────────────────────
+  // Quatre-vingts minutes réelles contiennent 260 regroupements, contre 34
+  // dans un match de dix minutes : les mêmes situations s'y présentent huit
+  // fois plus souvent. Ce qu'elles valent y est donc ramené à sa mesure
+  // (`npm run mesure:rugby -- 72 ligue 2`). Étalonné le 05/10/2026 : voir CLAUDE.md.
+  /** Ce que valent les situations favorables au porteur (et la montée solitaire), en temps réel. */
+  avantageReel: 0.3,
+  /** Durée des retards après un regroupement, en temps réel. */
+  retardReel: 0.3,
+  /** Jeu au pied choisi hors de ses 22 (occupation, passe au pied, rasant, par-dessus), en temps réel. */
+  piedReel: 0.5,
+  /** Ce que le soutien à l'épaule ajoute à la vitesse du ballon de ruck, en temps réel. */
+  soutienReel: 0.3,
+  /** Part des ballons volés au sol, en temps réel : multiplie les trois `protection*`. */
+  protectionReel: 1.4,
+  /** Joueurs qui accompagnent une percée, en temps réel (trois dans un match condensé). */
+  soutiensReel: 3,
+  /** Chance qu'une faute (hors geste violent) vaille un carton, en temps réel. */
+  cartonsReel: 0.35,
 };
 
 export type ReglagesIA = typeof REGLAGES_IA;

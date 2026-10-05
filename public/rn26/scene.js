@@ -8,7 +8,6 @@ import { appearance,souhaitDepuisCarte,tirage,prepareBody,groundBody,grip,trackB
 import { prepareGaits,locomotion } from './allures.js';
 import { creerTenue,numeroter,creerPanneaux,creerAbords,creerPublic,creerEtiquette,creerBallon,nettoyerStade,chargerImage,texture,departagerTenues,nomCourt,luminance,hexa,MAILLOT_DEFAUT } from './habillage.js';
 import { creerSons } from './sons.js';
-import { creerDureeNomPorteur } from './nomPorteur.js';
 import { creerTelevision } from './television.js';
 
 // ---------------------------------------------------------------------------
@@ -205,13 +204,12 @@ export async function creerScene3D(conteneur,options={}){
   const anneau=(interieur,exterieur,teinte,opacite)=>{const m=new THREE.Mesh(new THREE.RingGeometry(interieur,exterieur,40),new THREE.MeshBasicMaterial({color:teinte,side:THREE.DoubleSide,transparent:true,opacity:opacite,depthWrite:false}));m.rotation.x=-Math.PI/2;m.visible=false;scene.add(m);return m;};
   const halo=anneau(.48,.58,'#f5efb9',.7),aura=anneau(.62,.74,'#ffd257',.85);
   const etiquette=creerEtiquette(renderer);scene.add(etiquette.sprite);
-  const dureeNomPorteur=creerDureeNomPorteur();
   // Le halo du porteur prend la couleur de son équipe, éclaircie si elle est trop sombre pour la pelouse.
   const teintesHalo=[tenueA,tenueB].map(t=>luminance(t.principal)<.3?'#f5efb9':hexa(t.principal));
 
   const actors=new Map(),officials=[];
   let match=null,paused=false,snap=true,speed=1,mode=options.camera||'follow',detruite=false;
-  const handA=new THREE.Vector3(),handB=new THREE.Vector3(),tmp=new THREE.Vector3(),tmp2=new THREE.Vector3();
+  const handA=new THREE.Vector3(),handB=new THREE.Vector3(),tmp=new THREE.Vector3(),tmp2=new THREE.Vector3(),tmp3=new THREE.Vector3();
   const gripL=new THREE.Vector3(),gripR=new THREE.Vector3(),rootNow={x:0,z:0},rootRef={x:0,z:0};
   const qa=new THREE.Quaternion();
 
@@ -693,10 +691,9 @@ export async function creerScene3D(conteneur,options={}){
     aura.visible=!!moi&&moi.group.visible;if(aura.visible){aura.position.set(moi.group.position.x,.03,moi.group.position.z);aura.material.opacity=.6+.25*Math.sin(visualTime*4);}
     renderCamera(dt,visualTime);
     // Le nom du porteur, dans sa flamme, sous ses appuis.
-    const nomVisible=dureeNomPorteur(match.carrier,performance.now());
-    if(porteur&&porteur.nom&&options.noms!==false&&nomVisible){
+    if(porteur&&porteur.nom&&options.noms!==false){
       etiquette.ecrire(porteur.nom,match.team===0?tenueA.principal:tenueB.principal);
-      const sp=etiquette.sprite,d=camera.position.distanceTo(porteur.group.position),h=d*Math.tan(camera.fov*Math.PI/360)*2*(leger?.037:.03)*clamp(900/hauteur,.75,1.6);
+      const sp=etiquette.sprite,d=camera.position.distanceTo(porteur.group.position),h=d*Math.tan(camera.fov*Math.PI/360)*2*(leger?.062:.05)*clamp(900/hauteur,.75,1.6);
       sp.position.set(porteur.group.position.x,-.06,porteur.group.position.z);sp.scale.set(h*4,h,1);sp.visible=true;
     }else etiquette.sprite.visible=false;
     if(!still&&!fige)tele.enregistrer(visualTime);
@@ -901,6 +898,14 @@ export async function creerScene3D(conteneur,options={}){
   const cibleFixe=new THREE.Vector3(),secousse={source:null,t:-10};
   function renderCamera(dt,visualTime){
     const e=match.e,tir=e.tir,want=rig.want;
+    // ⚠️ LE CHANGEMENT DE CÔTÉ : LE STADE TOURNE, PAS LE MATCH. Le moteur garde
+    // son repère (A attaque toujours dans le même sens) ; en seconde période le
+    // décor fait un demi-tour autour de lui, et la caméra est calculée dans le
+    // repère du STADE — elle reste dans sa tribune, et voit donc les équipes
+    // attaquer dans l'autre sens. Tout ce qui est relatif au jeu (courses,
+    // appuis, gestes) n'a rien à savoir de ce demi-tour.
+    const inv=e.cotesInverses?-1:1;
+    if(inv!==rig.inv){rig.inv=inv;decor.rotation.y=inv<0?Math.PI:0;snap=true;}
     // Ce qu'on cadre : le ballon, un peu en avant de sa course.
     want.copy(ballMesh.position);want.y=clamp(want.y*.35,.9,2.6);
     let zoom=1,suivi=.5;
@@ -929,6 +934,8 @@ export async function creerScene3D(conteneur,options={}){
       const poids=options.suivreMoi===true?.4:options.suivreMoi;
       want.x+=(moi.x-want.x)*poids;want.z+=(moi.z-want.z)*poids;zoom=Math.min(zoom,poids>=1?.52:poids>=.5?.7:.86);
     }
+    // Le point visé passe dans le repère du stade.
+    want.x*=inv;want.z*=inv;
     // Un écran étroit voit moins large : la caméra recule d'autant.
     zoom*=camera.aspect<1?1.18:camera.aspect<1.5?1.06:1;
     const real=Math.min(dt,.05)*Math.max(1,Math.sqrt(speed));
@@ -941,37 +948,39 @@ export async function creerScene3D(conteneur,options={}){
     let plan=mode,coupe=false;
     if(mode==='tv'){const c=tele.choisirPlan(match,visualTime);plan=c.plan;coupe=c.coupe;}
     if(plan!==planAffiche){coupe=coupe||!(['follow','close'].includes(plan)&&['follow','close'].includes(planAffiche));planAffiche=plan;}
-    const buteur=tir&&actors.get(tir.buteur?.id),versPoteaux=(tir?.buteur?.cote??e.possession)==='A'?1:-1;
+    const buteur=tir&&actors.get(tir.buteur?.id),versPoteaux=((tir?.buteur?.cote??e.possession)==='A'?1:-1)*inv;
+    const stade=v=>tmp3.set(v.x*inv,v.y,v.z*inv);
     let viser=rig.focus;
     if(plan==='wide')tmp.set(48,46,-9);
     else if(plan==='close')tmp.copy(rig.focus).add(tmp2.set(6.5,3.6,-8.5).multiplyScalar(Math.max(.62,z)));
     else if(plan==='aerienne')tmp.set(rig.focus.x*.35+12,34,rig.focus.z-27);
     else if(plan==='basse')tmp.set(rig.focus.x+11.5,1.3,rig.focus.z-4);
-    else if(plan==='enbut'){const s=e.possession==='A'?1:-1;tmp.set(rig.focus.x*.5,6.4,s*63.5);}
+    else if(plan==='enbut'){const s=(e.possession==='A'?1:-1)*inv;tmp.set(rig.focus.x*.5,6.4,s*63.5);}
     else if(plan==='tunnel'){tmp.set(15,2.2,8.5);viser=cibleFixe.set(31,1.45,0);}
-    else if(plan==='banc'){const zb=match.remplacement?.z??0;tmp.set(19,3.4,zb*2.4);viser=cibleFixe.set(34,1.3,zb*.7);}
+    else if(plan==='banc'){const zb=(match.remplacement?.z??0)*inv;tmp.set(19,3.4,zb*2.4);viser=cibleFixe.set(34,1.3,zb*.7);}
     else if(plan==='buteur'&&buteur){
       // Dans le dos du buteur, les poteaux au fond : on lit la trajectoire à venir.
-      const k=buteur.group.position;tmp2.set(k.x,0,k.z-versPoteaux*50);const d=Math.max(1,tmp2.length());
+      const k=stade(buteur.group.position);tmp2.set(k.x,0,k.z-versPoteaux*50);const d=Math.max(1,tmp2.length());
       tmp.set(k.x+tmp2.x/d*8,3,k.z+tmp2.z/d*8);
       viser=cibleFixe.set(k.x*.25,3.4,versPoteaux*50).lerp(tmp2.set(k.x,1.2,k.z),.22);
     }else if(plan==='poteaux'||plan==='buteur'){
       // Derrière les poteaux : le ballon vient vers la caméra, entre les montants ou non.
-      const kx=buteur?buteur.group.position.x:rig.focus.x;
+      const kx=buteur?buteur.group.position.x*inv:rig.focus.x;
       tmp.set(clamp(kx*.18,-3,3),8.2,versPoteaux*64);
-      viser=cibleFixe.set(ballMesh.position.x*.6,Math.max(2.2,ballMesh.position.y*.7),ballMesh.position.z);
+      viser=cibleFixe.set(ballMesh.position.x*inv*.6,Math.max(2.2,ballMesh.position.y*.7),ballMesh.position.z*inv);
     }else tmp.copy(rig.focus).add(tmp2.set(16,17,-22).multiplyScalar(z));
     // Reste en avant des tribunes proches pour éviter de traverser leurs murs.
     if(plan!=='wide')tmp.x=clamp(tmp.x,-37,37);
     if(snap||coupe){rig.pos.copy(tmp);rig.posV.set(0,0,0);if(coupe){rig.focus.copy(want);rig.focusV.set(0,0,0);}}
     else dampVector(rig.pos,tmp,rig.posV,plan==='wide'?.01:plan==='follow'||plan==='close'?.32:.5,real);
-    camera.position.copy(rig.pos);
-    if(plan==='wide')camera.lookAt(tmp2.copy(rig.focus).multiplyScalar(.3));else camera.lookAt(viser);
+    // Du repère du stade à celui de l'image : le même demi-tour, dans l'autre sens.
+    camera.position.set(rig.pos.x*inv,rig.pos.y,rig.pos.z*inv);
+    if(plan==='wide')camera.lookAt(rig.focus.x*.3*inv,rig.focus.y*.3,rig.focus.z*.3*inv);else camera.lookAt(viser.x*inv,viser.y,viser.z*inv);
     // Un très gros impact se sent : l'image tremble un tiers de seconde, à peine.
     if(e.grosImpact&&e.grosImpact!==secousse.source){secousse.source=e.grosImpact;secousse.t=visualTime;}
     const age=visualTime-secousse.t;
     if(age>=0&&age<.34&&speed<=1.5){const k=(1-age/.34)**2*.1;camera.position.x+=Math.sin(age*88)*k;camera.position.y+=Math.cos(age*71)*k*.7;}
-    const view=api.vue;if(view){camera.position.set(rig.focus.x+view[0],view[1],rig.focus.z+view[2]);camera.lookAt(rig.focus.x,view[3]??.9,rig.focus.z);}
+    const view=api.vue;if(view){camera.position.set((rig.focus.x+view[0])*inv,view[1],(rig.focus.z+view[2])*inv);camera.lookAt(rig.focus.x*inv,view[3]??.9,rig.focus.z*inv);}
   }
 
   // ── Définition adaptative : on préfère une image un peu moins fine à une image saccadée ──

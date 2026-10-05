@@ -26,6 +26,8 @@ const N = Number(process.argv[2] ?? 24);
 const MODES = (process.argv[3] ?? 'carriere3d,carriere2d,fond').split(',');
 const IA = process.argv[4] ? Number(process.argv[4]) : undefined;
 const DETAIL = process.argv.includes('--scores');
+/** Défense resserrée des matchs de ligue (règles 2 : 1). */
+const RESSERREMENT = Number(process.argv.find((a) => a.startsWith('--resserrement='))?.split('=')[1] ?? 1);
 // Essayer un réglage sans toucher au fichier : --reglages=condense:1.5,retardRapide:2
 const ESSAI = process.argv.find((a) => a.startsWith('--reglages='));
 if (ESSAI) {
@@ -48,7 +50,7 @@ function jouer(mode: string, k: number) {
     niveau: 'pro', scoreSurTerrain: true,
     tempsReel: mode === 'ligue',
     cadenceDetaillee: detaille, placementJoue: detaille,
-    resserrement: mode === 'ligue' ? 1 : undefined,
+    resserrement: mode === 'ligue' ? RESSERREMENT : undefined,
   };
   if (IA !== undefined) options.ia = IA;
   const e = creerMatch(a, b, effectifDuClub(a, 1), effectifDuClub(b, 1), cibles[0], cibles[1], `rugby-${k}`, undefined, options);

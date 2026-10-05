@@ -1786,3 +1786,11 @@ fondations vers le confort) est dans **[ROADMAP.md](ROADMAP.md)**.
 ---
 
 Fait avec 🏉 — thème artisanal, front soigné, sans rendu générique.
+
+
+## Correctifs 11 et 12 (octobre 2026)
+
+- **Ligue en ligne — consommation.** Un match de 80 minutes regardé par ses deux managers demandait 16 680 requêtes SQL ; il en demande 1 959, et envoie cinq fois moins d'octets aux écrans. Mesure : `npm run mesure:conso-direct` ; garde-fou : `npm run verify:ecriture-direct`. Détail dans `CLAUDE.md` (« Ce qu'un direct demande à la base »).
+- **Ligue en ligne — règles 3.** Les nouveaux matchs jouent l'IA par poste des matchs de carrière, étalonnée pour le temps réel (`REGLES_MATCH_EN_LIGNE`).
+- **Match.** Vent (direction, force, rafales), tirs au but aux trajectoires variées (poteau compris), drops décidés par la situation, changement de côté à la mi-temps, renvoi d'en-but et mêlée à cinq, touche rapide conforme, cellules d'avants lancées avant la passe, chenille tenue jusqu'à la frappe.
+- **Habillage TV.** Bandeau du marqueur avec sa statistique, bulles d'information, vent devant un tir — sans aucune requête.

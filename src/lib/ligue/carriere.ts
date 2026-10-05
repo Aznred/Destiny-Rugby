@@ -1651,12 +1651,24 @@ export function agirCarriere(etat: EtatCarriereEnLigne, compteId: string, comman
  * résultat après une actualisation ou une reconnexion.
  *
  * ⚠️ ET CE QUI EST VRAIMENT NOUVEAU DÉCLENCHE TOUJOURS UNE ÉCRITURE : un ordre
- * au journal, une décision en attente avec sa date limite, le gel du chrono, la
+ * au journal, une décision en attente avec sa date limite, le gel du chrono
+ * (une fois la décision tombée : voir `gelDerive`), la
  * présence d'un manager, et bien sûr la sirène (`termine`) avec le score final.
  * Un match TERMINÉ garde donc tous ses champs comparés : son fil et sa feuille
  * sont, eux, la seule trace qui restera.
  */
 const DERIVES_DU_DIRECT = ['horloge', 'essais', 'penalites', 'fil', 'stats'] as const;
+
+/**
+ * ⚠️ LE GEL D'UNE DÉCISION EN ATTENTE EST UNE HORLOGE, PAS UNE INFORMATION.
+ * Tant qu'un manager réfléchit, `gel` grandit à chaque lecture (il vaut
+ * « maintenant − coup d'envoi − chrono arrêté ») : le comparer faisait réécrire
+ * la ligue entière à chaque tick du direct, vingt secondes durant — mesuré,
+ * dix-neuf écritures de l'état complet pour une seule décision. Il se recalcule
+ * de l'heure qu'il est ; sa valeur DÉFINITIVE part avec la décision, quand elle
+ * tombe (clic ou délai), et cette écriture-là a toujours lieu.
+ */
+const gelDerive = (match: { decision?: unknown }) => Boolean(match.decision);
 
 export function empreinteEcriture(etat: EtatCarriereEnLigne, version: number): string {
   return JSON.stringify({
@@ -1666,9 +1678,71 @@ export function empreinteEcriture(etat: EtatCarriereEnLigne, version: number): s
       if (!r.match || r.match.termine) return r;
       const durable: Record<string, unknown> = { ...r.match };
       for (const cle of DERIVES_DU_DIRECT) delete durable[cle];
+      if (gelDerive(r.match)) delete durable.gel;
       return { ...r, match: durable };
     }),
   });
+}
+
+/** Égalité de contenu, au sens du JSON : une clé `undefined` est une clé absente. */
+function memeContenu(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) return false;
+  const tableau = Array.isArray(a);
+  if (tableau !== Array.isArray(b)) return false;
+  if (tableau) {
+    const x = a as unknown[], y = b as unknown[];
+    if (x.length !== y.length) return false;
+    for (let i = 0; i < x.length; i++) if (!memeContenu(x[i], y[i])) return false;
+    return true;
+  }
+  const x = a as Record<string, unknown>, y = b as Record<string, unknown>;
+  for (const cle in x) if (x[cle] !== undefined && !memeContenu(x[cle], y[cle])) return false;
+  for (const cle in y) if (y[cle] !== undefined && x[cle] === undefined) return false;
+  return true;
+}
+
+/**
+ * La question que pose `empreinteEcriture` — « y a-t-il quelque chose à
+ * écrire ? » — SANS sérialiser la ligue.
+ *
+ * ⚠️ DEUX `JSON.stringify` DE 300 À 400 Ko PAR TICK, c'était la moitié du temps
+ * de calcul d'un direct (mesuré au profileur). Or un tick ne recopie que ce
+ * qu'il touche : tout le reste de l'état est le MÊME objet qu'avant. On descend
+ * donc seulement là où les références diffèrent — une rencontre, son match,
+ * quelques champs — et on répond en quelques microsecondes.
+ *
+ * Même règle que l'empreinte, champ pour champ ; `npm run verify:ecriture-direct`
+ * rejoue des matchs entiers et vérifie que les deux répondent pareil.
+ */
+export function memeEtatDurable(avant: EtatCarriereEnLigne, apres: EtatCarriereEnLigne): boolean {
+  if (avant === apres) return true;
+  const x = avant as unknown as Record<string, unknown>, y = apres as unknown as Record<string, unknown>;
+  for (const cle of new Set([...Object.keys(x), ...Object.keys(y)])) {
+    if (cle === 'version' || x[cle] === y[cle]) continue;
+    if (cle !== 'rencontres') { if (!memeContenu(x[cle], y[cle])) return false; continue; }
+    const a = avant.rencontres, b = apres.rencontres;
+    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) if (!memeRencontreDurable(a[i], b[i])) return false;
+  }
+  return true;
+}
+
+function memeRencontreDurable(a: RencontreCarriere, b: RencontreCarriere): boolean {
+  if (a === b) return true;
+  const x = a as unknown as Record<string, unknown>, y = b as unknown as Record<string, unknown>;
+  for (const cle of new Set([...Object.keys(x), ...Object.keys(y)])) {
+    if (x[cle] === y[cle]) continue;
+    const enCours = cle === 'match' && a.match && b.match && !a.match.termine && !b.match.termine;
+    if (!enCours) { if (!memeContenu(x[cle], y[cle])) return false; continue; }
+    const m = a.match as unknown as Record<string, unknown>, n = b.match as unknown as Record<string, unknown>;
+    const sansGel = gelDerive(a.match!) && gelDerive(b.match!);
+    for (const champ of new Set([...Object.keys(m), ...Object.keys(n)])) {
+      if ((DERIVES_DU_DIRECT as readonly string[]).includes(champ) || (sansGel && champ === 'gel')) continue;
+      if (!memeContenu(m[champ], n[champ])) return false;
+    }
+  }
+  return true;
 }
 
 function statistiquesLigue(etat: EtatCarriereEnLigne) {
@@ -1729,12 +1803,14 @@ export function vueRencontreCarriere(
   etat: EtatCarriereEnLigne, compteId: string, matchId: string,
   /** L'écran rejoue le film du match : voir `filmDirect.ts`. */
   film?: { depuis?: number },
+  /** La réponse part aussitôt sur le réseau : inutile de recopier le fil et les temps forts. */
+  sansCopie = false,
 ): VueCarriereEnLigne['rencontres'][number] | null {
-  return vueRencontreInterne(etat, matchId, monClub(etat, compteId).id, film);
+  return vueRencontreInterne(etat, matchId, monClub(etat, compteId).id, film, sansCopie);
 }
 
 function vueRencontreInterne(
-  etat: EtatCarriereEnLigne, matchId: string, clubId: string, film?: { depuis?: number },
+  etat: EtatCarriereEnLigne, matchId: string, clubId: string, film?: { depuis?: number }, sansCopie = false,
 ): VueCarriereEnLigne['rencontres'][number] | null {
   const rencontre = etat.rencontres.find(r => r.id === matchId);
   if (!rencontre) return null;
@@ -1743,13 +1819,17 @@ function vueRencontreInterne(
   // recopier doublerait le coût de chaque sondage du direct.
   if (!match) return copier(publics);
   const { film: pas, ...vue } = vueMatchEnLigne(match, clubId, undefined, film);
+  // ⚠️ LE DIRECT NE RECOPIE PLUS SA RÉPONSE. Cloner deux cents lignes de fil à
+  // chaque sondage pour les sérialiser l'instant d'après coûtait autant que de
+  // les envoyer. La vue est un objet neuf ; ce qu'elle référence n'est que lu.
+  if (sansCopie) return { ...copier(publics), match: { ...vue, ...(pas ? { film: pas } : {}) } as ReturnType<typeof vueMatchEnLigne> };
   const copie = copier({ ...publics, match: vue as ReturnType<typeof vueMatchEnLigne> });
   if (pas && copie.match) copie.match.film = pas;
   return copie;
 }
 
 export function vueRencontreCarriereObservateur(
-  etat: EtatCarriereEnLigne, matchId: string, film?: { depuis?: number },
+  etat: EtatCarriereEnLigne, matchId: string, film?: { depuis?: number }, sansCopie = false,
 ): VueCarriereEnLigne['rencontres'][number] | null {
-  return vueRencontreInterne(etat, matchId, '', film);
+  return vueRencontreInterne(etat, matchId, '', film, sansCopie);
 }

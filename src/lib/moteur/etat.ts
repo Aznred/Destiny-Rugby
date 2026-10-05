@@ -293,6 +293,14 @@ export interface Vol {
   receveur: Pion | null;
   /** La façon de donner (cadence détaillée) : chistera, passe au contact, offload à une main, dans le dos… */
   variante?: string;
+  /**
+   * Ce que le vent a déplacé du point de chute (`vers` est le point RÉEL de
+   * retombée). La trajectoire s'en écarte comme le carré du temps : droite au
+   * départ, de plus en plus couchée à l'arrivée.
+   */
+  derive?: Vec;
+  /** Le ballon touche un poteau à l'instant `t` et repart vers `vers`. */
+  ricochet?: { t: number; vers: Vec };
 }
 
 /**
@@ -513,7 +521,9 @@ export interface EtatMatch {
   controleArcadeCamps?: Cote[];
   /** Défense du bot renforcée uniquement pour le match de collection. */
   defenseArcadeCote?: Cote;
-  dropEnCours?: { auteurId: string; reussi: boolean };
+  dropEnCours?: { auteurId: string; reussi: boolean;
+    /** IA par poste : comment il finit — dedans, sur le poteau, à côté, trop court, mal frappé, contré. */
+    issue?: string };
   /**
    * Les phases se jouent à leur rythme de terrain : mêlée complète, passes à
    * vitesse réelle, célébration puis rituel entier du buteur. Réservé au match
@@ -532,6 +542,22 @@ export interface EtatMatch {
    * annoncé. Un match de ligue en cours garde le niveau avec lequel il a commencé.
    */
   ia?: number;
+  /**
+   * LE VENT DU MATCH (IA par poste) : direction (radians, repère du stade),
+   * force moyenne (m/s) et graine des rafales, fixées au coup d'envoi. Trois
+   * champs à plat : ils voyagent tels quels dans le film d'un direct, et tout
+   * le reste s'en déduit (`moteur/vent.ts`).
+   */
+  ventDirection?: number;
+  ventForce?: number;
+  ventGraine?: number;
+  /**
+   * Seconde période : les équipes ont changé de côté. Le moteur garde son
+   * repère (A attaque vers les x croissants) ; c'est le STADE qui a tourné d'un
+   * demi-tour autour de lui — le vent souffle donc dans l'autre sens, et
+   * l'affichage retourne le terrain (bancs, tribunes, caméras).
+   */
+  cotesInverses?: boolean;
   /** La mémoire de l'arbitre, par camp fautif (IA par poste). */
   arbitrage?: Record<Cote, ArdoiseArbitre>;
   /**
@@ -580,7 +606,9 @@ export interface EtatMatch {
   gestes?: import('./dynamique.js').GesteMatch[];
   incidentApres?: number;
   fautesVues?: Record<string, boolean>;
-  piedPrepare?: { auteurId: string; arrivee: Vec; intention: IntentionPied; duree: number; hauteur: number; depuis: Vec; pretDepuis?: number; debut?: number; rapideArcade?: boolean };
+  piedPrepare?: { auteurId: string; arrivee: Vec; intention: IntentionPied; duree: number; hauteur: number; depuis: Vec; pretDepuis?: number; debut?: number; rapideArcade?: boolean;
+    /** Courbe déjà calculée pour ce coup de pied (drop : dérive du vent, poteau). */
+    courbe?: Pick<Vol, 'derive' | 'ricochet'> };
   clubA: string;
   clubB: string;
 
@@ -620,7 +648,14 @@ export interface EtatMatch {
   /** Combien de temps de jeu de suite vers le même côté : au-delà de trois, on renverse. */
   serieCote?: { cote: 1 | -1; n: number };
   /** Les trois avants qui se préparent à percuter près du ruck : la pointe, puis ses deux soutiens. */
-  blocPrepare?: { cote: Cote; ids: string[] } | null;
+  blocPrepare?: { cote: Cote; ids: string[];
+    /** IA par poste : à quelle distance du regroupement la cellule attend le ballon. */
+    profondeur?: 'courte' | 'standard' | 'profonde' } | null;
+  /**
+   * IA par poste : le 9 prépare son coup de pied derrière la chenille, qui reste
+   * liée jusqu'à la frappe. Le regroupement n'est défait qu'au départ du ballon.
+   */
+  chenilleTenue?: boolean;
   /** Identité de jeu de chaque équipe (cadence détaillée). */
   styles?: Record<Cote, StyleJeu>;
   phasesDepuisArret: number; // nombre de temps de jeu depuis la dernière phase arrêtée
@@ -710,8 +745,15 @@ export interface EtatMatch {
    * ils poussent) il faut savoir quelle fraction est écoulée.
    */
   dureeArret?: number;
+  /**
+   * Le renvoi se joue de la ligne d'essai (« renvoi d'en-but ») et non des 22 :
+   * abscisse de cette ligne. Absent : renvoi aux 22 mètres.
+   */
+  ligneRenvoi?: number;
   cibleRenvoi: Vec | null;   // où va tomber le coup d'envoi (sert au placement)
   tir: {
+    /** Comment le tir a fini (IA par poste) : dedans, poteau rentrant ou sortant, à gauche, à droite, trop court, sous la barre. */
+    issue?: string;
     buteur: Pion;
     distance: number;
     angle: number;

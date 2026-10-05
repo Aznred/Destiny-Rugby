@@ -62,7 +62,8 @@ import {
   chanceOffload, gesteDeContact, issueCrochet, issueRaffut, lirePlaquage, risqueOffload, varianteCrochet, varianteOffload,
   type LecturePlaquage,
 } from './duels.js';
-import { positionVol, GRAVITE_BALLON, viseeTir } from './trajectoire.js';
+import { positionVol, GRAVITE_BALLON, viseeTir, viseeTirVariee, type ContexteTir } from './trajectoire.js';
+import { creerVent, deriveDuVent, ventAuMoteur, ventMoyen, type Vent } from './vent.js';
 import {
   attaquantLibre, condense, defenseurPresent, espaceAutour, iaParPoste, situer,
 } from './ia/lecture.js';
@@ -381,6 +382,8 @@ export interface OptionsMatch {
   placementJoue?: boolean;
   /** Défense resserrée, de 0 à 1 : voir `EtatMatch.resserrement`. */
   resserrement?: number;
+  /** Le vent du match (IA par poste). Absent : tiré de la clé du match ; `null` : pas de vent. */
+  vent?: Vent | null;
   /** Niveau de l'IA de jeu (2 : IA par poste) : voir `EtatMatch.ia`. */
   ia?: number;
 }
@@ -520,6 +523,8 @@ export function creerMatch(
     placementJoue: options.placementJoue,
     resserrement: options.resserrement,
     ia: options.ia,
+    // Le vent : seulement avec l'IA par poste, et tiré à part des tirages du match.
+    ...((options.ia ?? 1) >= 2 && options.vent !== null ? ventDuMatch(options.vent ?? creerVent(cle)) : {}),
     styles: options.cadenceDetaillee || (options.ia ?? 1) >= 2 ? { A: styleDuClub(clubA), B: styleDuClub(clubB) } : undefined,
     scoreSurTerrain: options.scoreSurTerrain ?? true, meteoTir: options.meteoTir,
     niveau: options.niveau ?? 'pro',
@@ -643,7 +648,9 @@ function tick(e: EtatMatch): void {
         p.surLeTerrain = true;
         // IA par poste : il rentre d'où il attendait, au bord de la touche devant son
         // banc, et rejoint sa place en courant — il n'apparaît plus à hauteur du ballon.
-        p.pos = iaParPoste(e) ? { x: MILIEU + (p.cote === 'A' ? -9 : 9), y: LARGEUR - 0.3 }
+        p.pos = iaParPoste(e)
+          // Son banc est un lieu du STADE : après le changement de côté, il est en face.
+          ? { x: MILIEU + (p.cote === 'A' ? -9 : 9) * (e.cotesInverses ? -1 : 1), y: e.cotesInverses ? 0.3 : LARGEUR - 0.3 }
           : { x: e.ballon.x, y: p.numero <= 8 ? 4 : LARGEUR - 4 };
         stopper(p);
       }
@@ -860,6 +867,10 @@ function tick(e: EtatMatch): void {
     // saut ou des autres rituels restent parcourues avec l'inertie normale.
     // Le receveur d'une passe règle sa foulée sur le ballon : il peut retenir
     // sa course aussi sèchement qu'un soutien qui arrive sur un regroupement.
+    // ⚠️ PERSONNE NE COURT À TREIZE MÈTRES PAR SECONDE (IA par poste). Les efforts se
+    // multiplient (poursuite, rythme « intense », soutien) : un demi rapide et frais
+    // atteignait 12,7 m/s. La pointe de vitesse reste celle d'un sprinteur de rugby.
+    if (iaParPoste(e)) p.effort = Math.min(p.effort, 10.9 / Math.max(1, vitesseDisponible(p)));
     deplacer(p, dt, !!e.cadenceDetaillee && (p.role === 'ruck' || (e.vol?.type === 'passe' && e.vol.receveur === p)));
   }
   // Avec ballon porté, la collision est résolue APRÈS la course du porteur.
@@ -924,7 +935,7 @@ function tick(e: EtatMatch): void {
       delete e.placement[auteur.id];
       if (Object.keys(e.placement).length === 0) e.placement = null;
     }
-    lancerVol(e, auteur, attente.arrivee, attente.intention, attente.duree, attente.hauteur, auteur.pos, true);
+    lancerVol(e, auteur, attente.arrivee, attente.intention, attente.duree, attente.hauteur, auteur.pos, true, attente.courbe);
     return;
   }
 
@@ -1447,7 +1458,10 @@ function phaseRenvoi22(e: EtatMatch): void {
   const liste = surLeTerrain(e, camp);
   const botteur = liste.find((p) => p.buteur) ?? [...liste].sort((a, b) => b.pied - a.pied)[0] ?? liste[0];
   if (!botteur) return clorePeriode(e);
-  const depart = camp === 'A' ? M22_A : M22_B;
+  // Renvoi d'en-but : il part de la ligne d'essai, pas des 22.
+  const enBut = e.ligneRenvoi !== undefined;
+  const depart = e.ligneRenvoi ?? (camp === 'A' ? M22_A : M22_B);
+  delete e.ligneRenvoi;
   const arrivee = {
     x: depart + s * (28 + botteur.pied / 4 + e.rng() * 10),
     y: borner(AXE + (e.rng() * 30 - 15), 6, LARGEUR - 6),
@@ -1455,7 +1469,39 @@ function phaseRenvoi22(e: EtatMatch): void {
   botteur.stats.coupsDePied += 1;
   e.placement = null;
   lancerVol(e, botteur, arrivee, 'renvoi', 2.8, 10 + botteur.pied * .02, { x: depart, y: AXE });
-  dire(e, 'pied', camp, C.texteMatch('renvoi22Joueur', { nom: botteur.nom }), 0, botteur.moi);
+  dire(e, 'pied', camp, C.texteMatch(enBut ? 'renvoiEnButJoueur' : 'renvoi22Joueur', { nom: botteur.nom }), 0, botteur.moi);
+}
+
+/**
+ * ═══ QUELLE REPRISE APRÈS UN BALLON MORT DANS L'EN-BUT ? (IA par poste) ═══
+ *
+ * ⚠️ LE RENVOI AUX 22 N'EST PAS LA REPRISE PAR DÉFAUT. Le moteur le donnait pour
+ * tout ballon aplati ou sorti derrière la ligne. La règle regarde QUI y a
+ * envoyé le ballon, et COMMENT il est devenu mort :
+ *
+ *   - l'attaque l'y envoie (coup de pied, ballon porté puis tenu en-but) et la
+ *     défense le rend mort → RENVOI D'EN-BUT, de la ligne d'essai ;
+ *   - la défense l'y amène elle-même puis le rend mort → MÊLÉE À CINQ MÈTRES
+ *     pour l'attaque ;
+ *   - un tir au but ou un drop manqué qui meurt en-but → RENVOI AUX 22 ;
+ *   - un coup d'envoi ou un renvoi qui file en ballon mort → mêlée au point du
+ *     coup de pied, pour l'équipe qui recevait.
+ */
+type EntreeEnBut = 'attaque' | 'defense' | 'tir' | 'engagement';
+function reprendreApresEnBut(e: EtatMatch, defenseur: Cote, entree: EntreeEnBut, lieu: Vec = e.ballon, depuis?: Vec): void {
+  const s22 = { x: defenseur === 'A' ? M22_A : M22_B, y: AXE };
+  if (!iaParPoste(e) || entree === 'tir') { delete e.ligneRenvoi; return arret(e, 'renvoi22', defenseur, s22); }
+  if (entree === 'engagement') {
+    delete e.ligneRenvoi;
+    return arret(e, 'melee', defenseur, { x: borner(depuis?.x ?? MILIEU, LIGNE_A + 5, LIGNE_B - 5), y: AXE });
+  }
+  if (entree === 'defense') {
+    delete e.ligneRenvoi;
+    const x = defenseur === 'A' ? LIGNE_A + 5 : LIGNE_B - 5;
+    return arret(e, 'melee', adverse(defenseur), { x, y: borner(lieu.y, 6, LARGEUR - 6) });
+  }
+  e.ligneRenvoi = defenseur === 'A' ? LIGNE_A : LIGNE_B;
+  return arret(e, 'renvoi22', defenseur, { x: e.ligneRenvoi, y: AXE });
 }
 
 // ---------------------------------------------------------------------------
@@ -1492,11 +1538,13 @@ function poserVol(e: EtatMatch, vol: Vol): void {
 function lancerVol(
   e: EtatMatch, auteur: Pion, arrivee: Vec, intention: IntentionPied,
   duree: number, hauteur: number, depuis?: Vec, pret = false,
+  /** Courbe déjà calculée (drop : dérive du vent, poteau). */
+  courbe?: Pick<Vol, 'derive' | 'ricochet'>,
 ): void {
   if (!pret) {
     depuis ??= { ...auteur.pos };
     e.piedPrepare = { auteurId: auteur.id, arrivee: { ...arrivee }, intention, duree, hauteur, depuis: { ...depuis }, debut: e.sim,
-      rapideArcade: !!auteur.moi && !!e.controleArcadeCamps?.includes(auteur.cote) };
+      rapideArcade: !!auteur.moi && !!e.controleArcadeCamps?.includes(auteur.cote), ...(courbe ? { courbe } : {}) };
     auteur.cible = { ...depuis };
     (e.placement ??= {})[auteur.id] = { ...depuis };
     return;
@@ -1508,6 +1556,8 @@ function lancerVol(
   // RETOMBÉE : un 9 qui dégageait de ses 22 derrière une chenille puis montait
   // voyait sa touche jugée « directe » et ramenée là où il était arrivé.
   const de = depuis ? { x: depuis.x, y: depuis.y } : { x: auteur.pos.x, y: auteur.pos.y };
+  // Le ballon quitte le pied du 9 : la chenille se défait MAINTENANT, et la poursuite part.
+  if (e.chenilleTenue) { delete e.chenilleTenue; e.ruck = null; e.placement = null; }
   // La frappe termine le geste commencé pendant la préparation ; pas de
   // deuxième animation qui recommence après le départ du ballon.
 
@@ -1535,9 +1585,24 @@ function lancerVol(
   // Les adversaires ne sont jamais hors-jeu sur NOTRE coup de pied.
   for (const q of surLeTerrain(e, adverse(auteur.cote))) q.horsJeu = false;
 
+  // ═══ LE VENT (IA par poste) ════════════════════════════════════════════
+  // Le botteur a visé en comptant avec le vent MOYEN, plus ou moins bien selon
+  // son pied ; la rafale du moment et ce qu'il a mal lu déplacent la chute.
+  // Le vol garde la poussée entière (`derive`) : on voit le ballon se coucher.
+  // Les tirs et les drops ont déjà leur courbe (`viseeTirVariee`).
+  if (!courbe && iaParPoste(e) && (e.ventForce ?? 0) > 0.5) {
+    const lu = deriveDuVent(ventMoyen(e), duree, intention);
+    const reel = deriveDuVent(ventAuMoteur(e, e.t), duree, intention);
+    const lecture = borner((auteur.pied - 30) / 65, 0.2, 0.9);
+    arrivee = {
+      x: borner(arrivee.x + reel.x - lu.x * lecture, 0.5, LONGUEUR - 0.5),
+      y: arrivee.y + reel.y - lu.y * lecture,
+    };
+    courbe = { derive: reel };
+  }
   poserVol(e, {
     de, vers: arrivee, duree, ecoule: 0, hauteur,
-    type: 'pied', intention, auteur, receveur: null,
+    type: 'pied', intention, auteur, receveur: null, ...courbe,
   });
   auteur.stats.metresAuPied += Math.abs(arrivee.x - de.x);
   e.porteur = null;
@@ -1607,7 +1672,14 @@ function phaseBallonEnLAir(e: EtatMatch): void {
       return preparerCoupEnvoi(e, adverse(camp));
     }
     dire(e, 'butRate', camp, C.texteMatch('dropRate', { nom: v.auteur.nom }), 0, v.auteur.moi);
-    return arret(e, 'renvoi22', adverse(camp), { x: adverse(camp) === 'A' ? M22_A : M22_B, y: AXE });
+    // ⚠️ UN DROP MANQUÉ N'EST UN RENVOI AUX 22 QUE S'IL MEURT DANS L'EN-BUT
+    // (IA par poste). Trop court, contré ou mal frappé, le ballon reste en jeu :
+    // il se dispute comme n'importe quel coup de pied.
+    if (iaParPoste(e) && !franchieLigne(arrivee, camp)) {
+      v.intention = arrivee.x === v.de.x || v.duree < 0.6 ? 'rasant' : 'chandelle';
+    } else {
+      return arret(e, 'renvoi22', adverse(camp), { x: adverse(camp) === 'A' ? M22_A : M22_B, y: AXE });
+    }
   }
 
   // ── Sortie en touche ─────────────────────────────────────────────────────
@@ -1653,7 +1725,8 @@ function phaseBallonEnLAir(e: EtatMatch): void {
     if (v.intention === 'cinquanteVingtDeux' || v.intention === 'occupation') {
       dire(e, 'pied', camp, C.texteMatch('ballonEnBut'));
     }
-    return arret(e, 'renvoi22', defenseur, { x: defenseur === 'A' ? M22_A : M22_B, y: AXE });
+    return reprendreApresEnBut(e, defenseur,
+      v.intention === 'renvoi' ? 'engagement' : camp === defenseur ? 'defense' : 'attaque', arrivee, v.de);
   }
 
   // ── Réception contestée ──────────────────────────────────────────────────
@@ -1839,8 +1912,9 @@ function phaseBallonLibre(e: EtatMatch, dt: number): void {
   }
   if (e.ballon.x <= 0 || e.ballon.x >= LONGUEUR) {
     const defenseur: Cote = e.ballon.x <= LIGNE_A ? 'A' : 'B';
+    const envoyePar = libre.auteurCote;
     e.ballonLibre = null;
-    return arret(e, 'renvoi22', defenseur, { x: defenseur === 'A' ? M22_A : M22_B, y: AXE });
+    return reprendreApresEnBut(e, defenseur, envoyePar === defenseur ? 'defense' : 'attaque');
   }
 
   // Si le ballon traîne trop longtemps ou s'il est injouable, on ne fige jamais le match.
@@ -1901,7 +1975,7 @@ function phaseBallonLibre(e: EtatMatch, dt: number): void {
   }
   if ((e.ballon.x <= LIGNE_A && premier.cote === 'A')
     || (e.ballon.x >= LIGNE_B && premier.cote === 'B')) {
-    return arret(e, 'renvoi22', premier.cote, { x: premier.cote === 'A' ? M22_A : M22_B, y: AXE });
+    return reprendreApresEnBut(e, premier.cote, libre.auteurCote === premier.cote ? 'defense' : 'attaque');
   }
   dire(e, 'pied', premier.cote, `Le ballon vivant est récupéré par ${premier.nom}.`, 0, premier.moi);
   reprendreJeu(e, premier.pos, premier, undefined, undefined, undefined,
@@ -2356,11 +2430,13 @@ function soutenirLaPercee(e: EtatMatch): void {
     const q = trouver(id);
     return !!q && q !== p && q.cote === p.cote && attaquantLibre(q) && distance2(q.pos, p.pos) < 24 * 24;
   });
-  if (ids.length < 3) {
+  // En temps réel les percées sont huit fois plus nombreuses : moins de monde les accompagne.
+  const combien = condense(e) ? 3 : REGLAGES_IA.soutiensReel;
+  if (ids.length < combien) {
     const nouveaux = surLeTerrain(e, p.cote)
       .filter((q) => q !== p && attaquantLibre(q) && !ids.includes(q.id) && (q.pos.x - p.pos.x) * s < 3)
       .map((q) => ({ q, c: distance(q.pos, p.pos) - profilDe(q).suitLaPercee - (q.vitesseMax - 8) * 3 }))
-      .sort((a, b) => a.c - b.c).slice(0, 3 - ids.length).map((x) => x.q.id);
+      .sort((a, b) => a.c - b.c).slice(0, combien - ids.length).map((x) => x.q.id);
     ids = [...ids, ...nouveaux];
     const premier = trouver(nouveaux[0] ?? '');
     if (premier && e.cadenceDetaillee) jouerGeste(e, premier, 'call_ball', 0.9, premier.pos.y > p.pos.y ? 'g' : 'd');
@@ -2875,6 +2951,16 @@ function coteDeLaPhaseSuivante(e: EtatMatch): 1 | -1 {
 // passe — un avant sur trois recevait encore à l'arrêt (mesuré : 27 réceptions
 // sur 79 servies par le 9). Il attend plus bas et vise la hauteur du ballon.
 const BLOC = { lateral: 4.8, attente: 5.2, lance: 0.9, epaule: 1.2, soutien: 0.9 };
+/**
+ * Trois profondeurs de cellule (IA par poste) : courte, collée au
+ * regroupement ; standard ; profonde, plus large et plus loin — celle qui
+ * prend le ballon avec le plus d'élan.
+ */
+const PROFONDEURS_DE_BLOC = {
+  courte: { lateral: 3.2, attente: 3.8 },
+  standard: { lateral: 5.0, attente: 5.4 },
+  profonde: { lateral: 7.2, attente: 7.2 },
+} as const;
 
 /**
  * LE BLOC D'AVANTS SE FORME PENDANT LE RUCK.
@@ -2900,6 +2986,16 @@ function preparerBloc(e: EtatMatch, cote: Cote, plaqueId?: string): void {
   const percuteur = [...libres].sort((a, b) => a.stats.courses - b.stats.courses)[0];
   const soutiens = libres.filter((p) => p !== percuteur).slice(0, 2);
   e.blocPrepare = { cote, ids: [percuteur.id, soutiens[0].id, soutiens[1].id] };
+  if (iaParPoste(e)) {
+    // La cellule n'est pas toujours la même : près de la ligne ou pour une équipe
+    // d'avants elle se serre ; une équipe qui joue au large la recule.
+    const style = e.styles?.[cote] ?? 'equilibre';
+    const pres = metresAvantLaLigne(e.ballon, cote) < 15;
+    const t = e.rng();
+    const courte = pres ? 0.6 : style === 'avants' ? 0.45 : 0.25;
+    const profonde = pres ? 0.05 : style === 'large' || style === 'leurres' ? 0.35 : 0.2;
+    e.blocPrepare.profondeur = t < courte ? 'courte' : t > 1 - profonde ? 'profonde' : 'standard';
+  }
 }
 
 /** Les trois avants du bloc rejoignent leur place, puis attendent le ballon en appui. */
@@ -2920,18 +3016,30 @@ function placerBloc(e: EtatMatch): void {
   // ballon déjà sorti : une réception sur cinq se faisait encore à l'arrêt.
   // Elle s'élance désormais dans la dernière demi-seconde du ruck, pour
   // prendre le ballon lancée.
-  const lance = (enAttente && e.gardeRuck < 0.85) || (enRuck && e.minuteur < 0.6);
+  const ia = iaParPoste(e);
+  // ⚠️ LA CELLULE PART DU RUCK, PAS DE LA PASSE (IA par poste). Six dixièmes de
+  // seconde ne suffisaient pas à couvrir quatre mètres : la pointe recevait
+  // encore en accélérant, et l'on voyait le trio démarrer quand le ballon
+  // partait. Elle s'élance le temps qu'il lui FAUT pour arriver lancée à la
+  // hauteur du ballon quand il sort, soutiens à l'épaule ; ballon sorti, elle
+  // ne ralentit plus — le demi la sert dans sa course (`attendLaCourse`).
+  const prof = ia ? PROFONDEURS_DE_BLOC[bloc.profondeur ?? 'standard'] : BLOC;
+  const elan = 0.1 + (prof.attente - 0.2) / 5.4;
+  const lance = ia ? (enAttente || (enRuck && e.minuteur < elan))
+    : (enAttente && e.gardeRuck < 0.85) || (enRuck && e.minuteur < 0.6);
   bloc.ids.forEach((id, i) => {
     const p = e.pions.find((q) => q.id === id);
     if (!p || !p.surLeTerrain || p.sanction > 0 || p.corps || p.role === 'ruck' || p === e.porteur) return;
     const cote = i === 0 ? 0 : i === 1 ? -1 : 1;
     p.role = 'podRas';
+    // Lancée : jusqu'à la hauteur du ballon tant qu'il est au sol, au-delà dès qu'il est sorti.
+    const avance = !lance ? -prof.attente : !ia ? -BLOC.lance : enAttente ? 3 : -0.2;
     p.cible = {
       // Dès que le demi arme, la pointe monte sur le ballon : elle le prendra lancée.
-      x: bornerLong(ancre.x - s * ((lance ? BLOC.lance : BLOC.attente) + (i === 0 ? 0 : BLOC.soutien))),
-      y: borner(ancre.y + e.ouvert * BLOC.lateral + cote * BLOC.epaule, 2, LARGEUR - 2),
+      x: bornerLong(ancre.x + s * (avance - (i === 0 ? 0 : BLOC.soutien))),
+      y: borner(ancre.y + e.ouvert * prof.lateral + cote * BLOC.epaule, 2, LARGEUR - 2),
     };
-    p.effort = lance ? 0.96 : 0.9;
+    p.effort = !lance ? 0.9 : ia ? (i === 0 ? 1.08 : 1.04) : 0.96;
   });
 }
 
@@ -3631,7 +3739,7 @@ export function probaPlaquage(
   );
   // Défense resserrée (ligue en ligne, règles 2) : une part des plaquages
   // manqués ne l'est plus. Voir `EtatMatch.resserrement`.
-  return e.resserrement ? 1 - (1 - chance) * (1 - 0.6 * borner(e.resserrement, 0, 1)) : chance;
+  return e.resserrement ? 1 - (1 - chance) * (1 - 0.6 * borner(e.resserrement, 0, 1.5)) : chance;
 }
 
 /**
@@ -3666,7 +3774,7 @@ function avantageDuPorteur(e: EtatMatch, porteur: Pion, defenseur: Pion): number
     if (d === defenseur || d.cote !== defenseur.cote || !defenseurPresent(e, d)) continue;
     if (distance2(d.pos, porteur.pos) < 1.9 * 1.9) { a -= R.aDeux; break; }
   }
-  return a * (condense(e) ? R.condense : 1);
+  return a * (condense(e) ? R.condense : R.avantageReel);
 }
 
 /**
@@ -3883,7 +3991,7 @@ function resoudrePlaquage(
     const venuDuPied = !!e.derniereTouche && e.derniereTouche.cote !== camp && e.phasesDepuisArret === 0;
     if (venuDuPied) {
       dire(e, 'plaquage', defenseur.cote, `${porteur.nom} est repris dans son en-but par ${defenseur.nom} : renvoi pour ${nomClub(e, camp)}.`, 0, porteur.moi || defenseur.moi);
-      return arret(e, 'renvoi22', camp, { x: camp === 'A' ? M22_A : M22_B, y: AXE });
+      return reprendreApresEnBut(e, camp, 'attaque');
     }
     dire(e, 'plaquage', defenseur.cote, `${porteur.nom} est plaqué dans son propre en-but : mêlée à cinq mètres pour ${nomClub(e, defenseur.cote)}.`, 0, porteur.moi || defenseur.moi);
     return arret(e, 'melee', defenseur.cote, { x: ligneDefendue(camp) + sens(camp) * 5, y: porteur.pos.y });
@@ -4140,8 +4248,10 @@ function formerRuck(
   // IA par poste : les soutiens déjà à l'épaule du porteur font un ballon rapide ; un porteur isolé, un ballon lent.
   const soutiensAuContact = !iaParPoste(e) ? -1 : surLeTerrain(e, attaque)
     .filter((p) => p !== contact?.porteur && attaquantLibre(p) && distance2(p.pos, e.ballon) < 4.5 * 4.5).length;
-  const elanDuSoutien = soutiensAuContact < 0 ? 0 : soutiensAuContact >= 2 ? REGLAGES_IA.soutienDeux
+  const elanBrut = soutiensAuContact < 0 ? 0 : soutiensAuContact >= 2 ? REGLAGES_IA.soutienDeux
     : soutiensAuContact === 1 ? REGLAGES_IA.soutienUn : REGLAGES_IA.soutienAucun;
+  // En temps réel, le soutien accélère moins le ballon : il y a huit fois plus de regroupements.
+  const elanDuSoutien = elanBrut > 0 && !condense(e) ? elanBrut * REGLAGES_IA.soutienReel : elanBrut;
   const lent = vitesseDefense + (e.rng() - 0.5) * 12 > vitesseAttaque - 3 + avantage * 2.2 + elanDuSoutien;
   e.ballonLent = lent;
   e.minuteur = ((lent ? 4.0 : 2.25) + e.rng() * (lent ? 1.5 : 0.9)) * (1 - 0.07 * avantage);
@@ -4215,7 +4325,14 @@ function phaseRuck(e: EtatMatch): void {
     const neuf = e.pions.find(p => p.id === chenille.neufId && p.surLeTerrain && p.sanction <= 0 && !p.corps);
     const pret = chenille.pretDepuis !== undefined && e.sim - chenille.pretDepuis >= 1.5;
     if (neuf && pret) {
-      e.ruck = null; e.placement = null;
+      // ⚠️ LA CHENILLE NE SE DÉFAIT PLUS AVANT LA FRAPPE (IA par poste). Le
+      // regroupement était dissous à l'instant où le 9 commençait son geste :
+      // les avants quittaient la file une seconde avant que le ballon parte, et
+      // le 9 tapait derrière une structure déjà dispersée. Elle reste liée ;
+      // c'est le départ du ballon qui la libère (`lancerVol`), et la poursuite
+      // ne démarre qu'à ce moment-là.
+      const tenue = iaParPoste(e);
+      if (!tenue) { e.ruck = null; e.placement = null; }
 
       // 🏉 CONTRE SUR LA CHENILLE (1 chance sur 12 ~ 8.3%, calibré entre 1/10 et 1/15)
       // Un défenseur monte en flèche et contre la boîte au pied du 9 au bout de la chenille
@@ -4225,6 +4342,7 @@ function phaseRuck(e: EtatMatch): void {
       const contreur = defenseurs[0];
 
       if (contreur && e.rng() < 1 / 12) {
+        e.ruck = null; e.placement = null;
         jouerGeste(e, contreur, 'charge_down', 1.4);
         jouerGeste(e, neuf, 'kick', 0.8);
         contreur.effort = 1.15;
@@ -4254,7 +4372,10 @@ function phaseRuck(e: EtatMatch): void {
 
       // Derrière ses 22, la chenille sert à dégager en touche et à remonter
       // le terrain ; ailleurs, le 9 conserve sa boîte au pied dans le champ.
+      if (tenue) e.chenilleTenue = true;
       taperAuPied(e, neuf, dansSes22(neuf.pos, neuf.cote) ? 'degagement' : 'chandelle');
+      // Le coup de pied n'a pas pu se préparer (ballon déjà parti autrement) : rien ne reste tenu.
+      if (tenue && !e.piedPrepare) { delete e.chenilleTenue; if (e.phase !== 'ruck') { e.ruck = null; e.placement = null; } }
       return;
     }
     if (neuf && e.sim - chenille.debut < 10) { e.minuteur = Math.max(e.minuteur, .15); return; }
@@ -4297,6 +4418,12 @@ function phaseRuck(e: EtatMatch): void {
     // ballon rapide, pas le chronomètre.
     if (iaParPoste(e) && attente < 2.6 && !e.pions.some((p) => p.surLeTerrain && p.sanction <= 0 && !p.corps
       && p.cote === e.possession && p.id !== e.ruck?.porteurId && distance(p.pos, e.ballon) < PORTEE_SORTIE)) {
+      // Et quelqu'un y VA : le plus proche encore debout vient sortir le ballon
+      // (`placerRegroupement` l'y conduit). Attendre sans envoyer personne,
+      // c'était finir par le donner à l'ouvreur resté cinq mètres plus loin.
+      organisation.secoursId ??= surLeTerrain(e, e.possession)
+        .filter((p) => p.sanction <= 0 && !p.corps && p.id !== e.ruck?.porteurId)
+        .sort((a, b) => distance2(a.pos, e.ballon) - distance2(b.pos, e.ballon))[0]?.id;
       organisation.attenteSortie = attente + DT;
       return;
     }
@@ -4350,8 +4477,8 @@ function phaseRuck(e: EtatMatch): void {
   // vrai match) — aucune séquence ne tenait six temps de jeu. Deux soutiens
   // arrivés sur le ballon le protègent ; un porteur isolé reste une proie.
   const arrives = nettoyeurs.filter((p) => !p.corps && distance2(p.pos, e.ballon) < 2.4 * 2.4).length;
-  const protection = !iaParPoste(e) ? 1 : arrives >= 2 ? REGLAGES_IA.protectionDeux
-    : arrives === 1 ? REGLAGES_IA.protectionUn : REGLAGES_IA.protectionAucun;
+  const protection = !iaParPoste(e) ? 1 : (arrives >= 2 ? REGLAGES_IA.protectionDeux
+    : arrives === 1 ? REGLAGES_IA.protectionUn : REGLAGES_IA.protectionAucun) * (condense(e) ? 1 : REGLAGES_IA.protectionReel);
   const disciplineGratteur = gratteur?.discipline ?? 50;
   const malPlace = !gratteur || distance(gratteur.pos, e.ballon) > 3.4;
 
@@ -4466,7 +4593,24 @@ function phaseRuck(e: EtatMatch): void {
 
   e.ruck = null;
   e.placement = null;
-  reprendreJeu(e, e.ballon, undefined, 3.0, plaqueAuSolId, relayeur);
+  // ⚠️ UN BALLON GRATTÉ SE RAMASSE (IA par poste). Après un grattage ou un contre-ruck,
+  // personne du camp qui le gagne n'est parfois debout dessus : il était donné à
+  // l'ouvreur, resté cinq mètres plus loin. Le voleur le joue s'il est debout sur
+  // le ballon ; sinon il reste au sol, et le premier arrivé le prend.
+  let premierAuBallon = relayeur;
+  if (iaParPoste(e) && e.cadenceDetaillee && e.dernierTurnover?.t === e.t && e.dernierTurnover.pion.cote === e.possession) {
+    const voleur = e.dernierTurnover.pion;
+    const debout = (p: Pion) => p.surLeTerrain && p.sanction <= 0 && !p.corps && distance(p.pos, e.ballon) < 3.2;
+    if (debout(voleur)) premierAuBallon = voleur;
+    else if (!surLeTerrain(e, e.possession).some(debout)) {
+      const sol = { ...e.ballon };
+      return demarrerBallonLibre(e, {
+        de: sol, vers: { x: sol.x - sens(e.possession) * 1.2, y: sol.y }, duree: 0.3, ecoule: 0.3, hauteur: 0.1,
+        type: 'passe', intention: 'passe', auteur: voleur, receveur: null,
+      });
+    }
+  }
+  reprendreJeu(e, e.ballon, undefined, 3.0, plaqueAuSolId, premierAuBallon);
 }
 
 /**
@@ -4484,7 +4628,8 @@ function poserLesRetards(e: EtatMatch, defense: Cote): void {
   const R = REGLAGES_IA;
   const rapide = !e.ballonLent;
   const sa = sens(adverse(defense));
-  const duree = (rapide ? R.retardRapide : R.retardLent) * (e.ruck?.eclair ? 1.35 : 1) + e.rng() * (rapide ? 0.8 : 0.2);
+  const duree = ((rapide ? R.retardRapide : R.retardLent) * (e.ruck?.eclair ? 1.35 : 1) + e.rng() * (rapide ? 0.8 : 0.2))
+    * (condense(e) ? 1 : R.retardReel);
   const engages = new Set([e.ruck?.plaqueurId, ...(e.ruck?.organisation?.defense ?? [])]);
   const retards: Record<string, number> = {};
   for (const p of surLeTerrain(e, defense)) {
@@ -4523,7 +4668,7 @@ function deciderLaMontee(e: EtatMatch, attaque: Cote, lieu: Vec): void {
     if (n < note) { note = n; choisi = d; }
   }
   if (!choisi) return;
-  const chance = REGLAGES_IA.monteeSeul * (1.6 - note / 100) * (condense(e) ? REGLAGES_IA.condense : 1);
+  const chance = REGLAGES_IA.monteeSeul * (1.6 - note / 100) * (condense(e) ? REGLAGES_IA.condense : REGLAGES_IA.avantageReel);
   if (e.rng() < chance) e.monteeSeul = { id: choisi.id, jusqua: e.sim + 2.4 };
 }
 
@@ -4652,7 +4797,9 @@ function arret(e: EtatMatch, quoi: Phase, pour: Cote, lieu: Vec, enAvant = false
     }
     e.compteurs.melees += 1;
   } else if (quoi === 'renvoi22') {
-    installerPlacement(e, placementRenvoi22(e.pions, pour === 'A' ? M22_A : M22_B, pour));
+    // Un renvoi demandé ailleurs que sur la ligne d'essai est un renvoi aux 22.
+    if (Math.abs(lieu.x - (pour === 'A' ? LIGNE_A : LIGNE_B)) > 2) delete e.ligneRenvoi;
+    installerPlacement(e, placementRenvoi22(e.pions, e.ligneRenvoi ?? (pour === 'A' ? M22_A : M22_B), pour));
   } else {
     e.placement = null;
   }
@@ -5198,7 +5345,9 @@ function preparerToucheRapide(e: EtatMatch, pour: Cote): boolean {
   const s = sens(pour);
   const bord = e.ballon.y < AXE ? 0 : LARGEUR;
   const versTerrain = bord === 0 ? 1 : -1;
-  const point = { x: borner(e.ballon.x, LIGNE_A + 5, LIGNE_B - 5), y: bord + versTerrain * 0.6 };
+  // ⚠️ LES DEUX PIEDS HORS DU TERRAIN : la remise rapide se fait de derrière la
+  // ligne de touche, au point de sortie (jamais devant lui).
+  const point = { x: borner(e.ballon.x, LIGNE_A + 5, LIGNE_B - 5), y: bord - versTerrain * 0.45 };
   const miens = surLeTerrain(e, pour).filter((p) => p.sanction <= 0 && !p.corps);
   const lanceur = [...miens].sort((a, b) => distance2(a.pos, point) - distance2(b.pos, point))[0];
   if (!lanceur) return false;
@@ -5211,13 +5360,24 @@ function preparerToucheRapide(e: EtatMatch, pour: Cote): boolean {
   }
   // L'adversaire est déjà là, ou y sera avant le lanceur : alignement.
   if (adversaire < 9 || adversaire < trajet + 3) return false;
+  // ⚠️ LA REMISE RAPIDE NE VA JAMAIS VERS L'AVANT, ET LE BALLON FAIT CINQ MÈTRES :
+  // le partenaire est à hauteur du point de remise ou derrière lui, à plus de
+  // cinq mètres de la ligne de touche.
   const receveur = miens
-    .filter((q) => q !== lanceur && Math.abs(q.pos.y - bord) >= 6.5 && (q.pos.x - point.x) * s <= 1 && distance2(q.pos, point) < 24 * 24)
+    .filter((q) => q !== lanceur && Math.abs(q.pos.y - bord) >= 6.5 && (q.pos.x - point.x) * s <= -0.3 && distance2(q.pos, point) < 24 * 24)
     .sort((a, b) => distance2(a.pos, point) - distance2(b.pos, point))[0];
   if (!receveur) return false;
   const S = situer(e, pour, point);
-  const envie = (S.zone === 'ses22' ? 0.3 : 0.6) * goutDe(e, pour).mains
-    * (S.posture === 'gestion' ? 0.3 : S.posture === 'urgence' ? 1.5 : 1);
+  // On la joue vite quand la défense n'est pas revenue et que le partenaire a du champ ;
+  // on attend l'alignement quand elle couvre, ou qu'un maul près de la ligne vaut mieux.
+  const revenus = surLeTerrain(e, adverse(pour)).filter((d) => d.sanction <= 0 && !d.corps && distance2(d.pos, point) < 20 * 20).length;
+  const champ = espaceAutour(e, adverse(pour), receveur.pos);
+  if (champ < 5) return false;
+  const gout = goutDe(e, pour);
+  const envie = (S.zone === 'ses22' ? 0.3 : 0.6) * gout.mains
+    * (S.posture === 'gestion' ? 0.3 : S.posture === 'urgence' ? 1.5 : 1)
+    * (revenus <= 2 ? 1.4 : revenus >= 5 ? 0.4 : 1) * (champ >= 10 ? 1.3 : 1)
+    * (S.zone === 'zoneDeMarque' || S.zone === 'ligne' ? (gout.avants > gout.mains ? 0.2 : 0.5) : 1);
   if (e.rng() >= envie) return false;
   e.ballon = { ...point };
   e.placement = { [lanceur.id]: { ...point } };
@@ -5282,7 +5442,15 @@ function phaseToucheRapide(e: EtatMatch): void {
   e.gardeRuck = 0.6;
   e.origine = { x: lanceur.pos.x, y: lanceur.pos.y };
   // La remise en jeu part tout de suite, à deux mains — si le partenaire est
-  // resté derrière la ligne de remise. Sinon le lanceur garde le ballon et joue.
+  // resté derrière la ligne de remise, à plus de cinq mètres. Sinon la remise
+  // rapide n'est plus permise : l'alignement se forme.
+  const bordRemise = point.y < AXE ? 0 : LARGEUR;
+  if ((receveur.pos.x - lanceur.pos.x) * s > 0.1 || Math.abs(receveur.pos.y - bordRemise) < 5.2) {
+    e.lancement = null; e.porteur = null;
+    e.compteurs.touches -= 1;
+    dire(e, 'touche', cote, `${receveur.nom} n’est plus derrière la ligne de remise : la touche se jouera en alignement.`);
+    return arret(e, 'touche', cote, { x: point.x, y: bordRemise });
+  }
   if (e.porteur === lanceur && (receveur.pos.x - lanceur.pos.x) * s <= 0.3 && distance2(receveur.pos, lanceur.pos) < 24 * 24
     && passerLeBallon(e, lanceur, receveur, 9)) {
     jouerGeste(e, lanceur, 'pass', 0.9, 'remise');
@@ -5544,6 +5712,31 @@ function majAttroupement(e: EtatMatch): void {
   });
 }
 
+/**
+ * CE QUE LE VENT RETIRE À UN TIR AU BUT (IA par poste) : un vent de travers
+ * coûte à toutes les distances, un vent de face surtout de loin, un vent dans
+ * le dos rend un peu. Huit mètres par seconde de travers : onze points.
+ */
+function malusDuVent(e: EtatMatch, cote: Cote, distance: number): number {
+  if (!iaParPoste(e) || !(e.ventForce ?? 0)) return 0;
+  const v = ventMoyen(e), s = sens(cote);
+  const dos = v.x * s, travers = Math.abs(v.y);
+  return travers * 0.014 + Math.max(0, -dos) * 0.010 * Math.min(1.6, distance / 35) - Math.max(0, dos) * 0.004;
+}
+
+/** Ce qui donne sa manière à un tir : le buteur, sa fraîcheur, le vent, la pression. */
+function contexteDuTir(e: EtatMatch, buteur: Pion): ContexteTir {
+  const v = ventAuMoteur(e, e.t), s = sens(buteur.cote);
+  // La façon de frapper tient au joueur : tirée de son identifiant, la même tout le match.
+  let h = 7;
+  for (let i = 0; i < buteur.id.length; i++) h = (h * 31 + buteur.id.charCodeAt(i)) % 9973;
+  return {
+    puissance: buteur.puissance, precision: buteur.pied, fraicheur: buteur.endurance, style: (h / 9973) * 2 - 1,
+    ventDos: v.x * s, ventTravers: v.y,
+    pression: e.minute >= 65 && Math.abs(e.scoreA - e.scoreB) <= 7 ? 1 : e.minute >= 38 && e.minute <= 40 ? 0.4 : 0,
+  };
+}
+
 // Probabilité de réussite d'un tir au but selon la distance et l'angle.
 function probaTir(dist: number, ecartAxe: number, pied: number): number {
   const base = 0.97 - Math.max(0, dist - 20) / 62 - (ecartAxe / AXE) * 0.22;
@@ -5553,7 +5746,7 @@ function probaTir(dist: number, ecartAxe: number, pied: number): number {
 /** Même calcul pour la décision affichée et le tir réellement joué. */
 export function probabilitePenalite(e: EtatMatch, buteur: Pion, distance: number, angle: number): number {
   const pression = e.minute >= 65 && Math.abs(e.scoreA - e.scoreB) <= 7 ? 0.06 : 0;
-  const meteo = e.meteoTir === 'pluie' ? 0.08 : e.meteoTir === 'vent' ? 0.13 : 0;
+  const meteo = (e.meteoTir === 'pluie' ? 0.08 : e.meteoTir === 'vent' ? 0.13 : 0) + malusDuVent(e, buteur.cote, distance);
   return borner(probaTir(distance, angle, buteur.pied)
     - (100 - buteur.endurance) * 0.0018 - meteo - pression
     + (buteur.pied - 60) / 350, 0.04, 0.97);
@@ -5736,6 +5929,8 @@ function phasePenalite(e: EtatMatch): void {
   if (e.porteur) jouerGeste(e, e.porteur, 'tap', 1.1);
 }
 
+const ventDuMatch = (v: Vent) => ({ ventDirection: v.direction, ventForce: v.force, ventGraine: v.graine });
+
 type TirEnCours = NonNullable<EtatMatch['tir']>;
 
 /** Lance un vrai ballon vers les poteaux, réussi ou légèrement à côté. */
@@ -5774,16 +5969,24 @@ function lancerTrajectoireTir(e: EtatMatch, tir: TirEnCours, reussi: boolean): v
   // ballon vu dehors. `viseeTir` vise la traversée du plan des poteaux
   // elle-même : entre les deux et au-dessus de la barre si le tir est réussi,
   // à gauche, à droite ou trop court sinon. Trois tirages, comme avant.
-  const { vers, duree } = viseeTir(de, buteur.cote, reussi, e.rng(), e.rng(), e.rng());
-  const hauteur = borner(5.8 + Math.hypot(vers.x - de.x, vers.y - de.y) * 0.08, 6.8, 9.5);
+  // IA par poste : chaque tir a sa manière (hauteur, marge, vent, poteau). Trois tirages, comme avant.
+  const visee = iaParPoste(e)
+    ? viseeTirVariee(de, buteur.cote, reussi, e.rng(), e.rng(), e.rng(), contexteDuTir(e, buteur))
+    : viseeTir(de, buteur.cote, reussi, e.rng(), e.rng(), e.rng());
+  const { vers, duree } = visee;
+  // La hauteur suit le temps de vol (`poserVol`) : on ne l'impose plus quand le tir a sa propre courbe.
+  const hauteur = iaParPoste(e) ? 0.5 : borner(5.8 + Math.hypot(vers.x - de.x, vers.y - de.y) * 0.08, 6.8, 9.5);
   void s;
   tir.reussi = reussi;
+  tir.issue = visee.issue;
   tir.volLance = true;
   buteur.stats.coupsDePied += 1;
   poserVol(e, {
     de: { ...de }, vers,
     duree, ecoule: 0, hauteur,
     type: 'pied', intention: 'drop', auteur: buteur, receveur: null,
+    ...('derive' in visee && visee.derive ? { derive: visee.derive } : {}),
+    ...('ricochet' in visee && visee.ricochet ? { ricochet: visee.ricochet } : {}),
   });
   e.porteur = null;
   e.minuteur = duree;
@@ -5973,10 +6176,8 @@ function tenterEssai(e: EtatMatch, marqueur: Pion, origine: 'jeu' | 'maul' = 'je
       const defSauveur = defenseursEnBut[0];
       dire(e, 'jalon', adverse(cote), `🛑 SAUVETAGE HÉROÏQUE SUR LA LIGNE ! ${defSauveur.nom} et la défense se glissent sous le ballon : BALLON TENU EN-BUT !`, 0, true);
       pousserElan(e, adverse(cote), POUSSEES.turnover);
-      return arret(e, 'renvoi22', adverse(cote), {
-        x: adverse(cote) === 'A' ? M22_A : M22_B,
-        y: AXE,
-      });
+      // Tenu en-but : l'attaque y a porté le ballon, la défense l'a rendu mort.
+      return reprendreApresEnBut(e, adverse(cote), 'attaque');
     }
   }
 
@@ -6310,10 +6511,7 @@ function phaseTMO(e: EtatMatch): void {
         return siffler(e, coteDefense, action.lieu, 'jeu déloyal au départ de l\'action');
       }
       dire(e, 'jalon', null, `❌ TMO DÉCISION : Ballon non aplati et tenu en-but ! L’essai est REFUSÉ.`);
-      return arret(e, 'renvoi22', coteDefense, {
-        x: coteDefense === 'A' ? M22_A : M22_B,
-        y: AXE,
-      });
+      return reprendreApresEnBut(e, coteDefense, 'attaque');
     }
 
     tmo.decision = 'essai_accorde';
@@ -6473,6 +6671,18 @@ function reprendreJeu(
   let candidats = lancement.chaine;
   if (excluPremierId && candidats[0]?.id === excluPremierId) {
     candidats = candidats.filter((p) => p.id !== excluPremierId);
+  }
+  // ⚠️ LE BALLON D'UN REGROUPEMENT EST JOUÉ PAR QUELQU'UN QUI Y EST (IA par poste).
+  // Sans relayeur désigné, le premier maillon pouvait être l'ouvreur, cinq mètres
+  // plus loin : le ballon lui apparaissait dans les mains. Celui qui est au pied
+  // du ruck le sort, et écarte.
+  if (iaParPoste(e) && e.cadenceDetaillee && !porteurImpose && contexte !== 'reception' && candidats[0] && distance(candidats[0].pos, lieu) > 3.2) {
+    const present = liste.filter((p) => p.id !== excluPremierId && p.sanction <= 0 && !p.corps && distance(p.pos, lieu) <= 3.2)
+      .sort((a, b) => distance2(a.pos, lieu) - distance2(b.pos, lieu))[0];
+    if (present) {
+      lancement.chaine = [present, ...lancement.chaine.filter((p) => p !== present)];
+      candidats = lancement.chaine;
+    }
   }
   const premier = (porteurImpose && porteurImpose.id !== excluPremierId ? porteurImpose : null)
     ?? candidats[0]
@@ -6960,6 +7170,30 @@ function taperAuPied(e: EtatMatch, p: Pion, intention: IntentionPied): void {
       const plan = planDe(e, p.cote);
       p.stats.butsTentes += 1;
       const d = metresAvantLaLigne(p.pos, p.cote) + 11;
+      if (iaParPoste(e)) {
+        // ═══ LE DROP SE TAPE SOUS LA MONTÉE DE LA DÉFENSE ═══════════════════
+        // Il n'a pas le temps d'un tir posé : le rideau arrive pendant le
+        // lâcher. Plus le premier défenseur est près, plus il peut être contré
+        // ou mal frappé ; le vent pèse comme sur une pénalité.
+        const libre = pressionDevant(e, p);
+        const chance = borner(probaTir(d, Math.abs(p.pos.y - AXE), p.pied) - 0.10 - malusDuVent(e, p.cote, d)
+          - Math.max(0, 7 - libre) * 0.035 - (100 - p.endurance) * 0.001, 0.05, 0.9);
+        const contre = libre < 3.4 && e.rng() < (3.4 - libre) * 0.2;
+        const malFrappe = !contre && e.rng() < 0.05 + Math.max(0, 6 - libre) * 0.02 + (100 - p.pied) / 900;
+        const reussi = !contre && !malFrappe && !!(e.scoreSurTerrain || plan.penalites > 0) && e.rng() < chance;
+        if (contre || malFrappe) {
+          // Contré : le ballon heurte le défenseur et retombe à ses pieds. Mal frappé : il part bas, sans longueur.
+          const r = e.rng();
+          const vers = contre
+            ? { x: borner(p.pos.x + s * (1.5 + r * 2.5), 1, LONGUEUR - 1), y: borner(p.pos.y + (e.rng() - 0.5) * 5, 1, LARGEUR - 1) }
+            : { x: borner(p.pos.x + s * (9 + r * 9), 1, LONGUEUR - 1), y: borner(p.pos.y + (e.rng() - 0.5) * 12, 1, LARGEUR - 1) };
+          e.dropEnCours = { auteurId: p.id, reussi: false, issue: contre ? 'contre' : 'malFrappe' };
+          return lancerVol(e, p, vers, 'drop', contre ? 0.45 : 1.1, contre ? 0.3 : 0.5, undefined, false, {});
+        }
+        const visee = viseeTirVariee(p.pos, p.cote, reussi, e.rng(), e.rng(), e.rng(), contexteDuTir(e, p));
+        e.dropEnCours = { auteurId: p.id, reussi, issue: visee.issue };
+        return lancerVol(e, p, visee.vers, 'drop', visee.duree, .5, undefined, false, { derive: visee.derive, ricochet: visee.ricochet });
+      }
       const reussi = !!(e.scoreSurTerrain || plan.penalites > 0)
         && e.rng() < probaTir(d, Math.abs(p.pos.y - AXE), p.pied);
       e.dropEnCours = { auteurId: p.id, reussi };
@@ -7247,6 +7481,10 @@ function clorePeriode(e: EtatMatch): void {
 function phaseMiTemps(e: EtatMatch): void {
   if (e.minuteur > 0) return;
   dire(e, 'jalon', null, C.texteMatch('deuxiemeMiTemps'));
+  // ⚠️ ON CHANGE DE CÔTÉ (IA par poste). Le moteur garde son repère ; c'est le stade
+  // qui tourne autour de lui : le vent souffle désormais dans l'autre sens, et
+  // l'affichage retourne le terrain. Voir `EtatMatch.cotesInverses`.
+  if (iaParPoste(e)) e.cotesInverses = true;
   // L'équipe qui n'a pas engagé en début de match engage la seconde période.
   preparerCoupEnvoi(e, adverse(e.possession));
 }

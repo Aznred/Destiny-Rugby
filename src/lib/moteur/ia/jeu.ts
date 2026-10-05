@@ -136,7 +136,7 @@ export function choisirLeJeu(e: EtatMatch, cote: Cote, a: Acteurs, apresArret: b
   const pied = g.pied * (rapide ? 0.7 : 1.3) * (phases >= 5 && z !== 'zoneDeMarque' && z !== 'ligne' ? 1.45 : 1)
     * (posture === 'urgence' ? 0.05 : posture === 'gestion' ? (chezSoi ? 1.5 : 0.5) : posture === 'prudent' ? 1.25 : 1)
     // Hors de ses 22, un match condensé occupe moins au pied : chaque ballon rendu y pèse quatre fois plus.
-    * (condense(e) && z !== 'ses22' ? REGLAGES_IA.occupationCondensee : 1);
+    * (z === 'ses22' ? 1 : condense(e) ? REGLAGES_IA.occupationCondensee : REGLAGES_IA.piedReel);
 
   const decalage = L.milieu.att + L.large.att - L.milieu.def - L.large.def;
   const sLarge = surnombre(L.large);
@@ -263,10 +263,26 @@ export function choisirLeJeu(e: EtatMatch, cote: Cote, a: Acteurs, apresArret: b
     }));
   }
   // Le drop : il se prépare quand trois points suffisent. Ailleurs, il reste une rareté.
-  if (libre(a.dix) && a.dix.pied >= 55 && aPorteeDeTir(e.ballon, cote)) {
-    const dix = a.dix;
-    const envie = posture === 'troisPoints' ? (phases >= 2 ? 4 : 1.2)
-      : S.restantes <= 25 && Math.abs(S.diff) <= 3 ? 0.14 : dix.pied >= 72 ? 0.035 : 0;
+  // Qui le tape : l'ouvreur, ou l'arrière s'il a un meilleur pied et que le 10 est pris.
+  const dropeur = [a.dix, a.quinze].filter((p): p is Pion => !!p && libre(p) && p.pied >= 55).sort((x, y) => y.pied - x.pied)[0];
+  if (dropeur && aPorteeDeTir(e.ballon, cote)) {
+    const dix = dropeur;
+    // Un match condensé compte quatre fois moins de temps de jeu : « plusieurs phases » y arrive plus tôt.
+    const longue = condense(e) ? 3 : 6;
+    const serre = Math.abs(S.diff) <= 7;
+    // 1. Trois points changent le match : on le prépare dès le deuxième temps de jeu.
+    let envie = posture === 'troisPoints' ? (phases >= 2 ? 4 : 1.2) : 0;
+    // 2. Juste avant la pause, pour ne pas rentrer bredouille.
+    if (e.periode === 1 && e.minute >= 38 && phases >= 2) envie = Math.max(envie, serre ? 1.1 : 0.5);
+    // 3. La défense ne cède pas : plusieurs temps de jeu devant les 22 sans avancer.
+    if (phases >= longue && (e.avantage ?? 0) <= 0 && S.distLigne < 32) envie = Math.max(envie, (serre ? 0.9 : 0.4) * (dix.pied / 70));
+    // 4. Devant de peu en fin de match : se mettre à l'abri d'une pénalité.
+    if (S.restantes <= 12 && S.diff >= 1 && S.diff <= 4 && phases >= 2) envie = Math.max(envie, 0.8);
+    // 5. Ailleurs, un très bon pied le tente de loin en loin dans un match serré.
+    if (!envie) envie = S.restantes <= 25 && Math.abs(S.diff) <= 3 ? 0.14 : dix.pied >= 72 ? 0.035 : 0;
+    // Dans l'axe et près des poteaux, on le prend plus volontiers ; excentré, presque jamais.
+    const axe = Math.abs(e.ballon.y - AXE);
+    envie *= (axe < 8 ? 1.3 : axe > 13 ? 0.45 : 1) * (S.distLigne < 26 ? 1.2 : 1) * (posture === 'urgence' ? 0.05 : 1);
     ajouter('drop', envie, () => ({
       type: 'pied', chaine: [d, dix], index: 0, botteur: dix, intention: 'drop', jeu: 'drop', libelle: 'drop',
     }));
@@ -311,7 +327,8 @@ export function relireLeJeu(e: EtatMatch, porteur: Pion, pression: number): Rele
   const offensif = z === 'campAdverse' || z === 'zoneDeMarque';
   const pied = porteur.pied;
   // Ce que vaut un coup de pied offensif dans cette situation de match.
-  const envieDePied = g.pied * (S.posture === 'urgence' ? (z === 'zoneDeMarque' ? 0.5 : 0.12) : S.posture === 'gestion' ? 0.3 : S.posture === 'prudent' ? 0.3 : 1);
+  const reel = condense(e) ? 1 : REGLAGES_IA.piedReel;
+  const envieDePied = reel * g.pied * (S.posture === 'urgence' ? (z === 'zoneDeMarque' ? 0.5 : 0.12) : S.posture === 'gestion' ? 0.3 : S.posture === 'prudent' ? 0.3 : 1);
 
   const options: { r: Relecture; poids: number }[] = [{ r: null, poids: 1 + (decalage >= 1 ? 0.6 : 0) }];
   const ajouter = (r: Relecture, poids: number) => { if (poids > 0.002) options.push({ r, poids }); };
@@ -337,7 +354,7 @@ export function relireLeJeu(e: EtatMatch, porteur: Pion, pression: number): Rele
   // Rien d'ouvert, dans son camp, après plusieurs temps : on rend le ballon loin.
   if ((z === 'sonCamp' || z === 'milieu') && decalage <= -1 && e.phasesDepuisArret >= 3 && pied >= 52) {
     ajouter({ type: 'pied', intention: L.fond <= 1 ? 'occupation' : 'chandelle' },
-      0.5 * g.pied * (S.posture === 'urgence' ? 0.05 : S.posture === 'gestion' ? 1.6 : 1));
+      0.5 * reel * g.pied * (S.posture === 'urgence' ? 0.05 : S.posture === 'gestion' ? 1.6 : 1));
   }
   // La sautée : le suivant est marqué de près, celui d'après ne l'est pas.
   if (reste.length >= 2 && attaquantLibre(reste[1]) && distance(porteur.pos, reste[1].pos) < 26) {
@@ -394,7 +411,7 @@ export function choisirLaRelance(e: EtatMatch, porteur: Pion): Lancement | null 
   if (porteur.pied >= 48) {
     options.push({
       poids: (pres > 5 ? 1 : 0.35) * g.pied * (S.zone === 'ses22' ? 2.4 : S.zone === 'sonCamp' ? 1.15 : 0.3) * (urgence ? 0.08 : gestion ? 1.6 : 1)
-        * (condense(e) && S.zone !== 'ses22' ? REGLAGES_IA.occupationCondensee : 1),
+        * (S.zone === 'ses22' ? 1 : condense(e) ? REGLAGES_IA.occupationCondensee : REGLAGES_IA.piedReel),
       faire: () => ({
         type: 'pied', chaine: [porteur], index: 0, botteur: porteur, jeu: 'piedRetour', libelle: 'réponse au pied',
         intention: S.zone === 'ses22' ? 'degagement'

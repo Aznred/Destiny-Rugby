@@ -93,7 +93,8 @@ export function noterFaute(e: EtatMatch, fautif: Cote, lieu: Vec, motif: string)
  */
 export function graviteDeLaFaute(e: EtatMatch, motif: string, j: JugementFaute): { jaune: number; rouge: number } {
   const m = motif.toLowerCase();
-  const severite = e.niveau === 'amateur' ? 1.5 : 1;
+  // En temps réel les fautes sont quatre fois plus nombreuses : chacune pèse moins lourd.
+  const severite = (e.niveau === 'amateur' ? 1.5 : 1) * (condense(e) ? 1 : REGLAGES_IA.cartonsReel);
   // Devant sa ligne, empêcher l'attaque de jouer est une faute cynique.
   const surSaLigne = j.deSaLigne < 12 ? 1 : j.deSaLigne < 24 ? 0.45 : 0;
   if (m.includes('coup de poing') || m.includes('brutalité')) return { jaune: 1, rouge: 0.45 };

@@ -8,6 +8,7 @@ import {
   abreviationTV, DUREE_EQUIPE_TV, DUREE_LIGNE_TV, LIGNES_TV, logoTV, PALETTE_TV, PALETTE_TOP14, tempsTV, texteSurCouleur,
   type EquipeTV, type ExclusionTV, type IdentiteTV, type JoueurTV, type PaletteTV,
 } from '../../lib/habillageTV';
+import type { MarqueurTV, PhraseTV, VentTV } from '../../lib/statsTV';
 import './HabillageTV.css';
 
 const palettes = new Map<string, Partial<PaletteTV>>();
@@ -164,6 +165,33 @@ export function CartonTV({ identite, joueur, motif }: { identite: IdentiteTV; jo
   </aside>;
 }
 
+/** Après l'essai : le marqueur, son portrait, son poste, et la statistique qu'un réalisateur glisserait dessous. */
+export interface MarqueurAffiche extends MarqueurTV { club: string; photo?: string | null; stat?: PhraseTV }
+export function BandeauMarqueurTV({ identite, marqueur }: { identite: IdentiteTV; marqueur: MarqueurAffiche }) {
+  return <aside className="btv-carton btv-marqueur" role="status">
+    <LogoLigueTV identite={identite} />
+    <div className="btv-portrait"><PortraitTV joueur={marqueur} club={marqueur.club} /><b>{marqueur.numero}</b></div>
+    <div><small>{t('tv.essai')} · {marqueur.club}</small><strong>{marqueur.nom}</strong>
+      <span>{[nomDuPoste(marqueur.numero) ?? marqueur.poste, marqueur.stat ? t(marqueur.stat.cle, marqueur.stat.vars) : undefined]
+        .filter((texte): texte is string => !!texte).join(' · ')}</span></div>
+  </aside>;
+}
+
+/** Une petite information de retransmission, glissée pendant le jeu. */
+export function BulleStatTV({ phrase }: { phrase: PhraseTV }) {
+  return <aside className="btv-bulle" role="status"><i aria-hidden="true" /><span>{t(phrase.cle, phrase.vars)}</span></aside>;
+}
+
+/** Le vent devant un tir posé : la flèche est vue par le buteur, poteaux en haut. */
+export function VentTVPastille({ vent }: { vent: VentTV }) {
+  return <aside className="btv-vent" role="status" aria-label={`${t('tv.vent')} ${t('tv.kmh', { n: vent.kmh })}`}>
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" style={{ transform: `rotate(${vent.angle}rad)` }}>
+      <path d="M12 3 L12 21 M12 3 L6.5 9 M12 3 L17.5 9" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+    <div><small>{t('tv.vent')}</small><strong>{t('tv.kmh', { n: vent.kmh })}</strong></div>
+  </aside>;
+}
+
 /** Ce que l'arbitre vient de siffler (pénalité, en-avant, passe en avant) : même bandeau qu'un carton, sans le carton. */
 export interface SiffletTV { cle: string; club: string; fautif?: string; motif?: string }
 export function BandeauSiffletTV({ identite, sifflet }: { identite: IdentiteTV; sifflet: SiffletTV }) {
@@ -176,7 +204,9 @@ export function BandeauSiffletTV({ identite, sifflet }: { identite: IdentiteTV; 
 
 /** La même couche TV pour le moteur local et le film du direct en ligne. */
 export function HabillageTV({ identite = {}, equipes, seconde, periode = 1, phase, exclusions, joueurs = [],
-  presentation, surPasser, termine = false, motifCarton, pause = false, sifflet }: {
+  presentation, surPasser, termine = false, motifCarton, pause = false, sifflet, marqueur, bulle, vent }: {
+  /** Le marqueur de l'essai en cours de célébration, la bulle du moment, le vent devant un tir (`lib/statsTV.ts`). */
+  marqueur?: MarqueurAffiche | null; bulle?: PhraseTV | null; vent?: VentTV | null;
   /** Le coup de sifflet en cours, tel que le moteur le porte ; un carton a son propre bandeau. */
   sifflet?: (SiffletTV & { restant?: number }) | null;
   identite?: IdentiteTV; equipes: [EquipeTV, EquipeTV]; seconde: number; periode?: number; phase?: string;
@@ -234,6 +264,28 @@ export function HabillageTV({ identite = {}, equipes, seconde, periode = 1, phas
     const timer = window.setTimeout(() => setBandeau(null), 6500);
     return () => window.clearTimeout(timer);
   }, [bandeau, pause]);
+  // Le marqueur reste à l'image six secondes, même si la célébration est plus courte.
+  const [marqueurVu, setMarqueurVu] = useState<MarqueurAffiche | null>(null);
+  const cleMarqueur = marqueur ? `${marqueur.id}:${marqueur.essaisDuMatch}` : null;
+  const dernierMarqueur = useRef<MarqueurAffiche | null>(null);
+  if (marqueur) dernierMarqueur.current = marqueur;
+  useEffect(() => { if (cleMarqueur) setMarqueurVu(dernierMarqueur.current); }, [cleMarqueur]);
+  useEffect(() => {
+    if (!marqueurVu || pause) return;
+    const timer = window.setTimeout(() => setMarqueurVu(null), 6000);
+    return () => window.clearTimeout(timer);
+  }, [marqueurVu, pause]);
+  // Une bulle : six secondes, et jamais par-dessus un bandeau.
+  const [bulleVue, setBulleVue] = useState<PhraseTV | null>(null);
+  const cleBulle = bulle ? `${bulle.cle}|${Object.values(bulle.vars).join('|')}` : null;
+  const derniereBulle = useRef<PhraseTV | null>(null);
+  if (bulle) derniereBulle.current = bulle;
+  useEffect(() => { if (cleBulle) setBulleVue(derniereBulle.current); }, [cleBulle]);
+  useEffect(() => {
+    if (!bulleVue || pause) return;
+    const timer = window.setTimeout(() => setBulleVue(null), 6500);
+    return () => window.clearTimeout(timer);
+  }, [bulleVue, pause]);
   const etape = presentation === undefined ? null : presentation < 3 ? 'affiche' : presentation < 3 + DUREE_EQUIPE_TV ? 'A' : 'B';
   const cote = etape === 'B' ? 'B' : 'A';
   const compo = useMemo(() => joueurs.filter(p => p.cote === cote), [joueurs, cote]);
@@ -244,7 +296,10 @@ export function HabillageTV({ identite = {}, equipes, seconde, periode = 1, phas
       : etape === 'affiche' ? <AfficheTV identite={identite} equipes={equipes} avant />
       : etape ? <CompositionTV identite={identite} equipe={equipes[cote === 'A' ? 0 : 1]} joueurs={compo} ligne={ligne} />
       : bandeau !== null ? <AfficheTV identite={identite} equipes={equipes} periode={bandeau} />
-      : annonce && <BandeauSiffletTV key={`${annonce.cle}|${annonce.club}|${annonce.fautif ?? ''}`} identite={identite} sifflet={annonce} />}
+      : marqueurVu ? <BandeauMarqueurTV key={`${marqueurVu.id}:${marqueurVu.essaisDuMatch}`} identite={identite} marqueur={marqueurVu} />
+      : annonce ? <BandeauSiffletTV key={`${annonce.cle}|${annonce.club}|${annonce.fautif ?? ''}`} identite={identite} sifflet={annonce} />
+      : bulleVue && !etape && <BulleStatTV key={`${bulleVue.cle}|${Object.values(bulleVue.vars).join('|')}`} phrase={bulleVue} />}
+    {vent && !etape && !carton && <VentTVPastille vent={vent} />}
     {etape && surPasser && <button className="btv-passer" onClick={surPasser}>{t('tv.passer')} <span aria-hidden="true">→</span></button>}
   </div>;
 }

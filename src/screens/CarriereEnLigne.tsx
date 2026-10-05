@@ -69,7 +69,8 @@ import type { Affinite, AffiniteCarte } from '../lib/ligue/collectifCarriere';
 import { ModaleMarche } from '../components/ModaleMarche';
 import { PACKS_CARRIERE, packsBoutiqueDuJour } from '../lib/ligue/catalogueCarriere';
 import { tn, texteTraduit, locale, nombre, t } from '../lib/i18n';
-import { fusionnerDeltaDirect, fusionnerVueLigue } from '../lib/ligue/fusionDirect';
+import { fusionnerDeltaDirect, fusionnerVueLigue, presencesAcquittees } from '../lib/ligue/fusionDirect';
+import type { ContexteStatsTV } from '../lib/statsTV';
 import { reperesFilm } from '../lib/ligue/filmDirect';
 import { photoReelle } from '../lib/avatars';
 import type { AfficheDirect } from '../components/match/TerrainEnDirect';
@@ -586,8 +587,12 @@ export function CarriereEnLigne() {
         const directActif = suivi && derniereVue.current?.rencontres.some(r => r.id === suivi && r.match && !r.match.termine);
         if (directActif) {
           // On annonce le dernier pas du film déjà reçu : le serveur n'envoie que la suite.
-          const delta = await chargerDirectCarriere(ligueId, suivi, controleur.signal, connue, reperesFilm.get(suivi) ?? null);
+          // Et les repères des parties lentes que l'écran affiche vraiment : fil,
+          // temps forts et banc ne repartent que lorsqu'ils ont changé.
+          const tenus = derniereVue.current?.rencontres.find(r => r.id === suivi)?.match?.reperesDirect ?? '';
+          const delta = await chargerDirectCarriere(ligueId, suivi, controleur.signal, connue, reperesFilm.get(suivi) ?? null, tenus);
           echecs = 0;
+          if (delta.presence) presencesAcquittees.set(suivi, Date.now());
           if (actif && version === versionRequete.current) {
             // La fusion refuse aussi une réponse de direct plus ancienne ayant
             // la même version : chrono, score et fil ne peuvent plus reculer.
@@ -1264,6 +1269,8 @@ function Direct({ vue, rencontre: r, agir, occupe, fermer }: { vue: VueCarriereE
     let presenceEnCours = false;
     const signaler = () => {
       if (document.hidden || presenceEnCours) return;
+      // Le sondage du direct vaut présence quand le serveur le dit : pas de requête de plus.
+      if (Date.now() - (presencesAcquittees.get(matchId) ?? 0) < 30_000) return;
       presenceEnCours = true;
       void signalerPresenceCarriere(vue.id, matchId).catch(() => {}).finally(() => { presenceEnCours = false; });
     };
@@ -1299,6 +1306,22 @@ function Direct({ vue, rencontre: r, agir, occupe, fermer }: { vue: VueCarriereE
     }
     return p;
   }, [vue.cartes, r.domicile, r.exterieur]);
+  // ⚠️ LES STATISTIQUES DE L'HABILLAGE NE DEMANDENT RIEN AU SERVEUR. Essais et
+  // matchs des cartes, confrontations et séries sortent de la vue de la ligue
+  // déjà chargée ; pendant le match, le reste se lit sur le film.
+  const contexteTV = useMemo<ContexteStatsTV>(() => {
+    const joueurs: NonNullable<ContexteStatsTV['joueurs']> = {};
+    for (const c of vue.cartes) {
+      if (c.proprietaire === r.domicile || c.proprietaire === r.exterieur) joueurs[c.nom] = { essais: c.essais, matchs: c.matchs };
+    }
+    const jouees = vue.rencontres.filter(x => x.resultat && x.id !== r.id).sort((a, b) => Date.parse(b.ferme) - Date.parse(a.ferme));
+    const vainqueur = (x: typeof jouees[number]) => (x.resultat!.pointsD === x.resultat!.pointsE ? null : x.resultat!.pointsD > x.resultat!.pointsE ? x.domicile : x.exterieur);
+    const dernieres = jouees
+      .filter(x => (x.domicile === r.domicile && x.exterieur === r.exterieur) || (x.domicile === r.exterieur && x.exterieur === r.domicile))
+      .slice(0, 6).map(x => { const v = vainqueur(x); return v === r.domicile ? 'A' as const : v === r.exterieur ? 'B' as const : 'N' as const; });
+    const serie = (club: string) => { let n = 0; for (const x of jouees) { if (x.domicile !== club && x.exterieur !== club) continue; if (vainqueur(x) === club) n++; else break; } return n; };
+    return { joueurs, confrontations: { dernieres }, serieA: serie(r.domicile), serieB: serie(r.exterieur) };
+  }, [vue.cartes, vue.rencontres, r.id, r.domicile, r.exterieur]);
   const horlogeServeur = m?.horloge ?? 0;
   const ancre = useRef({ horloge: horlogeServeur, recu: Date.now() });
   useEffect(() => { ancre.current = { horloge: horlogeServeur, recu: Date.now() }; }, [horlogeServeur]);
@@ -1354,7 +1377,7 @@ function Direct({ vue, rencontre: r, agir, occupe, fermer }: { vue: VueCarriereE
     <DirectCinema key={`${m.id}:${m.instance ?? ''}`} match={m} domicile={nomClub(vue,r.domicile)} exterieur={nomClub(vue,r.exterieur)} couleurs={couleurs}
       identite={{ nom: vue.competitions.find(c => c.id === r.competitionId)?.nom ?? vue.nom,
         logo: vue.competitions.find(c => c.id === r.competitionId)?.logo ?? vue.logo, journee: r.journee }}
-      stade={stadeDomicile} portraits={portraits} emblemes={{ domicile: emblemeDomicile, exterieur: emblemeExterieur }} surAffiche={setAffiche}
+      stade={stadeDomicile} portraits={portraits} contexteTV={contexteTV} emblemes={{ domicile: emblemeDomicile, exterieur: emblemeExterieur }} surAffiche={setAffiche}
       /* ⚠️ ON N'EST RÉVEILLÉ QUE DANS LES 50 MÈTRES ADVERSES (`METRES_DECISION`).
          Le serveur ne propose plus une décision sur chacune des vingt-quatre
          pénalités d'un match — à soixante-dix mètres des poteaux, « je prends

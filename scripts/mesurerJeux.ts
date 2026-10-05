@@ -11,6 +11,7 @@ import { avancer, creerMatch } from '../src/lib/moteur/moteur';
 import { effectifDuClub } from '../src/lib/effectif';
 import type { EtatMatch } from '../src/lib/moteur/etat';
 import { sens } from '../src/lib/moteur/terrain';
+import { REGLAGES_IA } from '../src/lib/moteur/ia/reglages';
 
 const PAIRES: [string, string][] = [
   ['Stade Toulousain', 'RC Toulon'], ['Stade Rochelais', 'Racing 92'], ['Union Bordeaux-Bègles', 'ASM Clermont'],
@@ -18,6 +19,10 @@ const PAIRES: [string, string][] = [
 ];
 const N = Number(process.argv[2] ?? 24);
 const IA = Number(process.argv[3] ?? 2);
+/** --ligue : quatre-vingts minutes réelles, comme un match de ligue en règles 3. */
+const LIGUE = process.argv.includes('--ligue');
+const ESSAI = process.argv.find((a) => a.startsWith('--reglages='));
+if (ESSAI) for (const paire of ESSAI.slice('--reglages='.length).split(',')) { const [cle, valeur] = paire.split(':'); (REGLAGES_IA as Record<string, number>)[cle] = Number(valeur); }
 
 interface Bilan { n: number; metres: number; essais: number; rucks: number; perdus: number; penalitesPour: number; penalitesContre: number; pieds: number; touches: number; zoneMarque: number }
 const bilans: Record<string, Bilan> = {};
@@ -34,8 +39,8 @@ const departs: Record<string, number> = {};
 for (let k = 0; k < N; k++) {
   const [a, b] = PAIRES[k % PAIRES.length];
   const e = creerMatch(a, b, effectifDuClub(a, 1), effectifDuClub(b, 1), 24, 20, `rugby-${k}`, undefined,
-    { niveau: 'pro', scoreSurTerrain: true, cadenceDetaillee: true, placementJoue: true, ia: IA } as never);
-  e.carriereDixMinutes = true;
+    { niveau: 'pro', scoreSurTerrain: true, cadenceDetaillee: true, placementJoue: true, ia: IA, ...(LIGUE ? { tempsReel: true, resserrement: 1 } : {}) } as never);
+  if (!LIGUE) e.carriereDixMinutes = true;
   let courant: { jeu: string; cote: string; depart: number; ruck: 'eclair' | 'rapide' | 'lent' | null } | null = null;
   let lancementPrec: unknown = null, phasePrec = '', essais = 0, penalites = 0, dernierRuck: 'eclair' | 'rapide' | 'lent' | null = null;
   let dansLes22: string | null = null;

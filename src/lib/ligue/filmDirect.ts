@@ -95,6 +95,8 @@ export interface FilmDirect {
 const SCALAIRES = [
   'phase', 'possession', 'dureeArret', 'fini', 'scoreA', 'scoreB', 'essaisA', 'essaisB', 'systeme',
   'phasesDepuisArret', 'ligneAvantage', 'metresGagnesPhase', 'ballonLent', 'ouvert', 'periode', 'sirene', 'placementJoue',
+  // Le vent (trois nombres fixés au coup d'envoi) et le changement de côté : l'écran en déduit tout le reste.
+  'ventDirection', 'ventForce', 'ventGraine', 'cotesInverses',
 ] as const;
 /**
  * ⚠️ LES OBJETS DONT L'IDENTITÉ COMPTE. L'affichage reconnaît un nouveau ruck,

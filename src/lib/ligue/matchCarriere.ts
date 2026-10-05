@@ -81,6 +81,7 @@ import type { CompositionManager, PosteId, TactiqueManager } from '../../types.j
 import type { Coequipier } from '../effectif.js';
 import { graine } from './aleatoire.js';
 import { cadrerFilm, extraireFilm, filmer, poidsFilm, type FilmDirect } from './filmDirect.js';
+import { marqueurDepuisEtat, ventPourLeTir, type MarqueurTV, type VentTV } from '../statsTV.js';
 
 /** Les deux camps, nommés comme la rencontre les nomme. */
 export type CoteEnLigne = 'domicile' | 'exterieur';
@@ -334,6 +335,11 @@ export interface VolDirect {
 export interface TerrainDirect {
   /** Discipline de tous les joueurs, y compris ceux sortis de la pelouse. */
   exclusionsTV?: ExclusionTV[];
+  /** Le marqueur pendant la célébration, et le vent devant un tir posé (habillage TV). */
+  marqueurTV?: MarqueurTV;
+  ventTV?: VentTV;
+  /** Les équipes ont changé de côté (seconde période) : le terrain s'affiche retourné. */
+  cotesInverses?: boolean;
   periode?: 1 | 2;
   simulation?: number;
   gestes?: import('../moteur/dynamique.js').GesteMatch[];
@@ -513,8 +519,10 @@ export interface EtatMatchEnLigne {
    * le moteur d'origine — mêlées et touches installées d'un coup, phases sur
    * minuterie. 2 : le placement se joue (personne n'est déplacé d'un coup, la
    * phase attend ses joueurs) et le match suit la cadence détaillée des matchs
-   * en trois dimensions. Une rencontre en cours au moment d'une mise en ligne
-   * garde donc son moteur, et son score déjà annoncé.
+   * en trois dimensions. 3 : les règles 2, plus l'IA par poste des matchs de
+   * carrière (`moteur/ia/`), étalonnée pour quatre-vingts minutes réelles.
+   * Une rencontre en cours au moment d'une mise en ligne garde donc son
+   * moteur, et son score déjà annoncé.
    */
   regles?: number;
 }
@@ -524,13 +532,19 @@ export interface EtatMatchEnLigne {
  * ⚠️ LA REMETTRE À 1 SUFFIT À REVENIR EN ARRIÈRE pour les prochains matchs :
  * ceux déjà créés gardent les leurs.
  */
-export const REGLES_MATCH_EN_LIGNE = 2;
+export const REGLES_MATCH_EN_LIGNE = 3;
 /**
  * Défense resserrée des règles 2 : la cadence détaillée marque davantage, ce
  * réglage ramène le nombre d'essais à celui des matchs de ligue d'avant
  * (mesuré : voir `scripts/mesurerReglesLigue.ts`).
  */
 export const RESSERREMENT_REGLES_2 = 1;
+/**
+ * Le niveau d'IA du moteur (`EtatMatch.ia`) que demande une règle de match.
+ * ⚠️ Une retouche de l'IA par poste change la rejoue des matchs en règles 3
+ * déjà commencés : la porter par un nouveau niveau, donc une nouvelle règle.
+ */
+export const iaDesRegles = (regles: number | undefined): number | undefined => ((regles ?? 1) >= 3 ? 2 : undefined);
 
 /** Ce que le client reçoit : jamais la graine, jamais le plan d'en face. */
 export interface VueMatchEnLigne {
@@ -540,6 +554,8 @@ export interface VueMatchEnLigne {
   /** Identite du coup d'envoi : distingue une vraie relance d'une vieille reponse. */
   instance?: number;
   terrain?: TerrainDirect;
+  /** Côté écran seulement : les repères des parties lentes réellement affichées (`fusionDirect.ts`). */
+  reperesDirect?: string;
   /**
    * Les pas du moteur depuis le dernier que l'écran connaît (`filmDirect.ts`).
    * Envoyé À LA PLACE du relevé `terrain` quand l'écran le demande.
@@ -716,7 +732,10 @@ const MOTEUR_VERS_COTE: Record<Cote, CoteEnLigne> = { A: 'domicile', B: 'exterie
  * limite si les commentaires d'un match deviennent exceptionnellement longs.
  */
 const CACHE_MAX = 512;
-const CACHE_OCTETS_MAX = 96 * 1024 * 1024;
+// ⚠️ 96 Mio tenaient 190 directs REGARDÉS (un moteur filmé pèse 0,5 Mio) : au-delà, les
+// moteurs sortaient du cache et chaque sondage rejouait son match depuis le coup
+// d'envoi — mesuré à 300 matchs, 30 ms par requête au lieu de 4,5 et un film troué.
+const CACHE_OCTETS_MAX = 256 * 1024 * 1024;
 let cacheOctets = 0;
 const cleCache = (etat: EtatMatchEnLigne) => `${etat.cle}#${etat.journal.length}`;
 
@@ -865,6 +884,7 @@ function monter(etat: EtatMatchEnLigne): EtatMatch {
   const strategieD = strategieA(etat, 'domicile', 0);
   const strategieE = strategieA(etat, 'exterieur', 0);
   const regles2 = (etat.regles ?? 1) >= 2;
+  const niveauIA = iaDesRegles(etat.regles);
   const e = creerMatch(
     equipes.domicile.nom, equipes.exterieur.nom,
     equipes.domicile.feuille, equipes.exterieur.feuille,
@@ -878,6 +898,8 @@ function monter(etat: EtatMatchEnLigne): EtatMatch {
       // Règles 2 : voir `EtatMatchEnLigne.regles`.
       cadenceDetaillee: regles2, placementJoue: regles2,
       resserrement: regles2 ? RESSERREMENT_REGLES_2 : undefined,
+      // Règles 3 : l'IA par poste. Le niveau est figé avec la règle du match.
+      ...(niveauIA ? { ia: niveauIA } : {}),
       compositionA: equipes.domicile.feuille, compositionB: equipes.exterieur.feuille,
       tactiqueA: tactiqueDepuisStrategie(strategieD), tactiqueB: tactiqueDepuisStrategie(strategieE),
       capitaineAId: equipes.domicile.capitaineId, capitaineBId: equipes.exterieur.capitaineId,
@@ -1100,6 +1122,7 @@ export function extraireTerrain(
   const terrain: TerrainDirect = {
     exclusionsTV: exclusionsDepuisEtat(e),
     periode: e.periode,
+    ...(e.cotesInverses ? { cotesInverses: true } : {}),
     pions: e.pions.filter((p) => p.surLeTerrain).map((p) => ({
       id: p.id, numero: p.numeroMaillot ?? p.numero, numeroRole: p.numero, nom: p.nom, poste: p.poste,
       cote: MOTEUR_VERS_COTE[p.cote],
@@ -1146,6 +1169,11 @@ export function extraireTerrain(
     emisLe,
     snapshot: Math.max(0, Math.round(e.t / 0.6)),
   };
+  // L'habillage TV : le marqueur tant que dure sa célébration, le vent devant un tir posé.
+  const marqueurTV = marqueurDepuisEtat(e);
+  if (marqueurTV) terrain.marqueurTV = marqueurTV;
+  const ventTV = ventPourLeTir(e);
+  if (ventTV) terrain.ventTV = ventTV;
   if (e.lancement) {
     terrain.lancement = { type: e.lancement.type };
     if (e.combinaisonEnCours) terrain.lancement.combinaison = e.lancement.libelle;
@@ -1387,7 +1415,12 @@ export function commanderMatchEnLigne(
 
   // La décision se prend à la minute où le jeu est arrêté, pas à celle qu'il
   // serait sans l'arrêt : sinon l'ordre serait daté après la reprise.
-  const horloge = etat.decision && etat.decision.cote === cote
+  // ⚠️ ET LE CHRONO EST ARRÊTÉ POUR LES DEUX CAMPS. Le gel d'une décision en
+  // attente n'est plus écrit à chaque tick (`gelDerive`, dans `carriere.ts`) :
+  // une instance qui vient de lire la base tient un gel d'avant la décision,
+  // et daterait la consigne de l'autre banc APRÈS la pénalité — le moteur la
+  // jouerait alors sans attendre le choix.
+  const horloge = etat.decision
     ? etat.decision.horloge
     : Math.min(80, minuteCible(marque, maintenant));
 

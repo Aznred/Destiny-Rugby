@@ -18,6 +18,8 @@ export interface OrganisationRuck {
   relayeurId?: string;
   /** Secondes passées, ballon sorti, à attendre un relayeur encore en chemin. */
   attenteSortie?: number;
+  /** IA par poste : personne n'est debout sur le ballon — celui-ci y court pour le sortir. */
+  secoursId?: string;
   /** Le demi de mêlée a déjà montré le côté où il va jouer (IA par poste). */
   annonce?: boolean;
 }
@@ -165,6 +167,7 @@ export function placerRegroupement(e: EtatMatch): void {
     ? { x: lieu.x - s * (.7 + i * .85), y: lieu.y + (i % 2 ? .12 : -.12) }
     : { x: lieu.x - s * (i < 2 ? .5 : 1.25), y: lieu.y + (i === 0 ? -.42 : i === 1 ? .42 : 0) }));
   o.defense.forEach((id, i) => placer(id, { x: lieu.x + s * .5, y: lieu.y + (i === 0 ? -.42 : .42) }));
+  if (o.secoursId) placer(o.secoursId, { x: lieu.x - s * .7, y: lieu.y });
   const ancien = o.relayeurId;
   const relayeur = designerRelayeur(e);
   // Celui qui cède le relais retourne dans la ligne au lieu de rester planté

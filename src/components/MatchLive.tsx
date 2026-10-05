@@ -135,6 +135,7 @@ import {
 } from './match/PresentationTV';
 import { HabillageTV } from './match/HabillageTV';
 import { couleursEquipeTV, DUREE_EQUIPE_TV, exclusionsDepuisEtat, logoTV, type IdentiteTV } from '../lib/habillageTV';
+import { bulleDuMoment, marqueurDepuisEtat, memoireBullesVide, phraseDuMarqueur, ventPourLeTir, type ContexteStatsTV, type PhraseTV } from '../lib/statsTV';
 import { changementsRecents } from '../lib/presentationTV';
 import { urlLogoEquipe } from '../lib/logoEquipe';
 import { PelouseMemo } from './match/Pelouse';
@@ -1336,6 +1337,18 @@ export function MatchLive({
   // ⚠️ LA SCÈNE NE DÉCIDE DE RIEN : elle lit `e`, l'état que le moteur fait
   // avancer dans la boucle ci-dessus, et le met en images. Décisions, cartons,
   // remplacements, consignes : tout passe par le moteur, comme avant.
+  // ── Les statistiques de l'habillage : tout vient de ce que l'écran tient déjà ──
+  // La saison du joueur incarné est connue avant le coup d'envoi ; le reste se
+  // compte sur le match lui-même (`lib/statsTV.ts`).
+  const contexteTV = useMemo<ContexteStatsTV>(() => {
+    const moi = e.pions.find(p => p.moi);
+    if (!moi || !joueur) return {};
+    const saisonJouee = joueur.saisonEnCours;
+    return { joueurs: { [moi.id]: saisonJouee ? { essais: saisonJouee.essais, matchs: saisonJouee.matchs } : { essais: joueur.essais, matchs: joueur.matchsJoues } } };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cle]);
+  const memoireBulles = useRef(memoireBullesVide());
+  const bulleTenue = useRef<{ seconde: number; phrase: PhraseTV | null }>({ seconde: -1, phrase: null });
   const identiteTV = useMemo<IdentiteTV>(() => {
     const competition = selection ? undefined : competitionEffective(e.clubA);
     return { nom: titre || competition?.nom, logo: competition?.id,
@@ -1594,7 +1607,22 @@ export function MatchLive({
 
                 {/* ---------- 📺 L'HABILLAGE TÉLÉVISION ---------- */}
                 <CommentateursMatch lignes={e.commentaires} seconde={e.t} pause={enPause || !!avantMatch} />
+                {(() => {
+                  // Une décision par seconde d'écran : deux rendus du même instant lisent la même bulle.
+                  const seconde = Math.floor(e.sim);
+                  if (bulleTenue.current.seconde !== seconde) {
+                    bulleTenue.current = { seconde, phrase: avantMatch || enPause || e.fini ? null : bulleDuMoment(e, contexteTV, memoireBulles.current, e.sim, 80) };
+                  }
+                  return null;
+                })()}
                 <HabillageTV identite={identiteTV} seconde={e.t} periode={e.periode} phase={e.phase} termine={e.fini}
+                  marqueur={(() => {
+                    const m = avantMatch ? null : marqueurDepuisEtat(e);
+                    if (!m) return null;
+                    const club = m.cote === 'A' ? e.clubA : e.clubB;
+                    return { ...m, club, stat: phraseDuMarqueur(m, club, contexteTV) };
+                  })()}
+                  bulle={bulleTenue.current.phrase} vent={avantMatch ? null : ventPourLeTir(e)}
                   equipes={[
                     { nom: e.clubA, ...couleursEquipeTV(couleurA), logo: clubA?.logo ?? urlLogoEquipe(e.clubA), score: e.scoreA, essais: e.essaisA },
                     { nom: e.clubB, ...couleursEquipeTV(couleurB, true), logo: clubB?.logo ?? urlLogoEquipe(e.clubB), score: e.scoreB, essais: e.essaisB },

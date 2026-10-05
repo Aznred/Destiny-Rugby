@@ -446,7 +446,10 @@ que l'affichage lise exactement la version du moteur qui joue.
     `?regles=1`, `?releve=1`, `?pilote=1` pour un onglet caché).
 - ⚠️ **LES RÈGLES D'UN MATCH DE LIGUE SONT GELÉES AU COUP D'ENVOI**
   (`EtatMatchEnLigne.regles`). Absent ou 1 : le moteur d'origine. 2 : cadence
-  détaillée, `placementJoue` et défense resserrée. Un match en cours au moment
+  détaillée, `placementJoue` et défense resserrée. **3 (les matchs créés
+  aujourd'hui) : les règles 2 plus l'IA par poste** (`iaDesRegles`), étalonnée
+  pour quatre-vingts minutes réelles, avec le vent, les drops, les reprises
+  d'en-but et le changement de côté. Un match en cours au moment
   d'une mise en ligne garde donc son moteur — et son score. Remettre
   `REGLES_MATCH_EN_LIGNE` à 1 suffit à revenir en arrière pour les suivants.
   ⚠️ Toute retouche du moteur détaillé change la rejoue des matchs en règles 2
@@ -749,9 +752,19 @@ passe d'équilibrage côté serveur.
 ⚠️ **TOUT EST DERRIÈRE `iaParPoste(e)`, ET LE NIVEAU EST FIGÉ À LA CRÉATION DU
 MATCH.** Sans lui, le moteur rejoue exactement comme avant (vérifié : mêmes
 scores et mêmes statistiques sur les graines de référence, `verify:film-direct`
-identique). ⚠️ **LA LIGUE EN LIGNE NE LA REÇOIT PAS** : ses matchs se jouent en
-temps réel et l'IA par poste n'y est pas étalonnée (mesuré : 11,6 essais et
-81 points par match). L'y activer demande une règle 3 et sa propre mesure.
+identique). **La ligue en ligne la reçoit par ses règles 3** (voir plus haut) :
+un match de quatre-vingts minutes réelles contient 260 regroupements contre 34
+en dix minutes, donc les mêmes situations s'y présentent huit fois plus
+souvent. Ce qu'elles valent y est ramené à sa mesure par les réglages
+`*Reel` de `ia/reglages.ts` (avantage du porteur, retards, élan du soutien,
+ballons volés, jeu au pied choisi, cartons), qui ne jouent QUE hors match
+condensé. Mesuré sur 72 matchs (`npm run mesure:rugby -- 72 ligue 2`),
+règles 2 → règles 3 : **essais 4,7 → 7,1**, points 42,8 → 55,6, pénalités
+sifflées 31,7 → 26,5, ballons rendus 65,6 → 38,6, jaunes 1,2 → 1,3, rouges
+0,04 → 0,13, drops tentés 0 → 0,56. ⚠️ Les essais ne redescendent pas plus bas par ces réglages (essayé :
+défense resserrée jusqu'à 5 plaquages manqués par match, soutien réduit) :
+c'est la conservation du ballon qui les porte. Remettre
+`REGLES_MATCH_EN_LIGNE` à 2 rend l'ancien jeu aux matchs suivants.
 
 - **Lire avant de décider** (`ia/lecture.ts`, fonctions pures, aucun tirage).
   `lireLaDefense` compte, couloir par couloir (ras, milieu, large, petit
@@ -851,6 +864,78 @@ surtout tôt dans la possession (81 % en première main ou après un ou deux
 rucks) : les longues séquences restent le point faible. `horlogeCondensee`
 (8 par défaut) allonge le ballon vivant si l'on veut davantage de jeu — à 7,
 4,6 essais et 16,8 min ; ce n'est pas activé.
+
+#### Vent, tirs, drops, côtés, en-but (Correctif 12 — IA par poste seulement)
+
+Tout ce qui suit est derrière `iaParPoste(e)` : carrière, aperçu, ligue en
+règles 3. Les matchs de ligue en règles 1 et 2 rejouent comme avant.
+
+- **Le vent** (`moteur/vent.ts`) : direction, force (0 à 12 m/s) et graine des
+  rafales, fixées au coup d'envoi — trois champs à plat de l'état
+  (`ventDirection`, `ventForce`, `ventGraine`). ⚠️ Tirés d'un tirage À PART
+  (`graine('vent#' + clé)`) : le poser ne décale aucun tirage du match. Tout le
+  reste s'en déduit par des fonctions pures : en ligne, le serveur n'envoie rien
+  de plus (ils voyagent dans les scalaires du film) et deux écrans voient le
+  même vent. Il pèse dans la chance d'un tir (`malusDuVent` : 8 m/s de travers
+  coûtent onze points) et déplace tout coup de pied (`lancerVol`, le seul
+  entonnoir) : le botteur corrige le vent MOYEN selon son pied, la rafale et ce
+  qu'il a mal lu font le reste. Un rasant y échappe, une chandelle s'y offre.
+- **La courbe se voit** : `Vol.derive` (la poussée du vent, qui grandit comme
+  le carré du temps) et `Vol.ricochet` (poteau) sont lus par `positionVol`,
+  donc par le moteur, la scène et le film d'un même geste.
+- **Chaque tir a sa manière** (`viseeTirVariee`) : temps de vol de 1,5 à 3 s
+  (sommet de 3 à 11 m) selon le buteur, la distance et le vent de face ; réussi
+  au milieu ou à vingt centimètres du montant ; raté de peu, très large, trop
+  court, sous la barre ; **poteau rentrant ou sortant**. Le résultat reste
+  décidé AVANT : la trajectoire le montre. Banc : `npm run verify:tirs`
+  (20 000 tirs variés + matchs avec vent).
+- **Le drop** se décide (`ia/jeu.ts`) : trois points qui changent le match,
+  avant la pause, défense qui ne cède pas après plusieurs temps de jeu devant
+  les 22, se mettre à l'abri en fin de match ; dans l'axe surtout. Il peut être
+  **contré**, **mal frappé**, trop court, à côté. ⚠️ Un drop manqué n'est un
+  renvoi aux 22 que s'il meurt dans l'en-but : sinon le ballon reste en jeu.
+- **Changement de côté** (`cotesInverses`, à la reprise). ⚠️ LE STADE TOURNE,
+  PAS LE MATCH : le moteur garde son repère (A attaque vers les x croissants) ;
+  le vent y souffle donc dans l'autre sens, et la scène fait faire un demi-tour
+  au DÉCOR en calculant sa caméra dans le repère du stade (`inv` dans
+  `renderCamera`). Rien de ce qui est relatif au jeu (courses, gestes) n'a à le
+  savoir ; bancs, tunnel et touche d'attente d'un exclu sont des lieux du stade
+  (`scenographie`, et le retour de prison dans le moteur). ⚠️ La vue de haut
+  (2D) ne retourne pas encore le terrain.
+- **Reprises d'en-but** (`reprendreApresEnBut`) : qui y a envoyé le ballon ?
+  L'attaque (coup de pied, ballon tenu) et la défense le rend mort → **renvoi
+  d'en-but**, de la ligne d'essai (`ligneRenvoi`) ; la défense elle-même →
+  **mêlée à cinq mètres** pour l'attaque ; tir ou drop manqué mort en-but →
+  renvoi aux 22 ; coup d'envoi en ballon mort → mêlée au point du coup de pied.
+- **Touche rapide** : lanceur les deux pieds HORS du terrain, partenaire à
+  hauteur ou derrière et à plus de cinq mètres ; sinon l'alignement se forme.
+  Jouée quand la défense n'est pas revenue et que le partenaire a du champ ;
+  rarement près de la ligne adverse pour une équipe d'avants (elle veut son maul).
+- **Les cellules partent du ruck** (`placerBloc`) : la pointe s'élance le
+  temps qu'il lui faut pour arriver LANCÉE quand le ballon sort, et ne ralentit
+  plus une fois qu'il est sorti ; trois profondeurs (courte, standard, profonde).
+- **La chenille tient jusqu'à la frappe** (`chenilleTenue`) : le regroupement
+  n'est défait qu'au départ du ballon ; la poursuite part à ce moment-là.
+- **Deux garde-fous trouvés au banc** : personne ne dépasse 10,9 m/s (les
+  efforts se multipliaient jusqu'à 12,7) ; un ballon gratté est joué par le
+  voleur s'il est debout dessus, sinon il reste au sol et se ramasse (il était
+  donné à l'ouvreur cinq mètres plus loin).
+- **Habillage** (`lib/statsTV.ts`, `HabillageTV`) : bandeau du marqueur
+  (portrait, poste, numéro et une statistique — « 8 essais en 16 matchs pour
+  Toulouse » quand la saison est connue, « 2ᵉ essai aujourd'hui » sinon),
+  bulles d'information pendant le jeu (plaquages, ballons grattés, mètres,
+  possession des dix dernières minutes, confrontations, séries), pastille du
+  vent devant un tir (flèche vue par le buteur). ⚠️ AUCUNE REQUÊTE : tout sort
+  de l'état affiché et d'un `ContexteStatsTV` préparé une fois (saison du
+  joueur en carrière ; cartes et résultats de la ligue déjà chargés en ligne).
+  En ligne, les bulles par joueur du match en cours manquent encore : le film
+  ne transporte pas les statistiques individuelles.
+
+Mesuré sur 96 matchs de carrière 3D après ce correctif : 33 points et 4,7
+essais par match, 0,66 jaune, 0,04 rouge, 5,9 pénalités, 0,08 drop tenté.
+⚠️ `node verifier_destiny.mjs` échoue encore sur un contrôle (un avant au sol
+glisse de 2,2 m en une image, à 206 s d'une des trois graines) ; et
+`verify:direct-3d` échoue en règles 2 sur les touches (il passe avec `--ia=2`).
 
 Des corrections valent pour **tous** les écrans, parce que ce sont des règles :
 
@@ -1112,6 +1197,9 @@ turnovers, jeu au pied par type, cassures, offloads, qui porte et qui marque) :
 
 ```bash
 npm run mesure:rugby -- 120 carriere3d 2      # matchs, modes (carriere3d, carriere2d, fond, ligue), niveau d'IA
+npm run mesure:rugby -- 72 ligue 2            # la ligue en règles 3 (temps réel) ; --resserrement=1.2 pour essayer
+npm run mesure:conso-direct -- 10 --minutes=80   # ce qu'un direct coûte : SQL, octets, calcul (10,50,100,300 --minutes=4)
+npm run verify:ecriture-direct                # écritures du direct, présence par sondage, parties lentes
 npm run mesure:rugby -- 72 carriere3d 2 --reglages=condense:1.5,retardRapide:2.4   # essayer un réglage
 npx vite-node scripts/mesurerJeux.ts 96 2     # ce que rapporte chaque jeu, d'où partent les essais
 ```
@@ -1178,6 +1266,45 @@ match** — ne pas s'en servir pour retoucher la difficulté tant qu'ils n'ont p
   `scripts/verifierSynchronisationCompte.ts`, `scripts/verifierTransfertBoutique.ts` ;
   aperçu desktop/mobile `scripts/apercuTraficCollection.html` et diagnostic en
   lecture seule `scripts/diagnostiquerTraficBoutique.mjs`.
+
+  ⚠️ **CE QU'UN DIRECT DEMANDE À LA BASE (Correctif 11).** Mesuré par
+  `npm run mesure:conso-direct` (le vrai gestionnaire HTTP devant une base en
+  mémoire qui compte chaque requête SQL, heure simulée), pour UN match de 80
+  minutes regardé par ses deux managers : **16 680 requêtes → 1 959**
+  (SELECT 15 833 → 1 545, UPDATE 438 → 73, INSERT 409 → 341), écritures de
+  l'état entier 113 → 41, octets envoyés aux écrans 253 Mo → 49 Mo (33 → 10
+  compressés). À 50, 100 et 300 matchs simultanés sur une instance : 1 045
+  requêtes par match et par tranche de 4 minutes → 96 ; à 300, le calcul passe
+  de 30 ms à 2,7 ms par requête HTTP. Ce qui coûtait :
+  1. **Trois SELECT par sondage et par écran** (révision du catalogue, en-tête,
+     présences). La révision n'est relue que toutes les 30 s (`avecAtelier`,
+     et tout de suite si une ligue en montre une plus récente :
+     `exigerCatalogue`) ; l'en-tête et les présences arrivent ENSEMBLE
+     (`sondageDirect`), une fois toutes les 3 s et par LIGUE — un écran de plus
+     ne coûte rien.
+  2. **Le gel d'une décision réécrivait la ligue à chaque tick** (`gelDerive`) :
+     66 écritures de l'état entier par match. Le gel se recalcule de l'heure.
+  3. **Le battement de présence** (un POST toutes les 25 s, quatre requêtes
+     SQL) : le sondage du direct vaut présence (`noterPresenceDirecte`, un
+     rappel en base toutes les 30 s) ; l'écran ne l'envoie plus quand le
+     serveur l'acquitte (`presence: true`).
+  4. **32 ligues en cache, c'était la falaise** : au-delà, chaque sondage
+     relisait l'état ENTIER (18 Mo par match en 4 minutes à 50 ligues). 384
+     ligues et 160 Mio ; cache des moteurs 96 → 256 Mio (à 300 matchs regardés
+     ils en sortaient et chaque sondage rejouait son match du coup d'envoi).
+  5. **Le fil et les temps forts repartaient entiers toutes les 2 s** (33 Ko en
+     fin de match) : l'écran annonce ses repères (`&r=`), le serveur ne renvoie
+     que ce qui a changé, et pour le fil les seules lignes nouvelles
+     (`allegerDirect`, `completerMatch`). Un écran d'avant reçoit tout.
+  6. Deux sérialisations de la ligue par tick pour savoir s'il fallait écrire
+     (`memeEtatDurable` les remplace, sans rien sérialiser), une troisième pour
+     la peser, et `vu_le` réécrit chaque minute (dix minutes suffisent).
+  ⚠️ Le nombre de requêtes n'avait PAS changé avec le film 3D : le « deux fois
+  plus » ne se retrouve pas en base ; le calcul des règles 2 coûte environ 20 %
+  de plus que celui des règles 1. Banc de non-régression :
+  `npm run verify:ecriture-direct`. ⚠️ La requête groupée n'a pas pu être
+  essayée sur la vraie base : à la moindre erreur l'instance revient aux deux
+  lectures séparées (`sondageGroupeIndisponible`).
 
   ⚠️ **`DATABASE_URL` NE DÉSIGNE QU'UNE BASE, ET UN PROJET PEUT EN AVOIR
   PLUSIEURS.** Le piège a coûté une soirée : les tables créées dans la base

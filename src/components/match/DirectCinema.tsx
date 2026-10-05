@@ -7,6 +7,7 @@ import { Icone } from '../Icone';
 import { HabillageTV } from './HabillageTV';
 import { CommentateursMatch } from './CommentateursMatch';
 import { couleursEquipeTV, DUREE_EQUIPE_TV, type IdentiteTV } from '../../lib/habillageTV';
+import { bulleDuMoment, memoireBullesVide, phraseDuMarqueur, type ContexteStatsTV, type PhraseTV } from '../../lib/statsTV';
 import { preferencesTele } from '../../lib/match3D';
 import type { Stade3D } from '../../lib/stade3D';
 import './DirectCinema.css';
@@ -26,6 +27,7 @@ export function DirectCinema({
   surAffiche,
   identite,
   portraits,
+  contexteTV,
   panneauDecision,
   stade,
 }: {
@@ -38,6 +40,12 @@ export function DirectCinema({
   identite?: IdentiteTV;
   /** Le portrait de la carte de chaque joueur, par nom ; `null` : carte sans photo (silhouette grise). */
   portraits?: Record<string, string | null>;
+  /**
+   * Ce que la ligue savait AVANT le coup d'envoi (essais et matchs des cartes,
+   * confrontations, séries) : préparé une fois par l'hôte depuis la vue déjà
+   * chargée. Aucune bulle ne déclenche de requête.
+   */
+  contexteTV?: ContexteStatsTV;
   match: VueMatchEnLigne;
   domicile: string;
   exterieur: string;
@@ -85,6 +93,9 @@ export function DirectCinema({
   }, [m.termine]);
   const affiche = filmFini ? null : vu;
   const terrain = affiche?.terrain ?? m.terrain;
+  // Les bulles suivent l'instant MONTRÉ ; une décision par seconde d'écran.
+  const memoireBulles = useRef(memoireBullesVide());
+  const bulleTenue = useRef<{ seconde: number; phrase: PhraseTV | null }>({ seconde: -1, phrase: null });
   const dernieresExclusions = useRef(terrain?.exclusionsTV);
   useEffect(() => { if (terrain?.exclusionsTV) dernieresExclusions.current = terrain.exclusionsTV; }, [terrain?.exclusionsTV]);
   const score = affiche?.score ?? m.score;
@@ -127,7 +138,22 @@ export function DirectCinema({
       {m.monCote && cahier && (cahier.modeCombinaisons === 'configure' || !!cahier.combinaisons?.length) && <div className={`dc-cahier ${cahier.modeCombinaisons === 'configure' && combinaisonsActives ? 'actif' : ''}`}><Icone nom="sifflet" taille={16} /><span>{cahier.modeCombinaisons === 'automatique' ? t("ui.89b87c5d09fc") : combinaisonsActives ? tn("ui.13ebe03563fd", combinaisonsActives, { v0: combinaisonsActives }) : t("ui.c2b2701297f3")}</span></div>}
       <div className={`dc-ecran ${isTmo ? 'dc-ecran-tmo' : ''}`}>
         <CommentateursMatch key={`voix:${m.id}:${m.instance ?? ''}`} lignes={m.fil ?? []} seconde={secondeCourante} pause={pause} />
+        {(() => {
+          const seconde = Math.floor(secondeCourante);
+          if (bulleTenue.current.seconde !== seconde) {
+            bulleTenue.current = { seconde, phrase: !terrain || pause || m.termine || presentation !== undefined ? null : bulleDuMoment({
+              pions: [], phase: terrain.phase as never, possession: terrain.possession === 'domicile' ? 'A' : 'B', t: secondeCourante,
+              clubA: domicile, clubB: exterieur, tir: terrain.marqueurTV || terrain.ventTV ? ({} as never) : null, minute: Math.floor(secondeCourante / 60),
+            }, contexteTV, memoireBulles.current, secondeCourante, 300) };
+          }
+          return null;
+        })()}
         <HabillageTV key={`${m.id}:${m.instance ?? ''}`} identite={identite} seconde={secondeCourante}
+          marqueur={terrain?.marqueurTV ? (() => {
+            const mq = terrain.marqueurTV!, club = mq.cote === 'A' ? domicile : exterieur;
+            return { ...mq, club, photo: portraits ? portraits[mq.nom] ?? null : undefined, stat: phraseDuMarqueur(mq, club, contexteTV) };
+          })() : null}
+          bulle={bulleTenue.current.phrase} vent={terrain?.ventTV ?? null}
           periode={terrain?.periode ?? (secondeCourante >= 2400 ? 2 : 1)} phase={terrain?.phase} termine={m.termine && filmFini}
           equipes={[
             { nom: domicile, ...couleursEquipeTV(couleurs.domicile), logo: emblemes?.domicile, score: score.domicile, essais: essaisVus.domicile },

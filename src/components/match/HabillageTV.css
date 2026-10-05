@@ -107,3 +107,31 @@
 @media (max-height:500px) and (orientation:landscape) {
   .ml-scene:has(.btv) .ml-hud-haut { padding-top:80px; }
 }
+
+/* ── Le marqueur de l'essai : portrait, poste, statistique ─────────────────── */
+.btv-marqueur { border-bottom-color:var(--tv-accent); }
+.btv-marqueur small { color:var(--tv-accent); }
+.btv-marqueur .btv-portrait { position:relative; width:var(--bloc,72px); height:var(--bloc,72px); flex:none; align-self:stretch; overflow:hidden; background:rgba(255,255,255,.08); }
+.btv-marqueur .btv-portrait img { width:100%; height:100%; object-fit:cover; object-position:50% 12%; display:block; }
+.btv-marqueur .btv-portrait img.btv-sans-photo { opacity:.55; }
+.btv-marqueur .btv-portrait b { position:absolute; right:0; bottom:0; min-width:22px; padding:1px 5px; font-size:12px; text-align:center;
+  background:var(--tv-accent); color:var(--tv-accent-texte,#101613); }
+/* ── La bulle d'information : une ligne, en bas à gauche, qui glisse puis s'efface ── */
+.btv-bulle { position:absolute; left:7%; bottom:12%; display:flex; align-items:center; gap:10px; max-width:74%; padding:8px 14px 8px 0;
+  background:color-mix(in srgb,var(--tv-fond) 88%,transparent); color:var(--tv-texte); font-size:clamp(11px,1.45cqw,15px); font-weight:700;
+  border-bottom:2px solid var(--tv-accent); animation:btv-bulle 6.5s ease both; }
+.btv-bulle i { align-self:stretch; width:5px; background:var(--tv-accent); }
+@keyframes btv-bulle { 0% { opacity:0; transform:translateX(-14px); } 7%,90% { opacity:1; transform:none; } 100% { opacity:0; transform:translateX(-6px); } }
+/* ── Le vent devant un tir : une flèche vue par le buteur, les poteaux en haut ── */
+.btv-vent { position:absolute; right:5%; bottom:12%; display:flex; align-items:center; gap:9px; padding:7px 12px 7px 9px;
+  background:color-mix(in srgb,var(--tv-fond) 86%,transparent); color:var(--tv-texte); border-left:3px solid var(--tv-accent); }
+.btv-vent svg { color:var(--tv-accent); transition:transform .6s ease; }
+.btv-vent div { display:grid; line-height:1.1; }
+.btv-vent small { text-transform:uppercase; font-size:9px; letter-spacing:.14em; font-weight:900; opacity:.75; }
+.btv-vent strong { font-size:clamp(12px,1.5cqw,16px); font-variant-numeric:tabular-nums; }
+@media (max-width:700px) {
+  .btv-bulle { left:4%; max-width:88%; font-size:10.5px; padding:6px 10px 6px 0; }
+  .btv-vent { right:3%; padding:5px 9px 5px 7px; gap:6px; }
+  .btv-vent small { font-size:8px; }
+}
+@media (prefers-reduced-motion:reduce) { .btv-bulle { animation:none; } }

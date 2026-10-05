@@ -28,6 +28,8 @@ import { cadrerFilm, extraireFilm, filmer, LecteurFilm, type FilmDirect } from '
 // @ts-expect-error — module JavaScript du lecteur 3D, sans déclarations de types.
 import { DestinyMatch } from '../public/rn26/destiny.mjs';
 
+const IA_DU_BANC = Number(process.argv.find((a) => a.startsWith('--ia='))?.split('=')[1] ?? 0);
+
 const clips = new Set((JSON.parse(fs.readFileSync('public/rn26/motions/catalogue-match-poses.json', 'utf8')) as { name: string }[]).map((c) => c.name));
 const INTERVALLE = 2, IMAGE = 1 / 30;
 const outils = { porteurPourAffichage, positionVol, geometrieMelee, TEMPS_MELEE, RITUEL_TIR };
@@ -39,6 +41,7 @@ function jouer(cle: string, minutesReelles: number) {
     24, 20, cle, undefined, {
       tempsReel: true, niveau: 'pro', scoreSurTerrain: true,
       cadenceDetaillee: true, placementJoue: true, resserrement: RESSERREMENT_REGLES_2,
+      ...(IA_DU_BANC ? { ia: IA_DU_BANC } : {}),
     });
   filmer(e);
   const lecteur = new LecteurFilm();
