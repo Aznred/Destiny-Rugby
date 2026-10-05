@@ -1053,8 +1053,13 @@ titre('11. LES GARANTIES, ET LA DOTATION DE DÉPART');
     ancienne.packs = ancienne.packs.filter((p) => p.id === 'bronze' || p.id === 'standard');
     ancienne.packs[0].prix = 42;
     const apres = avancerCarriere(ancienne, T0 + 1000, 'maj');
-    dire(apres.packs.length === PACKS_CARRIERE.length, '⚠️ une ligue ancienne récupère les packs ajoutés depuis',
-      `${ancienne.packs.length} → ${apres.packs.length}`);
+    // Les packs d'événement (Halloween…) s'ajoutent à part : ils suivent le Labo
+    // et leur fenêtre, pas le catalogue des packs ordinaires.
+    const ordinaires = apres.packs.filter((p) => !p.evenement);
+    dire(ordinaires.length === PACKS_CARRIERE.length, '⚠️ une ligue ancienne récupère les packs ajoutés depuis',
+      `${ancienne.packs.length} → ${ordinaires.length}`);
+    dire(apres.packs.some((p) => p.evenement?.id === 'halloween-2026'), 'et le pack d’événement du moment',
+      `${apres.packs.length - ordinaires.length} pack(s) d’événement`);
     dire(apres.packs.find((p) => p.id === 'bronze')!.prix === 42,
       'et son économie n’est PAS écrasée au passage', 'prix maison conservé');
   }
