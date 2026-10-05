@@ -1,6 +1,6 @@
 import type { CompositionManager, FamillePoste, PosteId } from '../../types.js';
 import type { CommandeMatchEnLigne, EtatMatchEnLigne, StrategieEnLigne, VueMatchEnLigne } from './matchCarriere.js';
-import type { ResumeSpeciauxLigue } from './cartesSpeciales.js';
+import type { ResumeSpeciauxLigue } from './catalogueSpecial.js';
 
 export type RareteCarriere = 'bronze' | 'argent' | 'or' | 'elite' | 'star';
 /**

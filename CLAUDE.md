@@ -272,8 +272,15 @@ servies par `/api/carriere?imageSpeciale=<id>&v=<n>` (privées tant que jamais p
 `cartesSpeciales` ne consomme AUCUN tirage de plus (`preparerTirageSpecial` → null).
 Chance par carte : ICONS ≈ Mythique, Halloween = √(Élite × Mythique) ; la carte garantie
 d'un pack les tire au prorata des bandes autorisées (`tirerSpeciale`, option `base`).
-Le pack d'événement suit sa fenêtre (`packEvenementOuvert`), jamais la rotation ni les
-packs quotidiens, et refuse de s'ouvrir quand ses cartes sont toutes distribuées.
+⚠️ **Le pack Halloween se vend dans la boutique de packs spéciaux de la Collection
+solo, PAS en ligue** (`packsEvenementSolo`, prix en Ovas du compte, pochette 3D
+`MODELES_PACKS_EVENEMENT`) ; `completerPacks` retire tout pack d'événement d'une ligue.
+Ses cartes sortent aussi des packs ordinaires des ligues qui les autorisent, et des
+packs solo payants (jamais des gratuits). Le catalogue solo reçoit les seules cartes
+publiées (`specialesPubliques`, avec `/api/carriere?catalogueSolo=1`), ajoutées en FIN
+de tableau et hors des bandes de rareté. `cartesSpeciales.ts` reste LÉGER (le store
+l'importe via `collectionSolo.ts`) ; la graine et la fusion avec le Labo sont dans
+`catalogueSpecial.ts`, `rareteCarriere`/`carteDansPack` dans `raretesCartes.ts`.
 `collectif` est un PLANCHER (Halloween 10) ; la carte compte normalement pour ses
 coéquipiers. Deux cartes du même joueur (`identiteJoueur`) ne vont pas sur une feuille.
 Labo : `serveur/atelierSpeciales.ts`, `components/LaboCartesSpeciales.tsx`. Imports
@@ -1293,7 +1300,7 @@ npm run verify:distances-transferts
 npm run verify:photos             # portraits des cartes : liens morts, silhouettes, Top 14
 npm run verify:assets             # tout chemin /m3d /logos /photos écrit en dur existe vraiment
 npm run verify:triche             # 40 tentatives de triche, toutes refusées
-npm run verify:cartes-speciales   # ICONS, Halloween, Labo, imports (169 contrôles, ~2 min)
+npm run verify:cartes-speciales   # ICONS, Halloween, Labo, imports (292 contrôles, ~2 min)
 
 npx vite-node scripts/verif.ts    # banc général : divisions, effectifs, 8 saisons
 ```

@@ -15,7 +15,7 @@ import { catalogueBaseCarriere, catalogueMondialCarriere, packsCatalogueAdmin, R
 import {
   carteSpecialePackable, catalogueSpecial, chanceSpecialeParCarte, FAMILLES_SPECIALES, slugSpecial, statutCarteSpeciale,
   type DefinitionCarteSpeciale, type EvenementSpecial,
-} from '../src/lib/ligue/cartesSpeciales.js';
+} from '../src/lib/ligue/catalogueSpecial.js';
 import { analyserImport, cleImport, memeClub, nomComplet, posteImport, sourceIdImport, type AjoutJoueur, type LigneImport } from '../src/lib/ligue/importsJoueurs.js';
 import type { PackCarriere, RareteCarriere } from '../src/lib/ligue/typesCarriere.js';
 import { POSTES } from '../src/data/rugby.js';
@@ -152,7 +152,8 @@ function validerPackEvenement(brut: Record<string, unknown>, existant: PackCarri
     nom: texte(brut.nom ?? existant?.nom, 60, 'Nom du pack'),
     promesse: brut.promesse === undefined ? existant?.promesse : brut.promesse === '' ? undefined : texte(brut.promesse, 180, 'Promesse'),
     prix: entier(brut.prix ?? existant?.prix, 1, 1_000_000, 'Prix'),
-    cartes: entier(brut.cartes ?? existant?.cartes, 1, 12, 'Cartes'),
+    // Le pack d'événement vit en Collection solo : 10 à 20 cartes comme ses voisins.
+    cartes: entier(brut.cartes ?? existant?.cartes, 1, 20, 'Cartes'),
     famille: 'general', probabilites,
     ...(Object.keys(speciales).length ? { speciales } : {}),
     ...(garantieSpeciale ? { garantieSpeciale } : {}),

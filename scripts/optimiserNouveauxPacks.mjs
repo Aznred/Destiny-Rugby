@@ -102,7 +102,8 @@ for (const [id, fragment] of Object.entries(correspondances)) {
   const binHeader = Buffer.alloc(8);
   binHeader.writeUInt32LE(offset); binHeader.writeUInt32LE(0x004e4942, 4);
   const fichier = `${id}.glb`;
-  const dossier = ['halloween', 'noel', 'paques'].includes(id) ? saisons : destination;
+  // Halloween est sorti (octobre 2026) : sa pochette est servie avec les autres.
+  const dossier = ['noel', 'paques'].includes(id) ? saisons : destination;
   await fs.writeFile(new URL(fichier, dossier), Buffer.concat([header, padded, binHeader, ...parts]));
   console.log(`${fichier}: ${(input.length / 1e6).toFixed(1)} → ${(offset / 1e6).toFixed(1)} Mo`);
 }

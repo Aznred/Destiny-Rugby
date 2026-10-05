@@ -68,8 +68,7 @@ import { collectifCarriere, paliersCollectif, bonusCollectif, COLLECTIF_MAX } fr
 import type { Affinite, AffiniteCarte } from '../lib/ligue/collectifCarriere';
 import { ModaleMarche } from '../components/ModaleMarche';
 import { PACKS_CARRIERE, packsBoutiqueDuJour } from '../lib/ligue/catalogueCarriere';
-import { nomFamilleSpeciale, packEvenementOuvert } from '../lib/ligue/cartesSpeciales';
-import { PackEvenement } from '../components/PackEvenement';
+import { nomFamilleSpeciale } from '../lib/ligue/cartesSpeciales';
 import { Citrouille, EmblemeIcon } from '../components/EmblemesSpeciaux';
 import { tn, texteTraduit, locale, nombre, t } from '../lib/i18n';
 import { fusionnerDeltaDirect, fusionnerVueLigue, presencesAcquittees } from '../lib/ligue/fusionDirect';
@@ -1862,9 +1861,6 @@ export function Packs({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Ag
   const packsDuJour = (vue.packsActifs
     ? vue.packs.filter(pack => vue.packsActifs!.includes(pack.id))
     : packsBoutiqueDuJour(vue.packs, instant, vue.rotationPacks === true)).filter(pack => !pack.evenement);
-  // ⚠️ LE PACK D'ÉVÉNEMENT SE RÉGLE SUR SA FENÊTRE, PAS SUR LA ROTATION : il
-  // disparaît tout seul le 1er décembre, même si l'écran est resté ouvert.
-  const packsEvenement = vue.packs.filter(pack => pack.evenement && packEvenementOuvert(pack, vue.cartesSpeciales, instant));
   const evenementsOuverts = (vue.speciales?.evenements ?? []).filter(e => e.cartes > 0 && (!e.du || Date.parse(e.du) <= instant) && (!e.au || instant < Date.parse(e.au)));
   const chancesSpeciales = (packId: string) => evenementsOuverts
     .map(e => ({ nom: nomFamilleSpeciale(e.type), chance: vue.speciales?.chances[packId]?.[e.id] ?? 0 }))
@@ -1895,7 +1891,7 @@ export function Packs({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Ag
     achatEnCours.current = true;
     const pack = vue.packs.find(p => p.id === packId);
     if (pack) prechargerOuverturePack(pack);
-    setOuverture({ cartes: null, pack: `${nomPack}${suffixe}`, modele: pack && packAvecSkin(pack.id) ? modelePackParNom(pack) : undefined, garantie: pack?.garantie, apparenceInitiale: pack && apparencePack(pack) });
+    setOuverture({ cartes: null, pack: `${nomPack}${suffixe}`, modele: pack && packAvecSkin(pack) ? modelePackParNom(pack) : undefined, garantie: pack?.garantie, apparenceInitiale: pack && apparencePack(pack) });
     try {
       const avant = new Set(vue.transactions.map(t => t.id));
       const suivante = await agir(commande);
@@ -1929,7 +1925,6 @@ export function Packs({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Ag
       {packsGratuits.length > 20 && <small className="cel-note">{t('online.shop.morePacksNote', { count: packsGratuits.length - 20 })}</small>}
     </section>
 
-    {packsEvenement.map(pack => <PackEvenement key={pack.id} pack={pack} solde={solde} occupe={occupe || ouverture !== null} onOuvrir={(id, nom) => { void ouvrir(id, nom); }} />)}
     <div className="cel-note">{t('online.shop.basePacksNote')}</div>
     <BoutiquePacks3D packs={packsDuJour} solde={solde} occupe={occupe || ouverture !== null} onOuvrir={ouvrir} chancesSpeciales={chancesSpeciales} />
 

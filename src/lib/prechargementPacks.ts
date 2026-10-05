@@ -35,7 +35,7 @@ export function prechargerOuverturePack(pack?: PackCarriere): void {
   void import('@react-three/drei').then(({ useGLTF }) => {
     if (pack) {
       useGLTF.preload(modelePackParNom(pack));
-      if (!packAvecSkin(pack.id)) useGLTF.preload(modelePack(apparencePack(pack), true));
+      if (!packAvecSkin(pack)) useGLTF.preload(modelePack(apparencePack(pack), true));
     } else {
       useGLTF.preload(modelePack('bronze'));
       useGLTF.preload(modelePack('bronze', true));

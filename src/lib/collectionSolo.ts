@@ -1,5 +1,6 @@
 import type { PackCarriere, RareteCarriere } from './ligue/typesCarriere.js';
 import type { SourceCarte } from './ligue/catalogueCarriere.js';
+import { packEvenementOuvert, preparerTirageSpecial, tirerSpeciale, type CatalogueSpecial } from './ligue/cartesSpeciales.js';
 import { packAvecSkin } from './presentationPacks.js';
 
 export interface EtatCollectionSolo {
@@ -101,6 +102,9 @@ export function cartesPackSolo(pack: Pick<PackCarriere, 'id' | 'cartes'>): numbe
 }
 
 export function packCollectionSolo(pack: PackCarriere): PackCarriere {
+  // ⚠️ UN PACK D'ÉVÉNEMENT EST RÉGLÉ POUR LA COLLECTION SOLO DANS LE LABO : prix
+  // en Ovas du compte, volume et chances tels quels. Pas de conversion.
+  if (pack.evenement) return { ...pack };
   const probabilitesSolo = PROBABILITES_PACKS_SOLO_GRATUITS[pack.id];
   const precisionGratuite = pack.id === 'or'
     ? 'Pack gratuit : environ 1 chance sur 100 d’obtenir une carte Élite bleue et 1 sur 1 000 une Star rouge.'
@@ -118,6 +122,20 @@ export function packCollectionSolo(pack: PackCarriere): PackCarriere {
 
 export function packsCollectionSolo(packs: readonly PackCarriere[]): PackCarriere[] {
   return packs.filter(pack => packAvecSkin(pack.id) || PACKS_SOLO_GRATUITS.has(pack.id)).map(packCollectionSolo);
+}
+
+/**
+ * Les packs d'événement (Halloween…) en vente À CET INSTANT dans la boutique de
+ * packs spéciaux : famille active, fenêtre ouverte, au moins une carte publiée.
+ * Le 1er décembre, le pack Halloween disparaît de lui-même.
+ */
+export function packsEvenementSolo(speciales: CatalogueSpecial | null, maintenant: number): PackCarriere[] {
+  if (!speciales) return [];
+  return speciales.evenements.filter(ev => ev.pack).map((ev): PackCarriere => ({
+    ...structuredClone(ev.pack!),
+    evenement: { id: ev.id, type: ev.cardType, actif: ev.actif, ...(ev.availableFrom ? { du: ev.availableFrom } : {}), ...(ev.availableUntil ? { au: ev.availableUntil } : {}),
+      cartes: speciales.definitions.filter(d => d.specialEventId === ev.id && d.published && d.canBePacked).length },
+  })).filter(pack => packEvenementOuvert(pack, true, maintenant));
 }
 
 /** Une empreinte stable sur 64 bits : la collection survit aux reordonnancements du catalogue. */
@@ -214,41 +232,77 @@ function rayonsDuPack(pack: PackCarriere, catalogue: readonly SourceCarte[]): Re
   const connus = parPack.get(cle);
   if (connus) return connus;
   const rayons: Record<RareteCarriere, number[]> = { bronze: [], argent: [], or: [], elite: [], star: [] };
-  catalogue.forEach((carte, indice) => { if (carteDansPack(carte, pack)) rayons[carte.rarete].push(indice); });
+  // ⚠️ UNE CARTE SPÉCIALE N'EST JAMAIS DANS UNE BANDE : elle a sa propre chance
+  // (`preparerTirageSpecial`), sinon une ICON à 97 sortirait comme une Mythique.
+  catalogue.forEach((carte, indice) => { if (!carte.speciale && carteDansPack(carte, pack)) rayons[carte.rarete].push(indice); });
   parPack.set(cle, rayons);
   return rayons;
 }
 
-/** Tirage avec remise : une carte possedee peut ressortir, meme dans le meme pack. */
+const INDEX_SOURCES = new WeakMap<object, Map<string, number>>();
+function indexDesSources(catalogue: readonly SourceCarte[]): Map<string, number> {
+  let index = INDEX_SOURCES.get(catalogue);
+  if (!index) { index = new Map(catalogue.map((carte, i) => [carte.sourceId, i])); INDEX_SOURCES.set(catalogue, index); }
+  return index;
+}
+
+/**
+ * Tirage avec remise : une carte possedee peut ressortir, meme dans le meme pack.
+ *
+ * `speciales` : les cartes spéciales publiées (ICONS, Halloween), tirées AVANT
+ * la bande avec la même règle que les ligues (`chanceSpecialeParCarte`), et la
+ * garantie d'un pack d'événement. Elles doivent figurer dans `catalogue`.
+ */
 export function ouvrirPackSolo(
   pack: PackCarriere,
   catalogue: readonly SourceCarte[],
   precedent: EtatCollectionSolo,
   rng: () => number = hasard,
+  options: { speciales?: CatalogueSpecial | null; maintenant?: number } = {},
 ): ResultatPackSolo {
   const quantites = { ...precedent.quantites };
   const rayons = rayonsDuPack(pack, catalogue);
   const disponibles = new Set(RARETES.filter(rarete => rayons[rarete].length > 0 && pack.probabilites[rarete] > 0));
   if (!disponibles.size) return { etat: precedent, indices: [], nouvelles: 0 };
+  const index = indexDesSources(catalogue);
+  const tirage = options.speciales
+    ? preparerTirageSpecial(pack, true, options.maintenant ?? Date.now(), new Set(), options.speciales) : null;
+  if (tirage) for (const lot of tirage.lots) {
+    // Une carte absente du catalogue reçu ne peut pas être montrée : on l'écarte.
+    for (let i = lot.candidats.length - 1; i >= 0; i--) if (!index.has(lot.candidats[i].sourceId)) { lot.candidats.splice(i, 1); lot.poids.splice(i, 1); }
+  }
+  if (pack.garantieSpeciale && !tirage?.lots.some(l => l.evenement === pack.garantieSpeciale && l.candidats.length)) {
+    // Un pack d'événement promet SA carte : sans elle, rien n'est débité.
+    return { etat: precedent, indices: [], nouvelles: 0 };
+  }
 
   const indices: number[] = [];
   let nouvelles = 0;
   const garanties = pack.garantie ? RARETES.slice(RARETES.indexOf(pack.garantie)) : [];
+  const compter = (indice: number) => {
+    indices.push(indice);
+    const cle = cleCarteSolo(catalogue[indice].sourceId);
+    if (!quantites[cle]) nouvelles++;
+    quantites[cle] = (quantites[cle] ?? 0) + 1;
+  };
   for (let position = 0; position < pack.cartes; position++) {
     const derniere = position === pack.cartes - 1;
     const dejaGarantie = indices.some(indice => garanties.includes(catalogue[indice].rarete));
     const doitGarantir = derniere && garanties.length > 0 && !dejaGarantie;
+    const doitGarantirSpeciale = derniere && Boolean(pack.garantieSpeciale)
+      && !indices.some(indice => catalogue[indice].speciale?.evenement === pack.garantieSpeciale);
+    const speciale = doitGarantirSpeciale ? tirerSpeciale(tirage, rng, { forcer: pack.garantieSpeciale })
+      : doitGarantir ? tirerSpeciale(tirage, rng, { accepte: s => garanties.includes(s.rarete),
+        base: garanties.reduce((total, r) => total + (disponibles.has(r) ? pack.probabilites[r] || 1 : 0), 0) })
+      : tirerSpeciale(tirage, rng);
+    if (speciale) { compter(index.get(speciale.sourceId)!); continue; }
     const autorisees = doitGarantir
       ? new Set([...disponibles].filter(rarete => garanties.includes(rarete)))
       : disponibles;
     const rarete = rareteTiree(pack.probabilites, autorisees.size ? autorisees : disponibles, rng);
     if (!rarete) break;
     const rayon = rayons[rarete];
-    const indice = rayon[Math.min(rayon.length - 1, Math.floor(rng() * rayon.length))];
-    indices.push(indice);
-    const cle = cleCarteSolo(catalogue[indice].sourceId);
-    if (!quantites[cle]) nouvelles++;
-    quantites[cle] = (quantites[cle] ?? 0) + 1;
+    compter(rayon[Math.min(rayon.length - 1, Math.floor(rng() * rayon.length))]);
   }
 
   return {

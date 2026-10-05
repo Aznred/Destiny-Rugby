@@ -18,8 +18,10 @@ import { posteDepuisFamille, POSTE_PAR_ID } from '../../data/rugby.js';
 import type { FamillePoste, PosteId } from '../../types.js';
 import type { Coequipier } from '../effectif.js';
 import { graine, melanger } from './aleatoire.js';
-import type { CarteCarriere, FiltrePack, PackCarriere, RareteCarriere } from './typesCarriere.js';
+import type { CarteCarriere, PackCarriere, RareteCarriere } from './typesCarriere.js';
 import type { AjoutJoueur } from './importsJoueurs.js';
+import { carteDansPack, rareteCarriere } from './raretesCartes.js';
+export { carteDansPack, rareteCarriere } from './raretesCartes.js';
 
 export const RARETES_CARRIERE: RareteCarriere[] = ['bronze', 'argent', 'or', 'elite', 'star'];
 // ═══════════════════════════════════════════════════════════════════════════
@@ -252,9 +254,6 @@ export function packsBoutiqueDuJour(
   return [...permanents, tournants[depart], tournants[(depart + 1) % tournants.length]];
 }
 
-export function rareteCarriere(note: number): RareteCarriere {
-  return note >= 88 ? 'star' : note >= 80 ? 'elite' : note >= 65 ? 'or' : note >= 50 ? 'argent' : 'bronze';
-}
 const normaliser = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 const nationLisible = (s: string) => s.replace(/[^\p{L}\p{M}\s'-]/gu, '').trim();
 
@@ -634,26 +633,4 @@ export function coequipierDepuisCarte(c: CarteCarriere): Coequipier {
   return { id: c.id, nom: c.nom, poste: c.poste, age: c.age, note: c.note, potentiel: c.potentiel,
     postesSecondaires: c.postesSecondaires ? [...c.postesSecondaires] : undefined,
     photo: c.photo, jeuAuPied: c.statistiques.JDP, nation: c.nation, regen: c.origine === 'formation', horsGeneration: true };
-}
-/**
- * Une carte entre-t-elle dans ce pack ? Chaque champ du filtre est un ET ; à
- * l'intérieur d'un champ, c'est un OU.
- */
-export function carteDansPack(c: Pick<CarteCarriere, 'poste' | 'famille' | 'pays' | 'nation' | 'championnat' | 'age'>, filtre?: FiltrePack): boolean {
-  if (!filtre) return true;
-  // ⚠️ « Avant » PORTE UNE MAJUSCULE dans `data/rugby.ts`. Comparé en
-  // minuscules, le pack Avants ne trouvait personne et le pack Arrières
-  // renvoyait tout le catalogue, piliers compris.
-  if (filtre.categorie) {
-    const avant = POSTE_PAR_ID[c.poste].categorie === 'Avant';
-    if (avant !== (filtre.categorie === 'avant')) return false;
-  }
-  if (filtre.familles && !filtre.familles.includes(c.famille)) return false;
-  if (filtre.championnats && !filtre.championnats.includes(c.championnat)) return false;
-  if (filtre.pays && !filtre.pays.includes(c.pays)) return false;
-  if (filtre.nations && !filtre.nations.includes(c.nation)) return false;
-  if (filtre.horsFrance && c.pays === 'France') return false;
-  if (filtre.ageMax !== undefined && c.age > filtre.ageMax) return false;
-  if (filtre.ageMin !== undefined && c.age < filtre.ageMin) return false;
-  return true;
 }

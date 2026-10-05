@@ -37,7 +37,18 @@ export const IDS_PACKS_AVEC_SKIN = [
   'sixNations', 'prod2', 'premiership',
 ] as const;
 const idsAvecSkin = new Set<string>(IDS_PACKS_AVEC_SKIN);
-export const packAvecSkin = (id: string): boolean => idsAvecSkin.has(id);
+/**
+ * Les pochettes 3D des événements, par famille de cartes. ⚠️ Un modèle
+ * saisonnier ne sort de `assets/packs-saisonniers/` vers
+ * `public/m3d/packs-speciaux/` qu'à sa sortie : Noël et Pâques y attendent.
+ */
+export const MODELES_PACKS_EVENEMENT: Readonly<Record<string, string>> = {
+  halloween: '/m3d/packs-speciaux/halloween.glb',
+};
+const modeleEvenement = (pack: Pick<PackCarriere, 'evenement'>) => (pack.evenement ? MODELES_PACKS_EVENEMENT[pack.evenement.type] : undefined);
+/** Le pack a sa propre pochette (skin dédié ou pochette d'événement). */
+export const packAvecSkin = (pack: string | Pick<PackCarriere, 'id' | 'evenement'>): boolean =>
+  typeof pack === 'string' ? idsAvecSkin.has(pack) : idsAvecSkin.has(pack.id) || Boolean(modeleEvenement(pack));
 export function modelePackParNom(pack: PackCarriere): string {
-  return packAvecSkin(pack.id) ? `/m3d/packs-speciaux/${pack.id}.glb` : modelePack(apparencePack(pack));
+  return modeleEvenement(pack) ?? (packAvecSkin(pack.id) ? `/m3d/packs-speciaux/${pack.id}.glb` : modelePack(apparencePack(pack)));
 }

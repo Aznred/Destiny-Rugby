@@ -285,14 +285,14 @@ function EditeurEvenement({ ev, occupe, operer }: { ev: EvenementLabo; occupe: b
       </div>
       <details className="ls-chances"><summary>Chance par carte dans la boutique (réglage enregistré)</summary><ul>{ev.chances.map(c => <li key={c.pack}>{c.pack} <b>{c.chance.toLocaleString('fr-FR', { maximumFractionDigits: 3 })} %</b></li>)}</ul></details>
       {pack && <div className="ls-pack">
-        <h4>{pack.nom} · pack payant en Ovas</h4>
+        <h4>Pack {pack.nom} · boutique de packs spéciaux de la Collection solo</h4>
         <div className="ak-champs">
           <label>Nom du pack<input required maxLength={60} value={pack.nom} onChange={x => majPack({ nom: x.target.value })} /></label>
-          <label>Prix (Ovas)<input required type="number" min={1} max={1000000} value={pack.prix} onChange={x => majPack({ prix: Number(x.target.value) })} /></label>
+          <label>Prix (Ovas du compte)<input required type="number" min={1} max={1000000} value={pack.prix} onChange={x => majPack({ prix: Number(x.target.value) })} /></label>
         </div>
         <label>Promesse<textarea maxLength={180} value={pack.promesse ?? ''} onChange={x => majPack({ promesse: x.target.value })} /></label>
         <div className="ak-champs">
-          <label>Cartes par pack<input required type="number" min={1} max={12} value={pack.cartes} onChange={x => majPack({ cartes: Number(x.target.value) })} /></label>
+          <label>Cartes par pack<input required type="number" min={1} max={20} value={pack.cartes} onChange={x => majPack({ cartes: Number(x.target.value) })} /></label>
           <label>Chance {e.cardType === 'icon' ? 'ICON' : 'Halloween'} par carte (%)<input type="number" min={0} max={100} step=".1" value={pack.speciales?.[e.id] ?? 0} onChange={x => majPack({ speciales: { ...(pack.speciales ?? {}), [e.id]: Number(x.target.value) } })} /></label>
         </div>
         <div className="ak-poids">{(['bronze', 'argent', 'or', 'elite', 'star'] as const).map(r => <label key={r}>{r}<input required type="number" min={0} max={100} step=".01" value={pack.probabilites[r]} onChange={x => majPack({ probabilites: { ...pack.probabilites, [r]: Number(x.target.value) } })} /></label>)}</div>
@@ -300,7 +300,7 @@ function EditeurEvenement({ ev, occupe, operer }: { ev: EvenementLabo; occupe: b
         <label className="ls-bascule"><input type="checkbox" checked={pack.garantieSpeciale === e.id} onChange={x => majPack({ garantieSpeciale: x.target.checked ? e.id : undefined })} /><span>Une carte {e.cardType === 'icon' ? 'ICON' : 'Halloween'} garantie par pack</span></label>
       </div>}
       <div className="ls-actions"><button className="btn primaire" disabled={Boolean(pack) && Math.abs(total - 100) > .001}>Enregistrer {e.nom}</button></div>
-      <p className="ak-note">Fin de l’événement : le pack quitte la boutique, ses cartes ne sortent plus d’aucun pack, celles déjà obtenues restent dans les clubs.</p>
+      <p className="ak-note">Le pack se vend dans la boutique de packs spéciaux de la Collection solo, jamais dans les ligues ; ses cartes peuvent aussi sortir des packs ordinaires des ligues qui les autorisent. Fin de l’événement : le pack quitte la boutique, ses cartes ne sortent plus d’aucun pack, celles déjà obtenues restent.</p>
     </fieldset>
   </form>;
 }

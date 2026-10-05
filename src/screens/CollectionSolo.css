@@ -149,3 +149,14 @@
   .solo-pack { grid-template-columns: 82px 1fr; }
 }
 .solo-bouton-echanges{width:100%;margin:18px 0;text-align:center;border-color:rgba(239,202,111,.5)}
+
+/* Cartes spéciales : leurs filtres, à côté de ceux du catalogue. */
+.solo-types { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: .8rem; }
+.solo-type { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 6px 14px; border-radius: 99px; border: 1px solid #ffffff24; background: #08150fd1; color: var(--craie); font: 700 .8rem var(--police-forte); letter-spacing: .04em; cursor: pointer; }
+.solo-type b { padding: 1px 8px; border-radius: 99px; background: #ffffff14; font-size: .72rem; }
+.solo-type.actif { border-color: var(--or-400); background: color-mix(in srgb, var(--or-400) 16%, #08150f); }
+.solo-type.type-icon { letter-spacing: .16em; }
+.solo-type.type-icon.actif { border-color: #d8aa45; background: linear-gradient(135deg, #fffaf0, #ecdcb6); color: #3a2b10; }
+.solo-type.type-halloween { letter-spacing: .12em; }
+.solo-type.type-halloween.actif { border-color: #ff8a1c; background: linear-gradient(135deg, #26262b, #0d0d0f); color: #ff9a2e; box-shadow: 0 0 14px #ff7a0040; }
+@media (max-width: 560px) { .solo-types { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; } .solo-type { flex: none; } }

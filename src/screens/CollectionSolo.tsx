@@ -1,4 +1,4 @@
-import { lazy, Suspense, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { Icone } from '../components/Icone';
 import { CarteJoueurEnLigne } from '../components/CarteJoueurEnLigne';
 import OuverturePack from '../components/OuverturePack';
@@ -6,9 +6,11 @@ import BoutiquePacks3D from '../components/BoutiquePacks3D';
 import { useGame } from '../store/useGame';
 import { carteDepuisSource, PACKS_CARRIERE } from '../lib/ligue/catalogueCarriere';
 import type { SourceCarte } from '../lib/ligue/catalogueCarriere';
-import { synchroniserCatalogueSolo, useCatalogueSolo } from '../lib/catalogueSoloCommun';
+import { catalogueSpecialSolo, synchroniserCatalogueSolo, useCatalogueSolo } from '../lib/catalogueSoloCommun';
 import type { PackCarriere, RareteCarriere } from '../lib/ligue/typesCarriere';
-import { cleCarteSolo, IDS_PACKS_SOLO_GRATUITS, ouvrirPackSolo, packsCollectionSolo } from '../lib/collectionSolo';
+import { cleCarteSolo, IDS_PACKS_SOLO_GRATUITS, ouvrirPackSolo, packsCollectionSolo, packsEvenementSolo } from '../lib/collectionSolo';
+import { carteSpecialePackable, carteSpecialeVisibleCollection, chanceSpecialeParCarte, nomFamilleSpeciale } from '../lib/ligue/cartesSpeciales';
+import { Citrouille, EmblemeIcon } from '../components/EmblemesSpeciaux';
 import { nombre, t } from '../lib/i18n';
 import { apparencePack, modelePackParNom, packAvecSkin } from '../lib/presentationPacks';
 import './CollectionSolo.css';
@@ -26,10 +28,40 @@ export function CollectionSolo() {
   const joueur = useGame(s => s.joueur);
   const manager = useGame(s => s.manager);
   const catalogue = useCatalogueSolo();
-  const packsRoue = useMemo<PackCarriere[]>(() => packsCollectionSolo(PACKS_CARRIERE), []);
+  // Relu à chaque nouveau catalogue : `useCatalogueSolo` change d'identité quand
+  // le serveur a servi de nouvelles cartes spéciales.
+  const speciales = useMemo(() => (catalogue.length ? catalogueSpecialSolo() : null), [catalogue]);
+  // L'horloge de la boutique : le pack d'un événement qui se termine disparaît
+  // dans la minute, même si l'écran est resté ouvert.
+  const [instant, setInstant] = useState(() => Date.now());
+  useEffect(() => { const minute = window.setInterval(() => setInstant(Date.now()), 60_000); return () => window.clearInterval(minute); }, []);
+  // ⚠️ LE PACK HALLOWEEN EST ICI, DANS LES PACKS SPÉCIAUX, PAS DANS LES LIGUES.
+  // Il apparaît en tête pendant sa fenêtre et disparaît seul à la fin du mois.
+  const packsEvenement = useMemo(() => packsEvenementSolo(speciales, instant), [speciales, instant]);
+  const packsRoue = useMemo<PackCarriere[]>(() => [...packsEvenement, ...packsCollectionSolo(PACKS_CARRIERE)], [packsEvenement]);
   const idsPacksGratuits = useMemo(() => new Set<string>(IDS_PACKS_SOLO_GRATUITS), []);
   const packsGratuits = useMemo(() => packsRoue.filter((pack) => idsPacksGratuits.has(pack.id)), [packsRoue, idsPacksGratuits]);
   const packsPayants = useMemo(() => packsRoue.filter((pack) => !idsPacksGratuits.has(pack.id)), [packsRoue, idsPacksGratuits]);
+  /** Une carte spéciale non obtenue ne se montre que publiée, et son événement ouvert. */
+  const visibleSiInconnue = useCallback((carte: SourceCarte) => {
+    if (!carte.speciale) return true;
+    const def = speciales?.parId.get(carte.sourceId);
+    return Boolean(def && speciales && carteSpecialeVisibleCollection(def, speciales, instant));
+  }, [speciales, instant]);
+  /** Ce que chaque pack payant peut donner en cartes spéciales, par carte. */
+  const chancesSpeciales = (packId: string) => {
+    const pack = packsRoue.find(p => p.id === packId);
+    if (!pack || !speciales || idsPacksGratuits.has(pack.id)) return [];
+    return speciales.evenements.filter(ev => ev.actif && speciales.definitions.some(d => d.specialEventId === ev.id && carteSpecialePackable(d, speciales, instant)))
+      .map(ev => ({ nom: nomFamilleSpeciale(ev.cardType), chance: Math.round(chanceSpecialeParCarte(pack, ev) * 1000) / 1000 }))
+      .filter(c => c.chance > 0);
+  };
+  const [typeCartes, setTypeCartes] = useState<'' | 'normal' | 'icon' | 'halloween'>('');
+  const comptesSpeciaux = useMemo(() => {
+    const comptes: Record<string, number> = {};
+    for (const carte of catalogue) if (carte.speciale && (etat.quantites[cleCarteSolo(carte.sourceId)] || visibleSiInconnue(carte))) comptes[carte.speciale.type] = (comptes[carte.speciale.type] ?? 0) + 1;
+    return comptes;
+  }, [catalogue, etat.quantites, visibleSiInconnue]);
   const [categoriePacks, setCategoriePacks] = useState<'gratuits' | 'payants'>('gratuits');
   const [recherche, setRecherche] = useState('');
   const [rarete, setRarete] = useState<RareteCarriere | 'toutes'>('toutes');
@@ -46,15 +78,17 @@ export function CollectionSolo() {
       const quantite = etat.quantites[cleCarteSolo(carte.sourceId)] ?? 0;
       return { carte, indice, trouvee: quantite > 0, quantite };
     })
-      .filter(({ carte, trouvee }) => (rarete === 'toutes' || carte.rarete === rarete)
+      .filter(({ carte, trouvee }) => (trouvee || visibleSiInconnue(carte))
+        && (!typeCartes || (typeCartes === 'normal' ? !carte.speciale : carte.speciale?.type === typeCartes))
+        && (rarete === 'toutes' || carte.rarete === rarete)
         && (statut === 'toutes' || (statut === 'trouvees' ? trouvee : !trouvee))
         && (!terme || normaliser(`${carte.nom} ${carte.clubReel} ${carte.nation} ${carte.championnat}`).includes(terme)))
       .sort((a, b) => b.carte.note - a.carte.note || a.carte.nom.localeCompare(b.carte.nom, 'fr'));
-  }, [catalogue, etat.quantites, rarete, recherche, statut]);
+  }, [catalogue, etat.quantites, rarete, recherche, statut, typeCartes, visibleSiInconnue]);
   const pages = Math.max(1, Math.ceil(cartesFiltrees.length / PAR_PAGE));
   const pageSure = Math.min(page, pages - 1);
   const visibles = cartesFiltrees.slice(pageSure * PAR_PAGE, (pageSure + 1) * PAR_PAGE);
-  const total = catalogue.length;
+  const total = catalogue.filter(carte => !carte.speciale || visibleSiInconnue(carte) || etat.quantites[cleCarteSolo(carte.sourceId)]).length;
   const trouvees = catalogue.reduce((somme, carte) => somme + (etat.quantites[cleCarteSolo(carte.sourceId)] ? 1 : 0), 0);
   const exemplaires = Object.values(etat.quantites).reduce((somme, quantite) => somme + quantite, 0);
   const progression = total ? Math.round(trouvees / total * 1000) / 10 : 0;
@@ -64,7 +98,11 @@ export function CollectionSolo() {
     if (!pack) return;
     const catalogueActuel = await synchroniserCatalogueSolo();
     const prix = pack.prix;
-    const resultat = acheterPack(prix, precedent => ouvrirPackSolo(pack, catalogueActuel, precedent));
+    // ⚠️ PAS DE CARTE SPÉCIALE DANS LES PACKS GRATUITS : ils s'ouvrent sans
+    // limite, une ICON finirait par tomber à force de clics.
+    const avecSpeciales = !idsPacksGratuits.has(pack.id);
+    const resultat = acheterPack(prix, precedent => ouvrirPackSolo(pack, catalogueActuel, precedent, undefined,
+      avecSpeciales ? { speciales: catalogueSpecialSolo(), maintenant: Date.now() } : {}));
     if (!resultat) {
       setBilan(coins < prix ? t('solo.missingOvas', { n: nombre(prix - coins) }) : t('solo.noPlayerInPack'));
       return;
@@ -129,12 +167,21 @@ export function CollectionSolo() {
         occupe={ouverture !== null}
         onOuvrir={ouvrirDepuisRoue}
         gratuit={categoriePacks === 'gratuits'}
+        chancesSpeciales={chancesSpeciales}
         paiementAlternatif={categoriePacks === 'gratuits' ? <button type="button" className="btn fantome petit solo-pub-desactivee" disabled title={t('solo.adTitle')}><Icone nom="video" taille={15} /> {t('solo.adDisabled')}</button> : undefined}
       />
     </section>
 
     <section className="solo-catalogue">
       <div className="solo-titre-ligne"><div><div className="eyebrow">{t('solo.playersSubtitle')}</div><h2>{t('solo.playersTitle')}</h2></div><span>{t('solo.badgeNotice')}</span></div>
+      {Object.keys(comptesSpeciaux).length > 0 && <div className="solo-types" role="group" aria-label={t('special.filter.label')}>
+        {([['', t('online.collection.all'), null], ['normal', t('special.filter.players'), null],
+          ['icon', t('special.icons'), <EmblemeIcon key="i" taille={20} />], ['halloween', t('special.halloween'), <Citrouille key="h" taille={20} />]] as const).map(([valeur, libelle, embleme]) =>
+          (valeur === 'icon' || valeur === 'halloween') && !comptesSpeciaux[valeur] ? null
+            : <button key={valeur} type="button" className={`solo-type type-${valeur || 'tout'}${typeCartes === valeur ? ' actif' : ''}`} aria-pressed={typeCartes === valeur} onClick={() => { setTypeCartes(valeur); setPage(0); }}>
+              {embleme}<span>{libelle}</span>{(valeur === 'icon' || valeur === 'halloween') && <b>{nombre(comptesSpeciaux[valeur] ?? 0)}</b>}
+            </button>)}
+      </div>}
       <div className="solo-filtres">
         <label><span>{t('solo.search')}</span><input value={recherche} onChange={e => { setRecherche(e.target.value); setPage(0); }} placeholder={t('solo.searchPlaceholder')} /></label>
         <label><span>{t('solo.rarity')}</span><select value={rarete} onChange={e => { setRarete(e.target.value as RareteCarriere | 'toutes'); setPage(0); }}><option value="toutes">{t('solo.rarity.all')}</option>{RARETES.map(r => <option value={r} key={r}>{t(`online.rarity.${r}`)}</option>)}</select></label>
@@ -151,7 +198,7 @@ export function CollectionSolo() {
     {ouverture && <OuverturePack
       cartes={ouverture.indices.map((indice, position) => ({ ...carteDepuisSource(ouverture.catalogue[indice], 'solo', 'collection', 1), id: `solo-pack-${position}-${ouverture.catalogue[indice].sourceId}` }))}
       pack={ouverture.pack.nom}
-      modele={packAvecSkin(ouverture.pack.id) ? modelePackParNom(ouverture.pack) : undefined}
+      modele={packAvecSkin(ouverture.pack) ? modelePackParNom(ouverture.pack) : undefined}
       garantie={ouverture.pack.garantie}
       apparenceInitiale={apparencePack(ouverture.pack)}
       onFermer={() => setOuverture(null)}

@@ -1,5 +1,5 @@
 import { catalogueMondialCarriere, type SourceCarte } from './catalogueCarriere.js';
-import { carteSpecialeVisibleCollection, catalogueSpecial } from './cartesSpeciales.js';
+import { carteSpecialeVisibleCollection, catalogueSpecial } from './catalogueSpecial.js';
 import type { CarteCarriere, EtatCarriereEnLigne, PageCollection } from './typesCarriere.js';
 
 const normaliser = (texte: string) => texte.normalize('NFD').replace(/[̀-ͯ]/g, '').toLocaleLowerCase('fr');

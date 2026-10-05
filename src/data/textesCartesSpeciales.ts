@@ -13,11 +13,6 @@ export const TEXTES_CARTES_SPECIALES: Record<string, Traduction> = {
   'special.filter.players': { fr: 'Joueurs', en: 'Players', es: 'Jugadores', it: 'Giocatori', de: 'Spieler', pt: 'Jogadores', ja: '選手' },
   'special.collection.section': { fr: 'Cartes spéciales', en: 'Special cards', es: 'Cartas especiales', it: 'Carte speciali', de: 'Sonderkarten', pt: 'Cartas especiais', ja: 'スペシャルカード' },
   'special.collection.players': { fr: 'Joueurs du monde', en: 'Players from around the world', es: 'Jugadores del mundo', it: 'Giocatori dal mondo', de: 'Spieler aus aller Welt', pt: 'Jogadores do mundo', ja: '世界の選手' },
-  'special.collection.disabled': {
-    fr: 'Les cartes spéciales sont désactivées dans cette ligue.', en: 'Special cards are disabled in this league.',
-    es: 'Las cartas especiales están desactivadas en esta liga.', it: 'Le carte speciali sono disattivate in questa lega.',
-    de: 'Sonderkarten sind in dieser Liga deaktiviert.', pt: 'As cartas especiais estão desativadas nesta liga.', ja: 'このリーグではスペシャルカードが無効です。',
-  },
   'special.league.option': { fr: 'Autoriser les cartes spéciales', en: 'Allow special cards', es: 'Permitir cartas especiales', it: 'Consenti le carte speciali', de: 'Sonderkarten erlauben', pt: 'Permitir cartas especiais', ja: 'スペシャルカードを許可' },
   'special.league.optionHelp': {
     fr: 'ICONS, Halloween et les prochains événements : dans les packs, la collection, les équipes et le marché.',
@@ -58,14 +53,10 @@ export const TEXTES_CARTES_SPECIALES: Record<string, Traduction> = {
     es: 'Las cartas especiales están desactivadas en la liga.', it: 'Le carte speciali sono disattivate nella lega.',
     de: 'Sonderkarten sind in der Liga deaktiviert.', pt: 'As cartas especiais estão desativadas na liga.', ja: 'リーグでスペシャルカードが無効になりました。',
   },
-  'special.shop.packName': { fr: 'Pack {name}', en: '{name} pack', es: 'Sobre {name}', it: 'Pacchetto {name}', de: '{name}-Pack', pt: 'Pacote {name}', ja: '{name}パック' },
   'special.shop.event': { fr: 'Événement limité', en: 'Limited event', es: 'Evento limitado', it: 'Evento limitato', de: 'Begrenztes Event', pt: 'Evento limitado', ja: '期間限定イベント' },
   'special.shop.until': { fr: 'Jusqu’au {date}', en: 'Until {date}', es: 'Hasta el {date}', it: 'Fino al {date}', de: 'Bis {date}', pt: 'Até {date}', ja: '{date}まで' },
-  'special.shop.open': { fr: 'Ouvrir · {price} Ovas', en: 'Open · {price} Ovas', es: 'Abrir · {price} Ovas', it: 'Apri · {price} Ovas', de: 'Öffnen · {price} Ovas', pt: 'Abrir · {price} Ovas', ja: '開封 · {price} Ovas' },
   'special.shop.guaranteed': { fr: 'Une carte {name} garantie', en: 'One {name} card guaranteed', es: 'Una carta {name} garantizada', it: 'Una carta {name} garantita', de: 'Eine {name}-Karte garantiert', pt: 'Uma carta {name} garantida', ja: '{name}カード1枚確定' },
   'special.shop.perCard': { fr: '{name} : {n} % par carte', en: '{name}: {n}% per card', es: '{name}: {n} % por carta', it: '{name}: {n}% per carta', de: '{name}: {n} % pro Karte', pt: '{name}: {n} % por carta', ja: '{name}：1枚あたり{n}%' },
-  'special.shop.odds': { fr: 'Cartes spéciales', en: 'Special cards', es: 'Cartas especiales', it: 'Carte speciali', de: 'Sonderkarten', pt: 'Cartas especiais', ja: 'スペシャルカード' },
-  'special.shop.missing': { fr: 'Il te manque {n} Ovas.', en: 'You need {n} more Ovas.', es: 'Te faltan {n} Ovas.', it: 'Ti mancano {n} Ovas.', de: 'Dir fehlen {n} Ovas.', pt: 'Faltam-te {n} Ovas.', ja: 'あと{n} Ovas必要です。' },
   'special.chemistry.floor': {
     fr: 'Carte spéciale : collectif garanti {points}/{max}.', en: 'Special card: guaranteed chemistry {points}/{max}.',
     es: 'Carta especial: colectivo garantizado {points}/{max}.', it: 'Carta speciale: collettivo garantito {points}/{max}.',

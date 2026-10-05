@@ -14,7 +14,7 @@ import { actualiserCahierMatchEnLigne, avancerMatchEnLigne, commanderMatchEnLign
 import type { CarteCarriere, ClubCarriere, CommandeCarriere, CompetitionCarriere, CreationCarriere, EtatCarriereEnLigne, LigneClassementCarriere, ObjectifCarriere, PackCarriere, RencontreCarriere, TransactionCarriere, VueCarriereEnLigne } from './typesCarriere.js';
 import { LOT_VENTE_RAPIDE_MAX, valeurVenteRapide } from './venteRapideCarriere.js';
 import { bonusCollectif, collectifCarriere } from './collectifCarriere.js';
-import { carteSurMarcheAutorisee, catalogueSpecial, identiteJoueur, packEvenementOuvert, packsEvenements, preparerTirageSpecial, resumeSpeciauxLigue, tirerSpeciale } from './cartesSpeciales.js';
+import { carteSurMarcheAutorisee, catalogueSpecial, identiteJoueur, preparerTirageSpecial, resumeSpeciauxLigue, tirerSpeciale } from './catalogueSpecial.js';
 import { estPuissanceDeDeux, nombreQualifiesPlayoffs, nombreQualifiesPoules, repartirPoules } from './poulesCarriere.js';
 
 const HEURE = 3_600_000;
@@ -223,7 +223,6 @@ function attribuerPacksQuotidiens(etat: EtatCarriereEnLigne, maintenant: number)
     const place = classement.findIndex(ligne => ligne.clubId === club.id);
     const rang = place >= 0 ? place : Math.max(0, etat.clubs.length - 1);
     const actifs = packsActifsLigue(etat);
-    // ⚠️ UN PACK D'ÉVÉNEMENT NE TOMBE JAMAIS DU CIEL : il s'achète en Ovas.
     const disponibles = etat.packs.filter(pack => !pack.evenement && (!actifs || actifs.includes(pack.id)));
     const poids = disponibles.map(pack => poidsPackQuotidien(pack, rang, etat.clubs.length, classementActif));
     const rng = hasard(`${etat.graine}:packs-quotidiens:${jour}:${club.id}`);
@@ -479,7 +478,7 @@ export function creerCarriere(config: CreationCarriere, maintenant: number, grai
     // lui-même : sans plafond, il se donne dix millions et le marché de la
     // ligue n'existe plus. 100 000 Ovas, c'est déjà trois saisons de gains.
     dotationOvas: dotationValide(config.dotationOvas),
-    clubs: [], cartes: [], packs: [...copier(packsCatalogueAdmin()), ...packsEvenements()], competitions: [], rencontres: [], ventes: [], echanges: [], transactions: [], objectifs: [], histoire: [] };
+    clubs: [], cartes: [], packs: copier(packsCatalogueAdmin()), competitions: [], rencontres: [], ventes: [], echanges: [], transactions: [], objectifs: [], histoire: [] };
   ajouterClub(etat, config.compteId, config.pseudo, config.clubNom, maintenant, graine, config.embleme);
   attribuerPacksQuotidiens(etat, maintenant);
   return etat;
@@ -530,11 +529,11 @@ export function creerLaboratoireCarriere(config: Pick<CreationCarriere, 'id' | '
 
 function ouvrirPack(etat: EtatCarriereEnLigne, club: ClubCarriere, packId: string, maintenant: number, graine: string, gratuit = false) {
   const pack = etat.packs.find(p => p.id === packId); exiger(pack, 'Pack inconnu.');
-  // ⚠️ UN PACK D'ÉVÉNEMENT OBÉIT À SA FENÊTRE, PAS À LA LISTE DES PACKS DE LA
-  // LIGUE : fini le 30 novembre, il refuse de s'ouvrir même si l'écran
-  // d'avant l'affiche encore. Aucun Ova n'est débité.
-  if (pack.evenement) exiger(packEvenementOuvert(pack, etat.cartesSpeciales, maintenant), 'Ce pack d’événement n’est plus disponible.');
-  else if (etat.publique || !gratuit) {
+  // ⚠️ UN PACK D'ÉVÉNEMENT (HALLOWEEN…) NE SE VEND PAS EN LIGUE : il est dans la
+  // boutique de packs spéciaux de la Collection solo. Ses cartes, elles, peuvent
+  // sortir des packs ordinaires d'une ligue qui les autorise.
+  exiger(!pack.evenement, 'Ce pack se trouve dans la boutique de packs spéciaux de la Collection solo.');
+  if (etat.publique || !gratuit) {
     const actifs = packsActifsLigue(etat);
     exiger(!actifs || actifs.includes(packId), 'Ce pack est désactivé dans cette ligue.');
   }
@@ -560,7 +559,7 @@ function ouvrirPack(etat: EtatCarriereEnLigne, club: ClubCarriere, packId: strin
   // Les cartes spéciales passent AVANT la bande : une chance par carte, qui
   // suit la qualité du pack (`chanceSpecialeParCarte`). Sans carte spéciale
   // possible, `tirage` vaut null et l'ouverture tire exactement comme avant.
-  const tirage = preparerTirageSpecial(pack, etat.cartesSpeciales, maintenant, pris);
+  const tirage = preparerTirageSpecial(pack, etat.cartesSpeciales, maintenant, pris, catalogueSpecial());
   // Un pack d'événement promet SA carte : sans elle, il ne s'ouvre pas.
   exiger(!pack.garantieSpeciale || tirage?.lots.some(l => l.evenement === pack.garantieSpeciale),
     'Toutes les cartes de cet événement sont déjà distribuées dans votre ligue. Aucun Ova débité.');
@@ -1293,15 +1292,9 @@ function expirerMarche(etat: EtatCarriereEnLigne, maintenant: number) {
  * fait l'économie — restent ceux de la ligue.
  */
 function completerPacks(etat: EtatCarriereEnLigne) {
-  // Les packs d'événement suivent le Labo à chaque actualisation (prix,
-  // probabilités, dates, interrupteur) : c'est ce qui les fait disparaître
-  // d'eux-mêmes à la fin de l'événement.
-  const evenements = packsEvenements();
-  for (const pack of evenements) {
-    const i = etat.packs.findIndex(p => p.id === pack.id);
-    if (i < 0) etat.packs.push(pack); else etat.packs[i] = pack;
-  }
-  for (const pack of etat.packs) if (pack.evenement && pack.evenement.actif && !evenements.some(e => e.id === pack.id)) pack.evenement = { ...pack.evenement, actif: false };
+  // Les packs d'événement vivent dans la boutique de packs spéciaux de la
+  // Collection solo, jamais dans l'état d'une ligue.
+  if (etat.packs.some(p => p.evenement)) etat.packs = etat.packs.filter(p => !p.evenement);
   for (const edition of Object.values(catalogueAdmin().packs)) {
     const i = etat.packs.findIndex(p => p.id === edition.id);
     if(i < 0) etat.packs.push(copier(edition)); else etat.packs[i] = copier(edition);

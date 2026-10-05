@@ -1,7 +1,7 @@
 import { creerPaiement, diagnosticErreurStripe, journalErreurStripe } from './paiementsStripe.js';
 import { contexteAtelier, enregistrerAtelier, vueAtelier } from './atelierAdmin.js';
 import { lotImport, vueImports, vueSpeciales } from './atelierSpeciales.js';
-import { catalogueSpecial } from '../src/lib/ligue/cartesSpeciales.js';
+import { catalogueSpecial, specialesPubliques } from '../src/lib/ligue/catalogueSpecial.js';
 import { catalogueAdmin, CATALOGUE_ADMIN_VIDE, type CatalogueAdmin } from '../src/lib/ligue/atelierCatalogue.js';
 import { createHash, randomBytes, randomUUID, scrypt, timingSafeEqual } from 'node:crypto';
 import { isDeepStrictEqual, promisify } from 'node:util';
@@ -53,7 +53,16 @@ const texte = (x: unknown, min: number, max: number, nom: string): string => {
 };
 const idValide = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 let clesCartesSolo: Set<string> | undefined;
-const cartesEchangeables = () => (clesCartesSolo ??= new Set(catalogueBaseCarriere().map(c => cleCarteSolo(c.sourceId))));
+/**
+ * Les cartes qu'on peut s'échanger en Collection solo : le catalogue de base,
+ * plus les cartes spéciales publiées un jour (leurs exemplaires existent).
+ */
+const cartesEchangeables = () => {
+  clesCartesSolo ??= new Set(catalogueBaseCarriere().map(c => cleCarteSolo(c.sourceId)));
+  const speciales = specialesPubliques().definitions;
+  if (!speciales.length) return clesCartesSolo;
+  return new Set([...clesCartesSolo, ...speciales.map(d => cleCarteSolo(d.id))]);
+};
 
 interface SalonAmicalServeur {
   code: string;
@@ -678,10 +687,12 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         const config = catalogueAdmin();
         const connue = Number(url.searchParams.get('revision'));
         // Le gros catalogue de base est déjà dans le jeu. Seules les éditions
-        // de joueurs de la base en ligne traversent le réseau.
+        // de joueurs de la base en ligne traversent le réseau — et les cartes
+        // spéciales PUBLIÉES, avec leurs événements (pack Halloween compris) :
+        // jamais un brouillon ni une carte sans image.
         return res.status(200).json(connue === config.revision
           ? { revision: config.revision }
-          : { revision: config.revision, joueurs: config.joueurs });
+          : { revision: config.revision, joueurs: config.joueurs, speciales: specialesPubliques(config) });
       }
       // ⚠️ Les écussons se demandent à part, PAS dans la vue de la ligue :
       // 1 353 entrées, soit 80 Ko qui repartiraient toutes les deux secondes

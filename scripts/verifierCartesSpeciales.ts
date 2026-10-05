@@ -8,8 +8,9 @@
 //   • rien ne sort avant l'image et la publication, rien dans une ligue qui
 //     ne les autorise pas — et une telle ligue tire EXACTEMENT comme avant ;
 //   • la rareté : ICONS proches des Mythiques, Halloween entre bleue et Mythique ;
-//   • le pack Halloween : en boutique pendant la fenêtre, garanti, puis disparu
-//     le 1er décembre, les cartes obtenues restant dans les clubs ;
+//   • le pack Halloween : dans la boutique de packs spéciaux de la Collection
+//     solo (jamais en ligue), garanti, puis disparu le 1er décembre ; ses
+//     cartes sortent aussi des packs ordinaires des ligues, jusqu'à la même date ;
 //   • collection, marché, collectif (COL 10), une seule carte par joueur sur la feuille ;
 //   • le Labo par l'API réelle : droits, bornes, images, publication, imports.
 
@@ -24,8 +25,10 @@ import { contexteAtelier } from '../serveur/atelierAdmin';
 import { CATALOGUE_ADMIN_VIDE, type CatalogueAdmin } from '../src/lib/ligue/atelierCatalogue';
 import { PACKS_CARRIERE } from '../src/lib/ligue/catalogueCarriere';
 import {
-  catalogueSpecial, chanceSpecialeParCarte, definitionsDepart, packEvenementOuvert, statutCarteSpeciale, EVENEMENTS_DEPART,
-} from '../src/lib/ligue/cartesSpeciales';
+  assemblerCatalogueSpecial, catalogueSpecial, chanceSpecialeParCarte, definitionsDepart, specialesPubliques, statutCarteSpeciale, EVENEMENTS_DEPART,
+} from '../src/lib/ligue/catalogueSpecial';
+import { catalogueBaseCarriere } from '../src/lib/ligue/catalogueCarriere';
+import { etatCollectionSoloVide, ouvrirPackSolo, packCollectionSolo, packsEvenementSolo } from '../src/lib/collectionSolo';
 import { agirCarriere, avancerCarriere, creerCarriere } from '../src/lib/ligue/carriere';
 import { collectionCarriere } from '../src/lib/ligue/collectionCarriere';
 import { collectifCarriere } from '../src/lib/ligue/collectifCarriere';
@@ -97,8 +100,6 @@ contexteAtelier.run(PUBLIEE, () => {
   const fermee = ouvrir(ligue(false, id), 'elite', 25);
   egal(speciales(fermee).length, 0, 'ligue fermée : aucune carte spéciale');
   egal(fermee.cartes.map(c => c.sourceId), sans.cartes.map(c => c.sourceId), 'ligue fermée : mêmes tirages qu’avant les cartes spéciales');
-  ok(!fermee.packs.find(p => p.evenement) || !packEvenementOuvert(fermee.packs.find(p => p.evenement)!, fermee.cartesSpeciales, PENDANT), 'ligue fermée : pas de pack Halloween');
-  assert.throws(() => agirCarriere(fermee, kiri, { type: 'ouvrirPack', packId: 'evenement-halloween-2026' }, PENDANT, 'x'), /plus disponible/); controles++;
 
   // ── 4. Sans image, rien ne sort même dans une ligue ouverte ──────────────
   const sansImage = contexteAtelier.run(CATALOGUE_ADMIN_VIDE, () => ouvrir(ligue(true), 'elite', 25));
@@ -122,30 +123,48 @@ contexteAtelier.run(PUBLIEE, () => {
   egal(halloweenCarte.speciale?.collectif, 10, 'la carte distribuée garde son COL 10');
   egal(new Set(ouverte.cartes.map(c => c.sourceId)).size, ouverte.cartes.length, 'unicité par ligue respectée');
 
-  // ── 6. Le pack Halloween ───────────────────────────────────────────────────
-  let avecPack = ligue(true), ouverts = 0;
-  for (;;) {
-    avecPack.clubs[0].ovas = 1_000_000;
-    try { avecPack = agirCarriere(avecPack, kiri, { type: 'ouvrirPack', packId: 'evenement-halloween-2026' }, PENDANT, `h-${ouverts}`); ouverts++; }
-    catch (e) { ok(/déjà distribuées/.test((e as Error).message), 'lot Halloween épuisé : ouverture refusée, aucun Ova débité'); break; }
-    if (ouverts > 40) throw new Error('le lot Halloween ne s’épuise jamais');
-  }
-  const lots = avecPack.transactions.filter(t => t.nature === 'pack');
-  ok(lots.length >= 8 && lots.length <= 23, `${lots.length} packs Halloween avant épuisement des 23 cartes`);
-  ok(lots.every(t => t.cartes.some(id => avecPack.cartes.find(c => c.id === id)?.speciale?.evenement === 'halloween-2026')), 'chaque pack Halloween contient une Halloween');
-  ok(lots.every(t => t.ovas === -9000), 'payé 9 000 Ovas');
-  egal(speciales(avecPack).filter(c => c.speciale?.type === 'halloween').length, 23, 'les 23 Halloween sont sorties');
-  const nonPubliees = contexteAtelier.run(CATALOGUE_ADMIN_VIDE, () => avancerCarriere(ligue(true), PENDANT, 'v'));
-  ok(!packEvenementOuvert(nonPubliees.packs.find(p => p.id === 'evenement-halloween-2026')!, true, PENDANT), 'aucune Halloween publiée : pas de pack en boutique');
-  ok(!avecPack.clubs[0].packsGratuits?.some(p => p.packId === 'evenement-halloween-2026'), 'jamais offert en pack quotidien');
-  // Le 1er décembre : le pack disparaît, la proba tombe à 0, les cartes restent.
-  const decembre = avancerCarriere(avecPack, APRES, 'decembre');
-  ok(!packEvenementOuvert(decembre.packs.find(p => p.id === 'evenement-halloween-2026')!, true, APRES), 'fin novembre : le pack quitte la boutique');
-  assert.throws(() => agirCarriere(decembre, kiri, { type: 'ouvrirPack', packId: 'evenement-halloween-2026' }, APRES, 'x'), /plus disponible/); controles++;
+  // ── 6. Le pack Halloween n'est PAS en ligue ; ses cartes, si ─────────────
+  ok(!ouverte.packs.some(p => p.evenement), 'aucun pack d’événement dans la boutique d’une ligue');
+  assert.throws(() => agirCarriere(ouverte, kiri, { type: 'ouvrirPack', packId: 'evenement-halloween-2026' }, PENDANT, 'x'), /Pack inconnu/); controles++;
+  ok(!ouverte.clubs[0].packsGratuits?.some(p => p.packId.startsWith('evenement-')), 'jamais offert en pack quotidien');
+  const ancienneAvecPack = structuredClone(ouverte);
+  ancienneAvecPack.packs.push({ ...structuredClone(PACKS_CARRIERE[0]), id: 'evenement-halloween-2026', evenement: { id: 'halloween-2026', type: 'halloween', actif: true } });
+  ok(!avancerCarriere(ancienneAvecPack, PENDANT, 'nettoyage').packs.some(p => p.evenement), 'un pack d’événement resté dans une ligue en est retiré');
+  // Le 1er décembre : plus aucune Halloween ne sort des packs de ligue ; les cartes restent.
+  const decembre = avancerCarriere(ouverte, APRES, 'decembre');
   const apres = ouvrir(decembre, 'elite', 150, APRES);
   egal(speciales(apres).filter(c => c.speciale?.type === 'halloween').length, speciales(decembre).filter(c => c.speciale?.type === 'halloween').length, 'après l’événement : plus aucune Halloween ne sort');
-  ok(speciales(apres).some(c => c.speciale?.type === 'icon'), 'ICONS toute l’année');
-  ok(speciales(decembre).length === speciales(avecPack).length, 'les Halloween obtenues restent dans les clubs');
+  ok(speciales(apres).length > speciales(decembre).length && speciales(apres).some(c => c.speciale?.type === 'icon'), 'ICONS toute l’année');
+  egal(speciales(decembre).length, speciales(ouverte).length, 'les Halloween obtenues restent dans les clubs');
+
+  // ── 6 bis. Collection solo : la boutique de packs spéciaux ───────────────
+  const publiques = specialesPubliques(PUBLIEE);
+  const base = catalogueBaseCarriere(), parId = new Map(base.map(c => [c.sourceId, c]));
+  const solo = assemblerCatalogueSpecial(publiques.definitions, publiques.evenements, id => parId.get(id));
+  const catalogueSolo = [...base, ...solo.definitions.map(d => solo.sources.get(d.id)!)];
+  const [packHalloween] = packsEvenementSolo(solo, PENDANT);
+  ok(packHalloween?.id === 'evenement-halloween-2026', 'le pack Halloween est en vente dans la boutique de packs spéciaux');
+  egal([packHalloween.prix, packHalloween.cartes], [150, 10], 'prix en Ovas du compte, dix cartes comme les packs solo');
+  egal(packCollectionSolo(packHalloween).prix, 150, 'le prix du Labo n’est pas converti');
+  egal(packsEvenementSolo(solo, APRES).length, 0, 'le 1er décembre, il quitte la boutique');
+  const soloVide = assemblerCatalogueSpecial(specialesPubliques(CATALOGUE_ADMIN_VIDE).definitions, specialesPubliques(CATALOGUE_ADMIN_VIDE).evenements);
+  egal(soloVide.definitions.length, 0, 'sans publication, le public ne reçoit aucune carte spéciale');
+  egal(packsEvenementSolo(soloVide, PENDANT).length, 0, 'et le pack n’apparaît pas');
+  let etatSolo = etatCollectionSoloVide(), halloweenSolo = 0;
+  for (let n = 0; n < 60; n++) {
+    const r = ouvrirPackSolo(packHalloween, catalogueSolo, etatSolo, undefined, { speciales: solo, maintenant: PENDANT });
+    egal(r.indices.length, 10, `pack Halloween n° ${n + 1} : dix cartes`);
+    const tirees = r.indices.map(i => catalogueSolo[i]);
+    ok(tirees.some(c => c.speciale?.evenement === 'halloween-2026'), `pack Halloween n° ${n + 1} : une Halloween au moins`);
+    halloweenSolo += tirees.filter(c => c.speciale?.type === 'halloween').length;
+    etatSolo = r.etat;
+  }
+  console.log(`  60 packs Halloween solo : ${halloweenSolo} cartes Halloween`);
+  const refuse = ouvrirPackSolo(packHalloween, catalogueSolo, etatSolo, undefined, { speciales: solo, maintenant: APRES });
+  egal(refuse.indices.length, 0, 'après l’événement, un pack Halloween ne se tire plus (rien débité)');
+  let speciauxGratuits = 0;
+  for (let n = 0; n < 200; n++) speciauxGratuits += ouvrirPackSolo(packCollectionSolo(PACKS_CARRIERE.find(p => p.id === 'or')!), catalogueSolo, etatCollectionSoloVide()).indices.filter(i => catalogueSolo[i].speciale).length;
+  egal(speciauxGratuits, 0, 'les cartes spéciales n’entrent jamais dans les bandes ordinaires');
 
   // ── 7. Interrupteur global ICONS ───────────────────────────────────────────
   const sansIcons = contexteAtelier.run(configPubliee(() => true, { speciales: { evenements: { icons: { actif: false } } } }), () => ouvrir(ligue(true), 'elite', 200));
@@ -250,10 +269,10 @@ try {
   egal((await ecrire('publierCartesSpeciales', { ids: ['icon:dan-carter', 'icon:richie-mccaw'], published: true })).donnees.ignorees, ['Richie McCaw'], 'publication en masse : sans image, ignorée');
   const publique = await appel(idAutre, url);
   ok(publique.statut === 200 && publique.entetes['Content-Type'] === 'image/png' && publique.entetes['Cache-Control'].includes('immutable'), 'image publique après publication');
-  egal((await ecrire('evenementSpecial', { id: 'halloween-2026', evenement: { pack: { prix: 12000 }, tauxPacksNormaux: 1.5 } })).statut, 200, 'pack Halloween : prix réglé');
+  egal((await ecrire('evenementSpecial', { id: 'halloween-2026', evenement: { pack: { prix: 220, cartes: 15 }, tauxPacksNormaux: 1.5 } })).statut, 200, 'pack Halloween : prix et volume réglés');
   egal((await ecrire('evenementSpecial', { id: 'icons', evenement: { actif: false } })).statut, 200, 'bouton « Activer ICONS »');
   const apresReglage = await appel(idKiri, '/api/carriere?atelier=1&section=speciales');
-  egal(apresReglage.donnees.evenements.find((e: any) => e.id === 'halloween-2026').pack.prix, 12000, 'prix relu');
+  egal([apresReglage.donnees.evenements.find((e: any) => e.id === 'halloween-2026').pack.prix, apresReglage.donnees.evenements.find((e: any) => e.id === 'halloween-2026').pack.cartes], [220, 15], 'prix et volume relus');
   egal(apresReglage.donnees.evenements.find((e: any) => e.id === 'icons').actif, false, 'ICONS coupées');
   const carter = apresReglage.donnees.cartes.find((c: any) => c.id === 'icon:dan-carter');
   egal([carter.overall, carter.collectif, carter.packWeight, carter.statut], [96, 8, 2, 'published'], 'carte relue');
@@ -262,11 +281,11 @@ try {
     { cardType: 'icon', nom: 'Sébastien Chabal', poste: 'numero_8', nation: 'France', overall: 89 },
     { cardType: 'halloween', nom: 'Hors bornes', poste: 'arriere', nation: 'France', overall: 70 },
   ] })).donnees.erreurs.length, 1, 'import en masse : la ligne fautive est rendue, les autres passent');
-  // Une ligue lit le nouveau prix à sa prochaine actualisation.
-  const etat = creerCarriere({ id: randomUUID(), nom: 'Après réglage', code: 'RG', compteId: idKiri, pseudo: 'Kiri', clubNom: 'Kiri XV', rythme: 1, maxClubs: 2, cartesSpeciales: true }, PENDANT, 'reglage');
-  contexteAtelier.run(await db.atelier!.lire(), () => {
-    egal(avancerCarriere(etat, PENDANT, 'a').packs.find(p => p.id === 'evenement-halloween-2026')?.prix, 12000, 'les ligues suivent le prix du Labo');
-  });
+  // La Collection solo lit le catalogue public : seules les cartes publiées, le pack au prix du Labo.
+  const publicSolo = await appel('', '/api/carriere?catalogueSolo=1&revision=-1');
+  egal(publicSolo.statut, 200, 'catalogue solo public');
+  egal(publicSolo.donnees.speciales.definitions.map((d: any) => d.id), ['icon:dan-carter'], 'le public ne reçoit que les cartes publiées');
+  egal(publicSolo.donnees.speciales.evenements.find((e: any) => e.id === 'halloween-2026').pack.prix, 220, 'le pack Halloween solo suit le prix du Labo');
 
   // ── 13. Imports joueurs ─────────────────────────────────────────────────
   const lot = await appel(idKiri, '/api/carriere?atelier=1&section=imports&lot=mlr-championship-npc');
