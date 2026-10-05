@@ -147,8 +147,9 @@ function jouer(cle: string, minutesReelles: number) {
     } else etapeMelee = '';
 
     // ── La touche : le lancer part quand l'alignement est formé ──────────────
-    const conquete = etat.conquete as { type: string; progression?: number } | null;
-    if (conquete?.type === 'touche') {
+    const conquete = etat.conquete as { type: string; progression?: number; rapide?: unknown } | null;
+    // Une touche jouée vite n'a pas d'alignement : c'est justement ce qui la rend permise.
+    if (conquete?.type === 'touche' && !conquete.rapide) {
       if (toucheVue !== conquete) { toucheVue = conquete; bilan.touches++; sautVu = false; lancerVu = false; }
       if (!lancerVu && (conquete.progression ?? 0) > 0.05) {
         // Le temps de la touche vient de commencer à se décompter : l'attente est finie.

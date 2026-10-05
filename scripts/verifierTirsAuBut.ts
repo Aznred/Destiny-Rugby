@@ -59,6 +59,7 @@ console.log('géométrie : 20 000 tirs |', issues, `| marges : barre ${margeBarr
 // ── 1 bis. Les tirs « à leur manière » de l'IA par poste : vent, hauteur, poteau ──
 {
   const vus: Record<string, number> = {};
+  let chuteMin = Infinity, chuteMax = 0; const chutes: number[] = [];
   let dureeMin = Infinity, dureeMax = 0, sommetMin = Infinity, sommetMax = 0, deriveMax = 0, ecartMaxReussi = 0, largeMax = 0;
   for (let i = 0; i < 20_000; i++) {
     const cote = alea() < .5 ? 'A' : 'B';
@@ -69,6 +70,8 @@ console.log('géométrie : 20 000 tirs |', issues, `| marges : barre ${margeBarr
     const contexte = {
       puissance: 45 + alea() * 50, precision: 45 + alea() * 50, fraicheur: 30 + alea() * 70, style: alea() * 2 - 1,
       ventDos: (alea() - .5) * 22, ventTravers: (alea() - .5) * 22, pression: alea() < .3 ? 1 : 0,
+      // Une fois sur deux, le ballon continue sa course après les poteaux (IA 3).
+      suite: alea() < .5,
     };
     const visee = viseeTirVariee(de, cote, reussi, alea(), alea(), alea(), contexte);
     vus[visee.issue] = (vus[visee.issue] ?? 0) + 1;
@@ -97,12 +100,21 @@ console.log('géométrie : 20 000 tirs |', issues, `| marges : barre ${margeBarr
     const sommet = .19 + 9.81 * visee.duree * visee.duree / 8;
     sommetMin = Math.min(sommetMin, sommet); sommetMax = Math.max(sommetMax, sommet);
     deriveMax = Math.max(deriveMax, Math.abs(visee.derive?.y ?? 0));
-    assert.ok(visee.vers.y >= 1 && visee.vers.y <= LARGEUR - 1 && visee.vers.x >= 1 && visee.vers.x <= LIGNE_B + LIGNE_A - 1, 'Le ballon retombe dans l’enceinte.');
+    if (contexte.suite) {
+      // La chute suit la portée de la frappe : de trois mètres derrière la ligne jusqu'à la tribune.
+      assert.ok(visee.vers.y >= -24 && visee.vers.y <= LARGEUR + 24 && visee.vers.x >= -26 && visee.vers.x <= LIGNE_B + LIGNE_A + 26, 'Le ballon retombe dans le stade.');
+      if (reussi && !visee.ricochet) { const derriere = (visee.vers.x - ligne) * (cote === 'A' ? 1 : -1); chuteMin = Math.min(chuteMin, derriere); chuteMax = Math.max(chuteMax, derriere); chutes.push(derriere); }
+    } else assert.ok(visee.vers.y >= 1 && visee.vers.y <= LARGEUR - 1 && visee.vers.x >= 1 && visee.vers.x <= LIGNE_B + LIGNE_A - 1, 'Le ballon retombe dans l’enceinte.');
   }
   for (const issue of ['dedans', 'poteauRentrant', 'poteauSortant', 'gauche', 'droite', 'court', 'sousLaBarre']) {
     assert.ok((vus[issue] ?? 0) > 40, `L’issue « ${issue} » doit exister (${vus[issue] ?? 0}).`);
   }
   assert.ok(sommetMax - sommetMin > 6, 'Les tirs n’ont pas tous la même hauteur.');
+  // Le point de chute n'est plus « toujours au même endroit » : il s'étale sur plus de vingt mètres.
+  const moyenne = chutes.reduce((a, b) => a + b, 0) / chutes.length;
+  const ecartType = Math.sqrt(chutes.reduce((a, b) => a + (b - moyenne) ** 2, 0) / chutes.length);
+  assert.ok(chuteMax - chuteMin > 22 && ecartType > 6, `Les tirs réussis retombent tous au même endroit (de ${chuteMin.toFixed(1)} à ${chuteMax.toFixed(1)} m, écart type ${ecartType.toFixed(1)}).`);
+  console.log(`après les poteaux : chute de ${chuteMin.toFixed(1)} à ${chuteMax.toFixed(1)} m derrière la ligne, écart type ${ecartType.toFixed(1)} m`);
   assert.ok(ecartMaxReussi > 2 && largeMax > 5, 'Un tir réussi peut frôler le poteau ; un raté peut passer très large.');
   console.log('tirs variés : 20 000 |', vus, `| vol de ${dureeMin.toFixed(2)} à ${dureeMax.toFixed(2)} s, sommet de ${sommetMin.toFixed(1)} à ${sommetMax.toFixed(1)} m, dérive du vent jusqu’à ${deriveMax.toFixed(1)} m, réussi jusqu’à ${ecartMaxReussi.toFixed(2)} m de l’axe, raté jusqu’à ${largeMax.toFixed(1)} m du poteau`);
 }
@@ -144,7 +156,7 @@ function jouer(cle: string, cadenceDetaillee: boolean, ia?: number) {
   assert.ok(e.fini, `${cle} : le match va à son terme.`);
   return { tirs, drops, contres, score: `${e.scoreA}-${e.scoreB}` };
 }
-for (const [detaillee, ia] of [[false, 0], [true, 0], [true, 2]] as const) {
+for (const [detaillee, ia] of [[false, 0], [true, 0], [true, 2], [true, 3]] as const) {
   let tirs = 0, drops = 0, contres = 0;
   const scores: string[] = [];
   const combien = ia ? 16 : 8;

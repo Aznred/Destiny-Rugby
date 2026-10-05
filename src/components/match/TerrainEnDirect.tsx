@@ -118,6 +118,8 @@ export interface AfficheDirect {
   /** Secondes de jeu affichées. */
   seconde: number;
   score: { domicile: number; exterieur: number };
+  /** L'état rejoué du film à l'instant montré : c'est lui que regardent les commentateurs. */
+  etat?: object;
 }
 
 interface Props {
@@ -561,6 +563,7 @@ function TerrainEnDirect({ terrain = TERRAIN_VIDE, film, matchId, surAffiche, no
         rappelAffiche.current?.({
           terrain: courant, seconde: imageFilm ? lec.etat.t : courant.instantJeu ?? courant.horloge * 60,
           score: imageFilm ? { domicile: lec.etat.scoreA, exterieur: lec.etat.scoreB } : scoreCourant.current!,
+          etat: imageFilm ? lec.etat : undefined,
         });
       }
       if (maintenant >= prochainRenduReact) {

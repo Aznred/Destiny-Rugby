@@ -6,6 +6,7 @@ import { CadreTmoReplay } from './CadreTmoReplay';
 import { Icone } from '../Icone';
 import { HabillageTV } from './HabillageTV';
 import { CommentateursMatch } from './CommentateursMatch';
+import type { EtatRetransmission } from '../../lib/commentaires/retransmission';
 import { couleursEquipeTV, DUREE_EQUIPE_TV, type IdentiteTV } from '../../lib/habillageTV';
 import { bulleDuMoment, memoireBullesVide, phraseDuMarqueur, type ContexteStatsTV, type PhraseTV } from '../../lib/statsTV';
 import { preferencesTele } from '../../lib/match3D';
@@ -111,6 +112,11 @@ export function DirectCinema({
   const cahier = m.maStrategie;
   const combinaisonsActives = cahier?.combinaisons?.filter(c => c.active).length ?? 0;
   const secondeCourante = affiche ? affiche.seconde : (m.terrain?.horloge ?? m.horloge) * 60;
+  // Les commentateurs regardent l'état REJOUÉ du film (celui qu'on voit), complété de ce qu'il ne porte pas.
+  const etatCommente = affiche?.etat
+    ? { ...(affiche.etat as EtatRetransmission), clubA: domicile, clubB: exterieur, minute: Math.floor(secondeCourante / 60),
+        periode: (terrain?.periode ?? (secondeCourante >= 2400 ? 2 : 1)) as 1 | 2 }
+    : null;
   const presentation = ouverture.current && !presentationPassee ? tempsPresentation : undefined;
   const momentsVus = affiche ? moments.filter((v) => v.seconde <= secondeCourante + 0.5) : moments;
   const dernierMoment = momentsVus.at(-1);
@@ -137,7 +143,9 @@ export function DirectCinema({
       </header>
       {m.monCote && cahier && (cahier.modeCombinaisons === 'configure' || !!cahier.combinaisons?.length) && <div className={`dc-cahier ${cahier.modeCombinaisons === 'configure' && combinaisonsActives ? 'actif' : ''}`}><Icone nom="sifflet" taille={16} /><span>{cahier.modeCombinaisons === 'automatique' ? t("ui.89b87c5d09fc") : combinaisonsActives ? tn("ui.13ebe03563fd", combinaisonsActives, { v0: combinaisonsActives }) : t("ui.c2b2701297f3")}</span></div>}
       <div className={`dc-ecran ${isTmo ? 'dc-ecran-tmo' : ''}`}>
-        <CommentateursMatch key={`voix:${m.id}:${m.instance ?? ''}`} lignes={m.fil ?? []} seconde={secondeCourante} pause={pause} />
+        <CommentateursMatch key={`voix:${m.id}:${m.instance ?? ''}`} lignes={m.fil ?? []} seconde={secondeCourante} pause={pause}
+          contexte={contexteTV}
+          etat={etatCommente} />
         {(() => {
           const seconde = Math.floor(secondeCourante);
           if (bulleTenue.current.seconde !== seconde) {

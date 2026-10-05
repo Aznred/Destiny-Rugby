@@ -3,7 +3,16 @@ import { AXE, EN_BUT, LARGEUR, LIGNE_A, LIGNE_B, sens, type Cote, type Vec } fro
 
 export const GRAVITE_BALLON = 9.81;
 /** La même trajectoire sert au moteur et à sa représentation en trois dimensions. */
-export function positionVol(vol: Pick<Vol, 'de' | 'vers' | 'duree' | 'ecoule' | 'type' | 'intention' | 'hauteur'> & Pick<Partial<Vol>, 'derive' | 'ricochet'>, avance = 0): { x: number; y: number; hauteur: number } {
+export function positionVol(vol: Pick<Vol, 'de' | 'vers' | 'duree' | 'ecoule' | 'type' | 'intention' | 'hauteur'> & Pick<Partial<Vol>, 'derive' | 'ricochet' | 'rebond'>, avance = 0): { x: number; y: number; hauteur: number } {
+  // Le rebond : après la retombée, une petite cloche jusqu'à l'endroit où le ballon s'arrête.
+  if (vol.rebond && vol.ecoule + avance > vol.duree) {
+    const sol = vol.ricochet ? vol.ricochet.vers : vol.vers;
+    const v = Math.min(1, (vol.ecoule + avance - vol.duree) / Math.max(.05, vol.rebond.duree));
+    return {
+      x: sol.x + (vol.rebond.vers.x - sol.x) * v, y: sol.y + (vol.rebond.vers.y - sol.y) * v,
+      hauteur: .12 + 4 * vol.rebond.hauteur * v * (1 - v),
+    };
+  }
   const instant = Math.max(0, Math.min(vol.duree, vol.ecoule + avance));
   // Après le poteau, le ballon tombe droit vers son nouveau point de chute.
   if (vol.ricochet && instant > vol.ricochet.t) {
@@ -130,6 +139,13 @@ export interface ContexteTir {
   ventDos: number; ventTravers: number;
   /** Pression du moment, de 0 à 1. */
   pression: number;
+  /**
+   * IA 3 : le ballon continue SA course après les poteaux. Le point de chute
+   * n'est plus « quelques mètres derrière la ligne » : il dépend de la portée
+   * du buteur et de la distance du tir — juste derrière la barre sur une longue
+   * pénalité, vingt-cinq mètres plus loin (dans la tribune) sur un tir de près.
+   */
+  suite?: boolean;
 }
 
 export type IssueTir = 'dedans' | 'poteauRentrant' | 'gauche' | 'droite' | 'court' | 'sousLaBarre' | 'poteauSortant';
@@ -183,6 +199,14 @@ export function viseeTirVariee(
   if (sousLaBarre) ecart = (r2 - .5) * 3.6;
 
   let recul = Math.min(EN_BUT - 1.5, 5 + r3 * 4.5 + dos * .25);
+  // Les bornes de la chute : l'en-but, ou l'enceinte entière quand le ballon continue sa course.
+  let yMin = 1.5, yMax = LARGEUR - 1.5;
+  if (c.suite) {
+    // La portée naturelle de la frappe : un buteur ne dose pas un tir de près, le ballon file loin derrière.
+    const portee = (37 + (c.puissance - 60) * .45 + dos * .9 - face * 1.1 - (100 - c.fraicheur) * .05) * (.8 + r3 * .32);
+    recul = Math.max(2.5, Math.min(34, portee - distance));
+    yMin = -11; yMax = LARGEUR + 11;
+  }
   // Le point de chute qui fait passer la courbe (droite + dérive) à l'écart voulu dans le plan des poteaux.
   const viser = (prolonge: number, d: number) => {
     const part = jusquALaLigne / (jusquALaLigne + prolonge);
@@ -191,7 +215,7 @@ export function viseeTirVariee(
     // de.y + (y − dy − de.y)·part + dy·u² = AXE + ecart
     return (AXE + ecart - de.y - dy * u * u) / part + de.y + dy;
   };
-  while (recul > 1 && (viser(recul, duree) < 1.5 || viser(recul, duree) > LARGEUR - 1.5)) recul -= .5;
+  while (recul > 1 && (viser(recul, duree) < yMin || viser(recul, duree) > yMax)) recul -= .5;
   const construire = (d: number) => ({ de, vers: { x: ligne + s * recul, y: viser(recul, d) }, duree: d, derive: { x: 0, y: c.ventTravers * .5 * .11 * d * d } });
   let vol = construire(duree);
   if (reussi || poteau) {

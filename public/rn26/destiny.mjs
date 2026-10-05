@@ -816,6 +816,16 @@ export class DestinyMatch {
     // soutien reparti à pleine vitesse gardait sa posture de poussée deux
     // secondes, tourné vers l'ancien regroupement (mesuré : 180 images sur 36 000).
     if(recent&&gestures[recent.clip]&&now-recent.debut<=recent.duree&&!(STATIQUES.has(recent.clip)&&speed>1.6&&e.phase!=='ruck')){clip(gestures[recent.clip],now-recent.debut);return done();}
+    // ── Feinte de passe : le haut du corps arme la passe vers le partenaire, puis ramène le ballon ──
+    // Aucun clip de feinte dans l'APK : on joue le DÉBUT de la passe courte, à l'endroit puis à
+    // l'envers, sur le buste seul. Les jambes ne ralentissent pas.
+    if(recent?.clip==='dummy_pass'&&now-recent.debut<.7&&p.id===this.carrier){
+      const t=now-recent.debut,versY=recent.variante==='plus';
+      // L'équipe 0 a sa gauche du côté des y croissants.
+      const cote=versY===(p.team===0)?'left':'right';
+      const arme=t<.32?t:Math.max(0,.32-(t-.32)*.85);
+      d.upper={name:'pass_short_'+cote,time:LACHER_PASSE-.34+arme,weight:clamp(t/.08,0,1)*clamp((.7-t)/.2,0,1)};
+    }
     // ── Crochet : l'appui se voit, le porteur ne s'arrête pas ────────────────
     if(recent?.clip==='dodge'&&now-recent.debut<.95&&p.id===this.carrier){
       const [genre,appui]=String(recent.variante||'exterieur:1').split(':'),t=now-recent.debut;

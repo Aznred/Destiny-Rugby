@@ -1794,3 +1794,10 @@ Fait avec 🏉 — thème artisanal, front soigné, sans rendu générique.
 - **Ligue en ligne — règles 3.** Les nouveaux matchs jouent l'IA par poste des matchs de carrière, étalonnée pour le temps réel (`REGLES_MATCH_EN_LIGNE`).
 - **Match.** Vent (direction, force, rafales), tirs au but aux trajectoires variées (poteau compris), drops décidés par la situation, changement de côté à la mi-temps, renvoi d'en-but et mêlée à cinq, touche rapide conforme, cellules d'avants lancées avant la passe, chenille tenue jusqu'à la frappe.
 - **Habillage TV.** Bandeau du marqueur avec sa statistique, bulles d'information, vent devant un tir — sans aucune requête.
+
+## Correctif 14 (octobre 2026)
+
+- **Le porteur regarde devant lui** (IA de niveau 3 ; ligue : règles 4) : intervalles, deux contre un avec fixation et passe au dernier moment, feinte de passe, défenseur qui choisit, trois contre deux, gestes selon les qualités du joueur.
+- **Tirs au but** : le ballon continue sa course après les poteaux et rebondit ; le point de chute varie de 2 à 34 mètres.
+- **Commentateurs** : un commentateur et un consultant qui nomment les joueurs et connaissent leurs statistiques (français et anglais, voix de synthèse de l'appareil).
+- **Téléphone** : carrière joueur qui tient sur un écran, sortie de match en plein écran sans plantage, scène allégée et pelouse de secours pour iOS.

@@ -36,7 +36,13 @@ export function Terrain3D({
     if (!noeud) return;
     let annule = false;
     let scene: Scene3D | null = null;
-    creerScene3D(noeud, { leger: appareilLeger(), ...rappels.current.options })
+    creerScene3D(noeud, {
+      leger: appareilLeger(),
+      // Le navigateur a repris la mémoire graphique en plein match (iOS quand elle manque) :
+      // l'hôte revient au terrain vu de haut au lieu de laisser une image noire.
+      surPerte: () => { if (!annule) rappels.current.surEchec?.(new Error('Contexte WebGL perdu')); },
+      ...rappels.current.options,
+    })
       .then((creee) => {
         if (annule) { creee.detruire(); return; }
         scene = creee;

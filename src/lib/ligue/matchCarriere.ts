@@ -519,7 +519,8 @@ export interface EtatMatchEnLigne {
    * le moteur d'origine — mêlées et touches installées d'un coup, phases sur
    * minuterie. 2 : le placement se joue (personne n'est déplacé d'un coup, la
    * phase attend ses joueurs) et le match suit la cadence détaillée des matchs
-   * en trois dimensions. 3 : les règles 2, plus l'IA par poste des matchs de
+   * en trois dimensions. 4 : les règles 3, plus la lecture locale du porteur
+   * (intervalles, deux contre un, feinte de passe : IA de niveau 3). 3 : les règles 2, plus l'IA par poste des matchs de
    * carrière (`moteur/ia/`), étalonnée pour quatre-vingts minutes réelles.
    * Une rencontre en cours au moment d'une mise en ligne garde donc son
    * moteur, et son score déjà annoncé.
@@ -532,7 +533,7 @@ export interface EtatMatchEnLigne {
  * ⚠️ LA REMETTRE À 1 SUFFIT À REVENIR EN ARRIÈRE pour les prochains matchs :
  * ceux déjà créés gardent les leurs.
  */
-export const REGLES_MATCH_EN_LIGNE = 3;
+export const REGLES_MATCH_EN_LIGNE = 4;
 /**
  * Défense resserrée des règles 2 : la cadence détaillée marque davantage, ce
  * réglage ramène le nombre d'essais à celui des matchs de ligue d'avant
@@ -544,7 +545,8 @@ export const RESSERREMENT_REGLES_2 = 1;
  * ⚠️ Une retouche de l'IA par poste change la rejoue des matchs en règles 3
  * déjà commencés : la porter par un nouveau niveau, donc une nouvelle règle.
  */
-export const iaDesRegles = (regles: number | undefined): number | undefined => ((regles ?? 1) >= 3 ? 2 : undefined);
+// Règles 4 : le porteur lit ce qu'il a devant lui (`moteur/ia/vision.ts`, IA de niveau 3).
+export const iaDesRegles = (regles: number | undefined): number | undefined => ((regles ?? 1) >= 4 ? 3 : (regles ?? 1) >= 3 ? 2 : undefined);
 
 /** Ce que le client reçoit : jamais la graine, jamais le plan d'en face. */
 export interface VueMatchEnLigne {

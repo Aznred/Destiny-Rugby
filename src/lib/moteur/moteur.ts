@@ -71,6 +71,7 @@ import { choisirLaRelance, choisirLeJeu, goutDe, relireLeJeu, type Acteurs } fro
 import { choisirPorteur, profilDe } from './ia/postes.js';
 import { echelleDesFautes, graviteDeLaFaute, noterFaute, tentation } from './ia/arbitrage.js';
 import { REGLAGES_IA } from './ia/reglages.js';
+import { lectureLocale, ligneDePasseCoupee, lireLeSurnombre, niveauDeLecture, regarderDevant } from './ia/vision.js';
 import {
   AXE, LARGEUR, LONGUEUR, LIGNE_A, LIGNE_B, MILIEU, M22_A, M22_B, adverse, borner,
   dansLes22Adverses, dansSes22, dansSonCamp, distance, distance2, franchieLigne,
@@ -718,6 +719,7 @@ function tick(e: EtatMatch): void {
   // « hésiterait » au lieu de foncer.
   lancerAppelsCombinaison(e);
   if (iaParPoste(e)) soutenirLaPercee(e);
+  if (lectureLocale(e)) conduireLeSurnombre(e);
   if (e.controle) piloterMonJoueur(e);
   if (e.cadenceDetaillee) {
     if (e.phase === 'melee' && e.conquete?.melee) avancerMeleeDetaillee(e);
@@ -2058,7 +2060,7 @@ function phaseJeuCourant(e: EtatMatch, dt: number): void {
   const piloteArcade = e.controleArcadeCamps?.includes(porteur.cote) ?? false;
   if (!piloteArcade) porteur.cible = enEchappee
     ? { x: porteur.cote === 'A' ? LIGNE_B + 2 : LIGNE_A - 2, y: borner(porteur.pos.y, 3, LARGEUR - 3) }
-    : cibleCourseCombinaison(e) ?? cibleCourseStructure(e, porteur) ?? ligneDeCourse(e, porteur);
+    : cibleCourseCombinaison(e) ?? cibleDuRegard(e, porteur) ?? cibleCourseStructure(e, porteur) ?? ligneDeCourse(e, porteur);
   const avant = porteur.pos.x;
   if (!piloteArcade) deplacer(porteur, dt);
   suivreCellule(e);
@@ -2266,7 +2268,17 @@ function phaseJeuCourant(e: EtatMatch, dt: number): void {
     // Croisée et redoublée : le ballon ne part que lorsque le partenaire a
     // fait sa course — ou que le défenseur est sur le porteur.
     || (!!e.cadenceDetaillee && !!suivant && attendLaCourse(e, porteur, suivant) && pression > 2.4);
-  if (!prioriteAplatir && !enEchappee && (enSortieDeRuck || !aDeLEspaceDevant) && suivant && suivant.surLeTerrain
+  // ── LE PORTEUR REGARDE CE QU'IL A DEVANT LUI (IA 3) ──────────────────────
+  // Le plan annoncé n'est qu'une intention. À chaque pas, celui qui a le
+  // ballon lit le rideau : un intervalle à prendre, un deux contre un à
+  // jouer. S'il y a mieux que le plan, il l'abandonne.
+  let gardeLeBallon = false;
+  if (lectureLocale(e) && !enSortieDeRuck && !prioriteAplatir && !enEchappee && !piloteArcade) {
+    const vu = deciderALaVue(e, porteur, pression, suivant);
+    if (vu === 'passe') return;
+    gardeLeBallon = vu === 'garde';
+  } else if (e.duel) e.duel = null;
+  if (!gardeLeBallon && !prioriteAplatir && !enEchappee && (enSortieDeRuck || !aDeLEspaceDevant) && suivant && suivant.surLeTerrain
     && suivantEnRetrait && !temporise
     && distSuivant <= distMax && pression <= pressionMax) {
     passerLeBallon(e, porteur, suivant, pression);
@@ -2309,6 +2321,194 @@ function phaseJeuCourant(e: EtatMatch, dt: number): void {
   e.prochaineDecision = 0.25;
   // On ne tape pas en touche quand on a la ligne devant soi.
   if (!enEchappee && !prioriteAplatir) deciderAvecLeBallon(e, porteur, pression);
+}
+
+// ---------------------------------------------------------------------------
+// LE REGARD DU PORTEUR (IA 3) — intervalles, deux contre un, feinte de passe
+// ---------------------------------------------------------------------------
+
+/** La course que le porteur a décidée en regardant devant lui, tant qu'elle est fraîche. */
+function cibleDuRegard(e: EtatMatch, porteur: Pion): Vec | null {
+  const r = e.regard;
+  if (!lectureLocale(e) || !r || r.id !== porteur.id || !r.cible || e.sim - (r.cibleA ?? -9) > 0.35) return null;
+  return r.cible;
+}
+
+/**
+ * CE QUE CHOISIT LE DÉFENSEUR D'UN DEUX CONTRE UN. Monter sur le porteur,
+ * glisser sur le soutien (surtout quand la touche l'aide), hésiter entre les
+ * deux, ou se jeter dans la ligne de passe. Un seul tirage, au moment où il
+ * comprend qu'il est seul ; celui qui hésite se décide une demi-seconde après.
+ */
+function choixDuDefenseur(e: EtatMatch, d: Pion, soutien: Pion): NonNullable<EtatMatch['duel']>['choix'] {
+  const lit = borner((d.vision - 40) / 50, 0, 1);
+  const presDeLaTouche = Math.min(soutien.pos.y, LARGEUR - soutien.pos.y) < 9;
+  const couper = lit > 0.5 ? 0.1 : 0.03;
+  const glisser = 0.28 + (presDeLaTouche ? 0.2 : 0) + lit * 0.1;
+  const hesiter = borner(0.3 - lit * 0.24, 0.06, 0.3);
+  const t = e.rng();
+  return t < couper ? 'couper' : t < couper + glisser ? 'glisser' : t < couper + glisser + hesiter ? 'hesiter' : 'monter';
+}
+
+/**
+ * LE PORTEUR DÉCIDE AVEC SES YEUX. Rend « passe » s'il vient de donner,
+ * « garde » s'il a une raison de ne pas suivre le plan (il fixe, il feinte, il
+ * attaque un intervalle), `null` s'il n'a rien vu : le plan continue.
+ *
+ * ⚠️ IL NE VOIT PAS TOUT, NI TOUT DE SUITE. Sa lecture (`niveauDeLecture`) fixe
+ * le temps qu'il met à lever la tête, la taille du trou qu'il lui faut, et un
+ * tirage — UN par ballon reçu — dit s'il a la bonne inspiration ce coup-ci.
+ */
+function deciderALaVue(e: EtatMatch, p: Pion, pression: number, suivant: Pion | null): 'passe' | 'garde' | null {
+  const s = sens(p.cote);
+  // Les réglages de la lecture ont deux mesures : le match condensé, et les quatre-vingts minutes réelles.
+  const reel = !condense(e);
+  const R = { ...REGLAGES_IA,
+    intervalleMin: reel ? REGLAGES_IA.intervalleMinReel : REGLAGES_IA.intervalleMin,
+    margeDuPlan: reel ? REGLAGES_IA.margeDuPlanReel : REGLAGES_IA.margeDuPlan,
+    defenseurFixe: reel ? REGLAGES_IA.defenseurFixeReel : REGLAGES_IA.defenseurFixe,
+    feinteReussie: reel ? REGLAGES_IA.feinteReussieReel : REGLAGES_IA.feinteReussie };
+  if (e.regard?.id !== p.id) e.regard = { id: p.id, depuis: e.sim, alea: e.rng() };
+  const regard = e.regard!;
+  const lecture = niveauDeLecture(p);
+  if (e.sim - regard.depuis < (1 - lecture) * R.tempsDeLecture) { if (e.duel?.porteurId !== p.id) e.duel = null; return null; }
+  const courir = (cible: Vec) => { regard.cible = cible; regard.cibleA = e.sim; };
+
+  // ── 1. Le surnombre : fixer, puis donner au dernier moment ───────────────
+  const sur = lireLeSurnombre(e, p);
+  const marge = sur ? 1 + sur.soutiens.length - sur.defenseurs.length : 0;
+  if (sur && lecture + regard.alea * 0.35 > (marge >= 2 ? 0.18 : 0.4)) {
+    const fixe = sur.defenseurs[0];
+    const soutien = sur.soutiens[0];
+    let duel = e.duel;
+    if (!duel || duel.porteurId !== p.id || duel.defenseurId !== fixe.id) {
+      duel = e.duel = { porteurId: p.id, soutienIds: sur.soutiens.map((q) => q.id), defenseurId: fixe.id, cote: sur.cote,
+        choix: choixDuDefenseur(e, fixe, soutien), depuis: e.sim };
+      if (duel.choix === 'hesiter') duel.rechoisiA = e.sim + 0.4 + e.rng() * 0.45;
+    } else duel.soutienIds = sur.soutiens.map((q) => q.id);
+    if (duel.choix === 'hesiter' && e.sim >= (duel.rechoisiA ?? 0)) duel.choix = e.rng() < 0.5 ? 'monter' : 'glisser';
+    const dist = distance(p.pos, fixe.pos);
+    // La vitesse à laquelle les deux hommes se rapprochent.
+    const ux = (fixe.pos.x - p.pos.x) / Math.max(0.1, dist), uy = (fixe.pos.y - p.pos.y) / Math.max(0.1, dist);
+    const fermeture = Math.max(0, (p.vitesse.x - fixe.vitesse.x) * ux + (p.vitesse.y - fixe.vitesse.y) * uy);
+    const dPasse = borner(R.passeAuDernierMoment + fermeture * 0.3, 2.3, 4.6);
+    const coupe = ligneDePasseCoupee(e, p, soutien);
+    const large = Math.abs(soutien.pos.y - p.pos.y);
+    // Le défenseur est-il parti sur le soutien ? Il est alors plus près de sa ligne de course que de celle du porteur.
+    const surLeSoutien = coupe === fixe || (fixe.pos.y - p.pos.y) * sur.cote > 0.6 * large;
+    // Il faut l'avoir VU partir : un lecteur moyen donne quand même (et risque l'interception), ou va au contact.
+    const voitLeDefenseur = lecture + regard.alea * 0.3 > R.lectureDeLaFeinte;
+    if (surLeSoutien && voitLeDefenseur && dist <= dPasse + 1.8) {
+      // ── La feinte de passe : il regarde son partenaire, arme, et garde ──
+      if (regard.feinteA === undefined) {
+        regard.feinteA = e.sim;
+        if (e.cadenceDetaillee) jouerGeste(e, p, 'dummy_pass', 0.7, sur.cote > 0 ? 'plus' : 'moins');
+        const dupe = e.rng() < borner(R.feinteReussie + (p.passe + p.vision - 2 * fixe.vision) / 260 + (duel.choix === 'couper' ? 0.18 : 0), 0.12, 0.85);
+        if (dupe) {
+          fixe.battu = Math.max(fixe.battu, R.defenseurFixe);
+          (e.retards ??= {})[fixe.id] = e.sim + R.defenseurFixe;
+          p.stats.franchissements += 1;
+        }
+        e.lancement = { type: 'large', chaine: [p], index: 0, jeu: 'feinte', libelle: 'feinte de passe' };
+        dire(e, 'jeu', p.cote, dupe
+          ? `Feinte de passe de ${p.nom} ! ${fixe.nom} est parti sur ${soutien.nom}, la porte est ouverte.`
+          : `${p.nom} feinte la passe et garde, ${fixe.nom} ne s’y laisse pas prendre.`, 0, p.moi || fixe.moi);
+      }
+      // Il repart à l'intérieur, là où le défenseur n'est plus.
+      courir({ x: bornerLong(p.pos.x + s * 14), y: borner(p.pos.y - sur.cote * 1.8, 2.5, LARGEUR - 2.5) });
+      return 'garde';
+    }
+    const enRetrait = (soutien.pos.x - p.pos.x) * s <= 0.4;
+    if (dist <= dPasse && !coupe && enRetrait && large <= 22) {
+      e.lancement = { type: 'large', chaine: [soutien, ...sur.soutiens.slice(1)], index: -1, jeu: 'surnombre',
+        libelle: `${1 + sur.soutiens.length} contre ${sur.defenseurs.length}`, tempo: sur.defenseurs.length > 1 ? 'vite' : undefined };
+      if (passerLeBallon(e, p, soutien, pression)) {
+        // Il venait sur le porteur : il finit sa course sur un homme sans ballon.
+        if (duel.choix !== 'glisser') {
+          fixe.battu = Math.max(fixe.battu, R.defenseurFixe);
+          (e.retards ??= {})[fixe.id] = e.sim + R.defenseurFixe;
+        }
+        dire(e, 'jeu', p.cote, `${p.nom} fixe ${fixe.nom} et donne au dernier moment : ${soutien.nom} est lancé dans l’espace.`, 0, p.moi || soutien.moi);
+        e.duel = null;
+        return 'passe';
+      }
+    }
+    // Pas encore : il court sur l'épaule intérieure de son défenseur pour l'aspirer.
+    courir({ x: bornerLong(p.pos.x + s * 12), y: borner(fixe.pos.y - sur.cote * 0.6, 2.5, LARGEUR - 2.5) });
+    return 'garde';
+  }
+  if (e.duel) e.duel = null;
+
+  // ── 2. L'intervalle : ce que vaut la percée contre ce que vaut la passe ──
+  const vue = regarderDevant(e, p);
+  const trou = vue.intervalle;
+  if (!trou) return null;
+  // Un mauvais lecteur a besoin d'un boulevard ; un trois-quarts lancé y va plus volontiers qu'un pilier.
+  const seuil = R.intervalleMin + (1 - lecture) * 3.2 + (p.avant ? 0.9 : p.numero >= 11 ? -0.5 : 0);
+  if (trou.largeur < seuil || vue.rayons.axe.libre < 2.5 && Math.abs(trou.y - p.pos.y) < 1.2) return null;
+  // Percée = espace + vitesse + appuis ou puissance − couverture, avec l'inspiration du moment.
+  const scorePercee = Math.min(trou.largeur, 9) + (p.vitesseMax - 8) * 1.1 + Math.max((p.evitement - 60) / 16, (p.puissance - 70) / 22)
+    - trou.couverture * 1.4 - trou.profondeur * 0.1 + (regard.alea - 0.5) * 2.6 * (1.15 - lecture);
+  // Passe = espace du receveur + qualité du passeur − risque d'interception.
+  let scorePasse = -Infinity;
+  if (suivant && attaquantLibre(suivant) && (suivant.pos.x - p.pos.x) * s <= 0.4) {
+    const champ = Math.min(12, espaceAutour(e, adverse(p.cote), suivant.pos));
+    scorePasse = champ * 0.75 + (p.passe - 60) / 14 + (e.lancement?.tempo === 'vite' ? 1.6 : 0)
+      - (ligneDePasseCoupee(e, p, suivant) ? 3 : 0);
+  }
+  if (scorePercee <= scorePasse + R.margeDuPlan || scorePercee < 3.2) return null;
+  if (!regard.intervalle) {
+    regard.intervalle = true;
+    if (e.lancement && e.lancement.index + 1 < e.lancement.chaine.length) {
+      e.lancement = { ...e.lancement, chaine: [p], index: 0, jeu: 'intervalle', libelle: 'intervalle pris à la main' };
+      dire(e, 'jeu', p.cote, `${p.nom} voit l’intervalle s’ouvrir devant lui et garde le ballon !`, 0, p.moi);
+    }
+  }
+  courir({ x: bornerLong(p.pos.x + s * 14), y: borner(trou.y, 2.5, LARGEUR - 2.5) });
+  return 'garde';
+}
+
+/**
+ * LES AUTRES ACTEURS DU SURNOMBRE, à chaque pas (après le placement tactique,
+ * qui les aurait ramenés dans leur couloir). Les soutiens gardent leur largeur
+ * et un peu de profondeur — deux attaquants collés l'un à l'autre n'ont plus de
+ * surnombre. Le défenseur joue son choix.
+ */
+function conduireLeSurnombre(e: EtatMatch): void {
+  const d = e.duel;
+  if (!d) return;
+  const p = e.porteur;
+  if (e.phase !== 'jeuCourant' || !p || p.id !== d.porteurId) { if (!e.vol) e.duel = null; return; }
+  const s = sens(p.cote);
+  d.soutienIds.forEach((id, i) => {
+    const q = e.pions.find((x) => x.id === id);
+    if (!q || !attaquantLibre(q)) return;
+    // Jamais plus près que six mètres et demi du porteur (ou ce que la touche laisse).
+    const voulu = Math.max(Math.abs(q.pos.y - p.pos.y), 6.5 + i * 6);
+    const y = borner(p.pos.y + d.cote * voulu + p.vitesse.y * 0.4, 2.5, LARGEUR - 2.5);
+    q.role = 'ligne';
+    q.cible = { x: bornerLong(p.pos.x - s * (1.7 + i * 1.3) + p.vitesse.x * 0.55), y };
+    q.effort = Math.max(q.effort, 1.05);
+  });
+  const def = e.pions.find((x) => x.id === d.defenseurId);
+  const soutien = e.pions.find((x) => x.id === d.soutienIds[0]);
+  if (!def || !soutien || !defenseurPresent(e, def)) return;
+  const large = (soutien.pos.y - p.pos.y);
+  if (d.choix === 'monter') {
+    def.cible = { x: p.pos.x + p.vitesse.x * 0.25, y: p.pos.y + p.vitesse.y * 0.25 };
+    def.effort = Math.max(def.effort, 1.04);
+  } else if (d.choix === 'glisser') {
+    // Il accompagne, côté soutien, en restant entre le ballon et sa ligne.
+    def.cible = { x: bornerLong(p.pos.x + s * 2.4), y: borner(p.pos.y + large * 0.62, 1.5, LARGEUR - 1.5) };
+  } else if (d.choix === 'hesiter') {
+    // Ni l'un ni l'autre : il recule à petits pas entre les deux.
+    def.cible = { x: bornerLong(def.pos.x + s * 1.2), y: borner(p.pos.y + large * 0.35, 1.5, LARGEUR - 1.5) };
+    def.effort = Math.min(def.effort, 0.6);
+  } else {
+    // Il se jette dans la ligne de passe.
+    def.cible = { x: bornerLong((p.pos.x + soutien.pos.x) / 2 + s * 0.6), y: borner(p.pos.y + large * 0.5, 1.5, LARGEUR - 1.5) };
+    def.effort = Math.max(def.effort, 1.08);
+  }
 }
 
 // LA LIGNE DE COURSE : on ne fonce pas tout droit. Tant qu'il reste un
@@ -3822,6 +4022,19 @@ function gesteAutomatique(e: EtatMatch, porteur: Pion, defenseur: Pion): ActionJ
   // plan gardent exactement la même rejoue, contact après contact.
   const espace = intervalle(e, porteur);
   const frontal = Math.abs(defenseur.pos.y - porteur.pos.y) < .9;
+  if (lectureLocale(e)) {
+    // ── CHAQUE JOUEUR A SES ARMES (IA 3) : on note chaque geste contre CE défenseur ──
+    // crochet = appuis − plaquage et vitesse du défenseur ; raffut = puissance et
+    // poids contre les siens ; sprint = pointe de vitesse dans l'espace. Un centre
+    // puissant percute, un ailier vif crochète, et aucun ne fait le métier de l'autre.
+    const auBord = porteur.pos.y < 3 || porteur.pos.y > LARGEUR - 3;
+    const crochet = (porteur.evitement - defenseur.plaquage * 0.55 - defenseur.vitesseMax * 3) / 10 + (espace > 2.5 ? 1 : -1.5) - (auBord ? 2 : 0);
+    const raffut = (porteur.puissance - defenseur.puissance) / 8 + (frontal ? 0.8 : 0) + ((porteur.poidsKg ?? 95) - (defenseur.poidsKg ?? 95)) / 14;
+    const sprint = (porteur.vitesseMax - defenseur.vitesseMax) * 2.2 + (frontal ? -2 : 0.6) + (espace > 4 ? 0.8 : -1);
+    const meilleur = Math.max(crochet, raffut, sprint);
+    if (meilleur < 0.8) return null;
+    return meilleur === crochet ? 'crochet' : meilleur === raffut ? 'raffut' : 'sprint';
+  }
   const profilPuissant = porteur.puissance - porteur.evitement;
   if (frontal && porteur.puissance >= 70 && profilPuissant >= 7) return 'raffut';
   if (porteur.evitement >= 66 && espace > 2 && porteur.pos.y > 3 && porteur.pos.y < LARGEUR - 3) return 'crochet';
@@ -5734,6 +5947,7 @@ function contexteDuTir(e: EtatMatch, buteur: Pion): ContexteTir {
     puissance: buteur.puissance, precision: buteur.pied, fraicheur: buteur.endurance, style: (h / 9973) * 2 - 1,
     ventDos: v.x * s, ventTravers: v.y,
     pression: e.minute >= 65 && Math.abs(e.scoreA - e.scoreB) <= 7 ? 1 : e.minute >= 38 && e.minute <= 40 ? 0.4 : 0,
+    suite: lectureLocale(e),
   };
 }
 
@@ -5931,6 +6145,28 @@ function phasePenalite(e: EtatMatch): void {
 
 const ventDuMatch = (v: Vent) => ({ ventDirection: v.direction, ventForce: v.force, ventGraine: v.graine });
 
+/**
+ * LE BALLON NE S'ARRÊTE PAS NET DERRIÈRE LES POTEAUX (IA 3). Il retombe où sa
+ * course l'a mené, puis rebondit — un ballon ovale, donc pas tout droit. Tombé
+ * dans la tribune ou au-delà du ballon mort, il y reste.
+ */
+function rebondApresTir(e: EtatMatch, de: Vec, sol: Vec): Vol['rebond'] | undefined {
+  if (!lectureLocale(e)) return undefined;
+  // Dans la tribune ou au-delà du ballon mort, il ne revient pas.
+  if (sol.x < 0.5 || sol.x > LONGUEUR - 0.5 || sol.y < 0.5 || sol.y > LARGEUR - 0.5) return undefined;
+  const dx = sol.x - de.x, dy = sol.y - de.y, d = Math.hypot(dx, dy) || 1;
+  // Un ballon ovale ne rebondit pas droit : il file devant lui, plus ou moins de travers.
+  const longueur = 1.4 + e.rng() * 4.6, travers = (e.rng() - 0.5) * 3.6;
+  return {
+    duree: 0.55 + e.rng() * 0.4, hauteur: 0.4 + longueur * 0.16,
+    vers: { x: sol.x + (dx / d) * longueur - (dy / d) * travers, y: sol.y + (dy / d) * longueur + (dx / d) * travers },
+  };
+}
+/** Le ballon d'un tir a-t-il fini sa course, rebond compris ? */
+const volTermine = (vol: Vol): boolean => vol.ecoule >= vol.duree + (vol.rebond?.duree ?? 0);
+/** Où le ballon d'un tir s'arrête : après le rebond, sinon là où le poteau l'a renvoyé, sinon à sa retombée. */
+const arretDuBallon = (vol: Vol): Vec => vol.rebond?.vers ?? vol.ricochet?.vers ?? vol.vers;
+
 type TirEnCours = NonNullable<EtatMatch['tir']>;
 
 /** Lance un vrai ballon vers les poteaux, réussi ou légèrement à côté. */
@@ -5988,6 +6224,9 @@ function lancerTrajectoireTir(e: EtatMatch, tir: TirEnCours, reussi: boolean): v
     ...('derive' in visee && visee.derive ? { derive: visee.derive } : {}),
     ...('ricochet' in visee && visee.ricochet ? { ricochet: visee.ricochet } : {}),
   });
+  // La course continue après les poteaux : retombée, puis rebond (IA 3).
+  const rebond = e.vol ? rebondApresTir(e, de, e.vol.ricochet ? e.vol.ricochet.vers : vers) : undefined;
+  if (rebond && e.vol) e.vol.rebond = rebond;
   e.porteur = null;
   e.minuteur = duree;
 }
@@ -6014,9 +6253,9 @@ function phaseTirAuBut(e: EtatMatch): void {
   }
   // Le ballon est en vol : on attend qu'il termine son vol et retombe au sol
   if (!tir.retombe) {
-    if (e.vol && e.vol.ecoule < e.vol.duree) return;
+    if (e.vol && !volTermine(e.vol)) return;
     tir.retombe = true;
-    if (e.vol) e.ballon = { ...e.vol.vers };
+    if (e.vol) e.ballon = { ...(lectureLocale(e) ? arretDuBallon(e.vol) : e.vol.vers) };
     e.vol = null;
     const reussi = !!tir.reussi;
     if (reussi) {
@@ -6094,9 +6333,9 @@ function phaseTransformation(e: EtatMatch): void {
   }
   // Le ballon est en vol : on attend qu'il termine son vol et retombe au sol
   if (!tir.retombe) {
-    if (e.vol && e.vol.ecoule < e.vol.duree) return;
+    if (e.vol && !volTermine(e.vol)) return;
     tir.retombe = true;
-    if (e.vol) e.ballon = { ...e.vol.vers };
+    if (e.vol) e.ballon = { ...(lectureLocale(e) ? arretDuBallon(e.vol) : e.vol.vers) };
     e.vol = null;
     const plan = planDe(e, cote);
     if (tir.reussi) {

@@ -16,7 +16,10 @@
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { useGame, BUDGET_IA_PAR_SAISON } from '../store/useGame';
+import { useGame, BUDGET_IA_PAR_SAISON, bonusClubDuJoueur, noteGlobale } from '../store/useGame';
+import { matchDeLaSemaine } from '../lib/matchLive';
+import { estTitulaire } from '../lib/moteur/titulaire';
+import type { Joueur } from '../types';
 import { PanneauJoueur } from '../components/PanneauJoueur';
 import { ClassementLateral } from '../components/ClassementLateral';
 import { demanderAuMJ, messageErreurIA } from '../lib/mj';
@@ -222,6 +225,7 @@ export function Carriere({ onReglages }: Props) {
           <span><b>{joueur.club}</b><small>{nomPoste(joueur.poste)}</small></span>
         </div>
       </header>
+      <ResumeMobile joueur={joueur} />
       <nav className="carriere-mobile-vues manager-onglets" aria-label={t('car.navigationMobile')}>
         <button
           type="button"
@@ -349,6 +353,67 @@ export function Carriere({ onReglages }: Props) {
       {/* Le classement du championnat, en permanence sous les yeux. */}
       <ClassementLateral joueur={joueur} />
     </section>
+  );
+}
+
+/**
+ * LA CARRIÈRE SUR TÉLÉPHONE TIENT SUR UN ÉCRAN. Tout ce qu'on veut savoir en
+ * ouvrant le jeu — qui je suis, ce que je vaux, dans quel état, contre qui je
+ * joue et si je débute — est ici, en trois lignes serrées. Le reste (fiche
+ * complète, classement) est derrière les onglets ; la barre du bas porte
+ * l'action de la semaine. Visible seulement sous 700 px (`Carriere.css`).
+ */
+function ResumeMobile({ joueur }: { joueur: Joueur }) {
+  const generale = noteGlobale(joueur);
+  const vecu = joueur.saisonEnCours;
+  const notes = vecu?.notes ?? [];
+  const moyenne = notes.length ? notes.reduce((a, b) => a + b, 0) / notes.length : null;
+  const blesse = !!joueur.blessure && joueur.blessure.semaines > 0;
+  const affiche = useMemo(() => {
+    try { return matchDeLaSemaine(joueur, bonusClubDuJoueur(joueur)); } catch { return null; }
+  }, [joueur]);
+  const adversaire = affiche ? (affiche.match.domicile === joueur.club ? affiche.match.exterieur : affiche.match.domicile) : null;
+  const aDomicile = affiche?.match.domicile === joueur.club;
+  const titulaire = affiche ? estTitulaire(joueur, affiche.cle) : null;
+  const statut = blesse ? 'blesse' : titulaire === null ? null : titulaire ? 'titulaire' : 'remplacant';
+  const jauges: [string, number, string][] = [
+    [t('pj.forme'), joueur.forme, 'vert'], [t('pj.moral'), joueur.moral, 'or'], [t('pj.staff'), joueur.confianceCoach ?? 50, 'cuir'],
+  ];
+  return (
+    <div className="carriere-resume">
+      <div className="cr-identite">
+        <div className="cr-gen" title={t('pj.generale')}>
+          <b>{generale}</b><span>{t('pj.noteCourte')}</span>
+        </div>
+        <div className="cr-nom">
+          <strong>{joueur.nom}</strong>
+          <small>{nomPoste(joueur.poste)} · {joueur.club}</small>
+        </div>
+        <div className="cr-droite">
+          {statut && <span className={`cr-statut ${statut}`}>{t(`car.mob.${statut}`)}</span>}
+          {joueur.potentiel && joueur.potentiel > generale && <small>↗ {t('car.mob.potentiel', { n: joueur.potentiel })}</small>}
+        </div>
+      </div>
+      <div className="cr-jauges">
+        {jauges.map(([label, valeur, variante]) => (
+          <div key={label} className={`cr-jauge ${variante}`} role="img" aria-label={`${label} ${Math.round(valeur)}`}>
+            <span>{label}</span><i><b style={{ width: `${Math.max(0, Math.min(100, valeur))}%` }} /></i><em>{Math.round(valeur)}</em>
+          </div>
+        ))}
+      </div>
+      <div className="cr-bas">
+        <span className="cr-match">
+          <Icone nom="calendrier" taille={13} />
+          {adversaire
+            ? <span>{t('car.mob.prochain')} : <b>{adversaire}</b> <small>({t(aDomicile ? 'car.mob.domicile' : 'car.mob.exterieur')})</small></span>
+            : <span>{t('car.mob.repos')}</span>}
+        </span>
+        <span className="cr-stats">
+          <b>{vecu?.matchs ?? 0}</b> {t('car.mob.matchs')} · <b>{vecu?.essais ?? 0}</b> {t('car.mob.essais')}
+          {moyenne !== null && <> · <b>{moyenne.toFixed(1)}</b> {t('car.mob.note')}</>}
+        </span>
+      </div>
+    </div>
   );
 }
 

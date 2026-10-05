@@ -48,6 +48,8 @@ export interface OptionsScene3D {
   suivreMoi?: boolean | number;
   /** Téléphone ou tablette : textures et définition réduites. */
   leger?: boolean;
+  /** Le navigateur a repris le contexte graphique en cours de match : à l'hôte de revenir au terrain vu de haut. */
+  surPerte?: () => void;
   camera?: Camera3D;
   /** Ralentis automatiques après un essai. */
   television?: { ralentis?: boolean };

@@ -66,9 +66,63 @@ function charger(){
 // l'habillage aux couleurs du club s'applique donc à chacun sans cas particulier.
 export const STADES={campagne:'stade-club-1.glb',village:'stade-club-2.glb',moyen:'stade-club-3.glb',grand:'stade-club-5.glb',international:'stade-france.glb'};
 const decors=new Map();
-function chargerStade(nom){
-  const fichier=STADES[nom]||STADES.international;
-  if(!decors.has(fichier))decors.set(fichier,(async()=>{
+/**
+ * ⚠️ SUR TÉLÉPHONE, LE STADE EST CE QUI PÈSE. L'enceinte internationale porte
+ * cinq textures de 2 048 px : quatre-vingts mégaoctets une fois décodées, autant
+ * sur la carte graphique, et un WebView iOS qui manque de mémoire ne prévient
+ * pas — la pelouse reste noire, ou l'application se ferme. En mode léger :
+ * textures ramenées à 1 024 px (quatre fois moins de mémoire), matériaux sans
+ * éclairage physique (un seul calcul par sommet), et UN seul stade gardé.
+ */
+function allegerDecor(decor,materiaux,origine){
+  const reduites=new Map(),legers=new Map();
+  const reduire=t=>{
+    if(!t?.image)return t||null;
+    if(reduites.has(t))return reduites.get(t);
+    const im=t.image,w=im.width||0,h=im.height||0;let r=t;
+    if(Math.max(w,h)>1024){
+      const k=1024/Math.max(w,h),c=document.createElement('canvas');
+      c.width=Math.max(1,Math.round(w*k));c.height=Math.max(1,Math.round(h*k));
+      c.getContext('2d').drawImage(im,0,0,c.width,c.height);
+      r=new THREE.CanvasTexture(c);r.colorSpace=t.colorSpace;r.wrapS=t.wrapS;r.wrapT=t.wrapT;
+      r.repeat.copy(t.repeat);r.offset.copy(t.offset);r.flipY=t.flipY;r.name=t.name;
+      // L'image d'origine ne servira plus : on rend sa mémoire tout de suite.
+      t.dispose();im.close?.();
+    }
+    reduites.set(t,r);return r;
+  };
+  const convertir=m=>{
+    if(!m||m.isMeshLambertMaterial)return m;
+    if(legers.has(m))return legers.get(m);
+    const l=new THREE.MeshLambertMaterial({name:m.name,color:m.color,map:reduire(m.map),alphaTest:m.alphaTest,transparent:m.transparent,opacity:m.opacity,side:m.side,vertexColors:m.vertexColors});
+    for(const k of ['normalMap','roughnessMap','metalnessMap','aoMap','emissiveMap'])m[k]?.dispose?.();
+    m.dispose();legers.set(m,l);materiaux[m.name]=l;if(origine[m.name])origine[m.name]=l.map;
+    return l;
+  };
+  decor.traverse(o=>{if(o.isMesh)o.material=Array.isArray(o.material)?o.material.map(convertir):convertir(o.material);});
+}
+/** Rend la mémoire des stades gardés (textures, géométries). Une scène encore vivante les recharge d'elle-même. */
+function libererStades(sauf){
+  for(const [cle,promesse] of decors){
+    if(cle===sauf)continue;
+    decors.delete(cle);
+    promesse.then(({decor})=>decor.traverse(o=>{if(!o.isMesh)return;o.geometry?.dispose?.();
+      for(const m of Array.isArray(o.material)?o.material:[o.material]){m?.map?.dispose?.();m?.dispose?.();}})).catch(()=>{});
+  }
+}
+/** La pelouse de secours : un vert rayé dessiné sur place, quand la texture du terrain n'a pas pu être lue. */
+function pelouseDeSecours(){
+  const c=document.createElement('canvas');c.width=c.height=256;
+  const g=c.getContext('2d');
+  for(let i=0;i<8;i++){g.fillStyle=i%2?'#4d8a3f':'#5a9a49';g.fillRect(0,i*32,256,32);}
+  const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.wrapS=t.wrapT=THREE.RepeatWrapping;
+  return t;
+}
+function chargerStade(nom,leger=false){
+  const fichier=(STADES[nom]||STADES.international),cle=fichier+(leger?'#leger':'');
+  // Un téléphone ne garde pas le stade du match d'avant.
+  if(leger)libererStades(cle);
+  if(!decors.has(cle))decors.set(cle,(async()=>{
     const stadium=await new GLTFLoader().loadAsync(RACINE_DECOR+fichier);
     const decor=stadium.scene,origine={},materiaux={};
     decor.traverse(o=>{if(!o.isMesh)return;
@@ -90,13 +144,14 @@ function chargerStade(nom){
         for(const n of ['stadedefrance','stadedefrance_alpha'])if(materiaux[n]?.map?.image===origine.stadedefrance.image){materiaux[n].map=propre;origine[n]=propre;}
       }
     }catch(e){console.warn('Marquage Destiny Rugby :',e);}
+    if(leger)allegerDecor(decor,materiaux,origine);
     return {decor,origine,materiaux};
   })().catch(e=>{
     // Un décor absent ou illisible : on retombe sur l'enceinte d'origine, jamais sur un terrain vide.
-    decors.delete(fichier);if(fichier===STADES.international)throw e;
-    console.warn('Stade « '+nom+' » indisponible :',e);return chargerStade('international');
+    decors.delete(cle);if(fichier===STADES.international)throw e;
+    console.warn('Stade « '+nom+' » indisponible :',e);return chargerStade('international',leger);
   }));
-  return decors.get(fichier);
+  return decors.get(cle);
 }
 /** Remplace la texture d'un matériau du stade en gardant son cadrage. */
 function repeindre(materiau,canvas,renderer){
@@ -124,13 +179,20 @@ function repeindre(materiau,canvas,renderer){
  *  - `son` : `false` pour une scène muette (vignettes, aperçus).
  */
 export async function creerScene3D(conteneur,options={}){
-  const [r,stade]=await Promise.all([charger(),chargerStade(options.stade)]);
-  const {motions,gaits}=r,leger=!!options.leger;
+  const leger=!!options.leger;
+  // iPhone, iPad (qui se présente comme un Mac tactile) : la mémoire d'un WebView y est la plus courte.
+  const ios=typeof navigator!=='undefined'&&(/iP(hone|ad|od)/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1));
+  // ⚠️ SUR TÉLÉPHONE, UN CHARGEMENT APRÈS L'AUTRE : décoder le stade, les joueurs et
+  // les mouvements en même temps fait un pic de mémoire que le match ne redemandera jamais.
+  let r,stade;
+  if(leger){r=await charger();stade=await chargerStade(options.stade,true);}
+  else [r,stade]=await Promise.all([charger(),chargerStade(options.stade)]);
+  const {motions,gaits}=r;
   const scene=new THREE.Scene();
   scene.background=new THREE.Color('#b6d4e4');scene.fog=new THREE.Fog('#b6d4e4',180,420);
   const camera=new THREE.PerspectiveCamera(48,1,.1,600);
-  const renderer=new THREE.WebGLRenderer({antialias:!leger,preserveDrawingBuffer:!!options.capture,powerPreference:'high-performance'});
-  let definition=Math.min(globalThis.devicePixelRatio||1,leger?1.25:1.5);
+  const renderer=new THREE.WebGLRenderer({antialias:!leger,preserveDrawingBuffer:!!options.capture,powerPreference:leger?'default':'high-performance',failIfMajorPerformanceCaveat:false});
+  let definition=Math.min(globalThis.devicePixelRatio||1,ios?1:leger?1.25:1.5);
   renderer.setPixelRatio(definition);
   renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.15;
   const toile=renderer.domElement;toile.style.cssText='display:block;width:100%;height:100%;touch-action:none';
@@ -144,6 +206,18 @@ export async function creerScene3D(conteneur,options={}){
   // faisait qu'une scène détruite (React monte deux fois en développement, et
   // deux matchs peuvent s'enchaîner) rendait à l'autre les panneaux d'origine.
   const decor=clone(stade.decor);scene.add(decor);
+  // ⚠️ LA PELOUSE S'AFFICHE TOUJOURS. Une texture que l'appareil n'a pas pu décoder laisse
+  // un terrain noir : on la remplace sur-le-champ par un vert rayé dessiné sur place.
+  decor.traverse(o=>{if(!o.isMesh)return;
+    for(const m of Array.isArray(o.material)?o.material:[o.material]){
+      if(m&&/pitch/i.test(m.name||'')&&!(m.map?.image?.width>0)){m.map=pelouseDeSecours();m.color?.set('#ffffff');m.needsUpdate=true;}
+    }
+  });
+  // Le navigateur a repris la mémoire graphique (fréquent sur iOS quand elle manque) : l'hôte
+  // revient au terrain vu de haut au lieu de laisser une image noire.
+  let contextePerdu=false;
+  const surPerteDeContexte=ev=>{ev.preventDefault();if(contextePerdu)return;contextePerdu=true;paused=true;options.surPerte?.();};
+  renderer.domElement.addEventListener('webglcontextlost',surPerteDeContexte);
   // Autour d'un petit stade il n'y a pas de ville modélisée : un sol jusqu'à l'horizon évite le vide sous le ciel.
   const alentours=new THREE.Mesh(new THREE.PlaneGeometry(1600,1600),new THREE.MeshStandardMaterial({color:'#7d9160',roughness:1,metalness:0}));alentours.rotation.x=-Math.PI/2;alentours.position.y=-.12;scene.add(alentours);
   const jetables=[],propres={};
@@ -1061,6 +1135,7 @@ export async function creerScene3D(conteneur,options={}){
     cadrer,
     detruire(){
       if(detruite)return;detruite=true;observateur.disconnect();
+      toile.removeEventListener('webglcontextlost',surPerteDeContexte);
       toile.removeEventListener('pointerdown',passerAuToucher);sons?.detruire();tele.detruire();
       for(const a of [...actors.values(),...officials]){a.kit?.dispose();a.model.traverse(o=>{if(o.isMesh&&o.material?.dispose&&o.material!==undefined){const ms=Array.isArray(o.material)?o.material:[o.material];ms.forEach(m=>m.dispose());}});scene.remove(a.group);if(a.flag)scene.remove(a.flag);if(a.card)scene.remove(a.card);}
       actors.clear();
@@ -1068,7 +1143,9 @@ export async function creerScene3D(conteneur,options={}){
       for(const j of jetables)j.dispose?.();
       etiquette.sprite.material.map.dispose();etiquette.sprite.material.dispose();
       scene.remove(decor);
-      renderer.dispose();renderer.forceContextLoss?.();toile.remove();
+      renderer.renderLists?.dispose?.();renderer.dispose();renderer.forceContextLoss?.();toile.remove();
+      // Sur téléphone, le stade n'attend pas le match suivant en mémoire.
+      if(leger)libererStades();
     },
   };
   return api;

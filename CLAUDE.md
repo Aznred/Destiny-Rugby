@@ -937,6 +937,92 @@ essais par match, 0,66 jaune, 0,04 rouge, 5,9 pénalités, 0,08 drop tenté.
 glisse de 2,2 m en une image, à 206 s d'une des trois graines) ; et
 `verify:direct-3d` échoue en règles 2 sur les touches (il passe avec `--ia=2`).
 
+#### Le porteur regarde devant lui (Correctif 14 — IA de niveau 3)
+
+`lectureLocale(e)` (`ia` ≥ 3) : matchs de carrière (`IA_MATCH_DE_CARRIERE` = 3),
+aperçu, et ligue en **règles 4** (`iaDesRegles`). ⚠️ Les règles 3 sont en
+production depuis le 05/10/2026 : rien de ce qui suit ne touche un match de
+niveau 2, qui rejoue comme avant.
+
+- **`ia/vision.ts`** (pur, sans tirage) : `regarderDevant` lance trois rayons
+  (gauche, axe, droite) et mesure le meilleur INTERVALLE du rideau — largeur une
+  fois retiré ce que chaque défenseur referme, profondeur, couverture derrière,
+  et s'il est atteignable sans courir en travers ; `lireLeSurnombre` compte, d'un
+  côté du porteur, les partenaires qui peuvent vraiment recevoir et les
+  défenseurs qui peuvent encore jouer (2 contre 1, 3 contre 2) ;
+  `niveauDeLecture` (vision + poste) dit ce que vaut le regard d'un joueur.
+- **`deciderALaVue`** (`moteur.ts`, à chaque pas, avant la passe prévue) :
+  - *surnombre* → le porteur FIXE (il court sur l'épaule intérieure de son
+    défenseur) et ne donne qu'au dernier moment — à 2,2 m plus ce que la vitesse
+    de fermeture demande ; le défenseur fixé reste hors jeu 0,7 s ;
+  - le défenseur a fait un **choix** au moment où il comprend qu'il est seul
+    (`e.duel`) : monter, glisser sur le soutien (surtout près de la touche),
+    hésiter une demi-seconde, ou couper la passe ; `conduireLeSurnombre` le lui
+    fait jouer, et garde les soutiens à 6,5 m au moins du porteur, un peu en retrait ;
+  - s'il est parti sur le soutien et que le porteur l'a VU (`lectureDeLaFeinte`),
+    **feinte de passe** (geste `dummy_pass`, construit par la scène) et il repart
+    intérieur ; un lecteur moyen donne quand même, au risque de l'interception ;
+  - sinon *intervalle* : percée (espace + vitesse + appuis ou puissance −
+    couverture) contre passe prévue (champ du receveur + qualité du passeur −
+    ligne de passe coupée) ; le plan n'est abandonné que si la percée vaut
+    nettement mieux (`margeDuPlan`).
+  - ⚠️ Un tirage PAR BALLON REÇU (`e.regard`), pas par pas : sinon le joueur
+    change d'avis six fois par seconde. Et il lui faut un temps de lecture,
+    d'autant plus long que sa vision est faible.
+- **Chaque joueur a ses armes** (`gesteAutomatique`) : crochet, raffut ou sprint
+  sont notés contre CE défenseur (appuis, puissance, poids, pointe de vitesse).
+- **Après les poteaux** : le point de chute d'un tir suit la portée du buteur
+  (de 2,5 à 34 m derrière la ligne, écart type 8 m), puis le ballon rebondit
+  (`Vol.rebond`, dans le même vol : ni second coup de pied ni second bruit).
+- Réglages : bloc « lecture locale » de `ia/reglages.ts`, avec leurs valeurs
+  `*Reel` pour la ligue. Mesuré (96 matchs de carrière, 48 de ligue) : essais
+  4,4 par match en carrière (4,7 au niveau 2), 6,8 en ligue (7,1 en règles 3) ;
+  10 surnombres joués, 6 intervalles pris et 2 à 3 feintes par match de carrière.
+  `mesurerJeux.ts 48 3` : un surnombre finit en essai une fois sur dix, une
+  feinte réussie beaucoup plus — c'est elle qu'il faut surveiller.
+
+#### Les commentateurs (`lib/commentaires/`)
+
+Le bouton des commentateurs a trois positions : coupés, **retransmission**,
+voix d'origine en anglais (les clips d'avant, inchangés).
+
+- `retransmission.ts` REGARDE l'état du match affiché (carrière : l'état
+  vivant ; ligue : l'état rejoué du film, remonté par `AfficheDirect.etat`) et
+  sait donc qui a fait quoi : vols, regroupements, ballons grattés, percées,
+  conquêtes, tirs (poteau compris), sifflets et cartons, remplacements, fins de
+  période. Il produit des `Replique` (voix, texte, priorité).
+- Deux voix : le **commentateur** décrit, le **consultant** explique et enchaîne
+  parfois (jamais deux fois en moins de neuf secondes), parle seul pendant les
+  temps calmes (possession des dix dernières minutes, confrontations, séries).
+- Il connaît les joueurs : « 3ᵉ franchissement pour X aujourd'hui », « encore un
+  grattage de Y », « 7ᵉ essai de la saison » (`ContexteStatsTV` — aucune requête).
+- `phrases.ts` : 73 catégories, 408 phrases en français et 268 en anglais (six à huit par voix dans les grandes catégories — pas encore « plusieurs dizaines »). **L'humour de la cabine** : deux catégories à déclencheur — `plaquageCaramel` (plaquage dominant, six fois sur dix) et `fessesParTerre` (le geste « assis » du défenseur qui perd son duel) — et des variantes « Blague » (`xxxBlague`) tirées une fois sur cinq (`PART_DES_BLAGUES`), jamais sur un carton rouge ni une blessure,
+  tirées de sacs qui se vident avant de se remplir. Les autres langues du jeu
+  entendent l'anglais.
+- `voix.ts` : synthèse vocale de l'appareil (`speechSynthesis`), deux voix
+  différentes quand la langue en a deux, sinon deux hauteurs. ⚠️ C'est une
+  INTERFACE (`LecteurVoix`) : des voix de studio ou un service en ligne se
+  brancheront là. La qualité dépend aujourd'hui de l'appareil ; le sous-titre
+  reste quand il n'y a pas de voix.
+
+#### Téléphone : sortie de match, iOS, mémoire
+
+- **Sortir d'un match** (`lib/pleinEcran.ts`, `quitter` dans `MatchLive`) :
+  « Terminer » ne fait plus tout à la fois. La scène 3D se démonte d'abord, puis
+  l'orientation est rendue, le plein écran quitté, et l'on ATTEND que l'écran
+  soit revenu debout avant de changer de page. Un second appui ne fait rien.
+- **Mode léger de la scène** (`leger`, téléphones et tablettes) : chargement
+  l'un après l'autre, textures du stade ramenées à 1 024 px (elles pèsent
+  quatre fois moins), matériaux sans éclairage physique, un seul stade gardé
+  en mémoire et rendu à la fin du match, définition 1 sur iOS. La pelouse a un
+  vert rayé de secours si sa texture n'a pas pu être lue. Un contexte WebGL
+  repris par le système rend la main à l'hôte (`surPerte`), qui revient au
+  terrain vu de haut. ⚠️ RIEN DE CELA N'A PU ÊTRE ESSAYÉ SUR UN iPhone.
+- **Carrière joueur** (`Carriere.css`, `ResumeMobile`) : sous 700 px la page
+  ne défile plus. Un résumé (note, nom, poste, club, statut, trois jauges,
+  prochain match, statistiques), les onglets, puis la vue choisie qui défile en
+  elle-même ; les pistes d'action tiennent sur une rangée glissante.
+
 Des corrections valent pour **tous** les écrans, parce que ce sont des règles :
 
 - ⚠️ **LE BALLON PASSE OÙ LE SCORE LE DIT** (`viseeTir`, `moteur/trajectoire.ts`).

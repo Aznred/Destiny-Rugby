@@ -92,3 +92,80 @@
   .carriere .carriere-mobile-vues button { font-size: .76rem; gap: .3rem; }
   .carriere .choix-rapides { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* ═══ LA CARRIÈRE SUR TÉLÉPHONE TIENT SUR UN ÉCRAN ═══════════════════════════
+   Sous 700 px, la page ne défile plus : un résumé serré en haut (qui je suis,
+   mon état, mon prochain match), les trois onglets, puis la vue choisie qui
+   prend TOUT ce qui reste et défile en elle-même. La barre du bas (semaine et
+   bouton « Jouer ») et la navigation restent posées sous le pouce.
+   Avant : l'en-tête et le bloc du club mangeaient 180 px, les suggestions 224,
+   et le champ de saisie passait SOUS la barre « Jouer ». */
+.carriere-resume { display: none; }
+@media (max-width: 700px) {
+  .carriere {
+    display: flex; flex-direction: column; gap: .4rem;
+    /* Écran − barre du haut (68) − barre « Jouer » (68) − navigation − marges. */
+    height: calc(100dvh - 68px - 68px - var(--nav-mobile-hauteur, 64px) - env(safe-area-inset-bottom, 0px) - 10px);
+    min-height: 420px; overflow: hidden; padding-top: .35rem;
+    /* La place des deux barres fixes est déjà retirée de la hauteur : plus de marge basse à réserver. */
+    padding-bottom: 0; margin-top: 0; margin-bottom: 0;
+  }
+  .carriere > .carriere-entete { display: none; }
+  .carriere-resume {
+    display: grid; gap: .4rem; flex: none; padding: .55rem .65rem .5rem;
+    border: 1px solid color-mix(in srgb, var(--or, #e0bc54) 26%, transparent); border-radius: 14px;
+    background: linear-gradient(160deg, rgba(20, 36, 58, .92), rgba(10, 20, 34, .92));
+  }
+  .cr-identite { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: .6rem; }
+  .cr-gen { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 12px; line-height: 1;
+    background: var(--or, #e0bc54); color: #14110a; }
+  .cr-gen b { font-size: 1.25rem; font-weight: 900; }
+  .cr-gen span { font-size: .5rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; margin-top: -4px; }
+  .cr-nom { display: grid; min-width: 0; }
+  .cr-nom strong { font-size: 1.02rem; line-height: 1.15; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cr-nom small { font-size: .72rem; opacity: .78; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cr-droite { display: grid; justify-items: end; gap: .15rem; }
+  .cr-droite small { font-size: .62rem; opacity: .7; white-space: nowrap; }
+  .cr-statut { padding: .16rem .5rem; border-radius: 999px; font-size: .64rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase;
+    background: rgba(255, 255, 255, .1); white-space: nowrap; }
+  .cr-statut.titulaire { background: rgba(72, 187, 120, .2); color: #8ee6b0; }
+  .cr-statut.remplacant { background: rgba(224, 188, 84, .18); color: #f1d584; }
+  .cr-statut.blesse { background: rgba(244, 82, 96, .2); color: #ff9aa4; }
+  .cr-jauges { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .5rem; }
+  .cr-jauge { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: .3rem; row-gap: .12rem; font-size: .64rem; }
+  .cr-jauge span { opacity: .78; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cr-jauge em { font-style: normal; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .cr-jauge i { grid-column: 1 / -1; height: 5px; border-radius: 3px; background: rgba(255, 255, 255, .12); overflow: hidden; }
+  .cr-jauge i b { display: block; height: 100%; border-radius: 3px; background: #57c58a; }
+  .cr-jauge.or i b { background: var(--or, #e0bc54); }
+  .cr-jauge.cuir i b { background: #c98a5a; }
+  .cr-bas { display: grid; gap: .12rem; font-size: .68rem; }
+  .cr-match { display: flex; align-items: center; gap: .35rem; min-width: 0; }
+  .cr-match span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cr-match small, .cr-stats { opacity: .75; }
+  .cr-stats b { opacity: 1; font-variant-numeric: tabular-nums; }
+
+  /* Les onglets : une ligne basse, toujours atteignable au pouce. */
+  .carriere .carriere-mobile-vues { flex: none; gap: .3rem; }
+  .carriere .carriere-mobile-vues button { flex-direction: row; min-height: 40px; padding: .3rem .25rem; font-size: .76rem; gap: .35rem; }
+
+  /* La vue active prend ce qui reste, et défile en elle-même. */
+  .carriere[data-mobile-vue='jeu'] > .jeu,
+  .carriere[data-mobile-vue='joueur'] > .panneau-joueur,
+  .carriere[data-mobile-vue='classement'] > .classement-lateral { flex: 1 1 0; min-height: 0; height: auto; }
+  .carriere[data-mobile-vue='joueur'] > .panneau-joueur,
+  .carriere[data-mobile-vue='classement'] > .classement-lateral { overflow-y: auto; overscroll-behavior: contain; }
+  .carriere[data-mobile-vue='jeu'] > .jeu { display: flex; flex-direction: column; }
+  .carriere .jeu .journal { flex: 1 1 0; min-height: 0; max-height: none; height: auto; }
+  /* Les pistes d'action : une rangée que l'on fait glisser, plus quatre blocs empilés. */
+  .carriere .choix-rapides { display: flex; grid-template-columns: none; gap: .4rem; flex: none; overflow-x: auto; padding: .4rem .6rem !important;
+    scroll-snap-type: x proximity; scrollbar-width: none; }
+  .carriere .choix-rapides::-webkit-scrollbar { display: none; }
+  .carriere .choix-rapides button { flex: 0 0 74%; width: auto; min-height: 44px; font-size: .78rem; scroll-snap-align: start; }
+  .carriere .scenario-choix { flex: none; max-height: 46%; overflow-y: auto; }
+  .carriere .saisie { flex: none; padding: .45rem .6rem .55rem; }
+}
+@media (max-width: 700px) and (max-height: 640px) {
+  /* Petit téléphone : le résumé perd sa dernière ligne, le match est déjà dans la barre du bas. */
+  .cr-bas .cr-stats { display: none; }
+}

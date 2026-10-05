@@ -135,6 +135,7 @@ import {
 } from './match/PresentationTV';
 import { HabillageTV } from './match/HabillageTV';
 import { couleursEquipeTV, DUREE_EQUIPE_TV, exclusionsDepuisEtat, logoTV, type IdentiteTV } from '../lib/habillageTV';
+import { deuxImages, quitterPleinEcran } from '../lib/pleinEcran';
 import { bulleDuMoment, marqueurDepuisEtat, memoireBullesVide, phraseDuMarqueur, ventPourLeTir, type ContexteStatsTV, type PhraseTV } from '../lib/statsTV';
 import { changementsRecents } from '../lib/presentationTV';
 import { urlLogoEquipe } from '../lib/logoEquipe';
@@ -356,7 +357,28 @@ export function MatchLive({
   const setTutoMatchVu = useGame((s) => s.setTutoMatchVu);
   const enregistrerMatchVecu = useGame((s) => s.enregistrerMatchVecu);
   const appliquerSanctionMatch = useGame((s) => s.appliquerSanctionMatch);
-  const { overlayRef, dialogRef } = useModalDialog(onFermer);
+  // ⚠️ ON SORT D'UN MATCH UNE SEULE FOIS, ET DANS L'ORDRE (`lib/pleinEcran.ts`).
+  // « Continuer » démontait la scène 3D, changeait de page, quittait le plein
+  // écran et rendait l'orientation dans le même instant : sur téléphone,
+  // l'application tombait. On arrête d'abord l'image (la scène se démonte et
+  // rend son contexte graphique), puis on quitte le plein écran et on ATTEND
+  // que l'écran soit revenu debout ; alors seulement on change de page. Un
+  // second appui pendant ce temps ne fait rien.
+  const sortieDemandee = useRef(false);
+  const [sortie, setSortie] = useState(false);
+  const fermerAuParent = useRef(onFermer);
+  fermerAuParent.current = onFermer;
+  const quitter = useCallback(() => {
+    if (sortieDemandee.current) return;
+    sortieDemandee.current = true;
+    setSortie(true);
+    void (async () => {
+      await deuxImages();
+      await quitterPleinEcran();
+      fermerAuParent.current();
+    })();
+  }, []);
+  const { overlayRef, dialogRef } = useModalDialog(quitter);
   const large = useLarge();
   // ⚠️ LA VUE EST CHOISIE AVANT LE COUP D'ENVOI, parce qu'elle règle la cadence
   // du moteur. En trois dimensions, chaque phase se joue à son rythme de
@@ -1046,11 +1068,11 @@ export function MatchLive({
   // plus.
   useEffect(() => {
     const clavier = (ev: KeyboardEvent) => {
-      if (ev.key === 'Escape') onFermer();
+      if (ev.key === 'Escape') quitter();
     };
     window.addEventListener('keydown', clavier);
     return () => window.removeEventListener('keydown', clavier);
-  }, [onFermer]);
+  }, [quitter]);
 
   // ⚠️ UNE BAGARRE MET LA PAUSE, ET C'EST INDISPENSABLE. Le moteur attend un
   // ordre pour la résoudre : laisser le match défiler pendant qu'on lit quatre
@@ -1411,7 +1433,7 @@ export function MatchLive({
   tutoRef.current = montrerTuto;
 
   return createPortal(
-    <div ref={overlayRef} className="overlay-match" onClick={(ev) => { if (ev.target === ev.currentTarget) onFermer(); }}>
+    <div ref={overlayRef} className="overlay-match" onClick={(ev) => { if (ev.target === ev.currentTarget) quitter(); }}>
       <motion.div
         ref={dialogRef}
         className="match-live"
@@ -1439,7 +1461,7 @@ export function MatchLive({
             <b>{e.clubB}</b>
             {clubB ? <Blason club={clubB} taille={26} /> : <LogoEquipe nom={e.clubB} taille={26} />}
           </div>
-          <button className="ml-fermer" onClick={onFermer} title={t('ml.fermerAide')}><Icone nom="croix" taille={18} /></button>
+          <button className="ml-fermer" onClick={quitter} disabled={sortie} title={t('ml.fermerAide')}><Icone nom="croix" taille={18} /></button>
         </header>
         <div className="ml-progression" title={titre}>
           <span style={{ width: `${Math.min(100, (e.t / 4800) * 100)}%` }} />
@@ -1480,7 +1502,7 @@ export function MatchLive({
                  bloquait le menu contextuel pour le clic droit du coup de pied.
                  On ne pilote plus : c'est une image, et on regarde. */
               <div className="ml-scene" ref={sceneRef}>
-                {vue3D ? (
+                {sortie ? null : vue3D ? (
                   <Terrain3D
                     options={options3D}
                     surPrete={brancherScene}
@@ -1606,7 +1628,7 @@ export function MatchLive({
                 )}
 
                 {/* ---------- 📺 L'HABILLAGE TÉLÉVISION ---------- */}
-                <CommentateursMatch lignes={e.commentaires} seconde={e.t} pause={enPause || !!avantMatch} />
+                <CommentateursMatch lignes={e.commentaires} seconde={e.t} pause={enPause || !!avantMatch} etat={e} contexte={contexteTV} />
                 {(() => {
                   // Une décision par seconde d'écran : deux rendus du même instant lisent la même bulle.
                   const seconde = Math.floor(e.sim);
@@ -1982,7 +2004,7 @@ export function MatchLive({
               >
                 ⋯
               </button>
-              {e.fini && <button className="btn vert" onClick={onFermer}>{t('ml.terminer')}</button>}
+              {e.fini && <button className="btn vert" onClick={quitter} disabled={sortie} aria-busy={sortie}>{t('ml.terminer')}</button>}
             </div>
           </div>
 

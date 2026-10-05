@@ -179,6 +179,18 @@ export const TEXTES_SUPPLEMENTAIRES: Record<string, Traduction> = {
   'ml.vitesseAide': { fr: 'Vitesse {vitesse}', en: 'Speed {vitesse}', es: 'Velocidad {vitesse}', it: 'Velocità {vitesse}', de: 'Geschwindigkeit {vitesse}', pt: 'Velocidade {vitesse}', ja: '速度 {vitesse}' },
   'ml.enduranceAide': { fr: 'Endurance de ton joueur', en: 'Your player’s stamina', es: 'Resistencia de tu jugador', it: 'Resistenza del tuo giocatore', de: 'Ausdauer deines Spielers', pt: 'Resistência do teu jogador', ja: '選手のスタミナ' },
   // ── L'habillage TV du match (score incrusté, compositions, cartons, bandeaux) ──
+  // ── La carrière joueur sur téléphone : le résumé qui tient en haut de l'écran ──
+  'car.mob.prochain': { fr: 'Prochain match', en: 'Next match', es: 'Próximo partido', it: 'Prossima partita', de: 'Nächstes Spiel', pt: 'Próximo jogo', ja: '次の試合' },
+  'car.mob.repos': { fr: 'Pas de match cette semaine', en: 'No match this week', es: 'Sin partido esta semana', it: 'Nessuna partita questa settimana', de: 'Kein Spiel diese Woche', pt: 'Sem jogo esta semana', ja: '今週は試合なし' },
+  'car.mob.domicile': { fr: 'domicile', en: 'home', es: 'local', it: 'casa', de: 'Heim', pt: 'casa', ja: 'ホーム' },
+  'car.mob.exterieur': { fr: 'extérieur', en: 'away', es: 'visitante', it: 'trasferta', de: 'Auswärts', pt: 'fora', ja: 'アウェイ' },
+  'car.mob.matchs': { fr: 'matchs', en: 'matches', es: 'partidos', it: 'partite', de: 'Spiele', pt: 'jogos', ja: '試合' },
+  'car.mob.essais': { fr: 'essais', en: 'tries', es: 'ensayos', it: 'mete', de: 'Versuche', pt: 'ensaios', ja: 'トライ' },
+  'car.mob.note': { fr: 'de moyenne', en: 'average', es: 'de media', it: 'di media', de: 'im Schnitt', pt: 'de média', ja: '平均' },
+  'car.mob.titulaire': { fr: 'Titulaire', en: 'Starter', es: 'Titular', it: 'Titolare', de: 'Stammspieler', pt: 'Titular', ja: '先発' },
+  'car.mob.remplacant': { fr: 'Remplaçant', en: 'Substitute', es: 'Suplente', it: 'Riserva', de: 'Ersatz', pt: 'Suplente', ja: '控え' },
+  'car.mob.blesse': { fr: 'Blessé', en: 'Injured', es: 'Lesionado', it: 'Infortunato', de: 'Verletzt', pt: 'Lesionado', ja: '負傷中' },
+  'car.mob.potentiel': { fr: 'potentiel {n}', en: 'potential {n}', es: 'potencial {n}', it: 'potenziale {n}', de: 'Potenzial {n}', pt: 'potencial {n}', ja: '潜在 {n}' },
   'tv.essai': { fr: 'Essai', en: 'Try', es: 'Ensayo', it: 'Meta', de: 'Versuch', pt: 'Ensaio', ja: 'トライ' },
   'tv.vent': { fr: 'Vent', en: 'Wind', es: 'Viento', it: 'Vento', de: 'Wind', pt: 'Vento', ja: '風' },
   'tv.kmh': { fr: '{n} km/h', en: '{n} km/h', es: '{n} km/h', it: '{n} km/h', de: '{n} km/h', pt: '{n} km/h', ja: '時速{n}km' },

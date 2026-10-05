@@ -19,7 +19,7 @@
  * et l'IA par poste n'y est pas étalonnée (mesuré : 11,6 essais par match).
  * La remettre à 1 suffit à revenir au moteur d'origine.
  */
-export const IA_MATCH_DE_CARRIERE = 2;
+export const IA_MATCH_DE_CARRIERE = 3;
 
 export const REGLAGES_IA = {
   // ── Le duel porteur / plaqueur (`avantageDuPorteur`) ──────────────────────
@@ -80,6 +80,27 @@ export const REGLAGES_IA = {
   /** Nombre de fautes dans la même zone (ou de la même famille) avant l'avertissement : condensé, temps réel. */
   serieCondense: 2,
   serieTempsReel: 5,
+
+  // ── La lecture locale du porteur (IA 3 : `ia/vision.ts`) ──────────────────
+  /** Secondes qu'un joueur sans vision met à lire le rideau après avoir reçu (un bon lecteur : presque rien). */
+  tempsDeLecture: 0.5,
+  /** Largeur (m) d'un intervalle qu'un lecteur parfait attaque ; un mauvais lecteur en demande trois de plus. */
+  intervalleMin: 3.6,
+  /** Ce que la percée doit valoir de plus que la passe prévue pour que le porteur abandonne le plan. */
+  margeDuPlan: 1.2,
+  /** Distance (m) à laquelle le porteur d'un surnombre donne, avant d'ajouter la vitesse de fermeture. */
+  passeAuDernierMoment: 2.2,
+  /** Secondes pendant lesquelles un défenseur fixé (ou dupé par une feinte) ne peut plus intervenir. */
+  defenseurFixe: 0.7,
+  /** Lecture qu'il faut pour voir le défenseur partir sur le soutien et tenter la feinte de passe. */
+  lectureDeLaFeinte: 0.62,
+  /** Chance de base qu'une feinte de passe dupe le défenseur, avant les statistiques des deux joueurs. */
+  feinteReussie: 0.36,
+  // Les mêmes, en temps réel (ligue, règles 4) : huit fois plus de ballons portés, donc une lecture plus exigeante.
+  intervalleMinReel: 4.5,
+  margeDuPlanReel: 2.2,
+  defenseurFixeReel: 0.45,
+  feinteReussieReel: 0.26,
 
   // ── Le match en temps réel (ligue en ligne, règles 3) ─────────────────────
   // Quatre-vingts minutes réelles contiennent 260 regroupements, contre 34

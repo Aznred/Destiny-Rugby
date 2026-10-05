@@ -301,6 +301,12 @@ export interface Vol {
   derive?: Vec;
   /** Le ballon touche un poteau à l'instant `t` et repart vers `vers`. */
   ricochet?: { t: number; vers: Vec };
+  /**
+   * IA 3 : retombé, le ballon rebondit encore — `duree` secondes de plus,
+   * jusqu'à `vers`, en montant à `hauteur`. Le même vol : ni second coup de
+   * pied, ni second bruit de frappe.
+   */
+  rebond?: { duree: number; vers: Vec; hauteur: number };
 }
 
 /**
@@ -558,6 +564,19 @@ export interface EtatMatch {
    * l'affichage retourne le terrain (bancs, tribunes, caméras).
    */
   cotesInverses?: boolean;
+  /**
+   * LE REGARD DU PORTEUR (IA 3) : depuis quand il a le ballon, son tirage de
+   * lecture (un seul par ballon reçu, pour qu'il ne change pas d'avis à chaque
+   * pas), et la course qu'il a décidée en regardant devant lui.
+   */
+  regard?: { id: string; depuis: number; alea: number; cible?: Vec; cibleA?: number; intervalle?: boolean; feinteA?: number } | null;
+  /**
+   * LE DUEL D'UN SURNOMBRE (IA 3) : le porteur fixe, les soutiens gardent leur
+   * largeur, et le défenseur a fait un choix — monter, glisser, hésiter ou
+   * couper la passe.
+   */
+  duel?: { porteurId: string; soutienIds: string[]; defenseurId: string; cote: 1 | -1;
+    choix: 'monter' | 'glisser' | 'hesiter' | 'couper'; depuis: number; rechoisiA?: number } | null;
   /** La mémoire de l'arbitre, par camp fautif (IA par poste). */
   arbitrage?: Record<Cote, ArdoiseArbitre>;
   /**
