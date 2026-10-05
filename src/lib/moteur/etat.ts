@@ -975,6 +975,12 @@ export interface EtatMatch {
   prochaineFriction: number;
   /** L'ardoise disciplinaire du joueur incarné. */
   discipline: DisciplineMatch;
+  /**
+   * LE CONTRÔLE DIRECT (Correctif 16) : le joueur conduit son pion lui-même, au stick
+   * ou au clavier, et les vingt-neuf autres jouent seuls. Absent ou éteint : le moteur
+   * rejoue à l'identique (empreinte : `npm run mesure:empreinte`). Voir `direct.ts`.
+   */
+  direct?: import('./direct.js').EtatDirect;
 }
 
 /**

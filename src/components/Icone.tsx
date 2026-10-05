@@ -46,7 +46,10 @@ export type NomIcone =
   // ── Les listes déroulantes ───────────────────────────────────────────────
   | 'chevron' | 'lecture' | 'pause' | 'moins'
   // ── Le match à la télévision ─────────────────────────────────────────────
-  | 'son' | 'son-coupe' | 'ralenti' | 'camera';
+  | 'son' | 'son-coupe' | 'ralenti' | 'camera'
+  // ── Les commandes du contrôle direct ─────────────────────────────────────
+  | 'sprint' | 'passe-gauche' | 'passe-droite' | 'pied' | 'raffut' | 'crochet' | 'plaquage'
+  | 'grattage' | 'appel' | 'viseur' | 'manette' | 'clavier' | 'feinte' | 'soutien';
 
 interface Props {
   nom: NomIcone;
@@ -624,6 +627,118 @@ const TRACES: Record<NomIcone, React.ReactNode> = {
       <path d="m13.4 3 3.2 3-3.2 3" />
       <path d="M19.4 14.6V16a2 2 0 0 1-2 2H7.6" />
       <path d="m10.6 21-3.2-3 3.2-3" />
+    </>
+  ),
+  // Deux chevrons qui filent : accélérer.
+  sprint: (
+    <>
+      <path d="m6.5 6.5 5.5 5.5-5.5 5.5" />
+      <path d="m13 6.5 5.5 5.5-5.5 5.5" />
+      <path d="M3 9.5h2M3 14.5h2" />
+    </>
+  ),
+  // Une flèche qui part vers la gauche, le ballon derrière elle : la passe côté gauche.
+  'passe-gauche': (
+    <>
+      <path d="M15 12H5" />
+      <path d="m9.2 7.2L4.5 12l4.7 4.8" />
+      <ellipse cx="18.2" cy="12" rx="2.3" ry="1.6" />
+    </>
+  ),
+  'passe-droite': (
+    <>
+      <path d="M9 12h10" />
+      <path d="m14.8 7.2 4.7 4.8-4.7 4.8" />
+      <ellipse cx="5.8" cy="12" rx="2.3" ry="1.6" />
+    </>
+  ),
+  // Le ballon et la courbe qu'il suit : le coup de pied.
+  pied: (
+    <>
+      <path d="M3.5 19.5c2.2-8.2 8-12.4 14-12.2" />
+      <ellipse cx="19" cy="7.4" rx="2.7" ry="1.75" transform="rotate(-24 19 7.4)" />
+      <path d="M3 21h7" />
+    </>
+  ),
+  // Le bras tendu, la paume qui repousse : le raffut.
+  raffut: (
+    <>
+      <path d="M2.8 13.5h8" />
+      <path d="M11.2 6.8v13.4" />
+      <path d="M11.2 8.6h4.8a1.2 1.2 0 0 1 1.2 1.2" />
+      <path d="M11.2 12h6.2a1.2 1.2 0 0 1 1.2 1.2" />
+      <path d="M11.2 15.4h5.4a1.2 1.2 0 0 1 1.2 1.2" />
+    </>
+  ),
+  // Une flèche qui se dérobe en S : le crochet.
+  crochet: (
+    <>
+      <path d="M7 20c0-6.2 10-5.4 10-12" />
+      <path d="m13.4 9.6 3.6-3.8 3.8 3.6" />
+    </>
+  ),
+  // Le choc : un point d'impact et ses rayons.
+  plaquage: (
+    <>
+      <circle cx="12" cy="12" r="2.6" />
+      <path d="M12 3.6v3.4M12 17v3.4M3.6 12H7M17 12h3.4" />
+      <path d="m6.2 6.2 2.4 2.4M15.4 15.4l2.4 2.4M17.8 6.2l-2.4 2.4M8.6 15.4l-2.4 2.4" />
+    </>
+  ),
+  // Un crochet qui accroche le ballon au sol : le grattage.
+  grattage: (
+    <>
+      <path d="M5.5 4.5c6.2 0 10.5 3.2 10.5 8.2" />
+      <path d="m13.4 10.8 2.6 2.4 2.4-2.8" />
+      <ellipse cx="11.5" cy="18.2" rx="5.4" ry="2.5" />
+    </>
+  ),
+  // Une main levée : « je suis là ».
+  appel: (
+    <>
+      <path d="M9.4 11.2V6.2M11.8 11V4.4M14.2 11.2V5.2M16.5 12V8" />
+      <path d="M8 11.4h8.4v4.2a4.2 4.2 0 0 1-4.2 4.2A4.2 4.2 0 0 1 8 15.6Z" />
+      <path d="M8 14.2 5.4 11.6" />
+    </>
+  ),
+  // Un viseur : l'aide au placement, la visée.
+  viseur: (
+    <>
+      <circle cx="12" cy="12" r="6.6" />
+      <circle cx="12" cy="12" r="1.7" />
+      <path d="M12 2.8v3.2M12 18v3.2M2.8 12H6M18 12h3.2" />
+    </>
+  ),
+  // Une manette : corps, croix directionnelle, deux boutons.
+  manette: (
+    <>
+      <path d="M6.6 8h10.8a4.4 4.4 0 0 1 4.3 3.5l.8 4.3a2.2 2.2 0 0 1-3.9 1.7L16.2 15H7.8l-2.4 2.5a2.2 2.2 0 0 1-3.9-1.7l.8-4.3A4.4 4.4 0 0 1 6.6 8Z" />
+      <path d="M7.4 10.2v3.2M5.8 11.8H9" />
+      <circle cx="15.8" cy="10.8" r=".6" />
+      <circle cx="17.9" cy="12.6" r=".6" />
+    </>
+  ),
+  // Un clavier : le cadre et trois rangées de touches.
+  clavier: (
+    <>
+      <rect x="2.6" y="6.2" width="18.8" height="11.6" rx="2" />
+      <path d="M6 10h.01M9 10h.01M12 10h.01M15 10h.01M18 10h.01M6 13.8h12" />
+    </>
+  ),
+  // Une feinte : la passe esquissée, la main qui revient.
+  feinte: (
+    <>
+      <path d="M5 15.5c3.6-6 9.4-7.4 14-5" />
+      <path d="m16 7.4 3.2 2.4-2.4 3.2" />
+      <path d="M5 20c3.4-3.2 6.6-3.6 9-2.6" strokeDasharray="1.6 2.2" />
+    </>
+  ),
+  // Deux joueurs côte à côte et un ballon entre eux : le soutien, le nettoyage du ruck.
+  soutien: (
+    <>
+      <circle cx="8.4" cy="7.6" r="2.4" />
+      <circle cx="15.6" cy="7.6" r="2.4" />
+      <path d="M4.2 19c0-3.2 1.9-5.2 4.2-5.2 1.3 0 2.2.4 3.6 1.6 1.4-1.2 2.3-1.6 3.6-1.6 2.3 0 4.2 2 4.2 5.2" />
     </>
   ),
 };

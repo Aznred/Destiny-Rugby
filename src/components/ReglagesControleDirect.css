@@ -1,0 +1,76 @@
+/* La section « Contrôle direct » du panneau des réglages. Elle reprend les classes du panneau (`.champ`, `.aide`,
+   `.choix-langue`) et n'ajoute que ce qui lui est propre : la table des touches, les curseurs, la ligne de la manette. */
+.rcd { display: grid; gap: 0.15rem; margin-top: 1.1rem; padding-top: 1rem; border-top: 1px solid var(--bordure, rgba(232, 178, 58, 0.18)); }
+.rcd-titre {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.2rem;
+  font-family: var(--police-forte, 'Archivo', system-ui, sans-serif);
+  font-size: 1rem;
+  color: var(--or-clair, #f4cd63);
+}
+.rcd-sous-titre {
+  margin: 0.9rem 0 0.1rem;
+  font-family: var(--police-forte, 'Archivo', system-ui, sans-serif);
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--craie-dim, #c7d1c6);
+}
+.rcd-choix { flex-wrap: wrap; }
+.rcd-ligne label { display: flex; align-items: center; gap: 0.55rem; cursor: pointer; }
+.rcd-curseur label { display: flex; justify-content: space-between; gap: 0.6rem; }
+.rcd-curseur label b { color: var(--or-clair, #f4cd63); font-variant-numeric: tabular-nums; }
+.rcd-curseur input[type='range'] { width: 100%; accent-color: var(--or-500, #e8b23a); }
+
+/* La table des touches : l'action, ses touches, un bouton. */
+.rcd-touches { display: grid; gap: 0.3rem; margin: 0.4rem 0; padding: 0; list-style: none; }
+.rcd-touches li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.3rem 0.5rem;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+}
+.rcd-touches li[data-ecoute='oui'] { background: rgba(244, 205, 99, 0.12); outline: 1px solid var(--or-500, #e8b23a); }
+/* Le bouton de la ligne : discret, la table doit se lire comme une table, pas comme une pile de boutons. */
+.rcd-touches .btn, .rcd-tuto .btn, .rcd .btn.mini {
+  min-height: 0;
+  padding: 0.28rem 0.75rem;
+  font-size: 0.74rem;
+  line-height: 1.2;
+}
+.rcd-action { font-size: 0.82rem; color: var(--craie, #f5f7f2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rcd-cles { display: inline-flex; align-items: center; gap: 4px; min-width: 6.4rem; justify-content: flex-end; }
+.rcd-cles em { font-size: 0.78rem; color: var(--or-clair, #f4cd63); font-style: normal; }
+.rcd-touche {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.5rem;
+  height: 1.5rem;
+  padding: 0 0.4rem;
+  border-radius: 5px;
+  background: linear-gradient(180deg, #f7f9f4, #cdd6cd);
+  color: #10190f;
+  font-family: var(--police-forte, 'Archivo', system-ui, sans-serif);
+  font-size: 0.74rem;
+  font-weight: 800;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.55);
+}
+.rcd-fixe { opacity: 0.55; }
+.rcd-retour { margin: 0.2rem 0; padding: 0.4rem 0.6rem; border-radius: 8px; font-size: 0.8rem; background: rgba(255, 255, 255, 0.05); color: var(--craie, #f5f7f2); }
+.rcd-retour[data-ton='alerte'] { background: rgba(255, 150, 80, 0.14); color: #ffc79a; }
+.rcd-manette { display: flex; align-items: center; gap: 0.5rem; margin: 0.2rem 0; font-size: 0.85rem; color: var(--craie-dim, #c7d1c6); }
+.rcd-manette[data-detectee='oui'] { color: var(--succes, #48c47a); }
+.rcd-tuto { display: grid; gap: 0.3rem; margin-top: 0.8rem; }
+.rcd-tuto .btn { justify-self: start; }
+
+@media (max-width: 520px) {
+  .rcd-touches li { grid-template-columns: minmax(0, 1fr) auto; }
+  .rcd-touches li .rcd-cles { grid-column: 1; grid-row: 2; justify-content: flex-start; }
+  .rcd-touches li .btn { grid-column: 2; grid-row: 1 / span 2; }
+}

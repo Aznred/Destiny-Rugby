@@ -277,6 +277,12 @@ export async function creerScene3D(conteneur,options={}){
   teeMesh.updateMatrixWorld(true);const teeBounds=new THREE.Box3().setFromObject(teeMesh);teeMesh.userData.floor=-teeBounds.min.y;teeMesh.userData.top=teeBounds.max.y-teeBounds.min.y;
   const anneau=(interieur,exterieur,teinte,opacite)=>{const m=new THREE.Mesh(new THREE.RingGeometry(interieur,exterieur,40),new THREE.MeshBasicMaterial({color:teinte,side:THREE.DoubleSide,transparent:true,opacity:opacite,depthWrite:false}));m.rotation.x=-Math.PI/2;m.visible=false;scene.add(m);return m;};
   const halo=anneau(.48,.58,'#f5efb9',.7),aura=anneau(.62,.74,'#ffd257',.85);
+  // ── Les repères du pilotage direct : anneaux (rayon 1 en base, mis à l'échelle) et pointillés ──
+  // Posés sur la pelouse par l'hôte (`reperes`) ; la scène ne décide de rien, elle dessine ce qu'on lui donne.
+  const anneauxRepere=[0,1,2,3,4,5,6,7].map(()=>anneau(.8,1,'#ffffff',.6));
+  const pointsRepere=[...Array(16)].map(()=>{const m=new THREE.Mesh(new THREE.CircleGeometry(.11,10),new THREE.MeshBasicMaterial({color:'#ffffff',transparent:true,opacity:.6,depthWrite:false}));m.rotation.x=-Math.PI/2;m.visible=false;scene.add(m);return m;});
+  let reperes=null;
+  for(const m of [...anneauxRepere,...pointsRepere])jetables.push(m.geometry,m.material);
   const etiquette=creerEtiquette(renderer);scene.add(etiquette.sprite);
   // Le halo du porteur prend la couleur de son équipe, éclaircie si elle est trop sombre pour la pelouse.
   const teintesHalo=[tenueA,tenueB].map(t=>luminance(t.principal)<.3?'#f5efb9':hexa(t.principal));
@@ -451,6 +457,7 @@ export async function creerScene3D(conteneur,options={}){
     const reel=Math.min(dt,.05);
     if(!tele.imageRalenti(reel)){tele.finirRalenti(false);return;}
     halo.visible=false;aura.visible=false;etiquette.sprite.visible=false;
+    for(const m of anneauxRepere)m.visible=false;for(const m of pointsRepere)m.visible=false;
     // Contre-champ bas, côté opposé à la caméra principale, qui suit le ballon.
     const rl=tele.ralenti,s=rl.sens||1;
     cibleRalenti.set(ballMesh.position.x,clamp(ballMesh.position.y*.5,.9,2.2),ballMesh.position.z);
@@ -763,6 +770,7 @@ export async function creerScene3D(conteneur,options={}){
     halo.position.set(ballMesh.position.x,.035,ballMesh.position.z);halo.visible=!!porteur;halo.material.color.set(teintesHalo[match.team]);
     const moi=options.moi&&actors.get(options.moi);
     aura.visible=!!moi&&moi.group.visible;if(aura.visible){aura.position.set(moi.group.position.x,.03,moi.group.position.z);aura.material.opacity=.6+.25*Math.sin(visualTime*4);}
+    dessinerReperes(visualTime);
     renderCamera(dt,visualTime);
     // Le nom du porteur, dans sa flamme, sous ses appuis.
     if(porteur&&porteur.nom&&options.noms!==false){
@@ -970,6 +978,114 @@ export async function creerScene3D(conteneur,options={}){
   }
   let planAffiche=null;
   const cibleFixe=new THREE.Vector3(),secousse={source:null,t:-10};
+
+  // ── Le glissé : de la pose où l'on était à celle où l'on va, sans coupe ───────
+  // ⚠️ IL SE JOUE PAR-DESSUS LE PLAN QUI VIENT D'ÊTRE CALCULÉ : chaque plan trouve sa pose comme avant,
+  // et ce calque la fond avec celle de l'image précédente le temps d'une seconde et demie.
+  const poseDerniere={pos:new THREE.Vector3(),quat:new THREE.Quaternion(),ok:false},poseBlend={pos:new THREE.Vector3(),quat:new THREE.Quaternion()};
+  let transition=null;
+  function glisser(duree=1.5){if(poseDerniere.ok)transition={t:0,dur:duree,pos:poseDerniere.pos.clone(),quat:poseDerniere.quat.clone()};}
+  function miseEnPose(dt){
+    if(transition){
+      transition.t+=dt;
+      if(transition.t>=transition.dur||snap)transition=null;
+      else{
+        const k=smooth(transition.t/transition.dur);
+        poseBlend.pos.copy(camera.position);poseBlend.quat.copy(camera.quaternion);
+        camera.position.lerpVectors(transition.pos,poseBlend.pos,k);camera.quaternion.slerpQuaternions(transition.quat,poseBlend.quat,k);
+      }
+    }
+    poseDerniere.pos.copy(camera.position);poseDerniere.quat.copy(camera.quaternion);poseDerniere.ok=true;
+  }
+
+  // ── La caméra derrière notre joueur ───────────────────────────────────────────
+  // ⚠️ ELLE SUIT SON CAP, PAS SA TÊTE : un cap vers l'avant du terrain (l'axe d'attaque de son camp), infléchi par
+  // sa course quand il va vite vers l'avant ou en travers, et par le ballon quand celui-ci est LOIN — ou DANS SON DOS,
+  // auquel cas elle pivote, mais lentement (au plus 63° par seconde, et le poids du ballon est lissé sur sept
+  // dixièmes de seconde pour qu'une passe ou un coup de pied ne la fasse pas tourner pour rien). Jamais de demi-tour instantané.
+  // Elle recule quand le ballon s'éloigne et se resserre quand le joueur est dans l'action.
+  const cible_J=new THREE.Vector3(),viser_J=new THREE.Vector3();
+  function cameraJoueur(real,moiA,e){
+    let J=rig.joueur;
+    const P=moiA.group.position,B=ballMesh.position,equipe=match.byId.get(options.moi)?.team??0;
+    const ax=0,az=equipe===0?1:-1;
+    if(!J){J=rig.joueur={yaw:az>0?0:Math.PI,zoom:1,wB:0,vx:0,vz:0,px:P.x,pz:P.z,pos:new THREE.Vector3(),posV:new THREE.Vector3(),look:new THREE.Vector3(),lookV:new THREE.Vector3(),init:false};}
+    const dt=Math.max(real,.001);
+    // La course lissée, vue de la caméra (positions affichées, pas celles du moteur : jamais de saut).
+    const vx=(P.x-J.px)/dt,vz=(P.z-J.pz)/dt;J.px=P.x;J.pz=P.z;
+    const kv=1-Math.exp(-dt*7);
+    if(Math.hypot(vx,vz)<14){J.vx+=(vx-J.vx)*kv;J.vz+=(vz-J.vz)*kv;}
+    const sp=Math.hypot(J.vx,J.vz),dvx=sp>.05?J.vx/sp:0,dvz=sp>.05?J.vz/sp:0;
+    let bx=B.x-P.x,bz=B.z-P.z;const db=Math.hypot(bx,bz)||1;bx/=db;bz/=db;
+    const derriere=Math.max(0,-(bx*ax+bz*az));
+    // Courir vers l'avant ou en travers oriente la vue ; battre en retraite ne la retourne pas.
+    const wV=clamp((sp-3)/4,0,1)*.8*clamp(dvx*ax+dvz*az+.5,0,1);
+    const wBvoulu=.22*clamp((db-8)/22,0,1)+1.3*derriere*clamp((db-3)/12,0,1);
+    J.wB+=(wBvoulu-J.wB)*(1-Math.exp(-dt/.7));
+    let dx=ax+dvx*wV+bx*J.wB,dz=az+dvz*wV+bz*J.wB;
+    const cap=snap||!J.init?null:Math.hypot(dx,dz)>.25?Math.atan2(dx,dz):null;
+    if(!J.init||snap){J.yaw=Math.atan2(ax+dvx*wV,az+dvz*wV);}
+    else if(cap!==null){
+      const delta=Math.atan2(Math.sin(cap-J.yaw),Math.cos(cap-J.yaw));
+      J.yaw+=clamp(delta*(1-Math.exp(-dt*2.4)),-1.1*dt,1.1*dt);
+    }
+    const fx=Math.sin(J.yaw),fz=Math.cos(J.yaw);
+    // Le joueur est dans l'action : il porte, ou le ballon est tout près. Elle se resserre alors d'un sixième.
+    const porte=match.carrier===options.moi;
+    const impliquee=porte?1:clamp(1-(db-2)/9,0,1);
+    const zoomVoulu=1+.3*clamp((db-12)/30,0,1)-.15*impliquee+.06*clamp(sp/9,0,1);
+    J.zoom+=(zoomVoulu-J.zoom)*(1-Math.exp(-dt/.9));
+    const asp=camera.aspect<1?1.3:camera.aspect<1.5?1.1:1;
+    const dist=6.6*J.zoom*asp,haut=3.3*J.zoom*asp;
+    // Pas collée à son dos : un peu décalée de l'autre côté du ballon, pour qu'il reste lisible à côté du joueur.
+    const droiteX=-fz,droiteZ=fx;
+    const decal=clamp(-((B.x-P.x)*droiteX+(B.z-P.z)*droiteZ)*.07,-1.4,1.4)*(1-impliquee*.7);
+    cible_J.set(P.x-fx*dist+droiteX*decal,Math.max(2.1,haut),P.z-fz*dist+droiteZ*decal);
+    cible_J.x=clamp(cible_J.x,-37,37);cible_J.z=clamp(cible_J.z,-72,72);
+    const avance=7+.5*sp;
+    viser_J.set(P.x+fx*avance+(B.x-P.x)*.1,1,P.z+fz*avance+(B.z-P.z)*.1);
+    if(!J.init||snap){J.pos.copy(cible_J);J.posV.set(0,0,0);J.look.copy(viser_J);J.lookV.set(0,0,0);J.init=true;}
+    else{dampVector(J.pos,cible_J,J.posV,.24,real);dampVector(J.look,viser_J,J.lookV,.16,real);}
+    camera.position.copy(J.pos);camera.lookAt(J.look);
+    J.cap=J.yaw;
+  }
+
+  // ── Les repères : anneaux et pointillés posés sur la pelouse ──────────────────
+  function poserAnneau(i,x,z,rayon,teinte,opacite){const m=anneauxRepere[i];if(!m)return;m.visible=true;m.position.set(x,.045+i*.001,z);m.scale.setScalar(rayon);m.material.color.set(teinte);m.material.opacity=opacite;}
+  function pointiller(de,vers,depart,teinte,opacite,pas=1.7){
+    let n=0;const dx=vers.x-de.x,dz=vers.z-de.z,d=Math.hypot(dx,dz);if(d<1.2)return 0;
+    const nb=Math.min(pointsRepere.length,Math.floor((d-depart)/pas));
+    for(let k=0;k<nb;k++){const m=pointsRepere[n++],u=(depart+k*pas+pas*.5)/d;m.visible=true;m.position.set(de.x+dx*u,.05,de.z+dz*u);m.material.color.set(teinte);m.material.opacity=opacite*(.35+.65*(k+1)/nb);}
+    return n;
+  }
+  function dessinerReperes(t){
+    for(const m of anneauxRepere)m.visible=false;
+    for(const m of pointsRepere)m.visible=false;
+    const r=reperes;if(!r||!match||tele.ralenti.actif)return;
+    const moiA=options.moi?actors.get(options.moi):null;
+    const pied=moiA&&moiA.group.visible?moiA.group.position:null;
+    let i=0;
+    const sur=id=>{const a=id?actors.get(id):null;return a&&a.group.visible?a.group.position:null;};
+    // Le poste que l'IA lui donnerait : un anneau vert, et un pointillé quand il est loin.
+    if(r.suggestion&&pied){
+      const z=xyz(r.suggestion),loin=Math.hypot(z.x-pied.x,z.z-pied.z);
+      const teinte=r.horsPoste?'#ffb347':'#7ee08f',pouls=.5+.14*Math.sin(t*3.2);
+      poserAnneau(i++,z.x,z.z,1.5,teinte,pouls);
+      if(loin>6)pointiller(pied,z,1.4,teinte,.55);
+    }
+    // Les receveurs qu'une passe à gauche ou à droite servirait.
+    for(const p of r.passes||[]){const q=sur(p.id);if(q)poserAnneau(i++,q.x,q.z,p.fort===false?.8:.95,'#ffd257',p.fort===false?.5:.85);}
+    // Le porteur qu'on peut plaquer.
+    if(r.plaquage){const q=sur(r.plaquage);if(q)poserAnneau(i++,q.x,q.z,1.05,'#ff5a4d',.55+.25*Math.sin(t*9));}
+    // La visée d'un coup de pied : où le ballon retombera, d'après la puissance.
+    if(r.visee&&pied){
+      const z=xyz(r.visee.arrivee),p=clamp(r.visee.puissance,0,1);
+      const teinte=p<.35?'#e8f1ff':p<.7?'#ffd257':'#ff9a3c';
+      poserAnneau(i++,z.x,z.z,1.9,teinte,.8);
+      pointiller(pied,z,1.0,teinte,.8,2.2);
+    }
+  }
+
   function renderCamera(dt,visualTime){
     const e=match.e,tir=e.tir,want=rig.want;
     // ⚠️ LE CHANGEMENT DE CÔTÉ : LE STADE TOURNE, PAS LE MATCH. Le moteur garde
@@ -1020,8 +1136,14 @@ export async function creerScene3D(conteneur,options={}){
     // d'un point de vue à un autre se fait par une COUPE, comme à la télévision ;
     // seuls le plan large et le plan serré, qui partagent leur axe, se rejoignent en glissant.
     let plan=mode,coupe=false;
-    if(mode==='tv'){const c=tele.choisirPlan(match,visualTime);plan=c.plan;coupe=c.coupe;}
+    // ⚠️ LE PLAN « JOUEUR » EXIGE UN JOUEUR À L'IMAGE : sur le banc, ou entre deux jeux, la réalisation reprend la main.
+    const moiJ=mode==='joueur'&&options.moi?actors.get(options.moi):null;
+    const joueurVisible=!!moiJ&&moiJ.group.visible&&match.byId.has(options.moi);
+    if(mode==='tv'||(mode==='joueur'&&!joueurVisible)){const c=tele.choisirPlan(match,visualTime);plan=c.plan;coupe=c.coupe;}
+    // Entrer dans le plan « joueur », ou en sortir, se fait en glissant : jamais de coupe sèche.
+    if(!snap&&plan!==planAffiche&&(plan==='joueur'||planAffiche==='joueur'))glisser(1.5);
     if(plan!==planAffiche){coupe=coupe||!(['follow','close'].includes(plan)&&['follow','close'].includes(planAffiche));planAffiche=plan;}
+    if(plan==='joueur'&&joueurVisible){cameraJoueur(real,moiJ,e);miseEnPose(real);return;}
     const buteur=tir&&actors.get(tir.buteur?.id),versPoteaux=((tir?.buteur?.cote??e.possession)==='A'?1:-1)*inv;
     const stade=v=>tmp3.set(v.x*inv,v.y,v.z*inv);
     let viser=rig.focus;
@@ -1055,6 +1177,7 @@ export async function creerScene3D(conteneur,options={}){
     const age=visualTime-secousse.t;
     if(age>=0&&age<.34&&speed<=1.5){const k=(1-age/.34)**2*.1;camera.position.x+=Math.sin(age*88)*k;camera.position.y+=Math.cos(age*71)*k*.7;}
     const view=api.vue;if(view){camera.position.set((rig.focus.x+view[0])*inv,view[1],(rig.focus.z+view[2])*inv);camera.lookAt(rig.focus.x*inv,view[3]??.9,rig.focus.z*inv);}
+    miseEnPose(real);
   }
 
   // ── Définition adaptative : on préfère une image un peu moins fine à une image saccadée ──
@@ -1120,6 +1243,20 @@ export async function creerScene3D(conteneur,options={}){
     surRalenti:null,
     set moi(id){options.moi=id;},
     set suivreMoi(v){options.suivreMoi=v;},
+    /** Les repères à poser sur la pelouse : `{ suggestion, horsPoste, passes: [{id, fort}], plaquage, visee: { arrivee, puissance } }`, ou `null`. */
+    set reperes(v){reperes=v||null;},
+    get reperes(){return reperes;},
+    /** Ce que le joueur voit : « droit devant » et « à droite », en repère TERRAIN (x vers la ligne B, y vers la touche haute). */
+    reperesCamera(){
+      const f=tmp.set(0,0,0);camera.getWorldDirection(f);
+      const n=Math.hypot(f.x,f.z)||1,fx=f.x/n,fz=f.z/n;
+      // Scène → terrain : x_terrain = z_scène, y_terrain = x_scène. La droite de l'image est (−fz, fx) en scène.
+      return {avant:{x:fz,y:fx},droite:{x:fx,y:-fz}};
+    },
+    /** Le remplaçant est-il encore en train d'entrer sur le terrain ? (La caméra attend qu'il soit sur la pelouse.) */
+    entreeEnCours(id){return !!match&&(match.changements||[]).some(c=>c.type==='entree'&&c.id===id&&!c.retour);},
+    /** Fond la pose de la caméra avec la précédente (par défaut en 1,5 s) : un changement de point de vue sans coupe. */
+    glisser,
     /** Position à l'écran (pixels du conteneur) du dessus de la tête d'un joueur. */
     ecran(id,hauteurTete=2.02){
       const a=actors.get(id);if(!a||!a.group.visible)return null;

@@ -25,6 +25,7 @@ import type { Pion } from './entites.js';
 import { placerCombinaison } from './combinaisons.js';
 import { PHASES_ARRETEES, type EtatMatch, type SystemeDefensif } from './etat.js';
 import { defenseurPresent, iaParPoste } from './ia/lecture.js';
+import { deserteurDefensif } from './direct.js';
 import { coutDeLaPlace, profilDe, type PlaceAvant } from './ia/postes.js';
 import {
   AXE, LARGEUR, LONGUEUR, LIGNE_A, LIGNE_B, adverse, borner, coteOuvert, dansSes22, distance, distance2,
@@ -680,6 +681,10 @@ export function placerEquipes(e: EtatMatch): void {
   const defense = surLeTerrain(e, adverse(e.possession));
   structurerAttaque(e, attaque, e.possession);
   structurerDefense(e, defense, adverse(e.possession));
+  // Correctif 16 — le joueur a déserté son poste de défenseur : la ligne se refait sans lui, à quatorze.
+  // Sa propre cible (le poste que l'IA lui donnait) a été posée par le premier calcul : l'aide au placement la montre.
+  const deserteur = deserteurDefensif(e);
+  if (deserteur) structurerDefense(e, defense.filter((p) => p !== deserteur), adverse(e.possession));
   placerCombinaison(e);
   if (rolesConquete) {
     for (const p of e.pions) {
@@ -795,6 +800,8 @@ function separer(e: EtatMatch, arret: boolean): void {
     // Le botteur pose son pied d'appui. La charge est arbitrée au tee, sans
     // que la séparation de formation le repousse et redémarre sa frappe.
     if (e.tir?.buteur === p && !e.tir.volLance) continue;
+    // Le pion du joueur n'est pas écarté de force : il a ses propres collisions et ses propres doigts.
+    if (p.moi && e.direct?.actif && !p.corps) continue;
     if (p.role === 'ruck' || p.role === 'melee' || p.role === 'alignement' || p.role === 'maul') continue;
     if (arret && (e.phase === 'melee' || e.phase === 'touche')) continue;
     libres.push(p);

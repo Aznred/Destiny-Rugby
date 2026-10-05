@@ -47,7 +47,8 @@ export function organiserRuck(e: EtatMatch): void {
     || (ia && p.numero !== 9 && p.numero !== 10 && distance(p.pos, e.ballon) < (attaque ? 6 : 3.5));
   const priorite = (p: typeof e.pions[number], attaque: boolean) => !ia ? 0
     : attaque ? profilDe(p).soutienRuck : profilDe(p).gratte * 0.5;
-  const choisir = (attaque: boolean) => e.pions.filter(p => p.surLeTerrain && p.sanction <= 0 && eligible(p, attaque)
+  // Le pion du joueur n'est jamais enrôlé d'office : il s'engage de lui-même, ou il reste libre (Correctif 16).
+  const choisir = (attaque: boolean) => e.pions.filter(p => p.surLeTerrain && p.sanction <= 0 && !(p.moi && e.direct?.actif) && eligible(p, attaque)
     && (!detaille || !p.corps)
     && (p.cote === e.possession) === attaque && p.id !== e.ruck?.porteurId && p.id !== e.ruck?.plaqueurId)
     .map(p => ({ p, c: cout(p) - priorite(p, attaque) }))
@@ -79,8 +80,10 @@ export function designerRelayeur(e: EtatMatch): Pion | undefined {
   if (!ruck.organisation) organiserRuck(e);
   const o = ruck.organisation!;
   const lies = new Set([...o.attaque, ...o.defense, ruck.porteurId, ruck.plaqueurId]);
+  // Un joueur qui conduit son pion n'est le relayeur que s'il est VRAIMENT au pied du ruck.
   const disponible = (p: Pion) => p.surLeTerrain && p.sanction <= 0 && !p.corps
-    && p.cote === e.possession && !lies.has(p.id);
+    && p.cote === e.possession && !lies.has(p.id)
+    && (!(p.moi && e.direct?.actif) || distance(p.pos, e.ballon) <= 2.6);
   const actuel = o.relayeurId ? e.pions.find(p => p.id === o.relayeurId) : undefined;
   const neuf = e.pions.find(p => p.numero === 9 && p.cote === e.possession);
   // En cadence détaillée, le demi n'est le relayeur que s'il peut vraiment y
@@ -159,6 +162,8 @@ export function placerRegroupement(e: EtatMatch): void {
   const placer = (id: string, cible: Vec) => {
     const p = e.pions.find(q => q.id === id && q.surLeTerrain && q.sanction <= 0);
     if (!p) return;
+    // Le pion du joueur n'est placé que s'il s'est engagé dans le regroupement.
+    if (p.moi && e.direct?.actif && !o.attaque.includes(id) && !o.defense.includes(id)) return;
     p.role = 'ruck';
     p.cible = { x: borner(cible.x, LIGNE_A + .5, LIGNE_B - .5), y: borner(cible.y, 1.2, LARGEUR - 1.2) };
     e.placement![id] = { ...p.cible };

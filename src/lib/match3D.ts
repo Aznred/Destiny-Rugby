@@ -24,9 +24,30 @@ export interface EquipeScene3D {
   blason?: string;
 }
 
-/** `tv` : la réalisation choisit ses plans (derrière le buteur, derrière les poteaux, en-but, vue aérienne…). */
-export type Camera3D = 'tv' | 'follow' | 'close' | 'wide' | 'aerienne' | 'basse' | 'enbut';
+/**
+ * `tv` : la réalisation choisit ses plans (derrière le buteur, derrière les poteaux, en-but, vue aérienne…).
+ * `joueur` : derrière notre joueur, légèrement surélevée — la vue du contrôle direct (Correctif 16).
+ */
+export type Camera3D = 'tv' | 'follow' | 'close' | 'wide' | 'aerienne' | 'basse' | 'enbut' | 'joueur';
 export const CAMERAS_3D: readonly Camera3D[] = ['tv', 'follow', 'close', 'wide', 'aerienne', 'basse', 'enbut'];
+/** Les mêmes, plus la vue derrière le joueur : celle que le bouton de caméra propose quand on incarne un joueur. */
+export const CAMERAS_3D_AVEC_JOUEUR: readonly Camera3D[] = ['tv', 'joueur', 'follow', 'close', 'wide', 'aerienne', 'basse', 'enbut'];
+
+/**
+ * Ce que l'hôte pose sur la pelouse pendant le contrôle direct (Correctif 16). Les points sont en repère
+ * TERRAIN du moteur ; la scène les convertit et ne décide de rien.
+ */
+export interface ReperesScene {
+  /** Le poste que l'IA lui donnerait, et s'il s'en est éloigné (l'anneau devient orange). */
+  suggestion?: { x: number; y: number };
+  horsPoste?: boolean;
+  /** Les receveurs qu'une passe à gauche ou à droite servirait (`fort: false` : un joueur plus loin). */
+  passes?: { id: string; fort?: boolean }[];
+  /** Le porteur qu'on peut plaquer. */
+  plaquage?: string;
+  /** Un coup de pied qui se prépare : où le ballon retomberait, et avec quelle puissance (0 à 1). */
+  visee?: { arrivee: { x: number; y: number }; puissance: number };
+}
 
 /** Le son du match, porté par la scène : foule, sifflet, chocs, frappes. */
 export interface Son3D {
@@ -93,6 +114,14 @@ export interface Scene3D {
   moi: string | undefined;
   suivreMoi: boolean | number;
   readonly ips: number;
+  /** Les repères du contrôle direct, redessinés à chaque image ; `null` les éteint. */
+  reperes: ReperesScene | null;
+  /** « Droit devant » et « à droite » tels que le joueur les voit, en repère terrain (vecteurs unitaires). */
+  reperesCamera(): { avant: { x: number; y: number }; droite: { x: number; y: number } };
+  /** Le remplaçant est-il encore en train d'entrer sur le terrain ? */
+  entreeEnCours(id: string): boolean;
+  /** Fond la pose de la caméra avec la précédente : un changement de point de vue sans coupe sèche. */
+  glisser(duree?: number): void;
 }
 
 const OUTILS_3D = {

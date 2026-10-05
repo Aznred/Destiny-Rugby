@@ -13,6 +13,7 @@ import type { Theme } from '../types';
 import { LANGUES, nombre, t, tn } from '../lib/i18n';
 import { useModalDialog } from '../lib/useModalDialog';
 import { Icone } from './Icone';
+import { ReglagesControleDirect } from './ReglagesControleDirect';
 import { usePreferencesInterface } from '../store/preferencesInterface';
 
 // Les huit ambiances. `apercu` est le dégradé montré sur la pastille — il
@@ -258,14 +259,12 @@ export function Reglages({ onFermer }: Props) {
           </p>
         </div>
 
-        {/* ⚠️ LE RÉGLAGE DES TOUCHES DU MATCH A ÉTÉ RETIRÉ, ET IL NE DOIT PAS
-            REVENIR TANT QU'ON NE PILOTE PAS. Il y avait ici une table de six
-            commandes réassignables (quatre directions, sprint, action du
-            moment) plus les gestes. Le match ne se pilote plus : « on ne fait
-            que les choix, on ne bouge pas le joueur ». Les cartes de décision
-            se jouent aux chiffres 1-4, qui sont écrits dessus et qu'on ne
-            réassigne pas. Un panneau de réglage pour des touches qui n'existent
-            plus, c'est pire qu'une fonction manquante : c'est un mensonge. */}
+        {/* ⚠️ LE RÉGLAGE DES COMMANDES DU MATCH EST REVENU, parce que le match se pilote de nouveau (Correctif 16 :
+            on conduit son joueur en carrière). Il avait été retiré le jour où « on ne fait que les choix » — un panneau
+            de touches qui n'existent pas est un mensonge ; celui-ci décrit des commandes qui existent. Ses réglages
+            (touches, taille et côté des boutons, aide au placement, tutoriel) sont des préférences d'appareil, dans
+            `localStorage` : voir `lib/controleDirect/prefs.ts`. */}
+        <ReglagesControleDirect />
 
         <details className="tuto">
           <summary><Icone nom="livre" taille={16} /> {t('reg.tutoriel')}</summary>

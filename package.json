@@ -69,6 +69,8 @@
     "verify:pied": "vite-node scripts/verifierJeuAuPied.ts",
     "mesure:regles-ligue": "vite-node scripts/mesurerReglesLigue.ts",
     "mesure:rugby": "vite-node scripts/mesurerRugby.ts",
+    "mesure:empreinte": "vite-node scripts/empreinteMoteur.ts",
+    "verify:controle-direct": "vite-node scripts/verifierControleDirect.ts",
     "mesure:conso-direct": "vite-node scripts/mesurerConsommationDirect.ts",
     "verify:ecriture-direct": "vite-node scripts/verifierEcritureDirect.ts",
     "verify:tirs": "vite-node scripts/verifierTirsAuBut.ts",

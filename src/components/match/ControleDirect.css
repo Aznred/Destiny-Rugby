@@ -1,0 +1,648 @@
+/* ═══ LE HUD DU CONTRÔLE DIRECT ══════════════════════════════════════════════
+   Posé sur la scène 3D, dans `.ml-hud`. Trois habillages — pouce, clavier, manette — et un seul langage :
+   verre sombre, liseré doré, la même famille que les bandeaux de la retransmission.
+
+   ⚠️ « pointer-events: none » SUR LA COUCHE, « auto » SUR CE QUI SE TOUCHE : le terrain reste cliquable
+   partout ailleurs, et les zones tactiles ne couvrent que le bas de l'image (jamais le haut, où vivent le
+   score, la caméra et le plein écran).
+
+   ⚠️ LA TAILLE ET L'OPACITÉ SE RÈGLENT DANS LES RÉGLAGES (`--cd-taille`, de 0,75 à 1,5 ; `--cd-opa`, de 0,3 à 1).
+   `--u` est l'unité de tout le HUD : un téléphone en portrait en prend 0,84, un téléphone en paysage 0,92,
+   une tablette 1,12. On ne met JAMAIS de pixels fixes pour une taille de bouton.
+
+   ⚠️ L'OPACITÉ PORTE SUR LE FOND ET LE CONTOUR, PAS SUR LES PICTOGRAMMES : un HUD à 30 % reste lisible. */
+
+.cd {
+  --cd-base: 1;
+  --cd-taille: 1;
+  --cd-opa: 0.62;
+  --u: calc(var(--cd-taille) * var(--cd-base));
+  --cd-marge-g: max(14px, env(safe-area-inset-left));
+  --cd-marge-d: max(14px, env(safe-area-inset-right));
+  --cd-marge-b: max(14px, env(safe-area-inset-bottom));
+  --cd-or: #f4cd63;
+  --cd-or-fonce: #d9a93a;
+  --cd-verre: rgba(5, 16, 10, calc(0.28 + var(--cd-opa) * 0.62));
+  --cd-contour: rgba(244, 205, 99, calc(0.22 + var(--cd-opa) * 0.5));
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  opacity: 1;
+  transition: opacity 0.5s ease;
+}
+.cd[data-visible='non'] { opacity: 0; }
+/* ⚠️ La pause et la carte d'accueil du tutoriel passent AU-DESSUS de tout : du score de la retransmission (z-index 7) et
+   du bouton des commentateurs (32), qui sinon rognaient le titre et le bouton « Reprendre ». */
+.cd[data-modale='oui'] { z-index: 40; }
+.cd[data-visible='non'] * { pointer-events: none !important; }
+
+@media (max-width: 560px) { .cd { --cd-base: 0.84; } }
+@media (max-height: 430px) and (orientation: landscape) { .cd { --cd-base: 0.92; } }
+@media (min-width: 1000px) and (pointer: coarse) { .cd { --cd-base: 1.12; } }
+
+/* ── Les zones tactiles : muettes pour la souris, actives dès qu'un écran tactile existe ───────────── */
+.cd-zone-stick,
+.cd-zone-gestes { position: absolute; touch-action: none; pointer-events: none; }
+@media (any-pointer: coarse) {
+  .cd-zone-stick, .cd-zone-gestes { pointer-events: auto; }
+}
+.cd-zone-stick { left: 0; bottom: 0; width: 48%; height: 70%; }
+.cd-zone-gestes { right: 0; bottom: 0; top: 16%; width: 54%; }
+.cd[data-gaucher='oui'] .cd-zone-stick { left: auto; right: 0; }
+.cd[data-gaucher='oui'] .cd-zone-gestes { right: auto; left: 0; }
+/* Joystick fixe : la zone se resserre autour de sa base, le reste de l'écran redevient libre. */
+.cd-zone-stick[data-fixe='oui'] {
+  width: calc(280px * var(--u));
+  height: calc(280px * var(--u));
+  max-width: 48%;
+}
+
+/* ── Le joystick ────────────────────────────────────────────────────────────────────────────────── */
+.cd-stick-base {
+  position: absolute;
+  width: calc(124px * var(--u));
+  height: calc(124px * var(--u));
+  transform: translate(-50%, -50%);
+  left: calc(var(--cd-marge-g) + 62px * var(--u) + 8px);
+  top: calc(100% - var(--cd-marge-b) - 62px * var(--u));
+  opacity: 0;
+  transition: opacity 0.18s ease;
+  pointer-events: none;
+}
+.cd[data-gaucher='oui'] .cd-stick-base { left: calc(100% - var(--cd-marge-d) - 62px * var(--u) - 8px); }
+.cd-zone-stick[data-fixe='oui'] .cd-stick-base { opacity: calc(0.4 + var(--cd-opa) * 0.4); }
+.cd-stick-base[data-actif] { opacity: 1 !important; }
+.cd-stick-anneau {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(244, 205, 99, 0.12) 0 8%, transparent 9%),
+    var(--cd-verre);
+  border: 2px solid var(--cd-contour);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(2px);
+}
+/* L'anneau du sprint : au-delà, le doigt court. Il s'allume quand il l'atteint. */
+.cd-stick-base::after {
+  content: '';
+  position: absolute;
+  inset: calc(-0.22 * 62px * var(--u));
+  border-radius: 50%;
+  border: 2px dashed rgba(244, 205, 99, 0);
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+.cd-stick-base[data-actif]::after { border-color: rgba(244, 205, 99, 0.34); }
+.cd-stick-base[data-sprint]::after { border-color: var(--cd-or); box-shadow: 0 0 18px rgba(244, 205, 99, 0.45); }
+.cd-stick-tete {
+  position: absolute;
+  left: 27%;
+  top: 27%;
+  width: 46%;
+  height: 46%;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 34% 26%, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 46%),
+    linear-gradient(160deg, #f6d779, #c9962c);
+  border: 1.5px solid rgba(60, 38, 8, 0.7);
+  box-shadow: 0 5px 12px rgba(0, 0, 0, 0.5), inset 0 -3px 5px rgba(80, 48, 6, 0.4);
+  will-change: transform;
+}
+.cd-stick-base[data-sprint] .cd-stick-tete { background: linear-gradient(160deg, #ffe08a, #e6a72b); }
+
+/* ── L'arc de commandes ───────────────────────────────────────────────────────────────────────────── */
+.cd-commandes {
+  position: absolute;
+  right: var(--cd-marge-d);
+  bottom: var(--cd-marge-b);
+  width: 0;
+  height: 0;
+}
+.cd[data-gaucher='oui'] .cd-commandes { right: auto; left: var(--cd-marge-g); }
+.cd-commandes[data-apercu='oui'] { opacity: 0.55; }
+.cd-commandes[data-apercu='oui'] .cd-bouton { pointer-events: none !important; }
+
+.cd-bouton {
+  position: absolute;
+  right: calc(var(--x) * 1px * var(--u));
+  bottom: calc(var(--y) * 1px * var(--u));
+  width: calc(var(--s) * 1px * var(--u));
+  height: calc(var(--s) * 1px * var(--u));
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: center;
+  justify-items: center;
+  gap: calc(2px * var(--u));
+  padding: 0;
+  border: 2px solid var(--cd-contour);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 32% 22%, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0) 46%),
+    var(--cd-verre);
+  color: var(--craie, #f5f7f2);
+  box-shadow: 0 7px 16px rgba(0, 0, 0, 0.46), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(2px);
+  pointer-events: auto;
+  touch-action: none;
+  cursor: pointer;
+  font-family: var(--police-forte, 'Archivo', system-ui, sans-serif);
+  transform: scale(1);
+  transition: transform 0.1s ease, background 0.12s ease, border-color 0.12s ease, opacity 0.2s ease, box-shadow 0.12s ease;
+  animation: cd-entree 0.24s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+}
+.cd[data-gaucher='oui'] .cd-bouton { right: auto; left: calc(var(--x) * 1px * var(--u)); }
+.cd-bouton > span {
+  max-width: 96%;
+  font-size: calc(9.5px * var(--u));
+  line-height: 1;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: rgba(245, 247, 242, 0.92);
+}
+.cd-bouton[data-grand='oui'] > span { font-size: calc(11px * var(--u)); }
+.cd-bouton[data-presse] {
+  transform: scale(0.92);
+  background: linear-gradient(160deg, #f6d779, #c9962c);
+  border-color: #ffe9a6;
+  color: #1a1204;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5), 0 0 22px rgba(244, 205, 99, 0.5);
+}
+.cd-bouton[data-presse] > span { color: #1a1204; }
+.cd-bouton[data-allume='oui'] {
+  border-color: var(--cd-or);
+  box-shadow: 0 7px 16px rgba(0, 0, 0, 0.46), 0 0 0 3px rgba(244, 205, 99, 0.28), 0 0 20px rgba(244, 205, 99, 0.45);
+}
+.cd-bouton[data-eteint='oui'] { opacity: 0.38; filter: saturate(0.4); }
+.cd-bouton[data-guide='oui']::after {
+  content: '';
+  position: absolute;
+  inset: -7px;
+  border-radius: 50%;
+  border: 3px solid var(--cd-or);
+  animation: cd-pulse 1.2s ease-out infinite;
+  pointer-events: none;
+}
+
+@keyframes cd-entree { from { opacity: 0; transform: scale(0.6); } }
+@keyframes cd-pulse {
+  0% { opacity: 0.95; transform: scale(0.94); }
+  100% { opacity: 0; transform: scale(1.28); }
+}
+
+/* ── La roue de passe : deux moitiés ───────────────────────────────────────────────────────────────── */
+.cd-roue { grid-template-columns: 1fr 1fr; overflow: hidden; align-content: stretch; gap: 0; }
+.cd-roue::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 14%;
+  bottom: 14%;
+  width: 2px;
+  margin-left: -1px;
+  background: linear-gradient(180deg, transparent, var(--cd-contour) 30%, var(--cd-contour) 70%, transparent);
+  pointer-events: none;
+}
+.cd-roue-moitie {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  padding-bottom: calc(14px * var(--u));
+  transition: background 0.1s ease, color 0.1s ease;
+}
+.cd-roue-legende {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(13px * var(--u));
+  text-align: center;
+  font-size: calc(9.5px * var(--u));
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(245, 247, 242, 0.92);
+  pointer-events: none;
+}
+.cd-roue[data-presse='g'] .cd-roue-moitie.g,
+.cd-roue[data-presse='d'] .cd-roue-moitie.d { background: linear-gradient(160deg, #f6d779, #c9962c); color: #1a1204; }
+.cd-roue[data-presse] { background: var(--cd-verre); color: var(--craie, #f5f7f2); border-color: #ffe9a6; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5), 0 0 22px rgba(244, 205, 99, 0.4); }
+.cd-roue[data-presse] .cd-roue-legende { color: #fff4cc; }
+.cd-roue[data-longue='1'] { box-shadow: 0 0 0 4px rgba(244, 205, 99, 0.35), 0 0 26px rgba(244, 205, 99, 0.55); }
+.cd-roue[data-offload='oui'] { border-color: var(--cd-or); }
+.cd-roue[data-offload='oui'] .cd-roue-legende { color: var(--cd-or); }
+
+/* ── La visée d'un coup de pied : le fil part du bouton et suit le doigt ───────────────────────────── */
+.cd-visee-fil {
+  position: absolute;
+  height: 4px;
+  margin-top: -2px;
+  transform-origin: 0 50%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, rgba(244, 205, 99, 0.1), rgba(244, 205, 99, 0.95));
+  box-shadow: 0 0 10px rgba(244, 205, 99, 0.45);
+  opacity: 0;
+  pointer-events: none;
+}
+.cd-visee-fil[data-actif] { opacity: 1; }
+.cd-visee-tete {
+  position: absolute;
+  width: calc(26px * var(--u));
+  height: calc(26px * var(--u));
+  margin: calc(-13px * var(--u)) 0 0 calc(-13px * var(--u));
+  border-radius: 50%;
+  border: 3px solid var(--cd-or);
+  background: rgba(244, 205, 99, 0.22);
+  opacity: 0;
+  pointer-events: none;
+}
+.cd-visee-tete[data-actif] { opacity: 1; }
+
+/* ── Le bouton d'aide au placement ─────────────────────────────────────────────────────────────────── */
+.cd-aide {
+  position: absolute;
+  left: var(--cd-marge-g);
+  top: 58px;
+  width: calc(40px * var(--u));
+  height: calc(40px * var(--u));
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border-radius: 50%;
+  border: 1.5px solid var(--cd-contour);
+  background: var(--cd-verre);
+  color: rgba(245, 247, 242, 0.62);
+  backdrop-filter: blur(2px);
+  pointer-events: auto;
+  touch-action: none;
+  cursor: pointer;
+}
+.cd[data-gaucher='oui'] .cd-aide { left: auto; right: var(--cd-marge-d); }
+.cd-aide[aria-pressed='true'] { color: var(--cd-or); border-color: var(--cd-or); }
+
+/* ── Le souffle ─────────────────────────────────────────────────────────────────────────────────────── */
+/* ⚠️ AU RAS DU BAS, ET MINCE : le nom du joueur flotte sous ses pieds, au tiers bas de l'image — la jauge ne
+   doit pas le recouvrir. Elle reste au centre : c'est le seul endroit que ni le pouce gauche ni le pouce droit
+   ne couvrent. */
+.cd-souffle {
+  position: absolute;
+  left: 50%;
+  bottom: calc(max(6px, env(safe-area-inset-bottom)));
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: min(26%, 190px);
+  padding: 3px 9px 3px 7px;
+  border-radius: 999px;
+  background: rgba(4, 12, 8, 0.62);
+  backdrop-filter: blur(3px);
+  color: var(--craie-dim, #c7d1c6);
+}
+.cd-souffle > span {
+  flex: 1;
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.14);
+  overflow: hidden;
+}
+.cd-souffle > span > i {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #35b76d, #9be26c);
+  transition: width 0.4s ease, background 0.3s ease;
+}
+.cd-souffle[data-bas='oui'] { color: #ffb066; }
+.cd-souffle[data-bas='oui'] > span > i { background: linear-gradient(90deg, #ff8a4d, #ff4d4d); }
+
+/* ── Pastilles de situation, toast ─────────────────────────────────────────────────────────────────── */
+.cd-situation {
+  position: absolute;
+  left: 50%;
+  top: 52px;
+  transform: translateX(-50%);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  max-width: 82%;
+}
+.cd-situation > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: rgba(4, 12, 8, 0.7);
+  backdrop-filter: blur(3px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: var(--craie, #f5f7f2);
+  font-family: var(--police-forte, 'Archivo', system-ui, sans-serif);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  animation: cd-glisse 0.24s ease-out both;
+}
+.cd-situation > span[data-ton='alerte'] { border-color: rgba(255, 150, 80, 0.65); color: #ffc79a; }
+.cd-situation > span[data-ton='ok'] { border-color: rgba(244, 205, 99, 0.6); color: var(--cd-or); }
+@keyframes cd-glisse { from { opacity: 0; transform: translateY(-6px); } }
+
+.cd-toast {
+  position: absolute;
+  left: 50%;
+  bottom: 24%;
+  transform: translateX(-50%);
+  max-width: 82%;
+  padding: 7px 16px;
+  border-radius: 999px;
+  background: rgba(34, 12, 8, 0.82);
+  border: 1px solid rgba(255, 140, 110, 0.55);
+  color: #ffd8cc;
+  font-family: var(--police-forte, 'Archivo', system-ui, sans-serif);
+  font-size: 12.5px;
+  font-weight: 700;
+  text-align: center;
+  animation: cd-toast 1.5s ease-out both;
+}
+@keyframes cd-toast {
+  0% { opacity: 0; transform: translateX(-50%) translateY(8px); }
+  12%, 80% { opacity: 1; transform: translateX(-50%) translateY(0); }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-6px); }
+}
+
+/* ── Les indications : clavier ou manette, rien à toucher ──────────────────────────────────────────── */
+.cd-indications {
+  position: absolute;
+  left: var(--cd-marge-g);
+  right: var(--cd-marge-d);
+  bottom: calc(max(6px, env(safe-area-inset-bottom)) + 26px);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  opacity: calc(0.45 + var(--cd-opa) * 0.55);
+}
+.cd-indic {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 11px 3px 5px;
+  border-radius: 999px;
+  background: rgba(4, 12, 8, 0.62);
+  backdrop-filter: blur(3px);
+  color: var(--craie, #f5f7f2);
+  font-family: var(--police-forte, 'Archivo', system-ui, sans-serif);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  animation: cd-glisse 0.22s ease-out both;
+}
+.cd-indic-bouger { padding-left: 4px; }
+.cd-touche {
+  display: inline-grid;
+  place-items: center;
+  min-width: 21px;
+  height: 21px;
+  padding: 0 6px;
+  margin-right: 2px;
+  border-radius: 5px;
+  background: linear-gradient(180deg, #f7f9f4, #cdd6cd);
+  color: #10190f;
+  font-family: var(--police-forte, 'Archivo', system-ui, sans-serif);
+  font-size: 11.5px;
+  font-weight: 800;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.55), inset 0 -1px 0 rgba(0, 0, 0, 0.12);
+}
+
+/* Les symboles de manette */
+.cd-pastille-manette {
+  display: inline-grid;
+  place-items: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.86);
+  color: #10190f;
+  font-family: var(--police-forte, 'Archivo', system-ui, sans-serif);
+  font-size: 10.5px;
+  font-weight: 800;
+}
+.cd-pastille-manette[data-b='a'] { background: #3fa35e; color: #fff; }
+.cd-pastille-manette[data-b='b'] { background: #d9534f; color: #fff; }
+.cd-pastille-manette[data-b='x'] { background: #4a86d9; color: #fff; }
+.cd-pastille-manette[data-b='y'] { background: #d9a93a; color: #1a1204; }
+.cd-pastille-manette[data-b='stick'] { background: transparent; border: 2px solid rgba(255, 255, 255, 0.8); color: #fff; }
+.cd-glyphe {
+  width: 22px;
+  height: 22px;
+  padding: 3px;
+  border-radius: 50%;
+  background: rgba(10, 18, 14, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  fill: none;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.cd-glyphe[data-forme='croix'] { stroke: #6fa8ff; }
+.cd-glyphe[data-forme='rond'] { stroke: #ff7a7a; }
+.cd-glyphe[data-forme='carre'] { stroke: #f0a8d8; }
+.cd-glyphe[data-forme='triangle'] { stroke: #7ee0a8; }
+
+/* ── Le tutoriel ───────────────────────────────────────────────────────────────────────────────────── */
+.cd-tuto {
+  position: absolute;
+  left: 50%;
+  top: 96px;
+  transform: translateX(-50%);
+  width: min(92%, 430px);
+  display: grid;
+  gap: 4px;
+  padding: 10px 14px 10px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(14, 30, 20, 0.92), rgba(6, 16, 10, 0.92));
+  border: 1px solid rgba(244, 205, 99, 0.5);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  color: var(--craie, #f5f7f2);
+  pointer-events: auto;
+  animation: cd-glisse 0.3s ease-out both;
+}
+.cd-tuto-etape {
+  font-family: var(--police-forte, 'Archivo', system-ui, sans-serif);
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--cd-or);
+}
+.cd-tuto b { font-family: var(--police-forte, 'Archivo', system-ui, sans-serif); font-size: 15px; color: #fff4cc; }
+.cd-tuto p { margin: 0; font-size: 13px; line-height: 1.38; color: var(--craie-dim, #c7d1c6); }
+.cd-tuto-bravo { display: inline-flex; align-items: center; gap: 8px; color: #9be26c !important; }
+.cd-tuto[data-valide='oui'] { border-color: rgba(155, 226, 108, 0.7); }
+.cd-tuto-passer {
+  justify-self: end;
+  margin-top: 2px;
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--craie-dim, #c7d1c6);
+  font-family: inherit;
+  font-size: 12px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.cd-tuto-passer:hover { color: #fff; }
+
+.cd-tuto-voile {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(2, 8, 5, 0.66);
+  pointer-events: auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+}
+.cd-tuto-carte {
+  display: grid;
+  gap: 10px;
+  margin: auto;
+  width: min(100%, 400px);
+  padding: 18px 20px 16px;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #11261a, #0a1a11);
+  border: 1px solid rgba(244, 205, 99, 0.5);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  color: var(--craie, #f5f7f2);
+}
+.cd-tuto-titre {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--police-forte, 'Archivo', system-ui, sans-serif);
+  font-size: 17px;
+  color: var(--cd-or);
+}
+.cd-tuto-carte p { margin: 0; font-size: 13.5px; line-height: 1.45; color: var(--craie, #f5f7f2); }
+.cd-tuto-carte ul { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.cd-tuto-carte li { display: flex; gap: 9px; align-items: flex-start; font-size: 12.8px; line-height: 1.4; color: var(--craie-dim, #c7d1c6); }
+.cd-tuto-carte li svg { flex: 0 0 auto; margin-top: 2px; color: var(--cd-or); }
+.cd-tuto-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 4px; flex-wrap: wrap; }
+
+/* Le guide du joystick : un anneau qui pulse là où le pouce doit se poser. */
+.cd[data-gaucher='oui'] .cd-guide-stick { left: auto; right: calc(var(--cd-marge-d) + 8px); }
+.cd-guide-stick {
+  position: absolute;
+  left: calc(var(--cd-marge-g) + 8px);
+  bottom: calc(var(--cd-marge-b));
+  width: calc(124px * var(--u));
+  height: calc(124px * var(--u));
+  border-radius: 50%;
+  border: 3px solid var(--cd-or);
+  animation: cd-pulse 1.3s ease-out infinite;
+  pointer-events: none;
+}
+
+/* ── La pause ─────────────────────────────────────────────────────────────────────────────────────── */
+.cd-pause {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(2, 8, 5, 0.7);
+  pointer-events: auto;
+  overflow-y: auto;
+  touch-action: pan-y;
+}
+.cd-pause-carte {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: auto;
+  width: min(100%, 660px);
+  max-height: 100%;
+  overflow: hidden;
+  padding: 16px 20px;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #11261a, #0a1a11);
+  border: 1px solid rgba(244, 205, 99, 0.45);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.65);
+  color: var(--craie, #f5f7f2);
+}
+.cd-pause-tete { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex: 0 0 auto; }
+/* La liste défile sous l'en-tête ; sur un écran assez large, elle se range sur deux colonnes. */
+.cd-pause-carte .cd-liste {
+  overflow-y: auto;
+  min-height: 0;
+  padding-right: 4px;
+  align-content: start;
+  grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+  gap: 7px 26px;
+  overscroll-behavior: contain;
+}
+.cd-pause-titre {
+  font-family: var(--police-titre, 'Anton', 'Archivo', sans-serif);
+  font-size: 22px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--cd-or);
+}
+.cd-liste { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; }
+.cd-liste li { display: flex; align-items: center; gap: 12px; font-size: 13px; color: var(--craie, #f5f7f2); }
+.cd-liste li > svg { flex: 0 0 auto; color: var(--cd-or); }
+.cd-liste li > span:last-child { flex: 1; color: var(--craie-dim, #c7d1c6); }
+.cd-cles { display: inline-flex; gap: 4px; min-width: 96px; flex: 0 0 auto; }
+
+/* ── Un écran bas (téléphone en paysage) : tout se resserre, rien ne couvre le joueur ──────────────────
+   ⚠️ La scène ne fait alors que 260 px de haut. L'invite du tutoriel passait AU MILIEU de l'image, c'est-à-dire
+   sur le joueur : elle monte sous le bord haut, étroite, entre le score (à gauche) et les outils de la vue
+   (à droite). La carte d'accueil perd sa troisième ligne — le bouton « Passer » est juste dessous. */
+@media (max-height: 470px) {
+  .cd-commandes { right: calc(var(--cd-marge-d) + 46px); }
+  .cd[data-gaucher='oui'] .cd-commandes { right: auto; left: var(--cd-marge-g); }
+  .cd-situation { top: 6px; }
+  .cd-situation > span { padding: 3px 10px; font-size: 11px; }
+  .cd-tuto { top: 40px; width: min(58%, 400px); padding: 6px 11px 6px; gap: 2px; }
+  .cd-tuto b { font-size: 13px; }
+  .cd-tuto p { font-size: 11.5px; line-height: 1.3; }
+  .cd-tuto-etape { font-size: 9.5px; }
+  .cd-tuto-passer { padding: 2px 8px; font-size: 11px; margin-top: 0; }
+  .cd-toast { bottom: 30%; font-size: 12px; padding: 5px 12px; }
+  .cd-tuto-voile { padding: 8px; }
+  .cd-tuto-carte { gap: 6px; padding: 10px 16px 10px; width: min(100%, 440px); }
+  .cd-tuto-titre { font-size: 15px; }
+  .cd-tuto-carte p { font-size: 12.5px; line-height: 1.35; }
+  .cd-tuto-carte ul { gap: 3px; }
+  .cd-tuto-carte li { font-size: 11.8px; line-height: 1.3; }
+  .cd-tuto-carte li:nth-child(3) { display: none; }
+  .cd-tuto-actions { margin-top: 0; }
+  .cd-pause-carte { gap: 8px; padding: 10px 14px; }
+  .cd-pause-titre { font-size: 18px; }
+  .cd-pause-carte .cd-liste { gap: 4px 20px; }
+  .cd-liste li { font-size: 12px; }
+}
+
+/* ── Mouvement réduit ─────────────────────────────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .cd, .cd-bouton, .cd-stick-base, .cd-souffle > span > i { transition: none; }
+  .cd-bouton, .cd-situation > span, .cd-indic, .cd-tuto, .cd-toast { animation: none; }
+  .cd-bouton[data-guide='oui']::after, .cd-guide-stick { animation: none; opacity: 0.8; }
+}

@@ -32,11 +32,13 @@ const nomCourt = (nom: string) => {
 // ── Les commandes de la réalisation ─────────────────────────────────────────
 
 /** Caméra, son et ralentis : trois boutons, posés avec ceux de la vue. */
-export function OutilsTele({ scene, camera, surCamera }: {
+export function OutilsTele({ scene, camera, surCamera, cameras = CAMERAS_3D }: {
   scene: MutableRefObject<Scene3D | null>;
   /** Absent : l'écran garde sa propre commande de caméra. */
   camera?: Camera3D;
   surCamera?: (c: Camera3D) => void;
+  /** Les plans qu'on peut parcourir : en contrôle direct, la vue « derrière mon joueur » s'y ajoute. */
+  cameras?: readonly Camera3D[];
 }) {
   const son = scene.current?.son ?? null;
   const [muet, setMuet] = useState(() => son?.muet ?? false);
@@ -58,7 +60,7 @@ export function OutilsTele({ scene, camera, surCamera }: {
     <>
       {camera && surCamera && (
         <button type="button"
-          onClick={() => surCamera(CAMERAS_3D[(CAMERAS_3D.indexOf(camera) + 1) % CAMERAS_3D.length])}
+          onClick={() => surCamera(cameras[(cameras.indexOf(camera) + 1) % cameras.length])}
           className={camera === 'tv' ? 'actif' : undefined}
           title={`${t('ml.camera')} · ${t(`ml.camera.${camera}`)}`}
           aria-label={`${t('ml.camera')} · ${t(`ml.camera.${camera}`)}`}>

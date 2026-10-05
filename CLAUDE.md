@@ -1077,6 +1077,38 @@ Détail et limites : `../analyse-rn26/SIMULATION.md`.
 
 ---
 
+### Le contrôle direct du joueur (Correctif 16 — carrière solo, 3D)
+
+En carrière, le joueur CONDUIT son pion dès qu'il est sur le terrain (les vingt-neuf autres gardent l'IA par poste).
+⚠️ C'est le renversement de « on ne bouge plus son joueur » : les cartes de décision restent le mode « cartes » des
+Réglages et le repli sans 3D. Séquence : banc → caméra télé → remplacement animé (la scène l'annonce par
+`entreeEnCours`) → glissé de caméra derrière le joueur → HUD → main au moteur (`activerDirect`).
+
+- **Trois couches.** `lib/moteur/direct.ts` (le moteur obéit : `e.direct`, commandes en repère TERRAIN, demandes en file,
+  `VueDirecte` recalculée à chaque pas, appel du ballon, plaquage manuel à portée, offload armé au contact, compensation
+  défensive) ; `lib/controleDirect/` (le PILOTE : clavier, manette, pouce → `Intention`, prise et remise de la main,
+  tutoriel, préférences d'appareil dans `localStorage` `destiny-rugby:controle`) ; `components/match/ControleDirect.tsx`
+  (le HUD) et `ReglagesControleDirect.tsx` (touches remappables, taille/opacité/gaucher…). `MatchLive` n'en porte que le
+  branchement : `pilotage.surImage` AVANT tout retour anticipé de la boucle, cartes tues quand `pilote.voulu`, gel pour la
+  pause et la carte d'accueil, tempo ramené à ×1 à l'entrée.
+- ⚠️ **Éteint, le moteur rejoue à l'identique** : `npm run mesure:empreinte -- 6` (empreinte globale `94f2ae2e` au commit
+  `d29eb36` — elle change dès que les effectifs changent : comparer toujours avec le moteur d'origine du MÊME commit).
+  Banc : `npm run verify:controle-direct` (51 contrôles : course, passes, plaquage, pied, appel 98 %/0 %/0 %, matchs entiers, note).
+- ⚠️ **Les touches sont des CODES PHYSIQUES** (`KeyW`) : ZQSD (AZERTY) et WASD (QWERTY) sont les mêmes touches ; l'affichage lit la
+  lettre gravée (`libelleDeTouche`). Défauts : Maj sprint, Q/E passes (A/E sur AZERTY), V pied (pas Ctrl : Ctrl+W ferme l'onglet),
+  F raffut, C crochet, Espace action, R réclamer, G gratter, H aide au placement, P pause. **Échap n'est pas réassignable** : un
+  seul écouteur, celui de `useModalDialog` (pause quand on conduit, sortie sinon) ; le pilote l'ignore.
+- **Le HUD tactile** : joystick flottant (au-delà de l'anneau : sprint), roue de passe (tapée : courte ; tenue 0,26 s : sautée),
+  satellites rangés par poste, glissé sur « Pied » (direction et puissance), balayage = passe. Sur PC, aucun bouton : des
+  indications de touches ; à la manette, les symboles Xbox/PlayStation. Chaque geste devient une `Intention` ; le moteur seul
+  décide si elle est jouable. La note de match gagne des lignes bornées (`detailNote`, seulement après 90 s de jeu conduit).
+- **Tester dans le navigateur** : `/scripts/apercuControleDirect.html?role=banc|titulaire&pilote=1&tuto=0|1&langue=fr` (ou
+  `&vue=reglages`). ⚠️ Un panneau de navigateur CACHÉ ne tire plus `requestAnimationFrame` : sans `pilote=1` le match reste figé
+  et les captures sont périmées (en prendre une seconde). En développement, `globalThis.__matchLive` donne `{ e, pilotage, scene }`.
+- **Pas fait (à reprendre)** : orbite de caméra à la souris (la souris ne vise que le coup de pied) ; vérification fine de
+  l'engagement du joueur au ruck (`engagerAuRuck` : à 3-6 m le pion prend `role: 'ruck'` sans figurer dans l'organisation) ;
+  essai sur un vrai téléphone, une vraie manette et iOS ; README.md et `../analyse-rn26/SIMULATION.md` ; build complet.
+
 ## ⚠️ Équilibrage : ce qui ne se retouche pas sans mesurer
 
 ### Difficulté

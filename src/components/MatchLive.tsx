@@ -37,7 +37,27 @@ import { situationInternationale } from '../lib/rassemblements';
 //    → Tout ce qui n'est pas le jeu part dans un tiroir (📜 fil, 📣 consigne,
 //      🕹️ commandes). Sur grand écran, le fil revient en colonne de droite.
 //
-// ═══ ⚠️ ON NE BOUGE PLUS SON JOUEUR — ON NE FAIT QUE CHOISIR ═════════════════
+// ═══ 🕹️ CORRECTIF 16 — ON REPREND LA MAIN, DANS LA CARRIÈRE SOLO ══════════════════
+//
+// Demande : « sur le banc, on regarde le match comme à la télé ; puis l'entraîneur nous fait entrer,
+// animation de remplacement, la caméra descend derrière notre joueur, et on joue notre carrière nous-même. »
+// Le joueur CONDUIT donc son pion — et seulement le sien : les vingt-neuf autres gardent l'IA par poste.
+// C'est le renversement de la décision d'avant (« on ne bouge plus son joueur », juste en dessous), qui
+// reste en vigueur dans deux cas : le mode « cartes » des Réglages, et tout match sans scène 3D.
+//
+// ⚠️ TROIS COUCHES, ET CET ÉCRAN N'EN PORTE QU'UNE :
+//   1. `lib/moteur/direct.ts` — le moteur obéit (déplacement, passes, plaquage, appel du ballon…).
+//   2. `lib/controleDirect/` — le PILOTE : clavier, manette, pouce → intentions ; quand prendre et rendre la main.
+//   3. `components/match/ControleDirect.tsx` — le HUD (joystick, arc de boutons, indications, tutoriel).
+// Cet écran ne fait que : appeler `pilotage.surImage` AVANT tout retour anticipé de la boucle, taire les cartes
+// de décision quand le contrôle direct est voulu (`pilote.voulu`), figer le match pour la pause et la carte
+// d'accueil du tutoriel, et rendre le tempo au temps réel dès que le joueur entre.
+//
+// ⚠️ ÉCHAP PAUSE QUAND ON CONDUIT, ET NE FERME QU'AUTREMENT. Un seul écouteur : celui de `useModalDialog`
+// (le pilote ignore Échap, et l'écouteur à part qui existait est supprimé : deux auraient basculé la pause
+// deux fois, c'est-à-dire jamais).
+//
+// ═══ (HISTORIQUE — mode « cartes ») ON NE BOUGE PLUS SON JOUEUR — ON NE FAIT QUE CHOISIR ═════════════════
 //
 // Demande, mot pour mot : « je veux que tu modifies juste pour que dans les
 // matchs on puisse faire que les choix, pas bouger le joueur, et qu'on voie
@@ -127,7 +147,8 @@ import { useGame } from '../store/useGame';
 import { Blason, LogoEquipe } from './Blason';
 import { Terrain3D } from './match/Terrain3D';
 import {
-  apparencesDesJoueurs, ecussonPourToile, preferenceMatch3D, preferencesTele, retenirPreferenceMatch3D, tenueDepuisCouleurs,
+  apparencesDesJoueurs, CAMERAS_3D_AVEC_JOUEUR, ecussonPourToile, preferenceMatch3D, preferencesTele, retenirPreferenceMatch3D,
+  tenueDepuisCouleurs,
   type Camera3D, type OptionsScene3D, type Scene3D,
 } from '../lib/match3D';
 import {
@@ -152,6 +173,10 @@ import {
 } from '../lib/compositionManager';
 import { texteTraduit, t } from '../lib/i18n';
 import { useModalDialog } from '../lib/useModalDialog';
+import { ControleDirect, ListeCommandes } from './match/ControleDirect';
+import { PilotageDirect } from '../lib/controleDirect/pilotage';
+import { chargerDisposition } from '../lib/controleDirect/touches';
+import { usePreferencesControle } from '../lib/controleDirect/prefs';
 
 function couleursDe(nom: string): [string, string] {
   const club = clubParNom(nom);
@@ -378,7 +403,15 @@ export function MatchLive({
       fermerAuParent.current();
     })();
   }, []);
-  const { overlayRef, dialogRef } = useModalDialog(quitter);
+  // ⚠️ ÉCHAP PAUSE LE MATCH QUAND ON LE CONDUIT, ET NE LE FERME QU'AUTREMENT : un seul écouteur, celui de la
+  // fenêtre (`useModalDialog`, en phase de capture). Le pilote ignore Échap — voir l'en-tête du fichier.
+  const pilotage = useRef<PilotageDirect | null>(null);
+  const echapper = useCallback(() => {
+    const p = pilotage.current;
+    if (p?.actif) p.demanderPause();
+    else quitter();
+  }, [quitter]);
+  const { overlayRef, dialogRef } = useModalDialog(echapper);
   const large = useLarge();
   // ⚠️ LA VUE EST CHOISIE AVANT LE COUP D'ENVOI, parce qu'elle règle la cadence
   // du moteur. En trois dimensions, chaque phase se joue à son rythme de
@@ -499,6 +532,25 @@ export function MatchLive({
   // qu'à regarder (⏩ accélérer, ⏭️ aller à la fin), et les quitter revient à
   // renoncer à jouer, ce que dit déjà le bouton 👁️ Je regarde.
   const [tempo, setTempo] = useState<Tempo>(monPion ? 'decisions' : 'suivre');
+  // --- 🕹️ LE CONTRÔLE DIRECT (Correctif 16) ---------------------------------------
+  // Le pilote vit dans une ref (il est lu soixante fois par seconde par la boucle) ; son HUD s'abonne à son
+  // cliché, il ne repasse donc pas par le rendu du match. La caméra choisie est relue par la boucle dans une
+  // ref, pour la même raison que `decisionRef` : la mettre en dépendance relancerait la boucle.
+  const prefsControle = usePreferencesControle();
+  const camera3DRef = useRef<Camera3D>(camera3D);
+  camera3DRef.current = camera3D;
+  if (!pilotage.current) {
+    pilotage.current = new PilotageDirect({
+      surCamera: (c) => setCamera3D(c),
+      surPause: () => setEnPause((p) => !p),
+      vibrer,
+      // Il prend la main : on ne conduit pas à ×4, le tempo revient au jeu normal.
+      surPrise: () => setTempo((v) => (v === 'accelere' || v === 'fin' ? 'decisions' : v)),
+    });
+  }
+  // Aperçu et essais dans le navigateur (développement seulement, retiré du build) : de quoi lire le moteur et
+  // le pilote depuis la console — voir `scripts/apercuControleDirect.tsx`.
+  if (import.meta.env.DEV) (globalThis as { __matchLive?: unknown }).__matchLive = { e, pilotage: pilotage.current, scene: () => scene3D.current };
   /**
    * La carte de décision ouverte, s'il y en a une. Le match est FIGÉ tant
    * qu'elle est là : c'est tout l'intérêt.
@@ -637,6 +689,10 @@ export function MatchLive({
   // banc ou sous carton, le pion existe toujours (il porte ses statistiques et
   // ses minutes) mais il n'est pas sur le pré.
   const jePeuxJouer = !!monPion && monPion.surLeTerrain && monPion.sanction <= 0;
+  // ⚠️ « VOULU » N'EST PAS « ACTIF ». Voulu : le joueur a choisi de conduire, la 3D est là, il joue (pas « je
+  // regarde ») — les cartes de décision, le vieux tutoriel et la vieille jauge de souffle s'effacent, même pendant
+  // qu'il est sur le banc. Actif : il a la main (`pilotage.current.actif`), le HUD répond et le tempo est normal.
+  const directVoulu = enJeu && vue3D && prefsControle.mode === 'direct';
 
   // --- LA TAILLE DU TERRAIN À L'ÉCRAN ---------------------------------------
   // ⚠️ Par ResizeObserver, PAS par `getBoundingClientRect()` à chaque image :
@@ -818,7 +874,7 @@ export function MatchLive({
       const planAChange = rj.action !== gesteAvant || (rj.restant > 0 && !!rj.resultat);
 
       // ── ⏱️ EST-CE MON MOMENT ? ────────────────────────────────────────────
-      const m = enJeu ? momentDuJoueur(e, moi) : null;
+      const m = enJeu && !pilotage.current!.voulu ? momentDuJoueur(e, moi) : null;
       const suivi = momentRef.current;
       // Nouveau moment : une vibration courte pour dire « c'est à toi »,
       // parce qu'un ralenti qu'on n'a pas vu venir ne sert à rien.
@@ -886,6 +942,16 @@ export function MatchLive({
         n.style.left = `${borner(q.x, l / 2 + 4, Math.max(l / 2 + 4, largeur - l / 2 - 4))}px`;
         n.style.top = `${borner(q.y, h + 22, Math.max(h + 22, hauteur - 6))}px`;
       };
+
+      // ── 🕹️ LE CONTRÔLE DIRECT : lit les doigts, commande le pion, pose les repères ──────────────
+      // ⚠️ AVANT TOUT RETOUR ANTICIPÉ : la fin du match, la pause et la carte d'accueil du tutoriel doivent
+      // pouvoir le lire (une touche de pause se lit PENDANT la pause, un joueur qui sort rend la main).
+      const pilote = pilotage.current!;
+      pilote.surImage(e, scene, dtReel, {
+        moi: enJeu ? moi : undefined, pause: enPause, avantMatch: !!presentation.current,
+        cameraChoisie: camera3DRef.current,
+      });
+      if (scene) scene.camera = pilote.cameraPour(camera3DRef.current, e);
 
       // Match terminé : on arrête la boucle, plus rien ne bouge.
       if (e.fini) { redessiner((n) => n + 1); actif = false; cancelAnimationFrame(brut); return; }
@@ -956,7 +1022,7 @@ export function MatchLive({
         if (planAChange) redessiner((n) => n + 1);
         return;
       }
-      if (tempo === 'decisions' && enJeu && !enPause && !tutoRef.current) {
+      if (tempo === 'decisions' && enJeu && !enPause && !tutoRef.current && !pilote.voulu) {
         // ⚠️ UN ENCHAÎNEMENT NE PASSE PAS PAR LE REPOS. On vient de percer : la
         // carte suivante doit tomber TOUT DE SUITE, sinon « tu peux tenter un
         // autre truc sur le défenseur » n'arrive jamais — 95 secondes simulées
@@ -984,7 +1050,7 @@ export function MatchLive({
       // redessine pas. Et le tutoriel ARRÊTE le match, ce qu'il ne faisait pas
       // — on lisait trois lignes pendant que le jeu défilait à seize fois la
       // vitesse réelle derrière le voile.
-      if (enPause || tutoRef.current) {
+      if (enPause || tutoRef.current || pilote.fige) {
         scene?.image(dtReel, { fige: true });
         suivreBulle();
         if (planAChange) redessiner((n) => n + 1);
@@ -992,7 +1058,9 @@ export function MatchLive({
       }
 
       e.carriereDixMinutes = true;
-      const allure = tempo === 'accelere' ? 2 : tempo === 'fin' ? 4 : 1;
+      // ⚠️ ON NE CONDUIT PAS À ×4 : dès que le joueur entre, le jeu retombe au temps réel — et le tutoriel peut
+      // le ralentir tant qu'une invite presse.
+      const allure = (pilote.phase !== 'attente' ? 1 : tempo === 'accelere' ? 2 : tempo === 'fin' ? 4 : 1) * pilote.vitesseTuto;
       // Les packs rejoignent une mêlée ou un alignement avant qu'il ne commence.
       scene?.retenir(dtReel * allure);
       avancer(e, dtReel * allure);
@@ -1060,19 +1128,14 @@ export function MatchLive({
     filRef.current?.scrollTo({ top: filRef.current.scrollHeight });
   }, [e.commentaires.length]);
 
-  // ⚠️ IL N'Y A PLUS QU'UNE TOUCHE HORS CARTE, ET C'EST ÉCHAP. Tout le reste
-  // — les quatre directions, le sprint maintenu, la barre d'espace « fais ce
-  // qu'il faut faire », les gestes assignables, les boutons de souris — a été
-  // retiré avec le pilotage. On ne relâche donc plus rien au `blur` : plus
-  // aucun état de touche ne survit à un changement d'onglet, puisqu'il n'y en a
-  // plus.
+  // ⚠️ LE CLAVIER DU MATCH. Échap n'a plus d'écouteur ici : la fenêtre (`useModalDialog`) le prend en capture
+  // et appelle `echapper` — pause quand on conduit, sortie sinon. Le pilote écoute le reste (déplacement, sprint,
+  // passes, pied…), relâche tout quand la fenêtre perd le focus, et la disposition du clavier (AZERTY/QWERTY) est
+  // lue une fois pour que les indications affichent la lettre gravée sur la touche.
   useEffect(() => {
-    const clavier = (ev: KeyboardEvent) => {
-      if (ev.key === 'Escape') quitter();
-    };
-    window.addEventListener('keydown', clavier);
-    return () => window.removeEventListener('keydown', clavier);
-  }, [quitter]);
+    void chargerDisposition();
+    return pilotage.current!.attacher();
+  }, []);
 
   // ⚠️ UNE BAGARRE MET LA PAUSE, ET C'EST INDISPENSABLE. Le moteur attend un
   // ordre pour la résoudre : laisser le match défiler pendant qu'on lit quatre
@@ -1140,7 +1203,7 @@ export function MatchLive({
   // part dans la saison — donc rigoureusement la note qui compte.
   const maNote = useMemo(() => {
     if (!e.fini || !monPion) return null;
-    const s = statsPourLaNote(monPion);
+    const s = statsPourLaNote(monPion, e.direct?.stats);
     return { note: noterMatch(monPion.poste, s), detail: detailNote(monPion.poste, s) };
   }, [e.fini, monPion]);
 
@@ -1157,7 +1220,7 @@ export function MatchLive({
     // feuille de match d'être la seule entrée du journal pour ce week-end.
     const chezMoi = monPion.cote === 'A';
     enregistrerMatchVecu(
-      statsPourLaNote(monPion),
+      statsPourLaNote(monPion, e.direct?.stats),
       {
         adversaire: chezMoi ? e.clubB : e.clubA,
         scorePour: chezMoi ? e.scoreA : e.scoreB,
@@ -1403,7 +1466,7 @@ export function MatchLive({
     scene3D.current = null; setVue3D(false);
   }, []);
   // La caméra choisie est poussée à la scène dès qu'elle existe, puis à chaque changement.
-  useEffect(() => { if (scene3D.current) scene3D.current.camera = camera3D; });
+  useEffect(() => { if (scene3D.current) scene3D.current.camera = pilotage.current!.cameraPour(camera3D, e); });
   const basculerVue = () => {
     const suivante = !vue3D;
     retenirPreferenceMatch3D(suivante);
@@ -1426,7 +1489,7 @@ export function MatchLive({
       .catch(() => { /* refusé par le navigateur : le match reste dans sa fenêtre */ });
   };
   const pleinEcranPossible = typeof document !== 'undefined' && !!document.fullscreenEnabled;
-  const montrerTuto = enJeu && jePeuxJouer && !tutoMatchVu && !e.fini;
+  const montrerTuto = enJeu && jePeuxJouer && !tutoMatchVu && !e.fini && !directVoulu;
   // ⚠️ LA BOUCLE LE LIT DANS UNE REF, comme la carte de décision : la poser en
   // dépendance de `useEffect` relancerait la boucle et remettrait `dernierTemps`
   // à zéro, ce qui fait sauter le match d'un cran à chaque bascule.
@@ -1671,7 +1734,8 @@ export function MatchLive({
                           <Icone nom="plein-ecran" taille={17} />
                         </button>
                       )}
-                      {vue3D && <OutilsTele scene={scene3D} camera={camera3D} surCamera={setCamera3D} />}
+                      {vue3D && <OutilsTele scene={scene3D} camera={camera3D} surCamera={setCamera3D}
+                        cameras={directVoulu ? CAMERAS_3D_AVEC_JOUEUR : undefined} />}
                       <button type="button" onClick={basculerVue}
                         title={t(vue3D ? 'ml.vue2D' : 'ml.vue3D')} aria-label={t(vue3D ? 'ml.vue2D' : 'ml.vue3D')}>
                         <b>{vue3D ? '2D' : '3D'}</b>
@@ -1687,7 +1751,7 @@ export function MatchLive({
                       ⚠️ ELLE SERT ENCORE, MÊME SANS MANETTE : c'est elle qui
                       dit POURQUOI « 🏃 Relancer » n'est pas gratuit sur une
                       carte de décision à la 70e minute. */}
-                  {monPion && jePeuxJouer && (
+                  {monPion && jePeuxJouer && !directVoulu && (
                     <div
                       className="ml-souffle"
                       data-bas={monPion.endurance < 30 ? 'oui' : undefined}
@@ -1701,7 +1765,7 @@ export function MatchLive({
                   {/* La bannière du moment : elle dit POURQUOI ça vient de
                       ralentir. Un ralenti sans explication passe pour une
                       saccade. */}
-                  {moment && (
+                  {moment && !directVoulu && (
                     <div className="ml-banniere" key={moment.type}>
                       <b><IconeEmoji emoji={moment.emoji} /> {t(moment.cle)}</b>
                     </div>
@@ -1734,6 +1798,13 @@ export function MatchLive({
                         {monPion && monPion.sanction > 0 ? t('ml.sanctionne') : t('ml.surLeBanc')}
                       </span>
                     </div>
+                  )}
+
+                  {/* ---------- 🕹️ LE CONTRÔLE DIRECT ----------
+                      Le HUD ne se montre qu'une fois le joueur entré et la caméra venue derrière lui ; sur le
+                      banc il ne rend rien. Il porte aussi la pause (liste des commandes) et le tutoriel. */}
+                  {directVoulu && !e.fini && (
+                    <ControleDirect pilotage={pilotage.current!} surReprendre={() => setEnPause(false)} />
                   )}
 
                   {/* ---------- LA PREMIÈRE FOIS ---------- */}
@@ -1946,7 +2017,7 @@ export function MatchLive({
                     </div>
                   )}
 
-                  {enPause && !decision && !e.bagarre && (
+                  {enPause && !decision && !e.bagarre && !pilotage.current?.actif && (
                     <button type="button" className="ml-voile-pause" onClick={() => setEnPause(false)}>
                       <b><Icone nom="fleche-droite" taille={16} /> {t('ml.reprendre')}</b>
                     </button>
@@ -1973,7 +2044,7 @@ export function MatchLive({
               )}
               {!e.fini && (
                 <div className="ml-tempos">
-                  {TEMPOS.filter((v) => v.id !== 'decisions' || !!monPion).map((v) => (
+                  {!(directVoulu && pilotage.current!.phase !== 'attente') && TEMPOS.filter((v) => v.id !== 'decisions' || !!monPion).map((v) => (
                     <button
                       key={v.id}
                       type="button"
@@ -2071,6 +2142,16 @@ export function MatchLive({
                     documenter — ce tiroir explique donc la MÉCANIQUE, ce qui
                     est la seule question qui reste : « qu'est-ce que je suis
                     censé faire ? ». */}
+                {directVoulu ? (
+                  <>
+                    <p className="ml-tiroir-note">{t(pilotage.current!.actif ? 'cd.commandes.intro' : 'cd.commandes.banc')}</p>
+                    <ListeCommandes
+                      appareil={pilotage.current!.lire().appareil}
+                      manette={pilotage.current!.lire().manette}
+                      touches={prefsControle.touches}
+                    />
+                  </>
+                ) : (
                 <div className="ml-commandes-liste">
                   <span><Icone nom="ballon" taille={13} /> {t('ml.commandes.file')}</span>
                   <span><Icone nom="stop" taille={14} /> {t('ml.commandes.carte')}</span>
@@ -2080,6 +2161,7 @@ export function MatchLive({
                   <span><Icone nom="sifflet" taille={13} /> {t('ml.commandes.consigne')}</span>
                   <span><Icone nom="alerte" taille={13} /> {t('ml.commandes.bagarre')}</span>
                 </div>
+                )}
               </div>
             )}
           </div>

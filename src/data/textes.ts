@@ -30,6 +30,7 @@ import { TEXTES_SOLO_AMICAL } from './textesSoloEtAmical.js';
 import { TEXTES_INTERFACE } from './textesInterface.js';
 import { TEXTES_INTERFACE_CORRECTIONS } from './textesInterfaceCorrections.js';
 import { TEXTES_CARTES_SPECIALES } from './textesCartesSpeciales.js';
+import { TEXTES_CONTROLE_DIRECT } from './textesControleDirect.js';
 
 // ⚠️ LA TRADUCTION AUTOMATIQUE PASSE EN DERNIER — c'est-à-dire qu'elle est
 // écrasée par tout le reste. `scripts/traduire.ts` remplit les langues
@@ -73,6 +74,7 @@ const ECRIT_A_LA_MAIN: Record<string, Traduction> = {
   ...TEXTES_SOLO_AMICAL,
   ...TEXTES_INTERFACE,
   ...TEXTES_CARTES_SPECIALES,
+  ...TEXTES_CONTROLE_DIRECT,
 
   // --- NAVIGATION ---------------------------------------------------------
   'nav.accueil': { fr: 'Accueil', en: 'Home', es: 'Inicio', it: 'Home', de: 'Start', pt: 'Início', ja: 'ホーム' },

@@ -15,6 +15,7 @@
 //     de regarder tous ses matchs pour exploser le plafond de carrière.
 
 import type { Pion } from './entites.js';
+import type { StatsDirectes } from './direct.js';
 import type { AttributId, Joueur, PosteId, StatVariable } from '../../types.js';
 import { POSTE_PAR_ID } from '../../data/rugby.js';
 
@@ -52,6 +53,21 @@ export interface StatsMatchJoueur {
   pickAndGo?: number;
   cinquanteVingtDeux?: number;
   cartonsRouges?: number;   // un rouge coûte bien plus cher qu'un jaune
+  // --- Le jeu à la manette (Correctif 16) -----------------------------------
+  // Posés SEULEMENT quand le joueur a conduit son pion (voir `statsPourLaNote`) : un joueur que l'IA a mené seule garde
+  // exactement l'ancienne note. Durées en secondes simulées de ballon vivant.
+  directTemps?: number;
+  directAuPoste?: number;
+  directHorsPoste?: number;
+  directSoutien?: number;
+  appels?: number;
+  appelsServis?: number;
+  appelsIgnores?: number;
+  passesReussies?: number;
+  passesInterceptees?: number;
+  ballonsPerdus?: number;
+  plaquagesDansLeVide?: number;
+  fautes?: number;
 }
 
 // Ce qu'on attend d'un poste sur 80 minutes. Chiffres calés sur les moyennes du
@@ -178,6 +194,46 @@ export function detailNote(poste: PosteId, s: StatsMatchJoueur): PostNote[] {
   ajouter('ml.note.cinquanteVingtDeux', `50/22 réussis (${s.cinquanteVingtDeux ?? 0})`,
     borner((s.cinquanteVingtDeux ?? 0) * 0.7, 0, 1.4), { n: s.cinquanteVingtDeux ?? 0 });
 
+  // ═══ LE JEU À LA MANETTE (Correctif 16) ═══════════════════════════════════
+  // ⚠️ CE QUE L'IA FAIT POUR UN JOUEUR, CELUI QUI CONDUIT DOIT LE FAIRE LUI-MÊME — et la note le regarde : se placer,
+  // soutenir le porteur, réclamer le ballon à bon escient, passer sans se faire intercepter, ne pas plaquer dans le vide,
+  // ne pas donner de pénalité. Aucune de ces lignes n'existe tant que le joueur n'a pas conduit une minute et demie de
+  // jeu (`directTemps`) : l'ancienne note reste exactement la même pour tout match mené par l'IA.
+  // ⚠️ CHAQUE LIGNE EST BORNÉE, ET LE GROUPE AUSSI (+1,1 au plus, −2 au plus) : l'étalonnage de difficulté ne bouge pas, et
+  // un bon match à la manette ne peut pas valoir dix à lui seul.
+  if ((s.directTemps ?? 0) >= 90) {
+    const groupe: PostNote[] = [];
+    const ajouterDirect = (cle: string, libelle: string, points: number, variables?: Record<string, string | number>) => {
+      if (Math.abs(points) >= 0.05) groupe.push({ cle, libelle, variables, points });
+    };
+    const auPoste = s.directAuPoste ?? 0, horsPoste = s.directHorsPoste ?? 0;
+    if (auPoste + horsPoste > 0) {
+      const ratio = auPoste / (auPoste + horsPoste);
+      ajouterDirect('ml.note.placement', `Placement (${Math.round(ratio * 100)} % au poste)`,
+        borner((ratio - 0.78) * 2.2, -0.7, 0.35), { pct: Math.round(ratio * 100) });
+    }
+    ajouterDirect('ml.note.soutien', `Soutien du porteur (${Math.round(s.directSoutien ?? 0)} s)`,
+      borner((s.directSoutien ?? 0) / 260, 0, 0.5), { n: Math.round(s.directSoutien ?? 0) });
+    // Un appel servi est un appel bien lu ; un appel ignoré ne coûte presque rien — sauf à spammer : au-delà de trois, ça se paie.
+    ajouterDirect('ml.note.appels', `Appels servis (${s.appelsServis ?? 0} sur ${s.appels ?? 0})`,
+      borner((s.appelsServis ?? 0) * 0.3, 0, 0.9) - borner(((s.appelsIgnores ?? 0) - 3) * 0.06, 0, 0.3),
+      { n: s.appelsServis ?? 0, total: s.appels ?? 0 });
+    ajouterDirect('ml.note.passesReussies', `Passes réussies (${s.passesReussies ?? 0})`,
+      borner((s.passesReussies ?? 0) * 0.05, 0, 0.5), { n: s.passesReussies ?? 0 });
+    ajouterDirect('ml.note.interceptions', `Passes interceptées (${s.passesInterceptees ?? 0})`,
+      -borner((s.passesInterceptees ?? 0) * 0.5, 0, 1.2), { n: s.passesInterceptees ?? 0 });
+    ajouterDirect('ml.note.ballonsPerdus', `Ballons perdus au sol (${s.ballonsPerdus ?? 0})`,
+      -borner((s.ballonsPerdus ?? 0) * 0.35, 0, 1), { n: s.ballonsPerdus ?? 0 });
+    ajouterDirect('ml.note.plaquagesDansLeVide', `Plaquages dans le vide (${s.plaquagesDansLeVide ?? 0})`,
+      -borner((s.plaquagesDansLeVide ?? 0) * 0.12, 0, 0.5), { n: s.plaquagesDansLeVide ?? 0 });
+    ajouterDirect('ml.note.fautes', `Pénalités concédées (${s.fautes ?? 0})`,
+      -borner((s.fautes ?? 0) * 0.35, 0, 1.2), { n: s.fautes ?? 0 });
+    const plus = groupe.filter((l) => l.points > 0).reduce((a, l) => a + l.points, 0);
+    const moins = groupe.filter((l) => l.points < 0).reduce((a, l) => a + l.points, 0);
+    const kPlus = plus > 1.1 ? 1.1 / plus : 1, kMoins = moins < -2 ? -2 / moins : 1;
+    for (const l of groupe) lignes.push({ ...l, points: l.points * (l.points > 0 ? kPlus : kMoins) });
+  }
+
   // ⚠️ Le rouge n'est pas un jaune. `cartons` reste le total pour compatibilité
   // (les appelants historiques ne fournissent que lui) ; quand la couleur est
   // connue, un rouge coûte trois fois plus — il a mis son équipe à quatorze.
@@ -202,7 +258,7 @@ export function detailNote(poste: PosteId, s: StatsMatchJoueur): PostNote[] {
  * ici : une fonction de barème n'avait de toute façon rien à faire dans un
  * composant de rendu.
  */
-export function statsPourLaNote(p: Pion): StatsMatchJoueur {
+export function statsPourLaNote(p: Pion, direct?: StatsDirectes | null): StatsMatchJoueur {
   return {
     points: p.stats.essais * 5 + (p.stats.pointsAuPied ?? p.stats.butsReussis * 2),
     essais: p.stats.essais,
@@ -227,6 +283,14 @@ export function statsPourLaNote(p: Pion): StatsMatchJoueur {
     pickAndGo: p.stats.pickAndGo,
     cinquanteVingtDeux: p.stats.cinquanteVingtDeux,
     cartonsRouges: p.stats.cartonsRouges,
+    // ⚠️ LE JEU À LA MANETTE, SI LE JOUEUR A CONDUIT (`e.direct.stats`, comptées par le moteur). Absent : l'ancienne note.
+    ...(direct && direct.tempsJeu > 0 ? {
+      directTemps: direct.tempsJeu, directAuPoste: direct.tempsAuPoste, directHorsPoste: direct.tempsHorsPoste,
+      directSoutien: direct.tempsSoutien, appels: direct.appels, appelsServis: direct.appelsServis,
+      appelsIgnores: direct.appelsIgnores, passesReussies: direct.passesReussies,
+      passesInterceptees: direct.passesInterceptees, ballonsPerdus: direct.ballonsPerdus,
+      plaquagesDansLeVide: direct.plaquagesDansLeVide, fautes: direct.fautes,
+    } : {}),
   };
 }
 
