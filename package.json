@@ -56,6 +56,7 @@
     "mesure:transfert-ligue": "vite-node scripts/mesureTransfertLigue.ts",
     "horloge:matchs": "node --env-file-if-exists=.env scripts/horlogeMatchs.mjs",
     "verify:atelier": "vite-node scripts/verifierAtelier.ts",
+    "verify:cartes-speciales": "vite-node scripts/verifierCartesSpeciales.ts",
     "verify:direct-push": "vite-node scripts/verifierDirectPush.ts",
     "verify:direct-3d": "vite-node scripts/verifierDirect3D.ts",
     "verify:film-direct": "vite-node scripts/verifierFilmDirect.ts",

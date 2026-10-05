@@ -1,5 +1,6 @@
 import type { CompositionManager, FamillePoste, PosteId } from '../../types.js';
 import type { CommandeMatchEnLigne, EtatMatchEnLigne, StrategieEnLigne, VueMatchEnLigne } from './matchCarriere.js';
+import type { ResumeSpeciauxLigue } from './cartesSpeciales.js';
 
 export type RareteCarriere = 'bronze' | 'argent' | 'or' | 'elite' | 'star';
 /**
@@ -25,6 +26,28 @@ export interface FiltrePack {
   /** Tout sauf la France — plus court que d'énumérer seize championnats. */
   horsFrance?: boolean;
 }
+/**
+ * Ce qu'une carte spéciale (ICON, Halloween, et demain Noël, TOTS…) emporte
+ * avec elle une fois distribuée : de quoi la dessiner et la jouer sans relire
+ * le catalogue. La définition complète vit dans `cartesSpeciales.ts`.
+ */
+export interface InfoCarteSpeciale {
+  /** `cardType` de la définition : 'icon', 'halloween'… */
+  type: string;
+  /** `specialEventId` : 'icons', 'halloween-2026'… */
+  evenement: string;
+  /** Le gabarit graphique (`designId`). */
+  design: string;
+  /** L'emblème posé à la place du logo de championnat (`specialLogo`). */
+  logo: string;
+  /** L'animation d'ouverture de pack (`rarityAnimation`). */
+  animation: 'mythique' | 'elite' | 'or';
+  /** Plancher de collectif de la carte (0-10). Absent : calculé normalement. */
+  collectif?: number;
+  /** `basePlayerId` : la carte ordinaire du même joueur, s'il joue encore. */
+  base?: string;
+  retraite?: boolean;
+}
 export interface CarteCarriere {
   id: string; sourceId: string; nom: string; poste: PosteId; famille: FamillePoste;
   /** Postes réellement occupés, d'après les compositions recensées. */
@@ -42,6 +65,8 @@ export interface CarteCarriere {
   favori?: boolean;
   fatigue: number; blesseJusqua?: string;
   matchs: number; essais: number; clubs: { clubId: string; saison: number }[];
+  /** Présent seulement sur une carte spéciale. */
+  speciale?: InfoCarteSpeciale;
 }
 export interface PackCarriere {
   id: IdPackCarriere; nom: string; prix: number; cartes: number;
@@ -53,6 +78,22 @@ export interface PackCarriere {
   promesse?: string;
   /** Le rayon de la boutique où il est présenté. */
   famille?: 'general' | 'poste' | 'monde' | 'age';
+  /**
+   * ⚠️ UN PACK D'ÉVÉNEMENT N'EXISTE EN BOUTIQUE QUE PENDANT SA FENÊTRE, si sa
+   * famille est active dans le Labo ET si la ligue autorise les cartes
+   * spéciales (`packEvenementOuvert`). Recopié par `completerPacks` depuis le
+   * Labo à chaque actualisation : il disparaît tout seul à la date de fin.
+   */
+  evenement?: { id: string; type: string; actif: boolean; du?: string; au?: string;
+    /** Cartes publiées de l'événement : sans aucune, le pack ne se montre pas. */
+    cartes?: number };
+  /**
+   * Chance par carte (en %) d'une carte spéciale de cet événement, à la place
+   * du calcul par défaut (`chanceSpecialeParCarte`). Clé : `specialEventId`.
+   */
+  speciales?: Record<string, number>;
+  /** La dernière carte est une carte de cet événement si aucune n'est sortie avant. */
+  garantieSpeciale?: string;
 }
 export interface PackGratuitCarriere {
   id: string; packId: IdPackCarriere; recuLe: string;
@@ -187,6 +228,12 @@ export interface EtatCarriereEnLigne {
   packsActifs?: string[]; packsGratuitsParJour?: number; doublonsAutorises?: boolean;
   /** Ce que chaque club reçoit en arrivant. Fixé à la création, jamais après. */
   dotationOvas: number;
+  /**
+   * « Autoriser les cartes spéciales » (ICONS, Halloween et les suivantes).
+   * Absent ou faux : aucune carte spéciale dans les packs, la collection ni le
+   * marché de cette ligue. Réglable par le créateur tant qu'aucun club n'en possède.
+   */
+  cartesSpeciales?: boolean;
   clubs: ClubCarriere[]; cartes: CarteCarriere[]; packs: PackCarriere[];
   competitions: CompetitionCarriere[]; rencontres: RencontreCarriere[];
   ventes: VenteCarriere[]; echanges: EchangeCarriere[]; transactions: TransactionCarriere[];
@@ -204,12 +251,15 @@ export interface VueCarriereEnLigne extends Omit<EtatCarriereEnLigne, 'graine' |
   classement: LigneClassementCarriere[]; vivierDisponible: number;
   /** Records publics de cette ligue, visibles dans son journal. */
   statistiques: StatistiquesLigueCarriere;
+  /** Présent seulement si la ligue autorise les cartes spéciales. */
+  speciales?: ResumeSpeciauxLigue;
 }
 export interface CreationCarriere {
   id: string; nom: string; code: string; compteId: string; pseudo: string; clubNom: string;
   rythme: number; maxClubs: number; embleme?: string;
   logo?: string; tropheeId?: string; playoffs?: boolean; dotationOvas?: number;
   packsActifs?: string[]; packsGratuitsParJour?: number; doublonsAutorises?: boolean;
+  cartesSpeciales?: boolean;
 }
 export type CommandeCarriere =
   // Les ligues privées gardent leur écusson initial ; seule la division
@@ -219,6 +269,7 @@ export type CommandeCarriere =
   | { type: 'celebrationVue'; competitionId: string; saison: number }
   | { type: 'demarrerSaison' }
   | { type: 'modifierRythme'; rythme: number }
+  | { type: 'reglerCartesSpeciales'; active: boolean }
   | { type: 'composition'; composition: CompositionManager }
   | { type: 'sauvegarderComposition'; nom: string; composition: CompositionManager }
   | { type: 'supprimerComposition'; id: string }
@@ -263,4 +314,6 @@ export interface PageCollection {
   joueurs: EntreeCollection[];
   total: number; page: number; pages: number;
   catalogueTotal: number; distribues: number; packes: number;
+  /** Cartes spéciales visibles dans cette ligue, par famille (`cardType`). */
+  speciales?: Record<string, number>;
 }

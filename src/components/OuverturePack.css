@@ -122,3 +122,12 @@
 .cel-slider-rail .cel-pack-garantie.bronze { background:#dca575;color:#302012; }
 .cel-slider-rail .cel-pack-garantie.elite { background:#69e7f5;color:#083e53; }
 .cel-slider-rail .pastille-equipement { background:transparent!important; }
+
+/* ── Cartes spéciales : l'éclat prend la matière de la carte ─────────────── */
+.pack-show.speciale-icon .pack-show-flash { background: radial-gradient(ellipse, #fffaf0 0%, #f3e3b4 14%, color-mix(in srgb, #d8aa45 70%, transparent) 26%, transparent 64%); }
+.pack-show.speciale-icon .pack-show-beams { background: repeating-conic-gradient(from 0deg, transparent 0deg 18deg, #f0cc6e33 21deg 23deg, transparent 26deg 40deg); opacity: .8; }
+.pack-show.speciale-icon .pack-show-heading h2 { color: #e8c46a; text-shadow: 0 0 18px #d8aa4566; }
+.pack-show.speciale-halloween .pack-show-flash { background: radial-gradient(ellipse, #ffe2b8 0%, #ff8a1c 14%, #2a1205 34%, transparent 66%); }
+.pack-show.speciale-halloween .pack-show-beams { background: repeating-conic-gradient(from 0deg, transparent 0deg 18deg, #ff7a0038 21deg 23deg, transparent 26deg 40deg); opacity: .85; }
+.pack-show.speciale-halloween .pack-show-main.cel-panneau { background: radial-gradient(ellipse at center, #ff7a0018, transparent 62%), linear-gradient(#141416, #0b0b0d); }
+.pack-show.speciale-halloween .pack-show-heading h2 { color: #ff8a1c; text-shadow: 0 0 16px #ff7a0088; }

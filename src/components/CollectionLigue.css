@@ -25,3 +25,21 @@
 .cel-collection-owner span, .cel-collection-owner small { color: var(--brume); }
 .cel-collection-pagination { justify-content: center; padding: 16px 0; }
 @media(max-width: 650px) { .cel-collection .cel-collection-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); } .cel-collection-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 8px; } .cel-collection-owner { font-size: .67rem; } }
+
+/* ── Cartes spéciales : leurs filtres, et leur place à part dans la grille ── */
+.cel-collection-types { display: flex; flex-wrap: wrap; gap: 8px; }
+.cel-collection-type { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 6px 14px; border-radius: 99px; border: 1px solid var(--bordure-forte); background: var(--surface-solid); color: var(--craie); font: 700 .8rem var(--police-forte); letter-spacing: .04em; cursor: pointer; transition: border-color .15s, background .15s, transform .15s; }
+.cel-collection-type b { padding: 1px 8px; border-radius: 99px; background: #ffffff14; font-size: .72rem; }
+.cel-collection-type:hover { transform: translateY(-1px); }
+.cel-collection-type.actif { border-color: var(--or-400); background: color-mix(in srgb, var(--or-400) 16%, var(--surface-solid)); }
+.cel-collection-type.type-icon { letter-spacing: .16em; }
+.cel-collection-type.type-icon.actif { border-color: #d8aa45; background: linear-gradient(135deg, #fffaf0, #ecdcb6); color: #3a2b10; }
+.cel-collection-type.type-icon.actif b { background: #15110c1f; }
+.cel-collection-type.type-halloween { letter-spacing: .12em; }
+.cel-collection-type.type-halloween.actif { border-color: #ff8a1c; background: linear-gradient(135deg, #26262b, #0d0d0f); color: #ff9a2e; box-shadow: 0 0 14px #ff7a0040; }
+.cel-collection-intertitre { grid-column: 1 / -1; margin: 6px 0 -4px; padding-bottom: 6px; border-bottom: 1px solid var(--bordure-forte); font: 1rem var(--police-titre); letter-spacing: .08em; text-transform: uppercase; color: var(--craie-dim); }
+.cel-collection-intertitre.speciales { color: var(--or-400); border-bottom-color: color-mix(in srgb, var(--or-400) 45%, transparent); }
+@media (max-width: 560px) {
+  .cel-collection-types { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-inline: -4px; padding: 2px 4px; }
+  .cel-collection-type { flex: none; }
+}

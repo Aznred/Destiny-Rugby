@@ -263,6 +263,25 @@ correspondante ou joueur disponible, le moteur reprend son jeu habituel.
 depuis un pseudo ou un drapeau envoyé par le client. Le cahier adverse reste
 privé dans la vue de ligue. Banc : `npm run verify:combinaisons`.
 
+**Cartes spéciales** (`ligue/cartesSpeciales.ts`, graine `data/cartesSpeciales.ts`) :
+ICONS (100 retraités, toute l'année) et Halloween 2026 (23 cartes, 5 oct. → 30 nov.,
+pack dédié). Définitions et événements dans `CatalogueAdmin.speciales` (diff de la
+graine, même révision que l'Atelier) ; images dans `carriere_cartes_speciales_images`,
+servies par `/api/carriere?imageSpeciale=<id>&v=<n>` (privées tant que jamais publiées).
+⚠️ **Rien ne sort sans image ni publication** (`statutCarteSpeciale`) ; une ligue sans
+`cartesSpeciales` ne consomme AUCUN tirage de plus (`preparerTirageSpecial` → null).
+Chance par carte : ICONS ≈ Mythique, Halloween = √(Élite × Mythique) ; la carte garantie
+d'un pack les tire au prorata des bandes autorisées (`tirerSpeciale`, option `base`).
+Le pack d'événement suit sa fenêtre (`packEvenementOuvert`), jamais la rotation ni les
+packs quotidiens, et refuse de s'ouvrir quand ses cartes sont toutes distribuées.
+`collectif` est un PLANCHER (Halloween 10) ; la carte compte normalement pour ses
+coéquipiers. Deux cartes du même joueur (`identiteJoueur`) ne vont pas sur une feuille.
+Labo : `serveur/atelierSpeciales.ts`, `components/LaboCartesSpeciales.tsx`. Imports
+joueurs : `ligue/importsJoueurs.ts` (nom + naissance, nom + club, fiche source unique,
+sinon douteux), ajouts dans `CatalogueAdmin.ajouts` (sourceId `import:…`), lot
+`serveur/lotImportJoueurs.ts` (`npx vite-node scripts/genLotImportJoueurs.ts`).
+Banc : `npm run verify:cartes-speciales`.
+
 `OuverturePack.tsx` ne montre aucun bouton d’amélioration ni indication du
 prochain palier avant le clic. Le bouton transparent sur la pochette porte le
 libellé neutre « Ouvrir le pack » et reçoit le focus au clavier. Les montées
@@ -1274,6 +1293,7 @@ npm run verify:distances-transferts
 npm run verify:photos             # portraits des cartes : liens morts, silhouettes, Top 14
 npm run verify:assets             # tout chemin /m3d /logos /photos écrit en dur existe vraiment
 npm run verify:triche             # 40 tentatives de triche, toutes refusées
+npm run verify:cartes-speciales   # ICONS, Halloween, Labo, imports (169 contrôles, ~2 min)
 
 npx vite-node scripts/verif.ts    # banc général : divisions, effectifs, 8 saisons
 ```

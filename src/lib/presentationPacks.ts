@@ -20,7 +20,15 @@ export function nomPackCarriere(pack: Pick<PackCarriere, 'id' | 'nom'>): string 
   const traduit = t(cle);
   return traduit === cle ? pack.nom : traduit;
 }
-export const rangPack = (carte: CarteCarriere) => PALIERS_PACK.indexOf(carte.rarete);
+/**
+ * Le palier d'animation d'une carte. ⚠️ UNE CARTE SPÉCIALE OUVRE COMME UNE
+ * MYTHIQUE (`rarityAnimation`), quelle que soit sa note : une Halloween à 84
+ * n'est pas une simple bleue, et la pochette doit monter jusqu'au rouge.
+ */
+const PALIER_ANIMATION = { mythique: 'star', elite: 'elite', or: 'or' } as const;
+export const rangPack = (carte: CarteCarriere) => carte.speciale
+  ? Math.max(PALIERS_PACK.indexOf(carte.rarete), PALIERS_PACK.indexOf(PALIER_ANIMATION[carte.speciale.animation] ?? 'star'))
+  : PALIERS_PACK.indexOf(carte.rarete);
 export const modelePack = (rarete: RareteCarriere, ouvert = false) => `/m3d/packs/${rarete}-${ouvert ? 'ouvert' : 'ferme'}.glb`;
 /** Une pochette dédiée reste identique quelle que soit la rareté des cartes tirées. */
 export const IDS_PACKS_AVEC_SKIN = [

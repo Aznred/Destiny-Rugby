@@ -14,6 +14,7 @@ import { actualiserCahierMatchEnLigne, avancerMatchEnLigne, commanderMatchEnLign
 import type { CarteCarriere, ClubCarriere, CommandeCarriere, CompetitionCarriere, CreationCarriere, EtatCarriereEnLigne, LigneClassementCarriere, ObjectifCarriere, PackCarriere, RencontreCarriere, TransactionCarriere, VueCarriereEnLigne } from './typesCarriere.js';
 import { LOT_VENTE_RAPIDE_MAX, valeurVenteRapide } from './venteRapideCarriere.js';
 import { bonusCollectif, collectifCarriere } from './collectifCarriere.js';
+import { carteSurMarcheAutorisee, catalogueSpecial, identiteJoueur, packEvenementOuvert, packsEvenements, preparerTirageSpecial, resumeSpeciauxLigue, tirerSpeciale } from './cartesSpeciales.js';
 import { estPuissanceDeDeux, nombreQualifiesPlayoffs, nombreQualifiesPoules, repartirPoules } from './poulesCarriere.js';
 
 const HEURE = 3_600_000;
@@ -46,7 +47,22 @@ let sourcesParId: Map<string, ReturnType<typeof catalogueMondialCarriere>[number
 function actualiserCartesCatalogue(cartes: CarteCarriere[]): void {
   const catalogueActuel = catalogueMondialCarriere();
   if (catalogueSources !== catalogueActuel) { catalogueSources = catalogueActuel; sourcesParId = new Map(catalogueActuel.map(source => [source.sourceId, source])); }
+  const speciales = catalogueSpecial().sources;
   for (const carte of cartes) {
+    // ⚠️ UNE CARTE SPÉCIALE SUIT LE LABO (GEN, COL, image, nation…) mais ne
+    // disparaît jamais : une définition retirée laisse l'exemplaire tel quel.
+    const speciale = speciales.get(carte.sourceId);
+    if (speciale) {
+      Object.assign(carte, {
+        nom: speciale.nom, note: speciale.note, potentiel: speciale.potentiel, poste: speciale.poste, famille: speciale.famille,
+        postesSecondaires: speciale.postesSecondaires ? [...speciale.postesSecondaires] : undefined, rarete: speciale.rarete,
+        photo: speciale.photo ?? carte.photo, statistiques: { ...speciale.statistiques }, clubReel: speciale.clubReel,
+        championnat: speciale.championnat, pays: speciale.pays, nation: speciale.nation, age: speciale.age,
+        speciale: { ...speciale.speciale! },
+      });
+      continue;
+    }
+    if (carte.speciale) continue;
     const source = sourcesParId!.get(carte.sourceId);
     if (!source) continue;
     if (source.origine === 'ffr' && !catalogueAdmin().joueurs[carte.sourceId]) {
@@ -207,7 +223,8 @@ function attribuerPacksQuotidiens(etat: EtatCarriereEnLigne, maintenant: number)
     const place = classement.findIndex(ligne => ligne.clubId === club.id);
     const rang = place >= 0 ? place : Math.max(0, etat.clubs.length - 1);
     const actifs = packsActifsLigue(etat);
-    const disponibles = etat.packs.filter(pack => !actifs || actifs.includes(pack.id));
+    // ⚠️ UN PACK D'ÉVÉNEMENT NE TOMBE JAMAIS DU CIEL : il s'achète en Ovas.
+    const disponibles = etat.packs.filter(pack => !pack.evenement && (!actifs || actifs.includes(pack.id)));
     const poids = disponibles.map(pack => poidsPackQuotidien(pack, rang, etat.clubs.length, classementActif));
     const rng = hasard(`${etat.graine}:packs-quotidiens:${jour}:${club.id}`);
     const programmes = club.packsGratuitsProgrammes?.[jour] ?? [];
@@ -225,10 +242,31 @@ function attribuerPacksQuotidiens(etat: EtatCarriereEnLigne, maintenant: number)
     club.dernierLotPacksGratuits = jour;
   }
 }
+/**
+ * ⚠️ DEUX CARTES DU MÊME JOUEUR NE JOUENT PAS ENSEMBLE. Dupont et Dupont
+ * Halloween, McCaw ICON et McCaw Halloween : une seule va sur la feuille —
+ * celle que le manager y a mise, sinon la meilleure. Les autres restent dans
+ * l'effectif. On ne regarde que les groupes où figure une carte spéciale : les
+ * doublons ordinaires des ligues qui les autorisent ne changent pas.
+ */
+function ecartesParIdentite(cartes: readonly CarteCarriere[], composition: CompositionManager | undefined): Set<string> {
+  const groupes = new Map<string, CarteCarriere[]>();
+  for (const c of cartes) { const id = identiteJoueur(c); groupes.set(id, [...(groupes.get(id) ?? []), c]); }
+  const feuille = composition ? [...composition.titulaires, ...composition.remplacants] : [];
+  const ecartes = new Set<string>();
+  for (const groupe of groupes.values()) {
+    if (groupe.length < 2 || !groupe.some(c => c.speciale)) continue;
+    const garde = groupe.filter(c => feuille.includes(c.id)).sort((a, b) => feuille.indexOf(a.id) - feuille.indexOf(b.id))[0]
+      ?? [...groupe].sort((a, b) => b.note - a.note || (a.id < b.id ? -1 : 1))[0];
+    for (const c of groupe) if (c !== garde) ecartes.add(c.id);
+  }
+  return ecartes;
+}
 function ajusterComposition(etat: EtatCarriereEnLigne, club: ClubCarriere, maintenant: number) {
   const cartes = cartesClub(etat, club.id);
-  club.composition = reconcilerCompositionManager(cartes.map(coequipierDepuisCarte), club.composition,
-    new Set(cartes.filter(c => c.blesseJusqua && Date.parse(c.blesseJusqua) > maintenant).map(c => c.id)));
+  const indisponibles = new Set(cartes.filter(c => c.blesseJusqua && Date.parse(c.blesseJusqua) > maintenant).map(c => c.id));
+  for (const id of ecartesParIdentite(cartes, club.composition)) indisponibles.add(id);
+  club.composition = reconcilerCompositionManager(cartes.map(coequipierDepuisCarte), club.composition, indisponibles);
   if (!club.buteurManuel) {
     const parId = new Map(cartes.map(c => [c.id, c]));
     const meilleur = club.composition.titulaires.map(id => parId.get(id)).filter((c): c is CarteCarriere => Boolean(c))
@@ -294,6 +332,12 @@ function verifierComposition(etat: EtatCarriereEnLigne, club: ClubCarriere, vale
   const ids = [...valeur.titulaires, ...valeur.remplacants];
   exiger(valeur.titulaires.length === 15 && valeur.remplacants.length === 8 && new Set(ids).size === 23, 'La feuille doit contenir 15 titulaires et 8 remplaçants distincts.');
   exiger(valeur.titulaires.includes(valeur.capitaineId) && ids.includes(valeur.buteurId), 'Choisissez un capitaine titulaire et un buteur sur la feuille.');
+  const presents = new Map<string, CarteCarriere>();
+  for (const id of ids) {
+    const c = carteParId(etat, id), identite = identiteJoueur(c), deja = presents.get(identite);
+    exiger(!deja || (!deja.speciale && !c.speciale), `${c.nom} est déjà sur la feuille avec une autre de ses cartes.`);
+    presents.set(identite, c);
+  }
   ids.forEach((id, i) => {
     const c = carteParId(etat, id);
     exiger(c.proprietaire === club.id, 'Cette carte appartient à un autre club.');
@@ -429,12 +473,13 @@ export function creerCarriere(config: CreationCarriere, maintenant: number, grai
     packsGratuitsParJour: Number.isInteger(config.packsGratuitsParJour)
       ? Math.max(0, Math.min(20, config.packsGratuitsParJour!)) : PACKS_GRATUITS_PAR_JOUR,
     doublonsAutorises: config.doublonsAutorises === true,
+    cartesSpeciales: config.cartesSpeciales === true,
     // ⚠️ BORNÉE, ET C'EST TOUTE LA DIFFÉRENCE ENTRE UN RÉGLAGE ET UNE FAILLE.
     // La dotation de départ est le seul robinet d'Ovas que le créateur ouvre
     // lui-même : sans plafond, il se donne dix millions et le marché de la
     // ligue n'existe plus. 100 000 Ovas, c'est déjà trois saisons de gains.
     dotationOvas: dotationValide(config.dotationOvas),
-    clubs: [], cartes: [], packs: copier(packsCatalogueAdmin()), competitions: [], rencontres: [], ventes: [], echanges: [], transactions: [], objectifs: [], histoire: [] };
+    clubs: [], cartes: [], packs: [...copier(packsCatalogueAdmin()), ...packsEvenements()], competitions: [], rencontres: [], ventes: [], echanges: [], transactions: [], objectifs: [], histoire: [] };
   ajouterClub(etat, config.compteId, config.pseudo, config.clubNom, maintenant, graine, config.embleme);
   attribuerPacksQuotidiens(etat, maintenant);
   return etat;
@@ -473,6 +518,8 @@ export function creerLaboratoireCarriere(config: Pick<CreationCarriere, 'id' | '
     maxClubs: 8, playoffs: true, dotationOvas: 100_000,
   }, maintenant, graine);
   etat.laboratoire = true;
+  // Le bac à sable de Kiri sert justement à essayer ce qui n'est pas encore public.
+  etat.cartesSpeciales = true;
   for (const robot of CLUBS_LABORATOIRE) ajouterClub(etat, robot.compteId, robot.pseudo, robot.nom, maintenant, `${graine}:${robot.compteId}`);
   demarrerSaison(etat, maintenant);
   const club = monClub(etat, config.compteId);
@@ -483,7 +530,11 @@ export function creerLaboratoireCarriere(config: Pick<CreationCarriere, 'id' | '
 
 function ouvrirPack(etat: EtatCarriereEnLigne, club: ClubCarriere, packId: string, maintenant: number, graine: string, gratuit = false) {
   const pack = etat.packs.find(p => p.id === packId); exiger(pack, 'Pack inconnu.');
-  if (etat.publique || !gratuit) {
+  // ⚠️ UN PACK D'ÉVÉNEMENT OBÉIT À SA FENÊTRE, PAS À LA LISTE DES PACKS DE LA
+  // LIGUE : fini le 30 novembre, il refuse de s'ouvrir même si l'écran
+  // d'avant l'affiche encore. Aucun Ova n'est débité.
+  if (pack.evenement) exiger(packEvenementOuvert(pack, etat.cartesSpeciales, maintenant), 'Ce pack d’événement n’est plus disponible.');
+  else if (etat.publique || !gratuit) {
     const actifs = packsActifsLigue(etat);
     exiger(!actifs || actifs.includes(packId), 'Ce pack est désactivé dans cette ligue.');
   }
@@ -506,11 +557,31 @@ function ouvrirPack(etat: EtatCarriereEnLigne, club: ClubCarriere, packId: strin
   // que la séquence devienne prévisible — et la plupart du temps elle ne sert
   // même pas, parce que le hasard a déjà fait le travail.
   const bandes = pack.garantie ? bandesGaranties(pack.garantie) : [];
+  // Les cartes spéciales passent AVANT la bande : une chance par carte, qui
+  // suit la qualité du pack (`chanceSpecialeParCarte`). Sans carte spéciale
+  // possible, `tirage` vaut null et l'ouverture tire exactement comme avant.
+  const tirage = preparerTirageSpecial(pack, etat.cartesSpeciales, maintenant, pris);
+  // Un pack d'événement promet SA carte : sans elle, il ne s'ouvre pas.
+  exiger(!pack.garantieSpeciale || tirage?.lots.some(l => l.evenement === pack.garantieSpeciale),
+    'Toutes les cartes de cet événement sont déjà distribuées dans votre ligue. Aucun Ova débité.');
   exiger(rayons.reduce((n, rayon) => n + rayon.length, 0) >= pack.cartes, 'Pas assez de joueurs disponibles pour ce pack.');
   exiger(!pack.garantie || bandes.some(r => rayons[RARETES_CARRIERE.indexOf(r)].length > 0), 'La garantie de ce pack est épuisée. Aucun Ova débité.');
   for (let n = 0; n < pack.cartes; n++) {
     const derniere = n === pack.cartes - 1;
     const doitGarantir = derniere && bandes.length > 0 && !tirees.some(c => bandes.includes(c.rarete));
+    const doitGarantirSpeciale = derniere && Boolean(pack.garantieSpeciale) && !tirees.some(c => c.speciale?.evenement === pack.garantieSpeciale);
+    const speciale = doitGarantirSpeciale ? tirerSpeciale(tirage, rng, { forcer: pack.garantieSpeciale })
+      : doitGarantir ? tirerSpeciale(tirage, rng, {
+        accepte: s => bandes.includes(s.rarete),
+        base: bandes.reduce((total, r) => total + (rayons[RARETES_CARRIERE.indexOf(r)].length ? pack.probabilites[r] || 1 : 0), 0),
+      })
+      : tirerSpeciale(tirage, rng);
+    if (speciale) {
+      const carte = carteDepuisSource(speciale, etat.id, club.id, etat.saison);
+      if (etat.doublonsAutorises) carte.id = idNouvelExemplaire(etat, etat.cartes.length);
+      pris.add(carte.sourceId); etat.cartes.push(carte); tirees.push(carte);
+      continue;
+    }
     const poids = RARETES_CARRIERE.map((r, b) => {
       if (!rayons[b].length) return 0;
       if (doitGarantir && !bandes.includes(r)) return 0;
@@ -1222,6 +1293,15 @@ function expirerMarche(etat: EtatCarriereEnLigne, maintenant: number) {
  * fait l'économie — restent ceux de la ligue.
  */
 function completerPacks(etat: EtatCarriereEnLigne) {
+  // Les packs d'événement suivent le Labo à chaque actualisation (prix,
+  // probabilités, dates, interrupteur) : c'est ce qui les fait disparaître
+  // d'eux-mêmes à la fin de l'événement.
+  const evenements = packsEvenements();
+  for (const pack of evenements) {
+    const i = etat.packs.findIndex(p => p.id === pack.id);
+    if (i < 0) etat.packs.push(pack); else etat.packs[i] = pack;
+  }
+  for (const pack of etat.packs) if (pack.evenement && pack.evenement.actif && !evenements.some(e => e.id === pack.id)) pack.evenement = { ...pack.evenement, actif: false };
   for (const edition of Object.values(catalogueAdmin().packs)) {
     const i = etat.packs.findIndex(p => p.id === edition.id);
     if(i < 0) etat.packs.push(copier(edition)); else etat.packs[i] = copier(edition);
@@ -1395,6 +1475,16 @@ export function agirCarriere(etat: EtatCarriereEnLigne, compteId: string, comman
       }
       case 'actualiser': break;
       case 'demarrerSaison': exiger(!nouveau.publique && compteId === nouveau.createurId, 'La saison publique démarre automatiquement.'); demarrerSaison(nouveau, maintenant); break;
+      case 'reglerCartesSpeciales': {
+        exiger(!nouveau.publique && compteId === nouveau.createurId, 'Seul le créateur de la ligue peut régler les cartes spéciales.');
+        exiger(typeof commande.active === 'boolean', 'Réglage invalide.');
+        // ⚠️ ON N'ÉTEINT PAS CE QUI EST DÉJÀ DANS LES VESTIAIRES. Une ICON
+        // achetée ne peut ni disparaître ni rester orpheline d'une règle qui
+        // dirait « interdite ici » : une fois distribuées, elles restent permises.
+        if (!commande.active) exiger(!nouveau.cartes.some(c => c.speciale), 'Des clubs possèdent déjà des cartes spéciales : elles restent autorisées dans cette ligue.');
+        nouveau.cartesSpeciales = commande.active;
+        break;
+      }
       case 'modifierRythme': {
         exiger(!nouveau.publique && compteId === nouveau.createurId, 'La fréquence de la division publique est fixe.');
         entier(commande.rythme, 1, 7);
@@ -1509,6 +1599,7 @@ export function agirCarriere(etat: EtatCarriereEnLigne, compteId: string, comman
         clubLibre(nouveau, club.id); identifiant(commande.carteId); entier(commande.prix, 1); entier(commande.dureeHeures, 1, 168);
         exiger(commande.mode === 'directe' || commande.mode === 'enchere', 'Type de vente invalide.');
         const carte = carteParId(nouveau, commande.carteId); exiger(carte.proprietaire === club.id && !carte.verrou, 'Cette carte ne peut pas être mise en vente.');
+        exiger(carteSurMarcheAutorisee(carte, nouveau.cartesSpeciales === true), 'Cette carte spéciale ne peut pas être mise sur le marché.');
         verifierHorsFeuille(nouveau, club, [carte.id], 'vente'); verifierDepart(nouveau, club.id, [carte.id]); const id = prochainId(nouveau, 'vente', nouveau.ventes.length); carte.verrou = id;
         nouveau.ventes.push({ id, carteId: carte.id, vendeurId: club.id, type: commande.mode, prix: commande.prix, expireLe: dateServeur(maintenant + commande.dureeHeures * HEURE), etat: 'ouverte' }); break;
       }
@@ -1517,6 +1608,7 @@ export function agirCarriere(etat: EtatCarriereEnLigne, compteId: string, comman
         exiger(v.vendeurId !== club.id, 'Vous ne pouvez pas acheter votre propre carte.'); clubLibre(nouveau, club.id); clubLibre(nouveau, v.vendeurId);
         const vendeur = clubParId(nouveau, v.vendeurId), carte = carteParId(nouveau, v.carteId);
         exiger(carte.proprietaire === vendeur.id && carte.verrou === v.id, 'La propriété de cette carte a changé.');
+        exiger(carteSurMarcheAutorisee(carte, nouveau.cartesSpeciales === true), 'Cette carte spéciale n’est plus proposée sur le marché.');
         journal(nouveau, club, 'vente', -v.prix, [carte.id], `Achat : ${carte.nom}`, date); journal(nouveau, vendeur, 'vente', v.prix, [carte.id], `Vente : ${carte.nom}`, date);
         transferer(carte, club, nouveau.saison); v.etat = 'vendue'; v.acheteurId = club.id; v.joueurNom = carte.nom;
         ajusterComposition(nouveau, vendeur, maintenant); ajusterComposition(nouveau, club, maintenant); break;
@@ -1524,6 +1616,7 @@ export function agirCarriere(etat: EtatCarriereEnLigne, compteId: string, comman
       case 'encherir': {
         entier(commande.montant, 1); const v = nouveau.ventes.find(v => v.id === commande.venteId);
         exiger(v && v.etat === 'ouverte' && v.type === 'enchere' && Date.parse(v.expireLe) > maintenant, 'Cette enchère est fermée.'); exiger(v.vendeurId !== club.id, 'Vous ne pouvez pas enchérir sur votre carte.');
+        exiger(carteSurMarcheAutorisee(carteParId(nouveau, v.carteId), nouveau.cartesSpeciales === true), 'Cette carte spéciale n’est plus proposée sur le marché.');
         exiger(commande.montant >= (v.enchere ? v.enchere.montant + Math.max(25, Math.ceil(v.enchere.montant * .05)) : v.prix), 'Votre offre doit dépasser la meilleure enchère d’au moins 5 % (minimum 25 Ovas).');
         if (v.enchere) journal(nouveau, clubParId(nouveau, v.enchere.clubId), 'enchere', v.enchere.montant, [], 'Enchère dépassée : Ovas restitués', date);
         journal(nouveau, club, 'enchere', -commande.montant, [], 'Ovas réservés pour une enchère', date); v.enchere = { clubId: club.id, montant: commande.montant }; break;
@@ -1537,6 +1630,7 @@ export function agirCarriere(etat: EtatCarriereEnLigne, compteId: string, comman
         exiger(commande.vers !== club.id, 'Choisissez un autre club.'); const destinataire = clubParId(nouveau, commande.vers);
         exiger(commande.cartesDonnees.length + commande.cartesDemandees.length > 0, 'Un échange doit contenir au moins une carte.');
         exiger(nouveau.echanges.filter(e => e.de === club.id && e.etat === 'propose').length < 10, 'Vous avez déjà dix offres en cours.');
+        for (const id of [...commande.cartesDonnees, ...commande.cartesDemandees]) exiger(!carteParId(nouveau, id).speciale || nouveau.cartesSpeciales === true, 'Les cartes spéciales ne s’échangent pas dans cette ligue.');
         for (const id of commande.cartesDonnees) { const c = carteParId(nouveau, id); exiger(c.proprietaire === club.id && !c.verrou, 'Une carte proposée est indisponible.'); }
         for (const id of commande.cartesDemandees) { const c = carteParId(nouveau, id); exiger(c.proprietaire === destinataire.id && !c.verrou, 'Une carte demandée est indisponible.'); }
         verifierDepart(nouveau, club.id, commande.cartesDonnees, commande.cartesDemandees); verifierDepart(nouveau, destinataire.id, commande.cartesDemandees, commande.cartesDonnees);
@@ -1786,6 +1880,7 @@ function construireVueCarriere(etat: EtatCarriereEnLigne, club?: ClubCarriere): 
     transactions: club ? etat.transactions.filter(t => t.clubId === club.id) : [],
     echanges: club ? etat.echanges.filter(e => e.de === club.id || e.vers === club.id).map(e => ({ ...e, blocage: e.etat === 'propose' ? blocageFeuilleEchange(etat, e) : undefined })) : [],
     classement: classementCarriere(etat), statistiques: statistiquesLigue(etat),
+    ...(etat.cartesSpeciales ? { speciales: resumeSpeciauxLigue(etat.packs) } : {}),
     vivierDisponible: vivierRestant(new Set(etat.cartes.map(c => c.sourceId))) });
 }
 

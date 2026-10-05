@@ -19,6 +19,7 @@ import type { FamillePoste, PosteId } from '../../types.js';
 import type { Coequipier } from '../effectif.js';
 import { graine, melanger } from './aleatoire.js';
 import type { CarteCarriere, FiltrePack, PackCarriere, RareteCarriere } from './typesCarriere.js';
+import type { AjoutJoueur } from './importsJoueurs.js';
 
 export const RARETES_CARRIERE: RareteCarriere[] = ['bronze', 'argent', 'or', 'elite', 'star'];
 // ═══════════════════════════════════════════════════════════════════════════
@@ -262,10 +263,27 @@ const nationLisible = (s: string) => s.replace(/[^\p{L}\p{M}\s'-]/gu, '').trim()
 export type SourceCarte = Omit<CarteCarriere, 'id' | 'proprietaire' | 'fatigue' | 'matchs' | 'essais' | 'clubs'>;
 let catalogue: SourceCarte[] | undefined;
 const cataloguesAdmin = new WeakMap<CatalogueAdmin, readonly SourceCarte[]>();
+/** Un joueur ajouté par « Imports joueurs » devient une source comme les autres. */
+function sourceDepuisAjout(a: AjoutJoueur): SourceCarte {
+  const famille = POSTE_PAR_ID[a.poste].famille;
+  return { sourceId: a.sourceId, nom: a.nom, famille, poste: a.poste,
+    postesSecondaires: a.postesSecondaires?.length ? [...a.postesSecondaires] : undefined,
+    note: a.note, potentiel: Math.max(a.note, a.potentiel), age: a.age, nation: a.nation, clubReel: a.clubReel,
+    championnat: a.championnat, pays: a.pays, photo: a.photo, origine: 'professionnel', rarete: rareteCarriere(a.note),
+    statistiques: statistiquesCarte(a.note, famille, a.sourceId) };
+}
+
 export function catalogueMondialCarriere(config: CatalogueAdmin = catalogueAdmin()): readonly SourceCarte[] {
-  if (!Object.keys(config.joueurs).length) return catalogueBaseCarriere();
+  const ajouts = Object.values(config.ajouts ?? {}).filter(a => POSTE_PAR_ID[a.poste]);
+  if (!Object.keys(config.joueurs).length && !ajouts.length) return catalogueBaseCarriere();
   const connu = cataloguesAdmin.get(config); if (connu) return connu;
-  const resultat = catalogueBaseCarriere().map(source => {
+  // ⚠️ LES AJOUTS PASSENT APRÈS LA BASE, triés : l'ordre du catalogue doit
+  // rester le même d'une instance serveur à l'autre, sinon un même tirage de
+  // pack ne donnerait pas la même carte.
+  const sources = ajouts.length
+    ? [...catalogueBaseCarriere(), ...ajouts.sort((a, b) => a.sourceId < b.sourceId ? -1 : 1).map(sourceDepuisAjout)]
+    : catalogueBaseCarriere();
+  const resultat = sources.map(source => {
     const edition = config.joueurs[source.sourceId];
     if (!edition) return source;
     const poste = edition.poste ?? source.poste;
@@ -381,7 +399,7 @@ let parRarete: Record<RareteCarriere, SourceCarte[]> | undefined;
 /** Une source du catalogue devient une carte de ligue au moment où elle sort. */
 export function carteDepuisSource(source: SourceCarte, ligueId: string, proprietaire: string, saison: number): CarteCarriere {
   return {
-    ...source, statistiques: { ...source.statistiques },
+    ...source, statistiques: { ...source.statistiques }, ...(source.speciale ? { speciale: { ...source.speciale } } : {}),
     id: `${ligueId}:${source.sourceId}`, proprietaire,
     fatigue: 0, matchs: 0, essais: 0, clubs: [{ clubId: proprietaire, saison }],
   };

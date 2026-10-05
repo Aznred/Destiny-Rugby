@@ -3,6 +3,7 @@ import { chargerCollectionCarriere, chargerEmblemesCarriere } from '../lib/carri
 import type { PageCollection, VueCarriereEnLigne } from '../lib/ligue/typesCarriere';
 import { NOMS_PACK } from '../lib/presentationPacks';
 import { CarteJoueurEnLigne } from './CarteJoueurEnLigne';
+import { Citrouille, EmblemeIcon } from './EmblemesSpeciaux';
 import { EcussonClub } from './EcussonClub';
 import { locale, nombre, t } from '../lib/i18n';
 import './CollectionLigue.css';
@@ -20,7 +21,7 @@ const obtenirPostesLigue = (): [string, string][] => [
 ];
 
 export function CollectionLigue({ vue }: { vue: VueCarriereEnLigne }) {
-  const [filtres, setFiltres] = useState({ q: '', rarete: '', poste: '', statut: '', club: '', tri: 'note', page: '1' });
+  const [filtres, setFiltres] = useState({ q: '', rarete: '', poste: '', statut: '', club: '', tri: 'note', page: '1', type: '' });
   const [donnees, setDonnees] = useState<PageCollection | null>(null);
   const [charge, setCharge] = useState(true);
   const [erreur, setErreur] = useState('');
@@ -50,6 +51,15 @@ export function CollectionLigue({ vue }: { vue: VueCarriereEnLigne }) {
     <header className="cel-panneau cel-collection-header"><div><div className="eyebrow">{t('online.collection.catalogue')}</div><h2>{t('online.nav.collection')}</h2><p>{t('online.collection.desc')}</p></div>
       {donnees && <div className="cel-collection-counts"><span><b>{nombre(donnees.catalogueTotal)}</b> {t('online.collection.players',{n:''}).trim()}</span><span><b>{nombre(donnees.packes)}</b> {t('online.collection.packStatus.packed').toLowerCase()}</span><span><b>{nombre(donnees.distribues)}</b> {t('online.collection.packStatus.distributed').toLowerCase()}</span></div>}
     </header>
+    {/* ⚠️ LES FILTRES SPÉCIAUX N'EXISTENT QUE DANS UNE LIGUE QUI LES AUTORISE :
+        ailleurs, les cartes spéciales n'existent pas du tout. */}
+    {vue.cartesSpeciales && <div className="cel-collection-types" role="group" aria-label={t('special.filter.label')}>
+      {([['', t('online.collection.all'), null], ['normal', t('special.filter.players'), null],
+        ['icon', t('special.icons'), <EmblemeIcon key="i" taille={20} />], ['halloween', t('special.halloween'), <Citrouille key="h" taille={20} />]] as const).map(([valeur, libelle, embleme]) =>
+        <button key={valeur} type="button" className={`cel-collection-type type-${valeur || 'tout'}${filtres.type === valeur ? ' actif' : ''}`} aria-pressed={filtres.type === valeur} onClick={() => changer('type', valeur)}>
+          {embleme}<span>{libelle}</span>{(valeur === 'icon' || valeur === 'halloween') && donnees?.speciales && <b>{nombre(donnees.speciales[valeur] ?? 0)}</b>}
+        </button>)}
+    </div>}
     <div className="cel-panneau cel-collection-filters">
       <label className="cel-collection-search">{t('online.collection.search')}<input type="search" placeholder={t('solo.searchPlaceholder')} maxLength={100} value={filtres.q} onChange={e => changer('q', e.target.value)} /></label>
       <label>{t('online.collection.rarity')}<select value={filtres.rarete} onChange={e => changer('rarete', e.target.value)}><option value="">{t('online.collection.all')}</option>{Object.entries(NOMS_PACK).map(([r, nom]) => <option key={r} value={r}>{nom}</option>)}</select></label>
@@ -61,10 +71,15 @@ export function CollectionLigue({ vue }: { vue: VueCarriereEnLigne }) {
     {erreur && <div className="cel-erreur" role="alert"><p>{erreur}</p><button className="btn fantome" onClick={() => setRevision(n => n + 1)}>{t('online.retry')}</button></div>}
     <div className="cel-collection-toolbar" aria-live="polite"><span>{charge ? t('online.loading') : t('online.collection.players',{n:nombre(donnees?.total ?? 0)})}</span><button className="btn fantome" disabled={charge} onClick={() => setRevision(n => n + 1)}>{t('online.collection.refresh')}</button></div>
     <div aria-busy={charge} className="cel-collection-grid">
-      {!charge && donnees?.joueurs.map(({ carte, obtenuPar, obtention, obtenuLe }) => {
+      {!charge && donnees?.joueurs.map(({ carte, obtenuPar, obtention, obtenuLe }, i, liste) => {
         const clubDetenteur = carte.proprietaire ? vue.clubs.find(c => c.id === carte.proprietaire) : undefined;
         const decouverte = Boolean(clubDetenteur);
-        return <article key={carte.id} className={`cel-collection-entry${decouverte ? ' est-decouverte' : ' est-inconnue'}`}>
+        // Dans « Toutes », les cartes spéciales passent en tête, à part : un
+        // intertitre marque chaque changement de famille sur la page.
+        const avecSpeciales = filtres.type === '' && liste.some(e => e.carte.speciale);
+        const intertitre = avecSpeciales && (i === 0 || Boolean(liste[i - 1].carte.speciale) !== Boolean(carte.speciale))
+          ? <h3 key={`titre-${carte.id}`} className={`cel-collection-intertitre${carte.speciale ? ' speciales' : ''}`}>{carte.speciale ? t('special.collection.section') : t('special.collection.players')}</h3> : null;
+        return [intertitre, <article key={carte.id} className={`cel-collection-entry${decouverte ? ' est-decouverte' : ' est-inconnue'}${carte.speciale ? ` est-speciale speciale-${carte.speciale.type}` : ''}`}>
         <CarteJoueurEnLigne carte={carte} logoClub={logos.get(carte.clubReel)} etatCollection={decouverte ? 'decouverte' : 'inconnue'} />
         {clubDetenteur && <div className="cel-collection-club" title={t('online.collection.heldByClub', { name: clubDetenteur.nom })}>
           <EcussonClub logo={clubDetenteur.embleme ?? logos.get(clubDetenteur.nom)} nom={clubDetenteur.nom} taille={42} />
@@ -74,7 +89,7 @@ export function CollectionLigue({ vue }: { vue: VueCarriereEnLigne }) {
           <span>{obtention === 'pack' ? t('online.collection.packedBy', { club: club(obtenuPar) }) : obtention === 'dotation' ? t('online.collection.grantedTo', { club: club(obtenuPar) }) : obtention === 'inconnue' ? t('online.collection.originUnknown') : t('online.collection.inLeaguePool')}</span>
           {obtenuLe && <small>{new Date(obtenuLe).toLocaleDateString(locale())}</small>}
         </div>
-      </article>;
+      </article>];
       })}
     </div>
     {!charge && donnees?.total === 0 && <p className="cel-panneau">{t('online.collection.emptyFiltered')}</p>}

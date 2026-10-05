@@ -61,6 +61,8 @@ export interface AffiniteCarte {
   championnat: number;
   /** Celle qui a donné les points — pour que l'écran puisse dire POURQUOI. */
   meilleure: Affinite | null;
+  /** Les points viennent du plancher d'une carte spéciale (Halloween : COL 10). */
+  speciale?: true;
 }
 
 export interface CollectifEquipe {
@@ -127,6 +129,15 @@ export function collectifCarriere(
     let meilleure: Affinite | null = null;
     let points = 0;
     for (const [nom, valeur] of scores) if (valeur > points) { points = valeur; meilleure = nom; }
+    // ⚠️ UNE CARTE SPÉCIALE PEUT AVOIR UN PLANCHER DE COLLECTIF (Halloween :
+    // COL 10). C'est SON collectif, pas celui des autres : elle compte toujours
+    // dans les groupes de ses coéquipiers par son club, sa nation et son
+    // championnat, comme n'importe quelle carte.
+    const plancher = carte.speciale?.collectif;
+    if (typeof plancher === 'number' && Math.min(COLLECTIF_MAX, plancher) > points) {
+      parCarte[carte.id] = { points: Math.max(0, Math.min(COLLECTIF_MAX, plancher)), club, nation, championnat, meilleure, speciale: true };
+      continue;
+    }
     parCarte[carte.id] = { points, club, nation, championnat, meilleure };
   }
 

@@ -1,0 +1,125 @@
+/* Le Labo · cartes spéciales et imports joueurs. Même matière que l'Atelier. */
+.labo-speciales, .labo-imports { display: grid; gap: 1rem; min-width: 0; }
+.labo-speciales fieldset, .labo-imports fieldset { min-width: 0; padding: 0; border: 0; }
+.ls-panneaux, .ls-types { display: flex; flex-wrap: wrap; gap: .4rem; }
+.ls-panneaux button, .ls-types button, .ls-postes button {
+  display: inline-flex; align-items: center; gap: .45rem; min-height: 2.5rem; padding: .5rem .9rem; border: 1px solid var(--bordure);
+  border-radius: 999px; background: color-mix(in srgb, var(--surface) 80%, #000); color: var(--brume); font: 700 .74rem/1 var(--police-forte); cursor: pointer;
+}
+.ls-panneaux button.actif, .ls-types button.actif, .ls-postes button.actif { border-color: var(--or-400); color: var(--or-400); background: color-mix(in srgb, var(--or-500) 16%, var(--surface)); }
+
+.ls-compteurs, .li-compteurs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .55rem; }
+.ls-compteur, .li-compteur { display: grid; gap: .2rem; padding: .75rem .9rem; border: 1px solid var(--bordure); border-left-width: 4px; border-radius: var(--rayon-controle); background: var(--surface); color: var(--craie); text-align: left; cursor: pointer; }
+.ls-compteur b, .li-compteur b { font: 1.5rem/1 var(--police-titre); }
+.ls-compteur span, .li-compteur span { color: var(--brume); font: 700 .7rem/1.2 var(--police-forte); text-transform: uppercase; letter-spacing: .06em; }
+.ls-compteur.actif, .li-compteur.actif { background: color-mix(in srgb, var(--or-500) 14%, var(--surface)); }
+.statut-draft { border-left-color: #8b8f99; } .statut-image_missing { border-left-color: #d46b60; } .statut-ready { border-left-color: #e9b949; } .statut-published { border-left-color: #4caf6c; }
+
+.ls-filtres { display: flex; flex-wrap: wrap; align-items: end; gap: .75rem 1rem; }
+.ls-recherche { flex: 1 1 14rem; margin: 0 !important; }
+.ls-masse { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; padding: .6rem .75rem; border: 1px solid var(--bordure); border-radius: var(--rayon-controle); background: color-mix(in srgb, var(--surface) 85%, #000); }
+.ls-masse span { flex: 1 1 10rem; color: var(--brume); font-size: .78rem; }
+.ls-masse .btn { min-height: 2.4rem; padding: .45rem .8rem; font-size: .74rem; }
+
+.ls-grille { display: grid; grid-template-columns: minmax(16rem, 23rem) minmax(0, 1fr); gap: 1rem; align-items: start; }
+.ls-liste { display: grid; align-content: start; grid-auto-rows: min-content; gap: .3rem; max-height: 52rem; overflow: auto; margin: 0; padding: .4rem; list-style: none; border: 1px solid var(--bordure); border-radius: var(--rayon); background: color-mix(in srgb, var(--surface) 88%, #000); }
+.ls-liste li { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: .4rem; }
+.ls-liste li > input { width: 1.05rem; height: 1.05rem; accent-color: var(--or-400); }
+.ls-liste li > button { display: grid; grid-template-columns: 2.6rem minmax(0, 1fr) auto; grid-template-areas: 'vignette identite gen' 'vignette statut statut'; gap: .15rem .55rem; align-items: center; width: 100%; padding: .5rem; border: 1px solid transparent; border-radius: var(--rayon-controle); background: transparent; color: var(--craie); text-align: left; cursor: pointer; }
+.ls-liste li > button:hover { border-color: var(--bordure); background: var(--surface); }
+.ls-liste li.selectionnee > button { border-color: var(--or-400); background: color-mix(in srgb, var(--or-500) 14%, var(--surface)); }
+.ls-vignette { grid-area: vignette; display: grid; place-items: center; width: 2.6rem; height: 2.6rem; overflow: hidden; border-radius: 8px; background: #0005; }
+.type-halloween .ls-vignette { background: linear-gradient(160deg, #2a2a30, #0b0b0d); box-shadow: inset 0 0 0 1px #ff8a1c55; }
+.type-icon .ls-vignette { background: linear-gradient(160deg, #fffaf0, #e4d4ae); box-shadow: inset 0 0 0 1px #c79a3c; }
+.ls-vignette img { width: 100%; height: 100%; object-fit: cover; object-position: top; }
+.ls-identite { grid-area: identite; display: grid; gap: .15rem; min-width: 0; }
+.ls-identite b { font: 700 .82rem/1.2 var(--police-forte); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ls-identite small { display: flex; align-items: center; gap: .3rem; color: var(--brume); font-size: .68rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ls-gen { grid-area: gen; display: grid; justify-items: end; }
+.ls-gen b { color: var(--or-400); font: 1.15rem/1 var(--police-titre); }
+.ls-gen small { color: var(--brume); font-size: .62rem; }
+.ls-statut { grid-area: statut; justify-self: start; padding: .15rem .5rem; border-left: 3px solid; border-radius: 4px; background: #0003; color: var(--craie-dim, var(--brume)); font: 700 .62rem/1.3 var(--police-forte); letter-spacing: .04em; }
+.ls-vide, .ls-vide-edition { padding: 1rem; color: var(--brume); font-size: .82rem; }
+.ls-vide-edition { border: 1px dashed var(--bordure); border-radius: var(--rayon); }
+
+.ls-edition, .ls-evenement, .ls-creation, .ls-import, .li-source { padding: 1.1rem; border: 1px solid var(--bordure); border-radius: var(--rayon); background: var(--surface); box-shadow: var(--ombre-2); }
+.ls-edition legend { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+.ls-edition legend .ls-statut { font-size: .66rem; }
+.ls-edition-corps { display: grid; grid-template-columns: minmax(0, 1fr) 13.5rem; gap: 1.1rem; }
+.ls-champ { display: grid; gap: .42rem; margin-bottom: .8rem; color: var(--brume); font: 700 .72rem/1.2 var(--police-forte); }
+.ls-postes { display: flex; flex-wrap: wrap; gap: .3rem; }
+.ls-postes button { min-width: 2.4rem; min-height: 2.2rem; justify-content: center; padding: .35rem .5rem; border-radius: 8px; }
+.ls-bascules { display: flex; flex-wrap: wrap; gap: .4rem .9rem; margin: .2rem 0 .8rem; }
+.labo-speciales .ls-bascule, .labo-imports .ls-bascule { display: inline-flex !important; grid-template-columns: none; align-items: center; gap: .45rem; margin: 0 !important; color: var(--craie) !important; font: 600 .78rem/1.2 var(--police-forte) !important; cursor: pointer; }
+.ls-bascule input { width: 1.05rem !important; height: 1.05rem; padding: 0 !important; accent-color: var(--or-400); }
+.ls-bascule.bloquee { opacity: .55; }
+.ls-alerte { margin-bottom: .8rem !important; color: #ffb4a8 !important; }
+.ls-actions { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: .4rem; }
+.ls-apercu { display: grid; align-content: start; gap: .8rem; }
+.ls-apercu .cel-carte { width: 100%; }
+.ls-image { display: grid; gap: .5rem; }
+.ls-image small { color: var(--brume); font-size: .68rem; line-height: 1.45; }
+.ls-fichier { position: relative; overflow: hidden; justify-content: center; text-align: center; margin: 0 !important; }
+.ls-fichier input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.ls-url { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .35rem; }
+.ls-url .btn { padding: .4rem .6rem; font-size: .72rem; }
+
+.ls-evenements { display: grid; gap: 1rem; }
+.ls-evenement header { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: .9rem; margin-bottom: 1rem; }
+.ls-evenement h3 { margin: .15rem 0; font: 1.35rem/1.1 var(--police-titre); }
+.ls-evenement header small { color: var(--brume); font-size: .75rem; }
+.ls-evenement.type-halloween { border-color: #ff8a1c44; background: radial-gradient(ellipse at 0 0, #ff7a0018, transparent 45%), var(--surface); }
+.ls-evenement.type-icon { border-color: #d8aa4555; background: radial-gradient(ellipse at 0 0, #f0cc6e18, transparent 45%), var(--surface); }
+.ls-interrupteur { display: flex; align-items: center; gap: .55rem; min-height: 2.65rem; padding: .6rem .9rem; border: 1px solid var(--bordure); border-radius: 999px; background: color-mix(in srgb, var(--surface) 78%, #000); color: var(--craie); font: 700 .72rem/1 var(--police-forte); cursor: pointer; }
+.ls-interrupteur i { position: relative; width: 32px; height: 18px; border-radius: 99px; background: #69747a; }
+.ls-interrupteur i::after { content: ''; position: absolute; top: 3px; left: 3px; width: 12px; height: 12px; border-radius: 50%; background: white; transition: transform .18s ease; }
+.ls-interrupteur.actif i { background: #4caf6c; }
+.ls-interrupteur.actif i::after { transform: translateX(14px); }
+.ls-chances { margin: 0 0 1rem; color: var(--brume); font-size: .78rem; }
+.ls-chances ul { display: grid; grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr)); gap: .25rem 1rem; margin: .5rem 0 0; padding: 0; list-style: none; }
+.ls-chances b { float: right; color: var(--or-400); }
+.ls-pack { margin: .5rem 0 1rem; padding: 1rem; border: 1px solid var(--bordure); border-radius: var(--rayon-controle); background: color-mix(in srgb, var(--surface) 80%, #000); }
+.ls-pack h4 { margin: 0 0 .8rem; font: 1rem/1.2 var(--police-titre); }
+.ls-import textarea, .li-source textarea { font-family: ui-monospace, monospace; font-size: .78rem; }
+.ls-import h3, .li-source h3 { margin: 0 0 .4rem; font: 1.15rem/1.2 var(--police-titre); }
+.ls-import code, .li-source code { padding: .05rem .3rem; border-radius: 4px; background: #0004; color: var(--craie); font-size: .72rem; word-break: break-word; }
+.ls-erreurs-import { margin: .6rem 0 0; padding-left: 1.2rem; color: #ffd2cd; font-size: .78rem; }
+
+/* Imports joueurs */
+.li-sources { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.li-source { display: grid; align-content: start; gap: .6rem; }
+.li-source .btn { justify-self: start; }
+.li-compteurs { grid-template-columns: repeat(3, minmax(0, 1fr)) auto; align-items: stretch; }
+.verdict-douteux { border-left-color: #e9b949; } .verdict-nouveau { border-left-color: #4caf6c; } .verdict-present { border-left-color: #6f8fb3; }
+.li-decides { align-self: center; color: var(--brume); font-size: .75rem; }
+.li-outils { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .6rem; }
+.li-liste { display: grid; gap: .5rem; margin: 0; padding: 0; list-style: none; }
+.li-liste > li { display: grid; gap: .5rem; padding: .8rem .9rem; border: 1px solid var(--bordure); border-left-width: 4px; border-radius: var(--rayon-controle); background: var(--surface); }
+.li-ligne { display: grid; gap: .2rem; }
+.li-ligne b { font: 700 .9rem/1.2 var(--police-forte); }
+.li-ligne small { color: var(--brume); font-size: .74rem; }
+.li-ligne em { color: #f3d27a; font-size: .76rem; font-style: normal; }
+.li-decision { justify-self: start; padding: .15rem .55rem; border-radius: 99px; background: #4caf6c33; color: #c9f0d4; font: 700 .66rem/1.4 var(--police-forte); }
+.li-candidats { display: grid; gap: .3rem; margin: 0; padding: 0 0 0 .6rem; list-style: none; border-left: 2px solid var(--bordure); }
+.li-candidats li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .4rem; color: var(--craie); font-size: .76rem; }
+.li-candidats .btn, .li-actions .btn { min-height: 2.2rem; padding: .35rem .75rem; font-size: .72rem; }
+.li-actions { display: flex; flex-wrap: wrap; gap: .45rem; }
+.li-vide { padding: 1rem !important; color: var(--brume); font-size: .8rem; }
+
+@media (max-width: 1120px) { .ls-edition-corps { grid-template-columns: minmax(0, 1fr) 11rem; } }
+@media (max-width: 760px) {
+  .ls-grille, .li-sources { grid-template-columns: 1fr; }
+  .ls-liste { max-height: 22rem; }
+  .ls-edition-corps { grid-template-columns: 1fr; }
+  .ls-apercu { grid-template-columns: 9.5rem minmax(0, 1fr); align-items: start; }
+  .ls-compteurs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .li-compteurs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .li-decides { grid-column: 1 / -1; }
+  .ls-evenement header { grid-template-columns: auto minmax(0, 1fr); }
+  .ls-evenement header .ls-interrupteur { grid-column: 1 / -1; justify-self: start; }
+}
+@media (max-width: 560px) {
+  .ls-apercu { grid-template-columns: 1fr; justify-items: center; }
+  .ls-apercu .cel-carte { width: 12rem; }
+  .labo-speciales .ak-champs, .labo-speciales .ak-poids { grid-template-columns: 1fr 1fr; }
+}

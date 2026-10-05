@@ -2490,3 +2490,15 @@ button.cel-carte:hover { transform: translateY(-3px); box-shadow: var(--ombre-3)
 .cel-public-bandeau{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;margin:12px 0;padding:12px 16px;background:#143c2c;border:1px solid #9f884d;border-radius:11px;color:#f2e6b6}
 .cel-public-bandeau span{color:#d7e4d7}
 .cel-public-bandeau strong{width:100%;color:#f4d377}
+
+/* Réglage « Autoriser les cartes spéciales » du commissaire. */
+.cel-reglage-speciales { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 1rem 1.25rem; margin-top: 1rem; }
+.cel-reglage-speciales h2 { margin: 0.15rem 0 0.35rem; }
+.cel-reglage-speciales h2 span { color: var(--brume); }
+.cel-reglage-speciales.active h2 span { color: var(--or-400); }
+.cel-reglage-speciales p { margin: 0; color: var(--brume); max-width: 72ch; }
+.cel-reglage-speciales-emblemes { display: flex; }
+.cel-reglage-speciales-emblemes svg + svg { margin-left: -10px; }
+.cel-reglage-speciales:not(.active) .cel-reglage-speciales-emblemes { filter: grayscale(1); opacity: .55; }
+.cel-bascule-speciales b::before { content: ''; display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; background: linear-gradient(135deg, #f0cc6e 50%, #ff8a1c 50%); vertical-align: middle; }
+@media (max-width: 700px) { .cel-reglage-speciales { grid-template-columns: 1fr; } .cel-reglage-speciales .cel-actions { justify-content: flex-start; } }

@@ -55,6 +55,11 @@ export default function OuverturePack({ cartes, pack, modele, garantie, apparenc
   const cartesRefs = useRef<(HTMLDivElement | null)[]>([]);
   const toutes = pret && revelees >= ordre.length;
   const rarete = PALIERS_PACK[rang];
+  // La famille de la meilleure carte spéciale colore l'éclat d'ouverture.
+  // ⚠️ SEULEMENT À L'OUVERTURE : avant, la pochette ne dit que son palier, sinon
+  // la lueur orange trahirait la Halloween avant même qu'on touche le pack.
+  const speciale = ordre.find(c => c.speciale)?.speciale?.type;
+  const eclatSpecial = speciale && (phase === 'ouverture' || phase === 'cartes') ? ` speciale-${speciale === 'halloween' ? 'halloween' : 'icon'}` : '';
   useEffect(() => {
     const precedent = document.activeElement as HTMLElement | null;
     const overflow = document.body.style.overflow;
@@ -147,7 +152,7 @@ export default function OuverturePack({ cartes, pack, modele, garantie, apparenc
     if (!dialogue.current?.contains(document.activeElement)) (principale.current ?? dialogue.current)?.focus();
     return () => window.removeEventListener('keydown', clavier);
   }, [phase, toutes, ordre.length, onFermer, muet, sons, pret]);
-  return createPortal(<div ref={dialogue} tabIndex={-1} className={`pack-show phase-${phase} palier-${rarete}${calme ? ' calme' : ''}${instant ? ' instant' : ''}`} style={{ '--pack-color': COULEURS[rang] } as CSSProperties} role="dialog" aria-modal="true" aria-labelledby="pack-show-title" onKeyDown={e => {
+  return createPortal(<div ref={dialogue} tabIndex={-1} className={`pack-show phase-${phase} palier-${rarete}${eclatSpecial}${calme ? ' calme' : ''}${instant ? ' instant' : ''}`} style={{ '--pack-color': eclatSpecial ? (speciale === 'halloween' ? '#ff8a1c' : '#e8c46a') : COULEURS[rang] } as CSSProperties} role="dialog" aria-modal="true" aria-labelledby="pack-show-title" onKeyDown={e => {
     if (e.key === 'Tab') { const elements = Array.from(dialogue.current?.querySelectorAll<HTMLElement>('button:not(:disabled), [tabindex="0"]') ?? []); const premier = elements[0], dernier = elements[elements.length-1]; if (e.shiftKey && document.activeElement === premier) { e.preventDefault(); dernier?.focus(); } else if (!e.shiftKey && document.activeElement === dernier) { e.preventDefault(); premier?.focus(); } }
   }}><main className="pack-show-main cel-panneau">
     <div className="pack-show-heading"><p className="eyebrow">{t("ui.4dfd1ccc8b22", { v0: pack, v1: cartes ? ` · ${t('online.shop.cards',{n:cartes.length})}` : '' })}</p><h2 id="pack-show-title" key={phase} aria-live="polite">{phase === 'cartes' ? t('online.pack.recruits') : pack}</h2></div>

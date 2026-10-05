@@ -11,6 +11,8 @@ import { EcussonClub } from './EcussonClub';
 import { Blason } from './Blason';
 import { clubParNom } from '../data/clubs';
 import { logoChampionnat } from '../lib/logoChampionnat';
+import { nomFamilleSpeciale } from '../lib/ligue/cartesSpeciales';
+import { EmblemeSpecial } from './EmblemesSpeciaux';
 import './CarteJoueurEnLigne.css';
 
 const PALETTES = {
@@ -35,6 +37,88 @@ const SILHOUETTE = 'M120 7 C107 23 83 21 65 29 L15 47 L15 282 Q15 314 57 326 Q10
  */
 const SANS_PHOTO = '/photos/silhouette.webp';
 
+// ═══════════════════════════════════════════════════════════════════════════
+// LES CARTES SPÉCIALES
+// ═══════════════════════════════════════════════════════════════════════════
+// ⚠️ PAS UNE RECOLORATION. Une ICON n'est pas une carte Or plus claire : c'est
+// un ivoire de Hall of Fame, un double filet d'or, un bandeau noir gravé, une
+// trame guillochée et un grain de papier. Une Halloween n'est pas une Mythique
+// assombrie : anthracite, citrouilles grises dans le fond, toile d'araignée,
+// filet orange qui luit. Les deux gardent la MÊME géométrie que les autres
+// cartes (portrait, colonne de note, bandeau du nom) : elles se rangent dans
+// les mêmes grilles, les mêmes packs, sur le même terrain.
+
+/** Les rayons guillochés d'une ICON, partant du haut du blason. */
+const RAYONS_ICON = Array.from({ length: 23 }, (_, i) => {
+  const a = (-100 + i * 9) * Math.PI / 180;
+  return `M120 26 L${(120 + Math.cos(a) * 330).toFixed(1)} ${(26 - Math.sin(a) * 330).toFixed(1)}`;
+}).join(' ');
+
+/** Les citrouilles grises semées dans le fond d'une carte Halloween : x, y, taille, angle. */
+const CITROUILLES_FOND: readonly [number, number, number, number][] = [
+  [18, 30, 30, -12], [176, 18, 22, 10], [196, 116, 34, 6], [24, 150, 26, 14], [150, 168, 20, -8],
+  [70, 92, 16, 20], [206, 196, 18, -16], [98, 20, 14, 4], [40, 238, 22, 8], [180, 262, 26, -6],
+];
+
+function ArtIcon({ id }: { id: string }) {
+  return <svg className="dr-player-art" viewBox="0 0 240 360" aria-hidden="true">
+    <defs>
+      <linearGradient id={`${id}-ivoire`} x1="0" y1="0" x2=".55" y2="1"><stop stopColor="#fffbf1" /><stop offset=".5" stopColor="#f4e9d0" /><stop offset="1" stopColor="#e2d1aa" /></linearGradient>
+      <linearGradient id={`${id}-or`} x1="0" y1="0" x2="1" y2="1"><stop stopColor="#fff2bd" /><stop offset=".32" stopColor="#d8aa45" /><stop offset=".62" stopColor="#8d661c" /><stop offset="1" stopColor="#f0cc6e" /></linearGradient>
+      <pattern id={`${id}-trame`} width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(38)"><path d="M0 3.5 H7" stroke="#a9853c" strokeWidth=".4" opacity=".28" /></pattern>
+      <filter id={`${id}-grain`} x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency=".85" numOctaves="2" seed="11" /><feColorMatrix values="0 0 0 0 .5  0 0 0 0 .4  0 0 0 0 .24  0 0 0 .13 0" /></filter>
+      <clipPath id={`${id}-clip`}><path d={SILHOUETTE} /></clipPath>
+    </defs>
+    <path d={SILHOUETTE} fill={`url(#${id}-ivoire)`} />
+    <g clipPath={`url(#${id}-clip)`}>
+      <rect width="240" height="360" fill={`url(#${id}-trame)`} />
+      <rect width="240" height="360" filter={`url(#${id}-grain)`} />
+      <path d={RAYONS_ICON} stroke="#b9913f" strokeWidth=".6" opacity=".22" fill="none" />
+      <circle cx="120" cy="26" r="62" fill="none" stroke="#b9913f" strokeWidth=".7" opacity=".3" />
+      <circle cx="120" cy="26" r="96" fill="none" stroke="#b9913f" strokeWidth=".5" opacity=".22" />
+      <text x="229" y="96" transform="rotate(90 229 96)" className="dr-icon-filigrane">ICON · HALL OF FAME</text>
+      <path d="M8 213 Q120 238 232 213 L240 365 H0Z" fill="#15110c" />
+      <path d="M8 213 Q120 238 232 213" stroke={`url(#${id}-or)`} strokeWidth="2.4" fill="none" />
+      <path d="M20 223 Q120 245 220 223" stroke={`url(#${id}-or)`} strokeWidth=".7" fill="none" opacity=".75" />
+      <path d="M44 276 H196" stroke={`url(#${id}-or)`} strokeWidth=".7" opacity=".55" />
+      <path d="M120 270 l4 6 l-4 6 l-4 -6 Z" fill={`url(#${id}-or)`} />
+    </g>
+    <path d={SILHOUETTE} fill="none" stroke={`url(#${id}-or)`} strokeWidth="4.2" />
+    <path d={SILHOUETTE} transform="translate(7 9) scale(.942 .95)" stroke="#15110c" strokeWidth="1.3" fill="none" opacity=".8" />
+    <path d={SILHOUETTE} transform="translate(10.5 13.5) scale(.913 .925)" stroke={`url(#${id}-or)`} strokeWidth=".9" fill="none" />
+    <path d="M120 3 l5 7 l-5 7 l-5 -7 Z" fill={`url(#${id}-or)`} stroke="#15110c" strokeWidth=".6" />
+  </svg>;
+}
+
+function ArtHalloween({ id }: { id: string }) {
+  return <svg className="dr-player-art" viewBox="0 0 240 360" aria-hidden="true">
+    <defs>
+      <linearGradient id={`${id}-nuit`} x1="0" y1="0" x2=".45" y2="1"><stop stopColor="#3a3a41" /><stop offset=".45" stopColor="#1c1c21" /><stop offset="1" stopColor="#0a0a0c" /></linearGradient>
+      <linearGradient id={`${id}-orange`} x1="0" y1="0" x2="1" y2="1"><stop stopColor="#ffd08a" /><stop offset=".38" stopColor="#ff8a1c" /><stop offset=".7" stopColor="#b44a06" /><stop offset="1" stopColor="#ffa242" /></linearGradient>
+      <radialGradient id={`${id}-lueur`} cx="50%" cy="22%" r="58%"><stop stopColor="#ff8a1c" stopOpacity=".26" /><stop offset="1" stopColor="#ff8a1c" stopOpacity="0" /></radialGradient>
+      <filter id={`${id}-halo`} x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur stdDeviation="3.2" /></filter>
+      <symbol id={`${id}-citrouille`} viewBox="0 0 20 20"><ellipse cx="6.4" cy="12" rx="5" ry="6" /><ellipse cx="13.6" cy="12" rx="5" ry="6" /><ellipse cx="10" cy="12" rx="5" ry="6.8" /><path d="M9.2 5.4 C9 3.6 9.8 2.4 11.4 1.8 L12 2.8 C11 3.3 10.6 4.1 10.8 5.4 Z" /></symbol>
+      <clipPath id={`${id}-clip`}><path d={SILHOUETTE} /></clipPath>
+    </defs>
+    <path d={SILHOUETTE} fill={`url(#${id}-nuit)`} />
+    <g clipPath={`url(#${id}-clip)`}>
+      <rect width="240" height="360" fill={`url(#${id}-lueur)`} />
+      {CITROUILLES_FOND.map(([x, y, taille, angle], i) => <use key={i} href={`#${id}-citrouille`} x={x} y={y} width={taille} height={taille}
+        transform={`rotate(${angle} ${x + taille / 2} ${y + taille / 2})`} fill="#8b8b93" opacity={i % 3 === 0 ? .2 : .13} />)}
+      <g stroke="#a3a3ab" strokeWidth=".7" fill="none" opacity=".22">
+        <path d="M232 8 L150 30 M232 8 L178 70 M232 8 L214 92 M232 8 L232 110" />
+        <path d="M206 15 Q212 30 218 34 Q224 38 232 40 M182 22 Q194 46 206 58 Q218 68 232 72 M164 26 Q178 58 196 80 Q214 98 232 100" />
+      </g>
+      <path d="M8 213 Q120 238 232 213 L240 365 H0Z" fill="#09090b" opacity=".93" />
+      <path d="M8 213 Q120 238 232 213" stroke={`url(#${id}-orange)`} strokeWidth="2.2" fill="none" />
+      <path d="M44 276 H196" stroke="#ff8a1c" strokeWidth=".7" opacity=".5" />
+    </g>
+    <path d={SILHOUETTE} fill="none" stroke="#ff7a00" strokeWidth="6" opacity=".55" filter={`url(#${id}-halo)`} />
+    <path d={SILHOUETTE} fill="none" stroke={`url(#${id}-orange)`} strokeWidth="3.4" />
+    <path d={SILHOUETTE} transform="translate(8 11) scale(.933 .94)" stroke="#ff8a1c" strokeWidth=".9" fill="none" opacity=".55" />
+  </svg>;
+}
+
 export function CarteJoueurEnLigne({ carte, proprietaire, logoClub, onClick, compacte = false, etatCollection }: {
   carte: CarteCarriere; proprietaire?: string; logoClub?: string; onClick?: () => void; compacte?: boolean; etatCollection?: 'inconnue' | 'decouverte';
 }) {
@@ -42,11 +126,15 @@ export function CarteJoueurEnLigne({ carte, proprietaire, logoClub, onClick, com
   const [photosRatees, setPhotosRatees] = useState<Set<string>>(() => new Set());
   const blason = useBlasonCarte(carte.clubReel, logoClub);
   const competition = logoChampionnat(carte.championnat);
-  const photoIndexee = photoReelle(carte.nom, carte.clubReel);
+  // ⚠️ UNE CARTE SPÉCIALE N'EMPRUNTE JAMAIS LE PORTRAIT ORDINAIRE DU JOUEUR :
+  // une Halloween de Dupont avec sa photo de club ne serait qu'un faux.
+  const photoIndexee = carte.speciale ? undefined : photoReelle(carte.nom, carte.clubReel);
   // Les cartes déjà distribuées peuvent conserver une ancienne URL. Si elle
   // échoue, on retente le portrait actuellement indexé avant le repli neutre.
   const photo = [carte.photo, photoIndexee].find((candidate) => candidate && !photosRatees.has(candidate));
   const [clair, couleur, sombre, bord] = PALETTES[carte.rarete];
+  const speciale = carte.speciale;
+  const design = speciale?.type === 'halloween' ? 'halloween' : speciale ? 'icon' : null;
   const stats = Object.entries(carte.statistiques).slice(0, 6);
   const Balise = onClick ? 'button' : 'div';
   const poste = nomPoste(carte.poste).replace(/\s*\(\d+\)\s*$/, '');
@@ -54,8 +142,8 @@ export function CarteJoueurEnLigne({ carte, proprietaire, logoClub, onClick, com
     .filter((p) => p !== carte.poste)
     .map((p) => ({ numero: POSTE_PAR_ID[p]?.numero, nom: nomPoste(p).replace(/\s*\(\d+\)\s*$/, '') }))
     .filter((p) => p.numero !== undefined);
-  return <Balise type={onClick ? 'button' : undefined} className={`cel-carte dr-player ${carte.rarete}${compacte ? ' compacte' : ''}${etatCollection ? ` collection-${etatCollection}` : ''}`} onClick={onClick}>
-    <svg className="dr-player-art" viewBox="0 0 240 360" aria-hidden="true">
+  return <Balise type={onClick ? 'button' : undefined} className={`cel-carte dr-player ${carte.rarete}${design ? ` speciale design-${design}` : ''}${compacte ? ' compacte' : ''}${etatCollection ? ` collection-${etatCollection}` : ''}`} onClick={onClick}>
+    {design === 'icon' ? <ArtIcon id={id} /> : design === 'halloween' ? <ArtHalloween id={id} /> : <svg className="dr-player-art" viewBox="0 0 240 360" aria-hidden="true">
       <defs>
         <linearGradient id={`${id}-metal`} x1="0" y1="0" x2="1" y2="1"><stop stopColor={clair} /><stop offset=".38" stopColor={couleur} /><stop offset=".78" stopColor={sombre} /><stop offset="1" stopColor={couleur} /></linearGradient>
         <clipPath id={`${id}-clip`}><path d={SILHOUETTE} /></clipPath>
@@ -68,7 +156,7 @@ export function CarteJoueurEnLigne({ carte, proprietaire, logoClub, onClick, com
         <path d="M25 215 Q120 233 215 215 M36 277 H204" stroke={bord} opacity=".55" fill="none" />
       </g>
       <path d={SILHOUETTE} transform="translate(6 8) scale(.95 .956)" stroke={bord} opacity=".55" fill="none" />
-    </svg>
+    </svg>}
     {/* ⚠️ LE CHAMPIONNAT SOUS L'ÉCUSSON, ET SEULEMENT S'IL EN A UN VRAI. La
         colonne de gauche disait déjà la note, le poste, la nation et le club :
         il manquait l'étage où le joueur évolue, la seule information qui
@@ -76,11 +164,17 @@ export function CarteJoueurEnLigne({ carte, proprietaire, logoClub, onClick, com
         n'affiche RIEN quand le championnat n'a pas de logo — le repli en ballon
         générique de `LogoCompet` se lirait ici comme un blason de compétition
         que personne ne reconnaîtrait. */}
-    <span className="dr-player-rating"><b>{carte.note}</b><em title={poste}><span>{POSTE_PAR_ID[carte.poste]?.numero} · {poste}</span>{seconds.length > 0 && <small title={t('online.card.secondPositions', { positions: seconds.map((p) => p.nom).join(', ') })}>2e : {seconds.map((p) => p.numero).join(' / ')}</small>}</em><Drapeau nation={carte.nation} taille={1.15} />{blason ? <EcussonClub logo={blason} nom={carte.clubReel} taille={25} /> : <span className="dr-player-blason-fallback"><Blason club={clubParNom(carte.clubReel) ?? { nom: carte.clubReel, c1: '#0a2a6b', c2: '#c1121f' }} taille={25} /></span>}{competition && <img className="dr-player-compet" src={competition} alt="" title={carte.championnat} loading="lazy" decoding="async" draggable={false} />}</span>
+    <span className="dr-player-rating"><b>{carte.note}</b><em title={poste}><span>{POSTE_PAR_ID[carte.poste]?.numero} · {poste}</span>{seconds.length > 0 && <small title={t('online.card.secondPositions', { positions: seconds.map((p) => p.nom).join(', ') })}>2e : {seconds.map((p) => p.numero).join(' / ')}</small>}</em><Drapeau nation={carte.nation} taille={1.15} />{
+      // ⚠️ UNE CARTE SPÉCIALE N'AFFICHE PAS SA LIGUE : son emblème en tient
+      // lieu (ICON, citrouille). Un joueur actif garde l'écusson de son club.
+      speciale ? <>{!speciale.retraite && blason && <EcussonClub logo={blason} nom={carte.clubReel} taille={25} />}<span className="dr-player-embleme" title={nomFamilleSpeciale(speciale.type)}><EmblemeSpecial logo={speciale.logo} /></span></>
+      : <>{blason ? <EcussonClub logo={blason} nom={carte.clubReel} taille={25} /> : <span className="dr-player-blason-fallback"><Blason club={clubParNom(carte.clubReel) ?? { nom: carte.clubReel, c1: '#0a2a6b', c2: '#c1121f' }} taille={25} /></span>}{competition && <img className="dr-player-compet" src={competition} alt="" title={carte.championnat} loading="lazy" decoding="async" draggable={false} />}</>}</span>
     <span className="dr-player-photo">{photo ? <img draggable={false} src={photo} alt="" loading="lazy" onError={() => setPhotosRatees((ratees) => new Set(ratees).add(photo))} /> : <img draggable={false} src={SANS_PHOTO} alt={t('online.card.defaultPortrait')} />}</span>
-    <span className="dr-player-identity"><strong>{carte.nom}</strong><small>{carte.clubReel}</small></span>
+    <span className="dr-player-identity"><strong>{carte.nom}</strong><small>{speciale?.retraite ? carte.nation : carte.clubReel}</small></span>
     <span className="dr-player-stats">{stats.map(([cle, valeur]) => <span key={cle}><b>{valeur}</b><small>{cle}</small></span>)}</span>
-    <span className="dr-player-rarity">{nomRaretePack(carte.rarete)}<i> · {carte.age} {t('compo.ans')}</i></span>
+    {speciale
+      ? <span className="dr-player-rarity dr-player-famille">{nomFamilleSpeciale(speciale.type)}<i> · {speciale.retraite ? t('special.legend') : `${carte.age} ${t('compo.ans')}`}</i></span>
+      : <span className="dr-player-rarity">{nomRaretePack(carte.rarete)}<i> · {carte.age} {t('compo.ans')}</i></span>}
     {(() => {
       const estBlesse = Boolean(carte.blesseJusqua && carte.blesseJusqua > new Date().toISOString());
       const tempsRestant = estBlesse && carte.blesseJusqua ? formatTempsBlessure(carte.blesseJusqua) : '';

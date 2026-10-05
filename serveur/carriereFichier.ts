@@ -4,6 +4,7 @@ import { CATALOGUE_ADMIN_VIDE, type CatalogueAdmin } from '../src/lib/ligue/atel
 // await entre la comparaison de version et le commit dans ce processus unique.
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { pushLocal, type BasePush } from './pushStockage.js';
+import type { ImageSpeciale } from './atelierStockage.js';
 import { dirname } from 'node:path';
 import type { CompteStocke, LigueStockee, SalonAmicalStocke, StockageCarriere } from './carriereStockage.js';
 import { echeanceLigue, prochaineEcheanceMatch } from '../src/lib/ligue/echeanceCarriere.js';
@@ -15,6 +16,7 @@ import { modifierCollectionSolo, possedeDoublons } from '../src/lib/echangesSolo
 interface BaseLocale {
   achatsStripe?: Record<string, string>;
   atelier?: CatalogueAdmin;
+  imagesSpeciales?: Record<string, ImageSpeciale>;
   push?: BasePush;
   comptes: CompteStocke[];
   sessions: Record<string, { compte: string; expiration: number }>;
@@ -101,6 +103,13 @@ export function stockageFichier(fichier: string): StockageCarriere {
         if ((base.atelier?.revision ?? 0) !== revision) return false;
         base.atelier = copie(configuration); sauver(); return true;
       },
+      async lireImage(id) { return copie(base.imagesSpeciales?.[id] ?? null); },
+      async ecrireImage(id, donnees) {
+        base.imagesSpeciales ??= {};
+        const version = (base.imagesSpeciales[id]?.version ?? 0) + 1;
+        base.imagesSpeciales[id] = { version, donnees }; sauver(); return version;
+      },
+      async supprimerImage(id) { if (base.imagesSpeciales?.[id]) { delete base.imagesSpeciales[id]; sauver(); } },
     },
     push: pushLocal(base.push, sauver),
     async compteParIdentifiant(i) { return copie(base.comptes.find(c => c.identifiant === i) ?? null); },

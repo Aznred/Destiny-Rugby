@@ -1,22 +1,42 @@
-import { catalogueMondialCarriere } from './catalogueCarriere.js';
+import { catalogueMondialCarriere, type SourceCarte } from './catalogueCarriere.js';
+import { carteSpecialeVisibleCollection, catalogueSpecial } from './cartesSpeciales.js';
 import type { CarteCarriere, EtatCarriereEnLigne, PageCollection } from './typesCarriere.js';
 
-const normaliser = (texte: string) => texte.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('fr');
+const normaliser = (texte: string) => texte.normalize('NFD').replace(/[̀-ͯ]/g, '').toLocaleLowerCase('fr');
 let dernierCatalogue: ReturnType<typeof catalogueMondialCarriere> | undefined;
-let index: { source: ReturnType<typeof catalogueMondialCarriere>[number]; recherche: string }[] | undefined;
+let index: { source: SourceCarte; recherche: string }[] | undefined;
+const indexer = (source: SourceCarte) => ({ source, recherche: normaliser(`${source.nom} ${source.clubReel} ${source.nation} ${source.championnat}`) });
 
-/** Une page à la demande, au lieu d'envoyer 67 000 joueurs à chaque sondage de ligue. */
-export function collectionCarriere(etat: EtatCarriereEnLigne, compteId: string, params: URLSearchParams): PageCollection {
+/**
+ * Une page à la demande, au lieu d'envoyer 67 000 joueurs à chaque sondage de ligue.
+ *
+ * ⚠️ LES CARTES SPÉCIALES N'Y SONT QUE SI LA LIGUE LES AUTORISE, et seulement
+ * publiées (image comprise) : une ICON en attente de son image n'existe pour
+ * personne. Un exemplaire déjà distribué reste toujours visible chez son club.
+ * Dans la vue « Toutes », elles passent en tête, à part des joueurs ordinaires.
+ *
+ * `maintenant` décide des événements pas encore ouverts ; sans lui (bancs), on
+ * ne les filtre pas.
+ */
+export function collectionCarriere(etat: EtatCarriereEnLigne, compteId: string, params: URLSearchParams, maintenant = Number.POSITIVE_INFINITY): PageCollection {
   const monClub = etat.clubs.find(c => c.compteId === compteId);
   if (!monClub) throw new Error('Membre requis');
   if (dernierCatalogue !== catalogueMondialCarriere()) { dernierCatalogue = catalogueMondialCarriere(); index = undefined; }
-  index ??= catalogueMondialCarriere().map(source => ({ source, recherche: normaliser(`${source.nom} ${source.clubReel} ${source.nation} ${source.championnat}`) }));
+  index ??= catalogueMondialCarriere().map(indexer);
   const possedees = new Map<string, CarteCarriere[]>();
   for (const carte of etat.cartes) {
     const exemplaires = possedees.get(carte.sourceId) ?? [];
     exemplaires.push(carte);
     possedees.set(carte.sourceId, exemplaires);
   }
+  // Les cartes spéciales de cette ligue : celles que le Labo a publiées, plus
+  // celles déjà distribuées ici (même si leur définition a changé depuis).
+  const cat = catalogueSpecial();
+  const speciales = etat.cartesSpeciales ? cat.definitions
+    .filter(def => possedees.has(def.id) || carteSpecialeVisibleCollection(def, cat, maintenant))
+    .map(def => indexer(cat.sources.get(def.id)!)) : [];
+  const comptes: Record<string, number> = {};
+  for (const { source } of speciales) comptes[source.speciale!.type] = (comptes[source.speciale!.type] ?? 0) + 1;
   const origines = new Map<string, { club: string; nature: 'pack' | 'dotation'; date: string }>();
   // Les transactions sont append-only. La première attribution reste l'origine après un transfert.
   for (const transaction of etat.transactions) {
@@ -26,8 +46,13 @@ export function collectionCarriere(etat: EtatCarriereEnLigne, compteId: string, 
   const recherche = normaliser((params.get('q') ?? '').slice(0, 100));
   const rarete = params.get('rarete') ?? '', poste = params.get('poste') ?? '', statut = params.get('statut') ?? '';
   const club = params.get('club') ?? '';
-  const correspond: { source: (typeof index)[number]['source']; carte?: CarteCarriere }[] = [];
-  for (const { source, recherche: texte } of index) {
+  // '' : tout ; 'normal' : joueurs ordinaires ; 'speciales' : toutes les
+  // familles spéciales ; sinon une famille ('icon', 'halloween'…).
+  const type = params.get('type') ?? '';
+  const parcours = type === 'normal' ? index : type === '' ? [...speciales, ...index]
+    : speciales.filter(({ source }) => type === 'speciales' || source.speciale!.type === type);
+  const correspond: { source: SourceCarte; carte?: CarteCarriere }[] = [];
+  for (const { source, recherche: texte } of parcours) {
     if (recherche && !texte.includes(recherche)) continue;
     if (rarete && source.rarete !== rarete) continue;
     if (poste && source.famille !== poste) continue;
@@ -46,7 +71,9 @@ export function collectionCarriere(etat: EtatCarriereEnLigne, compteId: string, 
     }
   }
   const tri = params.get('tri');
-  correspond.sort((a, b) => tri === 'nom' ? a.source.nom.localeCompare(b.source.nom, 'fr') : (b.carte ?? b.source).note - (a.carte ?? a.source).note || a.source.nom.localeCompare(b.source.nom, 'fr'));
+  const groupe = (e: { source: SourceCarte }) => (type === '' && e.source.speciale ? 0 : 1);
+  correspond.sort((a, b) => groupe(a) - groupe(b)
+    || (tri === 'nom' ? a.source.nom.localeCompare(b.source.nom, 'fr') : (b.carte ?? b.source).note - (a.carte ?? a.source).note || a.source.nom.localeCompare(b.source.nom, 'fr')));
   const pages = Math.max(1, Math.ceil(correspond.length / 24));
   const demande = Number(params.get('page') ?? 1);
   const page = Math.min(pages, Math.max(1, Number.isFinite(demande) ? Math.floor(demande) : 1));
@@ -57,5 +84,6 @@ export function collectionCarriere(etat: EtatCarriereEnLigne, compteId: string, 
     const origine = existante && origines.get(existante.id);
     return { carte, obtenuPar: origine ? origine.club : null, obtention: origine ? origine.nature : existante ? 'inconnue' as const : null, obtenuLe: origine ? origine.date : null };
   });
-  return { joueurs, total: correspond.length, page, pages, catalogueTotal: index.length, distribues: etat.cartes.length, packes: [...origines.values()].filter(o => o.nature === 'pack').length };
+  return { joueurs, total: correspond.length, page, pages, catalogueTotal: index.length + speciales.length, distribues: etat.cartes.length,
+    packes: [...origines.values()].filter(o => o.nature === 'pack').length, speciales: comptes };
 }

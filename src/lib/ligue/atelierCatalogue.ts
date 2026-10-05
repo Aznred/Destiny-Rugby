@@ -1,4 +1,6 @@
 import type { PosteId } from '../../types.js';
+import type { ConfigCartesSpeciales } from './cartesSpeciales.js';
+import type { AjoutJoueur, DecisionImport } from './importsJoueurs.js';
 import type { PackCarriere } from './typesCarriere.js';
 
 export interface EditionJoueur {
@@ -17,6 +19,17 @@ export interface CatalogueAdmin {
   rotationPacks: boolean;
   packs: Record<string, PackCarriere>;
   joueurs: Record<string, EditionJoueur>;
+  /**
+   * Les cartes spéciales telles que le Labo les a réglées : ce qui diffère de
+   * la graine (`data/cartesSpeciales.ts`), les cartes ajoutées et les
+   * événements. Les IMAGES n'y sont pas : elles vivent dans leur propre table,
+   * sans quoi chaque lecture du catalogue rapatrierait des mégaoctets.
+   */
+  speciales?: ConfigCartesSpeciales;
+  /** Joueurs ajoutés par « Imports joueurs », absents des effectifs générés. */
+  ajouts?: Record<string, AjoutJoueur>;
+  /** Ce que le Labo a tranché pour chaque ligne d'import déjà relue. */
+  importsDecisions?: Record<string, DecisionImport>;
 }
 export const CATALOGUE_ADMIN_VIDE: CatalogueAdmin = { revision: 0, rotationPacks: false, packs: {}, joueurs: {} };
 // Le serveur fournit un contexte par requête ; aucun réglage mutable partagé

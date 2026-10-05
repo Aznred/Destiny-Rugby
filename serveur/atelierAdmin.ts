@@ -3,6 +3,7 @@ import { CATALOGUE_ADMIN_VIDE, catalogueAdmin, fournirCatalogueAdmin, type Catal
 import { bandesGaranties, carteDansPack, catalogueBaseCarriere, catalogueMondialCarriere, packsCatalogueAdmin, RARETES_CARRIERE } from '../src/lib/ligue/catalogueCarriere.js';
 import type { PackCarriere, RareteCarriere } from '../src/lib/ligue/typesCarriere.js';
 import type { StockageAtelier } from './atelierStockage.js';
+import { appliquerOperationSpeciale, validerLigneImport, vueImports } from './atelierSpeciales.js';
 import { POSTES } from '../src/data/rugby.js';
 import type { PosteId } from '../src/types.js';
 
@@ -77,9 +78,15 @@ export function vueAtelier(q: string) {
   };
 }
 export async function enregistrerAtelier(stockage: StockageAtelier, corps: Record<string,unknown>) {
+  // L'analyse d'un import ne modifie rien : elle répond sans révision.
+  if(corps.operation === 'analyserImport') {
+    if(!Array.isArray(corps.lignes) || !corps.lignes.length || corps.lignes.length > 2000) refuser('Entre 1 et 2 000 lignes à analyser.');
+    return vueImports(corps.lignes.map(validerLigneImport));
+  }
   const courant=catalogueAdmin();
   if(corps.revision !== courant.revision) refuser('Le catalogue a changé. Recharge l’atelier avant d’enregistrer.');
   const suivant=structuredClone(courant);
+  let compteRendu: Record<string, unknown> | undefined;
   if(corps.operation === 'pack') {
     const pack=validerPack(corps.pack); suivant.packs[pack.id]=pack;
     if(Object.keys(suivant.packs).length>100) refuser('Maximum de 100 packs personnalisés.');
@@ -127,9 +134,12 @@ export async function enregistrerAtelier(stockage: StockageAtelier, corps: Recor
     if(edition.potentiel<edition.note) refuser('Le potentiel doit être au moins égal au GEN.');
     suivant.joueurs[id]=edition;
     if(Object.keys(suivant.joueurs).length>2000) refuser('Maximum de 2 000 joueurs personnalisés.');
-  } else refuser('Action inconnue.');
+  } else {
+    compteRendu = await appliquerOperationSpeciale(courant, suivant, corps, stockage);
+    if(!compteRendu) refuser('Action inconnue.');
+  }
   suivant.revision++;
   if(JSON.stringify(suivant).length>3000000) refuser('Catalogue trop volumineux. Utilise des URL pour les prochaines photos.');
   if(!await stockage.ecrire(suivant,courant.revision)) refuser('Une autre modification a été enregistrée. Recharge l’atelier.');
-  return {revision:suivant.revision};
+  return {...compteRendu, revision:suivant.revision};
 }

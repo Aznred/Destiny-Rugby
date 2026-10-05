@@ -1,5 +1,7 @@
 import { creerPaiement, diagnosticErreurStripe, journalErreurStripe } from './paiementsStripe.js';
 import { contexteAtelier, enregistrerAtelier, vueAtelier } from './atelierAdmin.js';
+import { lotImport, vueImports, vueSpeciales } from './atelierSpeciales.js';
+import { catalogueSpecial } from '../src/lib/ligue/cartesSpeciales.js';
 import { catalogueAdmin, CATALOGUE_ADMIN_VIDE, type CatalogueAdmin } from '../src/lib/ligue/atelierCatalogue.js';
 import { createHash, randomBytes, randomUUID, scrypt, timingSafeEqual } from 'node:crypto';
 import { isDeepStrictEqual, promisify } from 'node:util';
@@ -732,9 +734,35 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         return res.envoyer(octets);
       }
 
+      // ═══════════════════════════════════════════════════════════════════
+      // LES IMAGES DES CARTES SPÉCIALES
+      // ═══════════════════════════════════════════════════════════════════
+      // ⚠️ UNE IMAGE NE SE VOIT PAS AVANT SA PUBLICATION. Publiée une fois,
+      // elle reste servie à tout le monde (les exemplaires déjà distribués en
+      // ont besoin, même si la carte est dépubliée ensuite) ; jamais publiée,
+      // seul Kiri la voit, pour l'aperçu du Labo. L'URL porte la version :
+      // remplacer l'image change l'adresse, donc le cache long ne ment pas.
+      const imageSpeciale = req.method === 'GET' ? url.searchParams.get('imageSpeciale') : null;
+      const servirImageSpeciale = async (publique: boolean) => {
+        const image = imageSpeciale ? await stockage.atelier?.lireImage?.(imageSpeciale) : null;
+        const morceaux = image && /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/]+=*)$/.exec(image.donnees);
+        if (!image || !morceaux) throw new ErreurHttp(404, 'Image introuvable.');
+        if (!res.envoyer) throw new ErreurHttp(501, 'Images indisponibles sur cet hôte.');
+        res.setHeader('Content-Type', morceaux[1]);
+        res.setHeader('Cache-Control', !publique ? 'private, no-store'
+          : url.searchParams.get('v') === String(image.version) ? 'public, max-age=31536000, immutable' : 'public, max-age=300');
+        res.status(200);
+        return res.envoyer(new Uint8Array(Buffer.from(morceaux[2], 'base64')));
+      };
+      if (imageSpeciale) {
+        const definition = catalogueSpecial().parId.get(imageSpeciale);
+        if (definition?.imageReady && (definition.published || definition.publieeLe)) return await servirImageSpeciale(true);
+      }
+
       const maintenant = Date.now();
       const corps = req.method === 'POST' ? objet(typeof req.body === 'string' ? JSON.parse(req.body) : req.body) : {};
-      const tailleMax = corps.action === 'sauvegarderBoutique' ? 4_000_000 : corps.action === 'atelier' ? 120_000 : 24_000;
+      // Le Labo envoie des images de cartes (350 Ko) et des lots d'import.
+      const tailleMax = corps.action === 'sauvegarderBoutique' ? 4_000_000 : corps.action === 'atelier' ? 1_000_000 : 24_000;
       const corpsJson = JSON.stringify(corps);
       if (corpsJson.length > tailleMax) throw new ErreurHttp(413, 'Demande trop volumineuse.');
       const action = corps.action;
@@ -822,9 +850,18 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
       // Un GET de sondage est une lecture sûre. Le limiter SQL écrivait une
       // ligne à chaque consultation et gonflait à lui seul le WAL / l'historique.
       if (req.method === 'POST' && !await stockage.limiter(`jeu:${compte.id}`, 240, 60_000, maintenant)) throw new ErreurHttp(429, 'Trop de demandes. Patientez quelques secondes.');
+      if (imageSpeciale) {
+        if (compte.identifiant !== 'kiri') throw new ErreurHttp(404, 'Image introuvable.');
+        return await servirImageSpeciale(false);
+      }
       if (url.searchParams.has('atelier') || action === 'atelier') {
         if (compte.identifiant !== 'kiri') throw new ErreurHttp(404, 'Page introuvable.');
-        if (req.method === 'GET') return res.status(200).json(vueAtelier(url.searchParams.get('q') ?? ''));
+        if (req.method === 'GET') {
+          const section = url.searchParams.get('section');
+          if (section === 'speciales') return res.status(200).json(vueSpeciales(maintenant));
+          if (section === 'imports') return res.status(200).json(vueImports(await lotImport(url.searchParams.get('lot') ?? '')));
+          return res.status(200).json(vueAtelier(url.searchParams.get('q') ?? ''));
+        }
         if (!stockage.atelier) throw new ErreurHttp(503, 'Atelier indisponible sur ce serveur.');
         catalogueLuLe = -Infinity;
         return res.status(200).json(await enregistrerAtelier(stockage.atelier, corps));
@@ -1092,7 +1129,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
           const ligne = await lireLigue(id);
           if (!ligne || !ligne.comptes.includes(compte.id)) throw new ErreurHttp(404, 'Ligue introuvable.');
           const { collectionCarriere } = await import('../src/lib/ligue/collectionCarriere.js');
-          return res.status(200).json(collectionCarriere(ligne.etat, compte.id, url.searchParams));
+          return res.status(200).json(collectionCarriere(ligne.etat, compte.id, url.searchParams, maintenant));
         }
 
         /**
@@ -1201,6 +1238,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
             packsActifs: Array.isArray(corps.packsActifs) ? corps.packsActifs : undefined,
             packsGratuitsParJour: typeof corps.packsGratuitsParJour === 'number' ? corps.packsGratuitsParJour : undefined,
             doublonsAutorises: corps.doublonsAutorises === true,
+            cartesSpeciales: corps.cartesSpeciales === true,
           }, maintenant, randomBytes(24).toString('hex'));
           if (await stockage.creerLigue({ id, code, etat: e, comptes: comptesEtat(e), version: 0 })) return res.status(201).json(vueCarriere(e, compte.id));
         }
