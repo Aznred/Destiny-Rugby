@@ -3,6 +3,12 @@ import { differencesBoutiqueCompte, type EtatBoutiqueCompte } from './boutiqueCo
 import { chargerBoutiqueCompte, ErreurCarriere, modifierBoutiqueCompte, sauvegarderBoutiqueCompte } from './carriereEnLigneClient';
 
 let collectionDistante = false;
+let avantActionDistante: (() => Promise<void>) | undefined;
+/** Enregistre les packs locaux en attente avant qu'un pack serveur avance la révision. */
+export async function attendreBoutiqueSoloEnregistree(): Promise<void> {
+  if (!avantActionDistante) throw new Error('La synchronisation du compte est indisponible.');
+  await avantActionDistante();
+}
 /** Un échange est déjà enregistré côté serveur : sa réception ne se renvoie pas. */
 export function appliquerCollectionSoloDistante(collection: EtatBoutiqueCompte['collectionSolo']): void {
   if ((collection.revision ?? 0) < (useGame.getState().collectionSolo.revision ?? 0)) return;
@@ -34,6 +40,8 @@ export function activerSynchronisationBoutiqueCompte(): () => void {
   let generation = 0;
   let minuterie: ReturnType<typeof setTimeout> | undefined;
   let delaiReprise = 500;
+  const finsEcriture: (() => void)[] = [];
+  let lectureInitiale: Promise<void>;
 
   const planifier = () => {
     if (!minuterie && !ecritureEnCours && actif && compteConnecte) {
@@ -70,7 +78,7 @@ export function activerSynchronisationBoutiqueCompte(): () => void {
   };
 
   const viderAttente = async () => {
-    if (ecritureEnCours) return;
+    if (ecritureEnCours) { await new Promise<void>(resolve => finsEcriture.push(resolve)); return; }
     ecritureEnCours = true;
     while (actif && compteConnecte && attente) {
       const cible = attente;
@@ -131,8 +139,22 @@ export function activerSynchronisationBoutiqueCompte(): () => void {
       }
     }
     ecritureEnCours = false;
+    for (const resolve of finsEcriture.splice(0)) resolve();
     if (attente) planifier();
   };
+
+  const avantAction = async () => {
+    await lectureInitiale;
+    if (!actif || !compteConnecte) throw new Error('Connecte-toi pour ouvrir ce pack.');
+    while (attente || ecritureEnCours) {
+      clearTimeout(minuterie); minuterie = undefined;
+      await viderAttente();
+      if (!actif || !compteConnecte || delaiReprise > 500) {
+        throw new Error('Impossible de sauvegarder ta collection. Réessaie dans un instant.');
+      }
+    }
+  };
+  avantActionDistante = avantAction;
 
   const desabonner = useGame.subscribe((etatStore, precedent) => {
     if (!actif || !compteConnecte) return;
@@ -157,14 +179,15 @@ export function activerSynchronisationBoutiqueCompte(): () => void {
     planifier();
   });
 
-  const reconnecter = () => { compteConnecte = false; void synchroniser(); };
+  const reconnecter = () => { compteConnecte = false; lectureInitiale = synchroniser(); };
   const deconnecter = () => { generation++; compteConnecte = false; attente = null; clearTimeout(minuterie); minuterie = undefined; };
   window.addEventListener('destiny-compte-connecte', reconnecter);
   window.addEventListener('destiny-compte-deconnecte', deconnecter);
   const surFermeture = () => { clearTimeout(minuterie); minuterie = undefined; void viderAttente(); };
   window.addEventListener('pagehide', surFermeture);
-  void synchroniser();
+  lectureInitiale = synchroniser();
   return () => {
+    if (avantActionDistante === avantAction) avantActionDistante = undefined;
     actif = false; generation++;
     clearTimeout(minuterie);
     attente = null;

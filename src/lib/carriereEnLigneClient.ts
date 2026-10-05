@@ -141,6 +141,10 @@ export const deconnecterCarriere = async () => {
 };
 export const chargerBoutiqueCompte = (signal?: AbortSignal) =>
   requete<{ boutique: EtatBoutiqueCompte | null }>(undefined, undefined, signal, '?boutique=1');
+export const chargerPacksPrivesSolo = (signal?: AbortSignal) =>
+  requete<{ packs: import('./ligue/typesCarriere').PackCarriere[] }>(undefined, undefined, signal, '?packsPrivesSolo=1');
+export const ouvrirPackPriveSolo = (pack: string, signal?: AbortSignal) =>
+  requete<{ boutique: EtatBoutiqueCompte; cartes: import('./ligue/catalogueCarriere').SourceCarte[] }>({ action: 'ouvrirPackPriveSolo', pack }, undefined, signal);
 export const sauvegarderBoutiqueCompte = (boutique: EtatBoutiqueCompte) =>
   requete<{ boutique: EtatBoutiqueCompte | null }>({ action: 'sauvegarderBoutique', boutique, compact: true });
 export const modifierBoutiqueCompte = (modifications: ModificationsBoutiqueCompte) =>

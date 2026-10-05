@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Icone } from '../components/Icone';
 import { CarteJoueurEnLigne } from '../components/CarteJoueurEnLigne';
 import OuverturePack from '../components/OuverturePack';
@@ -13,6 +13,8 @@ import { carteSpecialePackable, carteSpecialeVisibleCollection, chanceSpecialePa
 import { Citrouille, EmblemeIcon } from '../components/EmblemesSpeciaux';
 import { nombre, t } from '../lib/i18n';
 import { apparencePack, modelePackParNom, packAvecSkin } from '../lib/presentationPacks';
+import { chargerPacksPrivesSolo, ouvrirPackPriveSolo } from '../lib/carriereEnLigneClient';
+import { appliquerCollectionSoloDistante, attendreBoutiqueSoloEnregistree } from '../lib/synchronisationBoutiqueCompte';
 import './CollectionSolo.css';
 
 const PAR_PAGE = 40;
@@ -71,6 +73,33 @@ export function CollectionSolo() {
   const [bilan, setBilan] = useState('');
   const nomCompte = joueur?.pseudo ?? joueur?.nom ?? manager?.nom ?? 'Compte joueur';
   const [echangesOuverts, setEchangesOuverts] = useState(false);
+  const [packsPrives, setPacksPrives] = useState<PackCarriere[]>([]);
+  const [occupe, setOccupe] = useState(false);
+  const verrouOuverture = useRef(false);
+  const controleurOuverture = useRef<AbortController | null>(null);
+  useEffect(() => {
+    let vivant = true;
+    let controleur: AbortController | undefined;
+    const charger = () => {
+      controleurOuverture.current?.abort();
+      controleur?.abort();
+      controleur = new AbortController();
+      const courant = controleur;
+      setPacksPrives([]);
+      void chargerPacksPrivesSolo(courant.signal).then(resultat => {
+        if (vivant && !courant.signal.aborted) setPacksPrives(resultat.packs);
+      }).catch(() => { /* Aucun pack privé sans session vérifiée. */ });
+    };
+    const deconnecter = () => { controleur?.abort(); controleurOuverture.current?.abort(); setPacksPrives([]); };
+    charger();
+    window.addEventListener('destiny-compte-connecte', charger);
+    window.addEventListener('destiny-compte-deconnecte', deconnecter);
+    return () => {
+      vivant = false; controleur?.abort(); controleurOuverture.current?.abort();
+      window.removeEventListener('destiny-compte-connecte', charger);
+      window.removeEventListener('destiny-compte-deconnecte', deconnecter);
+    };
+  }, []);
 
   const cartesFiltrees = useMemo(() => {
     const terme = normaliser(recherche.trim());
@@ -94,24 +123,44 @@ export function CollectionSolo() {
   const progression = total ? Math.round(trouvees / total * 1000) / 10 : 0;
 
   const ouvrirDepuisRoue = async (id: string) => {
-    const pack = packsRoue.find(candidat => candidat.id === id);
-    if (!pack) return;
-    const catalogueActuel = await synchroniserCatalogueSolo();
-    const prix = pack.prix;
-    // ⚠️ PAS DE CARTE SPÉCIALE DANS LES PACKS GRATUITS : ils s'ouvrent sans
-    // limite, une ICON finirait par tomber à force de clics.
-    const avecSpeciales = !idsPacksGratuits.has(pack.id);
-    const resultat = acheterPack(prix, precedent => ouvrirPackSolo(pack, catalogueActuel, precedent, undefined,
-      avecSpeciales ? { speciales: catalogueSpecialSolo(), maintenant: Date.now() } : {}));
-    if (!resultat) {
-      setBilan(coins < prix ? t('solo.missingOvas', { n: nombre(prix - coins) }) : t('solo.noPlayerInPack'));
-      return;
-    }
-    const doublons = resultat.indices.length - resultat.nouvelles;
-    const texteNouvelles = resultat.nouvelles > 1 ? t('solo.summaryNewPlural', { n: resultat.nouvelles }) : t('solo.summaryNew', { n: resultat.nouvelles });
-    const texteDoublons = doublons > 1 ? t('solo.summaryDupPlural', { n: doublons }) : t('solo.summaryDup', { n: doublons });
-    setBilan(`${texteNouvelles}, ${texteDoublons}.`);
-    setOuverture({ pack, indices: resultat.indices, catalogue: catalogueActuel });
+    if (verrouOuverture.current || ouverture) return;
+    verrouOuverture.current = true; setOccupe(true);
+    try {
+      const prive = packsPrives.find(pack => pack.id === id);
+      if (prive) {
+        const controleur = new AbortController();
+        controleurOuverture.current = controleur;
+        await attendreBoutiqueSoloEnregistree();
+        if (controleur.signal.aborted) return;
+        const resultat = await ouvrirPackPriveSolo(id, controleur.signal);
+        if (controleur.signal.aborted) return;
+        appliquerCollectionSoloDistante(resultat.boutique.collectionSolo);
+        setBilan('Dix cartes ICONS ajoutées à ta collection.');
+        setOuverture({ pack: prive, indices: resultat.cartes.map((_, indice) => indice), catalogue: resultat.cartes });
+        return;
+      }
+      const pack = packsRoue.find(candidat => candidat.id === id);
+      if (!pack) return;
+      const catalogueActuel = await synchroniserCatalogueSolo();
+      const prix = pack.prix;
+      // Les packs gratuits ordinaires conservent leur tirage sans carte spéciale.
+      const avecSpeciales = !idsPacksGratuits.has(pack.id);
+      const resultat = acheterPack(prix, precedent => ouvrirPackSolo(pack, catalogueActuel, precedent, undefined,
+        avecSpeciales ? { speciales: catalogueSpecialSolo(), maintenant: Date.now() } : {}));
+      if (!resultat) {
+        setBilan(coins < prix ? t('solo.missingOvas', { n: nombre(prix - coins) }) : t('solo.noPlayerInPack'));
+        return;
+      }
+      const doublons = resultat.indices.length - resultat.nouvelles;
+      const texteNouvelles = resultat.nouvelles > 1 ? t('solo.summaryNewPlural', { n: resultat.nouvelles }) : t('solo.summaryNew', { n: resultat.nouvelles });
+      const texteDoublons = doublons > 1 ? t('solo.summaryDupPlural', { n: doublons }) : t('solo.summaryDup', { n: doublons });
+      setBilan(`${texteNouvelles}, ${texteDoublons}.`);
+      setOuverture({ pack, indices: resultat.indices, catalogue: catalogueActuel });
+    } catch (erreur) {
+      if (!(erreur instanceof Error && erreur.name === 'AbortError')) {
+        setBilan(erreur instanceof Error ? erreur.message : 'Impossible d’ouvrir ce pack.');
+      }
+    } finally { controleurOuverture.current = null; verrouOuverture.current = false; setOccupe(false); }
   };
 
   return <section className="solo-collection">
@@ -135,6 +184,12 @@ export function CollectionSolo() {
       {echangesOuverts ? t("ui.ad2d61675932") : t("ui.5c8f1fe771de")}
     </button>
     {echangesOuverts && <Suspense fallback={<p>{t("ui.f433895f5136")}</p>}><EchangesCollectionSolo /></Suspense>}
+
+    {packsPrives.length > 0 && <section className="solo-rayon" aria-labelledby="solo-packs-prives-titre">
+      <div className="solo-titre-ligne"><div><div className="eyebrow">Réservé au compte Kiri</div><h2 id="solo-packs-prives-titre">ICONS garanties</h2></div><span>Gratuit · 10 cartes · 100 % ICONS</span></div>
+      <BoutiquePacks3D packs={packsPrives} solde={coins} occupe={occupe || Boolean(ouverture)} gratuit
+        onOuvrir={ouvrirDepuisRoue} chancesSpeciales={() => [{ nom: 'ICON', chance: 100 }]} />
+    </section>}
 
     <section className="solo-rayon" aria-labelledby="solo-packs-titre">
       <div className="solo-titre-ligne"><div><div className="eyebrow">{t('solo.allPacks')}</div><h2 id="solo-packs-titre">{t('solo.choosePack')}</h2></div><span>{categoriePacks === 'gratuits' ? t('solo.freePacksHelp') : t('solo.paidPacksHelp')}</span></div>
@@ -164,7 +219,7 @@ export function CollectionSolo() {
         key={categoriePacks}
         packs={categoriePacks === 'gratuits' ? packsGratuits : packsPayants}
         solde={coins}
-        occupe={ouverture !== null}
+        occupe={occupe || ouverture !== null}
         onOuvrir={ouvrirDepuisRoue}
         gratuit={categoriePacks === 'gratuits'}
         chancesSpeciales={chancesSpeciales}

@@ -17,6 +17,8 @@ import { appliquerModificationsBoutiqueCompte, validerEtatBoutiqueCompte, valide
 import { catalogueBaseCarriere, MEZE_RUGBY_EMBLEME } from '../src/lib/ligue/catalogueCarriere.js';
 import { cleCarteSolo } from '../src/lib/collectionSolo.js';
 import { lotCartesSolo } from '../src/lib/echangesSolo.js';
+import { PACK_ICONES_KIRI } from '../src/lib/packsPrivesSolo.js';
+import { packsPrivesSolo, tirerPackIconesKiri } from './packsPrivesSolo.js';
 
 export interface RequeteCarriere {
   method?: string; url?: string; body?: unknown;
@@ -855,6 +857,25 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         sessionsChaudes.set(empreinteSession, { compte, jusqua: maintenant + 60_000, toucheLe: toucher ? maintenant : sessionChaude!.toucheLe });
       }
       if (!compte) throw new ErreurHttp(401, 'Connectez-vous pour retrouver vos ligues.');
+      if (req.method === 'GET' && url.searchParams.has('packsPrivesSolo')) {
+        return res.status(200).json({ packs: packsPrivesSolo(compte.identifiant, catalogueSpecial(), maintenant) });
+      }
+      if (action === 'ouvrirPackPriveSolo') {
+        if (compte.identifiant !== 'kiri' || corps.pack !== PACK_ICONES_KIRI.id) throw new ErreurHttp(404, 'Pack introuvable.');
+        if (!await stockage.limiter(`pack-prive:${compte.id}`, 60, 60_000, maintenant)) throw new ErreurHttp(429, 'Patiente quelques secondes avant le prochain pack.');
+        if (!stockage.ajouterPackSolo) throw new ErreurHttp(503, 'Pack indisponible sur ce serveur.');
+        const cat = catalogueSpecial();
+        if (!packsPrivesSolo(compte.identifiant, cat, maintenant).length) throw new ErreurHttp(409, 'Aucune ICON disponible actuellement.');
+        const cartes = tirerPackIconesKiri(compte.identifiant, cat, maintenant);
+        const quantites: Record<string, number> = {};
+        for (const carte of cartes) {
+          const cle = cleCarteSolo(carte.sourceId);
+          quantites[cle] = (quantites[cle] ?? 0) + 1;
+        }
+        const boutique = await stockage.ajouterPackSolo(compte.id, PACK_ICONES_KIRI.id, quantites);
+        if (!boutique) throw new ErreurHttp(409, 'Recharge la page pour synchroniser ta collection.');
+        return res.status(200).json({ boutique, cartes });
+      }
       if (['creerSalonAmical', 'rejoindreSalonAmical', 'syncSalonAmical', 'quitterSalonAmical'].includes(action)) {
         throw new ErreurHttp(410, 'Les matchs amicaux sont désactivés.');
       }

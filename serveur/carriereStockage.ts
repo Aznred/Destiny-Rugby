@@ -68,6 +68,8 @@ export interface StockageCarriere {
   achatCredite?(session: string, compte: string): Promise<boolean>;
   crediterAchat?(session: string, compte: string, recompenses: RecompensesAchat): Promise<void>;
   boutique(compte: string): Promise<EtatBoutiqueCompte | null>;
+  /** Ajoute un pack tiré par le serveur sans écraser un échange ou une autre ouverture. */
+  ajouterPackSolo?(compte: string, pack: string, cartes: Record<string, number>): Promise<EtatBoutiqueCompte | null>;
   sauvegarderBoutique(compte: string, boutique: EtatBoutiqueCompte): Promise<EtatBoutiqueCompte>;
   /** null = accusé compact ; undefined = coffre absent ou sélection invalide. */
   modifierBoutique?(compte: string, modifications: ModificationsBoutiqueCompte): Promise<EtatBoutiqueCompte | null | undefined>;
@@ -426,6 +428,21 @@ export function stockageNeon(url: string): StockageCarriere {
           or coalesce((b.donnees->>'achatsOvas')::bigint,0) > coalesce((e.donnees->>'achatsOvas')::bigint,0)
           then b.donnees else null end as donnees`;
       return lignes.length ? lignes[0].donnees as EtatBoutiqueCompte | null : undefined;
+    },
+    async ajouterPackSolo(compte, pack, cartes) {
+      const lignes = await sql`update compte_boutique b set donnees = jsonb_set(b.donnees, '{collectionSolo}',
+        coalesce(b.donnees->'collectionSolo','{}'::jsonb) || jsonb_build_object(
+          'quantites', coalesce(b.donnees->'collectionSolo'->'quantites','{}'::jsonb) ||
+            (select jsonb_object_agg(k, coalesce((b.donnees->'collectionSolo'->'quantites'->>k)::bigint,0) + v::bigint)
+             from jsonb_each_text(${JSON.stringify(cartes)}::jsonb) a(k,v)),
+          'packsOuverts', coalesce(b.donnees->'collectionSolo'->'packsOuverts','{}'::jsonb) ||
+            jsonb_build_object(${pack}::text, coalesce((b.donnees->'collectionSolo'->'packsOuverts'->>${pack})::bigint,0) + 1),
+          'doublons', coalesce((b.donnees->'collectionSolo'->>'doublons')::bigint,0) +
+            (select sum(v::bigint - case when coalesce((b.donnees->'collectionSolo'->'quantites'->>k)::bigint,0) > 0 then 0 else 1 end)
+             from jsonb_each_text(${JSON.stringify(cartes)}::jsonb) a(k,v)),
+          'revision', coalesce((b.donnees->'collectionSolo'->>'revision')::bigint,0) + 1
+        )), modifie_le=now() where b.compte=${compte} returning donnees`;
+      return lignes[0]?.donnees as EtatBoutiqueCompte ?? null;
     },
     async limiter(cle, maximum, fenetre, maintenant) {
       if (cle.startsWith('jeu:')) {

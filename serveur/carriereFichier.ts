@@ -10,6 +10,7 @@ import type { CompteStocke, LigueStockee, SalonAmicalStocke, StockageCarriere } 
 import { echeanceLigue, prochaineEcheanceMatch } from '../src/lib/ligue/echeanceCarriere.js';
 import { vueCarriere } from '../src/lib/ligue/carriere.js';
 import { appliquerModificationsBoutiqueCompte, validerEtatBoutiqueCompte, type EtatBoutiqueCompte } from '../src/lib/boutiqueCompte.js';
+import { ajouterCartesPackSolo } from '../src/lib/packsPrivesSolo.js';
 import type { OffreSolo } from '../src/lib/echangesSolo.js';
 import { modifierCollectionSolo, possedeDoublons } from '../src/lib/echangesSolo.js';
 
@@ -154,6 +155,13 @@ export function stockageFichier(fichier: string): StockageCarriere {
       base.achatsStripe![session] = compte; sauver();
     },
     async boutique(compte) { return base.boutiques?.[compte] ? copie(base.boutiques[compte]) : null; },
+    async ajouterPackSolo(compte, pack, cartes) {
+      const boutique = base.boutiques![compte];
+      if (!boutique) return null;
+      boutique.collectionSolo = ajouterCartesPackSolo(boutique.collectionSolo, pack, cartes);
+      sauver();
+      return copie(boutique);
+    },
     async sauvegarderBoutique(compte, boutique) {
       const ancienne = base.boutiques![compte];
       const acquis = ancienne?.achatsOvas ?? 0;

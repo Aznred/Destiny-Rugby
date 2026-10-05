@@ -10,7 +10,7 @@ Object.defineProperty(globalThis, 'localStorage', { value: {
   removeItem: (cle: string) => valeurs.delete(cle),
 }, configurable: true });
 const { useGame } = await import('../src/store/useGame');
-const { activerSynchronisationBoutiqueCompte, appliquerCollectionSoloDistante } = await import('../src/lib/synchronisationBoutiqueCompte');
+const { activerSynchronisationBoutiqueCompte, appliquerCollectionSoloDistante, attendreBoutiqueSoloEnregistree } = await import('../src/lib/synchronisationBoutiqueCompte');
 const { listerEchangesSolo } = await import('../src/lib/carriereEnLigneClient');
 const pause = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 const reponse = (contenu: unknown) => new Response(JSON.stringify(contenu), { status: 200 });
@@ -119,5 +119,22 @@ try {
 
   await Promise.all([listerEchangesSolo(), listerEchangesSolo(), listerEchangesSolo()]);
   assert.equal(lecturesOffres, 1, 'Des rafraîchissements simultanés partagent une lecture du marché.');
+  useGame.setState(s => ({ collectionSolo: { ...s.collectionSolo,
+    quantites: { ...s.collectionSolo.quantites, 'joueur:2-abcdefgh': 3 } } }));
+  let preparee = false;
+  const preparation = attendreBoutiqueSoloEnregistree().then(() => { preparee = true; });
+  await attendreEcritures(10);
+  assert.equal(preparee, false, 'Le pack serveur attend la confirmation du pack local.');
+  useGame.setState(s => ({ coins: s.coins + 1 }));
+  finir!();
+  await attendreEcritures(11);
+  assert.equal(preparee, false, 'Les changements arrivés pendant la sauvegarde sont aussi enregistrés.');
+  finir!(); await preparation;
+  assert.equal(preparee, true);
+  assert.equal(coffre.collectionSolo.quantites['joueur:2-abcdefgh'], 3);
+  echouerProchaine = true;
+  useGame.setState(s => ({ coins: s.coins + 1 }));
+  await assert.rejects(attendreBoutiqueSoloEnregistree(), /Impossible de sauvegarder/,
+    'Une sauvegarde non confirmée doit empêcher l’ouverture du pack serveur.');
   console.log(`OK — coffre de ${poidsComplet} octets : gain ${tailles[0]} octets, pack ${taillePack} octets ; navigation/trade sans POST, crédit concurrent conservé, reprise espacée après accusé perdu.`);
 } finally { arreter(); }
