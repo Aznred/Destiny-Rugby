@@ -156,7 +156,8 @@ import {
 } from './match/PresentationTV';
 import { HabillageTV } from './match/HabillageTV';
 import { couleursEquipeTV, DUREE_EQUIPE_TV, exclusionsDepuisEtat, logoTV, type IdentiteTV } from '../lib/habillageTV';
-import { deuxImages, quitterPleinEcran } from '../lib/pleinEcran';
+import { deuxImages } from '../lib/pleinEcran';
+import { sortirDuMatch } from '../lib/sortieMatch';
 import { bulleDuMoment, marqueurDepuisEtat, memoireBullesVide, phraseDuMarqueur, ventPourLeTir, type ContexteStatsTV, type PhraseTV } from '../lib/statsTV';
 import { changementsRecents } from '../lib/presentationTV';
 import { urlLogoEquipe } from '../lib/logoEquipe';
@@ -178,7 +179,7 @@ import { PilotageDirect } from '../lib/controleDirect/pilotage';
 import { rolesDuJoueur } from '../lib/responsabilites';
 import { rolesImposesParLaComposition } from '../lib/compositionManager';
 import { chargerDisposition } from '../lib/controleDirect/touches';
-import { usePreferencesControle } from '../lib/controleDirect/prefs';
+import { lirePreferencesControle, usePreferencesControle } from '../lib/controleDirect/prefs';
 import { signaler, useGuide } from '../lib/tutoriel/guide';
 import { usePreferencesTutoriel } from '../lib/tutoriel/memoire';
 
@@ -401,15 +402,18 @@ export function MatchLive({
   const [sortie, setSortie] = useState(false);
   const fermerAuParent = useRef(onFermer);
   fermerAuParent.current = onFermer;
+  // C'est une MACHINE À ÉTATS (`lib/sortieMatch.ts`) : entrées coupées → boucle arrêtée → plein écran quitté →
+  // orientation stable → dimensions relues → écouteurs recréés → entrées rendues → navigation.
   const quitter = useCallback(() => {
     if (sortieDemandee.current) return;
     sortieDemandee.current = true;
     setSortie(true);
-    void (async () => {
-      await deuxImages();
-      await quitterPleinEcran();
-      fermerAuParent.current();
-    })();
+    void sortirDuMatch({
+      couperEntrees: () => { sortieDemandee.current = true; },
+      // Le moteur ne tourne plus (pause) et la scène se démonte (`sortie`) avant qu'on touche à l'écran.
+      arreterBoucle: async () => { setEnPause(true); setSortie(true); await deuxImages(); },
+      naviguer: () => fermerAuParent.current(),
+    }).then((fait) => { if (!fait) sortieDemandee.current = true; });
   }, []);
   // ⚠️ ÉCHAP PAUSE LE MATCH QUAND ON LE CONDUIT, ET NE LE FERME QU'AUTREMENT : un seul écouteur, celui de la
   // fenêtre (`useModalDialog`, en phase de capture). Le pilote ignore Échap — voir l'en-tête du fichier.
@@ -557,6 +561,8 @@ export function MatchLive({
   const prefsControle = usePreferencesControle();
   const camera3DRef = useRef<Camera3D>(camera3D);
   camera3DRef.current = camera3D;
+  // Le recul de caméra choisi dans les réglages s'applique en direct (la scène le relit à chaque image).
+  useEffect(() => { if (scene3D.current) scene3D.current.reculCamera = prefsControle.reculCamera; }, [prefsControle.reculCamera]);
   if (!pilotage.current) {
     pilotage.current = new PilotageDirect({
       surCamera: (c) => setCamera3D(c),
@@ -1476,6 +1482,7 @@ export function MatchLive({
   const brancherScene = useCallback((scene: Scene3D | null) => {
     scene3D.current = scene;
     if (!scene) return;
+    scene.reculCamera = lirePreferencesControle().reculCamera;
     scene.brancher(e);
     redessiner((n) => n + 1);
   }, [e]);
@@ -1516,7 +1523,7 @@ export function MatchLive({
   tutoRef.current = montrerTuto || guideFige;
 
   return createPortal(
-    <div ref={overlayRef} className="overlay-match" onClick={(ev) => { if (ev.target === ev.currentTarget) quitter(); }}>
+    <div ref={overlayRef} className={sortie ? 'overlay-match ml-sortie' : 'overlay-match'} onClick={(ev) => { if (ev.target === ev.currentTarget) quitter(); }}>
       <motion.div
         ref={dialogRef}
         className="match-live"

@@ -8,6 +8,7 @@
 
 import { useSyncExternalStore } from 'react';
 import { assainirTouches, copierTouches, type TouchesDirectes } from './touches';
+import type { SectionTuto } from './tutoriel';
 
 const CLE = 'destiny-rugby:controle';
 
@@ -27,8 +28,16 @@ export interface PreferencesControle {
   joystick: 'flottant' | 'fixe';
   /** Un doigt poussé au bord du joystick sprinte. */
   sprintAuBord: boolean;
-  /** Les commandes tactiles à droite (défaut) ou à gauche, pour les gauchers. */
+  /** Les commandes tactiles à droite (défaut) ou à gauche, pour les gauchers. Dérivé des deux positions ci-dessous (anciens réglages). */
   gaucher: boolean;
+  /** Où naît le joystick : à gauche (défaut) ou à droite. Indépendant de la position des actions. */
+  positionJoystick: 'gauche' | 'droite';
+  /** Où se posent les boutons d'action : à droite (défaut) ou à gauche. */
+  positionActions: 'droite' | 'gauche';
+  /** HUD contextuel (Correctif 20) : deux à quatre boutons au plus, les passes se font par balayage. Désactivé : tous les boutons d'avant. */
+  hudSimple: boolean;
+  /** Recul de la caméra derrière le joueur, de 0,85 (plus près) à 1,35 (plus large). */
+  reculCamera: number;
   /** Viser un coup de pied à la souris (facultatif). */
   souris: boolean;
   /** Vibrations du téléphone et de la manette. */
@@ -37,6 +46,10 @@ export interface PreferencesControle {
   indications: boolean;
   /** Le tutoriel d'entrée sur le terrain a été vu (ou passé). */
   tutorielVu: boolean;
+  /** La section à rejouer au prochain match (Réglages → Tutoriels) ; `tout` par défaut. */
+  tutoSection: SectionTuto;
+  /** Les explications contextuelles déjà vues (offload, ruck, passe au pied, placement). */
+  tutosContext: string[];
   touches: TouchesDirectes;
   // ── Les responsabilités (Correctif 17) ──────────────────────────────────
   /** Tir à la manette : `direct` (stick gauche vise, stick droit dose, A frappe) ou `charge` (on tient A pour charger, on relâche pour frapper). */
@@ -50,8 +63,8 @@ export interface PreferencesControle {
 }
 
 export const PREFERENCES_PAR_DEFAUT: Readonly<PreferencesControle> = {
-  mode: 'direct', aidePlacement: true, tailleHud: 1, opaciteHud: 0.62, joystick: 'flottant', sprintAuBord: true,
-  gaucher: false, souris: false, vibrations: true, indications: true, tutorielVu: false, touches: copierTouches(),
+  mode: 'direct', aidePlacement: true, tailleHud: 1, opaciteHud: 0.5, joystick: 'flottant', sprintAuBord: true,
+  gaucher: false, positionJoystick: 'gauche', positionActions: 'droite', hudSimple: true, reculCamera: 1, souris: false, vibrations: true, indications: true, tutorielVu: false, tutoSection: 'tout', tutosContext: [], touches: copierTouches(),
   tirManette: 'direct', aideTir: true, conseilCapitaine: true, tutosResp: [],
 };
 
@@ -68,11 +81,21 @@ function assainir(brut: unknown): PreferencesControle {
     opaciteHud: bornerNombre(b.opaciteHud, 0.3, 1, d.opaciteHud),
     joystick: b.joystick === 'fixe' ? 'fixe' : 'flottant',
     sprintAuBord: b.sprintAuBord !== false,
-    gaucher: b.gaucher === true,
+    // Les anciens réglages n'avaient qu'un interrupteur « gaucher » (joystick à droite, boutons à gauche) : on le traduit.
+    ...(() => {
+      const ancien = b.gaucher === true && b.positionJoystick === undefined && b.positionActions === undefined;
+      const joystick: 'gauche' | 'droite' = ancien ? 'droite' : b.positionJoystick === 'droite' ? 'droite' : 'gauche';
+      const actions: 'droite' | 'gauche' = ancien ? 'gauche' : b.positionActions === 'gauche' ? 'gauche' : 'droite';
+      return { positionJoystick: joystick, positionActions: actions, gaucher: joystick === 'droite' && actions === 'gauche' };
+    })(),
+    hudSimple: b.hudSimple !== false,
+    reculCamera: bornerNombre(b.reculCamera, 0.85, 1.35, d.reculCamera),
     souris: b.souris === true,
     vibrations: b.vibrations !== false,
     indications: b.indications !== false,
     tutorielVu: b.tutorielVu === true,
+    tutoSection: (['general', 'attaque', 'defense', 'pied'] as const).find((x) => x === b.tutoSection) ?? 'tout',
+    tutosContext: Array.isArray(b.tutosContext) ? b.tutosContext.filter((x): x is string => typeof x === 'string').slice(0, 12) : [],
     touches: assainirTouches(b.touches),
     tirManette: b.tirManette === 'charge' ? 'charge' : 'direct',
     aideTir: b.aideTir !== false,
@@ -112,8 +135,13 @@ export function reinitialiserTouchesDirectes(): PreferencesControle {
 }
 
 /** « Rejouer le tutoriel carrière joueur » : il se relancera à la prochaine entrée sur le terrain, et celui des responsabilités aussi. */
-export function rejouerLeTutorielDirect(): PreferencesControle {
-  return ecrirePreferencesControle({ tutorielVu: false, tutosResp: [] });
+export function rejouerLeTutorielDirect(section: SectionTuto = 'tout', avecRoles = section === 'tout'): PreferencesControle {
+  return ecrirePreferencesControle({ tutorielVu: false, tutoSection: section, tutosContext: [], ...(avecRoles ? { tutosResp: [] } : {}) });
+}
+
+/** Rejoue les cartes des rôles spéciaux (capitaine, buteur, lanceur, engagement, drop) à leur prochaine occasion. */
+export function rejouerLesRoles(): PreferencesControle {
+  return ecrirePreferencesControle({ tutosResp: [] });
 }
 
 function abonner(cb: () => void): () => void {

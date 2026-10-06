@@ -1,4 +1,6 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
+import { installerEcouteursApp } from './lib/viewport';
+import { useSynchroApparenceJoueur } from './lib/synchroApparenceJoueur';
 import { AnimatePresence, motion } from 'framer-motion';
 import './App.css';
 import { Analytics } from '@vercel/analytics/react'
@@ -63,6 +65,10 @@ function EcranEnRoute() {
 
 export default function App() {
   useCatalogueSolo();
+  // Écouteurs globaux (orientation, taille, retour au premier plan) : posés une fois, recréés après chaque match.
+  useEffect(() => { installerEcouteursApp(); }, []);
+  // Le joueur du jeu porte son casque, ses crampons et sa morphologie dans tous les matchs (registre lu par la scène 3D).
+  useSynchroApparenceJoueur();
   useEffect(() => { if (new URLSearchParams(location.search).has('paiement')) useGame.getState().setEcran('boutique'); }, []);
   const animationsMenus = usePreferencesInterface(s => s.animationsMenus);
   useEffect(() => { document.documentElement.classList.toggle('interface-fluide', !animationsMenus); }, [animationsMenus]);

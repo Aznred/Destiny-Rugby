@@ -1,3 +1,4 @@
+import { baremeDeCompetition } from './bareme.js';
 import { calendrier, classer, versionResultatsJoues } from './championnat.js';
 import { forceNation, jouerTestMatch, type CompetitionInternationale } from './international.js';
 import { mondialEnDirect, DATES_POULES } from './mondial.js';
@@ -26,7 +27,7 @@ const cache = new Map<string, CycleQualification>();
 function classement(c: CompetitionInternationale, saison: number) {
   const matchs = calendrier(c.equipes, c.id + '#' + saison).slice(0, c.journees).map((tour, j) =>
     tour.map(([d,e]) => jouerTestMatch(d,e,saison, `${c.id}#${saison}#${j}#${d}#${e}`, null)));
-  return classer(c.equipes, matchs).map((l) => l.club);
+  return classer(c.equipes, matchs, baremeDeCompetition(c.id)).map((l) => l.club);
 }
 
 /** Cycle du jeu : 12 places héritées, 11 régionales et un repêchage à quatre.

@@ -32,6 +32,103 @@ function chargerBallon(nom){
   if(!ballons.has(nom))ballons.set(nom,new GLTFLoader().loadAsync(RACINE_DECOR+'equipement/ballon-'+nom+'.glb').then(g=>{let m=null;g.scene.traverse(o=>{if(o.isMesh)m=o;});return m;}).catch(()=>null));
   return ballons.get(nom);
 }
+// ── ÉQUIPEMENT : un casque ou des crampons ne se chargent que s'ils sont portés ──
+// Un joueur du jeu (casque rouge, crampons dorés) en demande un ; les adversaires tirent dans une petite réserve.
+// ⚠️ Un fichier manquant n'empêche rien : le joueur garde l'équipement d'origine.
+const equipements=new Map(),equipementPret=new Map();
+const POOL_CASQUES=['casque','casque-rouge'],POOL_CRAMPONS=['crampons','crampons-bleus'];
+/** Un modèle allégé de la boutique, par son nom de fichier ; `null` s'il manque. Mis en cache pour la session. */
+export function chargerEquipement(nom){
+  if(!/^[a-z0-9-]+$/i.test(nom||''))return Promise.resolve(null);
+  if(!equipements.has(nom))equipements.set(nom,new GLTFLoader().loadAsync(RACINE_DECOR+'equipement/'+nom+'.glb').then(g=>{let m=null;g.scene.traverse(o=>{if(o.isMesh)m=o;});equipementPret.set(nom,m);return m;}).catch(()=>{equipementPret.set(nom,null);return null;}));
+  return equipements.get(nom);
+}
+/** Charge ce qu'une liste d'apparences porte, plus la réserve des adversaires. */
+async function chargerEquipementsDe(apparences,avecReserve=true){
+  const voulus=new Set(avecReserve?[...POOL_CASQUES,...POOL_CRAMPONS]:[]);
+  for(const a of Object.values(apparences||{})){const q=a?.equipement;if(q?.casque?.modele)voulus.add(q.casque.modele);if(q?.crampons?.modele)voulus.add(q.crampons.modele);}
+  await Promise.all([...voulus].map(chargerEquipement));
+}
+const teinter=(materiau,couleur)=>{const m=materiau.clone();if(m.color)m.color=m.color.clone().lerp(new THREE.Color(couleur),.75);return m;};
+const tmpV=new THREE.Vector3();
+
+/** Coiffure, barbe, casque, crampons : ajustés sur le crâne et aux pieds, puis attachés à l'os. */
+function habiller(r,model,kind,look){
+  const head=model.getObjectByName('CC_Base_Head');let headMesh=null;
+  model.traverse(o=>{if(o.isSkinnedMesh&&/head_/.test(o.name))headMesh=o;});
+  if(!head||!headMesh)return;
+  const attach=(source,color,marge,roughness=.82)=>{
+    if(!source)return;
+    // Le masque de la planche découpe les mèches : sans lui, chaque coupe est un bloc plein.
+    const masque=source.material?.map||null;
+    const mesh=new THREE.Mesh(fitToHead(source,headMesh,kind,marge),new THREE.MeshStandardMaterial({color,roughness,metalness:0,side:THREE.DoubleSide,map:masque,alphaTest:masque?.38:0}));
+    mesh.name=source.name;model.add(mesh);model.updateMatrixWorld(true);head.attach(mesh);
+  };
+  const casque=look.accessory==='casque';
+  if(look.hair&&!casque)attach(findHairMesh(r.hair,'Hair',look.hair,COIFFURES),look.color,.007);
+  if(look.beard)attach(findHairMesh(r.hair,'Beard',look.beard,BARBES),look.teinteBarbe?new THREE.Color(look.teinteBarbe):new THREE.Color(look.color).multiplyScalar(.85),.004);
+  if(casque){
+    // Le casque que le joueur porte (modèle de la boutique, teinte comprise) ; les autres tirent dans la réserve.
+    const demande=look.casqueModele,reserve=POOL_CASQUES.map(n=>equipementPret.get(n)).filter(Boolean);
+    const modele=demande?(equipementPret.get(demande.modele)||reserve[0]||null):(reserve.length?reserve[Math.floor(tirage(look.graine??0,9)*reserve.length)%reserve.length]:null);
+    if(modele){
+      const box=new THREE.Box3().setFromBufferAttribute(headMesh.geometry.attributes.position);
+      const mesh=new THREE.Mesh(modele.geometry,demande?.teinte?teinter(modele.material,demande.teinte):modele.material);mesh.name='Casque';
+      modele.geometry.computeBoundingBox();
+      const forme=modele.geometry.boundingBox,echelle=(box.max.x-box.min.x)*CASQUE.largeur/(forme.max.x-forme.min.x);
+      mesh.scale.setScalar(echelle);
+      // ⚠️ LE CASQUE REGARDE DU MÊME CÔTÉ QUE LE VISAGE. Les modèles allégés ont le
+      // visage vers −Z (alleger_equipement.mjs), la tête du joueur vers +Z : posé
+      // tel quel, il était devant-derrière — la nuque du casque sur les yeux.
+      // Il est donc retourné d'un demi-tour, et ses décalages changent de signe.
+      mesh.rotation.y=Math.PI;
+      mesh.position.set((forme.min.x+forme.max.x)/2*echelle,box.max.y+CASQUE.dessus-forme.max.y*echelle,(box.min.z+box.max.z)/2-CASQUE.recul+(forme.min.z+forme.max.z)/2*echelle);
+      model.add(mesh);model.updateMatrixWorld(true);head.attach(mesh);
+    }else attach(r.hair.getObjectByName('Helmet_LOD2'),look.bandColor,.012,.6);
+  }
+  // Les crampons : ceux que le joueur porte ; sinon la paire d'origine, et un modèle de la réserve pour un adversaire sur deux.
+  const demandeC=look.cramponsModele,reserveC=POOL_CRAMPONS.map(n=>equipementPret.get(n)).filter(Boolean);
+  const veutCrampons=look.equipe?!!demandeC:(reserveC.length&&look.graine!==undefined&&tirage(look.graine,10)<.55);
+  if(veutCrampons){
+    const modele=demandeC?(equipementPret.get(demandeC.modele)||null):reserveC[Math.floor(tirage(look.graine,11)*reserveC.length)%reserveC.length];
+    let bottes=null;model.traverse(o=>{if(o.isSkinnedMesh&&/boot/.test(o.name))bottes=o;});
+    const pieds=['L','R'].map(c=>model.getObjectByName('CC_Base_'+c+'_Foot')).filter(Boolean);
+    if(modele&&bottes&&pieds.length===2){
+      const p=bottes.geometry.attributes.position,poses=[];
+      for(const pied of pieds){
+        const ou=model.worldToLocal(pied.getWorldPosition(new THREE.Vector3())),cote=Math.sign(ou.x)||1,b=new THREE.Box3();
+        for(let i=0;i<p.count;i++)if(p.getX(i)*cote>0)b.expandByPoint(tmpV.set(p.getX(i),p.getY(i),p.getZ(i)));
+        if(!b.isEmpty())poses.push({pied,b});
+      }
+      if(poses.length===2){
+        bottes.visible=false;
+        const materiau=demandeC?.teinte?teinter(modele.material,demandeC.teinte):modele.material;
+        for(const {pied,b} of poses){
+          const mesh=new THREE.Mesh(modele.geometry,materiau);mesh.name='Crampon';
+          mesh.scale.setScalar((b.max.z-b.min.z)*CRAMPON.taille);mesh.position.set((b.min.x+b.max.x)/2,b.min.y,(b.min.z+b.max.z)/2);
+          model.add(mesh);model.updateMatrixWorld(true);pied.attach(mesh);
+        }
+      }
+    }
+  }
+  if(look.accessory==='bandeau')attach(r.hair.getObjectByName('Headband_LOD2'),look.bandColor,.014,.7);
+}
+
+/**
+ * Morphologie : des FACTEURS, calculés et bornés par le jeu (`lib/apparenceJoueur.ts`), jamais des valeurs libres.
+ * hauteur / largeur / épaisseur : échelle du corps ; épaules : écartement des bras ; bras et jambes : longueur.
+ * ⚠️ Bornés à ±12 % : au-delà, l'appui des pieds et la prise du ballon se décalent et le rig se déforme.
+ */
+function appliquerMorpho(model,m){
+  if(!m)return;
+  model.scale.set(m.largeur||1,m.hauteur||1,m.epaisseur||1);
+  for(const cote of ['L','R']){
+    const bras=model.getObjectByName('CC_Base_'+cote+'_Upperarm');
+    if(bras){if(m.epaules&&m.epaules!==1)bras.position.multiplyScalar(m.epaules);if(m.bras&&m.bras!==1)bras.scale.multiplyScalar(m.bras);}
+    const cuisse=model.getObjectByName('CC_Base_'+cote+'_Thigh');
+    if(cuisse&&m.jambes&&m.jambes!==1)cuisse.scale.multiplyScalar(m.jambes);
+  }
+}
 let ressources=null;
 const peintComme=(canvas,avant)=>{const t=texture(canvas,null);if(avant){t.wrapS=avant.wrapS;t.wrapT=avant.wrapT;t.repeat.copy(avant.repeat);t.offset.copy(avant.offset);t.flipY=avant.flipY;}return t;};
 /** Joueurs, ballon, coiffures, équipement et mouvements : chargés une fois, partagés par tous les matchs de la session. */
@@ -43,10 +140,7 @@ function charger(){
       loader.loadAsync(RACINE_DECOR+'ballon.glb'),loader.loadAsync(RACINE_DECOR+'coiffures.glb'),
       loader.loadAsync(RACINE_DECOR+'tee.glb'),image('kit_france_home.png'),
     ]);
-    // Casques et crampons de la boutique, allégés pour le match (alleger_equipement.mjs).
-    // Un fichier manquant n'empêche rien : le joueur garde l'équipement d'origine.
-    const equipement=async noms=>(await Promise.all(noms.map(n=>loader.loadAsync(RACINE_DECOR+'equipement/'+n+'.glb').then(g=>{let m=null;g.scene.traverse(o=>{if(o.isMesh)m=o;});return m;}).catch(()=>null)))).filter(Boolean);
-    const [casques,crampons]=await Promise.all([equipement(['casque','casque-rouge','casque-australie','casque-tribal','casque-rose']),equipement(['crampons','crampons-bleus','crampons-dupont','crampons-graffiti','crampons-roses'])]);
+    // Casques et crampons : chargés à la demande, un par un (`chargerEquipement`), jamais les cinquante de la boutique.
     const gaits={};for(const [key,rig] of Object.entries(motions.rigs))gaits[key]=prepareGaits(motions.clips,rig.scale);
     // ⚠️ AUCUNE MARQUE DE L'ÉDITEUR D'ORIGINE NE RESTE À L'IMAGE : le ballon est
     // repeint une fois pour la session, le panneau du stade à son chargement (le
@@ -55,7 +149,7 @@ function charger(){
       await document.fonts?.load?.('40px Anton').catch(()=>{});
       ball.scene.traverse(o=>{if(o.isMesh&&o.material?.map&&/ball/i.test(o.material.name)&&!/shadow/i.test(o.material.name))o.material.map=peintComme(creerBallon(512),o.material.map);});
     }catch(e){console.warn('Marquage Destiny Rugby :',e);}
-    return {motions,gaits,forward:forward.scene,back:back.scene,hair:hair.scene,casques,crampons,ball:ball.scene,tee:tee.scene,kit};
+    return {motions,gaits,forward:forward.scene,back:back.scene,hair:hair.scene,ball:ball.scene,tee:tee.scene,kit};
   })();
   return ressources;
 }
@@ -188,6 +282,7 @@ export async function creerScene3D(conteneur,options={}){
   if(leger){r=await charger();stade=await chargerStade(options.stade,true);}
   else [r,stade]=await Promise.all([charger(),chargerStade(options.stade)]);
   const {motions,gaits}=r;
+  await chargerEquipementsDe(options.apparences);
   const scene=new THREE.Scene();
   scene.background=new THREE.Color('#b6d4e4');scene.fog=new THREE.Fog('#b6d4e4',180,420);
   const camera=new THREE.PerspectiveCamera(48,1,.1,600);
@@ -294,66 +389,11 @@ export async function creerScene3D(conteneur,options={}){
   const qa=new THREE.Quaternion();
 
   function shadow(){const m=new THREE.Mesh(new THREE.CircleGeometry(.42,18),new THREE.MeshBasicMaterial({color:'#172319',transparent:true,opacity:.24,depthWrite:false}));m.rotation.x=-Math.PI/2;m.position.y=.015;return m;}
-  /** Coiffure, barbe et accessoire : ajustés sur le crâne puis attachés à l'os de la tête. */
-  function dress(model,kind,look){
-    const head=model.getObjectByName('CC_Base_Head');let headMesh=null;
-    model.traverse(o=>{if(o.isSkinnedMesh&&/head_/.test(o.name))headMesh=o;});
-    if(!head||!headMesh)return;
-    const attach=(source,color,marge,roughness=.82)=>{
-      if(!source)return;
-      // Le masque de la planche découpe les mèches : sans lui, chaque coupe est un bloc plein.
-      const masque=source.material?.map||null;
-      const mesh=new THREE.Mesh(fitToHead(source,headMesh,kind,marge),new THREE.MeshStandardMaterial({color,roughness,metalness:0,side:THREE.DoubleSide,map:masque,alphaTest:masque?.38:0}));
-      mesh.name=source.name;model.add(mesh);model.updateMatrixWorld(true);head.attach(mesh);
-    };
-    const casque=look.accessory==='casque';
-    if(look.hair&&!casque)attach(findHairMesh(r.hair,'Hair',look.hair,COIFFURES),look.color,.007);
-    if(look.beard)attach(findHairMesh(r.hair,'Beard',look.beard,BARBES),new THREE.Color(look.color).multiplyScalar(.85),.004);
-    if(casque){
-      // Un des casques de la boutique, tiré par joueur ; à défaut, le casque d'origine teinté.
-      const modele=r.casques.length?r.casques[Math.floor(tirage(look.graine??0,9)*r.casques.length)%r.casques.length]:null;
-      if(modele){
-        const box=new THREE.Box3().setFromBufferAttribute(headMesh.geometry.attributes.position);
-        const mesh=new THREE.Mesh(modele.geometry,modele.material);mesh.name='Casque';
-        modele.geometry.computeBoundingBox();
-        const forme=modele.geometry.boundingBox,echelle=(box.max.x-box.min.x)*CASQUE.largeur/(forme.max.x-forme.min.x);
-        mesh.scale.setScalar(echelle);
-        // ⚠️ LE CASQUE REGARDE DU MÊME CÔTÉ QUE LE VISAGE. Les modèles allégés ont le
-        // visage vers −Z (alleger_equipement.mjs), la tête du joueur vers +Z : posé
-        // tel quel, il était devant-derrière — la nuque du casque sur les yeux.
-        // Il est donc retourné d'un demi-tour, et ses décalages changent de signe.
-        mesh.rotation.y=Math.PI;
-        mesh.position.set((forme.min.x+forme.max.x)/2*echelle,box.max.y+CASQUE.dessus-forme.max.y*echelle,(box.min.z+box.max.z)/2-CASQUE.recul+(forme.min.z+forme.max.z)/2*echelle);
-        model.add(mesh);model.updateMatrixWorld(true);head.attach(mesh);
-      }else attach(r.hair.getObjectByName('Helmet_LOD2'),look.bandColor,.012,.6);
-    }
-    // Les crampons : la paire d'origine pour un joueur sur deux, un modèle de la boutique pour les autres.
-    if(r.crampons.length&&look.graine!==undefined&&tirage(look.graine,10)<.55){
-      const modele=r.crampons[Math.floor(tirage(look.graine,11)*r.crampons.length)%r.crampons.length];
-      let bottes=null;model.traverse(o=>{if(o.isSkinnedMesh&&/boot/.test(o.name))bottes=o;});
-      const pieds=['L','R'].map(c=>model.getObjectByName('CC_Base_'+c+'_Foot')).filter(Boolean);
-      if(bottes&&pieds.length===2){
-        const p=bottes.geometry.attributes.position,poses=[];
-        for(const pied of pieds){
-          const ou=model.worldToLocal(pied.getWorldPosition(new THREE.Vector3())),cote=Math.sign(ou.x)||1,b=new THREE.Box3();
-          for(let i=0;i<p.count;i++)if(p.getX(i)*cote>0)b.expandByPoint(tmp.set(p.getX(i),p.getY(i),p.getZ(i)));
-          if(!b.isEmpty())poses.push({pied,b});
-        }
-        if(poses.length===2){
-          bottes.visible=false;
-          for(const {pied,b} of poses){
-            const mesh=new THREE.Mesh(modele.geometry,modele.material);mesh.name='Crampon';
-            mesh.scale.setScalar((b.max.z-b.min.z)*CRAMPON.taille);mesh.position.set((b.min.x+b.max.x)/2,b.min.y,(b.min.z+b.max.z)/2);
-            model.add(mesh);model.updateMatrixWorld(true);pied.attach(mesh);
-          }
-        }
-      }
-    }
-    if(look.accessory==='bandeau')attach(r.hair.getObjectByName('Headband_LOD2'),look.bandColor,.014,.7);
-  }
+  const dress=(model,kind,look)=>habiller(r,model,kind,look);
   function buildActor(template,kind,kit,index,number,ref=false,wish={}){
     const model=clone(template),group=new THREE.Group(),look=appearance(index,wish,kind==='male_forward'&&!ref);model.updateMatrixWorld(true);
     const bounds=new THREE.Box3().setFromObject(model,true);model.position.y=-bounds.min.y;
+    if(look.morpho){appliquerMorpho(model,look.morpho);model.updateMatrixWorld(true);const apres=new THREE.Box3().setFromObject(model,true);model.position.y-=apres.min.y;}
     model.traverse(o=>{if(!o.isSkinnedMesh)return;o.frustumCulled=false;
       // Le corps utilise le shader de peau Unity, pas l'atlas du maillot.
       if(/body_|head_/.test(o.name)){o.material=o.material.clone();o.material.map=null;o.material.vertexColors=false;o.material.color.set(look.skin);o.material.roughness=.92;return;}
@@ -396,7 +436,9 @@ export async function creerScene3D(conteneur,options={}){
       const kind=p.number<=8?'male_forward':'male_back',kit=numeroter(tenues[p.team],p.shirt,renderer,tailleTenue);
       // Le tirage des traits manquants suit le nom : un joueur garde la même tête d'un match à l'autre.
       const index=p.source.nom?graine(p.source.nom)+p.team*31:p.shirt+p.team*31;
-      a=buildActor(p.number<=8?r.forward:r.back,kind,kit,index,p.shirt,false,{...souhait(p),accessoire:porteCasque(p)?'casque':tirage(index,7)>.93?'bandeau':''});
+      const voulu=souhait(p);
+      // Un joueur du jeu porte ce qu'il a équipé (et rien d'autre) ; les autres suivent le tirage de leur équipe.
+      a=buildActor(p.number<=8?r.forward:r.back,kind,kit,index,p.shirt,false,{...voulu,accessoire:voulu.equipe?(voulu.casque?'casque':''):porteCasque(p)?'casque':tirage(index,7)>.93?'bandeau':''});
       a.nom=nomCourt(p.source.nom||'');actors.set(p.id,a);
     }
     return a;
@@ -416,7 +458,7 @@ export async function creerScene3D(conteneur,options={}){
   function cadrer(){
     const l=Math.max(1,conteneur.clientWidth),h=Math.max(1,conteneur.clientHeight);
     if(l===largeur&&h===hauteur)return;largeur=l;hauteur=h;
-    camera.aspect=l/h;camera.fov=camera.aspect<.8?64:camera.aspect<1.2?56:48;camera.updateProjectionMatrix();renderer.setSize(l,h,false);
+    camera.aspect=l/h;camera.fov=(camera.aspect<.8?64:camera.aspect<1.2?56:48)+(leger?4:0);camera.updateProjectionMatrix();renderer.setSize(l,h,false);
   }
   const observateur=new ResizeObserver(cadrer);observateur.observe(conteneur);cadrer();
 
@@ -1033,17 +1075,28 @@ export async function creerScene3D(conteneur,options={}){
     // Le joueur est dans l'action : il porte, ou le ballon est tout près. Elle se resserre alors d'un sixième.
     const porte=match.carrier===options.moi;
     const impliquee=porte?1:clamp(1-(db-2)/9,0,1);
-    const zoomVoulu=1+.3*clamp((db-12)/30,0,1)-.15*impliquee+.06*clamp(sp/9,0,1);
-    J.zoom+=(zoomVoulu-J.zoom)*(1-Math.exp(-dt/.9));
+    // ⚠️ CAMÉRA DE JEU DE SPORT, PAS COLLÉE AU PERSONNAGE (Correctif 20) : on doit voir notre joueur, plusieurs coéquipiers,
+    // la ligne défensive, l'espace devant et les ailiers. Le zoom varie PEU et glisse (1,2 s) :
+    //   ballon très près → un peu plus près ; on reçoit → léger resserrement ; percée → on recule pour montrer l'espace ;
+    //   défense → large, pour voir le porteur ET ses soutiens.
+    const porteur=match.carrier?match.byId.get(match.carrier):null;
+    const defense=!!porteur&&porteur.team!==equipe;
+    const percee=porte&&sp>6.5;
+    const reception=!porteur&&db<9;
+    const zoomVoulu=1+.18*clamp((db-12)/30,0,1)-.08*impliquee-(reception?.06:0)+(percee?.14:0)+(defense?.1:0)+.05*clamp(sp/9,0,1);
+    J.zoom+=(zoomVoulu-J.zoom)*(1-Math.exp(-dt/1.2));
     const asp=camera.aspect<1?1.3:camera.aspect<1.5?1.1:1;
-    const dist=6.6*J.zoom*asp,haut=3.3*J.zoom*asp;
+    // Recul de base 11,8 m (6,6 avant) ; un téléphone (écran plus petit) recule encore de 12 % pour ne perdre ni un ailier ni un défenseur.
+    const recul=(options.reculCamera||1)*(leger?1.12:1);
+    const dist=11.8*J.zoom*asp*recul,haut=5.6*J.zoom*asp*recul;
     // Pas collée à son dos : un peu décalée de l'autre côté du ballon, pour qu'il reste lisible à côté du joueur.
     const droiteX=-fz,droiteZ=fx;
     const decal=clamp(-((B.x-P.x)*droiteX+(B.z-P.z)*droiteZ)*.07,-1.4,1.4)*(1-impliquee*.7);
     cible_J.set(P.x-fx*dist+droiteX*decal,Math.max(2.1,haut),P.z-fz*dist+droiteZ*decal);
     cible_J.x=clamp(cible_J.x,-37,37);cible_J.z=clamp(cible_J.z,-72,72);
-    const avance=7+.5*sp;
-    viser_J.set(P.x+fx*avance+(B.x-P.x)*.1,1,P.z+fz*avance+(B.z-P.z)*.1);
+    // On regarde plus loin devant : l'espace et la ligne défensive comptent plus que le dos du joueur.
+    const avance=12+.7*sp;
+    viser_J.set(P.x+fx*avance+(B.x-P.x)*.1,1.1,P.z+fz*avance+(B.z-P.z)*.1);
     if(!J.init||snap){J.pos.copy(cible_J);J.posV.set(0,0,0);J.look.copy(viser_J);J.lookV.set(0,0,0);J.init=true;}
     else{dampVector(J.pos,cible_J,J.posV,.24,real);dampVector(J.look,viser_J,J.lookV,.16,real);}
     camera.position.copy(J.pos);camera.lookAt(J.look);
@@ -1243,6 +1296,8 @@ export async function creerScene3D(conteneur,options={}){
     surRalenti:null,
     set moi(id){options.moi=id;},
     set suivreMoi(v){options.suivreMoi=v;},
+    /** Facteur de recul de la caméra du joueur (réglage du joueur, 1 par défaut). */
+    set reculCamera(v){options.reculCamera=v>0?Math.min(1.5,Math.max(.8,v)):1;},
     /** Les repères à poser sur la pelouse : `{ suggestion, horsPoste, passes: [{id, fort}], plaquage, visee: { arrivee, puissance } }`, ou `null`. */
     set reperes(v){reperes=v||null;},
     get reperes(){return reperes;},
@@ -1288,3 +1343,94 @@ export async function creerScene3D(conteneur,options={}){
   return api;
 }
 export { DestinyMatch,TICK };
+
+
+// ───────────────────────── APERÇU DU JOUEUR (Correctif 20) ─────────────────────────
+// Un joueur seul sur fond transparent, qui respire, qu'on tourne au doigt ou à la souris, et qui se
+// reconstruit à chaque changement (peau, coupe, barbe, morphologie, casque, crampons, maillot).
+// ⚠️ MÊME CODE QUE LE MATCH (`habiller`, `appliquerMorpho`, `appearance`) : ce qu'on voit ici EST ce qu'on verra sur le terrain.
+export async function creerApercuJoueur(conteneur,options={}){
+  const r=await charger();
+  const {motions}=r;
+  const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true,powerPreference:'default'});
+  renderer.setPixelRatio(Math.min(globalThis.devicePixelRatio||1,options.leger?1.5:2));
+  renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.1;
+  const toile=renderer.domElement;toile.style.cssText='display:block;width:100%;height:100%;touch-action:none;cursor:grab';
+  conteneur.prepend(toile);
+  const scene=new THREE.Scene();
+  scene.add(new THREE.HemisphereLight('#f3f7ff','#46503a',1.9));
+  const cle=new THREE.DirectionalLight('#fff4e0',2.2);cle.position.set(2.2,3.4,3.2);scene.add(cle);
+  const contre=new THREE.DirectionalLight('#9fc4ff',1.1);contre.position.set(-2.8,2.2,-2.6);scene.add(contre);
+  const camera=new THREE.PerspectiveCamera(28,1,.05,60);
+  const sol=new THREE.Mesh(new THREE.CircleGeometry(.75,40),new THREE.MeshBasicMaterial({color:'#0b1a12',transparent:true,opacity:.35,depthWrite:false}));sol.rotation.x=-Math.PI/2;sol.position.y=.002;scene.add(sol);
+  const groupe=new THREE.Group();scene.add(groupe);
+  let acteur=null,angle=options.angle??0,cible=angle,cadrage=options.cadrage||'corps',hauteurCorps=1.85,detruit=false,horloge=0,version=0,enGlisse=false,dernierX=0,optionsCourantes={};
+  let largeur=0,hauteur=0;
+  function cadrer(){
+    const l=Math.max(1,conteneur.clientWidth),h=Math.max(1,conteneur.clientHeight);
+    if(l!==largeur||h!==hauteur){largeur=l;hauteur=h;camera.aspect=l/h;renderer.setSize(l,h,false);}
+    // Le corps entier, ou le visage de près (pour choisir une coupe) ; plus de recul sur un écran étroit.
+    const H=hauteurCorps,marge=camera.aspect<.75?1.18:1;
+    const visage=cadrage==='visage';
+    const dist=(visage?H*.34:H*.84)/Math.tan(THREE.MathUtils.degToRad(camera.fov/2))*marge/(visage?1.55:1);
+    const cy=visage?H*.9:H*.5;
+    camera.position.set(0,cy+(visage?.02:H*.06),dist);camera.lookAt(0,cy,0);camera.updateProjectionMatrix();
+  }
+  async function construire(opt){
+    const mien=++version;
+    optionsCourantes=opt;
+    await chargerEquipementsDe({a:{equipement:opt.apparence?.equipement}},false);
+    if(detruit||mien!==version)return;
+    if(acteur){groupe.remove(acteur.model);}
+    const avant=!!opt.avant,kind=avant?'male_forward':'male_back',modele=clone(avant?r.forward:r.back);
+    const souhait=souhaitDepuisCarte(opt.apparence||{});
+    const look={...appearance(0,souhait,false),graine:0};
+    look.accessory=souhait.equipe?(souhait.casque?'casque':''):'';
+    modele.updateMatrixWorld(true);
+    const bornes=new THREE.Box3().setFromObject(modele,true);modele.position.y=-bornes.min.y;
+    if(look.morpho){appliquerMorpho(modele,look.morpho);modele.updateMatrixWorld(true);const apres=new THREE.Box3().setFromObject(modele,true);modele.position.y-=apres.min.y;}
+    const tenue=opt.maillot||{};
+    modele.traverse(o=>{if(!o.isSkinnedMesh)return;o.frustumCulled=false;
+      if(/body_|head_/.test(o.name)){o.material=o.material.clone();o.material.map=null;o.material.vertexColors=false;o.material.color.set(look.skin);o.material.roughness=.92;return;}
+      if(/shirt|short|sock|boot/.test(o.name)){o.material=o.material.clone();o.material.map=null;o.material.roughness=.85;
+        o.material.color.set(o.name.includes('shirt')?(tenue.principal||'#15317e'):o.name.includes('sock')?(tenue.chaussettes||tenue.principal||'#15317e'):o.name.includes('short')?(tenue.short||'#16203a'):'#202325');}
+    });
+    groupe.add(modele);groupe.updateMatrixWorld(true);
+    habiller(r,modele,kind,look);
+    const pose=preparePose(modele,motions.rigs[kind]);
+    const clip=motions.clips[options.pose||'menu_idle_breathing_legs_apart']||motions.clips.idle||motions.clips.light_idle;
+    acteur={model:modele,pose,clip};
+    applyPose(pose,clip,0,true);modele.updateMatrixWorld(true);
+    const total=new THREE.Box3().setFromObject(modele,true);
+    modele.position.y-=total.min.y;modele.updateMatrixWorld(true);
+    hauteurCorps=Math.max(1.4,total.max.y-total.min.y);
+    cadrer();
+  }
+  let trame=0;
+  function boucle(t){
+    if(detruit)return;
+    trame=requestAnimationFrame(boucle);
+    const dt=Math.min(.05,(t-horloge)/1000||0);horloge=t;
+    if(acteur){applyPose(acteur.pose,acteur.clip,t/1000,true);}
+    if(!enGlisse)angle+=(cible-angle)*Math.min(1,dt*8);
+    groupe.rotation.y=angle+Math.PI;
+    cadrer();renderer.render(scene,camera);
+  }
+  const bas=ev=>{enGlisse=true;dernierX=ev.clientX;toile.style.cursor='grabbing';toile.setPointerCapture?.(ev.pointerId);};
+  const bouge=ev=>{if(!enGlisse)return;const dx=ev.clientX-dernierX;dernierX=ev.clientX;angle+=dx*.012;cible=angle;};
+  const haut=ev=>{enGlisse=false;toile.style.cursor='grab';try{toile.releasePointerCapture?.(ev.pointerId);}catch{}};
+  toile.addEventListener('pointerdown',bas);toile.addEventListener('pointermove',bouge);toile.addEventListener('pointerup',haut);toile.addEventListener('pointercancel',haut);
+  const observateur=typeof ResizeObserver!=='undefined'?new ResizeObserver(()=>cadrer()):null;observateur?.observe(conteneur);
+  await construire(options);
+  trame=requestAnimationFrame(boucle);
+  return {
+    /** Reconstruit le joueur avec de nouvelles options (apparence, équipement, maillot, poste). */
+    async mettreAJour(opt){await construire({...optionsCourantes,...opt});},
+    /** 'face' | 'profil' | 'dos' | un angle en radians. */
+    orienter(cote){cible=typeof cote==='number'?cote:cote==='profil'?Math.PI/2:cote==='dos'?Math.PI:0;enGlisse=false;},
+    cadrer(mode){cadrage=mode==='visage'?'visage':'corps';cadrer();},
+    get angle(){return angle;},interne:{scene,renderer,camera,groupe},
+    recadrer:cadrer,
+    detruire(){detruit=true;cancelAnimationFrame(trame);toile.removeEventListener('pointerdown',bas);toile.removeEventListener('pointermove',bouge);toile.removeEventListener('pointerup',haut);toile.removeEventListener('pointercancel',haut);observateur?.disconnect();renderer.dispose();renderer.forceContextLoss?.();toile.remove();},
+  };
+}

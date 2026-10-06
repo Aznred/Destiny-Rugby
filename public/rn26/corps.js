@@ -49,6 +49,7 @@ export function appearance(index,souhait={},avant=false){
   // Le casque est une affaire d'avants ; le bandeau se voit partout.
   const accessoire=souhait.accessoire??(avant&&a<.14?'casque':a>.93?'bandeau':'');
   return {skin:souhait.couleurPeau??skins[peau],peau,famille,hair:coupe,beard:barbe,familleBarbe,color:teinte,accessory:accessoire,
+    teinteBarbe:souhait.teinteBarbe,casqueModele:souhait.casque,cramponsModele:souhait.crampons,equipe:!!souhait.equipe,morpho:souhait.morpho,
     bandColor:choisir(['#f2f2ee','#16181c','#1f4fa8','#c8202a','#f2f2ee'],tirage(index,8))};
 }
 const FAMILLES_CARTE={bald:'chauve',buzz:'ras',short:'court',fade:'court',mohawk:'court',messy:'miLong',mullet:'miLong',curly:'boucle',afro:'boucle',long:'long',dreadlocks:'long'};
@@ -66,6 +67,12 @@ export function souhaitDepuisCarte(a){
   if(a.coiffure&&FAMILLES_CARTE[a.coiffure]!==undefined)s.famille=FAMILLES_CARTE[a.coiffure];
   if(a.barbe&&BARBES_CARTE[a.barbe]!==undefined)s.familleBarbe=BARBES_CARTE[a.barbe];
   if(a.accessoire!==undefined)s.accessoire=a.accessoire;
+  // Correctif 20 : coupe et barbe EXACTES (numéro de maillage), couleur de barbe, équipement porté, morphologie.
+  if(a.coupeId!==undefined)s.coupe=a.coupeId;
+  if(a.barbeId!==undefined)s.barbe=a.barbeId;
+  if(a.couleurBarbe)s.teinteBarbe=a.couleurBarbe;
+  if(a.equipement){s.equipe=true;s.casque=a.equipement.casque||null;s.crampons=a.equipement.crampons||null;}
+  if(a.morpho)s.morpho=a.morpho;
   return s;
 }
 /** Le maillage demandé, ou le plus proche disponible dans la même famille. */

@@ -26,7 +26,7 @@ import { INDEX_BOUTON, LecteurManette, MANETTE_ABSENTE, type EtatManette, type T
 import { actionDeLaTouche, apprendreTouche, type ActionClavier } from './touches';
 import { lirePreferencesControle, ecrirePreferencesControle } from './prefs';
 import { tutorielsDesactives } from '../tutoriel/memoire';
-import { TutorielDirect, type SnapTuto } from './tutoriel';
+import { ExplicationsContextuelles, TutorielDirect, type SnapContexte, type SnapTuto } from './tutoriel';
 import { LARGEUR, sens } from '../moteur/terrain';
 import { PiloteResp, TOUCHES_BRUTES, type SnapResp } from './responsabilites';
 
@@ -95,6 +95,8 @@ export interface SnapPilotage {
   toast: { cle: string; n: number } | null;
   kick: { puissance: number } | null;
   tuto: SnapTuto | null;
+  /** L'explication contextuelle du moment (offload, ruck, passe au pied, placement), sans figer le match. */
+  ctx: SnapContexte | null;
   pause: boolean;
   /** Le poste que l'IA donnerait au joueur est connu (l'aide au placement a quelque chose à montrer). */
   aPoste: boolean;
@@ -204,6 +206,8 @@ export class PilotageDirect {
   tactile: EntreeTactile = { stick: { x: 0, y: 0 }, sprint: false, pied: null, file: [], actif: 0 };
   /** Le tutoriel d'entrée (premier contrôle). */
   tuto: TutorielDirect | null = null;
+  /** Les explications contextuelles : une phrase, le jour où la situation arrive. */
+  ctx: ExplicationsContextuelles | null = null;
 
   private clavier = new Clavier();
   private lecteur = new LecteurManette();
@@ -323,7 +327,8 @@ export class PilotageDirect {
         if (this.tEntree >= DUREE_ENTREE) {
           this.phase = 'actif';
           activerDirect(e, true);
-          if (!prefs.tutorielVu && !this.tuto && !tutorielsDesactives()) this.tuto = new TutorielDirect();
+          if (!prefs.tutorielVu && !this.tuto && !tutorielsDesactives()) this.tuto = new TutorielDirect(prefs.tutoSection);
+          if (!this.ctx && !tutorielsDesactives()) this.ctx = new ExplicationsContextuelles(prefs.tutosContext, (vus) => ecrirePreferencesControle({ tutosContext: vus }));
         }
         break;
       case 'actif':
@@ -460,7 +465,9 @@ export class PilotageDirect {
 
     // ── Le tutoriel regarde ce que le joueur fait, et l'aide ──────────────
     this.tuto?.surImage(e, moi, { dt, sprint: sprint && vue.libre, appareil: this.appareil, bouge: Math.hypot(mx, my) > 0.2 });
-    if (this.tuto?.fini) { ecrirePreferencesControle({ tutorielVu: true }); this.tuto = null; if (d.assistance) d.assistance.appelAssure = false; }
+    if (this.tuto?.fini) { ecrirePreferencesControle({ tutorielVu: true, tutoSection: 'tout' }); this.tuto = null; if (d.assistance) d.assistance.appelAssure = false; }
+    // Les explications contextuelles se taisent pendant le guide, une carte de rôle ou la pause.
+    this.ctx?.surImage(e, moi, dt, !!this.tuto || this.resp.fige || this.pause || tutorielsDesactives(), famillePoste(moi));
 
     // ── Ce que la scène dessine sur la pelouse ──────────────────────────────
     scene.reperes = this.reperes(e, moi, rep, kick, prefs.aidePlacement);
@@ -739,6 +746,7 @@ export class PilotageDirect {
       toast: this.toast ? { cle: this.toast.cle, n: this.toast.n } : null,
       kick: this.kickVise ? { puissance: Math.round(this.kickVise.puissance * 20) / 20 } : null,
       tuto: this.tuto?.snapshot() ?? null,
+      ctx: this.ctx?.snapshot() ?? null,
       pause: this.pause,
       aPoste: !!v?.suggestion,
       recharge: v ? (Object.entries(v.recharge) as [ActionDirecte, number][]).filter(([, s]) => s > 0).map(([a]) => a) : [],

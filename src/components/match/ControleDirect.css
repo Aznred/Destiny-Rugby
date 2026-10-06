@@ -15,14 +15,14 @@
 .cd {
   --cd-base: 1;
   --cd-taille: 1;
-  --cd-opa: 0.62;
+  --cd-opa: 0.5;
   --u: calc(var(--cd-taille) * var(--cd-base));
   --cd-marge-g: max(14px, env(safe-area-inset-left));
   --cd-marge-d: max(14px, env(safe-area-inset-right));
   --cd-marge-b: max(14px, env(safe-area-inset-bottom));
   --cd-or: #f4cd63;
   --cd-or-fonce: #d9a93a;
-  --cd-verre: rgba(5, 16, 10, calc(0.28 + var(--cd-opa) * 0.62));
+  --cd-verre: rgba(5, 16, 10, calc(0.12 + var(--cd-opa) * 0.5));
   --cd-contour: rgba(244, 205, 99, calc(0.22 + var(--cd-opa) * 0.5));
   position: absolute;
   inset: 0;
@@ -53,8 +53,8 @@
 }
 .cd-zone-stick { left: 0; bottom: 0; width: 48%; height: 70%; }
 .cd-zone-gestes { right: 0; bottom: 0; top: 16%; width: 54%; }
-.cd[data-gaucher='oui'] .cd-zone-stick { left: auto; right: 0; }
-.cd[data-gaucher='oui'] .cd-zone-gestes { right: auto; left: 0; }
+.cd[data-joy='droite'] .cd-zone-stick { left: auto; right: 0; }
+.cd[data-joy='droite'] .cd-zone-gestes { right: auto; left: 0; }
 /* Joystick fixe : la zone se resserre autour de sa base, le reste de l'écran redevient libre. */
 .cd-zone-stick[data-fixe='oui'] {
   width: calc(280px * var(--u));
@@ -74,7 +74,7 @@
   transition: opacity 0.18s ease;
   pointer-events: none;
 }
-.cd[data-gaucher='oui'] .cd-stick-base { left: calc(100% - var(--cd-marge-d) - 62px * var(--u) - 8px); }
+.cd[data-joy='droite'] .cd-stick-base { left: calc(100% - var(--cd-marge-d) - 62px * var(--u) - 8px); }
 .cd-zone-stick[data-fixe='oui'] .cd-stick-base { opacity: calc(0.4 + var(--cd-opa) * 0.4); }
 .cd-stick-base[data-actif] { opacity: 1 !important; }
 .cd-stick-anneau {
@@ -123,7 +123,7 @@
   width: 0;
   height: 0;
 }
-.cd[data-gaucher='oui'] .cd-commandes { right: auto; left: var(--cd-marge-g); }
+.cd[data-act='gauche'] .cd-commandes { right: auto; left: var(--cd-marge-g); }
 .cd-commandes[data-apercu='oui'] { opacity: 0.55; }
 .cd-commandes[data-apercu='oui'] .cd-bouton { pointer-events: none !important; }
 
@@ -155,7 +155,7 @@
   transition: transform 0.1s ease, background 0.12s ease, border-color 0.12s ease, opacity 0.2s ease, box-shadow 0.12s ease;
   animation: cd-entree 0.24s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
 }
-.cd[data-gaucher='oui'] .cd-bouton { right: auto; left: calc(var(--x) * 1px * var(--u)); }
+.cd[data-act='gauche'] .cd-bouton { right: auto; left: calc(var(--x) * 1px * var(--u)); }
 .cd-bouton > span {
   max-width: 96%;
   font-size: calc(9.5px * var(--u));
@@ -284,7 +284,7 @@
   touch-action: none;
   cursor: pointer;
 }
-.cd[data-gaucher='oui'] .cd-aide { left: auto; right: var(--cd-marge-d); }
+.cd[data-act='gauche'] .cd-aide { left: auto; right: var(--cd-marge-d); }
 .cd-aide[aria-pressed='true'] { color: var(--cd-or); border-color: var(--cd-or); }
 
 /* ── Le souffle ─────────────────────────────────────────────────────────────────────────────────────── */
@@ -546,7 +546,7 @@
 .cd-tuto-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 4px; flex-wrap: wrap; }
 
 /* Le guide du joystick : un anneau qui pulse là où le pouce doit se poser. */
-.cd[data-gaucher='oui'] .cd-guide-stick { left: auto; right: calc(var(--cd-marge-d) + 8px); }
+.cd[data-joy='droite'] .cd-guide-stick { left: auto; right: calc(var(--cd-marge-d) + 8px); }
 .cd-guide-stick {
   position: absolute;
   left: calc(var(--cd-marge-g) + 8px);
@@ -617,7 +617,7 @@
    (à droite). La carte d'accueil perd sa troisième ligne — le bouton « Passer » est juste dessous. */
 @media (max-height: 470px) {
   .cd-commandes { right: calc(var(--cd-marge-d) + 46px); }
-  .cd[data-gaucher='oui'] .cd-commandes { right: auto; left: var(--cd-marge-g); }
+  .cd[data-act='gauche'] .cd-commandes { right: auto; left: var(--cd-marge-g); }
   .cd-situation { top: 6px; }
   .cd-situation > span { padding: 3px 10px; font-size: 11px; }
   .cd-tuto { top: 40px; width: min(58%, 400px); padding: 6px 11px 6px; gap: 2px; }
@@ -646,3 +646,12 @@
   .cd-bouton, .cd-situation > span, .cd-indic, .cd-tuto, .cd-toast { animation: none; }
   .cd-bouton[data-guide='oui']::after, .cd-guide-stick { animation: none; opacity: 0.8; }
 }
+
+/* ── Correctif 20 : HUD contextuel — le terrain reste visible derrière ─────────────────────────────── */
+.cd-hint-swipe {
+  position: fixed; left: 50%; bottom: calc(max(10px, env(safe-area-inset-bottom)) + 8px); transform: translateX(-50%);
+  display: inline-flex; align-items: center; gap: 8px; padding: 4px 12px; border-radius: 999px;
+  font-size: 0.74rem; letter-spacing: 0.04em; color: rgba(244, 238, 220, 0.9); background: rgba(4, 12, 8, calc(0.2 + var(--cd-opa) * 0.3));
+  pointer-events: none; opacity: calc(0.35 + var(--cd-opa) * 0.4);
+}
+.cd[data-appareil='clavier'] .cd-hint-swipe, .cd[data-appareil='manette'] .cd-hint-swipe { display: none; }

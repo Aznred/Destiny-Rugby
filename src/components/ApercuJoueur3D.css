@@ -1,0 +1,12 @@
+.aj3d { position: relative; width: 100%; height: 100%; min-height: 220px; border-radius: 14px; overflow: hidden;
+  background: radial-gradient(ellipse at 50% 85%, rgba(63, 174, 102, 0.22), transparent 62%), linear-gradient(180deg, #0f2a21 0%, #0a1914 100%);
+  border: 1px solid rgba(240, 230, 200, 0.12); }
+.aj3d-toile { position: absolute; inset: 0; }
+.aj3d-attente { position: absolute; inset: 0; display: grid; place-items: center; color: var(--craie-dim, #cfd8c8); font-size: 0.9rem; letter-spacing: 0.04em; }
+.aj3d-repli { display: grid; place-items: center; padding: 1rem; text-align: center; color: var(--craie-dim, #cfd8c8); }
+.aj3d-cotes { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); display: flex; gap: 6px; padding: 4px;
+  background: rgba(6, 16, 12, 0.62); border-radius: 999px; backdrop-filter: blur(4px); }
+.aj3d-cotes button { min-height: 36px; padding: 0 14px; border: 0; border-radius: 999px; background: transparent; color: var(--craie, #f2ecd9);
+  font: inherit; font-size: 0.85rem; cursor: pointer; }
+.aj3d-cotes button.actif { background: var(--or, #d8a94a); color: #1a1408; }
+.aj3d-cotes button:focus-visible { outline: 2px solid var(--or, #d8a94a); outline-offset: 2px; }

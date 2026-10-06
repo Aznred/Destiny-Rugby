@@ -1,0 +1,30 @@
+.edap { display: grid; grid-template-columns: minmax(240px, 0.9fr) minmax(0, 1.4fr); gap: 1.2rem; align-items: start; }
+.edap-apercu { position: sticky; top: 12px; height: min(520px, 70vh); }
+.edap-apercu .aj3d { height: 100%; }
+.edap-cadre { position: absolute; top: 10px; right: 10px; min-height: 36px; padding: 0 12px; border-radius: 999px; border: 1px solid rgba(240, 230, 200, 0.25);
+  background: rgba(6, 16, 12, 0.62); color: var(--craie, #f2ecd9); font: inherit; font-size: 0.8rem; cursor: pointer; }
+.edap-onglets { display: flex; gap: 6px; margin-bottom: 0.9rem; border-bottom: 1px solid rgba(240, 230, 200, 0.14); }
+.edap-onglets button { min-height: 44px; padding: 0 16px; background: transparent; border: 0; border-bottom: 3px solid transparent; color: var(--craie-dim, #cfd8c8); font: inherit; cursor: pointer; }
+.edap-onglets button.actif { color: var(--craie, #f2ecd9); border-bottom-color: var(--or, #d8a94a); }
+.edap-panneau { display: grid; gap: 1rem; }
+.edap-panneau fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.edap-panneau legend { font-size: 0.82rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--craie-dim, #cfd8c8); margin-bottom: 0.45rem; padding: 0; }
+.edap-pastilles { display: flex; flex-wrap: wrap; gap: 8px; }
+.edap-pastilles button { width: 40px; height: 40px; border-radius: 50%; border: 2px solid rgba(240, 230, 200, 0.28); cursor: pointer; padding: 0; }
+.edap-pastilles button.actif { border-color: var(--or, #d8a94a); box-shadow: 0 0 0 2px #0a1914, 0 0 0 4px var(--or, #d8a94a); }
+.edap-pastilles .edap-meme { width: auto; border-radius: 999px; padding: 0 12px; background: transparent; color: var(--craie, #f2ecd9); font: inherit; font-size: 0.82rem; }
+.edap-choix { display: flex; flex-wrap: wrap; gap: 6px; }
+.edap-choix button { min-height: 40px; padding: 0 12px; border-radius: 10px; border: 1px solid rgba(240, 230, 200, 0.2); background: rgba(240, 230, 200, 0.05);
+  color: var(--craie, #f2ecd9); font: inherit; font-size: 0.85rem; cursor: pointer; }
+.edap-choix button.actif { background: var(--or, #d8a94a); border-color: var(--or, #d8a94a); color: #1a1408; }
+.edap-choix button:disabled { opacity: 0.55; cursor: default; }
+.edap-note { margin: 0; color: var(--craie-dim, #cfd8c8); font-size: 0.88rem; line-height: 1.45; }
+.edap-curseur { display: grid; grid-template-columns: minmax(110px, 0.9fr) 2fr 64px; gap: 10px; align-items: center; font-size: 0.9rem; }
+.edap-curseur input[type='range'] { width: 100%; min-height: 36px; accent-color: var(--or, #d8a94a); }
+.edap-curseur output { text-align: right; font-variant-numeric: tabular-nums; color: var(--craie-dim, #cfd8c8); }
+@media (max-width: 760px) {
+  .edap { grid-template-columns: 1fr; }
+  .edap-apercu { position: relative; top: 0; height: 320px; }
+  .edap-curseur { grid-template-columns: 1fr 64px; }
+  .edap-curseur span { grid-column: 1 / -1; }
+}

@@ -94,7 +94,7 @@ export function ReglagesControleDirect() {
     return () => window.removeEventListener('keydown', surTouche, true);
   }, [ecoute, prefs.touches]);
 
-  const commutateur = (cle: 'aidePlacement' | 'indications' | 'vibrations' | 'gaucher' | 'sprintAuBord' | 'souris' | 'aideTir' | 'conseilCapitaine', libelle: string, aide?: string) => (
+  const commutateur = (cle: 'aidePlacement' | 'indications' | 'vibrations' | 'hudSimple' | 'sprintAuBord' | 'souris' | 'aideTir' | 'conseilCapitaine', libelle: string, aide?: string) => (
     <div className="champ rcd-ligne">
       <label>
         <input type="checkbox" checked={prefs[cle]} onChange={(ev) => ecrirePreferencesControle({ [cle]: ev.target.checked })} />
@@ -163,7 +163,26 @@ export function ReglagesControleDirect() {
           onChange={(ev) => ecrirePreferencesControle({ opaciteHud: Number(ev.target.value) / 100 })}
         />
       </div>
-      {commutateur('gaucher', t('cd.reg.gaucher'), t('cd.reg.gaucher.aide'))}
+      {commutateur('hudSimple', t('cd.reg.hudSimple'), t('cd.reg.hudSimple.aide'))}
+      {([['positionJoystick', 'cd.reg.posJoystick', ['gauche', 'droite']], ['positionActions', 'cd.reg.posActions', ['gauche', 'droite']]] as const).map(([cle, libelle, valeurs]) => (
+        <div className="champ" key={cle}>
+          <label>{t(libelle)}</label>
+          <div className="choix-langue rcd-choix">
+            {valeurs.map((v) => (
+              <button key={v} type="button" className={prefs[cle] === v ? 'actif' : ''} aria-pressed={prefs[cle] === v}
+                onClick={() => ecrirePreferencesControle({ [cle]: v })}>
+                {t(v === 'gauche' ? 'cd.reg.gauche' : 'cd.reg.droite')}
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
+      <div className="champ rcd-curseur">
+        <label htmlFor="rcd-recul">{t('cd.reg.recul')} <b>{Math.round(prefs.reculCamera * 100)} %</b></label>
+        <input id="rcd-recul" type="range" min={85} max={135} step={5} value={Math.round(prefs.reculCamera * 100)}
+          onChange={(ev) => ecrirePreferencesControle({ reculCamera: Number(ev.target.value) / 100 })} />
+        <p className="aide">{t('cd.reg.recul.aide')}</p>
+      </div>
       <div className="champ">
         <label>{t('cd.reg.joystick')}</label>
         <div className="choix-langue rcd-choix">

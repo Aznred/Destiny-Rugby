@@ -18,6 +18,8 @@ import { Icone } from '../components/Icone';
 import { chantierVisible } from '../lib/modeDev';
 import { prendreLeModeDeCreation } from '../lib/tutoriel/intentions';
 import type { PosteId } from '../types';
+import { EditeurApparence } from '../components/EditeurApparence';
+import { apparencePourPoste, morphoConseillee, type ApparenceJoueur } from '../lib/apparenceJoueur';
 
 // ⚠️ L’ÂGE DE DÉPART EST BORNÉ, MAIS PAS PENDANT LA FRAPPE. Voir le champ
 // plus bas : c’est exactement ce qui le rendait impossible à changer.
@@ -128,6 +130,17 @@ export function Creation() {
   const [ageSaisi, setAgeSaisi] = useState(String(AGE_DEFAUT));
   const age = bornerAge(Number(ageSaisi) || AGE_DEFAUT);
   const [traits, setTraits] = useState<string[]>([]);
+  // L'apparence de départ : tirée une fois, puis tenue par le joueur. Tant qu'il n'a pas touché au physique, il suit le poste
+  // (pilier massif, demi de mêlée petit…) ; dès qu'il le règle lui-même, on n'y touche plus.
+  const [apparence, setApparence] = useState<ApparenceJoueur>(() => apparencePourPoste(poste, Math.floor(Math.random() * 99999)));
+  const [morphoTouchee, setMorphoTouchee] = useState(false);
+  const changerDePoste = (id: PosteId) => {
+    setPoste(id);
+    if (!morphoTouchee) setApparence((a) => ({ ...a, morpho: morphoConseillee(id) }));
+  };
+  const equipementActif = useGame((s) => s.equipementActif);
+  const equipementsAchetes = useGame((s) => s.equipements);
+  const basculerEquipement = useGame((s) => s.basculerEquipement);
 
   const changerDivision = (id: string) => {
     setDivisionId(id);
@@ -136,7 +149,7 @@ export function Creation() {
   };
 
   const valider = () => {
-    creerJoueur({ nom, poste, nation, club, division: divisionId, age, traits });
+    creerJoueur({ nom, poste, nation, club, division: divisionId, age, traits, apparence });
   };
 
   // Options des listes déroulantes (drapeaux, emojis de division, blasons)
@@ -304,7 +317,7 @@ export function Creation() {
                 key={p.id}
                 type="button"
                 className={`poste-carte ${poste === p.id ? 'actif' : ''}`}
-                onClick={() => setPoste(p.id)}
+                onClick={() => changerDePoste(p.id)}
               >
                 <div className="num">{p.numero}</div>
                 <div className="nom">{nomPoste(p.id)}</div>
@@ -313,6 +326,17 @@ export function Creation() {
               </button>
             ))}
           </div>
+        </div>
+
+        {/* Apparence : aperçu 3D en direct (teint, coupe, barbe, physique, équipement), à tourner de face, de profil et de dos. */}
+        <div className="champ" data-tuto="cr-apparence">
+          <label>{t('ap.titre')}</label>
+          <p className="champ-aide" style={{ marginBottom: '0.8rem' }}>{t('ap.chapo')}</p>
+          <EditeurApparence
+            apparence={apparence} poste={poste} nom={nom} club={club} onChange={setApparence}
+            equipementActif={equipementActif} equipements={equipementsAchetes} onEquiper={basculerEquipement}
+            onMorphoTouchee={() => setMorphoTouchee(true)}
+          />
         </div>
 
         {/* Traits de caractère : deux au maximum, pour toute la carrière. */}

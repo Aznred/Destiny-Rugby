@@ -16,6 +16,7 @@
 
 import { calendrier, classer, graine, scorePossible, resultatJoue, versionResultatsJoues, type LigneTableau, type MatchChampionnat } from './championnat.js';
 import { effectifDuClub, type Coequipier } from './effectif.js';
+import { baremeDeCompetition } from './bareme.js';
 import { POSTE_PAR_ID } from '../data/rugby.js';
 import { nomNation } from './nations.js';
 import { CALENDRIER, estAnneeDeCoupeDuMonde } from '../data/calendrier.js';
@@ -540,7 +541,7 @@ export function internationalEnDirect(
   const mondial = c.id === 'coupeDuMonde' ? mondialEnDirect(saison, jusqua) : null;
   return {
     id: c.id, nom: c.nom, emoji: c.emoji, equipes: c.equipes,
-    journees, classement: classer(c.equipes, journees),
+    journees, classement: classer(c.equipes, journees, baremeDeCompetition(c.id)),
     totalJournees: total, journeesJouees: jusqua,
     poules: mondial?.poules,
     bracket: mondial?.bracket,

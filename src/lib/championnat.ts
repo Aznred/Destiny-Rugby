@@ -10,6 +10,7 @@
 // tableau ne rejoue pas les matchs, et rien n'a besoin d'être sauvegardé.
 
 import { forceEffectif } from './effectif.js';
+import { BAREME_CLUBS, pointsDuMatch, type Bareme } from './bareme.js';
 import { clubsDeDivision } from './divisions.js';
 import { CALENDRIER, NB_JOURNEES, type Semaine, type TypeSemaine } from '../data/calendrier.js';
 import { clubParNom } from '../data/clubs.js';
@@ -332,7 +333,7 @@ export function jouerRencontre(
 
 // Classement au barème rugby (4 / 2 / 0, bonus offensif à 3 essais d'écart,
 // défensif à 7 points ou moins). Exporté : les poules de coupe s'en servent.
-export function classer(poule: string[], journees: MatchChampionnat[][]): LigneTableau[] {
+export function classer(poule: string[], journees: MatchChampionnat[][], bareme: Bareme = BAREME_CLUBS): LigneTableau[] {
   const stats = new Map<string, LigneTableau>();
   for (const club of poule) {
     stats.set(club, {
@@ -349,14 +350,13 @@ export function classer(poule: string[], journees: MatchChampionnat[][]): LigneT
       a.pour += m.scoreD; a.contre += m.scoreE;
       b.pour += m.scoreE; b.contre += m.scoreD;
 
-      if (m.scoreD > m.scoreE) { a.gagnes++; b.perdus++; a.points += 4; }
-      else if (m.scoreD < m.scoreE) { b.gagnes++; a.perdus++; b.points += 4; }
-      else { a.nuls++; b.nuls++; a.points += 2; b.points += 2; }
-
-      if (m.essaisD - m.essaisE >= 3) { a.points++; a.bonus++; }
-      if (m.essaisE - m.essaisD >= 3) { b.points++; b.bonus++; }
-      if (m.scoreD < m.scoreE && m.scoreE - m.scoreD <= 7) { a.points++; a.bonus++; }
-      if (m.scoreE < m.scoreD && m.scoreD - m.scoreE <= 7) { b.points++; b.bonus++; }
+      // Barème propre à la compétition : résultat + bonus, toujours séparés.
+      const pa = pointsDuMatch(bareme, m.scoreD, m.scoreE, m.essaisD, m.essaisE);
+      const pb = pointsDuMatch(bareme, m.scoreE, m.scoreD, m.essaisE, m.essaisD);
+      for (const [l, p] of [[a, pa], [b, pb]] as const) {
+        l.points += p.points; l.bonus += p.bonus;
+        if (p.resultat === 'victoire') l.gagnes++; else if (p.resultat === 'nul') l.nuls++; else l.perdus++;
+      }
     }
   }
   return [...stats.values()]

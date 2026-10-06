@@ -113,7 +113,8 @@ export function ControleDirect({ pilotage, surReprendre }: { pilotage: PilotageD
       className="cd"
       data-visible={snap.visible ? 'oui' : 'non'}
       data-appareil={snap.appareil}
-      data-gaucher={prefs.gaucher ? 'oui' : undefined}
+      data-joy={prefs.positionJoystick === 'droite' ? 'droite' : undefined}
+      data-act={prefs.positionActions === 'gauche' ? 'gauche' : undefined}
       data-pause={snap.pause ? 'oui' : undefined}
       data-modale={(snap.pause && snap.phase === 'actif') || snap.tuto?.carte || snap.resp.tuto ? 'oui' : undefined}
       style={style}
@@ -158,6 +159,12 @@ export function ControleDirect({ pilotage, surReprendre }: { pilotage: PilotageD
       )}
 
       {snap.tuto && <Tuto pilotage={pilotage} snap={snap} touches={prefs.touches} />}
+      {snap.ctx && !snap.tuto && !snap.pause && (
+        <div className="cd-tuto cd-tuto-ctx" role="status" key={snap.ctx.id} data-tuto="cd-contexte">
+          <b>{t(`${snap.ctx.cle}.titre`)}</b>
+          <p>{t(`${snap.ctx.cle}.texte`)}</p>
+        </div>
+      )}
       {snap.pause && snap.phase === 'actif' && (
         <PanneauPause snap={snap} touches={prefs.touches} surReprendre={surReprendre} />
       )}
@@ -408,6 +415,8 @@ function Commandes({ pilotage, snap, sprint }: {
   sprint: MutableRefObject<EtatSprint>;
 }) {
   const p = snap.possible;
+  // HUD contextuel (Correctif 20) : deux à quatre boutons, les passes se font par balayage.
+  const simple = usePreferencesControle().hudSimple;
   const guide = snap.tuto && !snap.tuto.carte && snap.tuto.visible ? snap.tuto.etape : null;
   const enRecharge = (a: keyof SnapPilotage['possible']) => snap.recharge.includes(a);
   const libre = snap.libre;
@@ -427,11 +436,14 @@ function Commandes({ pilotage, snap, sprint }: {
   const contact = snap.contactImminent;
 
   if (libre && snap.porte) {
-    if (p.passe) principal = <RoueDePasse pilotage={pilotage} offload={contact} guide={guide === 'passe'} eteinte={enRecharge('passe')} />;
+    // ⚠️ AVEC LE BALLON, EN HUD SIMPLE : CONTACT (raffut, percussion, protection du ballon), PIED et ESQUIVE ; la passe se fait
+    // d'un balayage gauche/droite (un balayage pendant un contact arme l'offload). Le drop n'apparaît que s'il est jouable.
+    if (!simple && p.passe) principal = <RoueDePasse pilotage={pilotage} offload={contact} guide={guide === 'passe'} eteinte={enRecharge('passe')} />;
     const offre: Record<IdBouton, boolean> = {
       raffut: p.raffut, crochet: p.crochet, pied: p.coupDePied, feinte: p.feinte, gratter: false, appel: false, drop: p.drop,
     };
-    for (const id of SATELLITES_BALLON[snap.famille]) {
+    const ordre: IdBouton[] = simple ? ['raffut', 'pied', 'crochet', 'drop'] : SATELLITES_BALLON[snap.famille];
+    for (const id of ordre) {
       if (!offre[id]) continue;
       satellites.push({ id, noeud: (place) => rendreSatellite(id, place) });
     }
@@ -448,7 +460,7 @@ function Commandes({ pilotage, snap, sprint }: {
       principal = (
         <BoutonRond
           place={PLACE_P} icone={icone} libelle={t(cle)} grand
-          guide={guide === 'plaquer' && p.plaquage}
+          guide={(guide === 'plaquer' && p.plaquage) || (guide === 'gratter' && p.grattage && !p.plaquage)}
           eteint={aucune ? enRecharge('appel') : p.plaquage ? enRecharge('plaquage') : p.grattage ? enRecharge('grattage') : false}
           allume={snap.arme === 'plaquage' && p.plaquage}
           onPress={() => pousser(pilotage, aucune ? { type: 'appel' } : { type: 'action' })}
@@ -467,16 +479,16 @@ function Commandes({ pilotage, snap, sprint }: {
         return (
           <BoutonRond
             key={id} place={place} icone="raffut"
-            libelle={t(snap.famille === 'avant' ? 'cd.act.percussion' : 'cd.act.raffut')}
-            guide={guide === 'duel'} eteint={enRecharge('raffut')} allume={snap.arme === 'raffut'}
+            libelle={t(simple ? 'cd.act.contact' : snap.famille === 'avant' ? 'cd.act.percussion' : 'cd.act.raffut')}
+            guide={guide === 'raffut'} eteint={enRecharge('raffut')} allume={snap.arme === 'raffut'}
             onPress={() => pousser(pilotage, { type: 'raffut' })}
           />
         );
       case 'crochet':
         return (
           <BoutonRond
-            key={id} place={place} icone="crochet" libelle={t('cd.act.crochet')}
-            guide={guide === 'duel'} eteint={enRecharge('crochet')} allume={snap.arme === 'crochet'}
+            key={id} place={place} icone="crochet" libelle={t(simple ? 'cd.act.esquive' : 'cd.act.crochet')}
+            guide={guide === 'crochet'} eteint={enRecharge('crochet')} allume={snap.arme === 'crochet'}
             onPress={() => pousser(pilotage, { type: 'crochet', cote: 0 })}
           />
         );
@@ -497,7 +509,7 @@ function Commandes({ pilotage, snap, sprint }: {
       case 'gratter':
         return (
           <BoutonRond
-            key={id} place={place} icone={p.grattage ? 'grattage' : 'soutien'}
+            key={id} place={place} icone={p.grattage ? 'grattage' : 'soutien'} guide={guide === 'gratter'}
             libelle={t(p.grattage ? 'cd.act.gratter' : 'cd.act.nettoyer')}
             eteint={p.grattage ? enRecharge('grattage') : false}
             onPress={() => pousser(pilotage, { type: 'gratter' })}
@@ -517,7 +529,8 @@ function Commandes({ pilotage, snap, sprint }: {
   // Les places : intérieur, puis extérieur. Le sprint garde SA place quoi qu'il arrive.
   const places = [...PLACES_INTERIEURES, ...PLACES_EXTERIEURES];
   return (
-    <div className="cd-commandes">
+    <div className="cd-commandes" data-simple={simple ? 'oui' : undefined}>
+      {simple && libre && snap.porte && p.passe && <div className="cd-hint-swipe" aria-hidden><Icone nom="passe-gauche" taille={16} /> {t('cd.hint.swipe')} <Icone nom="passe-droite" taille={16} /></div>}
       {libre && (
         <BoutonSprint pilotage={pilotage} place={PLACE_SPRINT} sprint={sprint} guide={guide === 'sprint'} allume={snap.sprint} />
       )}
@@ -902,7 +915,7 @@ function Tuto({ pilotage, snap, touches }: { pilotage: PilotageDirect; snap: Sna
   }
 
   return (
-    <div className="cd-tuto" data-valide={tuto.valide ? 'oui' : undefined} role="status" key={tuto.etape}>
+    <div className="cd-tuto" data-valide={tuto.valide ? 'oui' : undefined} role="status" key={tuto.etape} data-tuto="cd-etape">
       <span className="cd-tuto-etape">{t('cd.tuto.etape', { n: tuto.numero, total: tuto.total })}</span>
       {tuto.valide ? (
         <b className="cd-tuto-bravo"><Icone nom="check" taille={18} /> {t('cd.tuto.bravo')}</b>

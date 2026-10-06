@@ -1,4 +1,5 @@
 import { catalogueAdmin } from './atelierCatalogue.js';
+import { BAREME_CLUBS, pointsDuMatch } from '../bareme.js';
 import { statistiquesCarte } from './statistiquesCarte.js';
 import { rareteCarriere } from './catalogueCarriere.js';
 import { echelleFfrDuClub } from '../echelleNotesFfr.js';
@@ -901,8 +902,8 @@ function classementCompetition(etat: EtatCarriereEnLigne, competitionId: string 
     const r = rencontre.resultat!;
     for (const [id, points, contre, essais, essaisAdverses] of [[rencontre.domicile, r.pointsD, r.pointsE, r.essaisD, r.essaisE], [rencontre.exterieur, r.pointsE, r.pointsD, r.essaisE, r.essaisD]] as const) {
       const l = lignes.find(c => c.clubId === id)!; const victoire = points > contre, nul = points === contre;
-      const bonus = (essais - essaisAdverses >= 3 ? 1 : 0) + (!victoire && !nul && contre - points <= 7 ? 1 : 0);
-      l.joues++; l.gagnes += +victoire; l.nuls += +nul; l.perdus += +(!victoire && !nul); l.points += (victoire ? 4 : nul ? 2 : 0) + bonus;
+      const { points: gagnes, bonus } = pointsDuMatch(BAREME_CLUBS, points, contre, essais, essaisAdverses);
+      l.joues++; l.gagnes += +victoire; l.nuls += +nul; l.perdus += +(!victoire && !nul); l.points += gagnes;
       l.pour += points; l.contre += contre; l.difference = l.pour - l.contre; l.bonus += bonus;
     }
   }

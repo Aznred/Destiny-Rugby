@@ -62,7 +62,7 @@ export interface OptionsScene3D {
   /** Domicile d'abord : c'est son public qui remplit le stade. */
   equipes: [EquipeScene3D, EquipeScene3D];
   /** Par identifiant de pion : ce que la carte du joueur sait de son apparence. */
-  apparences?: Record<string, Pick<ApparenceMatch, 'peau' | 'cheveux' | 'coiffure' | 'barbe'>>;
+  apparences?: Record<string, Pick<ApparenceMatch, 'peau' | 'cheveux' | 'coiffure' | 'barbe' | 'coupeId' | 'barbeId' | 'couleurBarbe' | 'morpho' | 'equipement'>>;
   /** Le pion du joueur, cerclé sur la pelouse. */
   moi?: string;
   /** La caméra reste entre son pion et le ballon. */
@@ -113,6 +113,8 @@ export interface Scene3D {
   camera: Camera3D;
   moi: string | undefined;
   suivreMoi: boolean | number;
+  /** Recul de la caméra derrière le joueur (réglage du joueur, 1 par défaut). */
+  reculCamera: number;
   readonly ips: number;
   /** Les repères du contrôle direct, redessinés à chaque image ; `null` les éteint. */
   reperes: ReperesScene | null;
@@ -199,8 +201,30 @@ export function appareilLeger(): boolean {
   return tactile || Math.min(window.innerWidth, window.innerHeight) < 700;
 }
 
+/** Le joueur seul (création, personnalisation, profil) : voir `creerApercuJoueur` dans `public/rn26/scene.js`. */
+export interface OptionsApercuJoueur {
+  /** Apparence du match (`surchargeDeMatch`) : peau, cheveux, coupeId, barbeId, morpho, equipement… */
+  apparence?: Record<string, unknown>;
+  /** Couleurs du maillot porté. */
+  maillot?: { principal: string; secondaire?: string; short?: string; chaussettes?: string };
+  /** Un avant (1 à 8) ou un trois-quarts : deux modèles de corps. */
+  avant?: boolean;
+  cadrage?: 'corps' | 'visage';
+  angle?: number;
+  leger?: boolean;
+}
+export interface ApercuJoueur3D {
+  mettreAJour(options: Partial<OptionsApercuJoueur>): Promise<void>;
+  orienter(cote: 'face' | 'profil' | 'dos' | number): void;
+  cadrer(mode: 'corps' | 'visage'): void;
+  recadrer(): void;
+  readonly angle: number;
+  detruire(): void;
+}
+
 interface ModuleScene {
   creerScene3D: (conteneur: HTMLElement, options: unknown) => Promise<Scene3D>;
+  creerApercuJoueur: (conteneur: HTMLElement, options: OptionsApercuJoueur) => Promise<ApercuJoueur3D>;
 }
 let chargement: Promise<ModuleScene> | null = null;
 
@@ -233,6 +257,11 @@ function chargerModule(): Promise<ModuleScene> {
   return chargement;
 }
 
+export async function creerApercuJoueur(conteneur: HTMLElement, options: OptionsApercuJoueur): Promise<ApercuJoueur3D> {
+  const module = await chargerModule();
+  return module.creerApercuJoueur(conteneur, options);
+}
+
 export async function creerScene3D(conteneur: HTMLElement, options: OptionsScene3D): Promise<Scene3D> {
   const module = await chargerModule();
   return module.creerScene3D(conteneur, { outils: OUTILS_3D, ...options });
@@ -245,7 +274,7 @@ export function apparencesDesJoueurs(
   const sortie: NonNullable<OptionsScene3D['apparences']> = {};
   for (const j of joueurs) {
     const a = apparenceJoueurMatch(j.nom, j.poste);
-    sortie[j.id] = { peau: a.peau, cheveux: a.cheveux, coiffure: a.coiffure, barbe: a.barbe };
+    sortie[j.id] = { peau: a.peau, cheveux: a.cheveux, coiffure: a.coiffure, barbe: a.barbe, coupeId: a.coupeId, barbeId: a.barbeId, couleurBarbe: a.couleurBarbe, morpho: a.morpho, equipement: a.equipement };
   }
   return sortie;
 }

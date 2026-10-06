@@ -188,6 +188,8 @@ export interface Joueur {
   blessure?: Blessure | null; // blessure en cours
   mentorat?: boolean; // a pris un jeune sous son aile (30 ans et +)
   traits?: string[]; // traits de caractère choisis à la création
+  /** Apparence physique choisie à la création (teint, cheveux, barbe, morphologie). Absente des vieilles sauvegardes : tirage d'avant. */
+  apparence?: import('./lib/apparenceJoueur').ApparenceJoueur;
   capitaine?: boolean; // porte le brassard
   /**
    * Ce que le staff lui confie (Correctif 17) : hiérarchie, tee, engagement, drop, lancer en touche. Évalué à chaque intersaison par

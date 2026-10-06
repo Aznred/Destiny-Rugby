@@ -31,9 +31,11 @@ import { TEXTES_INTERFACE } from './textesInterface.js';
 import { TEXTES_INTERFACE_CORRECTIONS } from './textesInterfaceCorrections.js';
 import { TEXTES_CARTES_SPECIALES } from './textesCartesSpeciales.js';
 import { TEXTES_CONTROLE_DIRECT } from './textesControleDirect.js';
+import { TEXTES_TUTORIEL_JOUEUR_20 } from './textesTutorielJoueur20.js';
 import { TEXTES_RESPONSABILITES } from './textesResponsabilites.js';
 import { TEXTES_RESPONSABILITES_HUD } from './textesResponsabilitesHUD.js';
 import { TEXTES_TUTORIEL } from './textesTutoriel.js';
+import { TEXTES_APPARENCE } from './textesApparence.js';
 
 // ⚠️ LA TRADUCTION AUTOMATIQUE PASSE EN DERNIER — c'est-à-dire qu'elle est
 // écrasée par tout le reste. `scripts/traduire.ts` remplit les langues
@@ -78,9 +80,11 @@ const ECRIT_A_LA_MAIN: Record<string, Traduction> = {
   ...TEXTES_INTERFACE,
   ...TEXTES_CARTES_SPECIALES,
   ...TEXTES_CONTROLE_DIRECT,
+  ...TEXTES_TUTORIEL_JOUEUR_20,
   ...TEXTES_RESPONSABILITES,
   ...TEXTES_RESPONSABILITES_HUD,
   ...TEXTES_TUTORIEL,
+  ...TEXTES_APPARENCE,
 
   // --- NAVIGATION ---------------------------------------------------------
   'nav.accueil': { fr: 'Accueil', en: 'Home', es: 'Inicio', it: 'Home', de: 'Start', pt: 'Início', ja: 'ホーム' },

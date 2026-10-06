@@ -1819,7 +1819,7 @@ Fait avec 🏉 — thème artisanal, front soigné, sans rendu générique.
 
 La retransmission française utilise F5-TTS sur l'ordinateur via un service local. Lancer `Lancer voix F5.cmd` dans l'atelier `../test voice` ; instructions, limites et licences dans [VOIX_LOCALE.md](VOIX_LOCALE.md). La file et les textes de commentaires existants sont conservés.
 
-## Correctifs 16, 17 et 18 (octobre 2026)
+## Correctifs 16, 17, 18 et 20 (octobre 2026)
 
 ### Correctif 16 — le joueur conduit son pion
 - En carrière solo (match en 3D), le joueur **conduit** son personnage dès qu'il est sur le terrain : banc → caméra télé → remplacement animé → caméra derrière lui → commandes. Les vingt-neuf autres gardent l'IA par poste.
@@ -1837,3 +1837,12 @@ La retransmission française utilise F5-TTS sur l'ordinateur via un service loca
 - **Les responsabilités s'expliquent le jour où on les reçoit** (« Tu viens d'être nommé buteur… »). Les explications contextuelles (premier carton, carte spéciale, blessure, infirmerie, marché) attendent leur tour : jamais deux tutoriels à la fois.
 - Mobile soigné : bulle en feuille haut ou bas selon la cible, jamais hors écran, jamais sur l'élément expliqué. **Réglages → Tutoriels** : rejouer chaque guide, ou tout désactiver (les cartes du match aussi) sans rien perdre de ce qu'on a déjà vu.
 - Banc : `npm run verify:tutoriel` (textes dans les sept langues, ancres, 8 000 placements de bulle, mémoire).
+
+### Correctif 20 — le joueur, du HUD à l'apparence
+
+- **Barème de classement par compétition** (`src/lib/bareme.ts`) : victoire 4, nul 2, défaite 0, bonus offensif et défensif ajoutés séparément — jamais à la place des 2 points du nul. Chaque compétition déclare son barème (clubs : bonus offensif à 3 essais d'écart ; Six Nations, Coupe du monde et autres tournois : 4 essais marqués). Appliqué au championnat, aux coupes, au Six Nations, aux poules de Coupe du monde, à la ligue en ligne et à la carrière entraîneur. `npm run verify:bareme`.
+- **Sortie de match fiabilisée** : une machine à états (entrées coupées, boucle arrêtée, plein écran quitté, orientation stable, dimensions relues, écouteurs recréés, navigation) et un isolement de modales qui se compte (cause probable du gel après un match). Non essayé sur iPhone ni en PWA installée. `npm run verify:modales`.
+- **HUD mobile contextuel** : deux à quatre boutons (Sprint + Réclamer / Plaquer / Gratter sans ballon ; Contact, Pied, Esquive avec), passes par balayage, commandes plus transparentes, positions du joystick et des actions réglables, taille et opacité.
+- **Caméra plus large** derrière le joueur, encore plus sur téléphone, avec un zoom qui glisse selon la situation (réception, percée, défense) et un réglage de recul.
+- **Tutoriel de contrôle en dix étapes** (déplacement, sprint, placement, réclamer, passe, crochet, raffut, pied, plaquage, grattage), rejouable par partie depuis les Réglages, et des explications contextuelles (offload, ruck, passe au pied, placement).
+- **Apparence et équipement** : étape « Apparence » à la création (teint, coupes, couleur, barbe, morphologie bornée, aperçu 3D tournable en direct), « Personnaliser mon joueur » dans le profil, casque et crampons réellement portés par le modèle 3D du match comme de l'aperçu.

@@ -13,7 +13,8 @@ import { Icone, type NomIcone } from '../Icone';
 import { demarrer, rejouerLaFamille } from '../../lib/tutoriel/guide';
 import { desactiverLesTutoriels, usePreferencesTutoriel } from '../../lib/tutoriel/memoire';
 import { demanderLeModeDeCreation } from '../../lib/tutoriel/intentions';
-import { rejouerLeTutorielDirect } from '../../lib/controleDirect/prefs';
+import { rejouerLeTutorielDirect, rejouerLesRoles } from '../../lib/controleDirect/prefs';
+import type { SectionTuto } from '../../lib/controleDirect/tutoriel';
 import './ReglagesTutoriel.css';
 
 type Guide = 'general' | 'league' | 'player' | 'coach' | 'match';
@@ -29,6 +30,14 @@ const GUIDES: { id: Guide; icone: NomIcone; cle: string }[] = [
 export function ReglagesTutoriel({ onFermer }: { onFermer: () => void }) {
   const prefs = usePreferencesTutoriel();
   const [relance, setRelance] = useState<Guide | null>(null);
+  const [sectionRelancee, setSectionRelancee] = useState<string | null>(null);
+  /** Rejouer UNE partie du tutoriel de contrôle (elle revient à la prochaine entrée sur le terrain). */
+  const rejouerSection = (section: SectionTuto | 'roles'): void => {
+    desactiverLesTutoriels(false);
+    useGame.getState().setTutoMatchVu(false);
+    if (section === 'roles') rejouerLesRoles(); else rejouerLeTutorielDirect(section, false);
+    setSectionRelancee(section);
+  };
 
   const rejouer = (guide: Guide): void => {
     const jeu = useGame.getState();
@@ -80,6 +89,18 @@ export function ReglagesTutoriel({ onFermer }: { onFermer: () => void }) {
             <Icone nom={g.icone} taille={16} /> {t(g.cle)}
           </button>
         ))}
+      </div>
+      {/* Rejouer le tutoriel Carrière Joueur, par parties : commandes générales, attaque, défense, coups de pied, rôles spéciaux. */}
+      <div className="reglages-tuto-sections" role="group" aria-label={t('tg.reg.sections')} data-tuto="reglages-sections">
+        <p className="aide">{t('tg.reg.joueur')} · {t('tg.reg.sections')}</p>
+        <div className="reglages-tuto-boutons">
+          {(['tout', 'general', 'attaque', 'defense', 'pied', 'roles'] as const).map((s) => (
+            <button key={s} type="button" className="btn fantome petit" data-section={s} onClick={() => rejouerSection(s)}>
+              {t(`tg.reg.sec.${s}`)}
+            </button>
+          ))}
+        </div>
+        {sectionRelancee && <p className="aide reglages-tuto-relance" role="status">{t('tg.reg.sectionRelance')}</p>}
       </div>
       {relance === 'match' && <p className="aide reglages-tuto-relance" role="status">{t('tg.reg.matchRelance')}</p>}
     </div>

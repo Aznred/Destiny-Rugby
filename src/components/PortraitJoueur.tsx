@@ -14,34 +14,28 @@
 // FAIRE tourner le joueur à la souris : ce n'est plus une animation subie,
 // c'est le joueur qui regarde son avatar.
 
-import { Suspense, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
-import { Canvas } from '@react-three/fiber';
-import { ContactShadows, OrbitControls } from '@react-three/drei';
-import { Rugbyman3D } from './Rugbyman3D';
+import { ApercuJoueur3D } from './ApercuJoueur3D';
+import { EditeurApparence } from './EditeurApparence';
 import { useTenue } from '../lib/tenue';
+import { useGame } from '../store/useGame';
+import { POSTE_PAR_ID } from '../data/rugby';
+import { apparenceDepuisMatch, apparencePourApercu, apparenceValide } from '../lib/apparenceJoueur';
 import { modeAllege } from '../lib/modeles';
 import { useModalDialog } from '../lib/useModalDialog';
 import { t } from '../lib/i18n';
 import { Icone } from './Icone';
 import type { NomIcone } from './Icone';
 
-/**
- * ⚠️ DOIT VALOIR LA MÊME CHOSE QUE `TAILLE` DANS `Rugbyman3D.tsx`.
- * C'est la hauteur du personnage dans la scène : elle décide où viser pour
- * cadrer le visage, et où poser l'ombre au sol. Si le rugbyman change de
- * taille là-bas et pas ici, le portrait vise le torse ou le ciel.
- */
-const TAILLE = 5;
-
-function Lumieres() {
-  return (
-    <>
-      <ambientLight intensity={0.8} />
-      <directionalLight position={[3, 5, 4]} intensity={1.8} color="#fff2d0" />
-      <directionalLight position={[-4, 1, -3]} intensity={0.55} color="#3fae66" />
-    </>
+/** L'apparence que le match lit pour ce joueur, résolue ici pour ne pas attendre le registre du match. */
+function useApparenceResolue() {
+  const joueur = useGame((st) => st.joueur);
+  const equipementActif = useGame((st) => st.equipementActif);
+  return useMemo(
+    () => (joueur ? apparencePourApercu(joueur.nom, joueur.poste, joueur.apparence, equipementActif) : null),
+    [joueur, equipementActif],
   );
 }
 
@@ -52,8 +46,10 @@ export function PortraitJoueur({ repli = 'ballon' }: { repli?: NomIcone }) {
   const tenue = useTenue();
   const allege = useMemo(modeAllege, []);
   const [ouvert, setOuvert] = useState(false);
+  const apparence = useApparenceResolue();
+  const poste = useGame((st) => st.joueur?.poste);
 
-  if (allege || !tenue.nom) {
+  if (allege || !tenue.nom || !apparence) {
     return <div className="grand-avatar"><Icone nom={repli} taille={40} /></div>;
   }
 
@@ -66,30 +62,13 @@ export function PortraitJoueur({ repli = 'ballon' }: { repli?: NomIcone }) {
         aria-label={t('prof.voirJoueur')}
         onClick={() => setOuvert(true)}
       >
-        {/* ⚠️ LA VIGNETTE NE MONTRE QUE LE VISAGE. La caméra est posée à hauteur
-            de tête (le modèle est centré sur l'origine, la tête est donc en
-            haut) et le corps sort du cadre par le bas — c'est voulu : on veut
-            reconnaître son joueur, casque compris, pas admirer ses chaussures
-            dans une vignette de 130 px. */}
-        {/* ⚠️ C'EST LE JOUEUR QU'ON DESCEND, PAS LA CAMÉRA QU'ON MONTE. Une
-            caméra R3F vise TOUJOURS l'origine : posée à hauteur de tête, elle
-            regardait vers le bas et cadrait le torse. On descend donc le
-            personnage pour amener sa tête sur l'origine, et la caméra reste
-            droite, en face. */}
-        <Canvas
-          camera={{ position: [0, 0, 1.5], fov: 32 }}
-          dpr={[1, 1.5]}
-          gl={{ antialias: true, alpha: true }}
-        >
-          <Suspense fallback={null}>
-            <Lumieres />
-            {/* Le petit décalage en x recentre le visage : le personnage est
-                posé en trois-quarts, sa tête n'est donc pas sur l'axe. */}
-            <group position={[0.08, -TAILLE * 0.4, 0]}>
-              <Rugbyman3D tenue={tenue} />
-            </group>
-          </Suspense>
-        </Canvas>
+        {/* ⚠️ LA VIGNETTE NE MONTRE QUE LE VISAGE — casque, coupe, barbe et teint tels qu'ils seront sur le terrain.
+            C'est le MÊME lecteur que le match (`ApercuJoueur3D`) : deux modèles donneraient deux joueurs différents. */}
+        <ApercuJoueur3D
+          apparence={apparence} club={tenue.club} avant={(POSTE_PAR_ID[poste ?? 'arriere']?.numero ?? 15) <= 8}
+          cadrage="visage" cote="face" controles={false} className="portrait-joueur-3d"
+          repli={<Icone nom={repli} taille={40} />}
+        />
         <span className="portrait-loupe" aria-hidden="true"><Icone nom="plein-ecran" taille={15} /></span>
       </button>
 
@@ -98,17 +77,29 @@ export function PortraitJoueur({ repli = 'ballon' }: { repli?: NomIcone }) {
   );
 }
 
-/** Le joueur en entier, seul, sur fond de stade nocturne. */
+/** Le joueur en entier, seul : on le tourne, et on le personnalise (cheveux, barbe, couleurs, casque, crampons). */
 function VueEntiere({ onFermer }: { onFermer: () => void }) {
   const tenue = useTenue();
+  const joueur = useGame((st) => st.joueur);
+  const equipementActif = useGame((st) => st.equipementActif);
+  const equipements = useGame((st) => st.equipements);
+  const basculerEquipement = useGame((st) => st.basculerEquipement);
+  const personnaliserJoueur = useGame((st) => st.personnaliserJoueur);
+  const apparence = useApparenceResolue();
+  const [perso, setPerso] = useState(false);
   const { overlayRef, dialogRef } = useModalDialog(onFermer);
+  // Un joueur né avant l'étape « Apparence » s'ouvre sur ce qu'on voit déjà de lui.
+  const courante = useMemo(
+    () => (joueur ? (joueur.apparence ? apparenceValide(joueur.apparence, joueur.poste) : apparenceDepuisMatch(joueur.nom, joueur.poste)) : null),
+    [joueur],
+  );
 
   return createPortal(
     // ⚠️ `createPortal(document.body)` obligatoire : le `backdrop-filter` des
     // `.carte` crée un bloc conteneur qui piège les `position: fixed`.
     <div className="overlay" ref={overlayRef} onClick={onFermer}>
       <motion.div
-        className="carte modale modale-joueur"
+        className={`carte modale modale-joueur${perso ? ' modale-joueur-large' : ''}`}
         role="dialog"
         aria-modal="true"
         aria-label={tenue.nom}
@@ -117,37 +108,44 @@ function VueEntiere({ onFermer }: { onFermer: () => void }) {
         initial={{ opacity: 0, scale: 0.96 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.22 }}
+        style={perso ? { maxWidth: 'min(1000px, 96vw)', width: '96vw' } : undefined}
       >
         <div className="modale-joueur-tete">
           <div>
-            <div className="eyebrow">{t('prof.tonJoueur')}</div>
+            <div className="eyebrow">{perso ? t('perso.titre') : t('prof.tonJoueur')}</div>
             <h2>{tenue.nom}</h2>
           </div>
           <button type="button" className="btn fantome petit" onClick={onFermer}><Icone nom="croix" taille={17} /></button>
         </div>
 
-        <div className="modale-joueur-scene">
-          <Canvas
-            camera={{ position: [0, 0, 9.2], fov: 40 }}
-            dpr={[1, 2]}
-            gl={{ antialias: true, alpha: true }}
-          >
-            <Suspense fallback={null}>
-              <Lumieres />
-              <Rugbyman3D tenue={tenue} />
-              <ContactShadows position={[0, -TAILLE / 2 - 0.05, 0]} opacity={0.4} scale={8} blur={2.4} far={4} color="#04120a" />
-              {/* Ici seulement, la rotation est PILOTÉE : c'est le joueur qui
-                  tourne son avatar, pas une animation qui tourne toute seule. */}
-              <OrbitControls
-                enablePan={false}
-                enableZoom={false}
-                minPolarAngle={Math.PI / 2.6}
-                maxPolarAngle={Math.PI / 1.9}
-              />
-            </Suspense>
-          </Canvas>
-        </div>
-        <p className="aide">{t('prof.tournerAide')}</p>
+        {perso && joueur && courante ? (
+          <>
+            <p className="champ-aide" style={{ marginBottom: '0.8rem' }}>{t('perso.chapo')}</p>
+            <EditeurApparence
+              apparence={courante} poste={joueur.poste} nom={joueur.nom} club={joueur.club} morphoFigee
+              onChange={(a) => personnaliserJoueur({ peau: a.peau, coupe: a.coupe, couleurCheveux: a.couleurCheveux, barbe: a.barbe, couleurBarbe: a.couleurBarbe })}
+              equipementActif={equipementActif} equipements={equipements} onEquiper={basculerEquipement}
+            />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
+              <button type="button" className="btn primaire" onClick={() => setPerso(false)}>{t('perso.fermer')}</button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="modale-joueur-scene">
+              {apparence && joueur && (
+                <ApercuJoueur3D
+                  apparence={apparence} club={joueur.club} avant={(POSTE_PAR_ID[joueur.poste]?.numero ?? 15) <= 8}
+                  repli={<Icone nom="ballon" taille={40} />}
+                />
+              )}
+            </div>
+            <p className="aide">{t('prof.tournerAide')}</p>
+            <div style={{ display: 'flex', justifyContent: 'center', marginTop: '0.6rem' }}>
+              <button type="button" className="btn fantome" onClick={() => setPerso(true)} data-tuto="perso-bouton">{t('perso.bouton')}</button>
+            </div>
+          </>
+        )}
       </motion.div>
     </div>,
     document.body,

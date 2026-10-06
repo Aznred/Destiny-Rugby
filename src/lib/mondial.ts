@@ -4,6 +4,7 @@ import {
   type LigneTableau, type MatchChampionnat,
 } from './championnat.js';
 import type { MatchFinal } from './phaseFinale.js';
+import { baremeDeCompetition } from './bareme.js';
 import { forceNation, jouerTestMatch, qualifiesCoupeDuMonde } from './international.js';
 
 export const JOURNEES_POULES = 3;
@@ -180,26 +181,8 @@ function affichesDePoule(poule: string[]): [string, string][][] {
  * matchs, avec la règle du tournoi.
  */
 function classerMondial(equipes: string[], journees: MatchChampionnat[][]): LigneTableau[] {
-  const base = new Map(classer(equipes, journees).map((l) => [l.club, { ...l, points: 0, bonus: 0 }]));
-  for (const journee of journees) {
-    for (const m of journee) {
-      const a = base.get(m.domicile);
-      const b = base.get(m.exterieur);
-      if (!a || !b) continue;
-      if (m.scoreD > m.scoreE) a.points += 4;
-      else if (m.scoreD < m.scoreE) b.points += 4;
-      else { a.points += 2; b.points += 2; }
-      // Bonus offensif : quatre essais ou plus, victoire ou défaite.
-      if (m.essaisD >= 4) { a.points++; a.bonus++; }
-      if (m.essaisE >= 4) { b.points++; b.bonus++; }
-      // Bonus défensif : battu de sept points ou moins. Cumulable.
-      if (m.scoreD < m.scoreE && m.scoreE - m.scoreD <= 7) { a.points++; a.bonus++; }
-      if (m.scoreE < m.scoreD && m.scoreD - m.scoreE <= 7) { b.points++; b.bonus++; }
-    }
-  }
-  return [...base.values()]
-    .sort((x, y) => y.points - x.points || y.difference - x.difference || y.pour - x.pour)
-    .map((l, i) => ({ ...l, position: i + 1 }));
+  // Barème de la Coupe du monde (bareme.ts) : nul = 2 points, bonus en plus.
+  return classer(equipes, journees, baremeDeCompetition('coupeDuMonde'));
 }
 
 

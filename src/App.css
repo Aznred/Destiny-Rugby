@@ -9048,3 +9048,11 @@ select:focus {
   .x-mobile-marque strong { font-family: var(--police-forte); font-size: .95rem; }
   .x-app .x-tetes { top: calc(58px + env(safe-area-inset-top, 0px)); }
 }
+
+/* Sortie de match : plus aucune entrée tant que la machine à états (lib/sortieMatch.ts) déroule la séquence. */
+.overlay-match.ml-sortie { pointer-events: none; }
+.overlay-match.ml-sortie * { pointer-events: none !important; }
+
+/* Correctif 20 : l'aperçu 3D du joueur remplace l'ancien modèle dans la vignette du profil et la fenêtre « Ton joueur ». */
+.portrait-joueur .aj3d { min-height: 0; border: 0; border-radius: inherit; background: transparent; pointer-events: none; }
+.modale-joueur-scene .aj3d { min-height: 340px; }

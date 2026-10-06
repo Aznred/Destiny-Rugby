@@ -197,6 +197,7 @@ import { risqueDeBlessure, tirerBlessure, messageBlessure, deltasBlessure } from
 import { effetsTraits, MAX_TRAITS, TRAIT_PAR_ID } from '../data/traits';
 import { nouerRelations, bonusVestiaire, meriteLeBrassard } from '../lib/vestiaire';
 import { evaluerResponsabilites, ligneDeJournal, responsabilitesInitiales } from '../lib/responsabilites';
+import { apparenceValide, personnaliser } from '../lib/apparenceJoueur';
 import { interviewAleatoire, scenarioDuPool, type JugementMJ } from '../lib/ia';
 import { agentDe } from '../data/agents';
 import {
@@ -450,6 +451,7 @@ export interface CreationInput {
   division: string;
   age: number;
   traits?: string[];
+  apparence?: import('../lib/apparenceJoueur').ApparenceJoueur;
 }
 
 // Points d'attributs qu'on peut au maximum gagner via le MJ sur une saison.
@@ -1064,6 +1066,8 @@ interface GameState {
   setGroqKey: (k: string) => void;
   // carrière
   creerJoueur: (input: CreationInput) => void;
+  /** Personnalisation en carrière : cheveux, barbe, couleurs, teint. Taille, poids et carrure restent figés. */
+  personnaliserJoueur: (changement: Partial<Omit<import('../lib/apparenceJoueur').ApparenceJoueur, 'morpho' | 'morphoFigee'>>) => void;
   ajouterEntree: (e: Omit<EntreeJournal, 'id' | 'saison'>) => void;
   appliquerReponse: (r: ReponseMJ, actionJoueur: string) => void;
   saisonSuivante: () => void;
@@ -1415,6 +1419,12 @@ export const useGame = create<GameState>()(
       // thème) : `lib/groq.ts` ne peut pas importer le store sans cycle.
       setGroqKey: (groqKey) => { definirCleGroqJoueur(groqKey); set({ groqKey }); },
 
+      personnaliserJoueur: (changement) => set((s) => {
+        if (!s.joueur) return {};
+        const actuelle = apparenceValide(s.joueur.apparence, s.joueur.poste);
+        return { joueur: { ...s.joueur, apparence: personnaliser(actuelle, changement, s.joueur.poste) } };
+      }),
+
       creerJoueur: (input) => {
         // ⚠️ ON VALIDE À LA PORTE, PAS DANS L’ÉCRAN. `Creation` borne déjà
         //    l’âge et n’offre que les quinze postes, mais ce n’est pas le seul
@@ -1449,6 +1459,8 @@ export const useGame = create<GameState>()(
           nom: nomChoisi,
           poste: input.poste,
           traits: (input.traits ?? []).slice(0, MAX_TRAITS),
+          // L'apparence choisie à l'étape « Apparence » : validée à la porte, taille et carrure figées dès la création.
+          apparence: input.apparence ? { ...apparenceValide(input.apparence, input.poste), morphoFigee: true } : undefined,
           nation: input.nation,
           club: input.club,
           division: input.division,
