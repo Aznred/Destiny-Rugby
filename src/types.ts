@@ -184,6 +184,13 @@ export interface Joueur {
   saisonEnCours?: BilanEnCours;
   selections?: number; // nombre de capes internationales
   international?: import('./lib/rassemblements').ParcoursInternational;
+  /**
+   * ⚠️ LES RÉSULTATS DES MATCHS DE CLUB JOUÉS EN DIRECT (clé de la rencontre → score réel). Sans eux, le championnat
+   * rejouait le résultat THÉORIQUE du match que l'on venait de jouer : on finissait à 10-10 et le classement, le
+   * « dernier match » et le calendrier affichaient 21-15. Ils alimentent le registre de `lib/championnat.ts`
+   * (`enregistrerResultatJoue`) et sont rendus à la réhydratation. Absent des sauvegardes d'avant ce correctif.
+   */
+  resultatsClub?: Record<string, import('./lib/championnat').MatchChampionnat>;
   stats?: StatsDetaillees; // cumul de carrière
   blessure?: Blessure | null; // blessure en cours
   mentorat?: boolean; // a pris un jeune sous son aile (30 ans et +)

@@ -10560,3 +10560,24 @@ même Échap que la première, et celle du match appelle `quitter`. La fenêtre 
 remplaçant de son poste. Le banc vérifie que le joueur ne quitte jamais le terrain en pleine course, et que la fin du
 match simulée d'un coup est strictement identique à celle regardée à ×1.
 
+### Suite — ne plus quitter un match en cours, et le score affiché qui n'était pas le score joué
+
+Deux retours, une capture : « je veux pas qu'on puisse quitter le match sans simuler ou se faire remplacer », et un
+classement de Régionale 2 dont le « dernier match » disait 21-15 alors que le match s'était fini à 10-10.
+
+⚠️ **Le bug du score : un registre que la carrière joueur n'alimentait pas.** `jouerRencontre` rend le score
+théorique d'une rencontre (graine = clé) sauf si le registre des résultats joués en porte un. Le manager
+(`enregistrerResultatManager`) et les sélections y écrivaient ; `enregistrerMatchVecu`, lui, ne versait que les
+statistiques du joueur. Le journal disait « Match nul 10-10 », le tableau « 21-15 » : deux vérités. Le banc
+`verify:resultat-match` joue un vrai match, l'inscrit comme `MatchLive` et échoue sur l'ancien code (« le classement
+affiche le score JOUÉ (28-25), plus le théorique » : 18-0 joué, 28-25 affiché).
+⚠️ **Les clés d'une carrière sont celles de la suivante.** `reg2#1#0#club#adversaire` existe dans toute carrière qui
+commence en Régionale 2 : sans purge, un score joué se serait glissé dans la carrière suivante de la même session.
+Le registre est maintenant vidé à chaque création, retraite et réinitialisation.
+⚠️ **Fermer en plein match était gratuit** : la semaine n'avance qu'à la sirène, le match restait donc à rejouer. La
+croix, Échap et le clic hors du match ouvrent la fenêtre de sortie. Mesuré dans le navigateur : ✕ → fenêtre, Échap →
+la fenêtre s'ouvre puis se ferme, croix inactive pendant la simulation, et après « Simuler » + « Terminer » le
+« dernier match » du classement affiche 12-7, le score joué. (Un test trop rapide — Échap pressé dans la milliseconde
+qui suit la fermeture de la fenêtre — la voit encore ouverte : la ref suit le rendu, pas le clic. Sans conséquence à
+vitesse humaine.)
+

@@ -415,13 +415,16 @@ export function MatchLive({
   // ⚠️ ÉCHAP PAUSE LE MATCH QUAND ON LE CONDUIT, ET NE LE FERME QU'AUTREMENT : un seul écouteur, celui de la
   // fenêtre (`useModalDialog`, en phase de capture). Le pilote ignore Échap — voir l'en-tête du fichier.
   const pilotage = useRef<PilotageDirect | null>(null);
+  // ⚠️ ON NE QUITTE PAS UN MATCH EN COURS : la croix, Échap et le clic hors du match passent par `fermerOuSortir`, défini
+  // plus bas (il lit l'état du moteur, qui n'existe pas encore ici) et rendu par une ref.
+  const fermerOuSortirRef = useRef<() => void>(() => {});
   const echapper = useCallback(() => {
     // La fenêtre « se faire remplacer / simuler » se ferme avant que le match ne le fasse.
     if (sortieOuverteRef.current) { setSortieOuverte(false); return; }
     const p = pilotage.current;
     if (p?.actif) p.demanderPause();
-    else quitter();
-  }, [quitter]);
+    else fermerOuSortirRef.current();
+  }, []);
   const { overlayRef, dialogRef } = useModalDialog(echapper);
   const large = useLarge();
   // ⚠️ LA VUE EST CHOISIE AVANT LE COUP D'ENVOI, parce qu'elle règle la cadence
@@ -569,6 +572,20 @@ export function MatchLive({
   /** Le moteur joue seul le reste du match. Une ref : la boucle la lit à chaque image. */
   const [simulation, setSimulation] = useState(false);
   const simulationRef = useRef(false);
+  /**
+   * ⚠️ UN MATCH NE SE QUITTE PAS EN COURS DE ROUTE (demande explicite : « je veux pas qu'on puisse quitter le match
+   * sans simuler ou se faire remplacer »). Fermer en plein match ne coûtait rien — la semaine n'avançait pas, le
+   * match restait à rejouer : on pouvait donc le recommencer jusqu'à ce que ça tourne bien. Désormais la croix et
+   * Échap ouvrent la fenêtre de sortie, où les deux seules issues sont de se faire remplacer ou de simuler la fin.
+   * Deux exceptions, et elles ne rapportent rien : le match terminé (le bouton « Terminer » le ferme), et un match
+   * pas encore commencé — rien n'a été joué, il n'y a rien à refaire.
+   */
+  const fermerOuSortir = useCallback(() => {
+    if (simulationRef.current) return;
+    if (e.fini || e.sim < 0.5) { quitter(); return; }
+    setSortieOuverte(true);
+  }, [e, quitter]);
+  fermerOuSortirRef.current = fermerOuSortir;
   // --- 🕹️ LE CONTRÔLE DIRECT (Correctif 16) ---------------------------------------
   // Le pilote vit dans une ref (il est lu soixante fois par seconde par la boucle) ; son HUD s'abonne à son
   // cliché, il ne repasse donc pas par le rendu du match. La caméra choisie est relue par la boucle dans une
@@ -1320,6 +1337,10 @@ export function MatchLive({
         scorePour: chezMoi ? e.scoreA : e.scoreB,
         scoreContre: chezMoi ? e.scoreB : e.scoreA,
         domicile: chezMoi,
+        // ⚠️ LA CLÉ DE LA RENCONTRE : c'est elle qui fait entrer le score RÉEL dans le championnat (sinon le
+        // classement rejoue le score théorique : 10-10 joué, 21-15 affiché).
+        cle, equipe: chezMoi ? e.clubA : e.clubB,
+        essaisPour: chezMoi ? e.essaisA : e.essaisB, essaisContre: chezMoi ? e.essaisB : e.essaisA,
         // « Top 14 · 22 novembre · journée 7 » → « 22 novembre · journée 7 » :
         // le nom de la compétition est déjà partout ailleurs dans le journal.
         libelle: titre.split('·').slice(1).map((m) => m.trim()).filter(Boolean).join(' · ')
@@ -1336,7 +1357,7 @@ export function MatchLive({
       jaunes: e.discipline.jaunes,
       rouges: e.discipline.rouges,
     });
-  }, [e.fini, e, monPion, enregistrerMatchVecu, appliquerSanctionMatch, onTermine, titre]);
+  }, [e.fini, e, monPion, enregistrerMatchVecu, appliquerSanctionMatch, onTermine, titre, cle]);
 
   // --- LE RENDU DES PIONS ---------------------------------------------------
   // ⚠️ Interpolation exacte : le moteur avance par pas de 0,15 s, l'écran à
@@ -1592,7 +1613,7 @@ export function MatchLive({
   tutoRef.current = montrerTuto || guideFige;
 
   return createPortal(
-    <div ref={overlayRef} className="overlay-match" onClick={(ev) => { if (ev.target === ev.currentTarget) quitter(); }}>
+    <div ref={overlayRef} className="overlay-match" onClick={(ev) => { if (ev.target === ev.currentTarget) fermerOuSortir(); }}>
       <motion.div
         ref={dialogRef}
         className="match-live"
@@ -1632,7 +1653,7 @@ export function MatchLive({
               <Icone nom="repost" taille={16} />
             </button>
           )}
-          <button className="ml-fermer" onClick={quitter} disabled={sortie} title={t('ml.fermerAide')}><Icone nom="croix" taille={18} /></button>
+          <button className="ml-fermer" onClick={fermerOuSortir} disabled={sortie || simulation} title={t('ml.fermerAide')}><Icone nom="croix" taille={18} /></button>
         </header>
         <div className="ml-progression" title={titre}>
           <span style={{ width: `${Math.min(100, (e.t / 4800) * 100)}%` }} />
@@ -2572,6 +2593,7 @@ function FenetreSortie({ possibilite, avecJoueur, onRemplacer, onSimuler, onFerm
         onClick={(ev) => ev.stopPropagation()}
       >
         <h2 id="ml-sortie-titre">{t('ml.sortie.titre')}</h2>
+        <p className="ml-sortie-chapo">{t('ml.sortie.chapo')}</p>
         {avecJoueur && (
           <button type="button" className="ml-sortie-choix" ref={premier} disabled={!possibilite.possible} onClick={onRemplacer}>
             <Icone nom="repost" taille={22} />

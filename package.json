@@ -73,6 +73,7 @@
     "mesure:empreinte": "vite-node scripts/empreinteMoteur.ts",
     "verify:controle-direct": "vite-node scripts/verifierControleDirect.ts",
     "verify:vitesse-match": "vite-node scripts/verifierVitesseMatch.ts",
+    "verify:resultat-match": "vite-node scripts/verifierResultatMatchJoue.ts",
     "verify:carriere-existante": "vite-node -m banc-classement scripts/verifierCarriereExistante.ts",
     "verify:responsabilites": "vite-node scripts/verifierResponsabilites.ts",
     "verify:tutoriel": "vite-node scripts/verifierTutoriel.ts",

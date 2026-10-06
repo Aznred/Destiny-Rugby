@@ -4759,6 +4759,7 @@
   background: linear-gradient(168deg, var(--pelouse-700), var(--pelouse-800)); box-shadow: var(--ombre-1);
 }
 .ml-sortie-carte h2 { margin: 0 0 0.1rem; font-family: var(--police-titre); font-size: 1.25rem; }
+.ml-sortie-chapo { margin: 0 0 0.2rem; color: var(--craie-dim); font-size: 0.86rem; line-height: 1.45; }
 .ml-sortie-choix {
   display: grid; grid-template-columns: 26px 1fr; gap: 0.8rem; align-items: start; text-align: left;
   padding: 0.85rem 0.9rem; min-height: 56px; color: var(--craie); font: inherit; cursor: pointer;

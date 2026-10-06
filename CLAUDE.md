@@ -460,6 +460,23 @@ tirées minute par minute (`verifierBlessuresManager`). Le résultat est **ident
 (banc). ⚠️ La fenêtre vit DANS le match, pas dans un second portail : deux `useModalDialog` empilés reçoivent chacun
 Échap, et celui du match le fermait en entier — `echapper` ferme d'abord la fenêtre de sortie.
 
+⚠️ **ON NE QUITTE PAS UN MATCH EN COURS** (`fermerOuSortir`, `MatchLive`) : la croix, Échap et le clic hors du match
+ouvrent la fenêtre de sortie tant que le match n'est pas fini — fermer en plein match ne coûtait rien (la semaine
+n'avance qu'à la sirène, le match restait à rejouer) : on pouvait le recommencer jusqu'à ce que ça tourne bien. Deux
+exceptions qui ne rapportent rien : le match terminé (« Terminer »), et un match pas commencé (`e.sim < 0.5`, rien à
+refaire). Pendant la simulation la croix est inactive.
+
+⚠️ **LE SCORE RÉEL D'UN MATCH DE CLUB ENTRE DANS LE CHAMPIONNAT** (`enregistrerMatchVecu` +
+`Joueur.resultatsClub`). Le championnat rejoue un score THÉORIQUE (`jouerRencontre`, graine = clé de la rencontre)
+tant qu'aucun résultat n'est inscrit sous cette clé dans le registre des résultats joués : le manager et les
+sélections l'alimentaient, pas la carrière joueur — on finissait à 10-10 et le classement affichait 21-15.
+`MatchLive` passe maintenant la clé, l'équipe et les essais ; le store inscrit le résultat (départage de trois
+points en match couperet, comme pour le manager), le persiste dans la fiche, le rend à la réhydratation et
+`oublierResultats()` purge les fins de saison mémoïsées. ⚠️ **Les clés (`division#saison#journée#…`) sont celles de la
+carrière suivante** : `creerJoueur`, `creerJoueurExistant`, `prendreRetraite`, `creerManager` et `reinitialiser`
+effacent donc le registre. Banc : `npm run verify:resultat-match` (échoue sur l'ancien code). En développement,
+`globalThis.__useGame` donne le store aux scripts de test.
+
 ### Le match en trois dimensions
 
 Les matchs de carrière (`MatchLive`) et le direct d'une ligue en ligne
@@ -1486,6 +1503,7 @@ npm run verify:triche             # 40 tentatives de triche, toutes refusées
 npm run verify:cartes-speciales   # ICONS, Halloween, Labo, imports (292 contrôles, ~2 min)
 npm run verify:tutoriel           # le tutoriel guidé : textes, ancres, placement des bulles, mémoire (30 700 contrôles)
 npm run verify:vitesse-match      # ×1 à ×10, remplacement et simulation : même match quelle que soit la vitesse (132 contrôles, ~75 s)
+npm run verify:resultat-match     # le score joué entre au classement, persisté, rechargé, effacé (18 contrôles)
 npm run verify:carriere-existante # joueur existant : hors classement, carte intacte, monde sans son double (101 contrôles)
 
 npx vite-node scripts/verif.ts    # banc général : divisions, effectifs, 8 saisons

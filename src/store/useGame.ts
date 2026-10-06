@@ -192,7 +192,7 @@ import { phaseFinale, type MatchFinal, type PhaseFinale } from '../lib/phaseFina
 import {
   championnatEnDirect, journeesApres, nombreJournees, graine, rangFinal,
   estAmateur, weekEndsJoues, totalWeekEnds, poulesDe, indexPoule,
-  enregistrerResultatJoue, setResultatsJoues, effacerResultatsJoues, jouerRencontre,
+  enregistrerResultatJoue, setResultatsJoues, effacerResultatsJoues, jouerRencontre, type MatchChampionnat,
 } from '../lib/championnat';
 import {
   compositionManagerParDefaut, reconcilerCompositionManager, TACTIQUE_MANAGER_DEFAUT, EFFECTIF_MINIMUM,
@@ -1198,6 +1198,11 @@ interface GameState {
     contexte?: {
       adversaire: string; scorePour: number; scoreContre: number;
       domicile: boolean; libelle: string;
+      /**
+       * La rencontre jouée : sa clé dans le championnat, ses essais, et l'équipe pour laquelle on a joué. ⚠️ Sans la
+       * clé, le résultat du match n'entre nulle part : le classement rejoue le score théorique.
+       */
+      cle?: string; essaisPour?: number; essaisContre?: number; equipe?: string;
     },
   ) => void;
   matchRegarde: string; // « saison#semaine » du dernier match suivi en direct
@@ -1297,6 +1302,29 @@ async function personnaliserReponseNegociation(pseudo: string, id: string, conte
   } catch {
     // La réponse locale déjà affichée reste disponible hors ligne ou sans quota.
   }
+}
+
+/**
+ * Le score d'une rencontre de club telle que le classement doit la retenir.
+ *
+ * ⚠️ PAS DE NUL EN MATCH COUPERET : le départage (trois points) est décidé une fois, par la clé, comme pour le manager
+ * (`enregistrerResultatManager`) — le tableau final et la suite du tableau ne peuvent pas diverger.
+ */
+function resultatDeLaRencontre(
+  cle: string, equipe: string, adversaire: string, domicile: boolean,
+  scorePour: number, scoreContre: number, essaisPour: number, essaisContre: number,
+): MatchChampionnat {
+  if (/^(phase|coupe|acces|tournoi)#/.test(cle) && scorePour === scoreContre) {
+    if (graine(`departage#${cle}`)() < 0.5) scorePour += 3; else scoreContre += 3;
+  }
+  return {
+    domicile: domicile ? equipe : adversaire,
+    exterieur: domicile ? adversaire : equipe,
+    scoreD: domicile ? scorePour : scoreContre,
+    scoreE: domicile ? scoreContre : scorePour,
+    essaisD: domicile ? essaisPour : essaisContre,
+    essaisE: domicile ? essaisContre : essaisPour,
+  };
 }
 
 /**
@@ -1551,6 +1579,9 @@ export const useGame = create<GameState>()(
         // aucun transfert annoncé sur L'Ovale ne traîne.
         setMouvementsClubs({});
         setArriveesClubs({});
+        // ⚠️ ET PLUS AUCUN SCORE JOUÉ : les clés (`division#saison#journée#…`) sont celles de la carrière suivante — un
+        // résultat de la précédente s'y serait glissé.
+        effacerResultatsJoues();
         // La pyramide repart de zéro : les fins de saison mémoïsées et le contexte
         // du joueur précédent sont périmés (voir lib/promotion.ts).
         oublierResultats();
@@ -1568,6 +1599,7 @@ export const useGame = create<GameState>()(
         // Nouvelle carrière = pyramide d'origine, et plus aucun transfert annoncé : comme `creerJoueur`.
         setMouvementsClubs({});
         setArriveesClubs({});
+        effacerResultatsJoues();
         oublierResultats();
         setContexteJoueur('', 0);
         setTransfertsSociaux([]);
@@ -3650,6 +3682,7 @@ export const useGame = create<GameState>()(
         setContexteJoueur('', 0);
         // Il raccroche : son double reprend sa place dans le monde (ou n'y est plus, s'il était créé).
         setJoueurIncarne(null);
+        effacerResultatsJoues();
         set((s) => ({
           pantheon: [...s.pantheon, legende],
           // Le succès « Entrer au Hall » se décerne ici : juste après, il n'y a
@@ -3733,6 +3766,7 @@ export const useGame = create<GameState>()(
         const prestige = depuis ? prestigeDepuisJoueur(depuis) : PRESTIGE_DEBUT;
         // Plus de joueur incarné : le monde reprend tous ses joueurs avant qu'on lise un effectif.
         setJoueurIncarne(null);
+        effacerResultatsJoues();
         const force = forceEffectif(club, 1);
         const objectif = objectifDuBoard(club, comp, 1);
         const budgets = budgetsDuClub(club, 1);
@@ -5646,6 +5680,7 @@ export const useGame = create<GameState>()(
 
       reinitialiser: () => {
         setJoueurIncarne(null);
+        effacerResultatsJoues();
         setMouvementsClubs({});
         setArriveesClubs({});
         // La pyramide repart de zéro : les fins de saison mémoïsées et le contexte
@@ -6534,6 +6569,20 @@ export const useGame = create<GameState>()(
             enregistrerResultatJoue(inter.match.cle, match);
           }
         }
+        // ⚠️ LE SCORE RÉEL DU MATCH DE CLUB ENTRE DANS LE CHAMPIONNAT. Le tableau, le « dernier match » et le calendrier
+        // rejouent un score théorique (`jouerRencontre`) tant qu'aucun résultat n'est enregistré sous la clé de la
+        // rencontre : on finissait à 10-10 et l'écran affichait 21-15. La rencontre internationale a son propre
+        // chemin plus haut ; ici, tout le reste — championnat, phase finale, coupe.
+        let resultatClub = false;
+        if (contexte?.cle && contexte.cle !== inter.match?.cle) {
+          const match = resultatDeLaRencontre(
+            contexte.cle, contexte.equipe ?? j.club, contexte.adversaire, contexte.domicile,
+            contexte.scorePour, contexte.scoreContre, contexte.essaisPour ?? 0, contexte.essaisContre ?? 0,
+          );
+          enregistrerResultatJoue(contexte.cle, match);
+          j = { ...j, resultatsClub: { ...(j.resultatsClub ?? {}), [contexte.cle]: match } };
+          resultatClub = true;
+        }
         if (retour.attribut) {
           j = {
             ...j,
@@ -6593,6 +6642,8 @@ export const useGame = create<GameState>()(
             deltas: retour.deltas,
           }],
         }));
+        // Les fins de saison mémoïsées (promotions, phases finales) ont été calculées sur le score théorique.
+        if (resultatClub) oublierResultats();
         if (s.essais > 0) get().signalerDefi('essai');
         if (s.plaquages >= 8) get().signalerDefi('plaquages');
         if (s.butsReussis > 0) get().signalerDefi('transformation');
@@ -7473,6 +7524,7 @@ export const useGame = create<GameState>()(
           },
         })));
         for (const [cle, match] of Object.entries(etat?.joueur?.international?.resultats ?? {})) enregistrerResultatJoue(cle, match);
+        for (const [cle, match] of Object.entries(etat?.joueur?.resultatsClub ?? {})) enregistrerResultatJoue(cle, match);
         for (const [cle, match] of Object.entries(etat?.manager?.avancee?.selection?.resultats ?? {})) enregistrerResultatJoue(cle, match);
         // ⚠️ Le thème vit sur <html>, pas dans React : il faut le reposer à la
         // réhydratation, sinon le site repart en vert à chaque rechargement.
@@ -7578,6 +7630,10 @@ export const useGame = create<GameState>()(
     },
   ),
 );
+
+// Aperçus et essais dans le navigateur (développement seulement, retiré du build) : de quoi poser une carrière à la
+// semaine voulue depuis un script de test, sans cliquer vingt semaines d'événements (voir `window.__tutoriel`).
+if (import.meta.env.DEV) (globalThis as { __useGame?: unknown }).__useGame = useGame;
 
 /**
  * ⚠️ ET LE COMPTE SE RÉÉCRIT QUAND IL BOUGE, PAS QUAND LA PARTIE BOUGE.
