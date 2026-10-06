@@ -10,6 +10,7 @@ import { nomNation } from './nations.js';
 import { EFFECTIFS_REELS } from '../data/effectifsReels.js';
 import { POSTE_PAR_ID } from '../data/rugby.js';
 import { noteALAge } from './effectif.js';
+import { estJoueurIncarne, versionJoueurIncarne } from './joueurIncarne.js';
 // ⚠️ `international.ts` n'importe PAS `selection.ts` : le sens unique est
 // vérifié, il n'y a pas de cycle. C'est lui qui sait écrire « Galles U20 ».
 import { equipeU20 } from './international.js';
@@ -46,13 +47,16 @@ export function niveauInternational(j: Joueur): number {
 const cacheConcurrence = new Map<string, number[]>();
 
 function meilleursDuPays(nation: string, famille: string, saison: number): number[] {
-  const cle = nation + '#' + famille + '#' + saison;
+  // ⚠️ LA VERSION DU JOUEUR INCARNÉ FAIT PARTIE DE LA CLÉ (Correctif 19) : changer de carrière change le vivier.
+  const cle = nation + '#' + famille + '#' + saison + '#' + versionJoueurIncarne();
   const memo = cacheConcurrence.get(cle);
   if (memo) return memo;
   const notes: number[] = [];
   for (const effectif of Object.values(EFFECTIFS_REELS)) {
     for (const joueur of effectif) {
       if (joueur.poste !== famille) continue;
+      // On ne se dispute pas la place avec son propre double : le joueur incarné n'est pas un concurrent.
+      if (estJoueurIncarne(joueur.nom)) continue;
       if (nomNation(joueur.nation) !== nation) continue;
       // Le concurrent vieillit lui aussi d'une saison à l'autre.
       notes.push(noteALAge(joueur.note, joueur.age, joueur.potentiel, joueur.age + saison - 1, 0.5));
@@ -94,13 +98,14 @@ const REMISE_U20 = 15;
 const cacheEspoirs = new Map<string, number[]>();
 
 function meilleursEspoirs(nation: string, famille: string, saison: number): number[] {
-  const cle = 'u20#' + nation + '#' + famille + '#' + saison;
+  const cle = 'u20#' + nation + '#' + famille + '#' + saison + '#' + versionJoueurIncarne();
   const memo = cacheEspoirs.get(cle);
   if (memo) return memo;
   const notes: number[] = [];
   for (const effectif of Object.values(EFFECTIFS_REELS)) {
     for (const joueur of effectif) {
       if (joueur.poste !== famille) continue;
+      if (estJoueurIncarne(joueur.nom)) continue;
       if (nomNation(joueur.nation) !== nation) continue;
       const age = joueur.age + saison - 1;
       if (age > AGE_MAX_U20) continue;

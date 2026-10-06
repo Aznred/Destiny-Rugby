@@ -33,6 +33,7 @@ import { TEXTES_CARTES_SPECIALES } from './textesCartesSpeciales.js';
 import { TEXTES_CONTROLE_DIRECT } from './textesControleDirect.js';
 import { TEXTES_TUTORIEL_JOUEUR_20 } from './textesTutorielJoueur20.js';
 import { TEXTES_RESPONSABILITES } from './textesResponsabilites.js';
+import { TEXTES_CARRIERE_EXISTANTE } from './textesCarriereExistante.js';
 import { TEXTES_RESPONSABILITES_HUD } from './textesResponsabilitesHUD.js';
 import { TEXTES_TUTORIEL } from './textesTutoriel.js';
 import { TEXTES_APPARENCE } from './textesApparence.js';
@@ -82,6 +83,7 @@ const ECRIT_A_LA_MAIN: Record<string, Traduction> = {
   ...TEXTES_CONTROLE_DIRECT,
   ...TEXTES_TUTORIEL_JOUEUR_20,
   ...TEXTES_RESPONSABILITES,
+  ...TEXTES_CARRIERE_EXISTANTE,
   ...TEXTES_RESPONSABILITES_HUD,
   ...TEXTES_TUTORIEL,
   ...TEXTES_APPARENCE,

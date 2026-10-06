@@ -1,0 +1,76 @@
+/* LA SÉLECTION D'UN JOUEUR EXISTANT (Correctif 19) — filtres, cartes, confirmation.
+   Paliers du projet : 560 / 700 / 760 / 1120 / 1121+. Les cartes gardent leur proportion 2/3 (`cqw`) :
+   on ne règle que la largeur de la colonne. */
+.sje { display: grid; gap: 1rem; }
+.sje-titre { margin: 0; font-family: var(--police-titre); font-size: clamp(1.3rem, 3.6vw, 1.8rem); }
+.sje-chapo { margin: 0; color: var(--craie-dim); max-width: 64ch; }
+
+.sje-filtres {
+  display: grid;
+  grid-template-columns: minmax(220px, 2fr) repeat(2, minmax(0, 1fr));
+  gap: 0.8rem;
+  padding: 1rem;
+}
+.sje-recherche, .sje-champ { display: grid; gap: 0.35rem; align-content: start; min-width: 0; }
+.sje-recherche { grid-column: 1 / -1; }
+/* Les filtres avancés prennent la grille du bloc : ils sont « transparents » pour la mise en page sur grand écran. */
+.sje-avances { display: contents; }
+.sje-bascule { display: none; justify-self: start; gap: 0.5rem; align-items: center; }
+.sje-bascule[aria-expanded='true'] > .icone:last-child, .sje-bascule[aria-expanded='true'] svg:last-child { transform: rotate(180deg); }
+.sje-recherche > span, .sje-champ > span {
+  color: var(--craie-dim); font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em;
+}
+.sje-recherche input {
+  width: 100%; min-height: 46px; padding: 0.65rem 0.8rem; border: 1px solid #ffffff22; border-radius: 9px;
+  background: #020906; color: var(--craie); font: inherit;
+}
+.sje-recherche input:focus-visible { outline: 2px solid var(--or-clair); outline-offset: 1px; }
+.sje-gen { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; grid-column: span 2; }
+
+.sje-resume { display: flex; align-items: center; justify-content: space-between; gap: 1rem; color: var(--craie-dim); font-size: 0.86rem; }
+.sje-etat { margin: 0; padding: 2rem 0; text-align: center; color: var(--craie-dim); }
+.sje-vide { min-height: 160px; display: grid; place-items: center; align-content: center; gap: 0.7rem; color: var(--craie-dim); text-align: center; }
+.sje-suite { display: flex; justify-content: center; }
+
+.sje-cartes { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 1rem; }
+.sje-carte { display: grid; justify-items: center; min-width: 0; }
+.sje-carte .cel-carte.dr-player { max-width: 210px; transition: transform 0.18s ease, filter 0.18s ease; }
+.sje-carte .cel-carte.dr-player:hover { transform: translateY(-4px); filter: drop-shadow(0 12px 14px #000a); }
+.sje-carte .cel-carte.dr-player:focus-visible { outline: 2px solid var(--or-clair); outline-offset: 4px; border-radius: 12px; }
+
+/* La confirmation : la carte à gauche, ce qu'elle emporte à droite. */
+.sje-modale { display: grid; grid-template-columns: minmax(140px, 200px) 1fr; gap: 1.4rem; align-items: center; max-width: 640px; }
+.sje-modale-carte { min-width: 0; }
+.sje-modale-texte { display: grid; gap: 0.7rem; min-width: 0; }
+.sje-modale-texte h2 { margin: 0; }
+.sje-rappel { margin: 0; color: var(--craie-dim); font-size: 0.86rem; line-height: 1.45; }
+.sje-erreur { margin: 0; color: #ffb29d; font-size: 0.86rem; }
+
+/* Le choix du départ et l'avertissement « hors classement » (écran de création). */
+.cr-origine-titre { margin: 0 0 0.3rem; font-family: var(--police-titre); font-size: clamp(1.2rem, 3.4vw, 1.6rem); }
+.cr-origine-chapo { margin: 0 0 1rem; color: var(--craie-dim); max-width: 62ch; }
+.cr-avertissement { display: grid; gap: 0.7rem; justify-items: start; max-width: 62ch; }
+.cr-avertissement h2 { margin: 0; font-family: var(--police-titre); font-size: clamp(1.2rem, 3.4vw, 1.6rem); }
+.cr-avertissement p { margin: 0; line-height: 1.55; }
+.cr-avertissement .cr-avertissement-suite { color: var(--craie-dim); font-size: 0.9rem; }
+.cr-avertissement .rangee-fin { width: 100%; }
+
+@media (max-width: 760px) {
+  .sje-filtres { grid-template-columns: 1fr 1fr; }
+  .sje-gen { grid-column: 1 / -1; }
+}
+@media (max-width: 560px) {
+  .sje-filtres { grid-template-columns: 1fr; padding: 0.8rem; }
+  .sje-bascule { display: inline-flex; }
+  .sje-avances { display: none; gap: 0.8rem; }
+  .sje-avances.ouvert { display: grid; }
+  .sje-gen { grid-column: auto; }
+  .sje-cartes { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.55rem; }
+  .sje-modale { grid-template-columns: 1fr; gap: 0.9rem; justify-items: center; text-align: center; }
+  .sje-modale-carte { width: min(55vw, 200px); }
+  .sje-modale-texte .rangee-fin { flex-direction: column-reverse; }
+  .sje-resume { flex-direction: column; align-items: flex-start; gap: 0.4rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sje-carte .cel-carte.dr-player { transition: none; }
+}

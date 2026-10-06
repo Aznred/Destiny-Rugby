@@ -125,8 +125,9 @@ import { LARGEUR, LONGUEUR, borner, type Vec } from '../lib/moteur/terrain';
 import { corpsPourAffichage, porteurPourAffichage } from '../lib/moteur/dynamique';
 import { Camera, COUVERTURE, angleDeVue, type Cadrage, type Vue } from '../lib/moteur/camera';
 import {
-  momentDuJoueur, TEMPOS, TENUE, type Moment, type Tempo,
+  allureDuTempo, estAccelere, momentDuJoueur, secondesAAvancer, TEMPOS, TENUE, tempoALaPriseDeMain, type Moment, type Tempo,
 } from '../lib/moteur/moments';
+import { demanderMaSortie, possibiliteDeSortie, simulerPendant, type RaisonSansSortie } from '../lib/moteur/sortie';
 import {
   DELAI_DECISION, REJEU, REPOS_DECISION, decisionPour, delaiDeCarte,
   type Decision, type OptionDecision,
@@ -418,11 +419,16 @@ export function MatchLive({
   // ⚠️ ÉCHAP PAUSE LE MATCH QUAND ON LE CONDUIT, ET NE LE FERME QU'AUTREMENT : un seul écouteur, celui de la
   // fenêtre (`useModalDialog`, en phase de capture). Le pilote ignore Échap — voir l'en-tête du fichier.
   const pilotage = useRef<PilotageDirect | null>(null);
+  // ⚠️ ON NE QUITTE PAS UN MATCH EN COURS : la croix, Échap et le clic hors du match passent par `fermerOuSortir`, défini
+  // plus bas (il lit l'état du moteur, qui n'existe pas encore ici) et rendu par une ref.
+  const fermerOuSortirRef = useRef<() => void>(() => {});
   const echapper = useCallback(() => {
+    // La fenêtre « se faire remplacer / simuler » se ferme avant que le match ne le fasse.
+    if (sortieOuverteRef.current) { setSortieOuverte(false); return; }
     const p = pilotage.current;
     if (p?.actif) p.demanderPause();
-    else quitter();
-  }, [quitter]);
+    else fermerOuSortirRef.current();
+  }, []);
   const { overlayRef, dialogRef } = useModalDialog(echapper);
   const large = useLarge();
   // ⚠️ LA VUE EST CHOISIE AVANT LE COUP D'ENVOI, parce qu'elle règle la cadence
@@ -539,6 +545,8 @@ export function MatchLive({
   }
   useEffect(() => { if (presentation.current) setAvantMatch(presentation.current.etape); }, []);
   const monPion = e.pions.find((p) => p.moi);
+  const monPionRef = useRef(monPion);
+  monPionRef.current = monPion;
   const blessuresManager = useRef<{ joueurId: string; minute: number; activite: string }[]>([]);
   const minuteMedicale = useRef(-1);
 
@@ -553,7 +561,35 @@ export function MatchLive({
   // LE JEU. « On ne fait que les choix » — les autres tempos ne servent plus
   // qu'à regarder (⏩ accélérer, ⏭️ aller à la fin), et les quitter revient à
   // renoncer à jouer, ce que dit déjà le bouton 👁️ Je regarde.
-  const [tempo, setTempo] = useState<Tempo>(monPion ? 'decisions' : 'suivre');
+  const [tempo, setTempo] = useState<Tempo>(monPion ? 'decisions' : 'x1');
+  // ⚠️ LA BOUCLE LIT LE TEMPO DANS UNE REF, comme la carte de décision : changer de vitesse ne doit ni
+  // relancer la boucle ni toucher au match. C'est ce qui rend ×10 → ×1 instantané, au prochain pas.
+  const tempoRef = useRef<Tempo>(tempo);
+  tempoRef.current = tempo;
+  const choisirTempo = useCallback((v: Tempo) => { tempoRef.current = v; setTempo(v); }, []);
+  // --- SE FAIRE REMPLACER, OU SIMULER LA FIN (Correctif 19) ----------------------------------------------------
+  // La fenêtre vit DANS le match (pas dans un second portail) : deux fenêtres modales empilées recevaient chacune
+  // Échap, et la première fermait le match entier. `echapper` ferme d'abord celle-ci.
+  const [sortieOuverte, setSortieOuverte] = useState(false);
+  const sortieOuverteRef = useRef(false);
+  sortieOuverteRef.current = sortieOuverte;
+  /** Le moteur joue seul le reste du match. Une ref : la boucle la lit à chaque image. */
+  const [simulation, setSimulation] = useState(false);
+  const simulationRef = useRef(false);
+  /**
+   * ⚠️ UN MATCH NE SE QUITTE PAS EN COURS DE ROUTE (demande explicite : « je veux pas qu'on puisse quitter le match
+   * sans simuler ou se faire remplacer »). Fermer en plein match ne coûtait rien — la semaine n'avançait pas, le
+   * match restait à rejouer : on pouvait donc le recommencer jusqu'à ce que ça tourne bien. Désormais la croix et
+   * Échap ouvrent la fenêtre de sortie, où les deux seules issues sont de se faire remplacer ou de simuler la fin.
+   * Deux exceptions, et elles ne rapportent rien : le match terminé (le bouton « Terminer » le ferme), et un match
+   * pas encore commencé — rien n'a été joué, il n'y a rien à refaire.
+   */
+  const fermerOuSortir = useCallback(() => {
+    if (simulationRef.current) return;
+    if (e.fini || e.sim < 0.5) { quitter(); return; }
+    setSortieOuverte(true);
+  }, [e, quitter]);
+  fermerOuSortirRef.current = fermerOuSortir;
   // --- 🕹️ LE CONTRÔLE DIRECT (Correctif 16) ---------------------------------------
   // Le pilote vit dans une ref (il est lu soixante fois par seconde par la boucle) ; son HUD s'abonne à son
   // cliché, il ne repasse donc pas par le rendu du match. La caméra choisie est relue par la boucle dans une
@@ -568,8 +604,8 @@ export function MatchLive({
       surCamera: (c) => setCamera3D(c),
       surPause: () => setEnPause((p) => !p),
       vibrer,
-      // Il prend la main : on ne conduit pas à ×4, le tempo revient au jeu normal.
-      surPrise: () => setTempo((v) => (v === 'accelere' || v === 'fin' ? 'decisions' : v)),
+      // Il prend la main : on ne conduit pas à ×10, le tempo revient au jeu normal.
+      surPrise: () => choisirTempo(tempoALaPriseDeMain(tempoRef.current)),
     });
   }
   // Aperçu et essais dans le navigateur (développement seulement, retiré du build) : de quoi lire le moteur et
@@ -751,6 +787,41 @@ export function MatchLive({
     momentRef.current.tenue = joue ? REJEU : TENUE;
   }, []);
 
+  // ── 🔄 SE FAIRE REMPLACER / ⏩ SIMULER LA FIN ─────────────────────────────────────────────────────────────
+  /** Rend la main : plus de carte ouverte, plus de pause, et la présentation d'avant-match est passée. */
+  const cederLaMain = useCallback(() => {
+    if (decisionRef.current) {
+      if (monPionRef.current) ajouterCommentaire(e, 'jeu', monPionRef.current.cote, t('ml.dec.hesite', { nom: monPionRef.current.nom }), 0, true);
+      fermerDecision(false);
+    }
+    setEnPause(false);
+    presentation.current = null;
+    setAvantMatch(null);
+  }, [e, fermerDecision]);
+  /**
+   * ⚠️ SE FAIRE REMPLACER, C'EST DEVENIR SPECTATEUR : le staff te remplace au prochain arrêt de jeu, et d'ici là tu ne
+   * conduis plus. On passe donc en « regarder » à vitesse réelle — c'est là qu'on peut accélérer jusqu'à ×10.
+   */
+  const demanderMonRemplacement = useCallback(() => {
+    setSortieOuverte(false);
+    if (!demanderMaSortie(e).possible) return;
+    cederLaMain();
+    setMode('regarder');
+    choisirTempo('x1');
+    redessiner((n) => n + 1);
+  }, [e, cederLaMain, choisirTempo]);
+  const simulerLaFin = useCallback(() => {
+    setSortieOuverte(false);
+    if (e.fini) return;
+    cederLaMain();
+    simulationRef.current = true;
+    setSimulation(true);
+  }, [e, cederLaMain]);
+  // La sirène referme la simulation : plus rien à jouer.
+  useEffect(() => {
+    if (e.fini && simulationRef.current) { simulationRef.current = false; setSimulation(false); }
+  }, [e.fini]);
+
   /**
    * Le choix est fait : on l'arme, et ON LE REGARDE SE JOUER.
    *
@@ -805,12 +876,40 @@ export function MatchLive({
   useEffect(() => {
     let brut = 0;
     let actif = true;
+    // Une blessure du groupe du manager se produit pendant le match : le joueur reste au sol, le banc est appelé et le
+    // premier diagnostic ne sera connu qu'après la sirène. Le tirage est séparé du RNG sportif afin que cette
+    // vérification ne change jamais un score ou une trajectoire.
+    // ⚠️ UNE FONCTION, PARCE QU'ELLE SERT AUSSI PENDANT LA SIMULATION : jouer la fin du match d'un coup ne doit pas
+    // épargner les blessures de son club.
+    const verifierBlessuresManager = () => {
+      const minute = Math.floor(e.minute);
+      if (manager?.risquesBlessure && coteManager && minute >= 3 && minute !== minuteMedicale.current
+        && blessuresManager.current.length === 0) {
+        minuteMedicale.current = minute;
+        const terrain = e.pions.filter((p) => p.cote === coteManager && p.surLeTerrain && p.sanction <= 0 && p.sourceId);
+        const touche = terrain.find((p) => aleaMedicalStable(`${cle}#${minute}#${p.sourceId}`)
+          < (manager.risquesBlessure?.[p.sourceId] ?? 0) / 600_000);
+        if (touche) {
+          const banc = e.pions.filter((p) => p.cote === coteManager && !p.surLeTerrain && p.minutes === 0 && p.sourceId);
+          const entrant = banc.find((p) => p.poste === touche.poste)
+            ?? banc.find((p) => p.avant === touche.avant) ?? banc[0];
+          const activite = touche.avant ? 'contacts' : touche.poste.includes('ailier') || touche.poste === 'arriere' ? 'sprint' : 'match';
+          blessuresManager.current.push({ joueurId: touche.sourceId, minute, activite });
+          ajouterCommentaire(e, 'jeu', coteManager, `${touche.nom} reste au sol. Le staff médical demande sa sortie.`, 0, true);
+          // La scène et le bandeau de remplacement lisent ce drapeau : il sort en boitant.
+          (touche as typeof touche & { blesse?: boolean }).blesse = true;
+          if (entrant) demanderRemplacement(e, coteManager, entrant.sourceId, touche.sourceId);
+          else touche.surLeTerrain = false;
+        }
+      }
+    };
     const image = (ms: number) => {
       if (!actif) return;
       brut = requestAnimationFrame(image);
       const precedent = dernierTemps.current || ms;
       dernierTemps.current = ms;
       const dtReel = Math.min(0.2, (ms - precedent) / 1000);
+      const tempo = tempoRef.current;
 
       const moi = e.pions.find((p) => p.moi);
       const { largeur, hauteur } = boite.current;
@@ -972,7 +1071,7 @@ export function MatchLive({
       // pouvoir le lire (une touche de pause se lit PENDANT la pause, un joueur qui sort rend la main).
       const pilote = pilotage.current!;
       pilote.surImage(e, scene, dtReel, {
-        moi: enJeu ? moi : undefined, pause: enPause, avantMatch: !!presentation.current,
+        moi: enJeu ? moi : undefined, pause: enPause, avantMatch: !!presentation.current || simulationRef.current,
         cameraChoisie: camera3DRef.current,
       });
       if (scene) scene.camera = pilote.cameraPour(camera3DRef.current, e);
@@ -984,10 +1083,10 @@ export function MatchLive({
       const intro = presentation.current;
       if (intro) {
         // Le stade se charge encore : on l'attend quelques secondes plutôt que de présenter sur une image vide.
-        if (!scene && vue3DVoulue.current && (intro.attente = (intro.attente ?? 0) + dtReel) < 8 && tempo !== 'accelere' && tempo !== 'fin') return;
+        if (!scene && vue3DVoulue.current && (intro.attente = (intro.attente ?? 0) + dtReel) < 8 && !estAccelere(tempo)) return;
         intro.t += enPause ? 0 : dtReel;
         // Accélérer ou aller à la fin, c'est dire qu'on ne veut pas de l'avant-match.
-        if (tempo === 'accelere' || tempo === 'fin') intro.t = 99;
+        if (estAccelere(tempo)) intro.t = 99;
         const etape = intro.t < 3 ? 'affiche' : intro.t < 3 + DUREE_EQUIPE_TV ? 'A' : 'B';
         setTempsPresentation(Math.floor(intro.t));
         if (etape !== intro.etape) {
@@ -1006,6 +1105,19 @@ export function MatchLive({
         presentation.current = null;
         scene?.entrer(null);
         setAvantMatch(null);
+      }
+
+      // ── ⏩ LA SIMULATION : le moteur joue seul le reste du match ──────────────────────────────────────────────
+      // ⚠️ PLACÉE AVANT LA CARTE, LA PAUSE ET LE TUTORIEL : on n'attend plus personne. Le pilote a rendu la main
+      // (`avantMatch` ci-dessus), le moteur lève lui-même l'attente d'un joueur qui ne tient plus son rôle. Même
+      // moteur, mêmes pas : un budget de vingt-cinq millisecondes par image, le match entier en une à deux secondes.
+      if (simulationRef.current) {
+        e.carriereDixMinutes = true;
+        // La scène n'est PAS redessinée : le voile la cache, et un rendu 3D coûte plus cher que le match entier à
+        // simuler (mesuré en 3D logicielle : quatre cents millisecondes l'image contre douze de calcul).
+        simulerPendant(e, 25, () => performance.now(), verifierBlessuresManager);
+        if (ms - dernierRendu.current >= 100 || e.fini) { dernierRendu.current = ms; redessiner((n) => n + 1); }
+        return;
       }
 
       // ── 📺 L'ARBITRAGE VIDÉO : on revoit vraiment l'action, sous un autre angle ──
@@ -1082,38 +1194,19 @@ export function MatchLive({
       }
 
       e.carriereDixMinutes = true;
-      // ⚠️ ON NE CONDUIT PAS À ×4 : dès que le joueur entre, le jeu retombe au temps réel — et le tutoriel peut
+      // ⚠️ ON NE CONDUIT PAS À ×10 : dès que le joueur entre, le jeu retombe au temps réel — et le tutoriel peut
       // le ralentir tant qu'une invite presse.
-      const allure = (pilote.phase !== 'attente' ? 1 : tempo === 'accelere' ? 2 : tempo === 'fin' ? 4 : 1) * pilote.vitesseTuto;
+      const allure = (pilote.phase !== 'attente' ? 1 : allureDuTempo(tempo)) * pilote.vitesseTuto;
+      // ⚠️ PAS PLUS D'UNE SECONDE DE MATCH PAR IMAGE (`secondesAAvancer`) : sur un écran lent, ×10 ralentit au lieu de
+      // téléporter les joueurs. La scène reçoit la vitesse RÉELLEMENT jouée, pas celle qu'on demandait.
+      const pas = secondesAAvancer(dtReel, allure);
+      const vitesseJouee = dtReel > 0 ? pas / dtReel : allure;
       // Les packs rejoignent une mêlée ou un alignement avant qu'il ne commence.
-      scene?.retenir(dtReel * allure);
-      avancer(e, dtReel * allure);
-      // Une blessure du groupe du manager se produit pendant le match : le
-      // joueur reste au sol, le banc est appelé et le premier diagnostic ne
-      // sera connu qu'après la sirène. Le tirage est séparé du RNG sportif afin
-      // que cette vérification ne change jamais un score ou une trajectoire.
-      const minute = Math.floor(e.minute);
-      if (manager?.risquesBlessure && coteManager && minute >= 3 && minute !== minuteMedicale.current
-        && blessuresManager.current.length === 0) {
-        minuteMedicale.current = minute;
-        const terrain = e.pions.filter((p) => p.cote === coteManager && p.surLeTerrain && p.sanction <= 0 && p.sourceId);
-        const touche = terrain.find((p) => aleaMedicalStable(`${cle}#${minute}#${p.sourceId}`)
-          < (manager.risquesBlessure?.[p.sourceId] ?? 0) / 600_000);
-        if (touche) {
-          const banc = e.pions.filter((p) => p.cote === coteManager && !p.surLeTerrain && p.minutes === 0 && p.sourceId);
-          const entrant = banc.find((p) => p.poste === touche.poste)
-            ?? banc.find((p) => p.avant === touche.avant) ?? banc[0];
-          const activite = touche.avant ? 'contacts' : touche.poste.includes('ailier') || touche.poste === 'arriere' ? 'sprint' : 'match';
-          blessuresManager.current.push({ joueurId: touche.sourceId, minute, activite });
-          ajouterCommentaire(e, 'jeu', coteManager, `${touche.nom} reste au sol. Le staff médical demande sa sortie.`, 0, true);
-          // La scène et le bandeau de remplacement lisent ce drapeau : il sort en boitant.
-          (touche as typeof touche & { blesse?: boolean }).blesse = true;
-          if (entrant) demanderRemplacement(e, coteManager, entrant.sourceId, touche.sourceId);
-          else touche.surLeTerrain = false;
-        }
-      }
+      scene?.retenir(pas);
+      avancer(e, pas);
+      verifierBlessuresManager();
       if (scene) {
-        scene.image(dtReel, { vitesse: allure });
+        scene.image(dtReel, { vitesse: vitesseJouee });
         suivreBulle();
         // ⚠️ REACT N'A PLUS TRENTE PIONS À DÉPLACER. La scène dessine le terrain
         // toute seule ; le score, le fil et les bandeaux se contentent de dix
@@ -1125,7 +1218,7 @@ export function MatchLive({
     };
     brut = requestAnimationFrame(image);
     return () => { actif = false; cancelAnimationFrame(brut); };
-  }, [enPause, tempo, enJeu, e, fermerDecision, manager, coteManager, cle]);
+  }, [enPause, enJeu, e, fermerDecision, manager, coteManager, cle]);
 
   // ⚠️ LES CHIFFRES CHOISISSENT SUR LA CARTE — c'est le SEUL clavier du match,
   // maintenant qu'on ne pilote plus rien. Une carte à dix secondes se joue à la
@@ -1250,6 +1343,10 @@ export function MatchLive({
         scorePour: chezMoi ? e.scoreA : e.scoreB,
         scoreContre: chezMoi ? e.scoreB : e.scoreA,
         domicile: chezMoi,
+        // ⚠️ LA CLÉ DE LA RENCONTRE : c'est elle qui fait entrer le score RÉEL dans le championnat (sinon le
+        // classement rejoue le score théorique : 10-10 joué, 21-15 affiché).
+        cle, equipe: chezMoi ? e.clubA : e.clubB,
+        essaisPour: chezMoi ? e.essaisA : e.essaisB, essaisContre: chezMoi ? e.essaisB : e.essaisA,
         // « Top 14 · 22 novembre · journée 7 » → « 22 novembre · journée 7 » :
         // le nom de la compétition est déjà partout ailleurs dans le journal.
         libelle: titre.split('·').slice(1).map((m) => m.trim()).filter(Boolean).join(' · ')
@@ -1266,7 +1363,7 @@ export function MatchLive({
       jaunes: e.discipline.jaunes,
       rouges: e.discipline.rouges,
     });
-  }, [e.fini, e, monPion, enregistrerMatchVecu, appliquerSanctionMatch, onTermine, titre]);
+  }, [e.fini, e, monPion, enregistrerMatchVecu, appliquerSanctionMatch, onTermine, titre, cle]);
 
   // --- LE RENDU DES PIONS ---------------------------------------------------
   // ⚠️ Interpolation exacte : le moteur avance par pas de 0,15 s, l'écran à
@@ -1523,7 +1620,7 @@ export function MatchLive({
   tutoRef.current = montrerTuto || guideFige;
 
   return createPortal(
-    <div ref={overlayRef} className={sortie ? 'overlay-match ml-sortie' : 'overlay-match'} onClick={(ev) => { if (ev.target === ev.currentTarget) quitter(); }}>
+    <div ref={overlayRef} className={sortie ? 'overlay-match ml-sortie' : 'overlay-match'} onClick={(ev) => { if (ev.target === ev.currentTarget) fermerOuSortir(); }}>
       <motion.div
         ref={dialogRef}
         className="match-live"
@@ -1551,11 +1648,43 @@ export function MatchLive({
             <b>{e.clubB}</b>
             {clubB ? <Blason club={clubB} taille={26} /> : <LogoEquipe nom={e.clubB} taille={26} />}
           </div>
-          <button className="ml-fermer" onClick={quitter} disabled={sortie} title={t('ml.fermerAide')}><Icone nom="croix" taille={18} /></button>
+          {!e.fini && !simulation && (
+            <button
+              type="button"
+              className="ml-sortie"
+              onClick={() => setSortieOuverte(true)}
+              title={t('ml.sortie.bouton')}
+              aria-label={t('ml.sortie.bouton')}
+              aria-haspopup="dialog"
+            >
+              <Icone nom="repost" taille={16} />
+            </button>
+          )}
+          <button className="ml-fermer" onClick={fermerOuSortir} disabled={sortie || simulation} title={t('ml.fermerAide')}><Icone nom="croix" taille={18} /></button>
         </header>
         <div className="ml-progression" title={titre}>
           <span style={{ width: `${Math.min(100, (e.t / 4800) * 100)}%` }} />
         </div>
+
+        {/* ═══ SE FAIRE REMPLACER / SIMULER LA FIN ═══════════════════════════ */}
+        {sortieOuverte && !e.fini && (
+          <FenetreSortie
+            possibilite={possibiliteDeSortie(e)}
+            avecJoueur={!!monPion}
+            onRemplacer={demanderMonRemplacement}
+            onSimuler={simulerLaFin}
+            onFermer={() => setSortieOuverte(false)}
+          />
+        )}
+        {simulation && !e.fini && (
+          <div className="ml-simulation" role="status" aria-live="polite">
+            <div className="ml-simulation-carte">
+              <b>{t('ml.simulation.encours')}</b>
+              <span>{e.minute}′</span>
+              <i><u style={{ width: `${Math.min(100, (e.t / 4800) * 100)}%` }} /></i>
+            </div>
+          </div>
+        )}
 
         {/* ═══ LA DYNAMIQUE ════════════════════════════════════════════════
             Retour de jeu : « un turnover relance la dynamique de l’équipe ».
@@ -1718,7 +1847,8 @@ export function MatchLive({
                 )}
 
                 {/* ---------- 📺 L'HABILLAGE TÉLÉVISION ---------- */}
-                <CommentateursMatch lignes={e.commentaires} seconde={e.t} pause={enPause || !!avantMatch} etat={e} contexte={contexteTV} />
+                {/* ⚠️ À ×3 ET ×10 LES COMMENTATEURS SE TAISENT : une phrase de trois secondes arriverait après trois actions. */}
+                <CommentateursMatch lignes={e.commentaires} seconde={e.t} pause={enPause || !!avantMatch || allureDuTempo(tempo) >= 3} etat={e} contexte={contexteTV} />
                 {(() => {
                   // Une décision par seconde d'écran : deux rendus du même instant lisent la même bulle.
                   const seconde = Math.floor(e.sim);
@@ -2063,7 +2193,7 @@ export function MatchLive({
                   onClick={() => {
                     const suivant = mode === 'jouer' ? 'regarder' : 'jouer';
                     setMode(suivant);
-                    setTempo(suivant === 'jouer' ? 'decisions' : 'suivre');
+                    choisirTempo(suivant === 'jouer' ? 'decisions' : 'x1');
                   }}
                 >
                   {enJeu ? <><Icone nom="sifflet" taille={14} /> {t('ml.mode.jouer')}</> : <><Icone nom="oeil" taille={14} /> {t('ml.mode.regarder')}</>}
@@ -2071,18 +2201,40 @@ export function MatchLive({
               )}
               {!e.fini && (
                 <div className="ml-tempos">
-                  {!(directVoulu && pilotage.current!.phase !== 'attente') && TEMPOS.filter((v) => v.id !== 'decisions' || !!monPion).map((v) => (
-                    <button
-                      key={v.id}
-                      type="button"
-                      className={`ml-tempo${tempo === v.id ? ' actif' : ''}`}
-                      title={v.id === 'suivre' ? t("ui.3d83d13a7d65") : v.id === 'accelere' ? t("ui.9a94d8bba00b") : v.id === 'fin' ? t("ui.ee3221158417") : t(v.aide)}
-                      aria-label={v.id === 'suivre' ? t("ui.ac6c3bcc1174") : v.id === 'accelere' ? '×2' : v.id === 'fin' ? '×4' : t(v.cle)}
-                      onClick={() => setTempo(v.id)}
-                    >
-                      <b><Icone nom={v.id === 'suivre' ? 'oeil' : v.id === 'accelere' ? 'eclair' : v.id === 'fin' ? 'fleche-droite' : 'chrono'} taille={17} /></b><span>{v.id === 'suivre' ? t("ui.ac6c3bcc1174") : t(v.cle)}</span>
-                    </button>
-                  ))}
+                  {!(directVoulu && pilotage.current!.phase !== 'attente') && (
+                    <>
+                      {/* Le mode « cartes » : le match se fige sur chaque carrefour. À vitesse réelle, toujours. */}
+                      {monPion && (
+                        <button
+                          type="button"
+                          className={`ml-tempo${tempo === 'decisions' ? ' actif' : ''}`}
+                          title={t('ml.tempo.decisions.aide')}
+                          aria-label={t('ml.tempo.decisions')}
+                          aria-pressed={tempo === 'decisions'}
+                          onClick={() => choisirTempo('decisions')}
+                        >
+                          <b><Icone nom="chrono" taille={17} /></b><span>{t('ml.tempo.decisions')}</span>
+                        </button>
+                      )}
+                      {/* ⚠️ LES QUATRE VITESSES SE LISENT D'UN COUP D'ŒIL, chiffre écrit — jamais une icône muette.
+                          Passer de l'une à l'autre est instantané : la boucle relit le tempo à chaque image. */}
+                      <div className="ml-vitesses" role="group" aria-label={t('ml.tempo.vitesse')}>
+                        {TEMPOS.filter((v) => v.id !== 'decisions').map((v) => (
+                          <button
+                            key={v.id}
+                            type="button"
+                            className={`ml-vitesse${tempo === v.id ? ' actif' : ''}`}
+                            title={t(v.aide)}
+                            aria-label={t(v.cle)}
+                            aria-pressed={tempo === v.id}
+                            onClick={() => choisirTempo(v.id)}
+                          >
+                            {t(v.cle)}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
                   <button
                     type="button"
                     className={`ml-tempo${enPause ? ' actif' : ''}`}
@@ -2418,4 +2570,59 @@ function tracerTrajectoiresMatchLive(vol: { de: Vec; vers: Vec; hauteur: number;
     cheminAnticipe = pointsAnticipe.join(' ');
   }
   return { vol: pointsVol.join(' '), ombre: pointsOmbre.join(' '), anticipe: cheminAnticipe };
+}
+
+/**
+ * LA FENÊTRE « SE FAIRE REMPLACER / SIMULER LA FIN » (Correctif 19).
+ *
+ * Deux sorties, expliquées en une phrase chacune : ⚠️ la première n'est offerte que si elle est possible, et dit
+ * POURQUOI sinon — un bouton grisé sans raison passe pour un bug. La seconde l'est toujours : jouer la fin d'un match
+ * qu'on regarde ou qu'on dirige ne dépend de rien.
+ */
+function FenetreSortie({ possibilite, avecJoueur, onRemplacer, onSimuler, onFermer }: {
+  possibilite: ReturnType<typeof possibiliteDeSortie>; avecJoueur: boolean;
+  onRemplacer: () => void; onSimuler: () => void; onFermer: () => void;
+}) {
+  const raisons: Record<RaisonSansSortie, string> = {
+    fini: 'ml.sortie.raison.fini', absent: 'ml.sortie.raison.absent', banc: 'ml.sortie.raison.banc',
+    sorti: 'ml.sortie.raison.sorti', sanction: 'ml.sortie.raison.sanction',
+    aucunRemplacant: 'ml.sortie.raison.aucunRemplacant', demande: 'ml.sortie.raison.demande',
+  };
+  const premier = useRef<HTMLButtonElement>(null);
+  useEffect(() => { premier.current?.focus(); }, []);
+  return (
+    <div className="ml-sortie-voile" onClick={onFermer}>
+      <div
+        className="ml-sortie-carte"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="ml-sortie-titre"
+        onClick={(ev) => ev.stopPropagation()}
+      >
+        <h2 id="ml-sortie-titre">{t('ml.sortie.titre')}</h2>
+        <p className="ml-sortie-chapo">{t('ml.sortie.chapo')}</p>
+        {avecJoueur && (
+          <button type="button" className="ml-sortie-choix" ref={premier} disabled={!possibilite.possible} onClick={onRemplacer}>
+            <Icone nom="repost" taille={22} />
+            <span>
+              <b>{t('ml.sortie.remplacer')}</b>
+              <small>
+                {possibilite.possible && possibilite.remplacant
+                  ? t('ml.sortie.remplacerTexte', { nom: possibilite.remplacant.nom })
+                  : t(possibilite.raison ? raisons[possibilite.raison] : 'ml.sortie.raison.aucunRemplacant')}
+              </small>
+            </span>
+          </button>
+        )}
+        <button type="button" className="ml-sortie-choix" ref={avecJoueur ? undefined : premier} onClick={onSimuler}>
+          <Icone nom="eclair" taille={22} />
+          <span>
+            <b>{t('ml.sortie.simuler')}</b>
+            <small>{t('ml.sortie.simulerTexte')}</small>
+          </span>
+        </button>
+        <button type="button" className="btn fantome ml-sortie-annuler" onClick={onFermer}>{t('ml.sortie.annuler')}</button>
+      </div>
+    </div>
+  );
 }

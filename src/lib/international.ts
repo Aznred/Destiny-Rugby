@@ -17,6 +17,7 @@
 import { calendrier, classer, graine, scorePossible, resultatJoue, versionResultatsJoues, type LigneTableau, type MatchChampionnat } from './championnat.js';
 import { effectifDuClub, type Coequipier } from './effectif.js';
 import { baremeDeCompetition } from './bareme.js';
+import { versionJoueurIncarne } from './joueurIncarne.js';
 import { POSTE_PAR_ID } from '../data/rugby.js';
 import { nomNation } from './nations.js';
 import { CALENDRIER, estAnneeDeCoupeDuMonde } from '../data/calendrier.js';
@@ -681,7 +682,8 @@ const CLUBS_SELECTION = [...new Set(COMPETITIONS.flatMap((competition) => compet
 
 export function effectifNational(nation: string, saison: number): Coequipier[] {
   const nom = nomNation(nation);
-  const cle = nom + '#' + saison;
+  // ⚠️ LA VERSION DU JOUEUR INCARNÉ EST DANS LA CLÉ (Correctif 19) : le vivier national se compose depuis les effectifs de club.
+  const cle = nom + '#' + saison + '#' + versionJoueurIncarne();
   const memo = cacheSelections.get(cle);
   if (memo) return memo;
 

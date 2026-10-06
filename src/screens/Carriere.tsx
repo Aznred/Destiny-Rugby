@@ -32,6 +32,8 @@ import './Carriere.css';
 import type { EntreeJournal } from '../types';
 
 import { Icone } from '../components/Icone';
+import { BadgeHorsClassement } from '../components/BadgeHorsClassement';
+import { estCarriereClassee } from '../lib/carriereExistante';
 interface Props {
   onReglages: () => void;
 }
@@ -388,6 +390,7 @@ function ResumeMobile({ joueur }: { joueur: Joueur }) {
         <div className="cr-nom">
           <strong>{joueur.nom}</strong>
           <small>{nomPoste(joueur.poste)} · {joueur.club}</small>
+          {!estCarriereClassee(joueur) && <BadgeHorsClassement />}
         </div>
         <div className="cr-droite">
           {statut && <span className={`cr-statut ${statut}`}>{t(`car.mob.${statut}`)}</span>}
@@ -428,7 +431,7 @@ function Message({ entree }: { entree: EntreeJournal }) {
     ? t('car.debutTitre')
     : transfert ? t('car.mercatoOfficiel') : entree.role === 'systeme' ? texteTraduit(entree.titre) : entree.role === 'mj' ? texteTraduitExact(entree.titre) : entree.titre;
   const texte = estDebut && joueur
-    ? t('car.debutTexte', { joueur: joueur.nom, poste: nomPoste(joueur.poste).toLowerCase(), club: joueur.club })
+    ? t(joueur.origine ? 'car.debutTexteExistant' : 'car.debutTexte', { joueur: joueur.nom, poste: nomPoste(joueur.poste).toLowerCase(), club: joueur.club })
     : transfert
       ? t('car.transfertOfficiel', { joueur: transfert[1], de: transfert[2], vers: transfert[3] })
       : entree.role === 'systeme' ? texteTraduit(entree.texte) : entree.role === 'mj' ? texteTraduitExact(entree.texte) : entree.texte;

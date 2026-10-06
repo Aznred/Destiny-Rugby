@@ -177,6 +177,9 @@ function Avatar({
       <span className="x-avatar moi" style={style}>
         {choix?.startsWith('data:')
           ? <img className="x-photo" src={choix} alt="" />
+          // Le portrait d'un joueur existant (Correctif 19) : sa carte l'apporte, il peut le changer ici comme le reste.
+          : choix?.startsWith('photo:')
+            ? <Photo src={choix.slice(6)} nom={joueur?.nom ?? ''} />
           : choix && choix !== 'club'
             ? <span style={{ fontSize: taille * 0.55 }}>{choix}</span>
             : data ? <Blason club={data} taille={taille} /> : <span><Icone d={I_BALLON} /></span>}
@@ -671,6 +674,8 @@ function MonProfil({ onProfil, onRecherche }: { onProfil: (pseudo: string) => vo
               <span className="x-avatar" style={{ width: 46, height: 46 }}>
                 {brouillon.avatar.startsWith('data:')
                   ? <img className="x-photo" src={brouillon.avatar} alt="" />
+                  : brouillon.avatar.startsWith('photo:')
+                    ? <Photo src={brouillon.avatar.slice(6)} nom={joueur.nom} />
                   : brouillon.avatar === 'club'
                     ? (clubParNom(joueur.club) ? <Blason club={clubParNom(joueur.club)!} taille={46} /> : <span><Icone d={I_BALLON} /></span>)
                     : <span style={{ fontSize: 26 }}>{brouillon.avatar}</span>}

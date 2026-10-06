@@ -1,5 +1,7 @@
 import { Fragment, Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { Icone } from '../components/Icone';
+import { BadgeHorsClassement } from '../components/BadgeHorsClassement';
+import { estCarriereClassee } from '../lib/carriereExistante';
 import type { NomIcone } from '../components/Icone';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useGame, classementComplet, palmaresDepuisLibelles } from '../store/useGame';
@@ -353,7 +355,8 @@ export function Classement() {
   // Le verdict que le serveur rendrait sur la carrière en cours : il sert à
   // afficher l'état de l'envoi automatique, et à dire pourquoi si ça coince.
   const envoi = useMemo(() => {
-    if (!joueur) return null;
+    // ⚠️ UNE CARRIÈRE HORS CLASSEMENT N'A PAS DE VERDICT À AFFICHER : rien ne part (voir `publierAuClassement`).
+    if (!joueur || !estCarriereClassee(joueur)) return null;
     // ⚠️ LE MÊME PSEUDO QUE CELUI QUI PART VRAIMENT (voir `useGame` →
     // `pseudoClassement`). Afficher un verdict calculé sur un autre nom que
     // celui envoyé, c'est promettre une ligne qui n'arrivera pas.
@@ -403,6 +406,11 @@ export function Classement() {
       <p style={{ color: 'var(--craie-dim)', maxWidth: '64ch', margin: '0.6rem 0 1.4rem' }}>
         {t('clst.chapo')}
       </p>
+      {joueur && !estCarriereClassee(joueur) && (
+        <p className="aide" style={{ maxWidth: '64ch', margin: '-0.6rem 0 1.4rem' }}>
+          <BadgeHorsClassement /> {t('clst.horsClassement')}
+        </p>
+      )}
 
       {/* ⚠️ COMMENT BRANCHER CE CLASSEMENT SUR TOUS LES JOUEURS.
           Demande explicite : « explique comment connecter le classement à tous

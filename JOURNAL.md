@@ -10503,3 +10503,81 @@ tout le panneau. C'est maintenant la **piste de grille** qui vaut 12 rem
 tient dedans. Vérifié en forçant `width: 100% !important` sur la carte — elle
 reste à 192 px.
 
+---
+
+## Correctif 19 — vitesse ×1 à ×4, carrière avec un joueur existant (octobre 2026)
+
+### La vitesse : le ×4 existait déjà, sous le nom « Fin »
+
+Demande : « même en utilisant les boutons d'accélération, les matchs restent beaucoup trop longs ; monter jusqu'à ×4 ».
+Avant de toucher au moteur, mesure : la boucle de `MatchLive` faisait déjà `tempo === 'accelere' ? 2 : tempo === 'fin' ? 4 : 1`.
+Les trois boutons s'appelaient « Suivre », « Accéléré » et « Fin » (et sur téléphone, une icône), un tableau `TEMPOS`
+portait d'autres facteurs (×7, ×26, ×600) que personne ne lisait. Durée d'un match de carrière 3D, 6 matchs,
+`npm run verify:vitesse-match` : **15,5 min à ×1, 7,8 à ×2, 5,2 à ×3, 3,9 à ×4**. Le travail a donc été : un seul tableau
+d'allures (`allureDuTempo`), un bouton ×3, des chiffres écrits, et la preuve que changer de vitesse ne change pas le match.
+
+⚠️ **La preuve est un banc, pas un argument.** Un match joué avec un tempo ET une durée d'image tirés au hasard à
+chaque image (8 ms à 200 ms) finit avec la même empreinte, le même fil (mot pour mot) et la même suite de phases qu'à ×1.
+⚠️ **Mesuré dans un vrai navigateur** (Chromium, vue de haut, images rapides) : ×1 = 1,01 ; ×2 = 2,00 ; ×3 = 2,98 ;
+×4 = 3,98 ; retour à ×1 = 0,99 secondes de match par seconde réelle. En 3D logicielle (2,5 images/s) le plafond de
+`dtReel` (0,2 s) divise tout par deux : un artefact de l'environnement, pas du code — à revérifier sur un GPU réel.
+⚠️ **La barre sur 390 px** : les quatre vitesses ne faisaient que 29 px de large quand « Décisions » et « Pause »
+gardaient leur étiquette ; elles se réduisent à leur icône (44 px) et les vitesses passent à 34 px.
+
+### Le joueur existant : quatre pièges trouvés en chemin
+
+1. **Le monde contient déjà le joueur.** Deux Dupont sur la feuille, deux dans l'écran Effectif, et un club qui compte
+   deux fois son demi de mêlée. Retirer le nom de `effectifDuClub` règle aussi la sélection nationale (qui se compose
+   depuis les effectifs de club) — mais les mémoires (`cacheSelections`, `cacheConcurrence`, `cacheEspoirs`,
+   `cacheForce`) doivent porter la version du joueur incarné dans leur clé.
+2. **Un prédicat, pas un drapeau.** `rankedCareer` seul se contourne en le réécrivant ; `estCarriereClassee` lit aussi
+   `origine`. Toutes les publications passent par `publierAuClassement`, y compris celles de `force`.
+3. **La récompense de retraite paye le niveau de départ.** `score / 150` d'une carte à 95 dépasse une carrière entière
+   depuis la Régionale 3 : on retranche le score de départ.
+4. **Un banc qui compte les envois doit pouvoir envoyer.** `classementEnLigne.ts` n'appelle rien en développement
+   sans URL, et `import.meta.env` est figé au lancement de vite-node : `vite-node -m banc-classement` lit
+   `.env.banc-classement`. Sans cela, « rien n'est parti » était vrai pour TOUTES les carrières, et ne prouvait rien.
+
+Aussi : `Message` (écran de carrière) ré-affiche le premier message du journal avec `t('car.debutTexte')` d'après son
+titre — le texte propre aux joueurs existants a dû y être ajouté, sinon il n'apparaissait jamais.
+
+### Suite — ×10 à la place de ×4, et la sortie du match
+
+Demande : « ×10 à la place du ×4 », et « un bouton pour se faire remplacer / simuler ». Mesuré : ×10 fait un match en
+**1,6 min** (contre 3,9 à ×4) ; dans le navigateur, en vue de haut, **10,01 secondes de match par seconde réelle**.
+
+⚠️ **Un plafond que ×4 n'exigeait pas.** `dtReel` est borné à 0,2 s ; à ×10 une image lente ferait avancer le match de
+2 s, plus que ce que la scène sait interpoler (1,2 s) : les joueurs se seraient téléportés. `secondesAAvancer` borne à
+1 s de match par image — à très basse cadence, ×10 ralentit au lieu de sauter.
+⚠️ **La simulation était lente… à cause de l'image, pas du calcul.** Premier essai (3D logicielle) : 781 s de match
+simulées en 15 s réelles, le match n'allait pas à son terme. La scène était redessinée à chaque image pour rien — le
+voile la cache — à 400 ms l'image, contre 12 ms de calcul. Elle n'est plus redessinée pendant la simulation : le match
+entier passe en moins de 15 s même dans cet environnement, en une à deux secondes sur une machine ordinaire.
+⚠️ **Échap fermait le match entier.** Une seconde fenêtre modale (`useModalDialog`) empilée sur celle du match reçoit le
+même Échap que la première, et celle du match appelle `quitter`. La fenêtre de sortie vit donc dans le match, et
+`echapper` la ferme d'abord.
+⚠️ **« Se faire remplacer » n'est pas « sortir »** : c'est une demande, exécutée au prochain arrêt de jeu par le
+remplaçant de son poste. Le banc vérifie que le joueur ne quitte jamais le terrain en pleine course, et que la fin du
+match simulée d'un coup est strictement identique à celle regardée à ×1.
+
+### Suite — ne plus quitter un match en cours, et le score affiché qui n'était pas le score joué
+
+Deux retours, une capture : « je veux pas qu'on puisse quitter le match sans simuler ou se faire remplacer », et un
+classement de Régionale 2 dont le « dernier match » disait 21-15 alors que le match s'était fini à 10-10.
+
+⚠️ **Le bug du score : un registre que la carrière joueur n'alimentait pas.** `jouerRencontre` rend le score
+théorique d'une rencontre (graine = clé) sauf si le registre des résultats joués en porte un. Le manager
+(`enregistrerResultatManager`) et les sélections y écrivaient ; `enregistrerMatchVecu`, lui, ne versait que les
+statistiques du joueur. Le journal disait « Match nul 10-10 », le tableau « 21-15 » : deux vérités. Le banc
+`verify:resultat-match` joue un vrai match, l'inscrit comme `MatchLive` et échoue sur l'ancien code (« le classement
+affiche le score JOUÉ (28-25), plus le théorique » : 18-0 joué, 28-25 affiché).
+⚠️ **Les clés d'une carrière sont celles de la suivante.** `reg2#1#0#club#adversaire` existe dans toute carrière qui
+commence en Régionale 2 : sans purge, un score joué se serait glissé dans la carrière suivante de la même session.
+Le registre est maintenant vidé à chaque création, retraite et réinitialisation.
+⚠️ **Fermer en plein match était gratuit** : la semaine n'avance qu'à la sirène, le match restait donc à rejouer. La
+croix, Échap et le clic hors du match ouvrent la fenêtre de sortie. Mesuré dans le navigateur : ✕ → fenêtre, Échap →
+la fenêtre s'ouvre puis se ferme, croix inactive pendant la simulation, et après « Simuler » + « Terminer » le
+« dernier match » du classement affiche 12-7, le score joué. (Un test trop rapide — Échap pressé dans la milliseconde
+qui suit la fermeture de la fenêtre — la voit encore ouverte : la ref suit le rendu, pas le clic. Sans conséquence à
+vitesse humaine.)
+

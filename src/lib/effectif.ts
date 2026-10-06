@@ -12,6 +12,7 @@ import { mercatoReel, type RecrueReelle } from './mercato.js';
 import { generationDuClub } from './generations.js';
 import { noteJoueurRevalorisee, postesJoueurReel } from './evaluationJoueurReel.js';
 import { joueursCatalogueDuClub, sourceCatalogueEffectifs } from './catalogueEffectifs.js';
+import { definirJoueurIncarne, estJoueurIncarne, joueurIncarne } from './joueurIncarne.js';
 
 // Génération DÉTERMINISTE de l'effectif d'un club : même club + même saison
 // => même équipe. Les joueurs vieillissent d'un an par saison ; passé leur âge
@@ -595,6 +596,22 @@ function romain(n: number): string {
 }
 
 export function effectifDuClub(nomClub: string, saison: number): Coequipier[] {
+  const liste = effectifDuClubComplet(nomClub, saison);
+  // ⚠️ LE JOUEUR QUE L'ON INCARNE N'Y FIGURE PLUS (Correctif 19, `lib/joueurIncarne.ts`) : quand la carrière part
+  // d'un joueur existant, le monde le contient déjà — deux Dupont sur la feuille, un club qui compte deux fois son
+  // demi de mêlée. Il en sort ICI, au bout de la chaîne : le transfert, le mercato et la génération ont travaillé
+  // sur la liste entière, et tout ce qui lit un effectif (match, force du club, sélection nationale) le voit déjà parti.
+  return joueurIncarne() === null ? liste : liste.filter((j) => !estJoueurIncarne(j.nom));
+}
+
+/** Désigne le joueur incarné, ou plus personne (`null`) : les forces de club mémorisées en dépendent. */
+export function setJoueurIncarne(nom: string | null | undefined): void {
+  if (!definirJoueurIncarne(nom)) return;
+  cacheForce.clear();
+  cacheReference.clear();
+}
+
+function effectifDuClubComplet(nomClub: string, saison: number): Coequipier[] {
   nomClub = clubParNom(nomClub)?.nom ?? nomClub;
   // ⚠️ Les transferts annoncés sur L'Ovale s'appliquent APRÈS le mercato, et
   // dès la saison 1 (le mercato, lui, ne démarre qu'en saison 2).

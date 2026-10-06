@@ -355,6 +355,36 @@ Banc du mode : `npm run verify:carriere` (208 contrôles, ~3 min).
 vision, mental` (±3) · `forme, moral, reputation` (0-100, ±20) · `argent`.
 Toute clé inconnue est ignorée par `nettoyerDeltas()`.
 
+**Deux départs** (Correctif 19) : « Créer mon joueur » (`creerJoueur`, classé) ou
+« Jouer avec un joueur existant » (`creerJoueurExistant(carte)`, **hors classement**).
+La logique pure est dans `lib/carriereExistante.ts` (sélection, filtres, fiche de départ,
+`estCarriereClassee`), l'écran dans `components/SelectionJoueurExistant.tsx`, chargé à la demande.
+
+- ⚠️ **LA CARTE EST UN POINT DE DÉPART, JAMAIS UN LIEN.** `joueurDepuisCarte` copie tout ; `Joueur.origine`
+  ne garde qu'un instantané. La carte du catalogue (qui sert aux packs, aux ligues et à la collection) ne bouge
+  pas d'un point quand la carrière progresse — le banc gèle la carte en profondeur avant de l'utiliser.
+- ⚠️ **HORS CLASSEMENT POUR TOUJOURS.** `rankedCareer: false` est posé à la création ; aucune action du store
+  ne le réécrit. **`estCarriereClassee(joueur)` est LE prédicat** et lit aussi `origine` : un drapeau remis à `true`
+  à la main ne suffit pas. Il ferme : `publierAuClassement` (toutes les publications passent par là, `force`
+  n'y change rien), `classementComplet` (classement local), le Panthéon (`LegendeSauvegardee.horsClassement` :
+  gardée, badge, sans rang), `Manager.horsClassement` (un entraîneur issu de cette carrière), le bonus de retraite
+  (`score − scoreDeDepart`, sinon créer une superstar et raccrocher rapporterait plus qu'une carrière entière).
+  Une sauvegarde d'avant le Correctif 19 n'a ni l'un ni l'autre : elle est classée. ⚠️ La carrière solo vit dans
+  le navigateur : le drapeau est modifiable à la main, comme tout le reste — le serveur ne peut pas le savoir.
+- ⚠️ **LE JOUEUR INCARNÉ N'EXISTE PAS DEUX FOIS.** Le monde contient déjà Antoine DUPONT : sans précaution, deux
+  Dupont sur la feuille, deux dans l'écran Effectif, et un club qui compte deux fois son demi de mêlée (effectif +
+  apport du joueur). `lib/joueurIncarne.ts` tient le nom (registre de module, comme `setTransfertsSociaux`) ;
+  `effectifDuClub`, `meilleursDuPays` et `effectifNational` l'écartent, leurs mémoires l'ont dans leur clé
+  (`versionJoueurIncarne`). Le store le renseigne à la création, au rechargement (`onRehydrateStorage`), le retire
+  à la retraite, à `reinitialiser` et à `creerManager`. L'apport au club est calculé dès la première saison.
+- Les huit attributs viennent des notes de la carte (VIT, PAS, JDP, DEF, PHY ou MEL, RCK, END) et du profil de poste
+  du moteur (`attributsDe`) pour le reste, puis la moyenne est recalée **exactement** sur la GEN (`recalerSurLaNote`).
+- Seuls les joueurs **actifs** sont proposés : les cartes spéciales sont écartées (une légende n'a pas de club,
+  une Halloween double un joueur listé). `OptionsSelection.legendes` ouvre les ICONS retraités ; rien ne l'expose.
+- `.env.banc-classement` et `scripts/_envClassement.ts` : en développement `classementEnLigne.ts` n'appelle rien
+  sans `VITE_CLASSEMENT_URL`, et `import.meta.env` est figé au lancement de vite-node — un banc qui compte les
+  envois se lance donc par `vite-node -m banc-classement`. Banc : `npm run verify:carriere-existante`.
+
 ### Manager
 
 On prend un banc (`CreationManager`), on compose, on recrute, on fait monter le
@@ -400,6 +430,52 @@ voisins du passeur conservent leur glissée et l'arrière ferme le couloir menac
 
 Les autres rencontres de la poule sont rejouées sans rendu, dans une **file
 sérialisée** : une avance calendrier ne peut pas écraser un cumul concurrent.
+
+**La vitesse d'un match de carrière** (Correctif 19, `lib/moteur/moments.ts`) : cinq tempos — `decisions`
+(cartes, toujours à vitesse réelle) et `x1`, `x2`, `x3`, `x10` (⚠️ **×10 a remplacé ×4**, sur demande). ⚠️ **UN TEMPO N'EST PAS UN AUTRE MOTEUR** : c'est le
+nombre de secondes simulées par seconde réelle (`allureDuTempo`), et le moteur joue à pas fixe (`DT`). Changer de
+vitesse en plein jeu ne remet rien à zéro et ne change rien au résultat. Mesuré (`npm run verify:vitesse-match`) :
+un match dure 15,5 min à ×1, 7,8 à ×2, 5,2 à ×3, 1,6 à ×10 ; rejoué avec un tempo ET une cadence d'images tirés au
+hasard à chaque image (de 5 à 120 Hz), il finit avec le même score, les mêmes statistiques, le même fil et la même
+suite de phases. `MatchLive` lit le tempo dans une **ref** (`tempoRef`) : la boucle ne se relance pas au changement.
+⚠️ **ON NE CONDUIT PAS À ×10** : le pilote prend la main → `tempoALaPriseDeMain` rend `decisions` (et `allure` vaut 1
+dès que `pilote.phase !== 'attente'`) ; la présentation d'avant-match se passe dès qu'on accélère ; les
+commentateurs se taisent à ×3 et ×10. Les anciens noms (« Suivre », « Accéléré », « Fin ») et leurs facteurs
+×7/×26/×600, que personne ne lisait plus, sont supprimés. ⚠️ En 3D logicielle (SwiftShader, 2,5 images par
+seconde), `dtReel` est borné à 0,2 s et les vitesses plafonnent : mesurées en vue de haut, elles valent
+exactement ×1, ×2, ×3, ×10 (10,01 mesuré) ; la 3D sur GPU réel n'a pas pu être chronométrée ici.
+⚠️ **Plafond de pas par image** (`secondesAAvancer`, `PAS_MAXIMAL_PAR_IMAGE` = 1 s) : à ×10 sur un écran lent,
+une image de 0,2 s ferait avancer le match de 2 s — la scène n'interpole qu'un pas de 1,2 s, les joueurs se
+téléporteraient. À très basse cadence, ×10 ralentit au lieu de sauter ; la scène reçoit la vitesse RÉELLEMENT jouée.
+
+**Se faire remplacer / simuler la fin** (`lib/moteur/sortie.ts`, bouton rond à gauche de la croix de `MatchLive`,
+`FenetreSortie`) : ⚠️ *se faire remplacer* = `demanderRemplacement` du joueur incarné, exécuté **au prochain arrêt de
+jeu** (jamais en pleine course), par le remplaçant de **son poste** (à défaut sa famille, à défaut sa catégorie —
+`remplacantPour`, le même appariement que le moteur) ; la fenêtre dit POURQUOI c'est impossible (sur le banc, déjà
+remplacé, exclu, plus de remplaçant, déjà demandé). Le joueur passe en « regarder » à ×1 : c'est là qu'on accélère
+jusqu'à ×10. ⚠️ *Simuler* = `simulerPendant` : le MÊME moteur à pas fixe, par lots de 3 s sous un budget de 25 ms par
+image (la page reste vivante, le match entier passe en une à deux secondes) ; la scène n'est pas redessinée (un
+rendu 3D logiciel coûte 400 ms contre 12 de calcul), un voile affiche la minute, les blessures du manager restent
+tirées minute par minute (`verifierBlessuresManager`). Le résultat est **identique** à celui du match regardé à ×1
+(banc). ⚠️ La fenêtre vit DANS le match, pas dans un second portail : deux `useModalDialog` empilés reçoivent chacun
+Échap, et celui du match le fermait en entier — `echapper` ferme d'abord la fenêtre de sortie.
+
+⚠️ **ON NE QUITTE PAS UN MATCH EN COURS** (`fermerOuSortir`, `MatchLive`) : la croix, Échap et le clic hors du match
+ouvrent la fenêtre de sortie tant que le match n'est pas fini — fermer en plein match ne coûtait rien (la semaine
+n'avance qu'à la sirène, le match restait à rejouer) : on pouvait le recommencer jusqu'à ce que ça tourne bien. Deux
+exceptions qui ne rapportent rien : le match terminé (« Terminer »), et un match pas commencé (`e.sim < 0.5`, rien à
+refaire). Pendant la simulation la croix est inactive.
+
+⚠️ **LE SCORE RÉEL D'UN MATCH DE CLUB ENTRE DANS LE CHAMPIONNAT** (`enregistrerMatchVecu` +
+`Joueur.resultatsClub`). Le championnat rejoue un score THÉORIQUE (`jouerRencontre`, graine = clé de la rencontre)
+tant qu'aucun résultat n'est inscrit sous cette clé dans le registre des résultats joués : le manager et les
+sélections l'alimentaient, pas la carrière joueur — on finissait à 10-10 et le classement affichait 21-15.
+`MatchLive` passe maintenant la clé, l'équipe et les essais ; le store inscrit le résultat (départage de trois
+points en match couperet, comme pour le manager), le persiste dans la fiche, le rend à la réhydratation et
+`oublierResultats()` purge les fins de saison mémoïsées. ⚠️ **Les clés (`division#saison#journée#…`) sont celles de la
+carrière suivante** : `creerJoueur`, `creerJoueurExistant`, `prendreRetraite`, `creerManager` et `reinitialiser`
+effacent donc le registre. Banc : `npm run verify:resultat-match` (échoue sur l'ancien code). En développement,
+`globalThis.__useGame` donne le store aux scripts de test.
 
 ### Le match en trois dimensions
 
@@ -1165,17 +1241,17 @@ en une phrase → faire faire l'action → passer à la suivante**, sur les VRAI
   `destiny-rugby:tutoriel` — par appareil et par personne, PAS dans la sauvegarde ; `desactive` ne rend rien vu), `types.ts`
   (`ParcoursTuto` / `EtapeTuto`), `guide.ts` (le moteur : un seul parcours actif, une file, déclencheurs relus toutes les 200 ms,
   `signaler(id)` pour les événements, `noter(acte)` / `acteDepuisLEtape` pour les gestes que les écrans annoncent), `placement.ts` (où
-  poser la bulle — fonction pure, testée), `parcours/{general,joueur,entraineur,ligue,contexte}.ts` (29 parcours), `aides.ts`,
+  poser la bulle — fonction pure, testée), `parcours/{general,joueur,entraineur,ligue,contexte}.ts` (30 parcours), `aides.ts`,
   `intentions.ts`, `GuideTutoriel.tsx/.css` (voile à quatre panneaux, anneau, bulle, flèche), `AnimationTuto.tsx` (7 mini-démonstrations
   SVG : clic, glisse, molette, stick, glisser, retourne, défile), `ReglagesTutoriel.tsx` (rejouer × 5, désactiver). Textes :
-  `data/textesTutoriel*.ts` (116 phrases × 7 langues), clés `tg.<parcours>.<étape>.x|.t`.
+  `data/textesTutoriel*.ts` (119 phrases × 7 langues), clés `tg.<parcours>.<étape>.x|.t`.
 - **Les écrans ne connaissent QUE des ancres** : `data-tuto="cel-onglet-packs"`… Un parcours se déclenche quand son ancre apparaît (jamais de
   `useEffect` de tutoriel dans un composant). Ajouter un tutoriel = un `ParcoursTuto`, ses textes, ses `data-tuto` — rien d'autre à brancher.
   Ancres partagées : la composition (`compo-*` dans `CompositionTerrainManager`) sert le manager, la ligue en ligne et la collection solo.
 - **Types d'étapes** : `carte` (centre), `info` (surbrillance + Suivant), `clic` (attend le clic sur la cible), `action` (attend `jusqua()`),
   `ignorerSi` (étape sans objet, franchie sans s'afficher), `facultative` (cible absente après `patience` : sautée), `souple` (parcours sans voile,
   en haut de l'écran : tutoriels contextuels et carton/carte spéciale/blessure), `figeLeMatch` (le match s'arrête pendant la lecture).
-- **Parcours** : `general.intro` (3 grandes cartes) ; `league.{connexion,portail,club,packs,composition,marche,calendrier,direct,decision}` ;
+- **Parcours** : `general.intro` (3 grandes cartes) ; `player.depart` (Correctif 19 : les deux départs, « Créer mon joueur » / « Jouer avec un joueur existant » — pas de second tutoriel pour le second, tous les parcours suivants sont ceux de la carrière ordinaire) ; `league.{connexion,portail,club,packs,composition,marche,calendrier,direct,decision}` ;
   `player.{creation,carriere,premierMatch,role.<capitaine|vice|buteur|lanceur|engagement|droppeur>}` (un rôle ne s'explique que le jour où on le
   reçoit : `rolesDuJoueur`) ; `coach.{creation,club,composition,matchLive,premierMatch}` ; `context.{carton,carteSpeciale,blessure,infirmerie,marcheManager}`.
   Le marché de la ligue n'est expliqué qu'APRÈS l'équipe et les packs. Les anciens joueurs sont reconnus au premier lancement
@@ -1192,7 +1268,7 @@ en une phrase → faire faire l'action → passer à la suivante**, sur les VRAI
   (7) une étape `action` ne doit pas se terminer à la troisième lettre tapée (`stable()`) ; (8) « Désactiver » éteint aussi les cartes du match
   (`tutorielsDesactives` lu par `pilotage.ts`, `controleDirect/responsabilites.ts`, `MatchLive`) ; (9) les scripts de tournage
   (`_trailer.cjs`, `_joueur.cjs`) coupent le guide : sa mémoire est HORS de la sauvegarde.
-- **Tester** : `npm run verify:tutoriel` (30 600 contrôles : textes 7 langues et variables, chaque ancre existe dans le code, placements, mémoire,
+- **Tester** : `npm run verify:tutoriel` (30 700 contrôles : textes 7 langues et variables, chaque ancre existe dans le code, placements, mémoire,
   rôles et anciens). Navigateur : en développement `window.__tutoriel = { guide, memoire }` (⚠️ un `import()` direct donne une AUTRE instance du
   module après un rechargement à chaud : passer par cette poignée, et naviguer en cliquant l'interface plutôt qu'avec un `setEcran` importé).
   La carrière en ligne tourne en local (`serveur/carriereFichier.ts`) : un compte de test se crée par `identifierCarriere('inscription', …)`.
@@ -1421,7 +1497,7 @@ stratégie mixte conclut 16/17, la gourmandise pure 9/17 »).
 
 ## Bancs de mesure
 
-**89 scripts** dans `scripts/verif*.ts`, à lancer sans navigateur. Les
+**91 scripts** dans `scripts/verif*.ts`, à lancer sans navigateur. Les
 principaux sont déclarés dans `package.json` :
 
 ```bash
@@ -1438,9 +1514,12 @@ npm run verify:photos             # portraits des cartes : liens morts, silhouet
 npm run verify:assets             # tout chemin /m3d /logos /photos écrit en dur existe vraiment
 npm run verify:triche             # 40 tentatives de triche, toutes refusées
 npm run verify:cartes-speciales   # ICONS, Halloween, Labo, imports (292 contrôles, ~2 min)
-npm run verify:tutoriel           # le tutoriel guidé : textes, ancres, placement des bulles, mémoire (30 600 contrôles)
+npm run verify:tutoriel           # le tutoriel guidé : textes, ancres, placement des bulles, mémoire (30 700 contrôles)
 npm run verify:bareme             # barème par compétition : un nul vaut 2, bonus en plus (Correctif 20)
 npm run verify:modales            # l'isolement de l'arrière-plan se compte (gel après un match, Correctif 20)
+npm run verify:vitesse-match      # ×1 à ×10, remplacement et simulation : même match quelle que soit la vitesse (132 contrôles, ~75 s)
+npm run verify:resultat-match     # le score joué entre au classement, persisté, rechargé, effacé (18 contrôles)
+npm run verify:carriere-existante # joueur existant : hors classement, carte intacte, monde sans son double (101 contrôles)
 
 npx vite-node scripts/verif.ts    # banc général : divisions, effectifs, 8 saisons
 ```

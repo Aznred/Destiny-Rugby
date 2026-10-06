@@ -642,7 +642,7 @@ Inspiré des jeux de carrière type *Destin Eleven*, mais pour l'**ovalie**.
 - **Le match de la semaine se joue sous tes yeux** : un terrain aux proportions
   réelles vu du dessus (en-buts, 22 m, 10 m en pointillés, poteaux), 15 pions
   par équipe aux couleurs du club, le ballon qui circule, le score et le chrono
-  qui tournent et le commentaire qui descend — 80 minutes, en pause ou en ×4.
+  qui tournent et le commentaire qui descend — 80 minutes, en pause ou en ×10.
   Le placement suit le rugby : les avants au regroupement, le 9 à la sortie du
   ruck, les trois-quarts étalés, et en face une vraie **ligne défensive**. Le
   résultat est le vrai : regarder le match ou passer la semaine donne exactement
@@ -1819,7 +1819,7 @@ Fait avec 🏉 — thème artisanal, front soigné, sans rendu générique.
 
 La retransmission française utilise F5-TTS sur l'ordinateur via un service local. Lancer `Lancer voix F5.cmd` dans l'atelier `../test voice` ; instructions, limites et licences dans [VOIX_LOCALE.md](VOIX_LOCALE.md). La file et les textes de commentaires existants sont conservés.
 
-## Correctifs 16, 17, 18 et 20 (octobre 2026)
+## Correctifs 16 à 20 (octobre 2026)
 
 ### Correctif 16 — le joueur conduit son pion
 - En carrière solo (match en 3D), le joueur **conduit** son personnage dès qu'il est sur le terrain : banc → caméra télé → remplacement animé → caméra derrière lui → commandes. Les vingt-neuf autres gardent l'IA par poste.
@@ -1838,6 +1838,15 @@ La retransmission française utilise F5-TTS sur l'ordinateur via un service loca
 - Mobile soigné : bulle en feuille haut ou bas selon la cible, jamais hors écran, jamais sur l'élément expliqué. **Réglages → Tutoriels** : rejouer chaque guide, ou tout désactiver (les cartes du match aussi) sans rien perdre de ce qu'on a déjà vu.
 - Banc : `npm run verify:tutoriel` (textes dans les sept langues, ancres, 8 000 placements de bulle, mémoire).
 
+### Correctif 19 — vitesse ×1 à ×10, sortie du match, et la carrière avec un joueur existant
+- **Quatre vitesses écrites : ×1, ×2, ×3, ×10**, à côté du mode « Décisions » (cartes, toujours à vitesse réelle). Elles faisaient déjà ×1, ×2 et ×4 sous les noms « Suivre », « Accéléré » et « Fin », sans chiffre — sur téléphone il ne restait qu'une icône ; ×10 a ensuite remplacé ×4. Mesuré : un match de carrière dure **15,5 min à ×1, 7,8 à ×2, 5,2 à ×3, 1,6 à ×10**. Le passage d'une vitesse à l'autre est instantané (la boucle relit le tempo à chaque image) et ne change **rien** au résultat : le moteur est à pas fixe, la vitesse ne change que le nombre de pas par image. Prendre la main sur son joueur en contrôle direct ramène toujours à vitesse réelle ; les commentateurs se taisent à ×3 et ×10 ; sur un écran lent, ×10 ralentit au lieu de téléporter les joueurs (plafond d'une seconde de match par image). Banc : `npm run verify:vitesse-match` (un match joué avec une vitesse et une cadence d'images tirées au hasard à chaque image finit identique à ×1).
+- **Un bouton pour sortir du match** (rond, à gauche de la croix) : **« Me faire remplacer »** — le staff fait entrer le remplaçant de ton poste au prochain arrêt de jeu, jamais en pleine course, et tu regardes la fin en accélérant jusqu'à ×10 — ou **« Simuler la fin du match »** — le même moteur joue le reste d'un coup, sans rien sauter (le résultat est identique à celui du match regardé). La fenêtre dit pourquoi une sortie est impossible (sur le banc, déjà remplacé, exclu, plus de remplaçant).
+- **On ne quitte plus un match en cours** : la croix, Échap et le clic hors du match ouvrent la fenêtre de sortie (se faire remplacer, ou simuler la fin) tant que le match n'est pas terminé — fermer en plein match ne coûtait rien et permettait de le recommencer jusqu'à un bon résultat. Un match pas encore commencé se ferme librement.
+- **Bug corrigé : le score réel d'un match de club n'entrait pas au classement.** On finissait à 10-10 et le classement, le « dernier match » et le calendrier affichaient le score théorique (21-15). Le résultat joué est maintenant inscrit sous la clé de la rencontre, sauvegardé, rendu au rechargement et effacé à chaque nouvelle carrière. Banc : `npm run verify:resultat-match`.
+- **Au lancement d'une carrière joueur : « Créer mon joueur » ou « Jouer avec un joueur existant ».** Le second ouvre un écran de recherche sur tout le catalogue actif (78 000 cartes : nom ou club, championnat, club, nation, poste, GEN min et max) avec les vraies cartes, puis une confirmation. La carrière part de la carte : nom, âge, club, poste, postes secondaires, nationalité, portrait, huit attributs recalés **exactement** sur la GEN, pied, potentiel, rôles du premier jour (capitaine, buteur…). La carte du catalogue n'est jamais modifiée : la carrière en garde une **copie** et un instantané (`Joueur.origine`).
+- **Hors classement, pour toujours** : `rankedCareer = false` est posé à la création, aucune action ne le réécrit, et `estCarriereClassee` lit aussi `origine` — un drapeau retouché à la main ne rouvre pas la porte. Rien n'est envoyé au classement mondial (même forcé), le classement local ignore la carrière, le Panthéon la garde avec son badge et sans rang, la récompense de retraite ne paie que ce qu'on a accompli (score moins score de départ), un entraîneur issu de cette carrière est lui aussi hors classement. Badge discret « HORS CLASSEMENT » sur l'écran de carrière, avertissement unique avant le choix du joueur. Les cartes spéciales (ICONS, Halloween) ne sont pas proposées : l'option « légendes » existe dans `lib/carriereExistante.ts` mais reste fermée.
+- **Le joueur incarné n'existe pas deux fois** (`lib/joueurIncarne.ts`) : il sort de l'effectif de son club, du vivier de sa sélection et de la concurrence de son poste, et y revient à la retraite.
+- Le tutoriel présente les deux départs en trois étapes ; une fois le joueur choisi, tous les parcours sont ceux de la carrière ordinaire. Bancs : `npm run verify:carriere-existante` (101 contrôles, dont de vrais matchs titulaire et remplaçant et un entraîneur issu de la carrière), `npm run verify:tutoriel`.
 ### Correctif 20 — le joueur, du HUD à l'apparence
 
 - **Barème de classement par compétition** (`src/lib/bareme.ts`) : victoire 4, nul 2, défaite 0, bonus offensif et défensif ajoutés séparément — jamais à la place des 2 points du nul. Chaque compétition déclare son barème (clubs : bonus offensif à 3 essais d'écart ; Six Nations, Coupe du monde et autres tournois : 4 essais marqués). Appliqué au championnat, aux coupes, au Six Nations, aux poules de Coupe du monde, à la ligue en ligne et à la carrière entraîneur. `npm run verify:bareme`.
@@ -1846,3 +1855,4 @@ La retransmission française utilise F5-TTS sur l'ordinateur via un service loca
 - **Caméra plus large** derrière le joueur, encore plus sur téléphone, avec un zoom qui glisse selon la situation (réception, percée, défense) et un réglage de recul.
 - **Tutoriel de contrôle en dix étapes** (déplacement, sprint, placement, réclamer, passe, crochet, raffut, pied, plaquage, grattage), rejouable par partie depuis les Réglages, et des explications contextuelles (offload, ruck, passe au pied, placement).
 - **Apparence et équipement** : étape « Apparence » à la création (teint, coupes, couleur, barbe, morphologie bornée, aperçu 3D tournable en direct), « Personnaliser mon joueur » dans le profil, casque et crampons réellement portés par le modèle 3D du match comme de l'aperçu.
+
