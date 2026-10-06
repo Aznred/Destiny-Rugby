@@ -174,11 +174,10 @@ function affichesDePoule(poule: string[]): [string, string][][] {
 /**
  * ⚠️ LE BARÈME DE LA COUPE DU MONDE N'EST PAS CELUI DU TOP 14.
  *
- * Le bonus offensif d'un championnat de clubs se gagne à **trois essais
- * d'écart** ; celui d'une Coupe du monde se gagne à **quatre essais marqués**,
- * quel que soit le résultat. `classer` applique la règle des clubs (c'est la
- * bonne, pour eux) : on recalcule donc ici les seuls points, sur les mêmes
- * matchs, avec la règle du tournoi.
+ * Victoire 4, nul 2, défaite 0 ; le bonus offensif se gagne à **quatre essais
+ * marqués**, quel que soit le résultat (trois essais d'écart en championnat de
+ * clubs). Les bonus s'AJOUTENT aux points du résultat : un nul vaut toujours 2.
+ * Le barème vient de `bareme.ts`, jamais d'une règle globale.
  */
 function classerMondial(equipes: string[], journees: MatchChampionnat[][]): LigneTableau[] {
   // Barème de la Coupe du monde (bareme.ts) : nul = 2 points, bonus en plus.
