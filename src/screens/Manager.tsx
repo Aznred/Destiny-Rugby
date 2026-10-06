@@ -27,6 +27,7 @@ import { rareteCarriere } from '../lib/ligue/catalogueCarriere';
 import { statistiquesCarte } from '../lib/ligue/statistiquesCarte';
 import type { CarteCarriere } from '../lib/ligue/typesCarriere';
 import { Icone } from '../components/Icone';
+import { BadgeHorsClassement } from '../components/BadgeHorsClassement';
 import { FicheJoueur } from '../components/FicheJoueur';
 import { rareteDe } from '../lib/carteJoueur';
 import type { EtatDuJoueur } from '../lib/carteJoueur';
@@ -559,7 +560,7 @@ export function Manager() {
             {' · '}{t('gen.saison').toLowerCase()} {manager.saison}
             {!sansBanc && ` · ${libelleSemaine(sem, manager.saison)}`}
           </div>
-          <h1><Icone nom="entraineur" taille={26} /> {manager.nom}</h1>
+          <h1><Icone nom="entraineur" taille={26} /> {manager.nom}{manager.horsClassement && <> <BadgeHorsClassement /></>}</h1>
         </div>
         {!sansBanc && fiche && (
           <div className="manager-identite-club">
@@ -1777,7 +1778,7 @@ export function Manager() {
       <button className="btn fantome manager-raccrocher" onClick={() => setRaccrocher(true)}>
         <Icone nom="retraite" taille={17} /> {t('mgr.raccrocher')}
       </button>
-      {raccrocher && <Confirmation titre={t('mgr.raccrocherTitre')} message={libre ? t('mgr.raccrocherLibre') : t('mgr.raccrocherClasse')} libelleOui={t('mgr.raccrocher')} onOui={() => { setRaccrocher(false); quitterBanc(); }} onNon={() => setRaccrocher(false)} />}
+      {raccrocher && <Confirmation titre={t('mgr.raccrocherTitre')} message={manager.horsClassement ? t('mgr.raccrocherHorsClassement') : libre ? t('mgr.raccrocherLibre') : t('mgr.raccrocherClasse')} libelleOui={t('mgr.raccrocher')} onOui={() => { setRaccrocher(false); quitterBanc(); }} onNon={() => setRaccrocher(false)} />}
       {jeuneALiberer && (
         <Confirmation
           titre={t("ui.371cc4251fc5")}

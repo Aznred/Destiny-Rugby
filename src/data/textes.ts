@@ -32,6 +32,7 @@ import { TEXTES_INTERFACE_CORRECTIONS } from './textesInterfaceCorrections.js';
 import { TEXTES_CARTES_SPECIALES } from './textesCartesSpeciales.js';
 import { TEXTES_CONTROLE_DIRECT } from './textesControleDirect.js';
 import { TEXTES_RESPONSABILITES } from './textesResponsabilites.js';
+import { TEXTES_CARRIERE_EXISTANTE } from './textesCarriereExistante.js';
 import { TEXTES_RESPONSABILITES_HUD } from './textesResponsabilitesHUD.js';
 import { TEXTES_TUTORIEL } from './textesTutoriel.js';
 
@@ -79,6 +80,7 @@ const ECRIT_A_LA_MAIN: Record<string, Traduction> = {
   ...TEXTES_CARTES_SPECIALES,
   ...TEXTES_CONTROLE_DIRECT,
   ...TEXTES_RESPONSABILITES,
+  ...TEXTES_CARRIERE_EXISTANTE,
   ...TEXTES_RESPONSABILITES_HUD,
   ...TEXTES_TUTORIEL,
 

@@ -60,6 +60,10 @@ import { coupeEnDirect, coupesDuClub } from '../lib/coupe';
 import { LIMITES, ficheDepuisJoueur, ficheDepuisManager, scoreDeLaFiche } from '../lib/classementMondial';
 import { cleAleatoire, envoyerAuClassement } from '../lib/classementEnLigne';
 import {
+  estCarriereClassee, joueurDepuisCarte, responsabilitesDeDepart, scoreDeDepart,
+} from '../lib/carriereExistante';
+import type { SourceCarte } from '../lib/ligue/catalogueCarriere';
+import {
   COMPETITIONS_U20, competitionsDeLaSaison,
   internationalEnDirect,
 } from '../lib/international';
@@ -119,7 +123,7 @@ import { ETAT_PUBS_VIDE, OVAS_PAR_PUB, etatDuJour, pubDisponible, type EtatPubs 
 import type { Scenario } from '../data/scenarios';
 import { COMPETITIONS, divisionDuClub, competitionDuClub, clubParNom } from '../data/clubs';
 import {
-  forceEffectif, forceMoyenneDivision, noteDuClub, setApportsDuCentre, setTransfertsSociaux,
+  forceEffectif, forceMoyenneDivision, noteDuClub, setApportsDuCentre, setJoueurIncarne, setTransfertsSociaux,
   effectifDuClub,
 } from '../lib/effectif';
 import { nomAleatoirePourNation } from '../lib/nomsJoueurs';
@@ -1064,6 +1068,11 @@ interface GameState {
   setGroqKey: (k: string) => void;
   // carrière
   creerJoueur: (input: CreationInput) => void;
+  /**
+   * Commence une carrière avec un joueur existant du catalogue (Correctif 19). Rend `false` si la carte n'est pas
+   * incarnable (club inconnu, âge hors bornes). La carrière naît HORS CLASSEMENT, pour toujours.
+   */
+  creerJoueurExistant: (carte: SourceCarte) => boolean;
   ajouterEntree: (e: Omit<EntreeJournal, 'id' | 'saison'>) => void;
   appliquerReponse: (r: ReponseMJ, actionJoueur: string) => void;
   saisonSuivante: () => void;
@@ -1290,6 +1299,57 @@ async function personnaliserReponseNegociation(pseudo: string, id: string, conte
   }
 }
 
+/**
+ * L'état d'une carrière de joueur qui COMMENCE : le joueur, et tout ce qui repart de zéro autour de lui.
+ *
+ * ⚠️ UN SEUL ENDROIT POUR LES DEUX CRÉATIONS (Correctif 19). `creerJoueur` (on fabrique son joueur) et
+ * `creerJoueurExistant` (on incarne une carte) ouvraient la même carrière avec deux listes de remises à zéro : la
+ * première qui oublierait un champ laisserait des posts, des offres ou des conversations de la carrière précédente
+ * dans la nouvelle. Une seule liste, donc une seule vérité.
+ */
+function etatDeDepartDeCarriere(joueur: Joueur): Partial<GameState> {
+  return {
+    joueur,
+    finCarriere: null,
+    ecran: 'carriere',
+    // ⚠️ Le guide lit `ecransVus` : un écran atteint sans passer par
+    // `setEcran` doit s'y inscrire quand même, sinon son étape reste
+    // décochée alors qu'on est justement dessus.
+    ecransVus: ['carriere'],
+    scenarioActif: null,
+    attenteEvenement: false,
+    evenementHebdo: null,
+    evenementsVus: [],
+    mouvementsClubs: {}, arriveesClubs: {},
+    compteurs: { evenements: 0, situations: 0, gainsIA: 0, gainsArgentIA: 0, gainsMatchs: 0, ovasDefis: 0, ovasActions: 0, augmentations: 0, primesIA: 0 },
+    // Nouvelle carrière : timeline et défis repartent de zéro. Les SUCCÈS,
+    // eux, sont un palmarès de joueur — ils traversent les carrières (et
+    // ne peuvent donc pas être refarmés pour des Ovas).
+    posts: [],
+    filSemaine: '',
+    notifsSocial: [],
+    comptesSuivis: [],
+    suggestionsComptes: [],
+    conversations: {},
+    dossiersRecrutement: {},
+    transfertsSociaux: [],
+    relationsSociales: {},
+    defis: { cle: '', faits: [] },
+    journal: [
+      {
+        id: idUnique(),
+        saison: 1,
+        role: 'systeme',
+        titre: t('car.debutTitre'),
+        // Un joueur existant ouvre son journal en le disant : on n'a pas « créé » Antoine Dupont.
+        texte: t(joueur.origine ? 'car.debutTexteExistant' : 'car.debutTexte', {
+          joueur: joueur.nom, poste: nomPoste(joueur.poste).toLowerCase(), club: joueur.club,
+        }),
+      },
+    ],
+  };
+}
+
 export const useGame = create<GameState>()(
   persist(
     (set, get) => ({
@@ -1483,6 +1543,9 @@ export const useGame = create<GameState>()(
           // Le premier maillot de la carrière : la liste des clubs commence ici
           // et s'allonge à chaque signature (`appliquerPreAccord`).
           clubs: [input.club],
+          // ⚠️ CLASSÉE, ET POSÉ ICI POUR TOUJOURS (Correctif 19) : un joueur qu'on a fabriqué soi-même compte au
+          // classement. Le drapeau inverse n'est posé que par `creerJoueurExistant`, et rien ne le réécrit.
+          rankedCareer: true,
         };
         // Nouvelle carrière = pyramide remise à son état d'origine, et plus
         // aucun transfert annoncé sur L'Ovale ne traîne.
@@ -1494,45 +1557,31 @@ export const useGame = create<GameState>()(
         setContexteJoueur('', 0);
         setTransfertsSociaux([]);
         setApportsDuCentre([], {});
-        set({
-          joueur,
-          finCarriere: null,
-          ecran: 'carriere',
-          // ⚠️ Le guide lit `ecransVus` : un écran atteint sans passer par
-          // `setEcran` doit s'y inscrire quand même, sinon son étape reste
-          // décochée alors qu'on est justement dessus.
-          ecransVus: ['carriere'],
-          scenarioActif: null,
-          attenteEvenement: false,
-          evenementHebdo: null,
-          evenementsVus: [],
-          mouvementsClubs: {}, arriveesClubs: {},
-          compteurs: { evenements: 0, situations: 0, gainsIA: 0, gainsArgentIA: 0, gainsMatchs: 0, ovasDefis: 0, ovasActions: 0, augmentations: 0, primesIA: 0 },
-          // Nouvelle carrière : timeline et défis repartent de zéro. Les SUCCÈS,
-          // eux, sont un palmarès de joueur — ils traversent les carrières (et
-          // ne peuvent donc pas être refarmés pour des Ovas).
-          posts: [],
-          filSemaine: '',
-          notifsSocial: [],
-          comptesSuivis: [],
-          suggestionsComptes: [],
-          conversations: {},
-          dossiersRecrutement: {},
-          transfertsSociaux: [],
-          relationsSociales: {},
-          defis: { cle: '', faits: [] },
-          journal: [
-            {
-              id: idUnique(),
-              saison: 1,
-              role: 'systeme',
-              titre: t('car.debutTitre'),
-              texte: t('car.debutTexte', {
-                joueur: joueur.nom, poste: nomPoste(joueur.poste).toLowerCase(), club: joueur.club,
-              }),
-            },
-          ],
-        });
+        // ⚠️ ET PERSONNE N'EST « INCARNÉ » : le monde reprend tous ses joueurs (voir `lib/joueurIncarne.ts`).
+        setJoueurIncarne(null);
+        set(etatDeDepartDeCarriere(joueur));
+      },
+
+      creerJoueurExistant: (carte) => {
+        let fiche;
+        try { fiche = joueurDepuisCarte(carte); } catch { return false; }
+        // Nouvelle carrière = pyramide d'origine, et plus aucun transfert annoncé : comme `creerJoueur`.
+        setMouvementsClubs({});
+        setArriveesClubs({});
+        oublierResultats();
+        setContexteJoueur('', 0);
+        setTransfertsSociaux([]);
+        setApportsDuCentre([], {});
+        // ⚠️ LE MONDE PERD SON DOUBLE AVANT TOUTE LECTURE D'EFFECTIF : les rôles et l'apport du joueur se calculent
+        // sur son club tel qu'il sera joué — sans lui, puisque c'est lui qui joue (voir `lib/joueurIncarne.ts`).
+        setJoueurIncarne(fiche.nomIncarne);
+        const base = fiche.joueur;
+        const avecRoles: Joueur = { ...base, responsabilites: responsabilitesDeDepart(base, forceEffectif(base.club, base.saison)) };
+        // ⚠️ SON APPORT AU CLUB DÈS LA PREMIÈRE SAISON. Une carrière ordinaire commence à zéro (un débutant ne pèse
+        // pas encore sur son club) ; ici le joueur est retiré de l'effectif, donc le club doit déjà compter sur lui.
+        const joueur: Joueur = { ...avecRoles, apportClub: calculerApportClub(avecRoles) };
+        set(etatDeDepartDeCarriere(joueur));
+        return true;
       },
 
       ajouterEntree: (e) => {
@@ -3574,6 +3623,8 @@ export const useGame = create<GameState>()(
           clubs: joueur.clubs ?? [joueur.club],
           score: scoreCarriere(joueur),
           reconversion,
+          // ⚠️ UNE CARRIÈRE AVEC UN JOUEUR EXISTANT RESTE AU PANTHÉON (c'est SON histoire), mais jamais au classement.
+          ...(estCarriereClassee(joueur) ? {} : { horsClassement: true }),
         };
         const versManager = reconversion === 'entraineur' && chantierVisible('manager');
         const raison = motif ?? motifFinParDefaut(joueur);
@@ -3597,11 +3648,16 @@ export const useGame = create<GameState>()(
         // du joueur précédent sont périmés (voir lib/promotion.ts).
         oublierResultats();
         setContexteJoueur('', 0);
+        // Il raccroche : son double reprend sa place dans le monde (ou n'y est plus, s'il était créé).
+        setJoueurIncarne(null);
         set((s) => ({
           pantheon: [...s.pantheon, legende],
           // Le succès « Entrer au Hall » se décerne ici : juste après, il n'y a
           // plus de joueur, donc plus rien à évaluer.
-          coins: s.coins + Math.round(legende.score / 150)
+          // ⚠️ LE BONUS DE RETRAITE PAIE CE QU'ON A ACCOMPLI, PAS LE NIVEAU DE DÉPART. Un joueur existant démarre à sa note de
+          // carte : sans retrancher son score de départ, créer une superstar et raccrocher aussitôt rapporterait
+          // plus d'Ovas qu'une carrière menée dix saisons depuis la Régionale 3.
+          coins: s.coins + Math.round(Math.max(0, legende.score - (joueur.origine ? scoreDeDepart(joueur.origine) : 0)) / 150)
             + (s.succesDebloques.legende == null ? SUCCES_PAR_ID.legende.ovas : 0),
           succesDebloques: s.succesDebloques.legende == null
             ? { ...s.succesDebloques, legende: joueur.saison }
@@ -3675,6 +3731,8 @@ export const useGame = create<GameState>()(
         if (!fiche) return;
         const comp = competitionDuClub(club);
         const prestige = depuis ? prestigeDepuisJoueur(depuis) : PRESTIGE_DEBUT;
+        // Plus de joueur incarné : le monde reprend tous ses joueurs avant qu'on lise un effectif.
+        setJoueurIncarne(null);
         const force = forceEffectif(club, 1);
         const objectif = objectifDuBoard(club, comp, 1);
         const budgets = budgetsDuClub(club, 1);
@@ -3743,6 +3801,9 @@ export const useGame = create<GameState>()(
             },
           } : {}),
           ...(libre ? { libre: true } : {}),
+          // ⚠️ L'AVANTAGE D'UNE SUPERSTAR NE SE TRANSMET PAS À UN BANC CLASSÉ (Correctif 19) : le prestige d'un
+          // entraîneur issu d'un joueur existant vient de sa carrière, qui n'était pas comparable.
+          ...(depuis?.horsClassement ? { horsClassement: true } : {}),
         };
         manager.avancee = creerEtatCarriereAvancee(manager, effectifDuClub(club, 1));
         set((s) => ({
@@ -5559,6 +5620,11 @@ export const useGame = create<GameState>()(
         const j = get().joueur;
         const m = get().manager;
         if (!j && !m) return;
+        // ⚠️ UNE CARRIÈRE HORS CLASSEMENT N'ENVOIE RIEN, ET C'EST ICI QUE LA PORTE SE FERME (Correctif 19) : toutes les
+        // publications (fin de saison, retraite, semaine jouée, banc quitté) passent par cette fonction. `force` n'y
+        // change rien — il saute les freins de cadence, jamais le droit d'entrer. Une fonction pure comme
+        // `ficheDepuisJoueur` qui refuserait de produire une fiche se contournerait en retirant le drapeau.
+        if (j ? !estCarriereClassee(j) : m!.horsClassement) return;
         const fiche = j
           ? ficheDepuisJoueur(j, get().pseudoClassement || undefined, get().cleClassement)
           : ficheDepuisManager(m!, get().pseudoClassement || undefined, get().cleClassement);
@@ -5579,6 +5645,7 @@ export const useGame = create<GameState>()(
       },
 
       reinitialiser: () => {
+        setJoueurIncarne(null);
         setMouvementsClubs({});
         setArriveesClubs({});
         // La pyramide repart de zéro : les fins de saison mémoïsées et le contexte
@@ -7380,6 +7447,9 @@ export const useGame = create<GameState>()(
       // La pyramide (qui joue dans quelle division) vit dans un registre de
       // module : au retour d'une sauvegarde, il faut la lui rendre.
       onRehydrateStorage: () => (etat) => {
+        // ⚠️ LE JOUEUR INCARNÉ EST UN REGISTRE DE MODULE, comme la pyramide : après un rechargement, son double doit
+        // être écarté du monde AVANT qu'un effectif ne soit lu — sinon deux Dupont jusqu'à la prochaine création.
+        setJoueurIncarne(etat?.joueur?.origine ? etat.joueur.nom : null);
         setMouvementsClubs(etat?.mouvementsClubs ?? {});
         setArriveesClubs(etat?.arriveesClubs ?? {});
         // Les fins de saison mémoïsées (lib/promotion.ts) sont calculées sur la
@@ -8350,10 +8420,12 @@ export function classementComplet(
   pantheon: LegendeSauvegardee[],
   joueur: Joueur | null,
 ): (LegendeSauvegardee & { enCours?: boolean; joueur?: boolean })[] {
+  // ⚠️ UNE CARRIÈRE AVEC UN JOUEUR EXISTANT N'Y FIGURE PAS (Correctif 19) : ni au Panthéon-classement, ni « en cours ».
+  // Elle reste dans le Panthéon lui-même, qui est une mémoire, pas une compétition.
   const liste: (LegendeSauvegardee & { enCours?: boolean; joueur?: boolean })[] = [
-    ...pantheon.map((l) => ({ ...l, joueur: true })),
+    ...pantheon.filter((l) => !l.horsClassement).map((l) => ({ ...l, joueur: true })),
   ];
-  if (joueur) {
+  if (joueur && estCarriereClassee(joueur)) {
     liste.push({
       id: 'en-cours',
       nom: `${joueur.nom} (en cours)`,

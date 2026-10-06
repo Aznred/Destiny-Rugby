@@ -125,7 +125,7 @@ import { LARGEUR, LONGUEUR, borner, type Vec } from '../lib/moteur/terrain';
 import { corpsPourAffichage, porteurPourAffichage } from '../lib/moteur/dynamique';
 import { Camera, COUVERTURE, angleDeVue, type Cadrage, type Vue } from '../lib/moteur/camera';
 import {
-  momentDuJoueur, TEMPOS, TENUE, type Moment, type Tempo,
+  allureDuTempo, estAccelere, momentDuJoueur, TEMPOS, TENUE, tempoALaPriseDeMain, type Moment, type Tempo,
 } from '../lib/moteur/moments';
 import {
   DELAI_DECISION, REJEU, REPOS_DECISION, decisionPour, delaiDeCarte,
@@ -549,7 +549,12 @@ export function MatchLive({
   // LE JEU. « On ne fait que les choix » — les autres tempos ne servent plus
   // qu'à regarder (⏩ accélérer, ⏭️ aller à la fin), et les quitter revient à
   // renoncer à jouer, ce que dit déjà le bouton 👁️ Je regarde.
-  const [tempo, setTempo] = useState<Tempo>(monPion ? 'decisions' : 'suivre');
+  const [tempo, setTempo] = useState<Tempo>(monPion ? 'decisions' : 'x1');
+  // ⚠️ LA BOUCLE LIT LE TEMPO DANS UNE REF, comme la carte de décision : changer de vitesse ne doit ni
+  // relancer la boucle ni toucher au match. C'est ce qui rend ×4 → ×1 instantané, au prochain pas.
+  const tempoRef = useRef<Tempo>(tempo);
+  tempoRef.current = tempo;
+  const choisirTempo = useCallback((v: Tempo) => { tempoRef.current = v; setTempo(v); }, []);
   // --- 🕹️ LE CONTRÔLE DIRECT (Correctif 16) ---------------------------------------
   // Le pilote vit dans une ref (il est lu soixante fois par seconde par la boucle) ; son HUD s'abonne à son
   // cliché, il ne repasse donc pas par le rendu du match. La caméra choisie est relue par la boucle dans une
@@ -563,7 +568,7 @@ export function MatchLive({
       surPause: () => setEnPause((p) => !p),
       vibrer,
       // Il prend la main : on ne conduit pas à ×4, le tempo revient au jeu normal.
-      surPrise: () => setTempo((v) => (v === 'accelere' || v === 'fin' ? 'decisions' : v)),
+      surPrise: () => choisirTempo(tempoALaPriseDeMain(tempoRef.current)),
     });
   }
   // Aperçu et essais dans le navigateur (développement seulement, retiré du build) : de quoi lire le moteur et
@@ -805,6 +810,7 @@ export function MatchLive({
       const precedent = dernierTemps.current || ms;
       dernierTemps.current = ms;
       const dtReel = Math.min(0.2, (ms - precedent) / 1000);
+      const tempo = tempoRef.current;
 
       const moi = e.pions.find((p) => p.moi);
       const { largeur, hauteur } = boite.current;
@@ -978,10 +984,10 @@ export function MatchLive({
       const intro = presentation.current;
       if (intro) {
         // Le stade se charge encore : on l'attend quelques secondes plutôt que de présenter sur une image vide.
-        if (!scene && vue3DVoulue.current && (intro.attente = (intro.attente ?? 0) + dtReel) < 8 && tempo !== 'accelere' && tempo !== 'fin') return;
+        if (!scene && vue3DVoulue.current && (intro.attente = (intro.attente ?? 0) + dtReel) < 8 && !estAccelere(tempo)) return;
         intro.t += enPause ? 0 : dtReel;
         // Accélérer ou aller à la fin, c'est dire qu'on ne veut pas de l'avant-match.
-        if (tempo === 'accelere' || tempo === 'fin') intro.t = 99;
+        if (estAccelere(tempo)) intro.t = 99;
         const etape = intro.t < 3 ? 'affiche' : intro.t < 3 + DUREE_EQUIPE_TV ? 'A' : 'B';
         setTempsPresentation(Math.floor(intro.t));
         if (etape !== intro.etape) {
@@ -1078,7 +1084,7 @@ export function MatchLive({
       e.carriereDixMinutes = true;
       // ⚠️ ON NE CONDUIT PAS À ×4 : dès que le joueur entre, le jeu retombe au temps réel — et le tutoriel peut
       // le ralentir tant qu'une invite presse.
-      const allure = (pilote.phase !== 'attente' ? 1 : tempo === 'accelere' ? 2 : tempo === 'fin' ? 4 : 1) * pilote.vitesseTuto;
+      const allure = (pilote.phase !== 'attente' ? 1 : allureDuTempo(tempo)) * pilote.vitesseTuto;
       // Les packs rejoignent une mêlée ou un alignement avant qu'il ne commence.
       scene?.retenir(dtReel * allure);
       avancer(e, dtReel * allure);
@@ -1119,7 +1125,7 @@ export function MatchLive({
     };
     brut = requestAnimationFrame(image);
     return () => { actif = false; cancelAnimationFrame(brut); };
-  }, [enPause, tempo, enJeu, e, fermerDecision, manager, coteManager, cle]);
+  }, [enPause, enJeu, e, fermerDecision, manager, coteManager, cle]);
 
   // ⚠️ LES CHIFFRES CHOISISSENT SUR LA CARTE — c'est le SEUL clavier du match,
   // maintenant qu'on ne pilote plus rien. Une carte à dix secondes se joue à la
@@ -1711,7 +1717,8 @@ export function MatchLive({
                 )}
 
                 {/* ---------- 📺 L'HABILLAGE TÉLÉVISION ---------- */}
-                <CommentateursMatch lignes={e.commentaires} seconde={e.t} pause={enPause || !!avantMatch} etat={e} contexte={contexteTV} />
+                {/* ⚠️ À ×3 ET ×4 LES COMMENTATEURS SE TAISENT : une phrase de trois secondes arriverait après trois actions. */}
+                <CommentateursMatch lignes={e.commentaires} seconde={e.t} pause={enPause || !!avantMatch || allureDuTempo(tempo) >= 3} etat={e} contexte={contexteTV} />
                 {(() => {
                   // Une décision par seconde d'écran : deux rendus du même instant lisent la même bulle.
                   const seconde = Math.floor(e.sim);
@@ -2056,7 +2063,7 @@ export function MatchLive({
                   onClick={() => {
                     const suivant = mode === 'jouer' ? 'regarder' : 'jouer';
                     setMode(suivant);
-                    setTempo(suivant === 'jouer' ? 'decisions' : 'suivre');
+                    choisirTempo(suivant === 'jouer' ? 'decisions' : 'x1');
                   }}
                 >
                   {enJeu ? <><Icone nom="sifflet" taille={14} /> {t('ml.mode.jouer')}</> : <><Icone nom="oeil" taille={14} /> {t('ml.mode.regarder')}</>}
@@ -2064,18 +2071,40 @@ export function MatchLive({
               )}
               {!e.fini && (
                 <div className="ml-tempos">
-                  {!(directVoulu && pilotage.current!.phase !== 'attente') && TEMPOS.filter((v) => v.id !== 'decisions' || !!monPion).map((v) => (
-                    <button
-                      key={v.id}
-                      type="button"
-                      className={`ml-tempo${tempo === v.id ? ' actif' : ''}`}
-                      title={v.id === 'suivre' ? t("ui.3d83d13a7d65") : v.id === 'accelere' ? t("ui.9a94d8bba00b") : v.id === 'fin' ? t("ui.ee3221158417") : t(v.aide)}
-                      aria-label={v.id === 'suivre' ? t("ui.ac6c3bcc1174") : v.id === 'accelere' ? '×2' : v.id === 'fin' ? '×4' : t(v.cle)}
-                      onClick={() => setTempo(v.id)}
-                    >
-                      <b><Icone nom={v.id === 'suivre' ? 'oeil' : v.id === 'accelere' ? 'eclair' : v.id === 'fin' ? 'fleche-droite' : 'chrono'} taille={17} /></b><span>{v.id === 'suivre' ? t("ui.ac6c3bcc1174") : t(v.cle)}</span>
-                    </button>
-                  ))}
+                  {!(directVoulu && pilotage.current!.phase !== 'attente') && (
+                    <>
+                      {/* Le mode « cartes » : le match se fige sur chaque carrefour. À vitesse réelle, toujours. */}
+                      {monPion && (
+                        <button
+                          type="button"
+                          className={`ml-tempo${tempo === 'decisions' ? ' actif' : ''}`}
+                          title={t('ml.tempo.decisions.aide')}
+                          aria-label={t('ml.tempo.decisions')}
+                          aria-pressed={tempo === 'decisions'}
+                          onClick={() => choisirTempo('decisions')}
+                        >
+                          <b><Icone nom="chrono" taille={17} /></b><span>{t('ml.tempo.decisions')}</span>
+                        </button>
+                      )}
+                      {/* ⚠️ LES QUATRE VITESSES SE LISENT D'UN COUP D'ŒIL, chiffre écrit — jamais une icône muette.
+                          Passer de l'une à l'autre est instantané : la boucle relit le tempo à chaque image. */}
+                      <div className="ml-vitesses" role="group" aria-label={t('ml.tempo.vitesse')}>
+                        {TEMPOS.filter((v) => v.id !== 'decisions').map((v) => (
+                          <button
+                            key={v.id}
+                            type="button"
+                            className={`ml-vitesse${tempo === v.id ? ' actif' : ''}`}
+                            title={t(v.aide)}
+                            aria-label={t(v.cle)}
+                            aria-pressed={tempo === v.id}
+                            onClick={() => choisirTempo(v.id)}
+                          >
+                            {t(v.cle)}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
                   <button
                     type="button"
                     className={`ml-tempo${enPause ? ' actif' : ''}`}

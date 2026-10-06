@@ -72,6 +72,8 @@
     "mesure:rugby": "vite-node scripts/mesurerRugby.ts",
     "mesure:empreinte": "vite-node scripts/empreinteMoteur.ts",
     "verify:controle-direct": "vite-node scripts/verifierControleDirect.ts",
+    "verify:vitesse-match": "vite-node scripts/verifierVitesseMatch.ts",
+    "verify:carriere-existante": "vite-node -m banc-classement scripts/verifierCarriereExistante.ts",
     "verify:responsabilites": "vite-node scripts/verifierResponsabilites.ts",
     "verify:tutoriel": "vite-node scripts/verifierTutoriel.ts",
     "mesure:conso-direct": "vite-node scripts/mesurerConsommationDirect.ts",

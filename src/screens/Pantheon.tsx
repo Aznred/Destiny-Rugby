@@ -12,6 +12,7 @@ import { titreTraduit } from '../lib/tropheesI18n';
 // trophée : la mettre en import direct la ferait entrer dans le chunk du Hall,
 // que l'on ouvre parfois juste pour lire un classement.
 import { Icone } from '../components/Icone';
+import { BadgeHorsClassement } from '../components/BadgeHorsClassement';
 const ArmoireTrophees = lazy(() =>
   import('../components/ArmoireTrophees').then((m) => ({ default: m.ArmoireTrophees })),
 );
@@ -28,7 +29,11 @@ export function Pantheon() {
   const setEcran = useGame((s) => s.setEcran);
   const [vitrine, setVitrine] = useState<Vitrine | null>(null);
 
-  const legendes = [...pantheon].sort((a, b) => b.score - a.score);
+  // ⚠️ LE RANG NE VAUT QUE POUR LES CARRIÈRES CLASSÉES (Correctif 19). Une carrière menée avec un joueur existant reste
+  // au Panthéon — c'est son histoire — mais sans numéro : elle ne se range pas parmi celles qu'on a bâties de zéro.
+  const classees = pantheon.filter((l) => !l.horsClassement).sort((a, b) => b.score - a.score);
+  const horsClassement = pantheon.filter((l) => l.horsClassement).sort((a, b) => b.score - a.score);
+  const legendes = [...classees, ...horsClassement];
 
   // ⚠️ DEUX SOURCES, ET C'EST NORMAL. La carrière en cours porte un palmarès
   // STRUCTURÉ (`Joueur.palmares` : id de trophée, saison, club). Les légendes
@@ -88,12 +93,12 @@ export function Pantheon() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.05 }}
             >
-              <div className="legende-rang">#{i + 1}</div>
+              <div className="legende-rang">{l.horsClassement ? '—' : `#${i + 1}`}</div>
               <div className="legende-avatar">
                 <Icone nom={POSTE_PAR_ID[migrerPoste(l.poste)].categorie === 'Avant' ? 'bouclier' : 'eclair'} taille={20} />
               </div>
               <div style={{ flex: 1 }}>
-                <div className="legende-nom">{l.nom}</div>
+                <div className="legende-nom">{l.nom} {l.horsClassement && <BadgeHorsClassement />}</div>
                 <div className="legende-sous" style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                   {nomPoste(migrerPoste(l.poste))} · <Drapeau nation={l.nation} taille={0.75} /> {nomNationTraduit(l.nation)} · {l.saisons} {t('clst.saisons').toLowerCase()}
                 </div>

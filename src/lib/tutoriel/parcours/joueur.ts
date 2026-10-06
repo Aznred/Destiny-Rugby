@@ -66,6 +66,22 @@ function parcoursDeRole(
 // ───────────────────────────────────────────────────────────────────────────
 
 export const PARCOURS_JOUEUR: ParcoursTuto[] = [
+  // ── Le choix du départ (Correctif 19) : deux façons de commencer, présentées en trois phrases ──
+  // ⚠️ PAS DE SECOND TUTORIEL POUR « JOUEUR EXISTANT » : une fois la carte choisie, tous les systèmes sont ceux de la
+  // carrière ordinaire (écran de carrière, premier match, responsabilités) — leurs parcours se déclenchent comme avant.
+  {
+    id: 'player.depart',
+    famille: 'player',
+    priorite: 9,
+    declencheur: () => ancrePresente('cr-origine-choix'),
+    valide: () => ecranEst('creation'),
+    etapes: [
+      { id: 'choix', type: 'carte', titre: true, icone: 'joueur', bouton: 'tg.ui.suivant' },
+      { id: 'creer', cible: 'cr-origine-creer', icone: 'signature', cote: 'bas' },
+      { id: 'existant', cible: 'cr-origine-existant', icone: 'profil', cote: 'bas' },
+    ],
+  },
+
   // ── La création : un choix à la fois, le poste d'abord pesé ──────────────
   {
     id: 'player.creation',

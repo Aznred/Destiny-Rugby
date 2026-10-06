@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { lazy, Suspense, useMemo, useState } from 'react';
 import { LIMITES } from '../lib/classementMondial';
 import { t } from '../lib/i18n';
 import { motion } from 'framer-motion';
@@ -18,6 +18,12 @@ import { Icone } from '../components/Icone';
 import { chantierVisible } from '../lib/modeDev';
 import { prendreLeModeDeCreation } from '../lib/tutoriel/intentions';
 import type { PosteId } from '../types';
+import type { SourceCarte } from '../lib/ligue/catalogueCarriere';
+import '../components/SelectionJoueurExistant.css';
+
+// ⚠️ LA SÉLECTION D'UN JOUEUR EXISTANT EST CHARGÉE À LA DEMANDE : elle embarque le catalogue de 78 000 cartes et
+// l'écran des cartes, dont ne s'encombre pas qui crée son propre joueur.
+const SelectionJoueurExistant = lazy(() => import('../components/SelectionJoueurExistant').then((m) => ({ default: m.SelectionJoueurExistant })));
 
 // ⚠️ L’ÂGE DE DÉPART EST BORNÉ, MAIS PAS PENDANT LA FRAPPE. Voir le champ
 // plus bas : c’est exactement ce qui le rendait impossible à changer.
@@ -92,8 +98,55 @@ function ChoixDeCarriere({ onJoueur, onEntraineur, onEnLigne }: {
   );
 }
 
+/**
+ * LE CHOIX DU DÉPART — créer son joueur, ou incarner un joueur existant (Correctif 19).
+ *
+ * ⚠️ LA DIFFÉRENCE QUI COMPTE EST ÉCRITE SUR CHAQUE CARTE : l'un compte au classement, l'autre non. On ne la découvre
+ * pas trois saisons plus tard sur l'écran du classement. Un joueur existant démarre à sa note de carte ; le comparer
+ * à quelqu'un qui a fait grandir son propre personnage depuis la Régionale 3 n'aurait pas de sens.
+ */
+function ChoixDeDepart({ onCreer, onExistant }: { onCreer: () => void; onExistant: () => void }) {
+  return (
+    <div className="champ cr-modes" data-tuto="cr-origine-choix">
+      <h2 className="cr-origine-titre">{t('cr.origine.titre')}</h2>
+      <p className="cr-origine-chapo">{t('cr.origine.chapo')}</p>
+      <div className="cr-modes-grille">
+        <button type="button" className="cr-mode" onClick={onCreer} data-tuto="cr-origine-creer">
+          <span className="cr-mode-ico"><Icone nom="signature" taille={30} /></span>
+          <b>{t('cr.origine.creer')}</b>
+          <span className="cr-mode-desc">{t('cr.origine.creerTexte')}</span>
+          <em className="cr-mode-suite">{t('cr.origine.creerBadge')}</em>
+        </button>
+        <button type="button" className="cr-mode" onClick={onExistant} data-tuto="cr-origine-existant">
+          <span className="cr-mode-ico"><Icone nom="profil" taille={30} /></span>
+          <b>{t('cr.origine.existant')}</b>
+          <span className="cr-mode-desc">{t('cr.origine.existantTexte')}</span>
+          <em className="cr-mode-suite">{t('cr.origine.existantBadge')}</em>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** « Cette carrière est hors classement… » — une seule fois, avant de choisir le joueur, jamais à chaque match. */
+function AvertissementHorsClassement({ onContinuer, onRetour }: { onContinuer: () => void; onRetour: () => void }) {
+  return (
+    <div className="cr-avertissement" role="note">
+      <span className="cr-mode-ico"><Icone nom="alerte" taille={30} /></span>
+      <h2>{t('cr.horsClassement.titre')}</h2>
+      <p>{t('cr.horsClassement.texte')}</p>
+      <p className="cr-avertissement-suite">{t('cr.horsClassement.irreversible')}</p>
+      <div className="rangee-fin">
+        <button type="button" className="btn fantome" onClick={onRetour}>{t('cr.horsClassement.retour')}</button>
+        <button type="button" className="btn primaire grand" onClick={onContinuer}>{t('cr.horsClassement.continuer')}</button>
+      </div>
+    </div>
+  );
+}
+
 export function Creation() {
   const creerJoueur = useGame((s) => s.creerJoueur);
+  const creerJoueurExistant = useGame((s) => s.creerJoueurExistant);
   const setEcran = useGame((s) => s.setEcran);
   const traitsDebloques = useGame((s) => s.traitsDebloques);
   // ⚠️ LE CHOIX N'EST DEMANDÉ QUE S'IL EXISTE. Chantier fermé : on ouvre
@@ -103,6 +156,13 @@ export function Creation() {
   const [mode, setMode] = useState<'joueur' | 'entraineur' | null>(
     () => (choixPossible ? prendreLeModeDeCreation() : 'joueur'),
   );
+
+  // ⚠️ DEUX FAÇONS DE COMMENCER (Correctif 19). `null` : on n'a pas encore choisi. `existant` passe d'abord par
+  // l'avertissement « hors classement » (`avertissementVu`), puis par la sélection du joueur.
+  const [depart, setDepart] = useState<'creer' | 'existant' | null>(null);
+  const [avertissementVu, setAvertissementVu] = useState(false);
+  const [refus, setRefus] = useState(false);
+  const choisirUnExistant = (carte: SourceCarte) => { setRefus(!creerJoueurExistant(carte)); };
 
   const [nom, setNom] = useState('');
   const [poste, setPoste] = useState<PosteId>('demi_ouverture');
@@ -186,16 +246,25 @@ export function Creation() {
     >
       <button
         className="btn fantome"
-        onClick={() => (mode && choixPossible ? setMode(null) : setEcran('accueil'))}
+        onClick={() => {
+          // On remonte d'un cran à la fois : sélection → avertissement → choix du départ → choix du mode.
+          if (mode === 'joueur' && depart === 'existant' && avertissementVu) { setAvertissementVu(false); setRefus(false); return; }
+          if (mode === 'joueur' && depart) { setDepart(null); return; }
+          if (mode && choixPossible) setMode(null); else setEcran('accueil');
+        }}
         style={{ marginBottom: '1rem' }}
       >
         {t('gen.retour')}
       </button>
       <div className="eyebrow">{t('cr.eyebrow')}</div>
-      <h1>{mode ? t('cr.titre') : t('cr.titreChoix')}</h1>
-      <p style={{ color: 'var(--craie-dim)', margin: '0.6rem 0 2rem', maxWidth: '60ch' }}>
-        {mode ? t('cr.chapo') : t('cr.chapoChoix')}
-      </p>
+      {/* « Crée ton joueur » ne vaut que pour le formulaire : avant le choix du départ, ou en cherchant un joueur
+          existant, le titre dirait le contraire de ce qu'on fait. */}
+      <h1>{!mode ? t('cr.titreChoix') : depart === 'creer' ? t('cr.titre') : t('cr.titreDepart')}</h1>
+      {(!mode || depart === 'creer') ? (
+        <p style={{ color: 'var(--craie-dim)', margin: '0.6rem 0 2rem', maxWidth: '60ch' }}>
+          {!mode ? t('cr.chapoChoix') : t('cr.chapo')}
+        </p>
+      ) : <div style={{ height: '1.4rem' }} />}
 
       {!mode && (
         <div className="carte" style={{ padding: '1.6rem' }}>
@@ -207,7 +276,25 @@ export function Creation() {
         </div>
       )}
 
-      {mode === 'joueur' && (
+      {mode === 'joueur' && depart === null && (
+        <div className="carte" style={{ padding: '1.6rem' }}>
+          <ChoixDeDepart onCreer={() => setDepart('creer')} onExistant={() => { setDepart('existant'); setAvertissementVu(false); setRefus(false); }} />
+        </div>
+      )}
+
+      {mode === 'joueur' && depart === 'existant' && !avertissementVu && (
+        <div className="carte" style={{ padding: '1.6rem' }}>
+          <AvertissementHorsClassement onContinuer={() => setAvertissementVu(true)} onRetour={() => setDepart(null)} />
+        </div>
+      )}
+
+      {mode === 'joueur' && depart === 'existant' && avertissementVu && (
+        <Suspense fallback={<p className="aide">{t('cr.existant.chargement')}</p>}>
+          <SelectionJoueurExistant onChoisir={choisirUnExistant} erreur={refus} />
+        </Suspense>
+      )}
+
+      {mode === 'joueur' && depart === 'creer' && (
       <div className="carte" style={{ padding: '1.6rem' }} data-tuto="cr-formulaire">
         <div className="grille-2">
           <div className="champ" data-tuto="cr-nom">

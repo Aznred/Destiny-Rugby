@@ -217,10 +217,42 @@ export interface Joueur {
   // Poids du joueur sur les résultats de son club, figé pour la saison
   // (voir `calculerApportClub` dans le store).
   apportClub?: number;
+  /**
+   * ⚠️ LA CARRIÈRE COMPTE-T-ELLE AU CLASSEMENT ? (Correctif 19)
+   *
+   * Posé UNE FOIS, à la création, et jamais modifié : `true` quand on a créé son propre joueur, `false` quand on
+   * incarne un joueur existant. Aucune action du store ne le réécrit — voir `lib/carriereExistante.ts`
+   * (`estCarriereClassee`), qui est LE prédicat que tout le jeu interroge. Absent des sauvegardes d'avant le
+   * Correctif 19 : toutes ont été créées de zéro, elles restent classées.
+   */
+  rankedCareer?: boolean;
+  /**
+   * La carte dont cette carrière est partie (joueur existant), et ce qu'elle valait ce jour-là. Un INSTANTANÉ : la
+   * fiche du joueur de la carrière vit sa vie, la carte du catalogue ne bouge jamais à cause d'elle.
+   */
+  origine?: OrigineJoueur;
+  /** Les postes qu'il occupe aussi (joueur existant) : ceux de sa carte, jamais tirés. */
+  postesSecondaires?: PosteId[];
+  /** Son portrait officiel (joueur existant). Absent : la silhouette. */
+  photo?: string;
   // --- Lot 7 : réseau social ---
   pseudo?: string; // identifiant @ sur L'Ovale
   abonnes?: number; // nombre d'abonnés
   profilSocial?: ProfilSocial; // nom affiché, photo, bio, bannière
+}
+
+/** L'instantané de la carte d'un joueur existant au moment où sa carrière a commencé (Correctif 19). */
+export interface OrigineJoueur {
+  /** Identifiant de la carte dans le catalogue (`SourceCarte.sourceId`). */
+  sourceId: string;
+  /** Sa note générale ce jour-là (GEN) : la carrière part de cette valeur, puis vit sa vie. */
+  genDepart: number;
+  /** Son potentiel ce jour-là. */
+  potentielDepart: number;
+  /** Le club, le championnat et l'âge de départ — pour l'affichage, jamais pour rejouer la carrière. */
+  clubDepart: string;
+  championnatDepart: string;
+  ageDepart: number;
 }
 
 // Un titre remporté, avec ce qu'il faut pour construire un palmarès : quel
@@ -1218,6 +1250,11 @@ export interface Manager {
    * redevient pas légitime parce qu’on a gagné ensuite.
    */
   libre?: boolean;
+  /**
+   * Banc issu d'une carrière de joueur existant (Correctif 19) : il ne compte pas au classement des entraîneurs,
+   * pour la même raison que la carrière dont il vient. Posé à la création, jamais retiré.
+   */
+  horsClassement?: boolean;
   pseudo?: string;
 }
 
@@ -1250,6 +1287,11 @@ export interface LegendeSauvegardee {
   score: number;
   fictif?: boolean; // légende pré-générée (pour peupler le classement)
   reconversion?: string; // ce qu'il est devenu après sa carrière
+  /**
+   * Carrière menée avec un joueur existant (Correctif 19) : elle reste au Panthéon, jamais au classement.
+   * Absent = carrière créée de zéro, classée.
+   */
+  horsClassement?: boolean;
 }
 
 /** La raison qui a fermé une carrière, conservée jusqu'à ce que le joueur l'ait lue. */

@@ -10503,3 +10503,41 @@ tout le panneau. C'est maintenant la **piste de grille** qui vaut 12 rem
 tient dedans. Vérifié en forçant `width: 100% !important` sur la carte — elle
 reste à 192 px.
 
+---
+
+## Correctif 19 — vitesse ×1 à ×4, carrière avec un joueur existant (octobre 2026)
+
+### La vitesse : le ×4 existait déjà, sous le nom « Fin »
+
+Demande : « même en utilisant les boutons d'accélération, les matchs restent beaucoup trop longs ; monter jusqu'à ×4 ».
+Avant de toucher au moteur, mesure : la boucle de `MatchLive` faisait déjà `tempo === 'accelere' ? 2 : tempo === 'fin' ? 4 : 1`.
+Les trois boutons s'appelaient « Suivre », « Accéléré » et « Fin » (et sur téléphone, une icône), un tableau `TEMPOS`
+portait d'autres facteurs (×7, ×26, ×600) que personne ne lisait. Durée d'un match de carrière 3D, 6 matchs,
+`npm run verify:vitesse-match` : **15,5 min à ×1, 7,8 à ×2, 5,2 à ×3, 3,9 à ×4**. Le travail a donc été : un seul tableau
+d'allures (`allureDuTempo`), un bouton ×3, des chiffres écrits, et la preuve que changer de vitesse ne change pas le match.
+
+⚠️ **La preuve est un banc, pas un argument.** Un match joué avec un tempo ET une durée d'image tirés au hasard à
+chaque image (8 ms à 200 ms) finit avec la même empreinte, le même fil (mot pour mot) et la même suite de phases qu'à ×1.
+⚠️ **Mesuré dans un vrai navigateur** (Chromium, vue de haut, images rapides) : ×1 = 1,01 ; ×2 = 2,00 ; ×3 = 2,98 ;
+×4 = 3,98 ; retour à ×1 = 0,99 secondes de match par seconde réelle. En 3D logicielle (2,5 images/s) le plafond de
+`dtReel` (0,2 s) divise tout par deux : un artefact de l'environnement, pas du code — à revérifier sur un GPU réel.
+⚠️ **La barre sur 390 px** : les quatre vitesses ne faisaient que 29 px de large quand « Décisions » et « Pause »
+gardaient leur étiquette ; elles se réduisent à leur icône (44 px) et les vitesses passent à 34 px.
+
+### Le joueur existant : quatre pièges trouvés en chemin
+
+1. **Le monde contient déjà le joueur.** Deux Dupont sur la feuille, deux dans l'écran Effectif, et un club qui compte
+   deux fois son demi de mêlée. Retirer le nom de `effectifDuClub` règle aussi la sélection nationale (qui se compose
+   depuis les effectifs de club) — mais les mémoires (`cacheSelections`, `cacheConcurrence`, `cacheEspoirs`,
+   `cacheForce`) doivent porter la version du joueur incarné dans leur clé.
+2. **Un prédicat, pas un drapeau.** `rankedCareer` seul se contourne en le réécrivant ; `estCarriereClassee` lit aussi
+   `origine`. Toutes les publications passent par `publierAuClassement`, y compris celles de `force`.
+3. **La récompense de retraite paye le niveau de départ.** `score / 150` d'une carte à 95 dépasse une carrière entière
+   depuis la Régionale 3 : on retranche le score de départ.
+4. **Un banc qui compte les envois doit pouvoir envoyer.** `classementEnLigne.ts` n'appelle rien en développement
+   sans URL, et `import.meta.env` est figé au lancement de vite-node : `vite-node -m banc-classement` lit
+   `.env.banc-classement`. Sans cela, « rien n'est parti » était vrai pour TOUTES les carrières, et ne prouvait rien.
+
+Aussi : `Message` (écran de carrière) ré-affiche le premier message du journal avec `t('car.debutTexte')` d'après son
+titre — le texte propre aux joueurs existants a dû y être ajouté, sinon il n'apparaissait jamais.
+

@@ -6456,6 +6456,37 @@ img, svg, canvas { max-width: 100%; }
   text-overflow: ellipsis;
 }
 .ml-tempo.actif { background: rgba(212, 175, 55, 0.18); border-color: var(--or-clair); color: var(--or-clair); }
+/* ⚠️ LES QUATRE VITESSES FORMENT UN SEUL CONTRÔLE, chiffre écrit (×1 à ×4) : sur téléphone les
+   libellés des autres boutons se réduisent à une icône, mais une vitesse sans son chiffre ne dit
+   rien. Un groupe segmenté se lit comme un sélecteur, pas comme quatre actions sans lien. */
+.ml-vitesses {
+  flex: 2.2 1 0;
+  min-width: 0;
+  display: flex;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.04);
+}
+.ml-vitesse {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 0.1rem;
+  background: transparent;
+  border: 0;
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--craie-dim);
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.ml-vitesse:first-child { border-left: 0; }
+.ml-vitesse:hover { color: var(--craie); }
+.ml-vitesse.actif { background: rgba(212, 175, 55, 0.18); color: var(--or-clair); box-shadow: inset 0 0 0 1px var(--or-clair); }
+@media (max-height: 480px) and (orientation: landscape) { .ml-vitesse { min-height: 38px; } }
 .ml-tiroir-bouton {
   flex: 0 0 auto;
   min-width: 44px;
@@ -6575,9 +6606,12 @@ img, svg, canvas { max-width: 100%; }
    les autres se réduisent à leur emoji — la barre reste lisible et chaque
    bouton garde ses 44 px de cible. */
 @media (max-width: 430px) {
-  .ml-tempo span { display: none; }
-  .ml-tempo.actif { flex: 2.4 1 0; }
-  .ml-tempo.actif span { display: block; }
+  /* ⚠️ « DÉCISIONS » ET « PAUSE » SE RÉDUISENT À LEUR ICÔNE (44 px chacun) : tout le reste de la barre revient aux
+     quatre vitesses, qui doivent pouvoir se toucher du pouce — ≈ 38 px de large sur 44 de haut, contre 29 quand elles
+     partageaient la barre avec deux boutons à étiquette. Chaque bouton garde son nom pour les lecteurs d'écran. */
+  .ml-tempos > .ml-tempo, .ml-tempos > .ml-tempo.actif { flex: 0 0 44px; }
+  .ml-tempo span, .ml-tempo.actif span { display: none; }
+  .ml-vitesses { flex: 1 1 0; }
   .ml-mode { font-size: 0.68rem; padding: 0.3rem 0.45rem; }
 }
 
@@ -8561,6 +8595,16 @@ select:focus {
   margin-top: auto; font-style: normal; font-size: 0.76rem;
   color: var(--or-200); border-top: 1px dashed rgba(255, 255, 255, 0.14);
   padding-top: 8px;
+}
+
+/* ═══ LA PASTILLE « HORS CLASSEMENT » (Correctif 19) ═══════════════════════
+   Discrète : un filet doré et du texte, pas un bandeau. Elle accompagne le nom du joueur, elle ne le recouvre pas. */
+.badge-hors-classement {
+  display: inline-flex; align-items: center; padding: 0.12rem 0.5rem;
+  border: 1px solid rgba(239, 202, 111, 0.45); border-radius: 99px;
+  background: rgba(239, 202, 111, 0.1); color: var(--or-clair);
+  font-size: 0.62rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase;
+  white-space: nowrap; cursor: help; vertical-align: middle;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════

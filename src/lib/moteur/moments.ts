@@ -210,55 +210,77 @@ function lireMoment(e: EtatMatch, p: Pion): TypeMoment | null {
 /**
  * La vitesse à laquelle le match se joue.
  *
- * ⚠️ ON NE LES NOMME PLUS « ×1 / ×2 / ×4 ». L'ancienne barre appelait « ×1 »
- * une simulation à cinq fois la vitesse réelle : le libellé mentait, et c'est
- * lui qui faisait croire que le pilotage était cassé alors qu'il était
- * seulement cinq fois trop rapide. Chaque tempo dit maintenant ce qu'il FAIT.
+ * ⚠️ UN TEMPO N'EST PAS UN AUTRE MOTEUR : c'est le nombre de pas de simulation
+ * que l'écran fait avancer par seconde réelle (`allureDuTempo`). Le moteur joue
+ * à pas fixe (`DT`) et ne sait pas à quelle vitesse on le regarde : passer de
+ * ×4 à ×1 en plein jeu ne remet rien à zéro et ne change rien au résultat — il
+ * y a seulement plus ou moins de pas par image. Le banc `verify:vitesse-match`
+ * rejoue un match avec une vitesse tirée au hasard à chaque image et exige le
+ * même score, les mêmes statistiques et le même chronomètre qu'à ×1.
+ *
+ * ⚠️ ON NE LES NOMME PLUS « ÉCOULEMENT / FIN ». Le libellé d'avant (« Accéléré »,
+ * « Fin », sans chiffre) ne disait pas ce qu'il faisait : on ne savait pas qu'il
+ * existait un ×4, et sur téléphone il ne restait qu'une icône. Chaque bouton
+ * porte maintenant sa vitesse écrite.
+ *
+ *  - `decisions` : le mode « cartes » — ×1, le match se fige sur chaque carrefour ;
+ *  - `x1` à `x4` : on regarde, sans carte, à cette vitesse.
  */
-export type Tempo = 'decisions' | 'suivre' | 'accelere' | 'fin';
+export type Tempo = 'decisions' | 'x1' | 'x2' | 'x3' | 'x4';
 
 export interface DefinitionTempo {
   id: Tempo;
-  emoji: string;
   cle: string;
   aide: string;
-  /** Secondes simulées par seconde réelle quand c'est ton moment. */
-  moment: number;
-  /** … et quand il ne se passe rien pour toi. */
-  hors: number;
+  /** Secondes simulées par seconde réelle. */
+  allure: number;
 }
 
 export const TEMPOS: DefinitionTempo[] = [
-  // ⚠️ LE TEMPO PAR DÉFAUT, ET LE PLUS DEMANDÉ : « on a un moment, 10 secondes
-  // pour choisir une action, et ça la simule ». Le match file à seize fois la
-  // vitesse réelle, se FIGE sur une carte de décision (voir `decisions.ts`),
-  // puis rejoue la suite au ralenti pour qu'on voie ce que le choix a donné.
-  //
-  // ⚠️ ET C'EST LUI QUI RÉPOND À « LE TEMPS PASSE TROP LENTEMENT ». À neuf fois
-  // la vitesse réelle, une mêlée qui avale cinquante secondes d'horloge en
-  // demandait encore cinq de patience, et une possession de trois minutes en
-  // coûtait vingt : on regardait le chrono ramper pendant que le jeu, lui,
-  // débordait d'action. Seize, c'est le double d'écoulement pour la même
-  // densité de rugby.
-  { id: 'decisions', emoji: '⏸️', cle: 'ml.tempo.decisions', aide: 'ml.tempo.decisions.aide', moment: 2, hors: 16 },
-  // ⚠️ IL Y AVAIT ICI UN TEMPO « 🎯 MOMENTS » : temps réel dès qu'un ballon
-  // arrivait sur soi, pour avoir le temps de RÉAGIR à la manette. Il est parti
-  // avec elle (« on ne fait que les choix, on ne bouge pas le joueur ») — sans
-  // commandes, il n'offrait plus qu'un ralenti pendant lequel on ne pouvait
-  // rien faire, à côté d'un « ⏸️ Décisions » qui, lui, fige VRAIMENT le jeu et
-  // pose la question. Deux modes pour la même intention, dont un impuissant.
-  // Le match qu'on regarde : assez vif pour tenir en sept minutes, assez lent
-  // pour lire les courses. C'est l'ancien « ×1 ».
-  { id: 'suivre', emoji: '👁️', cle: 'ml.tempo.suivre', aide: 'ml.tempo.suivre.aide', moment: 7, hors: 7 },
-  { id: 'accelere', emoji: '⏩', cle: 'ml.tempo.accelere', aide: 'ml.tempo.accelere.aide', moment: 26, hors: 26 },
-  { id: 'fin', emoji: '⏭️', cle: 'ml.tempo.fin', aide: 'ml.tempo.fin.aide', moment: 600, hors: 600 },
+  // Le mode de ceux qui jouent : le match file, se FIGE sur une carte de décision
+  // (voir `decisions.ts`), puis joue la suite. Toujours à vitesse réelle : une
+  // carte qui tomberait à ×4 se lirait en trois dixièmes de seconde.
+  { id: 'decisions', cle: 'ml.tempo.decisions', aide: 'ml.tempo.decisions.aide', allure: 1 },
+  // Le match qu'on regarde : environ quinze minutes d'écran.
+  { id: 'x1', cle: 'ml.tempo.x1', aide: 'ml.tempo.x1.aide', allure: 1 },
+  { id: 'x2', cle: 'ml.tempo.x2', aide: 'ml.tempo.x2.aide', allure: 2 },
+  { id: 'x3', cle: 'ml.tempo.x3', aide: 'ml.tempo.x3.aide', allure: 3 },
+  // ⚠️ LE PLUS VITE QUE L'ON PUISSE ALLER : un match entier tient en moins de
+  // quatre minutes (mesuré : 14,8 min à ×1). Au-delà, une passe ne dure plus que
+  // quelques images et les gestes ne se lisent plus.
+  { id: 'x4', cle: 'ml.tempo.x4', aide: 'ml.tempo.x4.aide', allure: 4 },
 ];
 
 export const TEMPO_PAR_ID = new Map(TEMPOS.map((t) => [t.id, t]));
 
 /**
- * Le facteur de vitesse à appliquer maintenant.
+ * Le nombre de secondes de match à faire avancer par seconde réelle.
  *
+ * ⚠️ UNE SEULE FONCTION POUR LA BOUCLE, LA PRÉSENTATION ET LE BANC. L'écran
+ * lisait avant `tempo === 'accelere' ? 2 : tempo === 'fin' ? 4 : 1` en plusieurs
+ * endroits, et un tableau `TEMPOS` portait d'autres valeurs (jusqu'à ×600) que
+ * personne ne lisait plus : deux vérités pour la même vitesse.
+ */
+export function allureDuTempo(tempo: Tempo): number {
+  return TEMPO_PAR_ID.get(tempo)?.allure ?? 1;
+}
+
+/** Le jeu est-il accéléré ? Une présentation, une carte ou une entrée en jeu ne se jouent pas ainsi. */
+export function estAccelere(tempo: Tempo): boolean {
+  return allureDuTempo(tempo) > 1;
+}
+
+/**
+ * Le tempo à rendre quand on reprend la main sur son joueur.
+ *
+ * ⚠️ ON NE CONDUIT PAS À ×4. Un tempo accéléré retombe à vitesse réelle ; les
+ * autres sont conservés (le mode « cartes » reste le mode « cartes »).
+ */
+export function tempoALaPriseDeMain(tempo: Tempo): Tempo {
+  return estAccelere(tempo) ? 'decisions' : tempo;
+}
+
+/**
  * ⚠️ LE RALENTI NE S'ÉTEINT PAS AVEC LE MOMENT. Une passe reçue et donnée en
  * une seconde ferait clignoter la vitesse trois fois par phase — et le joueur
  * n'aurait jamais le temps de voir le résultat de son geste. Le mode ralenti
@@ -266,8 +288,3 @@ export const TEMPO_PAR_ID = new Map(TEMPOS.map((t) => [t.id, t]));
  * ralenti une durée de plan de télévision plutôt qu'un hoquet.
  */
 export const TENUE = 1.2;
-
-export function facteurTempo(tempo: Tempo, enMoment: boolean): number {
-  const def = TEMPO_PAR_ID.get(tempo) ?? TEMPOS[0];
-  return enMoment ? def.moment : def.hors;
-}

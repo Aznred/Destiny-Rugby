@@ -8,6 +8,8 @@ import { clubParNom } from '../data/clubs';
 import { competitionEffective } from '../lib/divisions';
 import { Blason, LogoEquipe } from './Blason';
 import { Icone } from './Icone';
+import { BadgeHorsClassement } from './BadgeHorsClassement';
+import { estCarriereClassee } from '../lib/carriereExistante';
 import type { NomIcone } from './Icone';
 import { LogoCompet } from './LogoCompet';
 import { Drapeau } from './Drapeau';
@@ -226,6 +228,12 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
           <div className="sous" style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
             {nomPoste(joueur.poste)} · <Drapeau nation={joueur.nation} taille={0.8} /> {nomNationTraduit(joueur.nation)}
           </div>
+          {/* Les postes de sa carte (joueur existant) : ceux qu'il occupe aussi, jamais tirés au sort. */}
+          {!!joueur.postesSecondaires?.length && (
+            <div className="sous">{t('pj.postesSecondaires', { postes: joueur.postesSecondaires.map((p) => nomPoste(p)).join(', ') })}</div>
+          )}
+          {/* ⚠️ DISCRÈTEMENT, MAIS TOUJOURS LÀ : on sait en permanence quel type de sauvegarde on joue (Correctif 19). */}
+          {!estCarriereClassee(joueur) && <div style={{ marginTop: '0.3rem' }}><BadgeHorsClassement /></div>}
         </div>
         <div
           className="badge-generale"
