@@ -10541,3 +10541,22 @@ gardaient leur étiquette ; elles se réduisent à leur icône (44 px) et les vi
 Aussi : `Message` (écran de carrière) ré-affiche le premier message du journal avec `t('car.debutTexte')` d'après son
 titre — le texte propre aux joueurs existants a dû y être ajouté, sinon il n'apparaissait jamais.
 
+### Suite — ×10 à la place de ×4, et la sortie du match
+
+Demande : « ×10 à la place du ×4 », et « un bouton pour se faire remplacer / simuler ». Mesuré : ×10 fait un match en
+**1,6 min** (contre 3,9 à ×4) ; dans le navigateur, en vue de haut, **10,01 secondes de match par seconde réelle**.
+
+⚠️ **Un plafond que ×4 n'exigeait pas.** `dtReel` est borné à 0,2 s ; à ×10 une image lente ferait avancer le match de
+2 s, plus que ce que la scène sait interpoler (1,2 s) : les joueurs se seraient téléportés. `secondesAAvancer` borne à
+1 s de match par image — à très basse cadence, ×10 ralentit au lieu de sauter.
+⚠️ **La simulation était lente… à cause de l'image, pas du calcul.** Premier essai (3D logicielle) : 781 s de match
+simulées en 15 s réelles, le match n'allait pas à son terme. La scène était redessinée à chaque image pour rien — le
+voile la cache — à 400 ms l'image, contre 12 ms de calcul. Elle n'est plus redessinée pendant la simulation : le match
+entier passe en moins de 15 s même dans cet environnement, en une à deux secondes sur une machine ordinaire.
+⚠️ **Échap fermait le match entier.** Une seconde fenêtre modale (`useModalDialog`) empilée sur celle du match reçoit le
+même Échap que la première, et celle du match appelle `quitter`. La fenêtre de sortie vit donc dans le match, et
+`echapper` la ferme d'abord.
+⚠️ **« Se faire remplacer » n'est pas « sortir »** : c'est une demande, exécutée au prochain arrêt de jeu par le
+remplaçant de son poste. Le banc vérifie que le joueur ne quitte jamais le terrain en pleine course, et que la fin du
+match simulée d'un coup est strictement identique à celle regardée à ×1.
+

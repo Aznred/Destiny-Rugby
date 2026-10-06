@@ -213,7 +213,7 @@ function lireMoment(e: EtatMatch, p: Pion): TypeMoment | null {
  * ⚠️ UN TEMPO N'EST PAS UN AUTRE MOTEUR : c'est le nombre de pas de simulation
  * que l'écran fait avancer par seconde réelle (`allureDuTempo`). Le moteur joue
  * à pas fixe (`DT`) et ne sait pas à quelle vitesse on le regarde : passer de
- * ×4 à ×1 en plein jeu ne remet rien à zéro et ne change rien au résultat — il
+ * ×10 à ×1 en plein jeu ne remet rien à zéro et ne change rien au résultat — il
  * y a seulement plus ou moins de pas par image. Le banc `verify:vitesse-match`
  * rejoue un match avec une vitesse tirée au hasard à chaque image et exige le
  * même score, les mêmes statistiques et le même chronomètre qu'à ×1.
@@ -224,9 +224,9 @@ function lireMoment(e: EtatMatch, p: Pion): TypeMoment | null {
  * porte maintenant sa vitesse écrite.
  *
  *  - `decisions` : le mode « cartes » — ×1, le match se fige sur chaque carrefour ;
- *  - `x1` à `x4` : on regarde, sans carte, à cette vitesse.
+ *  - `x1`, `x2`, `x3` et `x10` : on regarde, sans carte, à cette vitesse.
  */
-export type Tempo = 'decisions' | 'x1' | 'x2' | 'x3' | 'x4';
+export type Tempo = 'decisions' | 'x1' | 'x2' | 'x3' | 'x10';
 
 export interface DefinitionTempo {
   id: Tempo;
@@ -239,16 +239,16 @@ export interface DefinitionTempo {
 export const TEMPOS: DefinitionTempo[] = [
   // Le mode de ceux qui jouent : le match file, se FIGE sur une carte de décision
   // (voir `decisions.ts`), puis joue la suite. Toujours à vitesse réelle : une
-  // carte qui tomberait à ×4 se lirait en trois dixièmes de seconde.
+  // carte qui tomberait à ×10 se lirait en trois dixièmes de seconde.
   { id: 'decisions', cle: 'ml.tempo.decisions', aide: 'ml.tempo.decisions.aide', allure: 1 },
   // Le match qu'on regarde : environ quinze minutes d'écran.
   { id: 'x1', cle: 'ml.tempo.x1', aide: 'ml.tempo.x1.aide', allure: 1 },
   { id: 'x2', cle: 'ml.tempo.x2', aide: 'ml.tempo.x2.aide', allure: 2 },
   { id: 'x3', cle: 'ml.tempo.x3', aide: 'ml.tempo.x3.aide', allure: 3 },
-  // ⚠️ LE PLUS VITE QUE L'ON PUISSE ALLER : un match entier tient en moins de
-  // quatre minutes (mesuré : 14,8 min à ×1). Au-delà, une passe ne dure plus que
-  // quelques images et les gestes ne se lisent plus.
-  { id: 'x4', cle: 'ml.tempo.x4', aide: 'ml.tempo.x4.aide', allure: 4 },
+  // ⚠️ ×10 REMPLACE ×4 (demande : « une accélération ×10 à la place du ×4 »). Un match entier tient en moins de
+  // deux minutes ; les gestes ne se lisent plus, c'est fait pour avancer, pas pour regarder. Chaque pas du moteur
+  // reste joué (rien n'est sauté : essais, cartons, TMO, tirs au but) — seul le nombre de pas par image change.
+  { id: 'x10', cle: 'ml.tempo.x10', aide: 'ml.tempo.x10.aide', allure: 10 },
 ];
 
 export const TEMPO_PAR_ID = new Map(TEMPOS.map((t) => [t.id, t]));
@@ -271,9 +271,21 @@ export function estAccelere(tempo: Tempo): boolean {
 }
 
 /**
+ * Pas plus d'une seconde de match par image : à très basse cadence, ×10 ralentit au lieu de téléporter les joueurs
+ * (la scène n'interpole qu'un pas de 1,2 s). Mesuré : à 5 images par seconde, ×10 fait 0,2 s × 10 = 2 s de match par
+ * image sans ce plafond.
+ */
+export const PAS_MAXIMAL_PAR_IMAGE = 1;
+
+/** Ce que l'écran fait avancer le moteur pour une image de `dtReel` secondes réelles. */
+export function secondesAAvancer(dtReel: number, allure: number): number {
+  return Math.min(PAS_MAXIMAL_PAR_IMAGE, Math.max(0, dtReel) * allure);
+}
+
+/**
  * Le tempo à rendre quand on reprend la main sur son joueur.
  *
- * ⚠️ ON NE CONDUIT PAS À ×4. Un tempo accéléré retombe à vitesse réelle ; les
+ * ⚠️ ON NE CONDUIT PAS À ×10. Un tempo accéléré retombe à vitesse réelle ; les
  * autres sont conservés (le mode « cartes » reste le mode « cartes »).
  */
 export function tempoALaPriseDeMain(tempo: Tempo): Tempo {

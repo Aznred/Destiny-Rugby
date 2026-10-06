@@ -432,18 +432,33 @@ Les autres rencontres de la poule sont rejouées sans rendu, dans une **file
 sérialisée** : une avance calendrier ne peut pas écraser un cumul concurrent.
 
 **La vitesse d'un match de carrière** (Correctif 19, `lib/moteur/moments.ts`) : cinq tempos — `decisions`
-(cartes, toujours à vitesse réelle) et `x1` à `x4`. ⚠️ **UN TEMPO N'EST PAS UN AUTRE MOTEUR** : c'est le
+(cartes, toujours à vitesse réelle) et `x1`, `x2`, `x3`, `x10` (⚠️ **×10 a remplacé ×4**, sur demande). ⚠️ **UN TEMPO N'EST PAS UN AUTRE MOTEUR** : c'est le
 nombre de secondes simulées par seconde réelle (`allureDuTempo`), et le moteur joue à pas fixe (`DT`). Changer de
 vitesse en plein jeu ne remet rien à zéro et ne change rien au résultat. Mesuré (`npm run verify:vitesse-match`) :
-un match dure 15,5 min à ×1, 7,8 à ×2, 5,2 à ×3, 3,9 à ×4 ; rejoué avec un tempo ET une cadence d'images tirés au
+un match dure 15,5 min à ×1, 7,8 à ×2, 5,2 à ×3, 1,6 à ×10 ; rejoué avec un tempo ET une cadence d'images tirés au
 hasard à chaque image (de 5 à 120 Hz), il finit avec le même score, les mêmes statistiques, le même fil et la même
 suite de phases. `MatchLive` lit le tempo dans une **ref** (`tempoRef`) : la boucle ne se relance pas au changement.
-⚠️ **ON NE CONDUIT PAS À ×4** : le pilote prend la main → `tempoALaPriseDeMain` rend `decisions` (et `allure` vaut 1
+⚠️ **ON NE CONDUIT PAS À ×10** : le pilote prend la main → `tempoALaPriseDeMain` rend `decisions` (et `allure` vaut 1
 dès que `pilote.phase !== 'attente'`) ; la présentation d'avant-match se passe dès qu'on accélère ; les
-commentateurs se taisent à ×3 et ×4. Les anciens noms (« Suivre », « Accéléré », « Fin ») et leurs facteurs
+commentateurs se taisent à ×3 et ×10. Les anciens noms (« Suivre », « Accéléré », « Fin ») et leurs facteurs
 ×7/×26/×600, que personne ne lisait plus, sont supprimés. ⚠️ En 3D logicielle (SwiftShader, 2,5 images par
 seconde), `dtReel` est borné à 0,2 s et les vitesses plafonnent : mesurées en vue de haut, elles valent
-exactement ×1, ×2, ×3, ×4 ; la 3D sur GPU réel n'a pas pu être chronométrée ici.
+exactement ×1, ×2, ×3, ×10 (10,01 mesuré) ; la 3D sur GPU réel n'a pas pu être chronométrée ici.
+⚠️ **Plafond de pas par image** (`secondesAAvancer`, `PAS_MAXIMAL_PAR_IMAGE` = 1 s) : à ×10 sur un écran lent,
+une image de 0,2 s ferait avancer le match de 2 s — la scène n'interpole qu'un pas de 1,2 s, les joueurs se
+téléporteraient. À très basse cadence, ×10 ralentit au lieu de sauter ; la scène reçoit la vitesse RÉELLEMENT jouée.
+
+**Se faire remplacer / simuler la fin** (`lib/moteur/sortie.ts`, bouton rond à gauche de la croix de `MatchLive`,
+`FenetreSortie`) : ⚠️ *se faire remplacer* = `demanderRemplacement` du joueur incarné, exécuté **au prochain arrêt de
+jeu** (jamais en pleine course), par le remplaçant de **son poste** (à défaut sa famille, à défaut sa catégorie —
+`remplacantPour`, le même appariement que le moteur) ; la fenêtre dit POURQUOI c'est impossible (sur le banc, déjà
+remplacé, exclu, plus de remplaçant, déjà demandé). Le joueur passe en « regarder » à ×1 : c'est là qu'on accélère
+jusqu'à ×10. ⚠️ *Simuler* = `simulerPendant` : le MÊME moteur à pas fixe, par lots de 3 s sous un budget de 25 ms par
+image (la page reste vivante, le match entier passe en une à deux secondes) ; la scène n'est pas redessinée (un
+rendu 3D logiciel coûte 400 ms contre 12 de calcul), un voile affiche la minute, les blessures du manager restent
+tirées minute par minute (`verifierBlessuresManager`). Le résultat est **identique** à celui du match regardé à ×1
+(banc). ⚠️ La fenêtre vit DANS le match, pas dans un second portail : deux `useModalDialog` empilés reçoivent chacun
+Échap, et celui du match le fermait en entier — `echapper` ferme d'abord la fenêtre de sortie.
 
 ### Le match en trois dimensions
 
@@ -1470,7 +1485,7 @@ npm run verify:assets             # tout chemin /m3d /logos /photos écrit en du
 npm run verify:triche             # 40 tentatives de triche, toutes refusées
 npm run verify:cartes-speciales   # ICONS, Halloween, Labo, imports (292 contrôles, ~2 min)
 npm run verify:tutoriel           # le tutoriel guidé : textes, ancres, placement des bulles, mémoire (30 700 contrôles)
-npm run verify:vitesse-match      # ×1 à ×4 : même match quelle que soit la vitesse (102 contrôles, ~75 s)
+npm run verify:vitesse-match      # ×1 à ×10, remplacement et simulation : même match quelle que soit la vitesse (132 contrôles, ~75 s)
 npm run verify:carriere-existante # joueur existant : hors classement, carte intacte, monde sans son double (101 contrôles)
 
 npx vite-node scripts/verif.ts    # banc général : divisions, effectifs, 8 saisons

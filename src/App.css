@@ -4700,7 +4700,7 @@
 
 .ml-tete {
   display: grid;
-  grid-template-columns: 1fr auto 1fr auto;
+  grid-template-columns: 1fr auto 1fr auto auto;
   align-items: center;
   gap: 0.8rem;
   padding: 0.8rem 1rem 0.4rem;
@@ -4742,6 +4742,45 @@
   cursor: pointer;
 }
 .ml-fermer:hover { color: var(--craie); border-color: var(--or-clair); }
+/* ⚠️ SE FAIRE REMPLACER / SIMULER (Correctif 19) : un bouton rond comme la croix, juste à sa gauche — l'en-tête n'a pas
+   de place pour une étiquette. Son nom complet est dans `title` et `aria-label`. */
+.ml-sortie {
+  background: none; border: 1px solid rgba(255, 255, 255, 0.14); color: var(--craie-dim);
+  border-radius: 50%; width: 30px; height: 30px; display: grid; place-items: center; cursor: pointer;
+}
+.ml-sortie:hover, .ml-sortie:focus-visible { color: var(--or-clair); border-color: var(--or-clair); }
+.ml-sortie-voile {
+  position: absolute; inset: 0; z-index: 40; display: grid; place-items: center; padding: 1rem;
+  background: rgba(2, 8, 5, 0.72); backdrop-filter: none;
+}
+.ml-sortie-carte {
+  width: min(430px, 100%); display: grid; gap: 0.7rem; padding: 1.1rem;
+  border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 14px;
+  background: linear-gradient(168deg, var(--pelouse-700), var(--pelouse-800)); box-shadow: var(--ombre-1);
+}
+.ml-sortie-carte h2 { margin: 0 0 0.1rem; font-family: var(--police-titre); font-size: 1.25rem; }
+.ml-sortie-choix {
+  display: grid; grid-template-columns: 26px 1fr; gap: 0.8rem; align-items: start; text-align: left;
+  padding: 0.85rem 0.9rem; min-height: 56px; color: var(--craie); font: inherit; cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 12px; background: rgba(255, 255, 255, 0.04);
+}
+.ml-sortie-choix:hover:not(:disabled), .ml-sortie-choix:focus-visible { border-color: var(--or-clair); background: rgba(212, 175, 55, 0.1); }
+.ml-sortie-choix:disabled { opacity: 0.6; cursor: not-allowed; }
+.ml-sortie-choix span { display: grid; gap: 0.25rem; min-width: 0; }
+.ml-sortie-choix b { font-size: 0.98rem; }
+.ml-sortie-choix small { color: var(--craie-dim); font-size: 0.8rem; line-height: 1.4; }
+.ml-sortie-annuler { justify-self: end; }
+.ml-simulation {
+  position: absolute; inset: 0; z-index: 35; display: grid; place-items: center; background: rgba(2, 8, 5, 0.6);
+}
+.ml-simulation-carte {
+  display: grid; justify-items: center; gap: 0.6rem; min-width: min(300px, 80%); padding: 1.2rem 1.6rem;
+  border: 1px solid rgba(239, 202, 111, 0.4); border-radius: 14px; background: rgba(10, 32, 22, 0.94);
+}
+.ml-simulation-carte b { font-size: 1rem; }
+.ml-simulation-carte span { font-family: 'Anton', system-ui, sans-serif; font-size: 2rem; color: var(--or-clair); }
+.ml-simulation-carte i { width: 100%; height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.12); overflow: hidden; }
+.ml-simulation-carte u { display: block; height: 100%; background: var(--or-clair); text-decoration: none; }
 
 /* ⚠️ AUCUNE TRANSITION CSS SUR LES PIONS. Le moteur les déplace 60 fois par
    seconde avec interpolation exacte ; une transition de 0,55 s ajoutait une
@@ -6559,7 +6598,15 @@ img, svg, canvas { max-width: 100%; }
   /* ⚠️ L'en-tête tient sur UNE rangée — écusson, score, écusson — et la croix
      se pose en absolu par-dessus : sur 375 px, une quatrième colonne renvoyait
      le club visiteur à la ligne. */
-  .ml-tete { grid-template-columns: 1fr auto 1fr; padding: 0.45rem 2.5rem 0.3rem 0.55rem; gap: 0.35rem; }
+  .ml-tete { grid-template-columns: 1fr auto 1fr; padding: 0.45rem 5.1rem 0.3rem 0.55rem; gap: 0.35rem; }
+  .ml-sortie {
+    position: absolute;
+    top: calc(0.35rem + env(safe-area-inset-top, 0px));
+    right: calc(0.5rem + 34px + 0.4rem);
+    width: 34px;
+    height: 34px;
+    z-index: 9;
+  }
   .ml-equipe b { font-size: 0.72rem; }
   .ml-score { font-size: 1.45rem; gap: 0.5rem; }
   .ml-fermer {
