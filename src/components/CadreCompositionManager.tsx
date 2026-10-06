@@ -17,7 +17,7 @@ function CompositionPleinEcran({ children, fermer }: { children: ReactNode; ferm
   const { overlayRef, dialogRef } = useModalDialog(fermer);
   return createPortal(<div ref={overlayRef} className="cel-fullscreen-compo">
     <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={t("ui.6b2b119ba9d9")} tabIndex={-1} className="cel-compo cel-compo-etendue manager-compo-partagee">
-      <header className="cel-tete-compo"><h2>{t("online.nav.lineup")}</h2><span>{t("ui.42c598dbbbf9")}</span><button className="btn fantome" onClick={fermer}>{t("tuto.retour")}</button></header>
+      <header className="cel-tete-compo"><h2>{t("online.nav.lineup")}</h2><span>{t("ui.42c598dbbbf9")}</span><button className="btn fantome" onClick={fermer} data-tuto="compo-fermer">{t("tg.ui.retour")}</button></header>
       {children}
     </div>
   </div>, document.body);

@@ -1107,7 +1107,97 @@ Réglages et le repli sans 3D. Séquence : banc → caméra télé → remplacem
   et les captures sont périmées (en prendre une seconde). En développement, `globalThis.__matchLive` donne `{ e, pilotage, scene }`.
 - **Pas fait (à reprendre)** : orbite de caméra à la souris (la souris ne vise que le coup de pied) ; vérification fine de
   l'engagement du joueur au ruck (`engagerAuRuck` : à 3-6 m le pion prend `role: 'ruck'` sans figurer dans l'organisation) ;
-  essai sur un vrai téléphone, une vraie manette et iOS ; README.md et `../analyse-rn26/SIMULATION.md` ; build complet.
+  essai sur un vrai téléphone, une vraie manette et iOS. (README.md et `../analyse-rn26/SIMULATION.md` : faits avec le Correctif 18.)
+
+### Les responsabilités du joueur (Correctif 17 — carrière solo, 3D)
+
+Le joueur ne fait pas que courir : capitaine, vice-capitaine, buteur (principal ou secondaire), engagement, drop, lanceur
+de touche (principal ou secondaire). Rôles par `sourceId`, jamais par maillot : celui qui sort, se blesse ou prend un carton
+ne le tient plus et la CHAÎNE DE REPLI prend le relais (vice, buteur secondaire, lanceur secondaire, puis le meilleur
+disponible). Un remplaçant n'hérite de rien. Tout est derrière `e.responsabilites` (option `responsabilites` de `creerMatch`,
+passée par `MatchLive` en 3D seulement) : absent, le moteur rejoue à l'identique (empreinte `94f2ae2e` vérifiée).
+
+- **Moteur** : `moteur/responsabilites.ts` (rôles, attribution automatique, `pionDuRole`, `humainTientLe`, `decisionDuCapitaine`),
+  `moteur/tirHumain.ts` (la géométrie d'un tir joué à la main et celle du coup d'envoi), branchements dans `moteur.ts`
+  (`capitaineTranche`, `avancerTirDetaille` étape `vise`, `phaseCoupEnvoi`, `phaseTouche`, `dropDirect`, `verifierLAttente`).
+  ⚠️ L'IA n'attribue JAMAIS au joueur un rôle qu'il n'a pas gagné (`exclu`), même meilleur pied du groupe.
+- **Le capitaine IA ne tire jamais au hasard** (`decisionDuCapitaine`, banc : mené 20-18 à la 78ᵉ à 35 m → poteaux ; mené 24-18 à la
+  75ᵉ → touche ; mêlée dominante près de la ligne → mêlée ; défense désorganisée au sifflet → jeu vite) et dit POURQUOI (`raison`,
+  `rv.raison.*`, ligne du fil).
+- **Quand le jeu attend le joueur** (`e.responsabilites.attente` : `penalite`, `tir`, `engagement`, `touche`) : l'horloge du match est
+  arrêtée, la simulation continue, le chrono (10 s pénalité, 25 s tir, 20 s engagement, 22 s touche — compté depuis que
+  l'alignement est formé) donne la main à l'IA au dépassement (`stats.chronosDepasses`). ⚠️ `verifierLAttente` lève une attente dont
+  le joueur n'est plus titulaire (remplacé, carton, retour aux cartes) : sans elle l'horloge resterait arrêtée.
+- **Le tir à la main** : `resoudreTirHumain` — visée (écart dans le plan des poteaux), force (une DISTANCE : `porteeMaximale`), effet,
+  régularité du geste. ⚠️ MÊME ÉTALON QUE L'IA : la dispersion se déduit de `probabilitePenalite` (vent retiré) ; le vent est dans la
+  COURBE (`derive`), pas dans la probabilité ; l'issue se lit sur la trajectoire (`tirPasseEntreLesPoteaux`), poteaux rentrant/sortant
+  compris. Trop court : sous la barre ou retombé devant. Transformations et pénalités ; buteur secondaire par la chaîne.
+- **Engagement** (`resoudreEngagement`) : longueur, côté, hauteur ; **touche** : annonce (7 combinaisons dont leurres, maul, sortie vite)
+  qui change VRAIMENT l'animation de l'alignement (`conquete`), puis lancer (force dosée + régularité → `qualiteDuLancer`) ; **touche
+  rapide** manuelle, légalité vérifiée À LA DEMANDE (`evaluerToucheRapide`, sans tirage) ; **drop manuel** (`ActionDirecte 'drop'`) joué avec
+  la phase d'armé `kick_restart` du drop (jamais le clip de pénalité), contrable À LA FRAPPE (`contreurDuDrop`, géométrie).
+- **Le pilote** (`lib/controleDirect/responsabilites.ts`, `visee.ts`) : un geste, trois appareils, une seule loi — souris (côté = position,
+  molette = force, clic = frappe), clavier (flèches + Espace), manette (mode « direct » : stick gauche vise, stick droit dose, A frappe ; mode
+  « charge » : on tient A), pouce (glissé : direction, longueur = force, courbure = effet, relâcher = frappe). La RÉGULARITÉ du geste se gagne
+  partout pareil (calme avant la frappe ; netteté du tracé). Le HUD (`components/match/Responsabilites.tsx`) montre vent, distance, chance d'un
+  tir bien visé et une marque de force utile — JAMAIS le résultat ; cartes d'explication à la première occurrence (le match est figé derrière).
+  Touches ajoutées : drop `X` (LB + B à la manette, bouton Drop au pouce), chiffres 1 à 8 pour choisir, `T` touche rapide.
+- **Carrière** (`lib/responsabilites.ts`) : `Joueur.responsabilites` évalué à chaque intersaison PAR RAPPORT AU GROUPE (cadre → vice → capitaine ;
+  tee secondaire → principal ; engagement ; drop ; lanceur), PAR MARCHES et sans tirage, avec une ligne de journal par changement ; migration du
+  store v30. Bloc compact « Rôles dans l'équipe » dans `PanneauJoueur` (seulement les rôles tenus). Manager : `CompositionManager` gagne six
+  champs facultatifs (vice, buteur secondaire, engagement, droppeur, lanceurs), « Automatique » par défaut, lus par le match 3D du manager seulement.
+- **Scène** (hors git, `../analyse-rn26/correctif_17_scene.cjs`) : l'étape `vise` est animée comme `pret` ; l'élan d'un tir à la main dure
+  `RITUEL_TIR.elanHumain` = 2,25 s comme celui de l'IA (le clip de frappe est calé dessus). Reconstruire : `node scripts/construireMoteur3D.mjs`.
+- **Tester** : `npm run verify:responsabilites` (1 450 contrôles : rôles et repli, capitaine IA, géométrie des tirs, attentes, touche, drop, matchs
+  entiers conduits, visée) ; navigateur : `/scripts/apercuControleDirect.html?roles=capitaine,buteur,engagement,lanceur,droppeur&pilote=1&tuto=0`
+  puis `__apercu.situation('penalite'|'touche'|'drop'|'engagement')` (`tutosResp=1` masque les cartes d'explication ; un
+  `setInterval` qui force `attente.delai = 1e6` permet d'essayer à la main sans que le chrono tranche).
+
+### Le tutoriel guidé (Correctif 18 — tous les modes)
+
+Il remplace la modale d'accueil à cinq écrans (`Tutoriel.tsx` et le drapeau `tutoVu` ont disparu). Principe : **mettre en évidence → expliquer
+en une phrase → faire faire l'action → passer à la suivante**, sur les VRAIS écrans (le voile assombrit tout sauf l'élément visé, le clic passe
+à travers le trou : le vrai bouton réagit). Jamais une simulation : le pack ouvert est le vrai pack, la ligue créée est la vraie ligue.
+
+- **Architecture** (`lib/tutoriel/` + `components/tutoriel/`) : `memoire.ts` (drapeaux `tutorial.<mode>.<section>` dans `localStorage`
+  `destiny-rugby:tutoriel` — par appareil et par personne, PAS dans la sauvegarde ; `desactive` ne rend rien vu), `types.ts`
+  (`ParcoursTuto` / `EtapeTuto`), `guide.ts` (le moteur : un seul parcours actif, une file, déclencheurs relus toutes les 200 ms,
+  `signaler(id)` pour les événements, `noter(acte)` / `acteDepuisLEtape` pour les gestes que les écrans annoncent), `placement.ts` (où
+  poser la bulle — fonction pure, testée), `parcours/{general,joueur,entraineur,ligue,contexte}.ts` (29 parcours), `aides.ts`,
+  `intentions.ts`, `GuideTutoriel.tsx/.css` (voile à quatre panneaux, anneau, bulle, flèche), `AnimationTuto.tsx` (7 mini-démonstrations
+  SVG : clic, glisse, molette, stick, glisser, retourne, défile), `ReglagesTutoriel.tsx` (rejouer × 5, désactiver). Textes :
+  `data/textesTutoriel*.ts` (116 phrases × 7 langues), clés `tg.<parcours>.<étape>.x|.t`.
+- **Les écrans ne connaissent QUE des ancres** : `data-tuto="cel-onglet-packs"`… Un parcours se déclenche quand son ancre apparaît (jamais de
+  `useEffect` de tutoriel dans un composant). Ajouter un tutoriel = un `ParcoursTuto`, ses textes, ses `data-tuto` — rien d'autre à brancher.
+  Ancres partagées : la composition (`compo-*` dans `CompositionTerrainManager`) sert le manager, la ligue en ligne et la collection solo.
+- **Types d'étapes** : `carte` (centre), `info` (surbrillance + Suivant), `clic` (attend le clic sur la cible), `action` (attend `jusqua()`),
+  `ignorerSi` (étape sans objet, franchie sans s'afficher), `facultative` (cible absente après `patience` : sautée), `souple` (parcours sans voile,
+  en haut de l'écran : tutoriels contextuels et carton/carte spéciale/blessure), `figeLeMatch` (le match s'arrête pendant la lecture).
+- **Parcours** : `general.intro` (3 grandes cartes) ; `league.{connexion,portail,club,packs,composition,marche,calendrier,direct,decision}` ;
+  `player.{creation,carriere,premierMatch,role.<capitaine|vice|buteur|lanceur|engagement|droppeur>}` (un rôle ne s'explique que le jour où on le
+  reçoit : `rolesDuJoueur`) ; `coach.{creation,club,composition,matchLive,premierMatch}` ; `context.{carton,carteSpeciale,blessure,infirmerie,marcheManager}`.
+  Le marché de la ligue n'est expliqué qu'APRÈS l'équipe et les packs. Les anciens joueurs sont reconnus au premier lancement
+  (`reconnaitreLesAnciens`) : visite et création marquées vues, mais PAS les rôles (nés avec le Correctif 17), ni la ligue.
+- **Mobile** : en portrait (< 640 px) la bulle est une FEUILLE pleine largeur collée en haut ou en bas, du côté opposé à la cible ; en paysage de
+  téléphone une bulle étroite posée à côté ; une cible plus grande que l'écran passe en bulle « serrée » (sans animation) et la page défile pour la
+  dégager. `npm run verify:tutoriel` mesure 8 000 placements sur 20 tailles d'écran (jamais hors écran, jamais sur la cible sauf cible énorme).
+- ⚠️ **Pièges** : (1) `useModalDialog` rend `inert` tout ce qui est dans `body` — le conteneur du guide est immunisé par un
+  `MutationObserver` (sans lui, la bulle ne répond plus au doigt au-dessus d'une modale) ; (2) une ancre n'est « visible » que si aucune GRANDE
+  couche fixe ne la recouvre (la composition s'ouvre en plein écran et masque les rôles — l'étape `retour` la referme) ; (3) Échap passe le guide
+  SEUL (`stopImmediatePropagation` en capture) ; (4) `.sel-menu` passe à `z-index: 100001` tant que le guide est monté (choisir un capitaine pendant
+  une étape) ; (5) un pack peut MONTER EN GAMME (Argent → Or) et demander un second geste : l'étape `dechirer` dure jusqu'aux cartes et se tait
+  pendant les animations ; (6) avant le coup d'envoi de la saison il n'y a PAS de pack gratuit : l'étape propose d'acheter le Bronze avec les Ovas ;
+  (7) une étape `action` ne doit pas se terminer à la troisième lettre tapée (`stable()`) ; (8) « Désactiver » éteint aussi les cartes du match
+  (`tutorielsDesactives` lu par `pilotage.ts`, `controleDirect/responsabilites.ts`, `MatchLive`) ; (9) les scripts de tournage
+  (`_trailer.cjs`, `_joueur.cjs`) coupent le guide : sa mémoire est HORS de la sauvegarde.
+- **Tester** : `npm run verify:tutoriel` (30 600 contrôles : textes 7 langues et variables, chaque ancre existe dans le code, placements, mémoire,
+  rôles et anciens). Navigateur : en développement `window.__tutoriel = { guide, memoire }` (⚠️ un `import()` direct donne une AUTRE instance du
+  module après un rechargement à chaud : passer par cette poignée, et naviguer en cliquant l'interface plutôt qu'avec un `setEcran` importé).
+  La carrière en ligne tourne en local (`serveur/carriereFichier.ts`) : un compte de test se crée par `identifierCarriere('inscription', …)`.
+  Panneau navigateur caché : la première capture après un script est souvent périmée (en prendre une seconde).
+- **Pas fait** : bulles non testées sur un vrai téléphone (iOS : clavier virtuel, `visualViewport`) ; la carrière en ligne en tant qu'invité d'une
+  ligue d'amis n'a pas de parcours « rejoindre avec un code » (le formulaire de création est guidé, pas celui de l'invité) ; pas de tutoriel pour
+  l'Ovale, la boutique ni la collection solo.
 
 ## ⚠️ Équilibrage : ce qui ne se retouche pas sans mesurer
 
@@ -1335,6 +1425,7 @@ npm run verify:triche             # 40 tentatives de triche, toutes refusées
 npm run verify:cartes-speciales   # ICONS, Halloween, Labo, imports (292 contrôles, ~2 min)
 
 npx vite-node scripts/verif.ts    # banc général : divisions, effectifs, 8 saisons
+npm run verify:tutoriel           # le tutoriel guidé : textes, ancres, placement des bulles, mémoire (30 600 contrôles)
 ```
 
 Le rugby que produit le moteur (essais, pénalités, cartons, mêlées, touches,

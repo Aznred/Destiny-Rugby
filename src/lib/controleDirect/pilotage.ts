@@ -25,8 +25,10 @@ import type { Camera3D, ReperesScene, Scene3D } from '../match3D';
 import { INDEX_BOUTON, LecteurManette, MANETTE_ABSENTE, type EtatManette, type TypeManette } from './manette';
 import { actionDeLaTouche, apprendreTouche, type ActionClavier } from './touches';
 import { lirePreferencesControle, ecrirePreferencesControle } from './prefs';
+import { tutorielsDesactives } from '../tutoriel/memoire';
 import { TutorielDirect, type SnapTuto } from './tutoriel';
 import { LARGEUR, sens } from '../moteur/terrain';
+import { PiloteResp, TOUCHES_BRUTES, type SnapResp } from './responsabilites';
 
 export type Appareil = 'clavier' | 'tactile' | 'manette';
 export type PhasePilotage = 'attente' | 'entree' | 'actif';
@@ -55,6 +57,8 @@ export type Intention =
   | { type: 'appel' }
   | { type: 'gratter' }
   | { type: 'feinte'; cote: -1 | 0 | 1 }
+  /** Drop (Correctif 17) : sans direction, le jeu choisit ; avec, le joueur vise. */
+  | { type: 'drop'; auto: boolean; x: number; y: number }
   | { type: 'aide' }
   | { type: 'pause' };
 
@@ -100,6 +104,8 @@ export interface SnapPilotage {
   arme: VueDirecte['arme'];
   /** Le joueur sprinte (stick poussé au bord, bouton tenu ou verrouillé, touche, gâchette) : le bouton s'allume. */
   sprint: boolean;
+  /** Ce que le jeu attend de lui (capitaine, tir, engagement, touche) et les bandeaux qui l'accompagnent (Correctif 17). */
+  resp: SnapResp;
 }
 
 const DUREE_ENTREE = 1.45;
@@ -119,6 +125,8 @@ class Clavier {
   tenues = new Set<string>();
   debut = new Map<string, number>();
   fronts: string[] = [];
+  /** Touches lues en plus des actions remappées : choisir (1 à 8), valider, la touche rapide (Correctif 17). */
+  brutes: string[] = [];
   relaches: { code: string; duree: number }[] = [];
   /** Vrai quand le pilote conduit : les touches de jeu ne font plus rien d'autre (défilement, focus). */
   capture = false;
@@ -135,6 +143,7 @@ class Clavier {
       const cible = ev.target as HTMLElement | null;
       if (cible && /^(INPUT|TEXTAREA|SELECT)$/.test(cible.tagName)) return;
       if (ev.ctrlKey || ev.metaKey || ev.altKey) return;
+      if (this.capture && TOUCHES_BRUTES.has(ev.code)) { this.brutes.push(ev.code); ev.preventDefault(); }
       const a = this.action(ev.code);
       if (!a) return;
       if (this.capture) ev.preventDefault();
@@ -220,6 +229,8 @@ export class PilotageDirect {
   private sprintActuel = false;
   private visee: { x: number; y: number; puissance: number } | null = null;
   private rappels: RappelsPilotage;
+  /** Les responsabilités : le capitaine, le tir, l'engagement, la touche (Correctif 17). */
+  readonly resp = new PiloteResp();
   /** Où pointe la souris, dans le repère de la scène (posé par le HUD quand la visée à la souris est voulue). */
   souris: { x: number; y: number; t: number; h: number } | null = null;
 
@@ -250,7 +261,7 @@ export class PilotageDirect {
   /** Le joueur veut le contrôle direct et la scène est là pour le porter : les cartes de décision se taisent. */
   get voulu(): boolean { return this.veutDernier; }
   /** La carte d'accueil du tutoriel fige le match derrière elle. */
-  get fige(): boolean { return this.phase === 'actif' && !!this.tuto?.fige; }
+  get fige(): boolean { return this.phase === 'actif' && (!!this.tuto?.fige || this.resp.fige); }
   /** Facteur de vitesse que le tutoriel demande au match (1 : normal). */
   get vitesseTuto(): number { return this.phase === 'actif' ? (this.tuto?.vitesse ?? 1) : 1; }
   /** Échap ou le bouton de pause : c'est l'écran qui décide ce qu'il en fait. */
@@ -259,6 +270,10 @@ export class PilotageDirect {
   /** La caméra réellement affichée : le choix du joueur, sauf sur les phases qui ne lui appartiennent pas. */
   cameraPour(choix: Camera3D, e: EtatMatch, maintenant = performance.now()): Camera3D {
     if (choix !== 'joueur') return choix;
+    // La touche : on voit l'alignement entier, pas le dos du lanceur.
+    if (e.responsabilites?.attente?.type === 'touche') { this.enTV = true; this.tvJusqua = maintenant + 900; return 'tv'; }
+    // Le joueur qui tape : la caméra se place derrière lui, face aux poteaux ou au terrain, pour viser.
+    if (this.resp.zoneOuverte && (e.tir?.etape === 'vise' || e.phase === 'coupEnvoi')) { this.enTV = false; return 'joueur'; }
     if (PHASES_SPECTACLE.has(e.phase)) { this.enTV = true; this.tvJusqua = maintenant + 900; return 'tv'; }
     if (this.enTV && maintenant < this.tvJusqua) return 'tv';
     this.enTV = false;
@@ -308,7 +323,7 @@ export class PilotageDirect {
         if (this.tEntree >= DUREE_ENTREE) {
           this.phase = 'actif';
           activerDirect(e, true);
-          if (!prefs.tutorielVu && !this.tuto) this.tuto = new TutorielDirect();
+          if (!prefs.tutorielVu && !this.tuto && !tutorielsDesactives()) this.tuto = new TutorielDirect();
         }
         break;
       case 'actif':
@@ -331,10 +346,11 @@ export class PilotageDirect {
     if (this.cameraAuto && ctx.cameraChoisie === 'joueur') this.rappels.surCamera('tv');
     this.cameraAuto = false;
     this.phase = 'attente';
+    this.resp.reinitialiser();
     this.sprintActuel = false;
     this.pied = null;
     this.passes.clear();
-    this.clavier.fronts.length = 0; this.clavier.relaches.length = 0; this.tactile.file.length = 0;
+    this.clavier.fronts.length = 0; this.clavier.relaches.length = 0; this.clavier.brutes.length = 0; this.tactile.file.length = 0;
   }
 
   // ───────────────────────────────────────────────────────────────────────────
@@ -376,6 +392,27 @@ export class PilotageDirect {
       scene.reperes = null;
       return;
     }
+
+    // ── LES RESPONSABILITÉS : quand le jeu attend le joueur, il ne conduit plus — il répond ──
+    const brutes = cl.brutes.splice(0);
+    const tenuesAvant = cl.fronts.splice(0);
+    const occupe = this.resp.surImage(e, scene, moi, {
+      dt, maintenant, appareil: this.appareil, fronts: tenuesAvant, brutes, tenues: cl.tenues,
+      tables: { haut: t.haut, bas: t.bas, gauche: t.gauche, droite: t.droite, action: t.action, coupDePied: t.coupDePied },
+      manette: ma, droiteY: rep.droite.y,
+    });
+    if (occupe) {
+      commanderDirect(e, 0, 0, false);
+      poserViseur(e, null);
+      this.kickVise = null; this.sprintActuel = false; this.pied = null; this.passes.clear();
+      cl.relaches.length = 0; this.tactile.file.length = 0; this.tactile.pied = null;
+      const r = d.retour;
+      if (r && r.t !== this.dernierRetour) this.dernierRetour = r.t;
+      return;
+    }
+    // Rien n'attend : les touches de jeu lues plus haut reviennent aux intentions.
+    cl.fronts.push(...tenuesAvant);
+    this.resp.noterConseilDrop(vue.possible.drop, maintenant);
 
     // ── La souris, quand le joueur la veut : le point qu'elle désigne est celui où partirait le ballon ──
     this.visee = prefs.souris ? this.viseeSouris(scene, moi) : null;
@@ -453,6 +490,7 @@ export class PilotageDirect {
         case 'coupDePied': if (!this.pied) this.pied = { source: 'clavier', depuis: maintenant }; break;
         case 'raffut': sortie.push({ type: 'raffut' }); break;
         case 'crochet': sortie.push({ type: 'crochet', cote: Math.abs(sx) > 0.35 ? (sx > 0 ? 1 : -1) : 0 }); break;
+        case 'drop': sortie.push({ type: 'drop', auto: Math.hypot(sx, sy) < 0.3, x: sx, y: sy || 1 }); break;
         case 'action': sortie.push({ type: 'action' }); break;
         case 'appel': sortie.push({ type: 'appel' }); break;
         case 'gratter': sortie.push({ type: 'gratter' }); break;
@@ -500,10 +538,14 @@ export class PilotageDirect {
         if (vue.porte) this.passes.set('m:a', { debut: maintenant, long: false }); else sortie.push({ type: 'action' });
       } else if (b === INDEX_BOUTON.x) {
         if (vue.porte) this.passes.set('m:x', { debut: maintenant, long: false }); else sortie.push({ type: 'gratter' });
-      } else if (b === INDEX_BOUTON.b) { if (!this.pied) this.pied = { source: 'manette', depuis: maintenant }; }
+      } else if (b === INDEX_BOUTON.b) {
+        // LB tenu + B : le drop (Correctif 17). B seul : le coup de pied.
+        if (ma.boutons[INDEX_BOUTON.lb] && vue.porte) sortie.push({ type: 'drop', auto: Math.hypot(sx, sy) < 0.3, x: sx, y: sy || 1 });
+        else if (!this.pied) this.pied = { source: 'manette', depuis: maintenant };
+      }
       else if (b === INDEX_BOUTON.y) sortie.push(vue.porte ? { type: 'feinte', cote: 0 } : { type: 'appel' });
       else if (b === INDEX_BOUTON.rb) sortie.push({ type: 'raffut' });
-      else if (b === INDEX_BOUTON.lb) sortie.push({ type: 'crochet', cote: Math.abs(sx) > 0.35 ? (sx > 0 ? 1 : -1) : 0 });
+      else if (b === INDEX_BOUTON.lb) { if (!ma.boutons[INDEX_BOUTON.b]) sortie.push({ type: 'crochet', cote: Math.abs(sx) > 0.35 ? (sx > 0 ? 1 : -1) : 0 }); }
       else if (b === INDEX_BOUTON.start) sortie.push({ type: 'pause' });
       else if (b === 14) this.passes.set('m:g', { debut: maintenant, long: false });
       else if (b === 15) this.passes.set('m:d', { debut: maintenant, long: false });
@@ -615,6 +657,14 @@ export class PilotageDirect {
         demanderDirect(e, { action: 'feinte', vers: this.vers(rep, cote) });
         break;
       }
+      case 'drop': {
+        if (i.auto) demanderDirect(e, { action: 'drop', auto: true });
+        else {
+          const v = aEcran(i.x, i.y);
+          demanderDirect(e, { action: 'drop', visee: { x: v.x, y: v.y, puissance: 0.85, vif: 0.4 } });
+        }
+        break;
+      }
       case 'appel': demanderDirect(e, { action: 'appel' }); break;
       case 'gratter': demanderDirect(e, { action: vue.possible.grattage ? 'grattage' : vue.possible.engager ? 'engager' : 'grattage' }); break;
       case 'action': {
@@ -680,7 +730,7 @@ export class PilotageDirect {
       attaque: !!v?.attaque,
       endurance: Math.round(moi?.endurance ?? 100),
       famille: moi ? famillePoste(moi) : 'ailier',
-      possible: v?.possible ?? { passe: false, coupDePied: false, raffut: false, crochet: false, plaquage: false, grattage: false, appel: false, feinte: false, engager: false },
+      possible: v?.possible ?? { passe: false, coupDePied: false, raffut: false, crochet: false, plaquage: false, grattage: false, appel: false, feinte: false, engager: false, drop: false },
       contactImminent: !!v?.contactImminent,
       horsJeu: !!v?.horsJeu,
       horsPoste: !!v?.horsPoste,
@@ -694,13 +744,14 @@ export class PilotageDirect {
       recharge: v ? (Object.entries(v.recharge) as [ActionDirecte, number][]).filter(([, s]) => s > 0).map(([a]) => a) : [],
       arme: v?.arme ?? null,
       sprint: this.sprintActuel,
+      resp: this.resp.lire,
     };
   }
 
   private emettre(e: EtatMatch, moi: Pion | null, aide: boolean, dt: number): void {
     void dt;
     const maintenant = performance.now();
-    if (maintenant - this.derniereSnap < 90) return;
+    if (maintenant - this.derniereSnap < (this.resp.zoneOuverte ? 34 : 90)) return;
     this.derniereSnap = maintenant;
     const s = this.photographier(e, moi, aide);
     const json = JSON.stringify(s);

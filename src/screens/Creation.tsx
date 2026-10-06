@@ -16,6 +16,7 @@ import { Blason } from '../components/Blason';
 import { LogoCompet } from '../components/LogoCompet';
 import { Icone } from '../components/Icone';
 import { chantierVisible } from '../lib/modeDev';
+import { prendreLeModeDeCreation } from '../lib/tutoriel/intentions';
 import type { PosteId } from '../types';
 
 // ⚠️ L’ÂGE DE DÉPART EST BORNÉ, MAIS PAS PENDANT LA FRAPPE. Voir le champ
@@ -98,8 +99,9 @@ export function Creation() {
   // ⚠️ LE CHOIX N'EST DEMANDÉ QUE S'IL EXISTE. Chantier fermé : on ouvre
   // directement la fiche du joueur, comme avant ce lot.
   const choixPossible = chantierVisible('manager');
+  // ⚠️ L'introduction du tutoriel peut avoir demandé directement la fiche du joueur (lue une seule fois).
   const [mode, setMode] = useState<'joueur' | 'entraineur' | null>(
-    choixPossible ? null : 'joueur',
+    () => (choixPossible ? prendreLeModeDeCreation() : 'joueur'),
   );
 
   const [nom, setNom] = useState('');
@@ -206,9 +208,9 @@ export function Creation() {
       )}
 
       {mode === 'joueur' && (
-      <div className="carte" style={{ padding: '1.6rem' }}>
+      <div className="carte" style={{ padding: '1.6rem' }} data-tuto="cr-formulaire">
         <div className="grille-2">
-          <div className="champ">
+          <div className="champ" data-tuto="cr-nom">
             <label htmlFor="nom">{t('cr.nom')}</label>
             <input
               id="nom"
@@ -263,7 +265,7 @@ export function Creation() {
           </div>
         </div>
 
-        <div className="grille-2">
+        <div className="grille-2" data-tuto="cr-origine">
           <div className="champ">
             <label htmlFor="nation">{t('cr.nation')}</label>
             <Selecteur
@@ -284,7 +286,7 @@ export function Creation() {
           </div>
         </div>
 
-        <div className="champ">
+        <div className="champ" data-tuto="cr-club">
           <label htmlFor="club">{t('cr.club')} ({division.nom})</label>
           <Selecteur
             id="club"
@@ -294,7 +296,7 @@ export function Creation() {
           />
         </div>
 
-        <div className="champ">
+        <div className="champ" data-tuto="cr-poste">
           <label>{t('cr.poste')}</label>
           <div className="postes-grille">
             {POSTES.map((p) => (
@@ -314,7 +316,7 @@ export function Creation() {
         </div>
 
         {/* Traits de caractère : deux au maximum, pour toute la carrière. */}
-        <div className="champ">
+        <div className="champ" data-tuto="cr-traits">
           <label>
             {t('cr.traits')}{' '}
             <span style={{ fontWeight: 400, color: 'var(--brume)', fontSize: '0.85rem' }}>
@@ -361,7 +363,7 @@ export function Creation() {
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
-          <button className="btn primaire grand" onClick={valider}>
+          <button className="btn primaire grand" onClick={valider} data-tuto="cr-valider">
             <Icone nom="ballon" taille={20} /> {t('cr.lancer')}
           </button>
         </div>

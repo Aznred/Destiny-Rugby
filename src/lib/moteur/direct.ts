@@ -38,6 +38,7 @@ import type { EtatMatch, IntentionPied } from './etat.js';
 import { vitesseDisponible, type Pion } from './entites.js';
 import { attaquantLibre } from './ia/lecture.js';
 import { ligneDePasseCoupee } from './ia/vision.js';
+import { humainTientLe } from './responsabilites.js';
 import {
   AXE, LARGEUR, LIGNE_A, LIGNE_B, LONGUEUR, borner, dansSes22, dansSonCamp, distance, distance2,
   metresAvantLaLigne, sens, type Vec,
@@ -93,6 +94,10 @@ export const REGLAGES_DIRECT = {
   rechargeFeinte: 2.2,
   rechargeAppel: 2.6,
   rechargeGrattage: 4,
+  /** Un drop se tente une fois : tant qu'il n'est pas retombé, on n'en tente pas un autre. */
+  rechargeDrop: 6,
+  /** Le drop se tente d'au plus cette distance de la ligne (m) ; au-delà, le bouton reste grisé. */
+  porteeDrop: 50,
   /** Endurance dépensée. */
   coutPlaquage: 2.2,
   coutRaffut: 1.4,
@@ -129,7 +134,7 @@ export interface CommandeDirecte {
 
 export type ActionDirecte =
   | 'passe' | 'coupDePied' | 'raffut' | 'crochet' | 'plaquage' | 'grattage'
-  | 'appel' | 'feinte' | 'engager';
+  | 'appel' | 'feinte' | 'engager' | 'drop';
 
 export interface DemandeDirecte {
   action: ActionDirecte;
@@ -258,7 +263,7 @@ export function vueVide(): VueDirecte {
     horsJeu: false, cibleDePlaquage: null, ruckAPortee: false, contactImminent: false,
     possible: {
       passe: false, coupDePied: false, raffut: false, crochet: false, plaquage: false, grattage: false,
-      appel: false, feinte: false, engager: false,
+      appel: false, feinte: false, engager: false, drop: false,
     },
     recharge: {}, arme: null,
   };
@@ -864,9 +869,13 @@ export function majVueDirecte(e: EtatMatch): void {
   poss.grattage = libre && v.ruckAPortee && !v.attaque && recharge('grattage') <= 0;
   poss.engager = libre && v.ruckAPortee && v.attaque;
   poss.appel = libre && ouvert && !v.porte && (e.possession === p.cote || e.phase === 'ballonEnLAir') && recharge('appel') <= 0;
+  // Le drop (Correctif 17) : seulement avec les responsabilités, au ballon, en jeu, à portée — et celui qui tient le rôle de droppeur
+  // ou un pied sûr. Les autres le laissent à leur 10.
+  poss.drop = libre && v.porte && !!e.responsabilites && e.phase === 'jeuCourant' && !e.vol && recharge('drop') <= 0
+    && metresAvantLaLigne(p.pos, p.cote) < REGLAGES_DIRECT.porteeDrop && (humainTientLe(e, 'droppeur') || p.pied >= 55);
   v.recharge = {
     plaquage: recharge('plaquage'), raffut: recharge('raffut'), crochet: recharge('crochet'),
-    feinte: recharge('feinte'), appel: recharge('appel'), grattage: recharge('grattage'),
+    feinte: recharge('feinte'), appel: recharge('appel'), grattage: recharge('grattage'), drop: recharge('drop'),
   };
   v.arme = d.arme && e.sim < d.arme.jusqua ? d.arme.action : null;
 }

@@ -3,6 +3,7 @@ import type {
   CompositionManager, PosteId, TactiqueManager,
 } from '../types.js';
 import type { Coequipier } from './effectif.js';
+import type { RolesEquipe } from './moteur/responsabilites.js';
 import { adequationAuPoste, disponible, facteurDePerformance, type EtatDuJoueur } from './carteJoueur.js';
 
 export const POSTES_XV_MANAGER: PosteId[] = [
@@ -234,6 +235,12 @@ export function reconcilerCompositionManager(
   const titulaires = remplir(composition.titulaires, POSTES_XV_MANAGER, defaut.titulaires);
   const remplacants = remplir(composition.remplacants, POSTES_BANC_MANAGER, defaut.remplacants);
   const feuille = new Set([...titulaires, ...remplacants]);
+  // Les autres rôles (Correctif 17) : on garde ceux dont le joueur est toujours sur la feuille, les autres retombent en « automatique ».
+  const autres: Partial<CompositionManager> = {};
+  for (const champ of CHAMPS_ROLES_COMPOSITION) {
+    const id = composition[champ];
+    if (id && feuille.has(id)) autres[champ] = id;
+  }
   return {
     titulaires,
     remplacants,
@@ -241,7 +248,27 @@ export function reconcilerCompositionManager(
       ? composition.capitaineId : defaut.capitaineId,
     buteurId: composition.buteurId && feuille.has(composition.buteurId)
       ? composition.buteurId : defaut.buteurId,
+    ...autres,
   };
+}
+
+/** Les rôles de la composition au-delà du capitaine et du buteur, et le rôle du moteur qu'ils désignent (Correctif 17). */
+export const CHAMPS_ROLES_COMPOSITION = [
+  'viceCapitaineId', 'buteur2Id', 'engagementId', 'droppeurId', 'lanceurId', 'lanceur2Id',
+] as const;
+
+/** Ce que la composition impose au moteur : un identifiant par rôle, seulement ceux qui sont choisis. */
+export function rolesImposesParLaComposition(c: CompositionManager): RolesEquipe {
+  const roles: RolesEquipe = {};
+  if (c.capitaineId) roles.capitaine = c.capitaineId;
+  if (c.buteurId) roles.buteur = c.buteurId;
+  if (c.viceCapitaineId) roles.viceCapitaine = c.viceCapitaineId;
+  if (c.buteur2Id) roles.buteur2 = c.buteur2Id;
+  if (c.engagementId) roles.engagement = c.engagementId;
+  if (c.droppeurId) roles.droppeur = c.droppeurId;
+  if (c.lanceurId) roles.lanceur = c.lanceurId;
+  if (c.lanceur2Id) roles.lanceur2 = c.lanceur2Id;
+  return roles;
 }
 
 /** Transforme les identifiants choisis en feuille ordonnée 1 → 23. */

@@ -49,7 +49,8 @@ async function main() {
 
   // La sauvegarde de tournage, puis rechargement pour qu'elle prenne.
   const sauvegarde = fs.readFileSync('scripts/_seedTrailer.json', 'utf8');
-  await page.evaluate((s) => localStorage.setItem('destin-ovalie', s), sauvegarde);
+  // ⚠️ Le tutoriel guidé (Correctif 18) vit hors de la sauvegarde : on le coupe pour que ses bulles ne passent pas dans les images.
+  await page.evaluate((s) => { localStorage.setItem('destin-ovalie', s); localStorage.setItem('destiny-rugby:tutoriel', JSON.stringify({ v: 1, vus: {}, desactive: true })); }, sauvegarde);
   await page.reload({ waitUntil: 'networkidle2' });
   await dormir(2500);
 

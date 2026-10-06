@@ -22,7 +22,8 @@ async function main() {
   });
   const page = await navigateur.newPage();
   await page.goto(URL_JEU, { waitUntil: 'networkidle2' });
-  await page.evaluate((s) => localStorage.setItem('destin-ovalie', s),
+  // Le tutoriel guidé (Correctif 18) vit hors de la sauvegarde : on le coupe pour que ses bulles ne passent pas dans les images.
+  await page.evaluate((s) => { localStorage.setItem('destin-ovalie', s); localStorage.setItem('destiny-rugby:tutoriel', JSON.stringify({ v: 1, vus: {}, desactive: true })); },
     fs.readFileSync('scripts/_seedTrailer.json', 'utf8'));
   await page.reload({ waitUntil: 'networkidle2' });
   await page.evaluate(() => {

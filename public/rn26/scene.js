@@ -816,7 +816,7 @@ export async function creerScene3D(conteneur,options={}){
       }else{
         // Arbitre de touche : il court le long de sa ligne, à hauteur du ballon.
         const side=i===1?-1:1;let tx=side*TOUCHE_X,tz,vmax=6.2,zone=1.1;
-        if(tir&&(tir.etape==='pose'||tir.etape==='pret'||tir.etape==='elan'||tir.volLance)){
+        if(tir&&(tir.etape==='pose'||tir.etape==='vise'||tir.etape==='pret'||tir.etape==='elan'||tir.volLance)){
           // Tir au but : les deux juges vont se placer derrière les poteaux.
           const goal=tir.buteur.cote==='A'?1:-1;tx=side*3.6;tz=goal*51.7;vmax=6.5;zone=.3;
         }else if(kick){tz=xyz(kick.vers).z;vmax=8.4;zone=.6;}
@@ -1112,8 +1112,8 @@ export async function creerScene3D(conteneur,options={}){
       zoom=t<4.6?.36:.62;suivi=.6;
     }else if(tir){
       const kicker=actors.get(tir.buteur.id);
-      if(kicker&&!tir.volLance){want.copy(kicker.group.position).lerp(tmp.set(xyz(tir.lieu||e.ballon).x,0,xyz(tir.lieu||e.ballon).z),tir.etape==='pose'||tir.etape==='pret'||tir.etape==='elan'?.5:.15);want.y=1.1;}
-      zoom=tir.volLance?1.15:tir.etape==='pose'||tir.etape==='pret'||tir.etape==='elan'?.5:.7;suivi=.7;
+      if(kicker&&!tir.volLance){want.copy(kicker.group.position).lerp(tmp.set(xyz(tir.lieu||e.ballon).x,0,xyz(tir.lieu||e.ballon).z),tir.etape==='pose'||tir.etape==='vise'||tir.etape==='pret'||tir.etape==='elan'?.5:.15);want.y=1.1;}
+      zoom=tir.volLance?1.15:tir.etape==='pose'||tir.etape==='vise'||tir.etape==='pret'||tir.etape==='elan'?.5:.7;suivi=.7;
     }else if(['melee','maul'].includes(e.phase))zoom=.56;
     else if(e.phase==='touche')zoom=.72;
     else if(e.phase==='ruck')zoom=.8;

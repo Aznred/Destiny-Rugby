@@ -35,6 +35,7 @@ import {
   DEFINITIONS_TOUCHES, libelleDeTouche, type ActionClavier, type TouchesDirectes,
 } from '../../lib/controleDirect/touches';
 import { LIBELLES_MANETTE, type NomBouton, type TypeManette } from '../../lib/controleDirect/manette';
+import { Responsabilites } from './Responsabilites';
 import './ControleDirect.css';
 
 // ---------------------------------------------------------------------------
@@ -103,6 +104,8 @@ export function ControleDirect({ pilotage, surReprendre }: { pilotage: PilotageD
   if (snap.phase === 'attente') return null;
 
   const tactile = snap.appareil === 'tactile';
+  /** Le jeu attend la réponse du joueur : les commandes de jeu s'éteignent. */
+  const occupe = snap.resp.panneau !== null;
   const style = { '--cd-taille': prefs.tailleHud, '--cd-opa': prefs.opaciteHud } as CSSProperties;
   return (
     <div
@@ -112,7 +115,7 @@ export function ControleDirect({ pilotage, surReprendre }: { pilotage: PilotageD
       data-appareil={snap.appareil}
       data-gaucher={prefs.gaucher ? 'oui' : undefined}
       data-pause={snap.pause ? 'oui' : undefined}
-      data-modale={(snap.pause && snap.phase === 'actif') || snap.tuto?.carte ? 'oui' : undefined}
+      data-modale={(snap.pause && snap.phase === 'actif') || snap.tuto?.carte || snap.resp.tuto ? 'oui' : undefined}
       style={style}
     >
       {snap.visible && <Souffle valeur={snap.endurance} />}
@@ -120,17 +123,20 @@ export function ControleDirect({ pilotage, surReprendre }: { pilotage: PilotageD
       {snap.visible && snap.libre && <Toast snap={snap} />}
 
       {/* Les zones tactiles : toujours posées (un portable tactile doit pouvoir passer au pouce), muettes pour la souris. */}
-      <Joystick pilotage={pilotage} prefs={prefs} sprint={sprint} actif={enJeu && !snap.pause} />
-      <Gestes pilotage={pilotage} actif={enJeu && !snap.pause && snap.libre} />
+      {/* ⚠️ QUAND LE JEU ATTEND UNE RÉPONSE (capitaine, tir, engagement, touche), le joueur ne conduit plus : ni joystick, ni commandes. */}
+      <Joystick pilotage={pilotage} prefs={prefs} sprint={sprint} actif={enJeu && !snap.pause && !occupe} />
+      <Gestes pilotage={pilotage} actif={enJeu && !snap.pause && snap.libre && !occupe} />
 
-      {snap.visible && tactile && !snap.pause && (
+      {snap.visible && tactile && !snap.pause && !occupe && (
         <Commandes pilotage={pilotage} snap={snap} sprint={sprint} />
       )}
+      {/* Les responsabilités : les panneaux de décision, de tir, d'engagement et de touche — et leurs cartes d'explication. */}
+      {snap.visible && enJeu && !snap.pause && <Responsabilites pilotage={pilotage} snap={snap} prefs={prefs} />}
       {/* L'étape « déplace-toi » du tutoriel : un anneau pulse là où le pouce doit se poser. */}
       {snap.visible && tactile && !snap.pause && snap.tuto?.visible && snap.tuto.etape === 'deplacer' && (
         <div className="cd-guide-stick" aria-hidden />
       )}
-      {snap.visible && !tactile && prefs.indications && !snap.pause && (
+      {snap.visible && !tactile && prefs.indications && !snap.pause && !occupe && (
         <Indications snap={snap} touches={prefs.touches} />
       )}
 
@@ -384,16 +390,16 @@ const PLACE_SPRINT = placeSurArc(104, 4, 62);
 const PLACES_INTERIEURES = [placeSurArc(104, 46, 62), placeSurArc(104, 88, 62)];
 const PLACES_EXTERIEURES = [placeSurArc(184, 16, 54), placeSurArc(184, 44, 54), placeSurArc(184, 72, 54)];
 
-type IdBouton = 'raffut' | 'crochet' | 'pied' | 'feinte' | 'gratter' | 'appel';
+type IdBouton = 'raffut' | 'crochet' | 'pied' | 'feinte' | 'gratter' | 'appel' | 'drop';
 
 /** Ce qui entoure la roue de passe, du plus probable au moins probable, selon le poste. */
 const SATELLITES_BALLON: Record<FamillePoste, IdBouton[]> = {
-  avant: ['raffut', 'crochet', 'pied'],
-  demi: ['pied', 'raffut', 'crochet', 'feinte'],
-  ouvreur: ['pied', 'feinte', 'crochet', 'raffut'],
-  centre: ['crochet', 'raffut', 'pied'],
-  ailier: ['crochet', 'raffut', 'pied'],
-  arriere: ['pied', 'crochet', 'raffut'],
+  avant: ['raffut', 'crochet', 'pied', 'drop'],
+  demi: ['pied', 'raffut', 'crochet', 'feinte', 'drop'],
+  ouvreur: ['pied', 'drop', 'feinte', 'crochet', 'raffut'],
+  centre: ['crochet', 'raffut', 'pied', 'drop'],
+  ailier: ['crochet', 'raffut', 'pied', 'drop'],
+  arriere: ['pied', 'drop', 'crochet', 'raffut'],
 };
 
 function Commandes({ pilotage, snap, sprint }: {
@@ -423,7 +429,7 @@ function Commandes({ pilotage, snap, sprint }: {
   if (libre && snap.porte) {
     if (p.passe) principal = <RoueDePasse pilotage={pilotage} offload={contact} guide={guide === 'passe'} eteinte={enRecharge('passe')} />;
     const offre: Record<IdBouton, boolean> = {
-      raffut: p.raffut, crochet: p.crochet, pied: p.coupDePied, feinte: p.feinte, gratter: false, appel: false,
+      raffut: p.raffut, crochet: p.crochet, pied: p.coupDePied, feinte: p.feinte, gratter: false, appel: false, drop: p.drop,
     };
     for (const id of SATELLITES_BALLON[snap.famille]) {
       if (!offre[id]) continue;
@@ -472,6 +478,13 @@ function Commandes({ pilotage, snap, sprint }: {
             key={id} place={place} icone="crochet" libelle={t('cd.act.crochet')}
             guide={guide === 'duel'} eteint={enRecharge('crochet')} allume={snap.arme === 'crochet'}
             onPress={() => pousser(pilotage, { type: 'crochet', cote: 0 })}
+          />
+        );
+      case 'drop':
+        return (
+          <BoutonRond
+            key={id} place={place} icone="drop" libelle={t('cd.act.drop')} eteint={enRecharge('drop')}
+            onPress={() => pousser(pilotage, { type: 'drop', auto: true, x: 0, y: 1 })}
           />
         );
       case 'feinte':
@@ -803,6 +816,7 @@ function lignesDAide(snap: SnapPilotage): LigneAide[] {
     if (p.raffut) L.push({ icone: 'raffut', cle: snap.famille === 'avant' ? 'cd.act.percussion' : 'cd.act.raffut', touche: 'raffut', bouton: ['rb'] });
     if (p.crochet) L.push({ icone: 'crochet', cle: 'cd.act.crochet', touche: 'crochet', bouton: ['lb'] });
     if (p.feinte) L.push({ icone: 'feinte', cle: 'cd.act.feinte', touche: null, bouton: ['y'] });
+    if (p.drop) L.push({ icone: 'drop', cle: 'cd.act.drop', touche: 'drop', bouton: ['lb', 'b'] });
   } else {
     if (p.plaquage) L.push({ icone: 'plaquage', cle: 'cd.act.plaquer', touche: 'action', bouton: ['a'] });
     if (p.grattage) L.push({ icone: 'grattage', cle: 'cd.act.gratter', touche: p.plaquage ? 'gratter' : 'action', bouton: p.plaquage ? ['x'] : ['a'] });
@@ -833,7 +847,7 @@ function Indications({ snap, touches }: { snap: SnapPilotage; touches: TouchesDi
       {lignes.map((l) => (
         <span key={l.cle + (l.touche ?? l.bouton?.[0])} className="cd-indic">
           {manette
-            ? (l.bouton ? <Glyphe bouton={l.bouton[0]} type={snap.manette} /> : null)
+            ? (l.bouton ? l.bouton.map((b, i) => <span key={b}>{i > 0 && '+'}<Glyphe bouton={b} type={snap.manette} /></span>) : null)
             : (l.touche ? <PuceTouche codes={touches[l.touche].slice(0, 1)} /> : null)}
           {t(manette && l.cleManette ? l.cleManette : l.cle)}
         </span>

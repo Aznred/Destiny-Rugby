@@ -5,6 +5,7 @@ import type { CarteCarriere, RareteCarriere } from '../lib/ligue/typesCarriere';
 import { creerSonsPacks } from '../lib/sonsPacks';
 import { PALIERS_PACK, rangPack } from '../lib/presentationPacks';
 import { t } from '../lib/i18n';
+import { signaler } from '../lib/tutoriel/guide';
 import './OuverturePack.css';
 
 // ⚠️ CE `lazy` N'EST PLUS LE PREMIER À DEMANDER LE MODULE. `Pack3D` tire
@@ -60,6 +61,8 @@ export default function OuverturePack({ cartes, pack, modele, garantie, apparenc
   // la lueur orange trahirait la Halloween avant même qu'on touche le pack.
   const speciale = ordre.find(c => c.speciale)?.speciale?.type;
   const eclatSpecial = speciale && (phase === 'ouverture' || phase === 'cartes') ? ` speciale-${speciale === 'halloween' ? 'halloween' : 'icon'}` : '';
+  // La première carte spéciale tirée a droit à son explication (file du tutoriel : jamais par-dessus un autre).
+  useEffect(() => { if (speciale) signaler('context.carteSpeciale'); }, [speciale]);
   useEffect(() => {
     const precedent = document.activeElement as HTMLElement | null;
     const overflow = document.body.style.overflow;
@@ -160,10 +163,10 @@ export default function OuverturePack({ cartes, pack, modele, garantie, apparenc
       <div className="pack-show-beams" aria-hidden="true"/><div className="pack-show-orbit" aria-hidden="true"/>
       <div className="pack-show-particles" key={rang} aria-hidden="true">{Array.from({length:28}, (_,i) => <i key={i} style={{'--x':`${i*37%100}%`, '--delay':`${i%9*-.35}s`, '--duration':`${2+i%4}s`, '--drift':`${(i%2?1:-1)*(20+i*3)}px`} as CSSProperties}/>)}</div>
       <div className="pack-show-model"><Suspense fallback={null}><Pack3D rarete={rarete} rareteSuivante={prochainPalier ? PALIERS_PACK[rang + 1] : undefined} modele={modele} ouvert={phase === 'ouverture'} calme={calme} transition={phase}/></Suspense></div>
-      {phase === 'attente' && <button ref={principale} type="button" className="pack-show-touch" onClick={avancerPack} disabled={attenteTirage} aria-label={libelleAction} />}
+      {phase === 'attente' && <button ref={principale} type="button" className="pack-show-touch" data-tuto="pack-ouvrir" onClick={avancerPack} disabled={attenteTirage} aria-label={libelleAction} />}
       {(phase === 'charge' || phase === 'evolution') && <div className="pack-show-upgrade" aria-hidden="true"><i/><i/><span/></div>}
       {phase === 'ouverture' && <div className="pack-show-flash" aria-hidden="true"/>}
-    </div><p className="pack-show-hint" aria-live="polite">{phase === 'attente' ? attenteTirage ? t('online.pack.waitCards') : t('online.pack.openHint') : phase === 'charge' || phase === 'evolution' ? t('online.pack.upgrading') : t('online.shop.opening')}</p></> : <div className="pack-show-results" role="list" aria-label={t('online.pack.obtainedCards')} style={{ '--pack-count': ordre.length } as CSSProperties}>{ordre.map((carte,i) => {
+    </div><p className="pack-show-hint" aria-live="polite">{phase === 'attente' ? attenteTirage ? t('online.pack.waitCards') : t('online.pack.openHint') : phase === 'charge' || phase === 'evolution' ? t('online.pack.upgrading') : t('online.shop.opening')}</p></> : <div className="pack-show-results" data-tuto="pack-cartes" role="list" aria-label={t('online.pack.obtainedCards')} style={{ '--pack-count': ordre.length } as CSSProperties}>{ordre.map((carte,i) => {
       const visible = i >= ordre.length - revelees;
       const meilleure = i === 0;
       const active = i === carteActive;
@@ -179,7 +182,7 @@ export default function OuverturePack({ cartes, pack, modele, garantie, apparenc
         <div className="pack-show-flipper"><div className="pack-show-cardback" aria-hidden="true"><span className="pack-back-border"/><small>{t("ui.f173c39dab2b")}</small><b>{t("ui.40c30a28814a")}</b><span>{t("ui.f02addd67834")}</span><i>✦</i></div><div className="pack-show-front" aria-hidden={!visible}>{visible && rendreCarte(carte)}</div></div>
       </div>;
     })}</div>}
-    {phase === 'cartes' && <footer className="pack-show-footer"><button ref={principale} className="btn primaire" onClick={toutes ? onFermer : passer}>{toutes ? t('online.pack.clubhouse') : t('online.pack.reveal')}</button></footer>}
+    {phase === 'cartes' && <footer className="pack-show-footer"><button ref={principale} className="btn primaire" data-tuto="pack-suite" onClick={toutes ? onFermer : passer}>{toutes ? t('online.pack.clubhouse') : t('online.pack.reveal')}</button></footer>}
     <span className="pack-show-sr" aria-live="polite">{muet?t('online.pack.soundMuted'):t('online.pack.soundActive')}</span>
   </main></div>, document.body);
 }

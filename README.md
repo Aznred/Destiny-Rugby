@@ -1814,3 +1814,22 @@ Fait avec 🏉 — thème artisanal, front soigné, sans rendu générique.
 - **Labo** (Atelier Kiri) : onglet « Cartes spéciales » (liste, statuts, filtres, édition GEN/COL/poste/nation/club/dates/poids, image importée ou remplacée avec aperçu, publication carte par carte ou en masse, import en masse, boutons « Activer ICONS » / « Activer Halloween », prix et probabilités du pack Halloween) et onglet « Imports joueurs » (lot MLR · Championship · NPC et listes collées, appariement prénom + nom + date de naissance, sinon + club, entrées douteuses validées à la main).
 - **Base** : définitions et événements dans `carriere_catalogue_admin` (même révision que l'Atelier, propagée à toutes les ligues), images dans `carriere_cartes_speciales_images` (`serveur/schema-cartes-speciales.sql`, création automatique).
 - Banc : `npm run verify:cartes-speciales` (292 contrôles : graine, raretés mesurées, pack Halloween solo, fin d'événement, collections, marché, collectif, feuille, Labo par l'API, catalogue public, imports).
+
+## Correctifs 16, 17 et 18 (octobre 2026)
+
+### Correctif 16 — le joueur conduit son pion
+- En carrière solo (match en 3D), le joueur **conduit** son personnage dès qu'il est sur le terrain : banc → caméra télé → remplacement animé → caméra derrière lui → commandes. Les vingt-neuf autres gardent l'IA par poste.
+- Un seul geste, quatre appareils : **pouce** (joystick flottant, roue de passe, glissé pour le pied), **clavier** (touches remappables, ZQSD comme WASD), **manette** (symboles Xbox ou PlayStation), **souris**. Le moteur seul décide si une action est jouable.
+- Éteint, le moteur rejoue **à l'identique** (empreinte mesurée). Banc : `npm run verify:controle-direct`.
+
+### Correctif 17 — les responsabilités
+- Capitaine et vice-capitaine (décision après chaque pénalité : poteaux, touche, mêlée, jeu vite — l'IA capitaine dit *pourquoi*), buteur principal et secondaire, engagement, droppeur, lanceur de touche principal et secondaire. Un joueur qui sort, se blesse ou prend un carton perd le rôle : la chaîne de repli le passe au suivant.
+- **Tir à la main** (visée, force, effet, régularité du geste) avec le même étalon que l'IA ; coup d'envoi (longueur, côté, hauteur) ; touche (sept combinaisons, lancer dosé, touche rapide) ; drop manuel contrable. Le jeu **attend** le joueur (chrono 10 à 25 s), puis l'IA tranche.
+- Les rôles évoluent à chaque intersaison selon le niveau dans le groupe, avec une ligne de journal par changement, et se règlent dans la composition du manager. Banc : `npm run verify:responsabilites` (1 450 contrôles).
+
+### Correctif 18 — le tutoriel guidé
+- La modale d'accueil à cinq écrans est remplacée par un **onboarding interactif** sur les vrais écrans : l'élément visé reste éclairé, tout le reste s'assombrit, une bulle explique en une phrase, et le tutoriel **attend le geste** (clic, placement d'un joueur, choix d'un capitaine) avant de passer à la suite.
+- **Une introduction** à trois grandes cartes (Ligue en ligne, Carrière Joueur, Carrière Entraîneur), puis un guide par mode : compte et création de ligue en petites étapes, club, **vrai pack ouvert**, raretés, composition (titulaires, banc, collectif), marché, calendrier et direct ; création du joueur, écran de carrière, entraînement, premier match ; bureau de l'entraîneur, composition avec capitaine et buteur obligatoires, tactique, remplacements en direct (le match s'arrête le temps de lire).
+- **Les responsabilités s'expliquent le jour où on les reçoit** (« Tu viens d'être nommé buteur… »). Les explications contextuelles (premier carton, carte spéciale, blessure, infirmerie, marché) attendent leur tour : jamais deux tutoriels à la fois.
+- Mobile soigné : bulle en feuille haut ou bas selon la cible, jamais hors écran, jamais sur l'élément expliqué. **Réglages → Tutoriels** : rejouer chaque guide, ou tout désactiver (les cartes du match aussi) sans rien perdre de ce qu'on a déjà vu.
+- Banc : `npm run verify:tutoriel` (textes dans les sept langues, ancres, 8 000 placements de bulle, mémoire).

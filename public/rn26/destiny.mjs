@@ -417,7 +417,7 @@ export class DestinyMatch {
         // Rituel découpé sur la progression : il n'est posé au tee qu'une fois arrivé.
         if(p.arrival>1.2||speed>1.6){d.carry='deux';return done();}
         if(tir.etape==='pose')clip('kick_conversion_a_setup',.22+.78*clamp(depuis/Math.max(.5,tir.dureePose),0,1),false,true);
-        else if(tir.etape==='pret')clip('kick_conversion_a_ready',depuis,true);
+        else if(tir.etape==='pret'||tir.etape==='vise')clip('kick_conversion_a_ready',depuis,true);
         else clip('kick_conversion_a_kick',clamp(IMPACT_TIR-(tir.frappeDans-offset),0,IMPACT_TIR));
         d.anchor=tee;return done();
       }
@@ -426,8 +426,8 @@ export class DestinyMatch {
         clip('kickoff_pickup_ball',depuis*1.15);
         d.anchor={...this.remember('ramassage:'+tir.etapeDepuis,()=>({x:p.x,z:p.z,heading:cap(sol.x-p.x,sol.z-p.z)})),mode:'rel'};
       }else if(tir.etape==='transport'){d.carry='deux';d.heading=speed<.4?face:null;}
-      else if(tir.etape==='pose'){clip('kick_conversion_a_setup',clamp(depuis/this.outils.RITUEL_TIR.pose,0,1),false,true);d.anchor=tee;}
-      else if(tir.etape==='pret'){clip('kick_conversion_a_ready',depuis,true);d.anchor=tee;}
+      else if(tir.etape==='pose'){clip('kick_conversion_a_setup',clamp(depuis/(tir.humain?this.outils.RITUEL_TIR.poseHumain:this.outils.RITUEL_TIR.pose),0,1),false,true);d.anchor=tee;}
+      else if(tir.etape==='pret'||tir.etape==='vise'){clip('kick_conversion_a_ready',depuis,true);d.anchor=tee;}
       else if(tir.etape==='elan'){clip('kick_conversion_a_kick',Math.min(depuis,IMPACT_TIR));d.anchor=tee;}
       return done();
     }

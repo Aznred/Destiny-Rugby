@@ -15,7 +15,7 @@ import { useEffect, useState } from 'react';
 import { Icone } from './Icone';
 import { t } from '../lib/i18n';
 import {
-  ecrirePreferencesControle, rejouerLeTutorielDirect, reinitialiserTouchesDirectes, usePreferencesControle,
+  ecrirePreferencesControle, reinitialiserTouchesDirectes, usePreferencesControle,
 } from '../lib/controleDirect/prefs';
 import {
   DEFINITIONS_TOUCHES, copierTouches, libelleDeTouche, toucheRisquee, touchePermise, type ActionClavier,
@@ -61,7 +61,6 @@ export function ReglagesControleDirect() {
   const manette = useManetteDetectee();
   const [ecoute, setEcoute] = useState<ActionClavier | null>(null);
   const [retour, setRetour] = useState<Retour | null>(null);
-  const [tutoRelance, setTutoRelance] = useState(false);
 
   // Une touche à réassigner : on l'écoute AVANT la fenêtre (capture sur `window`), pour qu'Échap annule l'écoute sans fermer le panneau.
   useEffect(() => {
@@ -95,7 +94,7 @@ export function ReglagesControleDirect() {
     return () => window.removeEventListener('keydown', surTouche, true);
   }, [ecoute, prefs.touches]);
 
-  const commutateur = (cle: 'aidePlacement' | 'indications' | 'vibrations' | 'gaucher' | 'sprintAuBord' | 'souris', libelle: string, aide?: string) => (
+  const commutateur = (cle: 'aidePlacement' | 'indications' | 'vibrations' | 'gaucher' | 'sprintAuBord' | 'souris' | 'aideTir' | 'conseilCapitaine', libelle: string, aide?: string) => (
     <div className="champ rcd-ligne">
       <label>
         <input type="checkbox" checked={prefs[cle]} onChange={(ev) => ecrirePreferencesControle({ [cle]: ev.target.checked })} />
@@ -128,6 +127,25 @@ export function ReglagesControleDirect() {
       {commutateur('aidePlacement', t('cd.reg.aide'), t('cd.reg.aide.aide'))}
       {commutateur('indications', t('cd.reg.indications'), t('cd.reg.indications.aide'))}
       {commutateur('vibrations', t('cd.reg.vibrations'), t('cd.reg.vibrations.aide'))}
+
+      {/* ── Les responsabilités (Correctif 17) : capitaine, tir, engagement, touche ───────────────── */}
+      <h4 className="rcd-sous-titre">{t('cd.reg.resp')}</h4>
+      {commutateur('conseilCapitaine', t('cd.reg.conseil'), t('cd.reg.conseil.aide'))}
+      {commutateur('aideTir', t('cd.reg.aideTir'), t('cd.reg.aideTir.aide'))}
+      <div className="champ">
+        <label>{t('cd.reg.tirManette')}</label>
+        <div className="choix-langue rcd-choix">
+          {(['direct', 'charge'] as const).map((m) => (
+            <button
+              key={m} type="button" className={prefs.tirManette === m ? 'actif' : ''} aria-pressed={prefs.tirManette === m}
+              onClick={() => ecrirePreferencesControle({ tirManette: m })}
+            >
+              {t(m === 'direct' ? 'cd.reg.tirManette.direct' : 'cd.reg.tirManette.charge')}
+            </button>
+          ))}
+        </div>
+        <p className="aide">{t('cd.reg.tirManette.aide')}</p>
+      </div>
 
       {/* ── Le pouce ───────────────────────────────────────────────────────────── */}
       <h4 className="rcd-sous-titre">{t('cd.reg.mobile')}</h4>
@@ -204,17 +222,7 @@ export function ReglagesControleDirect() {
       </p>
       <p className="aide">{t('cd.reg.manette.aide')}</p>
 
-      {/* ── Le tutoriel ───────────────────────────────────────────────────────── */}
-      <div className="champ rcd-tuto">
-        <label>{t('cd.reg.tuto')}</label>
-        <button
-          type="button" className="btn fantome mini"
-          onClick={() => { rejouerLeTutorielDirect(); setTutoRelance(true); }}
-        >
-          {t('cd.reg.tuto.bouton')}
-        </button>
-        {tutoRelance && <p className="aide" role="status"><Icone nom="check" taille={14} /> {t('cd.reg.tuto.ok')}</p>}
-      </div>
+      {/* ⚠️ « Rejouer le tutoriel » a quitté cette section : les Réglages ont désormais un bloc « Tutoriels » (Correctif 18) qui rejoue chaque guide. */}
     </section>
   );
 }

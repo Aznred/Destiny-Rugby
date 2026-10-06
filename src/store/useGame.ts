@@ -196,6 +196,7 @@ import {
 import { risqueDeBlessure, tirerBlessure, messageBlessure, deltasBlessure } from '../lib/blessures';
 import { effetsTraits, MAX_TRAITS, TRAIT_PAR_ID } from '../data/traits';
 import { nouerRelations, bonusVestiaire, meriteLeBrassard } from '../lib/vestiaire';
+import { evaluerResponsabilites, ligneDeJournal, responsabilitesInitiales } from '../lib/responsabilites';
 import { interviewAleatoire, scenarioDuPool, type JugementMJ } from '../lib/ia';
 import { agentDe } from '../data/agents';
 import {
@@ -761,24 +762,12 @@ interface GameState {
   /** Consentement publicitaire — rien ne se charge tant que c'est 'inconnu'. */
   pubConsentement: 'inconnu' | 'oui' | 'non';
   /**
-   * LE TUTORIEL A-T-IL DÉJÀ ÉTÉ VU ?
-   *
-   * ⚠️ Demande explicite : « fais un tuto pour les nouveaux joueurs pour
-   * baisser le bounce rate ». Il ne s'ouvre donc QU'UNE FOIS, et seulement pour
-   * quelqu'un qui n'a pas encore de carrière : un tutoriel qui revient à chaque
-   * visite est exactement ce qui fait fuir. Persisté avec le reste.
-   */
-  tutoVu: boolean;
-  /**
    * La notice de la manette de match a déjà été vue.
    *
-   * ⚠️ ELLE EST SÉPARÉE DE `tutoVu`, et ce n'est pas de la coquetterie : le
-   * tutoriel d'accueil explique le JEU (« tu es un joueur, pas un manager »),
-   * celui-ci explique les COMMANDES du direct — joystick à gauche, gros bouton
-   * à droite, ralenti sur tes moments. Quelqu'un qui a passé l'accueil il y a
-   * trois saisons découvre quand même la manette à son premier match piloté.
-   * Il s'affiche UNE FOIS et se referme au premier geste : un tutoriel qui
-   * revient est exactement ce qui fait fermer l'onglet.
+   * ⚠️ L'ancien drapeau `tutoVu` (la modale d'accueil à cinq écrans) a disparu avec elle (Correctif 18) : ce que le joueur a vu du tutoriel
+   * guidé vit dans `localStorage`, par appareil et par personne (`lib/tutoriel/memoire.ts`) — pas dans la sauvegarde d'une carrière. Cette
+   * notice-ci, elle, explique les COMMANDES du direct à la première rencontre : elle s'affiche UNE FOIS et se referme au premier geste,
+   * et les réglages (« Rejouer » le tutoriel de match) la remettent à zéro.
    */
   tutoMatchVu: boolean;
   /**
@@ -1240,7 +1229,6 @@ interface GameState {
   debloquerParPub: (id: string) => boolean;
   basculerEquipement: (id: string) => void;
   setPubConsentement: (choix: 'oui' | 'non') => void;
-  setTutoVu: (vu: boolean) => void;
   setTutoMatchVu: (vu: boolean) => void;
   /** Referme le guide de carrière définitivement. */
   fermerGuide: () => void;
@@ -1316,7 +1304,6 @@ export const useGame = create<GameState>()(
       equipements: [],
       equipementActif: {},
       pubConsentement: 'inconnu',
-      tutoVu: false,
       tutoMatchVu: false,
       traitsDebloques: [],
       // Tirée au premier lancement, puis persistée : elle ne change plus.
@@ -2086,6 +2073,22 @@ export const useGame = create<GameState>()(
             texte: `Le staff a tranché : tu seras le capitaine de ${j.club} la saison prochaine. Le groupe t'écoute, à toi de le tirer vers le haut.`,
             deltas: { moral: 12, reputation: 4 },
           });
+        }
+
+        // ---- RESPONSABILITÉS (Correctif 17) : ce que le staff lui confie, d'après sa place dans le groupe ----
+        // Hiérarchie (cadre, vice-capitaine), tee, engagement, drop, lancer en touche : par marches, jamais d'un coup.
+        {
+          const evaluation = evaluerResponsabilites(j, joueur.saison, forceGroupe);
+          j = { ...j, responsabilites: evaluation.responsabilites };
+          for (const c of evaluation.changements) {
+            const ligne = ligneDeJournal(c, j.club);
+            if (!ligne) continue;
+            if (c.gagne) j = appliquerDeltas(j, { moral: 3, reputation: 1 });
+            entrees.push({
+              id: idUnique(), saison: j.saison, role: 'systeme', titre: ligne.titre, texte: ligne.texte,
+              ...(c.gagne ? { deltas: { moral: 3, reputation: 1 } } : {}),
+            });
+          }
         }
 
         // ---- Contrat : salaire encaissé (moins la commission de l'agent) ----
@@ -6914,7 +6917,6 @@ export const useGame = create<GameState>()(
       // n'est rendu (voir `lib/pub.ts`). Un refus est définitif et respecté :
       // le jeu ne redemande pas à chaque écran.
       setPubConsentement: (choix) => set({ pubConsentement: choix }),
-      setTutoVu: (vu) => set({ tutoVu: vu }),
       setTutoMatchVu: (vu) => set({ tutoMatchVu: vu }),
 
       // ⚠️ `setToucheMatch` ET `reinitialiserTouchesMatch` ONT ÉTÉ SUPPRIMÉS
@@ -6958,7 +6960,7 @@ export const useGame = create<GameState>()(
     }),
     {
       name: 'destin-ovalie',
-      version: 29,
+      version: 30,
       storage: stockageJeu,
       // Sauvegardes d'avant les 15 postes : le poste stocké est une famille
       // (« pilier »), on lui attribue un numéro de maillot.
@@ -6990,7 +6992,6 @@ export const useGame = create<GameState>()(
           iaActivee?: boolean;
           equipements?: string[];
           equipementActif?: Partial<Record<CategorieEquipement, string>>;
-          tutoVu?: boolean;
           tutoMatchVu?: boolean;
           traitsDebloques?: string[];
           cleClassement?: string;
@@ -7203,7 +7204,6 @@ export const useGame = create<GameState>()(
           delete actif.accessoire;
         }
         s.pubConsentement ??= 'inconnu';
-        s.tutoVu ??= false;
         s.tutoMatchVu ??= false;
         s.traitsDebloques ??= [];
         // ⚠️ Une sauvegarde d'avant ce champ n'a pas de clé : on lui en tire une
@@ -7363,6 +7363,14 @@ export const useGame = create<GameState>()(
           s.manager.budgetSalarial = reparerPlafondSalarial(s.manager, s.transfertsSociaux ?? []);
           s.manager.avancee = assurerEtatCarriereAvancee(s.manager, effectifDuClub(s.manager.club, s.manager.saison));
         }
+        // Les responsabilités (Correctif 17) : une sauvegarde d'avant ne les a pas, on les évalue une première fois.
+        if (version < 30 && s.joueur && !s.joueur.responsabilites) {
+          try {
+            s.joueur = { ...s.joueur, responsabilites: responsabilitesInitiales(s.joueur, s.joueur.saison, forceEffectif(s.joueur.club, s.joueur.saison)) };
+          } catch {
+            // Une sauvegarde abîmée (club inconnu) : le joueur n'aura simplement pas de responsabilités avant la prochaine saison.
+          }
+        }
         // Le mode de simulation saison par saison a été supprimé. On enlève
         // aussi sa valeur persistée afin qu'une sauvegarde v4 ne puisse plus
         // réactiver une branche obsolète après fusion par Zustand.
@@ -7431,7 +7439,6 @@ export const useGame = create<GameState>()(
         equipements: s.equipements,
         equipementActif: s.equipementActif,
         pubConsentement: s.pubConsentement,
-        tutoVu: s.tutoVu,
         tutoMatchVu: s.tutoMatchVu,
         traitsDebloques: s.traitsDebloques,
         cleClassement: s.cleClassement,

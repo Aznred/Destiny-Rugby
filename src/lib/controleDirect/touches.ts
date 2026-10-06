@@ -19,7 +19,7 @@ import { t } from '../i18n';
 export type ActionClavier =
   | 'haut' | 'bas' | 'gauche' | 'droite' | 'sprint'
   | 'passeGauche' | 'passeDroite' | 'coupDePied' | 'raffut' | 'crochet'
-  | 'action' | 'appel' | 'gratter' | 'aide' | 'pause';
+  | 'action' | 'appel' | 'gratter' | 'aide' | 'pause' | 'drop';
 
 export interface DefinitionTouche {
   id: ActionClavier;
@@ -41,6 +41,7 @@ export const DEFINITIONS_TOUCHES: DefinitionTouche[] = [
   { id: 'coupDePied', cle: 'cd.touche.coupDePied', aide: 'cd.touche.coupDePied.aide', groupe: 'ballon' },
   { id: 'raffut', cle: 'cd.touche.raffut', aide: 'cd.touche.raffut.aide', groupe: 'ballon' },
   { id: 'crochet', cle: 'cd.touche.crochet', aide: 'cd.touche.crochet.aide', groupe: 'ballon' },
+  { id: 'drop', cle: 'cd.touche.drop', aide: 'cd.touche.drop.aide', groupe: 'ballon' },
   { id: 'action', cle: 'cd.touche.action', aide: 'cd.touche.action.aide', groupe: 'sansBallon' },
   { id: 'appel', cle: 'cd.touche.appel', aide: 'cd.touche.appel.aide', groupe: 'sansBallon' },
   { id: 'gratter', cle: 'cd.touche.gratter', aide: 'cd.touche.gratter.aide', groupe: 'sansBallon' },
@@ -61,6 +62,7 @@ export const TOUCHES_PAR_DEFAUT: Readonly<TouchesDirectes> = {
   coupDePied: ['KeyV'],
   raffut: ['KeyF'],
   crochet: ['KeyC'],
+  drop: ['KeyX'],
   action: ['Space'],
   appel: ['KeyR'],
   gratter: ['KeyG'],

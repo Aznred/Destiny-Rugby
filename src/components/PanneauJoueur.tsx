@@ -41,6 +41,14 @@ import { EQUIPEMENT_PAR_ID } from '../data/boutique';
 // — elles vivent dans `moteur/decisions.ts` et `MatchLive` les affiche déjà.
 const MatchLive = lazy(() => import('./MatchLive').then((m) => ({ default: m.MatchLive })));
 import type { Joueur } from '../types';
+import { rolesAffichables } from '../lib/responsabilites';
+import type { RoleEquipe } from '../lib/moteur/responsabilites';
+
+/** L'icône de chaque rôle : le brassard pour la hiérarchie, les poteaux pour le tee, le ballon qui tombe pour le drop. */
+const ICONE_DU_ROLE: Record<RoleEquipe, NomIcone> = {
+  capitaine: 'brassard', viceCapitaine: 'brassard', buteur: 'poteaux', buteur2: 'poteaux',
+  engagement: 'engagement', droppeur: 'drop', lanceur: 'lanceur', lanceur2: 'lanceur',
+};
 
 // ⚠️ DES NOMS D'ICÔNES, PLUS DES EMOJI : c'est le repli de l'avatar quand le
 // joueur n'a ni portrait ni écusson de club, donc la première chose qu'on voit
@@ -205,7 +213,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
 
   return (
     <aside id="carriere-joueur" className="carte panneau-joueur">
-      <div className="ph">
+      <div className="ph" data-tuto="car-identite">
         {/* L'écusson de l'équipe pour laquelle on joue CE week-end : le club
             d’ordinaire, la sélection pendant une fenêtre internationale. */}
         <div className="avatar avatar-club" title={equipeDuWeekEnd ?? joueur.club}>
@@ -221,6 +229,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
         </div>
         <div
           className="badge-generale"
+          data-tuto="car-gen"
           title={`${t('pj.generale')}${joueur.potentiel ? ` - ${t('pj.potentiel', { note: joueur.potentiel })}` : ''}`}
         >
           <b>{generale}</b>
@@ -248,12 +257,26 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
         </div>
       )}
 
+      {/* ⚠️ « RÔLES DANS L'ÉQUIPE » (Correctif 17) : compact, et SEULEMENT ce qu'il tient — un joueur sans responsabilité n'a pas de bloc vide. */}
+      {rolesAffichables(joueur).length > 0 && (
+        <div className="roles-equipe" role="group" aria-label={t('rv.roles.titre')} data-tuto="roles-equipe">
+          <span className="roles-equipe-titre">{t('rv.roles.titre')}</span>
+          <span className="roles-equipe-liste">
+            {rolesAffichables(joueur).map((r) => (
+              <span key={r} className="pastille pastille-role" title={t(`rv.role.${r}.aide`)}>
+                <Icone nom={ICONE_DU_ROLE[r]} taille={13} /> {t(`rv.role.${r}`)}
+              </span>
+            ))}
+          </span>
+        </div>
+      )}
+
       <div className="ressources">
         <span className="pastille">{t('gen.saison')} <b>{joueur.saison}</b></span>
         <span className="pastille">{joueur.age} {t('gen.ans')}</span>
         <span className="pastille"><Icone nom="euro" taille={13} /> <b>{nombre(joueur.argent)} €</b></span>
       </div>
-      <div className="ressources" style={{ marginTop: '-0.4rem' }}>
+      <div className="ressources" style={{ marginTop: '-0.4rem' }} data-tuto="car-club">
         {/* ⚠️ Le club reste affiché À CÔTÉ de la sélection, jamais remplacé :
             on est sélectionné POUR une semaine, on appartient à un club toute
             l’année, et c’est lui qui paie le salaire affiché juste au-dessus. */}
@@ -276,7 +299,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
       </div>
 
       {joueur.blessure && (
-        <div className="bandeau-blessure" data-gravite={joueur.blessure.gravite}>
+        <div className="bandeau-blessure" data-gravite={joueur.blessure.gravite} data-tuto="car-blessure">
           <Icone nom="soin" taille={14} /> <b>{nomBlessure(joueur.blessure)}</b>
           <span>
             {joueur.blessure.gravite === 'carriere'
@@ -298,7 +321,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
 
       {/* Jauges sur deux colonnes : demande explicite — tout doit tenir dans
           l'écran, sans défilement du panneau. */}
-      <div className="pj-jauges">
+      <div className="pj-jauges" data-tuto="car-jauges">
         <Jauge label={t('pj.forme')} valeur={joueur.forme} variante="vert" />
         <Jauge label={t('pj.moral')} valeur={joueur.moral} variante="or" />
         <Jauge label={t('pj.reputation')} valeur={joueur.reputation} variante="cuir" />
@@ -309,13 +332,13 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
       </div>
 
       <div className="pj-titre eyebrow">{t('pj.attributs')}</div>
-      <div className="attrs-grille pj-attrs">
+      <div className="attrs-grille pj-attrs" data-tuto="car-attributs">
         {(Object.keys(joueur.attributs) as (keyof Joueur['attributs'])[]).map((k) => (
           <Jauge key={k} label={labelAttribut(k)} valeur={joueur.attributs[k]} />
         ))}
       </div>
 
-      <div className="ressources pj-stats">
+      <div className="ressources pj-stats" data-tuto="car-stats">
         <span className="pastille"><Icone nom="ballon" taille={13} /> <b>{joueur.matchsJoues}</b></span>
         <span className="pastille"><Icone nom="cible" taille={13} /> <b>{joueur.essais}</b></span>
         {joueur.noteSaison != null && (
@@ -373,7 +396,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
               chaque semaine : on choisit ce qu'on travaille, la séance se fait
               toute seule à chaque semaine jouée, et on peut changer quand on
               veut. */}
-          <div className="entrainement">
+          <div className="entrainement" data-tuto="car-entrainement">
             <div className="entr-tete">
               <Icone nom="halteres" taille={14} /> <b>{t('pj.travailles')}</b>
               <span>
@@ -383,7 +406,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
                     : t('pj.choisirSecteur')}
               </span>
             </div>
-            <div className="entr-boutons">
+            <div className="entr-boutons" data-tuto="car-entrainement-choix">
               {(Object.keys(joueur.attributs) as (keyof Joueur['attributs'])[]).map((k) => (
                 <button
                   key={k}
@@ -404,6 +427,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
           <button
             type="button"
             className="calendrier-semaine cliquable"
+            data-tuto="car-calendrier"
             onClick={() => setCalendrierOuvert(true)}
             title={t('pj.calendrierAide')}
           >
@@ -439,6 +463,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
             <button
               type="button"
               className="btn match-semaine"
+              data-tuto="car-match"
               onClick={() => setMatchOuvert(true)}
               disabled={bloque}
               title={bloque ? motifBlocage : t('pj.suivreDirect', { domicile: affiche!.match.domicile, exterieur: affiche!.match.exterieur })}
@@ -452,7 +477,7 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
               </span>
             </button>
           ) : (
-            <div className="pj-avancer">
+            <div className="pj-avancer" data-tuto="car-semaine">
               <button
                 className="btn vert"
                 onClick={semaineSuivante}

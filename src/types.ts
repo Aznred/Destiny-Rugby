@@ -119,6 +119,20 @@ export interface OffreContrat {
   primeMatch?: number;
 }
 
+/**
+ * Les responsabilités d'un joueur de la carrière, au fil des saisons. `hierarchie` : cadre du groupe, vice-capitaine, capitaine (le
+ * brassard garde `Joueur.capitaine`). `buteur` et `lanceur` : 0 aucun, 1 secondaire, 2 principal.
+ */
+export interface ResponsabilitesJoueur {
+  hierarchie?: 'aucune' | 'cadre' | 'vice' | 'capitaine';
+  buteur?: 0 | 1 | 2;
+  engagement?: boolean;
+  droppeur?: boolean;
+  lanceur?: 0 | 1 | 2;
+  /** La saison de la dernière évaluation. */
+  evalueeEn?: number;
+}
+
 export interface Joueur {
   nom: string;
   poste: PosteId;
@@ -175,6 +189,12 @@ export interface Joueur {
   mentorat?: boolean; // a pris un jeune sous son aile (30 ans et +)
   traits?: string[]; // traits de caractère choisis à la création
   capitaine?: boolean; // porte le brassard
+  /**
+   * Ce que le staff lui confie (Correctif 17) : hiérarchie, tee, engagement, drop, lancer en touche. Évalué à chaque intersaison par
+   * rapport au groupe (`lib/responsabilites.ts`) ; le match en tire les rôles que le joueur TIENT, avec le contrôle direct. Absent des
+   * vieilles sauvegardes : la migration l'initialise.
+   */
+  responsabilites?: ResponsabilitesJoueur;
   routineButeur?: string; // identifiant de la routine au tee (ex : 'wilkinson', 'farrell', 'crabe_cook'...)
   relations?: Relation[]; // amitiés et rivalités du vestiaire
   entrainementSemaine?: number; // dernière semaine où l'on s'est entraîné
@@ -930,6 +950,16 @@ export interface CompositionManager {
   remplacants: string[];
   capitaineId: string;
   buteurId: string;
+  /**
+   * Les autres rôles (Correctif 17), tous facultatifs : absent ou vide, c'est l'IA qui attribue (le meilleur pied, le talonneur…).
+   * ⚠️ Lus par le match 3D du manager (`creerMatch`, option `responsabilites`) ; le moteur de ligue ne les connaît pas.
+   */
+  viceCapitaineId?: string;
+  buteur2Id?: string;
+  engagementId?: string;
+  droppeurId?: string;
+  lanceurId?: string;
+  lanceur2Id?: string;
 }
 
 /** Le score réellement produit par le moteur et réinjecté au championnat. */

@@ -20,7 +20,7 @@ useGame.setState({
     reputation: 74, noteSaison: 8.1, argent: 240_000, popularite: 78, abonnes: 41_500,
     contrat: { club: j0.club, division: 'top14', saisons: 1, salaire: 420_000 },
   },
-  langue: 'en', langueManuelle: true, tutoVu: true, guideFerme: true, tutoMatchVu: true,
+  langue: 'en', langueManuelle: true, guideFerme: true, tutoMatchVu: true,
 });
 
 // Quelques semaines jouées : le journal se remplit, le classement bouge.
@@ -34,11 +34,11 @@ useGame.getState().susciterApproches(3, true);
 
 const etat = useGame.getState() as unknown as Record<string, unknown>;
 const garde = ['joueur','journal','approches','conversations','notifsSocial','ecran','coins','posts',
-  'comptesSuivis','relationsSociales','tutoVu','guideFerme','ecransVus','langue','langueManuelle',
+  'comptesSuivis','relationsSociales','guideFerme','ecransVus','langue','langueManuelle',
   'succesDebloques','dossiersRecrutement','iaActivee','theme','statsReelles','journeesReelles','tutoMatchVu'];
 const sauve: Record<string, unknown> = {};
 for (const k of garde) if (etat[k] !== undefined) sauve[k] = etat[k];
-sauve.ecran = 'carriere'; sauve.tutoVu = true; sauve.guideFerme = true; sauve.tutoMatchVu = true;
+sauve.ecran = 'carriere'; sauve.guideFerme = true; sauve.tutoMatchVu = true;
 writeFileSync('scripts/_seedTrailer.json', JSON.stringify({ state: sauve, version: 17 }));
 const j = useGame.getState().joueur!;
 console.log(`${j.nom} · ${j.club} · semaine ${j.semaine} · ${useGame.getState().journal.length} entrées de journal · ${useGame.getState().approches.length} approches`);

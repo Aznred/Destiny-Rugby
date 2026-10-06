@@ -22,6 +22,7 @@
 // en fond (appels de 8 s) donnent donc rigoureusement le même résultat.
 
 import { graine, scorePossible } from '../championnat.js';
+import { t as traduire } from '../i18n.js';
 import type { Coequipier } from '../effectif.js';
 import { cibleCourseCombinaison, combinaisonSituation, demarrerCombinaison, joueurCombinaison, lancerAppelsCombinaison, pointSurTerrain, preparerCombinaison } from './combinaisons.js';
 import type { PlanAttaqueManager, PosteId, TactiqueManager } from '../../types.js';
@@ -63,6 +64,9 @@ import {
   type LecturePlaquage,
 } from './duels.js';
 import { positionVol, GRAVITE_BALLON, viseeTir, viseeTirVariee, type ContexteTir } from './trajectoire.js';
+import {
+  deriveDuTir, distanceAuxPoteaux, porteeEngagement, puissanceUtile, resoudreEngagement, resoudreTirHumain, type ViseeEngagement, type ViseeHumaine,
+} from './tirHumain.js';
 import { creerVent, deriveDuVent, ventAuMoteur, ventMoyen, type Vent } from './vent.js';
 import {
   attaquantLibre, condense, defenseurPresent, espaceAutour, iaParPoste, situer,
@@ -80,6 +84,12 @@ import {
 export {
   activerDirect, commanderDirect, creerEtatDirect, demanderDirect, directActif, poserViseur,
 } from './direct.js';
+import {
+  COMBINAISONS_TOUCHE, contextePenalite, creerResponsabilites, decisionDuCapitaine, defenseAuSifflet, humainTientLe,
+  pionDuRole, qualiteDuLancer, synchroniserLesRoles,
+  type ChoixPenalite, type CombinaisonTouche, type DecisionCapitaine, type EtatResponsabilites, type LancerTouche,
+  type OptionsResponsabilites, type QualiteLancer, type RolesEquipe,
+} from './responsabilites.js';
 import { lectureLocale, ligneDePasseCoupee, lireLeSurnombre, niveauDeLecture, regarderDevant } from './ia/vision.js';
 import {
   AXE, LARGEUR, LONGUEUR, LIGNE_A, LIGNE_B, MILIEU, M22_A, M22_B, adverse, borner,
@@ -168,7 +178,9 @@ export const TEMPS_MELEE = { liaison: 3.6, impact: 1.2, introduction: 1.6, pouss
 const DUREE_MELEE_DETAILLEE = TEMPS_MELEE.liaison + TEMPS_MELEE.impact + TEMPS_MELEE.introduction
   + TEMPS_MELEE.poussee + TEMPS_MELEE.sortie;
 /** Le rituel du buteur : on fête l'essai, puis ramassage, pose, concentration, élan. */
-export const RITUEL_TIR = { celebration: 6, ramassage: 1.5, pose: 9.6, pret: 1.8, elan: 2.25 };
+export const RITUEL_TIR = { celebration: 6, ramassage: 1.5, pose: 9.6, pret: 1.8, elan: 2.25, poseHumain: 2.4, elanHumain: 2.25 };
+/** Secondes simulées accordées au joueur pour viser un tir : au-delà, l'IA tape à sa place. */
+export const DELAI_TIR_HUMAIN = 25;
 
 /**
  * En match de dix minutes, l'horloge avance huit fois plus vite que l'écran.
@@ -396,6 +408,11 @@ export interface OptionsMatch {
   vent?: Vent | null;
   /** Niveau de l'IA de jeu (2 : IA par poste) : voir `EtatMatch.ia`. */
   ia?: number;
+  /**
+   * Les responsabilités (Correctif 17) : capitaine, buteur, lanceur, engagement, drop. Absent : le
+   * moteur rejoue à l'identique. Voir `responsabilites.ts`.
+   */
+  responsabilites?: OptionsResponsabilites;
 }
 
 function planVide(total: number, rng: () => number): PlanDeScore {
@@ -498,6 +515,32 @@ export function creerMatch(
   monter(effectifA, 'A', clubA);
   monter(effectifB, 'B', clubB);
 
+  // ═══ LES RESPONSABILITÉS (Correctif 17) ═══════════════════════════════════
+  // Qui tient quoi est décidé UNE fois, ici ; ensuite le brassard et le tee suivent celui qui
+  // tient le rôle (`synchroniserLesRoles`). Le capitaine désigné reçoit le bonus de discipline
+  // que le moteur donnait déjà à celui de la composition.
+  let responsabilites: EtatResponsabilites | undefined;
+  if (options.responsabilites) {
+    const o = options.responsabilites;
+    const imposes = (cote: Cote): RolesEquipe => ({
+      ...((cote === 'A' ? options.capitaineAId : options.capitaineBId) ? { capitaine: (cote === 'A' ? options.capitaineAId : options.capitaineBId)! } : {}),
+      ...((cote === 'A' ? options.buteurAId : options.buteurBId) ? { buteur: (cote === 'A' ? options.buteurAId : options.buteurBId)! } : {}),
+      ...(cote === 'A' ? o.A : o.B),
+    });
+    responsabilites = creerResponsabilites(pions, { A: imposes('A'), B: imposes('B'), avatar: o.avatar });
+    for (const cote of ['A', 'B'] as Cote[]) {
+      const capitaine = pionDuRole({ pions, responsabilites }, cote, 'capitaine');
+      const buteur = pionDuRole({ pions, responsabilites }, cote, 'buteur');
+      for (const p of pions) {
+        if (p.cote !== cote) continue;
+        if (p.capitaine && p !== capitaine) p.discipline -= 4;
+        if (!p.capitaine && p === capitaine) p.discipline += 4;
+        p.capitaine = p === capitaine;
+        p.buteur = p === buteur;
+      }
+    }
+  }
+
   // Un capitaine ne se contente pas de porter le brassard : sa présence
   // stabilise aussi la discipline collective de son équipe.
   for (const cote of ['A', 'B'] as Cote[]) {
@@ -551,6 +594,7 @@ export function creerMatch(
     bulles: [],
     prochaineFriction: 12,
     discipline: disciplineVide(),
+    ...(responsabilites ? { responsabilites } : {}),
   };
 
   e.minuteur = dureeArret(e, 'coupEnvoi');
@@ -558,7 +602,7 @@ export function creerMatch(
     x: MILIEU + sens(possession) * 30,
     y: borner(AXE + (rng() < 0.5 ? 1 : -1) * 16, 8, LARGEUR - 8),
   };
-  e.placement = placementInitial(pions, possession, e.cibleRenvoi);
+  e.placement = placementInitial(pions, possession, e.cibleRenvoi, e.responsabilites ? pionDuRole(e, possession, 'engagement')?.id : undefined);
   for (const p of pions) {
     const c = e.placement[p.id];
     if (c) { p.pos = { x: c.x, y: c.y }; p.cible = { x: c.x, y: c.y }; stopper(p); }
@@ -630,7 +674,8 @@ function tick(e: EtatMatch): void {
     e.echappee.restant -= dt;
     if (e.echappee.restant <= 0 || e.porteur !== e.echappee.pion) e.echappee = null;
   }
-  const dtHorloge = dt * (e.dureeReelleArcade ? e.phase === 'miTemps' ? 0 : 4800 / e.dureeReelleArcade
+  // ⚠️ L'HORLOGE S'ARRÊTE QUAND LE JEU ATTEND LE JOUEUR (Correctif 17) : décider ne coûte pas une minute de match.
+  const dtHorloge = e.responsabilites?.attente ? 0 : dt * (e.dureeReelleArcade ? e.phase === 'miTemps' ? 0 : 4800 / e.dureeReelleArcade
     : e.carriereDixMinutes ? (e.cadenceDetaillee ? facteurArretDetaille(e) : horlogeCondensee(e)) : facteurHorloge(e.phase, e.tempsReel));
   e.t += dtHorloge;
   e.minute = Math.min(80, Math.floor(e.t / 60));
@@ -684,6 +729,9 @@ function tick(e: EtatMatch): void {
     }
   }
   if (e.minute >= 48 || Object.keys(e.remplacementsDemandes).length > 0) gererRemplacements(e);
+
+  // Qui tient le brassard et le tee MAINTENANT (un carton, un remplacement, une blessure les déplacent).
+  if (e.responsabilites) { synchroniserLesRoles(e); verifierLAttente(e); majOffreToucheRapide(e); }
 
   // ── L'ordre du joueur vit sa vie, la tension redescend ───────────────────
   // ⚠️ UNE INTENTION EXPIRE. Sans ça, un « je plaque » cliqué à la 12ᵉ minute
@@ -956,7 +1004,22 @@ function tick(e: EtatMatch): void {
       delete e.placement[auteur.id];
       if (Object.keys(e.placement).length === 0) e.placement = null;
     }
-    lancerVol(e, auteur, attente.arrivee, attente.intention, attente.duree, attente.hauteur, auteur.pos, true, attente.courbe);
+    // ═══ LE DROP DU JOUEUR PEUT ÊTRE CONTRÉ À LA FRAPPE (Correctif 17) ═══════
+    let { arrivee, duree, hauteur, courbe } = attente;
+    if (attente.intention === 'drop' && e.dropEnCours?.humain && e.dropEnCours.auteurId === auteur.id) {
+      const contreur = contreurDuDrop(e, auteur);
+      const etaitReussi = e.dropEnCours.reussi;
+      if (contreur) {
+        const sCote = sens(auteur.cote);
+        arrivee = { x: borner(auteur.pos.x + sCote * (1.5 + e.rng() * 2.5), 1, LONGUEUR - 1), y: borner(auteur.pos.y + (e.rng() - 0.5) * 5, 1, LARGEUR - 1) };
+        duree = 0.45; hauteur = 0.3; courbe = {};
+        e.dropEnCours = { auteurId: auteur.id, reussi: false, issue: 'contre', humain: true };
+        if (etaitReussi && e.responsabilites) e.responsabilites.stats.dropsReussis -= 1;
+        jouerGeste(e, contreur, 'charge_down', 1.4);
+        dire(e, 'pied', auteur.cote, traduire('rv.fil.dropContre', { nom: auteur.nom, contreur: contreur.nom }), 0, true);
+      }
+    }
+    lancerVol(e, auteur, arrivee, attente.intention, duree, hauteur, auteur.pos, true, courbe);
     return;
   }
 
@@ -1198,6 +1261,16 @@ function executerDemande(e: EtatMatch, p: Pion, dem: DemandeDirecte): boolean {
   switch (dem.action) {
     case 'passe': return passeDirecte(e, p, dem, false);
 
+    case 'drop': {
+      if (e.porteur !== p || e.phase !== 'jeuCourant' || e.vol || p.corps) return retourDirect(e, 'drop', false, 'pasDeBallon');
+      if (!v.possible.drop) return retourDirect(e, 'drop', false, (d.recharges.drop ?? 0) > 0 ? 'recharge' : 'horsPortee');
+      e.lancement = null;
+      e.combinaisonEnCours = undefined;
+      dropDirect(e, p, dem);
+      d.recharges.drop = R.rechargeDrop;
+      return retourDirect(e, 'drop', true);
+    }
+
     case 'coupDePied': {
       if (e.porteur !== p || e.phase !== 'jeuCourant' || e.vol || p.corps) return retourDirect(e, 'coupDePied', false, 'pasDeBallon');
       const plan = classerCoupDePied(e, p, dem);
@@ -1410,6 +1483,59 @@ function engagerAuRuck(e: EtatMatch, p: Pion, cote: 'attaque' | 'defense'): void
  * défenseur à moins de deux mètres, il peut être contré. Un coup de pied qui
  * voulait la touche et n'a pas la longueur retombe dans le jeu.
  */
+/**
+ * LE DROP MANUEL (Correctif 17). Le joueur décide de tenter trois points : le ballon est lâché, rebondit, et il frappe.
+ *
+ * ⚠️ MÊME GÉOMÉTRIE QUE LE TIR AU BUT (`resoudreTirHumain`), avec la pression du rideau en moins de chance — et le CONTRE se
+ * juge à la frappe (`contreurDuDrop`), d'après qui est vraiment sur lui à cet instant. La phase d'armé est celle du drop de
+ * l'IA : le botteur se place, lâche, frappe (le clip `kick_restart`), jamais celui de la pénalité.
+ */
+function dropDirect(e: EtatMatch, p: Pion, dem: DemandeDirecte): void {
+  p.stats.coupsDePied += 1;
+  p.stats.butsTentes += 1;
+  e.dernierPasseur = null;
+  const contexte = contexteDuTir(e, p);
+  const { devant, droite } = distanceAuxPoteaux(p.pos, p.cote);
+  const ecartAxe = Math.abs(p.pos.y - AXE);
+  // La visée : sans geste, il tape dans l'axe, avec juste ce qu'il faut de force ; en maintenant une direction, il choisit l'angle.
+  let ecart = 0, puissance = borner(puissanceUtile(p.pos, p.cote, contexte) + 0.1, 0.3, 1), geste = 0.6;
+  if (dem.visee) {
+    const n = Math.hypot(dem.visee.x, dem.visee.y) || 1;
+    const ux = dem.visee.x / n, uy = dem.visee.y / n;
+    const vers = ux * sens(p.cote);
+    if (vers > 0.2) ecart = borner(p.pos.y + uy * (devant / vers) - AXE, -6, 6);
+    puissance = borner(dem.visee.puissance, 0.3, 1);
+    geste = borner(0.5 + (dem.visee.vif ?? 0.4) * 0.5, 0.3, 0.95);
+  }
+  const libre = pressionDevant(e, p);
+  const chance = borner(probaTir(droite + 11, ecartAxe, p.pied) - 0.10 - Math.max(0, 7 - libre) * 0.02 - (100 - p.endurance) * 0.001, 0.05, 0.9);
+  const res = resoudreTirHumain(p.pos, p.cote, { ecart, puissance, effet: 0, geste }, contexte, chance, e.rng(), e.rng(), e.rng(), e.rng());
+  e.dropEnCours = { auteurId: p.id, reussi: res.reussi, issue: res.issue, humain: true };
+  const r = e.responsabilites;
+  if (r) { r.stats.drops += 1; if (res.reussi) r.stats.dropsReussis += 1; }
+  dire(e, 'pied', p.cote, traduire('rv.fil.dropTente', { nom: p.nom }), 0, true);
+  lancerVol(e, p, res.vers, 'drop', res.duree, .5, undefined, false, { derive: res.derive, ...(res.ricochet ? { ricochet: res.ricochet } : {}) });
+}
+
+/**
+ * Le défenseur qui contre un drop : celui qui est sur le botteur à la FRAPPE. Une charge se lit à la distance et à la vitesse
+ * de rapprochement : à plus d'un mètre, un défenseur qui court à six mètres par seconde le contre quand même.
+ */
+function contreurDuDrop(e: EtatMatch, botteur: Pion): Pion | null {
+  const s = sens(botteur.cote);
+  let meilleur: Pion | null = null, plusProche = Infinity;
+  for (const q of surLeTerrain(e, adverse(botteur.cote))) {
+    if (q.sanction > 0 || q.corps || q.battu > 0) continue;
+    if ((q.pos.x - botteur.pos.x) * s < -0.3) continue;
+    const d = distance(q.pos, botteur.pos);
+    // Vitesse de rapprochement, en m/s : la part de sa vitesse qui va vers le botteur.
+    const vx = botteur.pos.x - q.pos.x, vy = botteur.pos.y - q.pos.y, n = Math.max(0.1, Math.hypot(vx, vy));
+    const rapprochement = Math.max(0, (q.vitesse.x * vx + q.vitesse.y * vy) / n);
+    if (d <= 1.0 + 0.25 * rapprochement && d < plusProche) { plusProche = d; meilleur = q; }
+  }
+  return meilleur;
+}
+
 function taperAuPiedVise(e: EtatMatch, p: Pion, plan: PlanDePied): void {
   p.stats.coupsDePied += 1;
   e.dernierPasseur = null;
@@ -1478,8 +1604,10 @@ function phaseBagarre(e: EtatMatch): void {
     reprendreJeu(e, suite.lieu);
     return;
   }
+  // Un capitaine lit la défense AVANT qu'elle ne recule : on la mesure au coup de sifflet (Correctif 17).
+  const defense = e.responsabilites ? defenseAuSifflet(e, suite.pour, suite.lieu) : undefined;
   arret(e, 'penalite', suite.pour, suite.lieu);
-  e.penalite = { pour: suite.pour, lieu: { x: suite.lieu.x, y: suite.lieu.y }, motif: suite.motif };
+  e.penalite = { pour: suite.pour, lieu: { x: suite.lieu.x, y: suite.lieu.y }, motif: suite.motif, ...(defense ? { defense } : {}) };
 }
 
 // ---------------------------------------------------------------------------
@@ -1584,7 +1712,8 @@ function retenirLePlacement(e: EtatMatch): boolean {
     if (!p.surLeTerrain || p.sanction > 0) continue;
     const lie = p.role === 'melee' || p.role === 'alignement';
     const essentiel = e.phase === 'melee' ? lie || p.numero === 9
-      : e.phase === 'touche' ? lie || p.numero === 9 || (p.numero === 2 && p.cote === e.possession)
+      : e.phase === 'touche' ? lie || p.numero === 9
+          || (p.cote === e.possession && (e.responsabilites && e.conquete?.lanceurId ? p.id === e.conquete.lanceurId : p.numero === 2))
         : true;
     if (!essentiel) continue;
     // Mêlée et touche déplacent la cible de leurs joueurs liés (écart avant la
@@ -1814,7 +1943,7 @@ function preparerCoupEnvoi(e: EtatMatch, pour: Cote): void {
   // Un joueur à presque vingt mètres de sa marque au changement de période
   // manquerait encore le coup de pied cinq secondes plus tard. Les grands
   // replacements se font durant la coupure, les proches finissent en courant.
-  installerPlacement(e, placementCoupEnvoi(e.pions, MILIEU, pour, e.cibleRenvoi!), 18);
+  installerPlacement(e, placementCoupEnvoi(e.pions, MILIEU, pour, e.cibleRenvoi!, e.responsabilites ? pionDuRole(e, pour, 'engagement')?.id : undefined), 18);
 }
 
 // Fixe le point de chute du coup d'envoi et renvoie tout le monde au centre.
@@ -1845,7 +1974,8 @@ function phaseCoupEnvoi(e: EtatMatch): void {
   }
   const camp = e.possession;
   const liste = surLeTerrain(e, camp);
-  const botteur = liste.find((p) => p.buteur) ?? maillot(liste, 10) ?? liste[0];
+  const botteur = (e.responsabilites ? pionDuRole(e, camp, 'engagement') : undefined)
+    ?? liste.find((p) => p.buteur) ?? maillot(liste, 10) ?? liste[0];
   if (!botteur) return clorePeriode(e);
   // Le botteur est positionné au centre pour frapper. En cadence détaillée il
   // y est venu de lui-même : `lancerVol` attend son arrivée.
@@ -1853,7 +1983,31 @@ function phaseCoupEnvoi(e: EtatMatch): void {
     botteur.pos = { x: MILIEU, y: AXE };
     botteur.vitesse = { x: 0, y: 0 };
   }
-  const arrivee = e.cibleRenvoi ?? { x: MILIEU + sens(camp) * 30, y: AXE };
+  let arrivee = e.cibleRenvoi ?? { x: MILIEU + sens(camp) * 30, y: AXE };
+  let dureeVol = 3.0, hauteurVol = 11 + botteur.pied * .025;
+  // ═══ L'ENGAGEMENT À LA MAIN (Correctif 17) ══════════════════════════════════
+  // Le joueur qui tient l'engagement choisit la distance, le côté et la hauteur ; le match l'attend.
+  if (e.responsabilites && e.cadenceDetaillee && botteur.moi && humainTientLe(e, 'engagement', camp)) {
+    const r = e.responsabilites;
+    if (!r.engagement) {
+      if (r.attente?.type !== 'engagement') {
+        r.attente = { type: 'engagement', depuis: e.sim, delai: DELAI_ENGAGEMENT_HUMAIN, valeur: 0, portee: porteeEngagement(botteur.puissance, botteur.pied, botteur.endurance) };
+      }
+      if (e.sim - r.attente.depuis < r.attente.delai) return;
+      r.stats.chronosDepasses += 1;
+    } else {
+      const pression = e.minute >= 65 && Math.abs(e.scoreA - e.scoreB) <= 7 ? 1 : 0;
+      const res = resoudreEngagement(camp, r.engagement, botteur, pression, e.rng(), e.rng(), e.rng(), e.rng());
+      arrivee = res.arrivee;
+      dureeVol = res.duree;
+      hauteurVol = 0.4;
+      r.stats.engagements += 1;
+      if (res.enJeu) r.stats.engagementsReussis += 1;
+      e.cibleRenvoi = { ...arrivee };
+    }
+    r.attente = null;
+    r.engagement = null;
+  }
   botteur.stats.coupsDePied += 1;
   // Après le coup de pied, les receveurs gardent leur dispositif sous le
   // point de chute. Seuls les chasseurs sont libérés : auparavant les quinze
@@ -1865,8 +2019,24 @@ function phaseCoupEnvoi(e: EtatMatch): void {
     const cible = placementAvantTir?.[p.id];
     if (cible) e.placement[p.id] = { ...cible };
   }
-  lancerVol(e, botteur, arrivee, 'renvoi', 3.0, 11 + botteur.pied * .025, { x: MILIEU, y: AXE });
+  lancerVol(e, botteur, arrivee, 'renvoi', dureeVol, hauteurVol, { x: MILIEU, y: AXE });
   dire(e, 'pied', camp, C.texteMatch('coupEnvoiJoueur', { nom: botteur.nom }), 0, botteur.moi);
+}
+
+/** Secondes simulées accordées au joueur pour choisir son coup d'envoi. */
+export const DELAI_ENGAGEMENT_HUMAIN = 20;
+
+/** Le joueur, qui tient l'engagement, a choisi : la distance, le côté, la hauteur. */
+export function engagerHumain(e: EtatMatch, visee: ViseeEngagement): boolean {
+  const r = e.responsabilites;
+  if (!r || e.fini || e.phase !== 'coupEnvoi' || r.attente?.type !== 'engagement' || r.engagement) return false;
+  r.engagement = {
+    distance: Number.isFinite(visee.distance) ? borner(visee.distance, 10.5, 52) : 30,
+    ecart: Number.isFinite(visee.ecart) ? borner(visee.ecart, -34, 34) : 0,
+    hauteur: Number.isFinite(visee.hauteur) ? borner(visee.hauteur, 0, 1) : 0.6,
+    geste: Number.isFinite(visee.geste) ? borner(visee.geste, 0, 1) : 0.5,
+  };
+  return true;
 }
 
 function phaseRenvoi22(e: EtatMatch): void {
@@ -5407,13 +5577,16 @@ function arret(e: EtatMatch, quoi: Phase, pour: Cote, lieu: Vec, enAvant = false
   e.minuteur = dureeArret(e, quoi);
   e.ouvert = choisirCoteOuvert(e);
 
-  if (quoi === 'touche' && toucheRapidePossible && iaParPoste(e) && preparerToucheRapide(e, pour)) {
+  // Correctif 17 : le lanceur est celui qui tient le rôle (le talonneur par défaut), et c'est peut-être le joueur.
+  const lanceurRole = quoi === 'touche' && e.responsabilites ? pionDuRole(e, pour, 'lanceur') : undefined;
+  const humainLance = !!lanceurRole && lanceurRole.moi && !!e.cadenceDetaillee && humainTientLe(e, 'lanceur', pour);
+  if (quoi === 'touche' && toucheRapidePossible && iaParPoste(e) && !humainLance && preparerToucheRapide(e, pour)) {
     // Pas d'alignement : celui qui est au ballon le remet en jeu tout de suite.
   } else if (quoi === 'touche') {
     e.ballon.y = e.ballon.y < AXE ? 0.6 : LARGEUR - 0.6;
     e.ballon.x = borner(e.ballon.x, LIGNE_A + 5, LIGNE_B - 5);
     const nb = e.rng() < 0.32 ? 4 : e.rng() < 0.6 ? 5 : 7;
-    installerPlacement(e, placementTouche(e.pions, e.ballon, pour, nb), 34);
+    installerPlacement(e, placementTouche(e.pions, e.ballon, pour, nb, undefined, lanceurRole?.id), 34);
     const alignes = surLeTerrain(e, pour)
       .filter((p) => p.role === 'alignement')
       .sort((a, b) => Math.abs(a.cible.y - e.ballon.y) - Math.abs(b.cible.y - e.ballon.y));
@@ -5435,7 +5608,7 @@ function arret(e: EtatMatch, quoi: Phase, pour: Cote, lieu: Vec, enAvant = false
       // HORS du terrain, pas soixante-dix centimètres à l'intérieur.
       const dehors = e.ballon.y < AXE ? -1 : 1;
       const bord = dehors < 0 ? 0 : LARGEUR;
-      const lanceur = surLeTerrain(e, pour).find((p) => p.numero === 2);
+      const lanceur = lanceurRole ?? surLeTerrain(e, pour).find((p) => p.numero === 2);
       if (lanceur) {
         e.conquete.lanceurId = lanceur.id;
         e.conquete.ballonAuSol = { x: e.ballon.x, y: bord + dehors * 0.9 };
@@ -5443,6 +5616,7 @@ function arret(e: EtatMatch, quoi: Phase, pour: Cote, lieu: Vec, enAvant = false
         if (e.placement) e.placement[lanceur.id] = { x: e.ballon.x, y: bord + dehors * 0.55 };
       }
     }
+    if (humainLance) offrirLaTouche(e, pour, !!toucheRapidePossible);
     e.compteurs.touches += 1;
   } else if (quoi === 'melee') {
     e.ballon.y = borner(e.ballon.y, 12, LARGEUR - 12);
@@ -5777,13 +5951,166 @@ function scoreMelee(e: EtatMatch, pack: Pion[], cote: Cote): number {
   return technique * 0.62 + poussee * 0.32 + (e.cohesion?.[cote] ?? 50) * 0.06;
 }
 
+/**
+ * UNE ATTENTE NE SURVIT PAS À CELUI QUI DEVAIT LA LEVER. Le joueur est remplacé, sanctionné, ou rend la main (il passe aux cartes) pendant
+ * que le match l'attend : sans cette garde, l'horloge resterait arrêtée pour toujours. L'IA reprend, comme au chrono dépassé.
+ */
+function verifierLAttente(e: EtatMatch): void {
+  const r = e.responsabilites;
+  const a = r?.attente;
+  if (!r || !a) return;
+  const role = a.type === 'penalite' ? 'capitaine' : a.type === 'tir' ? 'buteur' : a.type === 'engagement' ? 'engagement'
+    : a.type === 'touche' ? 'lanceur' : null;
+  if (role && humainTientLe(e, role)) return;
+  r.attente = null; r.engagement = null; r.touche = null; r.offreToucheRapide = null;
+  if (a.type === 'tir' && e.tir) e.tir.humain = false;
+}
+
+/** Secondes simulées accordées au joueur pour annoncer et lancer sa touche, et pour demander une touche rapide. */
+export const DELAI_TOUCHE_HUMAINE = 22;
+const DELAI_OFFRE_RAPIDE = 6;
+
+/** Ce que l'IA aurait annoncé, dans le vocabulaire du lanceur. */
+function combinaisonAnnoncee(c: EtatMatch['conquete']): CombinaisonTouche {
+  if (!c) return 'milieu';
+  if (c.sortie === 'maul') return 'maul';
+  if (c.leurreId) return 'leurreMilieu';
+  if (c.combinaison === 'leurreDevant') return 'leurreAvant';
+  if (c.sortie === 'peel') return 'sortieRapide';
+  return c.combinaison === 'premierBloc' ? 'avant' : c.combinaison === 'fond' ? 'fond' : 'milieu';
+}
+
+/**
+ * LES SAUTEURS D'UN ALIGNEMENT, comme l'annonce de l'IA les choisit : le premier bloc, le milieu, le fond — celui dont
+ * c'est le métier — et l'avant qui peut contourner l'alignement.
+ */
+function sauteursDeLAlignement(e: EtatMatch, pour: Cote): { devant: Pion; milieu: Pion; fond: Pion; peeler?: Pion } | null {
+  const bord = e.ballon.y < AXE ? 0 : LARGEUR;
+  const alignes = surLeTerrain(e, pour).filter((p) => p.role === 'alignement')
+    .sort((a, b) => Math.abs(a.cible.y - bord) - Math.abs(b.cible.y - bord));
+  const n = alignes.length;
+  if (n < 3) return null;
+  const sauteur = (de: number, a: number): Pion => alignes.slice(Math.floor(n * de), Math.max(Math.floor(n * de) + 1, Math.ceil(n * a)))
+    .sort((x, y) => (profilDe(y).saute * 12 + y.detente) - (profilDe(x).saute * 12 + x.detente))[0] ?? alignes[0];
+  const devant = sauteur(0, 0.4), milieu = sauteur(0.3, 0.72), fond = sauteur(0.6, 1);
+  const peeler = n >= 5 ? alignes.filter((q) => q !== fond).sort((x, y) => y.puissance - x.puissance)[2] : undefined;
+  return { devant, milieu, fond, peeler };
+}
+
+/** Ce qu'annonce le lanceur : le saut, le sauteur, le leurre, la sortie. `null` si l'alignement ne le permet pas. */
+function annonceDuLanceur(e: EtatMatch, pour: Cote, choix: CombinaisonTouche): Partial<ConqueteAnimee> | null {
+  const s = sauteursDeLAlignement(e, pour);
+  if (!s) return null;
+  switch (choix) {
+    case 'avant': return { combinaison: 'premierBloc', cibleId: s.devant.id };
+    case 'milieu': return { combinaison: 'milieu', cibleId: s.milieu.id };
+    case 'fond': return { combinaison: 'fond', cibleId: s.fond.id, sortie: 'deviation' };
+    case 'maul': return { combinaison: 'premierBloc', cibleId: s.devant.id, sortie: 'maul' };
+    case 'leurreAvant': return { combinaison: 'leurreDevant', cibleId: s.fond.id, sortie: 'deviation' };
+    case 'leurreMilieu': return s.fond !== s.milieu ? { combinaison: 'milieu', cibleId: s.milieu.id, leurreId: s.fond.id } : null;
+    case 'sortieRapide': return s.peeler ? { combinaison: 'fond', cibleId: s.fond.id, sortie: 'peel', peelId: s.peeler.id } : null;
+  }
+}
+
+/** Les combinaisons que cet alignement permet. */
+function combinaisonsJouables(e: EtatMatch, pour: Cote): CombinaisonTouche[] {
+  return COMBINAISONS_TOUCHE.filter((c) => annonceDuLanceur(e, pour, c));
+}
+
+/** La touche qu'on offre au joueur : l'attente du lancer, et la touche rapide s'il y en a une de possible. */
+function offrirLaTouche(e: EtatMatch, pour: Cote, rapidePossible: boolean): void {
+  const r = e.responsabilites!;
+  r.attente = {
+    type: 'touche', depuis: e.sim, delai: DELAI_TOUCHE_HUMAINE,
+    combinaisons: combinaisonsJouables(e, pour), annoncee: combinaisonAnnoncee(e.conquete),
+  };
+  r.touche = {};
+  r.offreToucheRapide = rapidePossible ? { jusqua: e.sim + DELAI_OFFRE_RAPIDE, possible: false } : null;
+}
+
+/** La touche rapide est-elle encore permise ? Le bouton du joueur s'allume ou se grise d'après ce constat. */
+function majOffreToucheRapide(e: EtatMatch): void {
+  const r = e.responsabilites;
+  const o = r?.offreToucheRapide;
+  if (!r || !o) return;
+  if (e.phase !== 'touche' || e.conquete?.rapide || e.sim > o.jusqua || r.attente?.type !== 'touche') { r.offreToucheRapide = null; return; }
+  const plan = evaluerToucheRapide(e, e.possession);
+  o.possible = !!plan;
+  o.receveurId = plan?.receveur.id;
+}
+
+/**
+ * Le lanceur annonce sa combinaison. ⚠️ Elle change VRAIMENT le jeu : le sauteur et les lifteurs se placent pour elle
+ * (l'animation de l'alignement lit `conquete` à chaque pas), et la sortie qui suit est celle qu'il a annoncée.
+ */
+export function choisirCombinaisonTouche(e: EtatMatch, choix: CombinaisonTouche): boolean {
+  const r = e.responsabilites;
+  if (!r || e.fini || e.phase !== 'touche' || r.attente?.type !== 'touche' || !e.conquete || e.conquete.rapide) return false;
+  const annonce = annonceDuLanceur(e, e.possession, choix);
+  if (!annonce) return false;
+  Object.assign(e.conquete, {
+    leurreId: undefined, peelId: undefined, sortie: undefined, horsAlignement: undefined, reception: undefined, ...annonce,
+  });
+  // Une combinaison du club prévue d'avance ne se joue plus : le lanceur vient d'annoncer la sienne.
+  e.combinaisonPreparee = undefined;
+  e.combinaisonEnCours = undefined;
+  (r.touche ??= {}).choix = choix;
+  return true;
+}
+
+/** Le joueur lance : la force dosée et la régularité de son geste décident de la précision du lancer. */
+export function lancerLaTouche(e: EtatMatch, lancer: LancerTouche): boolean {
+  const r = e.responsabilites;
+  if (!r || e.fini || e.phase !== 'touche' || r.attente?.type !== 'touche' || r.touche?.lancer) return false;
+  const t = r.touche ??= {};
+  t.choix ??= r.attente.annoncee ?? 'milieu';
+  t.lancer = {
+    puissance: Number.isFinite(lancer.puissance) ? borner(lancer.puissance, 0, 1) : 0.5,
+    geste: Number.isFinite(lancer.geste) ? borner(lancer.geste, 0, 1) : 0.5,
+  };
+  return true;
+}
+
+/**
+ * Le joueur demande la touche rapide. ⚠️ La légalité est vérifiée ICI, sur l'état du jeu à cet instant : l'adversaire est
+ * peut-être revenu depuis que le bouton s'est allumé. Renvoie `false` (et rien ne change) si ce n'est plus permis.
+ */
+export function demanderToucheRapide(e: EtatMatch): boolean {
+  const r = e.responsabilites;
+  if (!r || e.fini || e.phase !== 'touche' || e.conquete?.rapide || !r.offreToucheRapide) return false;
+  const pour = e.possession;
+  const plan = evaluerToucheRapide(e, pour);
+  if (!plan) { r.offreToucheRapide.possible = false; return false; }
+  // L'alignement qui se formait est défait : ceux qui y couraient redeviennent des joueurs du jeu.
+  for (const p of e.pions) if (p.role === 'alignement') p.role = 'ligne';
+  e.compteurs.touches -= 1;
+  r.stats.toucheRapides += 1;
+  r.attente = null; r.touche = null; r.offreToucheRapide = null;
+  e.combinaisonPreparee = undefined;
+  installerToucheRapide(e, pour, plan);
+  return true;
+}
+
 function phaseTouche(e: EtatMatch): void {
   if (e.conquete?.rapide) return phaseToucheRapide(e);
   if (e.minuteur > 0) return;
   const cote = e.possession;
   const liste = surLeTerrain(e, cote);
   const avants = liste.filter((p) => p.avant);
-  const lanceur = liste.find((p) => p.numero === 2) ?? avants[0];
+  const lanceur = (e.responsabilites ? pionDuRole(e, cote, 'lanceur') : undefined) ?? liste.find((p) => p.numero === 2) ?? avants[0];
+  // ═══ LE JOUEUR LANCE LA TOUCHE (Correctif 17) ═════════════════════════════════
+  // La combinaison est annoncée (et animée) pendant la formation ; le lancer, lui, se joue ici. Le match attend,
+  // l'horloge aussi ; un chrono dépassé donne un lancer moyen.
+  let lancerHumain: QualiteLancer | undefined;
+  const rv = e.responsabilites;
+  if (rv?.attente?.type === 'touche') {
+    if (!rv.attente.pret) { rv.attente.pret = true; rv.attente.depuis = e.sim; }
+    if (!rv.touche?.lancer && e.sim - rv.attente.depuis < rv.attente.delai) return;
+    if (rv.touche?.lancer) lancerHumain = qualiteDuLancer(rv.touche.choix ?? rv.attente.annoncee ?? 'milieu', rv.touche.lancer);
+    else rv.stats.chronosDepasses += 1;
+    rv.stats.touches += 1;
+    rv.attente = null; rv.touche = null; rv.offreToucheRapide = null;
+  }
   // La combinaison annoncée n'est pas décorative : le lanceur cherche bien le
   // joueur mis en évidence pendant l'alignement. En l'absence de cible valide,
   // on revient au meilleur sauteur comme auparavant.
@@ -5817,9 +6144,9 @@ function phaseTouche(e: EtatMatch): void {
   const lifteurs = horsAlignement ? [] : avants.filter((p) => p !== sauteur && p !== lanceur)
     .sort((a, b) => distance2(a.pos, sauteur.pos) - distance2(b.pos, sauteur.pos)).slice(0, 2);
   const fraicheur = (p: Pion) => 0.74 + p.endurance / 385;
-  const scoreLance = lanceur
+  const scoreLance = (lanceur
     ? (lanceur.passe * 0.55 + lanceur.vision * 0.30 + lanceur.discipline * 0.15) * fraicheur(lanceur)
-    : 45;
+    : 45) + (lancerHumain?.delta ?? 0);
   const scoreLevage = moyenne(lifteurs, (p) => (p.puissance * 0.58 + p.detente * 0.24 + p.vision * 0.18) * fraicheur(p));
   const qte = e.bonusConqueteArcade?.type === 'touche' ? e.bonusConqueteArcade.scores : undefined;
   const bonusAttaqueArcade = (qte?.[cote] ?? 0) * 7;
@@ -5840,9 +6167,9 @@ function phaseTouche(e: EtatMatch): void {
     : 45;
   const qualiteLancer = scoreLance + (e.cohesion?.[cote] ?? 50) * 0.08;
   const tirageLancer = e.rng();
-  const pasDroit = borner(0.048 - (qualiteLancer - 55) / 950, 0.010, 0.075);
+  const pasDroit = borner(0.048 - (qualiteLancer - 55) / 950, 0.010, 0.075) * (lancerHumain?.pasDroit ?? 1);
   const mauvaiseLongueur = borner(0.065 - (qualiteLancer - 55) / 800, 0.018, 0.105)
-    * (zone === 'premierBloc' ? 0.55 : zone === 'fond' ? 1.6 : 1);
+    * (zone === 'premierBloc' ? 0.55 : zone === 'fond' ? 1.6 : 1) * (lancerHumain?.longueur ?? 1);
 
   if (tirageLancer < pasDroit) {
     dire(e, 'touche', adverse(cote), `${lanceur?.nom ?? 'Le lanceur'} n’est pas droit : mêlée pour ${nomClub(e, adverse(cote))}.`);
@@ -5891,6 +6218,7 @@ function phaseTouche(e: EtatMatch): void {
   // statistique officielle (« lineouts won »). Deuxièmes lignes en tête, comme
   // dans la réalité — `detente` les y met.
   sauteur.stats.touchesGagnees += 1;
+  if (lancerHumain && rv) rv.stats.touchesGagnees += 1;
   e.placement = null;
 
   // Ballon porté près de la ligne : l'arme n°1 des avants.
@@ -5990,6 +6318,56 @@ function annoncerLaTouche(e: EtatMatch, pour: Cote, alignes: Pion[]): Partial<Co
   return {};
 }
 
+/** Ce qu'une touche jouée vite demande, constaté SANS tirage : qui lance, qui reçoit, d'où — ou rien si ce n'est pas permis. */
+interface PlanToucheRapide {
+  point: Vec; lanceur: Pion; receveur: Pion; S: ReturnType<typeof situer>; revenus: number; champ: number;
+}
+function evaluerToucheRapide(e: EtatMatch, pour: Cote): PlanToucheRapide | null {
+  const s = sens(pour);
+  const bord = e.ballon.y < AXE ? 0 : LARGEUR;
+  const versTerrain = bord === 0 ? 1 : -1;
+  // ⚠️ LES DEUX PIEDS HORS DU TERRAIN : la remise rapide se fait de derrière la
+  // ligne de touche, au point de sortie (jamais devant lui).
+  const point = { x: borner(e.ballon.x, LIGNE_A + 5, LIGNE_B - 5), y: bord - versTerrain * 0.45 };
+  const miens = surLeTerrain(e, pour).filter((p) => p.sanction <= 0 && !p.corps);
+  const lanceur = [...miens].sort((a, b) => distance2(a.pos, point) - distance2(b.pos, point))[0];
+  if (!lanceur) return null;
+  const trajet = distance(lanceur.pos, point);
+  if (trajet > 15) return null;
+  let adversaire = 99;
+  for (const d of surLeTerrain(e, adverse(pour))) {
+    if (d.sanction > 0 || d.corps) continue;
+    adversaire = Math.min(adversaire, distance(d.pos, point));
+  }
+  // L'adversaire est déjà là, ou y sera avant le lanceur : alignement.
+  if (adversaire < 9 || adversaire < trajet + 3) return null;
+  // ⚠️ LA REMISE RAPIDE NE VA JAMAIS VERS L'AVANT, ET LE BALLON FAIT CINQ MÈTRES :
+  // le partenaire est à hauteur du point de remise ou derrière lui, à plus de
+  // cinq mètres de la ligne de touche.
+  const receveur = miens
+    .filter((q) => q !== lanceur && Math.abs(q.pos.y - bord) >= 6.5 && (q.pos.x - point.x) * s <= -0.3 && distance2(q.pos, point) < 24 * 24)
+    .sort((a, b) => distance2(a.pos, point) - distance2(b.pos, point))[0];
+  if (!receveur) return null;
+  const S = situer(e, pour, point);
+  // On la joue vite quand la défense n'est pas revenue et que le partenaire a du champ ;
+  // on attend l'alignement quand elle couvre, ou qu'un maul près de la ligne vaut mieux.
+  const revenus = surLeTerrain(e, adverse(pour)).filter((d) => d.sanction <= 0 && !d.corps && distance2(d.pos, point) < 20 * 20).length;
+  const champ = espaceAutour(e, adverse(pour), receveur.pos);
+  if (champ < 5) return null;
+  return { point, lanceur, receveur, S, revenus, champ };
+}
+
+function installerToucheRapide(e: EtatMatch, pour: Cote, plan: PlanToucheRapide): void {
+  const { point, lanceur, receveur } = plan;
+  e.ballon = { ...point };
+  e.placement = { [lanceur.id]: { ...point } };
+  e.conquete = { type: 'touche', progression: 0, rapide: { lanceurId: lanceur.id, receveurId: receveur.id } };
+  e.minuteur = 7;
+  e.dureeArret = 7;
+  e.compteurs.touches += 1;
+  dire(e, 'touche', pour, `${lanceur.nom} veut jouer la touche rapidement : ${nomClub(e, adverse(pour))} n’est pas replacé.`, 0, lanceur.moi);
+}
+
 /**
  * LA TOUCHE JOUÉE RAPIDEMENT (IA par poste).
  *
@@ -6002,50 +6380,16 @@ function annoncerLaTouche(e: EtatMatch, pour: Cote, alignes: Pion[]): Partial<Co
  * @returns vrai si la touche se joue vite : il n'y aura pas d'alignement.
  */
 function preparerToucheRapide(e: EtatMatch, pour: Cote): boolean {
-  const s = sens(pour);
-  const bord = e.ballon.y < AXE ? 0 : LARGEUR;
-  const versTerrain = bord === 0 ? 1 : -1;
-  // ⚠️ LES DEUX PIEDS HORS DU TERRAIN : la remise rapide se fait de derrière la
-  // ligne de touche, au point de sortie (jamais devant lui).
-  const point = { x: borner(e.ballon.x, LIGNE_A + 5, LIGNE_B - 5), y: bord - versTerrain * 0.45 };
-  const miens = surLeTerrain(e, pour).filter((p) => p.sanction <= 0 && !p.corps);
-  const lanceur = [...miens].sort((a, b) => distance2(a.pos, point) - distance2(b.pos, point))[0];
-  if (!lanceur) return false;
-  const trajet = distance(lanceur.pos, point);
-  if (trajet > 15) return false;
-  let adversaire = 99;
-  for (const d of surLeTerrain(e, adverse(pour))) {
-    if (d.sanction > 0 || d.corps) continue;
-    adversaire = Math.min(adversaire, distance(d.pos, point));
-  }
-  // L'adversaire est déjà là, ou y sera avant le lanceur : alignement.
-  if (adversaire < 9 || adversaire < trajet + 3) return false;
-  // ⚠️ LA REMISE RAPIDE NE VA JAMAIS VERS L'AVANT, ET LE BALLON FAIT CINQ MÈTRES :
-  // le partenaire est à hauteur du point de remise ou derrière lui, à plus de
-  // cinq mètres de la ligne de touche.
-  const receveur = miens
-    .filter((q) => q !== lanceur && Math.abs(q.pos.y - bord) >= 6.5 && (q.pos.x - point.x) * s <= -0.3 && distance2(q.pos, point) < 24 * 24)
-    .sort((a, b) => distance2(a.pos, point) - distance2(b.pos, point))[0];
-  if (!receveur) return false;
-  const S = situer(e, pour, point);
-  // On la joue vite quand la défense n'est pas revenue et que le partenaire a du champ ;
-  // on attend l'alignement quand elle couvre, ou qu'un maul près de la ligne vaut mieux.
-  const revenus = surLeTerrain(e, adverse(pour)).filter((d) => d.sanction <= 0 && !d.corps && distance2(d.pos, point) < 20 * 20).length;
-  const champ = espaceAutour(e, adverse(pour), receveur.pos);
-  if (champ < 5) return false;
+  const plan = evaluerToucheRapide(e, pour);
+  if (!plan) return false;
+  const { S, revenus, champ } = plan;
   const gout = goutDe(e, pour);
   const envie = (S.zone === 'ses22' ? 0.3 : 0.6) * gout.mains
     * (S.posture === 'gestion' ? 0.3 : S.posture === 'urgence' ? 1.5 : 1)
     * (revenus <= 2 ? 1.4 : revenus >= 5 ? 0.4 : 1) * (champ >= 10 ? 1.3 : 1)
     * (S.zone === 'zoneDeMarque' || S.zone === 'ligne' ? (gout.avants > gout.mains ? 0.2 : 0.5) : 1);
   if (e.rng() >= envie) return false;
-  e.ballon = { ...point };
-  e.placement = { [lanceur.id]: { ...point } };
-  e.conquete = { type: 'touche', progression: 0, rapide: { lanceurId: lanceur.id, receveurId: receveur.id } };
-  e.minuteur = 7;
-  e.dureeArret = 7;
-  e.compteurs.touches += 1;
-  dire(e, 'touche', pour, `${lanceur.nom} veut jouer la touche rapidement : ${nomClub(e, adverse(pour))} n’est pas replacé.`, 0, lanceur.moi);
+  installerToucheRapide(e, pour, plan);
   return true;
 }
 
@@ -6313,8 +6657,9 @@ function siffler(e: EtatMatch, pour: Cote, lieu: Vec, motif: string, fautif?: Pi
     // « pénalité » et le CadreTmoReplay ne s'affichait jamais sur les cartons.
     if (e.sifflet) e.sifflet.cle = rouge ? 'ml.sifflet.cartonRouge' : 'ml.sifflet.cartonJaune';
   }
+  const defense = e.responsabilites ? defenseAuSifflet(e, pour, lieu) : undefined;
   arret(e, 'penalite', pour, lieu);
-  e.penalite = { pour, lieu: { x: lieu.x, y: lieu.y }, motif };
+  e.penalite = { pour, lieu: { x: lieu.x, y: lieu.y }, motif, ...(defense ? { defense } : {}) };
   if (averti && e.sifflet && e.phase === 'penalite') {
     // L'avertissement se voit : l'arbitre appelle le capitaine, qui vient à lui.
     // La pénalité attend qu'il ait parlé (voir `conduireAvertissement`).
@@ -6484,8 +6829,82 @@ export function patienter(e: EtatMatch): void {
   e.apresPas?.(e);
 }
 
+/** Le délai que le joueur a pour trancher, en secondes simulées : le jeu est suspendu, l'horloge aussi. */
+export const DELAI_DECISION_HUMAINE = 10;
+
+/** Les mesures de la pénalité, du point de vue du buteur qui la tirera. */
+function mesuresPenalite(e: EtatMatch, cote: Cote, lieu: Vec): { distance: number; angle: number; chance: number } {
+  const distance = Math.max(0, metresAvantLaLigne(lieu, cote));
+  const angle = Math.abs(lieu.y - AXE);
+  const buteur = pionDuRole(e, cote, 'buteur');
+  return { distance, angle, chance: buteur ? probabilitePenalite(e, buteur, distance, angle) : 0 };
+}
+
+/**
+ * LE CAPITAINE CHOISIT. Renvoie `true` quand le choix est posé dans `e.choixPenalite`, `false` tant que
+ * le joueur n'a pas tranché (le jeu patiente, l'horloge est arrêtée — voir `tick`).
+ *
+ * ⚠️ UN CHRONO DÉPASSÉ N'EST PAS UN CHOIX : le capitaine IA, qui connaît la situation, tranche à sa
+ * place, et la note de match s'en souvient.
+ */
+function capitaineTranche(e: EtatMatch): boolean {
+  const r = e.responsabilites!, info = e.penalite!;
+  const cote = info.pour;
+  const mesures = mesuresPenalite(e, cote, info.lieu);
+  const suggestion = decisionDuCapitaine(e, contextePenalite(e, cote, info.lieu, mesures));
+  if (humainTientLe(e, 'capitaine', cote)) {
+    if (r.attente?.type !== 'penalite') {
+      r.attente = {
+        type: 'penalite', depuis: e.sim, delai: DELAI_DECISION_HUMAINE, suggestion,
+        distance: Math.round(mesures.distance), angle: Math.round(mesures.angle), chance: mesures.chance,
+      };
+    }
+    if (e.sim - r.attente.depuis < r.attente.delai) return false;
+    r.stats.chronosDepasses += 1;
+  }
+  poserLeChoix(e, cote, suggestion, false);
+  return true;
+}
+
+/** Pose le choix du capitaine, le dit, et le range. */
+function poserLeChoix(e: EtatMatch, cote: Cote, decision: DecisionCapitaine, humain: boolean): void {
+  const r = e.responsabilites!;
+  e.choixPenalite = decision.choix;
+  e.attenteDecision = 0;
+  r.attente = null;
+  r.derniere = { cote, decision, humain, t: e.sim };
+  const capitaine = pionDuRole(e, cote, 'capitaine');
+  if (capitaine) dire(e, 'jeu', cote, traduire(`rv.fil.capitaine.${decision.choix}`, { nom: capitaine.nom, raison: traduire(`rv.raison.${decision.raison}`) }), 0, capitaine.moi);
+}
+
+/**
+ * Le joueur, capitaine, choisit la suite de la pénalité : poteaux, touche, mêlée ou jeu rapide.
+ * ⚠️ Il ne fait que choisir : `phasePenalite` exécute avec les règles habituelles.
+ */
+export function trancherPenalite(e: EtatMatch, choix: ChoixPenalite): boolean {
+  const r = e.responsabilites;
+  if (!r || e.fini || e.phase !== 'penalite' || r.attente?.type !== 'penalite' || !e.penalite) return false;
+  const suggestion = r.attente.suggestion ?? { choix, raison: 'consignePoints' as const };
+  r.stats.decisions += 1;
+  if (choix === suggestion.choix) r.stats.decisionsConformes += 1;
+  poserLeChoix(e, e.penalite.pour, choix === suggestion.choix ? suggestion : { choix, raison: 'choixDuJoueur' }, true);
+  return true;
+}
+
+/** Qui prend une pénalité jouée vite : notre joueur s'il est à côté du ballon, sinon le demi de mêlée. */
+function preneurRapide(e: EtatMatch, cote: Cote, lieu: Vec): Pion | undefined {
+  const moi = e.direct?.actif ? e.pions.find((p) => p.moi && p.cote === cote) : undefined;
+  if (moi && moi.surLeTerrain && moi.sanction <= 0 && !moi.corps && distance(moi.pos, lieu) < 3.5) return moi;
+  const liste = surLeTerrain(e, cote).filter((p) => p.sanction <= 0 && !p.corps);
+  return liste.find((p) => p.numero === 9 && distance(p.pos, lieu) < 14)
+    ?? liste.filter((p) => distance(p.pos, lieu) < 10).sort((a, b) => distance2(a.pos, lieu) - distance2(b.pos, lieu))[0];
+}
+
 function phasePenalite(e: EtatMatch): void {
   if (e.minuteur > 0) return;
+  // ═══ LE CAPITAINE TRANCHE (Correctif 17) ═══════════════════════════════════
+  // Un capitaine IA choisit d'après la situation ; si c'est le joueur, le match attend sa décision.
+  if (e.responsabilites && e.penalite && !e.choixPenalite && !capitaineTranche(e)) return;
   const info = e.penalite;
   e.penalite = null;
   const choix = e.choixPenalite;
@@ -6532,6 +6951,7 @@ function phasePenalite(e: EtatMatch): void {
       buteur, distance: dist, angle: ecartAxe, valeur: 3,
       suite: 'coupEnvoi', lieu: { ...info.lieu },
       routine,
+      ...(tirALaMain(e, buteur) ? { humain: true } : {}),
     };
     e.phase = 'tirAuBut';
     e.minuteur = dureeArret(e, 'tirAuBut');
@@ -6587,7 +7007,8 @@ function phasePenalite(e: EtatMatch): void {
   e.placement = null;
   e.gardeRuck = 0.7;
   dire(e, 'jeu', cote, C.texteMatch('penaliteRapide', { club: nomClub(e, cote) }));
-  reprendreJeu(e, info.lieu);
+  // Correctif 17 : celui qui est au ballon prend la pénalité — notre joueur s'il est à côté du ballon.
+  reprendreJeu(e, info.lieu, e.responsabilites ? preneurRapide(e, cote, info.lieu) : undefined);
   if (e.porteur) jouerGeste(e, e.porteur, 'tap', 1.1);
 }
 
@@ -6617,6 +7038,63 @@ const arretDuBallon = (vol: Vol): Vec => vol.rebond?.vers ?? vol.ricochet?.vers 
 
 type TirEnCours = NonNullable<EtatMatch['tir']>;
 
+/**
+ * Ce que l'écran montre au joueur qui vise : la distance, ses chances d'un tir bien visé, le vent — et une force juste suffisante
+ * (un trait fin sur la jauge). ⚠️ JAMAIS LE RÉSULTAT : ni où tomberait le ballon, ni s'il passe.
+ */
+export interface AideDeTir {
+  distance: number;
+  angle: number;
+  /** Les chances d'un tir visé au milieu, vent compris, pour le buteur. */
+  chance: number;
+  /** La force qui suffit juste à passer la barre, de 0 à 1 (au-dessus de 1 : hors de portée). */
+  utile: number;
+  /** Vent dans le dos (positif) ou de face, et de travers (positif : vers les y croissants), en m/s. */
+  ventDos: number;
+  ventTravers: number;
+  /** Ce que la dérive du vent déplace le ballon dans le plan des poteaux, pour un vol moyen (mètres, signé). */
+  derive: number;
+  /** Le tee, l'équipe qui tape et la valeur du tir (2 : transformation, 3 : pénalité ou drop). */
+  lieu: Vec;
+  cote: Cote;
+  valeur: number;
+}
+
+export function aideDeTir(e: EtatMatch): AideDeTir | null {
+  const tir = e.tir;
+  if (!tir) return null;
+  const buteur = tir.buteur;
+  const lieu = tir.lieu ?? e.ballon;
+  const c = contexteDuTir(e, buteur);
+  const chance = probabilitePenalite(e, buteur, tir.distance, tir.angle);
+  return {
+    distance: tir.distance, angle: tir.angle, chance, utile: puissanceUtile(lieu, buteur.cote, c),
+    ventDos: c.ventDos, ventTravers: c.ventTravers, derive: deriveDuTir(c, 2.2),
+    lieu: { ...lieu }, cote: buteur.cote, valeur: tir.valeur,
+  };
+}
+
+/** Ce tir se joue-t-il à la main ? Il faut la 3D détaillée, le contrôle direct, et que le joueur tienne le tee. */
+function tirALaMain(e: EtatMatch, buteur: Pion): boolean {
+  return !!e.responsabilites && !!e.cadenceDetaillee && buteur.moi && humainTientLe(e, 'buteur', buteur.cote);
+}
+
+/**
+ * Le joueur a visé : la frappe suit son élan. ⚠️ Il ne décide pas du résultat — le vol le fera, d'après la
+ * visée, la force, le geste, ses stats, la fatigue, la pression, la distance et le vent.
+ */
+export function tirerHumain(e: EtatMatch, visee: ViseeHumaine): boolean {
+  const tir = e.tir, r = e.responsabilites;
+  if (!r || !tir || !tir.humain || tir.etape !== 'vise' || tir.visee || e.fini) return false;
+  tir.visee = {
+    ecart: Number.isFinite(visee.ecart) ? borner(visee.ecart, -9, 9) : 0,
+    puissance: Number.isFinite(visee.puissance) ? borner(visee.puissance, 0, 1) : 0.7,
+    effet: Number.isFinite(visee.effet) ? borner(visee.effet, -1, 1) : 0,
+    geste: Number.isFinite(visee.geste) ? borner(visee.geste, 0, 1) : 0.5,
+  };
+  return true;
+}
+
 /** Lance un vrai ballon vers les poteaux, réussi ou légèrement à côté. */
 function lancerTrajectoireTir(e: EtatMatch, tir: TirEnCours, reussi: boolean): void {
   tir.departSim = e.sim;
@@ -6644,6 +7122,32 @@ function lancerTrajectoireTir(e: EtatMatch, tir: TirEnCours, reussi: boolean): v
     });
     e.porteur = null;
     e.minuteur = 1.0;
+    return;
+  }
+
+  // ═══ LE TIR JOUÉ À LA MAIN (Correctif 17) ═════════════════════════════════
+  // Le vol est celui de la visée, de la force et du geste ; le résultat se lit sur la trajectoire.
+  if (tir.humain && tir.visee) {
+    const contexte = contexteDuTir(e, buteur);
+    // La chance d'un tir visé au milieu, SANS le vent : la dérive, elle, pousse vraiment le ballon.
+    const chance = borner(probabilitePenalite(e, buteur, tir.distance, tir.angle) + malusDuVent(e, buteur.cote, tir.distance), 0.04, 0.97);
+    const res = resoudreTirHumain(de, buteur.cote, tir.visee, contexte, chance, e.rng(), e.rng(), e.rng(), e.rng());
+    tir.reussi = res.reussi;
+    tir.issue = res.issue;
+    tir.volLance = true;
+    buteur.stats.coupsDePied += 1;
+    poserVol(e, {
+      de: { ...de }, vers: res.vers, duree: res.duree, ecoule: 0, hauteur: 0.5,
+      type: 'pied', intention: 'drop', auteur: buteur, receveur: null,
+      derive: res.derive, ...(res.ricochet ? { ricochet: res.ricochet } : {}),
+    });
+    const rebond = e.vol ? rebondApresTir(e, de, e.vol.ricochet ? e.vol.ricochet.vers : res.vers) : undefined;
+    if (rebond && e.vol) e.vol.rebond = rebond;
+    e.porteur = null;
+    e.minuteur = res.duree;
+    const r = e.responsabilites!;
+    if (tir.valeur === 2) { r.stats.transformations += 1; if (res.reussi) r.stats.transformationsReussies += 1; }
+    else { r.stats.tirs += 1; if (res.reussi) r.stats.tirsReussis += 1; }
     return;
   }
 
@@ -7023,6 +7527,7 @@ function validerEssai(e: EtatMatch, marqueur: Pion, origine: 'jeu' | 'maul'): vo
     e.tir = {
       buteur, distance: 22 + ecartAxe * 0.55, angle: ecartAxe,
       valeur: 2, suite: 'coupEnvoi', lieu, reussi: transforme, routine,
+      ...(tirALaMain(e, buteur) ? { humain: true } : {}),
       etape: 'celebration', etapeDepuis: e.sim, ballonAuSol: sol, marqueurId: marqueur.id,
       celebrationJusqua: e.sim + RITUEL_TIR.celebration, feteurs,
     };
@@ -7132,7 +7637,30 @@ function avancerTirDetaille(e: EtatMatch): void {
   stopper(b);
   b.cible = { ...b.pos };
   if (tir.etape === 'pose') {
-    if (depuis >= RITUEL_TIR.pose) passer('pret');
+    // Le joueur qui tape n'attend pas la routine entière : le ballon est sur le tee, il vise.
+    if (depuis >= (tir.humain ? RITUEL_TIR.poseHumain : RITUEL_TIR.pose)) passer(tir.humain ? 'vise' : 'pret');
+    return;
+  }
+  if (tir.etape === 'vise') {
+    // ═══ LE MATCH ATTEND SA VISÉE (Correctif 17) ═══════════════════════════════
+    const r = e.responsabilites!;
+    // Le joueur ne tient plus le tee (remplacé, a rendu la main) : l'IA tape.
+    if (!tir.humain) { passer('pret'); return; }
+    if (r.attente?.type !== 'tir') {
+      const chance = probabilitePenalite(e, b, tir.distance, tir.angle);
+      r.attente = {
+        type: 'tir', depuis: e.sim, delai: DELAI_TIR_HUMAIN, valeur: tir.valeur,
+        distance: Math.round(tir.distance), angle: Math.round(tir.angle), chance,
+      };
+    }
+    if (tir.visee) { r.attente = null; passer('elan'); return; }
+    if (e.sim - r.attente.depuis >= r.attente.delai) {
+      // Le chrono est dépassé : l'IA tape à sa place, normalement (la note s'en souvient).
+      r.attente = null;
+      r.stats.chronosDepasses += 1;
+      tir.humain = false;
+      passer('pret');
+    }
     return;
   }
   if (tir.etape === 'pret') {
@@ -7152,7 +7680,7 @@ function avancerTirDetaille(e: EtatMatch): void {
       if (e.placement) delete e.placement[ch.id];
     }
   }
-  if (depuis >= RITUEL_TIR.elan) {
+  if (depuis >= (tir.humain ? RITUEL_TIR.elanHumain : RITUEL_TIR.elan)) {
     // L'élan se termine sur la frappe : la phase reprend la main et lance le vol.
     tir.frappeDepuis = e.sim - 1;
     e.minuteur = 0;

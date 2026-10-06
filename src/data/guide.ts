@@ -1,8 +1,8 @@
 // LE GUIDE DE CARRIÈRE — ce qu'on fait, dans quel ordre, et pourquoi
 //
 // ⚠️ Retour de joueurs : « au début on ne comprend pas trop comment ça marche,
-// les transferts notamment ». Le tutoriel d'accueil (`components/Tutoriel.tsx`)
-// répond à « qu'est-ce que je vais faire ? » AVANT de créer un joueur. Il ne
+// les transferts notamment ». Le tutoriel guidé (`components/tutoriel/`, Correctif 18)
+// répond à « qu'est-ce que je vais faire ? » AVANT de créer un joueur, puis écran par écran. Il ne
 // répond pas à « et maintenant, je clique où ? », qui est la vraie question une
 // fois la carrière lancée.
 //

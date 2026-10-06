@@ -1,7 +1,7 @@
 // Les outils de l'empreinte du moteur, partagés par `empreinteMoteur.ts` (le banc
 // qu'on lance à la main) et par les bancs qui s'en servent comme garde-fou
 // (`verifierControleDirect.ts`). Voir `empreinteMoteur.ts` pour le propos.
-import { avancer, creerMatch } from '../src/lib/moteur/moteur';
+import { avancer, creerMatch, type OptionsMatch } from '../src/lib/moteur/moteur';
 import { effectifDuClub } from '../src/lib/effectif';
 import { IA_MATCH_DE_CARRIERE } from '../src/lib/moteur/ia/reglages';
 import type { EtatMatch } from '../src/lib/moteur/etat';
@@ -32,7 +32,7 @@ export function resumerMatch(e: EtatMatch): string {
 }
 
 /** Le même match de carrière 3D que le jeu crée, sans le lancer : à l'appelant de le faire avancer. */
-export function creerMatchDEmpreinte(k: number): EtatMatch {
+export function creerMatchDEmpreinte(k: number, plus: Partial<OptionsMatch> = {}): EtatMatch {
   const [a, b] = PAIRES[k % PAIRES.length];
   const cibles = [[24, 20], [31, 17], [18, 22], [27, 27]][k % 4];
   const poste = POSTES[k % POSTES.length];
@@ -44,6 +44,7 @@ export function creerMatchDEmpreinte(k: number): EtatMatch {
     },
     {
       niveau: 'pro', scoreSurTerrain: true, controle: true, cadenceDetaillee: true, placementJoue: true, ia: IA_MATCH_DE_CARRIERE,
+      ...plus,
     });
   e.carriereDixMinutes = true;
   return e;

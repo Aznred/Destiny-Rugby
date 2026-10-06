@@ -26,6 +26,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { DragEvent, RefObject, ReactNode } from 'react';
 import { nomPoste, POSTE_PAR_ID } from '../data/rugby';
 import { t } from '../lib/i18n';
+import { noter } from '../lib/tutoriel/guide';
 import { POSTES_BANC_MANAGER, POSTES_XV_MANAGER } from '../lib/compositionManager';
 import {
   adequationAuPoste, alertesDeComposition, badgesDe,
@@ -508,6 +509,9 @@ export function CompositionTerrainManager({
   const [groupe, setGroupe] = useState<'banc' | 'reserves'>('banc');
   const [detailsSelection, setDetailsSelection] = useState(false);
   const panneauRef = useRef<HTMLElement>(null);
+  // ⚠️ Le tutoriel guidé attend ces deux actes (« touche un joueur », « pose-le sur un poste ») : un seul endroit les signale, pour
+  // les trois écrans qui montent cette composition (manager, ligue en ligne, collection solo).
+  const placer: Props['onPlacer'] = (zone, index, joueurId) => { noter('compo.place'); onPlacer(zone, index, joueurId); };
   const parId = useMemo(
     () => new Map(effectifComplet.map((j) => [j.id, j])),
     [effectifComplet],
@@ -580,12 +584,13 @@ export function CompositionTerrainManager({
       for (const zone of ['titulaires', 'remplacants'] as const) {
         const index = composition[zone].indexOf(selection);
         if (index >= 0) {
-          onPlacer(zone, index, joueurId);
+          placer(zone, index, joueurId);
           setSelection(null);
           return;
         }
       }
     }
+    if (selection !== joueurId) noter('compo.selection');
     setSelection(selection === joueurId ? null : joueurId);
   };
 
@@ -595,16 +600,17 @@ export function CompositionTerrainManager({
         setSelection(null);
         return;
       }
-      onPlacer(zone, index, selection);
+      placer(zone, index, selection);
       setSelection(null);
       return;
     }
+    if (selection !== joueurId && joueurId) noter('compo.selection');
     setSelection(selection === joueurId ? null : joueurId ?? null);
   };
 
   const glisser = useGlisserDeposer((cible, id) => {
     const [zone, index] = cible.split('-');
-    if ((zone === 'titulaires' || zone === 'remplacants') && !indisponibles?.has(id)) onPlacer(zone, Number(index), id);
+    if ((zone === 'titulaires' || zone === 'remplacants') && !indisponibles?.has(id)) placer(zone, Number(index), id);
   });
   const demarrerDrag = (e: DragEvent<HTMLButtonElement>, joueurId?: string) => {
     if (!joueurId || indisponibles?.has(joueurId)) return;
@@ -634,7 +640,7 @@ export function CompositionTerrainManager({
   const deposer = (e: DragEvent<HTMLButtonElement>, zone: ZoneComposition, index: number) => {
     e.preventDefault();
     const joueurId = e.dataTransfer.getData('text/plain') || joueurGlisse;
-    if (joueurId && !indisponibles?.has(joueurId)) onPlacer(zone, index, joueurId);
+    if (joueurId && !indisponibles?.has(joueurId)) placer(zone, index, joueurId);
     setSelection(null);
     terminerDrag();
   };
@@ -645,10 +651,10 @@ export function CompositionTerrainManager({
     ? POSTES_XV_MANAGER[composition.titulaires.indexOf(selection)] : undefined;
 
   return (
-    <section className={`manager-feuille-visuelle${rendreCarte ? ' ct-feuille-fut' : ''}`} data-groupe={groupe} aria-label={t('compo.titre')}>
+    <section className={`manager-feuille-visuelle${rendreCarte ? ' ct-feuille-fut' : ''}`} data-groupe={groupe} aria-label={t('compo.titre')} data-tuto="compo-complet">
       {/* ── L'EN-TÊTE ─────────────────────────────────────────────────────── */}
-      <div className="ct-entete">
-        <div className="ct-note-equipe">
+      <div className="ct-entete" data-tuto="compo-entete">
+        <div className="ct-note-equipe" data-tuto="compo-note">
           <span>{t('compo.noteEquipe')}</span>
           <strong>{notes.generale}</strong>
         </div>
@@ -669,7 +675,7 @@ export function CompositionTerrainManager({
             </ul>
           </div>
         )}
-        <ul className="ct-alertes">
+        <ul className="ct-alertes" data-tuto="compo-alertes">
           {alertes.map((a) => (
             <li key={a.cle} className={`ct-${a.gravite}`}>
               <Icone nom={a.gravite === 'ok' ? 'ok' : a.gravite === 'bloquant' ? 'stop' : 'alerte'} taille={14} />
@@ -695,7 +701,7 @@ export function CompositionTerrainManager({
           )}
         </div>}
         {onMeilleureEquipe && (
-          <div className="ct-action-auto">
+          <div className="ct-action-auto" data-tuto="compo-meilleure">
             <button
               type="button"
               className="btn btn-meilleure-equipe ct-btn-meilleure-equipe"
@@ -713,14 +719,14 @@ export function CompositionTerrainManager({
           retrouve dans les sept langues, il ne se colore pas avec le texte et
           il change de taille d'un système à l'autre. L'icône est posée par
           l'écran, à côté de la phrase. */}
-      <div className="manager-compo-aide" aria-live="polite">
+      <div className="manager-compo-aide" aria-live="polite" data-tuto="compo-aide">
         <span><Icone nom="equipe" taille={14} /> {t('compo.aideGlisser')}</span>
         <span><Icone nom="cible" taille={14} /> {t('compo.aideMobile')}</span>
         {joueurEnMouvement && <b>{joueurEnMouvement.nom}</b>}
       </div>
 
       <div className="ct-plateau">
-        <div className="manager-terrain-cadre">
+        <div className="manager-terrain-cadre" data-tuto="compo-terrain">
           <div className="manager-terrain-legende">
             <span>{t('compo.enButAdverse')}</span><b>{t('compo.tonXV')}</b><span>{t('compo.tonEnBut')}</span>
           </div>
@@ -729,7 +735,7 @@ export function CompositionTerrainManager({
               const joueur = titulaires[index];
               const [x, y] = rendreCarte ? PLACEMENT_LIGUE[index] : PLACEMENT_XV[index];
               return (
-                <div className="manager-position" key={`${posteSlot}-${index}`} style={{ left: `${x}%`, top: `${y}%` }}>
+                <div className="manager-position" key={`${posteSlot}-${index}`} style={{ left: `${x}%`, top: `${y}%` }} data-tuto={index === 9 ? 'compo-carte' : undefined}>
                   <CarteJoueur
                     rendreCarte={rendreCarte}
                     rendreSousCarte={rendreSousCarte}
@@ -781,14 +787,14 @@ export function CompositionTerrainManager({
             <button type="button" onClick={() => setSelection(null)}>{t('compo.selection.annuler')}</button>
           </> : <span>{t('compo.selection.guide')}</span>}
         </div>
-        <nav className="ct-groupes" aria-label={t('compo.groupes.label')}>
+        <nav className="ct-groupes" aria-label={t('compo.groupes.label')} data-tuto="compo-groupes">
           <button type="button" aria-pressed={groupe === 'banc'} onClick={() => setGroupe('banc')}>{t('compo.groupes.remplacants', { count: remplacants.filter(Boolean).length })}</button>
           <button type="button" aria-pressed={groupe === 'reserves'} onClick={() => setGroupe('reserves')}>{t('compo.groupes.reserves', { count: reserves.length })}</button>
           <span>{t('compo.groupes.defilement')}</span>
         </nav>
       </>}
 
-      <div className="manager-banc-visuel">
+      <div className="manager-banc-visuel" data-tuto="compo-banc">
         <div className="comp-tete">
           <b><Icone nom="banc" taille={16} /> {t('compo.banc')}</b>
           <span className="comp-count">8</span>
@@ -841,6 +847,7 @@ export function CompositionTerrainManager({
       </div>
 
       <details
+        data-tuto="compo-reserves"
         className="manager-reserves"
         open={Boolean(rendreCarte) || reservesOuvertes}
         onToggle={(e) => { if (!rendreCarte) setReservesOuvertes(e.currentTarget.open); }}

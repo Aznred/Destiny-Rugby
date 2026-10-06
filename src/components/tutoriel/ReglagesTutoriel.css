@@ -1,0 +1,13 @@
+/* La section « Tutoriels » des réglages. */
+.reglages-tutoriels .reglages-tuto-bascule {
+  display: flex; align-items: flex-start; gap: 0.7rem; margin: 0.4rem 0 0.7rem; padding: 0.7rem 0.8rem;
+  border: 1px solid var(--bordure); border-radius: var(--rayon-sm); background: rgba(255, 255, 255, 0.03);
+  cursor: pointer; text-transform: none; letter-spacing: 0; font-weight: 400;
+}
+.reglages-tutoriels .reglages-tuto-bascule input { margin-top: 0.2rem; flex: none; width: 18px; height: 18px; accent-color: var(--or-500); }
+.reglages-tutoriels .reglages-tuto-bascule span { display: grid; gap: 0.15rem; }
+.reglages-tutoriels .reglages-tuto-bascule b { color: var(--craie); font-size: 0.92rem; }
+.reglages-tutoriels .reglages-tuto-bascule small { color: var(--craie-dim); font-size: 0.8rem; line-height: 1.4; }
+.reglages-tuto-boutons { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 0.5rem; }
+.reglages-tuto-boutons .btn { justify-content: flex-start; padding: 0.65rem 0.95rem; font-size: 0.88rem; min-height: 44px; }
+.reglages-tuto-relance { color: var(--or-400); margin-top: 0.5rem; }

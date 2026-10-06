@@ -14,6 +14,7 @@ import { LANGUES, nombre, t, tn } from '../lib/i18n';
 import { useModalDialog } from '../lib/useModalDialog';
 import { Icone } from './Icone';
 import { ReglagesControleDirect } from './ReglagesControleDirect';
+import { ReglagesTutoriel } from './tutoriel/ReglagesTutoriel';
 import { usePreferencesInterface } from '../store/preferencesInterface';
 
 // Les huit ambiances. `apercu` est le dégradé montré sur la pastille — il
@@ -266,10 +267,8 @@ export function Reglages({ onFermer }: Props) {
             `localStorage` : voir `lib/controleDirect/prefs.ts`. */}
         <ReglagesControleDirect />
 
-        <details className="tuto">
-          <summary><Icone nom="livre" taille={16} /> {t('reg.tutoriel')}</summary>
-          <p className="aide">{t('reg.tutorielAide')}</p>
-        </details>
+        {/* ⚠️ LES TUTORIELS (Correctif 18) : rejouer chaque guide, ou les désactiver tous. L'ancien bloc repliable n'expliquait que l'ancien tutoriel. */}
+        <ReglagesTutoriel onFermer={fermer} />
 
         <div className="note-sans-cle">
           <Icone nom="sifflet" taille={15} /> {t('reg.sansCleAide')}

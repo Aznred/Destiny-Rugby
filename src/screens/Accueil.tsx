@@ -7,7 +7,6 @@ import { texteTraduit, t } from '../lib/i18n';
 // ⚠️ PAS DE `lazy` ICI. Le tutoriel doit être là au premier rendu de l'accueil :
 // il existe pour retenir quelqu'un qui hésite à rester, une seconde d'attente
 // le viderait de son sens. Il ne monte ni canvas ni modèle 3D — c'est du texte.
-import { Tutoriel } from '../components/Tutoriel';
 import { chantierVisible } from '../lib/modeDev';
 import { Sauvegardes } from '../components/Sauvegardes';
 import { Icone } from '../components/Icone';
@@ -107,9 +106,6 @@ export function Accueil() {
 
   return (
     <>
-      {/* Il décide lui-même s'il doit s'ouvrir : jamais si une carrière existe,
-          jamais deux fois (`tutoVu`, persisté). */}
-      <Tutoriel />
       {interfacePC ? <section className="accueil-hub">
         <motion.header custom={0} variants={apparait} initial="hidden" animate="show" className="accueil-hub-tete">
           <div><span className="eyebrow">{t('accueil.eyebrow')}</span><h1>{t("ui.3990dc966295")}<em>{t("ml.terrain")}</em></h1></div>

@@ -49,7 +49,9 @@ export type NomIcone =
   | 'son' | 'son-coupe' | 'ralenti' | 'camera'
   // ── Les commandes du contrôle direct ─────────────────────────────────────
   | 'sprint' | 'passe-gauche' | 'passe-droite' | 'pied' | 'raffut' | 'crochet' | 'plaquage'
-  | 'grattage' | 'appel' | 'viseur' | 'manette' | 'clavier' | 'feinte' | 'soutien';
+  | 'grattage' | 'appel' | 'viseur' | 'manette' | 'clavier' | 'feinte' | 'soutien'
+  // ── Les responsabilités : capitaine, tir, engagement, touche, drop ───────
+  | 'poteaux' | 'drop' | 'engagement' | 'touche' | 'melee' | 'lanceur' | 'vent';
 
 interface Props {
   nom: NomIcone;
@@ -731,6 +733,67 @@ const TRACES: Record<NomIcone, React.ReactNode> = {
       <path d="M5 15.5c3.6-6 9.4-7.4 14-5" />
       <path d="m16 7.4 3.2 2.4-2.4 3.2" />
       <path d="M5 20c3.4-3.2 6.6-3.6 9-2.6" strokeDasharray="1.6 2.2" />
+    </>
+  ),
+  // Les deux montants et la barre : les poteaux.
+  poteaux: (
+    <>
+      <path d="M7 3.2v8.2M17 3.2v8.2" />
+      <path d="M7 11.4h10" />
+      <path d="M12 11.4v9.4M8.6 20.8h6.8" />
+    </>
+  ),
+  // Le ballon qui tombe, son rebond, le sol : le drop.
+  drop: (
+    <>
+      <ellipse cx="12" cy="6.2" rx="2.9" ry="1.9" transform="rotate(-18 12 6.2)" />
+      <path d="M12 9.8v4.6" strokeDasharray="1.8 2.2" />
+      <path d="M5.5 19.6h13" />
+      <path d="M8.2 19.6c.9-3 2.1-4.1 3.8-4.1s2.9 1.1 3.8 4.1" />
+    </>
+  ),
+  // Le ballon sur son tee et la flèche qui part vers le jeu : l'engagement.
+  engagement: (
+    <>
+      <path d="M9.4 20.6h5.2M12 20.6v-3.4" />
+      <ellipse cx="12" cy="14.8" rx="3" ry="2" transform="rotate(-24 12 14.8)" />
+      <path d="m15.4 11.4 4.4-5.2" />
+      <path d="M15.8 6.2h4v4" />
+    </>
+  ),
+  // Trois joueurs, celui du milieu levé, le ballon au-dessus : la touche.
+  touche: (
+    <>
+      <circle cx="5.8" cy="10.4" r="1.7" />
+      <circle cx="12" cy="7" r="1.7" />
+      <circle cx="18.2" cy="10.4" r="1.7" />
+      <path d="M5.8 12.6v8M18.2 12.6v8M12 9.2v11.4" />
+      <ellipse cx="12" cy="2.9" rx="2" ry="1.3" transform="rotate(-18 12 2.9)" />
+    </>
+  ),
+  // Deux packs face à face : la mêlée.
+  melee: (
+    <>
+      <path d="M3 17.4 5.6 9.4h4.2v8z" />
+      <path d="m21 17.4-2.6-8h-4.2v8z" />
+      <path d="M2.6 20.6h18.8" />
+    </>
+  ),
+  // Un bras levé qui lance le ballon : le lanceur de touche.
+  lanceur: (
+    <>
+      <circle cx="8.6" cy="7.4" r="2" />
+      <path d="M8.6 9.4v8.6M8.6 12.2l5.4-4.2" />
+      <ellipse cx="17" cy="5.4" rx="2.6" ry="1.7" transform="rotate(-30 17 5.4)" />
+      <path d="M6 20.8h5.2" />
+    </>
+  ),
+  // Trois filets d'air : le vent.
+  vent: (
+    <>
+      <path d="M3 9h10.5a2.4 2.4 0 1 0-2.4-2.4" />
+      <path d="M3 13h14.5a2.4 2.4 0 1 1-2.4 2.4" />
+      <path d="M3 17h6.5" />
     </>
   ),
   // Deux joueurs côte à côte et un ballon entre eux : le soutien, le nettoyage du ruck.

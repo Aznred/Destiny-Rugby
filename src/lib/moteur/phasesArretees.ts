@@ -93,6 +93,8 @@ export function placementMelee(pions: Pion[], mark: Vec, possession: Cote): Plac
 export function placementTouche(
   pions: Pion[], mark: Vec, possession: Cote, nbAlignes: number,
   variante?: Pick<VarianteCombinaison, 'sauteur' | 'touche'>,
+  /** Correctif 17 : celui qui lance, quand ce n'est pas le numéro 2 (le rôle de lanceur est tenu par un autre). */
+  lanceurId?: string,
 ): Placement {
   const pl: Placement = {};
   const bord = mark.y < AXE ? 0 : LARGEUR;
@@ -103,7 +105,7 @@ export function placementTouche(
     const liste = parCote(pions, cote);
     const lance = cote === possession;
 
-    const lanceur = numero(liste, 2);
+    const lanceur = (lance && lanceurId ? liste.find((p) => p.id === lanceurId) : undefined) ?? numero(liste, 2);
     const avants = liste.filter((p) => p.avant && p !== lanceur);
     const formation = lance && variante ? alignementCombinaison(variante, avants.map(p => p.numero)) : undefined;
     const alignes = formation ? formation.map(f => avants.find(p => p.numero === f.numero)!) : avants.slice(0, Math.max(2, nbAlignes));
@@ -195,6 +197,8 @@ export function placementRuck(pions: Pion[], ballon: Vec, possession: Cote): Pla
 // ---------------------------------------------------------------------------
 export function placementCoupEnvoi(
   pions: Pion[], ligneX: number, engage: Cote, chute: Vec,
+  /** Correctif 17 : celui qui tient l'engagement, quand ce n'est pas le numéro 10. */
+  botteurId?: string,
 ): Placement {
   const pl: Placement = {};
   for (const cote of ['A', 'B'] as Cote[]) {
@@ -204,7 +208,7 @@ export function placementCoupEnvoi(
     if (cote === engage) {
       // Le botteur au centre, les chasseurs en ligne DERRIÈRE la ligne de
       // renvoi (règle : on ne peut pas la dépasser avant le coup de pied).
-      const botteur = liste.find((p) => p.numero === 10) ?? liste[0];
+      const botteur = (botteurId ? liste.find((p) => p.id === botteurId) : undefined) ?? liste.find((p) => p.numero === 10) ?? liste[0];
       const iBot = liste.indexOf(botteur);
       liste.forEach((p, i) => {
         if (p === botteur) { pl[p.id] = { x: ligneX - s * 1.2, y: AXE }; return; }
@@ -280,6 +284,6 @@ export function placementRenvoi22(pions: Pion[], ligneX: number, engage: Cote): 
 }
 
 // Position de départ, avant le tout premier coup d'envoi.
-export function placementInitial(pions: Pion[], engage: Cote, chute: Vec): Placement {
-  return placementCoupEnvoi(pions, MILIEU, engage, chute);
+export function placementInitial(pions: Pion[], engage: Cote, chute: Vec, botteurId?: string): Placement {
+  return placementCoupEnvoi(pions, MILIEU, engage, chute, botteurId);
 }

@@ -271,7 +271,12 @@
 .manager-reserve-carte small em { color:var(--or-300); font-style:normal; font-weight:800; }
 .manager-reserve-carte.ct-indisponible { cursor:pointer; opacity:.68; filter:saturate(.58); }
 .manager-reserve-carte.ct-indisponible:hover { opacity:.86; filter:saturate(.72); }
-.manager-roles-visuels { display:grid; grid-template-columns:minmax(200px,1fr) minmax(190px,.65fr) minmax(190px,.65fr); align-items:end; gap:.75rem; padding:1rem; }
+/* ⚠️ `repeat(auto-fit, …)` APRÈS une colonne fixe ne rend PAS la grille réactive : huit rôles (Correctif 17) faisaient déborder la dernière colonne
+   hors de la carte. Une seule règle de répétition, des colonnes qui rétrécissent (`min-width: 0`), et l'en-tête sur toute la ligne. */
+.manager-roles-visuels { display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); align-items:end; gap:.75rem; padding:1rem; }
+.manager-roles-visuels > div:first-child { grid-column:1 / -1; }
+.manager-roles-visuels > label { min-width:0; }
+.manager-roles-visuels .selecteur { min-width:0; }
 .manager-roles-visuels > div { display:flex; flex-direction:column; }
 .manager-roles-visuels > div span { color:var(--craie-dim); font-size:.74rem; }
 .manager-roles-visuels label { display:grid; gap:.3rem; color:var(--craie-dim); font-size:.75rem; }
@@ -1815,35 +1820,7 @@
   color: var(--brume); opacity: 0.75;
 }
 .carte-pub { cursor: default; }
-/* ====== TUTORIEL D'ACCUEIL ====== */
-.modale-tuto {
-  position: relative; max-width: 480px; text-align: center;
-  display: flex; flex-direction: column; align-items: center; gap: 0.4rem;
-}
-.modale-tuto h2 { margin: 0.1rem 0 0; font-size: 1.35rem; line-height: 1.15; }
-.tuto-emoji { font-size: 2.6rem; line-height: 1; margin-top: 0.4rem; }
-.tuto-texte { color: var(--craie-dim); line-height: 1.55; max-width: 40ch; margin: 0.2rem 0 0.4rem; }
-.tuto-fermer {
-  position: absolute; top: 0.55rem; right: 0.7rem;
-  background: none; border: 0; color: var(--brume); font-size: 1rem;
-  line-height: 1; padding: 0.3rem; cursor: pointer;
-}
-.tuto-fermer:hover { color: var(--craie); }
-/* ⚠️ LES POINTS SONT LÀ POUR DIRE « C'EST COURT ». Sans eux, on ne sait pas si
-   on s'engage dans cinq écrans ou dans vingt — et dans le doute, on ferme. */
-.tuto-points { display: flex; gap: 0.35rem; margin: 0.2rem 0 0.6rem; }
-.tuto-points span {
-  width: 7px; height: 7px; border-radius: 50%;
-  background: rgba(255, 255, 255, 0.18); transition: background 0.2s ease, transform 0.2s ease;
-}
-.tuto-points span.fait { background: var(--or-500); }
-.tuto-points span.actif { background: var(--or-400); transform: scale(1.35); }
-.tuto-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: center; }
-@media (max-width: 560px) {
-  .modale-tuto { max-width: 94vw; }
-  .tuto-actions { width: 100%; }
-  .tuto-actions .btn { flex: 1 1 auto; }
-}
+/* Le tutoriel guidé vit dans `components/tutoriel/GuideTutoriel.css` (Correctif 18) : l'ancienne modale d'accueil n'existe plus. */
 
 .modale-pub { max-width: 460px; text-align: center; }
 .modale-pub .rangee-fin { justify-content: center; }
@@ -2433,17 +2410,6 @@
 }
 .choix-scenario:hover { background: rgba(232, 178, 58, 0.16); transform: translateX(3px); border-color: var(--or-500); }
 
-/* ====== TUTORIEL RÉGLAGES ====== */
-.tuto { margin-top: 0.6rem; border: 1px solid var(--bordure); border-radius: 10px; overflow: hidden; }
-.tuto summary {
-  cursor: pointer; padding: 0.7rem 1rem; font-family: var(--police-forte); font-weight: 700;
-  font-size: 0.9rem; color: var(--or-400); background: rgba(232, 178, 58, 0.06); list-style: none;
-}
-.tuto summary::-webkit-details-marker { display: none; }
-.tuto[open] summary { border-bottom: 1px solid var(--bordure); }
-.tuto-etapes { margin: 0; padding: 0.9rem 1rem 0.9rem 2.2rem; display: flex; flex-direction: column; gap: 0.5rem; font-size: 0.9rem; color: var(--craie-dim); line-height: 1.45; }
-.tuto-etapes b { color: var(--craie); }
-.tuto-etapes code { background: rgba(0,0,0,0.4); padding: 0.05rem 0.35rem; border-radius: 5px; color: var(--or-400); font-size: 0.85em; }
 .note-sans-cle {
   margin-top: 0.9rem; padding: 0.8rem 1rem; border-radius: 10px; font-size: 0.88rem; line-height: 1.5;
   background: rgba(52, 163, 90, 0.12); border: 1px solid rgba(52, 163, 90, 0.4); color: #b9e8ca;
@@ -2515,6 +2481,12 @@
 .club-carte { min-width: 0; }
 .club-carte .club-nom, .club-carte .club-ville { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pastille-capitaine { color: var(--or-400); border-color: rgba(232,178,58,0.45); background: rgba(232,178,58,0.12); }
+/* Rôles dans l'équipe (Correctif 17) : un bloc compact, seulement ce que le joueur tient. */
+.roles-equipe { display: flex; align-items: center; flex-wrap: wrap; gap: 0.35rem 0.6rem; margin-bottom: 0.35rem; }
+.roles-equipe-titre { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--craie-dim, #c7d1c6); }
+.roles-equipe-liste { display: inline-flex; flex-wrap: wrap; gap: 0.3rem; }
+.pastille-role { color: var(--or-400); border-color: rgba(232,178,58,0.38); background: rgba(232,178,58,0.08); }
+.pastille-role svg { vertical-align: -2px; }
 
 /* Traits de caractère (écran de création) */
 .traits-grille { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 0.6rem; }
@@ -7557,8 +7529,7 @@ img, svg, canvas { max-width: 100%; }
   .x-media-choisi button,
   .ml-tiroir-fermer,
   .fc-fermer,
-  .guide-fermer,
-  .tuto-fermer {
+  .guide-fermer {
     min-width: 44px;
     min-height: 44px;
   }
@@ -8726,7 +8697,6 @@ select:focus {
 .vide-icone { display: grid; place-items: center; color: var(--craie-dim); margin-bottom: 0.6rem; }
 .onglets-classement .chip-comp,
 .fc-titre,
-.tuto-emoji,
 .guide-jauge,
 .guide-coche,
 .sel-check,
@@ -8739,7 +8709,6 @@ select:focus {
 .nav-mobile-menu-grille button,
 .carriere-onglets button { display: inline-flex; align-items: center; gap: 6px; }
 .fc-titre svg, .solde svg, .pack-ovas svg { flex: 0 0 auto; }
-.tuto-emoji { justify-content: center; color: var(--or-400); }
 .vide-icone svg { color: var(--craie-dim); }
 
 /* ── « C'est toi » dans un classement ─────────────────────────────────────── */

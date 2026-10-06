@@ -114,13 +114,13 @@ export function CreationManager() {
         </div>
       )}
 
-      <div className="carte" style={{ padding: '1.6rem' }}>
+      <div className="carte" style={{ padding: '1.6rem' }} data-tuto="cm-formulaire">
         {/* ═══ LE MODE ═══════════════════════════════════════════════════════
             ⚠️ LE CHOIX SE FAIT ICI ET NULLE PART AILLEURS. Passer en mode libre
             en cours de carrière reviendrait à jouer classé jusqu'au moment où
             l'on décide de ne plus l'être : c'est pour ça que `signerBanc` refuse
             un club hors de portée. */}
-        <div className="champ">
+        <div className="champ" data-tuto="cm-mode">
           <label>{t('mgr.creation.mode')}</label>
           <div className="modes-manager">
             <button
@@ -142,7 +142,7 @@ export function CreationManager() {
           </div>
         </div>
 
-        <div className="grille-2">
+        <div className="grille-2" data-tuto="cm-identite">
           <div className="champ">
             <label htmlFor="mnom">{t('mgr.creation.nom')}</label>
             <input
@@ -204,7 +204,7 @@ export function CreationManager() {
           />
         </div>
 
-        <div className="champ">
+        <div className="champ" data-tuto="cm-club">
           <label htmlFor="mclub">
             {t('mgr.creation.club')} {libre
               ? t('mgr.creation.tousClubs')
@@ -230,7 +230,7 @@ export function CreationManager() {
         </div>
 
         {choisi && (
-          <div className="carte contrat-manager">
+          <div className="carte contrat-manager" data-tuto="cm-contrat">
             <div className="cm-tete">
               <Blason club={choisi.club} taille={40} />
               <div>
@@ -259,7 +259,7 @@ export function CreationManager() {
         )}
 
         <div className="actions">
-          <button className="btn primaire grand" onClick={valider} disabled={!choisi}>
+          <button className="btn primaire grand" onClick={valider} disabled={!choisi} data-tuto="cm-valider">
             <><Icone nom={libre ? 'etoile' : 'signature'} taille={19} /> {libre ? t('mgr.creation.prendreLibre') : t('mgr.signer')}</>
           </button>
         </div>

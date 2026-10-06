@@ -529,7 +529,9 @@ export interface EtatMatch {
   defenseArcadeCote?: Cote;
   dropEnCours?: { auteurId: string; reussi: boolean;
     /** IA par poste : comment il finit — dedans, sur le poteau, à côté, trop court, mal frappé, contré. */
-    issue?: string };
+    issue?: string;
+    /** Correctif 17 : le joueur l'a tenté à la main. Le contre se juge à la FRAPPE, d'après le défenseur le plus proche. */
+    humain?: boolean };
   /**
    * Les phases se jouent à leur rythme de terrain : mêlée complète, passes à
    * vitesse réelle, célébration puis rituel entier du buteur. Réservé au match
@@ -798,7 +800,14 @@ export interface EtatMatch {
      * ramasse, le porte jusqu'au point du tir, le pose, recule, se concentre
      * puis s'élance — sans jamais être déplacé d'un coup.
      */
-    etape?: 'celebration' | 'approche' | 'ramassage' | 'transport' | 'pose' | 'pret' | 'elan';
+    etape?: 'celebration' | 'approche' | 'ramassage' | 'transport' | 'pose' | 'vise' | 'pret' | 'elan';
+    /**
+     * Correctif 17 : le joueur tape lui-même (il tient le rôle de buteur). `vise` : l'étape où le
+     * match attend sa visée ; `visee` : ce qu'il a demandé. Le vol est alors résolu par la géométrie
+     * (`tirHumain.ts`), pas par un tirage.
+     */
+    humain?: boolean;
+    visee?: import('./tirHumain.js').ViseeHumaine;
     etapeDepuis?: number;
     /** Où repose le ballon tant que le buteur ne l'a pas ramassé. */
     ballonAuSol?: Vec;
@@ -808,7 +817,11 @@ export interface EtatMatch {
     /** Coéquipiers qui viennent entourer le marqueur. */
     feteurs?: string[];
   } | null;
-  penalite: { pour: Cote; lieu: Vec; motif: string } | null;
+  penalite: {
+    pour: Cote; lieu: Vec; motif: string;
+    /** Correctif 17 : le rideau d'en face au coup de sifflet (un capitaine lit la défense avant qu'elle ne recule). */
+    defense?: { rideau: number; retardataires: number };
+  } | null;
 
   remplacementsA: number;
   remplacementsB: number;
@@ -981,6 +994,12 @@ export interface EtatMatch {
    * rejoue à l'identique (empreinte : `npm run mesure:empreinte`). Voir `direct.ts`.
    */
   direct?: import('./direct.js').EtatDirect;
+  /**
+   * LES RESPONSABILITÉS (Correctif 17) : capitaine, buteurs, lanceur, engagement, drop. Le joueur les
+   * tient quand il les a, l'IA les tient sinon. Absent : le moteur rejoue à l'identique.
+   * Voir `responsabilites.ts`.
+   */
+  responsabilites?: import('./responsabilites.js').EtatResponsabilites;
 }
 
 /**

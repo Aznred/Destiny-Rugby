@@ -12,6 +12,7 @@ import { activerSynchronisationBoutiqueCompte } from './lib/synchronisationBouti
 import { Nav } from './components/Nav';
 import { Garde } from './components/Garde';
 import { Guide } from './components/Guide';
+import { GuideTutoriel } from './components/tutoriel/GuideTutoriel';
 import { Reglages } from './components/Reglages';
 import { Accueil } from './screens/Accueil';
 import { Creation } from './screens/Creation';
@@ -166,6 +167,8 @@ export default function App() {
       {/* Le guide de carrière : une pastille discrète, sur tous les écrans de
           jeu. Il ne monte rien tant qu'il n'y a pas de carrière. */}
       <Guide />
+      {/* Le tutoriel guidé (Correctif 18) : monté une fois, il surveille les écrans et ne dessine que quand un parcours est actif. */}
+      <GuideTutoriel />
 
       <main id="contenu-principal" tabIndex={-1}>
         {/* Un écran qui plante ne doit JAMAIS emporter la navigation avec lui. */}

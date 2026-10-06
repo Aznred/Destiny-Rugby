@@ -175,8 +175,12 @@ import { texteTraduit, t } from '../lib/i18n';
 import { useModalDialog } from '../lib/useModalDialog';
 import { ControleDirect, ListeCommandes } from './match/ControleDirect';
 import { PilotageDirect } from '../lib/controleDirect/pilotage';
+import { rolesDuJoueur } from '../lib/responsabilites';
+import { rolesImposesParLaComposition } from '../lib/compositionManager';
 import { chargerDisposition } from '../lib/controleDirect/touches';
 import { usePreferencesControle } from '../lib/controleDirect/prefs';
+import { signaler, useGuide } from '../lib/tutoriel/guide';
+import { usePreferencesTutoriel } from '../lib/tutoriel/memoire';
 
 function couleursDe(nom: string): [string, string] {
   const club = clubParNom(nom);
@@ -379,6 +383,10 @@ export function MatchLive({
   // Le ballon du match est celui qu'on a équipé en boutique.
   const skinActif = useGame((s) => s.skinActif);
   const tutoMatchVu = useGame((s) => s.tutoMatchVu);
+  const prefsTutoriel = usePreferencesTutoriel();
+  // Un guide qui explique le match (celui de l'entraîneur) l'arrête le temps de la lecture, comme la notice du premier match.
+  const guideActif = useGuide();
+  const guideFige = guideActif.parcours?.figeLeMatch === true;
   const setTutoMatchVu = useGame((s) => s.setTutoMatchVu);
   const enregistrerMatchVecu = useGame((s) => s.enregistrerMatchVecu);
   const appliquerSanctionMatch = useGame((s) => s.appliquerSanctionMatch);
@@ -495,6 +503,16 @@ export function MatchLive({
         // L'IA par poste : le 9 lit la défense, le 10 relit, chaque numéro tient son rôle,
         // l'arbitre a une mémoire (voir « L'IA par poste » dans CLAUDE.md).
         ia: IA_MATCH_DE_CARRIERE,
+        // LES RESPONSABILITÉS (Correctif 17) : en 3D, le capitaine, le buteur, l'engagement, le lancer et le drop se tiennent
+        // pour de bon — par le joueur s'il en a gagné le rôle, par l'IA sinon. En sélection, il n'en a aucun.
+        ...(cadenceInitiale.current ? {
+          responsabilites: {
+            avatar: joueur && !selection ? rolesDuJoueur(joueur) : [],
+            // Les rôles que la composition du manager impose à SON camp (le reste est attribué par l'IA).
+            ...(compoManager && coteManager === 'A' ? { A: rolesImposesParLaComposition(compoManager) } : {}),
+            ...(compoManager && coteManager === 'B' ? { B: rolesImposesParLaComposition(compoManager) } : {}),
+          },
+        } : {}),
         ...(coteManager === 'A' && feuilleManager && compoManager && manager ? {
           compositionA: feuilleManager, tactiqueA: manager.tactique,
           capitaineAId: compoManager.capitaineId, buteurAId: compoManager.buteurId,
@@ -1417,6 +1435,8 @@ export function MatchLive({
   })();
 
   const pelouse = useMemo(() => <PelouseMemo />, []);
+  // Le premier carton du match raconte ce qu'il change (tutoriel contextuel, en bulle souple : le jeu ne s'arrête pas).
+  useEffect(() => { if (cartonArbitre) signaler('context.carton'); }, [cartonArbitre]);
 
   // --- 🏟️ LE TERRAIN EN TROIS DIMENSIONS ------------------------------------
   // ⚠️ LA SCÈNE NE DÉCIDE DE RIEN : elle lit `e`, l'état que le moteur fait
@@ -1489,11 +1509,11 @@ export function MatchLive({
       .catch(() => { /* refusé par le navigateur : le match reste dans sa fenêtre */ });
   };
   const pleinEcranPossible = typeof document !== 'undefined' && !!document.fullscreenEnabled;
-  const montrerTuto = enJeu && jePeuxJouer && !tutoMatchVu && !e.fini && !directVoulu;
+  const montrerTuto = enJeu && jePeuxJouer && !tutoMatchVu && !e.fini && !directVoulu && !prefsTutoriel.desactive;
   // ⚠️ LA BOUCLE LE LIT DANS UNE REF, comme la carte de décision : la poser en
   // dépendance de `useEffect` relancerait la boucle et remettrait `dernierTemps`
   // à zéro, ce qui fait sauter le match d'un cran à chaque bascule.
-  tutoRef.current = montrerTuto;
+  tutoRef.current = montrerTuto || guideFige;
 
   return createPortal(
     <div ref={overlayRef} className="overlay-match" onClick={(ev) => { if (ev.target === ev.currentTarget) quitter(); }}>
@@ -2070,6 +2090,7 @@ export function MatchLive({
               <button
                 type="button"
                 className="ml-tiroir-bouton"
+                data-tuto={manager ? 'ml-bouton-tiroir-manager' : undefined}
                 aria-label={t('ml.plus')}
                 onClick={() => setTiroir((v) => (v ? null : (manager ? 'tactique' : large ? 'commandes' : 'fil')))}
               >
@@ -2207,7 +2228,7 @@ function CoachingManager({
   const entrantActif = banc.some((p) => p.sourceId === entrant) ? entrant : banc[0]?.sourceId ?? '';
   const demande = e.remplacementsDemandes[cote];
   return (
-    <div className="ml-coaching-manager">
+    <div className="ml-coaching-manager" data-tuto="ml-coaching-manager">
       <div className="ml-coaching-manager-tete">
         <b><Icone nom="banc" taille={15} />{t("ui.858229f340b7")}</b>
         <span>{t("ui.e93d3d44d4bc")}</span>
@@ -2231,7 +2252,7 @@ function CoachingManager({
           </div>
         </fieldset>
       ))}
-      <fieldset className="ml-changement-manuel">
+      <fieldset className="ml-changement-manuel" data-tuto="ml-changement">
         <legend>{t("ui.38a64c1b6084")}</legend>
         {banc.length ? (
           <div>

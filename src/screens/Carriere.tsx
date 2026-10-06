@@ -214,7 +214,7 @@ export function Carriere({ onReglages }: Props) {
   const suggestions = choix.length ? choix : IDEE_CLES.map((cle) => t(cle));
 
   return (
-    <section className="carriere" data-mobile-vue={vueMobile}>
+    <section className="carriere" data-mobile-vue={vueMobile} data-tuto-racine="carriere">
       <header className="carriere-entete manager-entete">
         <div>
           <div className="eyebrow">{t("ui.18afe0a36a0e", { v0: joueur.saison, v1: libelleDate(semaine(joueur.semaine ?? 1)) })}</div>
@@ -381,8 +381,8 @@ function ResumeMobile({ joueur }: { joueur: Joueur }) {
   ];
   return (
     <div className="carriere-resume">
-      <div className="cr-identite">
-        <div className="cr-gen" title={t('pj.generale')}>
+      <div className="cr-identite" data-tuto="car-identite">
+        <div className="cr-gen" data-tuto="car-gen" title={t('pj.generale')}>
           <b>{generale}</b><span>{t('pj.noteCourte')}</span>
         </div>
         <div className="cr-nom">
@@ -394,7 +394,7 @@ function ResumeMobile({ joueur }: { joueur: Joueur }) {
           {joueur.potentiel && joueur.potentiel > generale && <small>↗ {t('car.mob.potentiel', { n: joueur.potentiel })}</small>}
         </div>
       </div>
-      <div className="cr-jauges">
+      <div className="cr-jauges" data-tuto="car-jauges">
         {jauges.map(([label, valeur, variante]) => (
           <div key={label} className={`cr-jauge ${variante}`} role="img" aria-label={`${label} ${Math.round(valeur)}`}>
             <span>{label}</span><i><b style={{ width: `${Math.max(0, Math.min(100, valeur))}%` }} /></i><em>{Math.round(valeur)}</em>
@@ -402,13 +402,13 @@ function ResumeMobile({ joueur }: { joueur: Joueur }) {
         ))}
       </div>
       <div className="cr-bas">
-        <span className="cr-match">
+        <span className="cr-match" data-tuto="car-prochain">
           <Icone nom="calendrier" taille={13} />
           {adversaire
             ? <span>{t('car.mob.prochain')} : <b>{adversaire}</b> <small>({t(aDomicile ? 'car.mob.domicile' : 'car.mob.exterieur')})</small></span>
             : <span>{t('car.mob.repos')}</span>}
         </span>
-        <span className="cr-stats">
+        <span className="cr-stats" data-tuto="car-stats">
           <b>{vecu?.matchs ?? 0}</b> {t('car.mob.matchs')} · <b>{vecu?.essais ?? 0}</b> {t('car.mob.essais')}
           {moyenne !== null && <> · <b>{moyenne.toFixed(1)}</b> {t('car.mob.note')}</>}
         </span>

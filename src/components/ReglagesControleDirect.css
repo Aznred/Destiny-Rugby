@@ -38,7 +38,7 @@
 }
 .rcd-touches li[data-ecoute='oui'] { background: rgba(244, 205, 99, 0.12); outline: 1px solid var(--or-500, #e8b23a); }
 /* Le bouton de la ligne : discret, la table doit se lire comme une table, pas comme une pile de boutons. */
-.rcd-touches .btn, .rcd-tuto .btn, .rcd .btn.mini {
+.rcd-touches .btn, .rcd .btn.mini {
   min-height: 0;
   padding: 0.28rem 0.75rem;
   font-size: 0.74rem;
@@ -66,8 +66,6 @@
 .rcd-retour[data-ton='alerte'] { background: rgba(255, 150, 80, 0.14); color: #ffc79a; }
 .rcd-manette { display: flex; align-items: center; gap: 0.5rem; margin: 0.2rem 0; font-size: 0.85rem; color: var(--craie-dim, #c7d1c6); }
 .rcd-manette[data-detectee='oui'] { color: var(--succes, #48c47a); }
-.rcd-tuto { display: grid; gap: 0.3rem; margin-top: 0.8rem; }
-.rcd-tuto .btn { justify-self: start; }
 
 @media (max-width: 520px) {
   .rcd-touches li { grid-template-columns: minmax(0, 1fr) auto; }

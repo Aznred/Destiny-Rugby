@@ -305,7 +305,7 @@ export const CLES_COMPTE = [
   // Le palmarès qui TRAVERSE les carrières, par construction.
   'succesDebloques', 'pantheon',
   // L'accueil et la manette ne s'expliquent qu'une fois.
-  'tutoVu', 'tutoMatchVu',
+  'tutoMatchVu',
 ] as const;
 
 export type CleCompte = (typeof CLES_COMPTE)[number];

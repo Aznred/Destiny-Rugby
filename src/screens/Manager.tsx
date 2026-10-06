@@ -10,6 +10,7 @@ import { Selecteur } from '../components/Selecteur';
 import type { OptionSelecteur } from '../components/Selecteur';
 import { COMPETITIONS, clubParNom } from '../data/clubs';
 import { effectifDuClub, forceEffectif } from '../lib/effectif';
+import { noter } from '../lib/tutoriel/guide';
 import { useCatalogueSolo } from '../lib/catalogueSoloCommun';
 import { classementManagerEnDirect } from '../lib/tableauManager';
 import { semaine, libelleDate, libelleSemaine, SEMAINES_PAR_SAISON } from '../data/calendrier';
@@ -515,6 +516,11 @@ export function Manager() {
   };
   const optionsCapitaines = composition.titulaires.flatMap(optionRole);
   const optionsButeurs = [...composition.titulaires, ...composition.remplacants].flatMap(optionRole);
+  // Les autres rôles (Correctif 17) : toute la feuille peut les tenir, et « Automatique » laisse le staff choisir.
+  const optionsAutresRoles: OptionSelecteur[] = [
+    { valeur: '', label: t('rv.roles.auto'), sous: t('rv.roles.autoAide') },
+    ...optionsButeurs,
+  ];
   const optionsTactiques: Record<keyof TactiqueManager, OptionSelecteur[]> = {
     attaque: [
       { valeur: 'equilibre', label: 'Équilibré', sous: 'Alterner jeu au près et au large', vignette: <Icone nom="ballon" taille={16} /> },
@@ -612,36 +618,36 @@ export function Manager() {
               l'autre — d'où des libellés qui ne s'alignaient pas entre eux. Les
               icônes de `components/Icone.tsx` prennent la couleur du texte, donc
               l'or de l'onglet actif. Voir « ÇA FAIT TROP IA » dans CLAUDE.md. */}
-          <nav className="manager-onglets" aria-label={t('mgr.navigation')}>
-            <button className={vue === 'bureau' ? 'actif' : ''} onClick={() => setVue('bureau')}>
+          <nav className="manager-onglets" aria-label={t('mgr.navigation')} data-tuto="mgr-onglets">
+            <button data-tuto="mgr-onglet-bureau" className={vue === 'bureau' ? 'actif' : ''} onClick={() => setVue('bureau')}>
               <Icone nom="stade" taille={17} />{t("tb.club")}</button>
-            <button className={vue === 'equipe' ? 'actif' : ''} onClick={() => setVue('equipe')}>
+            <button data-tuto="mgr-onglet-equipe" className={vue === 'equipe' ? 'actif' : ''} onClick={() => setVue('equipe')}>
               <Icone nom="equipe" taille={17} />{t("online.nav.lineup")}</button>
-            <button className={vue === 'tresorerie' ? 'actif' : ''} onClick={() => setVue('tresorerie')}>
+            <button data-tuto="mgr-onglet-tresorerie" className={vue === 'tresorerie' ? 'actif' : ''} onClick={() => setVue('tresorerie')}>
               <Icone nom="euro" taille={17} />{t("ui.f40a457d4191")}</button>
-            <button className={vue === 'calendrier' || vue === 'match' ? 'actif' : ''} onClick={() => setVue('calendrier')}>
+            <button data-tuto="mgr-onglet-calendrier" className={vue === 'calendrier' || vue === 'match' ? 'actif' : ''} onClick={() => setVue('calendrier')}>
               <Icone nom="calendrier" taille={17} />{t("online.nav.calendar")}</button>
-            <button className={vue === 'marche' ? 'actif' : ''} onClick={() => setVue('marche')}>
+            <button data-tuto="mgr-onglet-marche" className={vue === 'marche' ? 'actif' : ''} onClick={() => setVue('marche')}>
               <Icone nom="monde" taille={17} /> {t('mgr.marche')}
             </button>
-            <button className={vue === 'ovale' ? 'actif' : ''} onClick={() => { setVue('ovale'); ouvrirMessages(); }}>
+            <button data-tuto="mgr-onglet-ovale" className={vue === 'ovale' ? 'actif' : ''} onClick={() => { setVue('ovale'); ouvrirMessages(); }}>
               <Icone nom="ovale" taille={17} /> L’Ovale {alertesOvale > 0 && <i>{alertesOvale}</i>}
             </button>
-            <button className={vue === 'formation' ? 'actif' : ''} onClick={() => setVue('formation')}>
+            <button data-tuto="mgr-onglet-formation" className={vue === 'formation' ? 'actif' : ''} onClick={() => setVue('formation')}>
               <Icone nom="formation" taille={17} />{t("ui.76c3b86f6626")}</button>
-            <button className={vue === 'recruteurs' ? 'actif' : ''} onClick={() => setVue('recruteurs')}>
+            <button data-tuto="mgr-onglet-recruteurs" className={vue === 'recruteurs' ? 'actif' : ''} onClick={() => setVue('recruteurs')}>
               <Icone nom="loupe" taille={17} />{t("ui.364f4d5ac9b4")}{rapportsFrais > 0 && <i>{rapportsFrais}</i>}
             </button>
-            <button className={vue === 'entrainement' ? 'actif' : ''} onClick={() => setVue('entrainement')}>
+            <button data-tuto="mgr-onglet-entrainement" className={vue === 'entrainement' ? 'actif' : ''} onClick={() => setVue('entrainement')}>
               <Icone nom="halteres" taille={17} />{t("ui.c5c8664b7a6e")}</button>
-            <button className={vue === 'direction' ? 'actif' : ''} onClick={() => setVue('direction')}>
+            <button data-tuto="mgr-onglet-direction" className={vue === 'direction' ? 'actif' : ''} onClick={() => setVue('direction')}>
               <Icone nom="institution" taille={17} />{t("ui.1a925074120c")}</button>
-            <button className={vue === 'vestiaire' ? 'actif' : ''} onClick={() => setVue('vestiaire')}>
+            <button data-tuto="mgr-onglet-vestiaire" className={vue === 'vestiaire' ? 'actif' : ''} onClick={() => setVue('vestiaire')}>
               <Icone nom="maillot" taille={17} />{t("ui.7d2fafb0e9e7")}{(discussionsOuvertes.length + dossiersMedicaux.filter((d) => d.decision === 'attente').length) > 0 && <i>{discussionsOuvertes.length + dossiersMedicaux.filter((d) => d.decision === 'attente').length}</i>}
             </button>
-            <button className={vue === 'univers' ? 'actif' : ''} onClick={() => setVue('univers')}>
+            <button data-tuto="mgr-onglet-univers" className={vue === 'univers' ? 'actif' : ''} onClick={() => setVue('univers')}>
               <Icone nom="journal" taille={17} />{t("ch.monde")}</button>
-            <button className={vue === 'histoire' ? 'actif' : ''} onClick={() => setVue('histoire')}>
+            <button data-tuto="mgr-onglet-histoire" className={vue === 'histoire' ? 'actif' : ''} onClick={() => setVue('histoire')}>
               <Icone nom="livre" taille={17} />{t("online.nav.history")}</button>
           </nav>
 
@@ -650,7 +656,7 @@ export function Manager() {
 
           {vue === 'bureau' && (
             <div className="manager-bureau">
-              <section className="carte manager-club-resume">
+              <section className="carte manager-club-resume" data-tuto="mgr-club">
                 <div className="manager-club-resume-identite">
                   {fiche && <Blason club={fiche} taille={62} />}
                   <div>
@@ -659,7 +665,7 @@ export function Manager() {
                     <p>{comp && <LogoCompet id={comp.id} taille={19} />} {manager.divisionNom} · {texteTraduit(humeur.texte)}</p>
                   </div>
                 </div>
-                <div className="manager-resume-actions">
+                <div className="manager-resume-actions" data-tuto="mgr-actions">
                   <button className="btn fantome" onClick={() => setEcran('effectif')}><Icone nom="equipe" taille={16} />{t("online.nav.squad")}</button>
                   <button className="btn fantome" onClick={() => { setVue('ovale'); ouvrirMessages(); }}>𝕏 L’Ovale</button>
                   {/* ⚠️ L'AVANCE RAPIDE EST À CÔTÉ DE LA SEMAINE, PAS À SA PLACE.
@@ -675,7 +681,7 @@ export function Manager() {
                       <Icone nom="chrono" taille={16} /> {t('mgr.avancer')}
                     </button>
                   )}
-                  <button className="btn primaire" onClick={() => {
+                  <button className="btn primaire" data-tuto="mgr-semaine" onClick={() => {
                     if (afficheManager && !resultatManager) setVue('match'); else semaineManager();
                   }}>
                     {afficheManager && !resultatManager ? t("ui.010f4333aeb4") : t("mgr.semaineSuivante")}
@@ -698,7 +704,7 @@ export function Manager() {
                 </p>
               )}
 
-              <section className="manager-kpis" aria-label={t("ui.1727855df4ce")}>
+              <section className="manager-kpis" aria-label={t("ui.1727855df4ce")} data-tuto="mgr-kpis">
                 <article className="carte"><small>{t("tb.classement")}</small><b>{maLigne ? `${maLigne.position}e` : '—'}</b><span>{t("ui.5a2866966f4c", { v0: maLigne?.points ?? 0 })}</span></article>
                 <article className="carte"><small>{t("ui.72c99b14f290")}</small><b>{manager.objectif}e</b><span>{maLigne && maLigne.position <= manager.objectif ? t("ui.ce99b4c2d577") : t("ui.a2feabf0e59a")}</span></article>
                 <article className="carte"><small>{t("ui.e8ebf252e98c")}</small><b>{force.toFixed(1)}</b><span>{t('compo.effectifTotal', { n: effectifComplet.length })}{indisponibles.length ? ` · ${t('compo.indisponibles', { n: indisponibles.length })}` : ''}</span></article>
@@ -707,7 +713,7 @@ export function Manager() {
                 <article className="carte"><small>{t("ui.b912533f7f9a")}</small><b>{nombre(manager.budgetStructure)} €</b><span>{t("ui.248327833f88", { v0: murs.formation, v1: murs.recrutement, v2: murs.entrainement })}</span></article>
               </section>
 
-              <section className="carte manager-classement-complet">
+              <section className="carte manager-classement-complet" data-tuto="mgr-classement">
                 <div className="comp-tete">
                   <div><b><Icone nom="resultats" taille={16} />{t("ui.b82c15fd7ceb", { v0: manager.divisionNom })}</b><small>{t("ui.1193ecba856d")}</small></div>
                   <button onClick={() => setEcran('tableau')}>{t("ui.eecc9ea176d1")}</button>
@@ -734,7 +740,7 @@ export function Manager() {
               </section>
 
               <section className="manager-bureau-bas">
-                <article className="carte manager-prochain-match">
+                <article className="carte manager-prochain-match" data-tuto="mgr-prochain">
                   <div className="comp-tete"><b><Icone nom="ballon" taille={16} />{t("ui.bb38c927bf1a")}</b></div>
                   {/* ⚠️ DEUX NOMS NE FONT PAS UNE AFFICHE. Le jeu embarque
                       957 écussons et les montre partout ailleurs — atlas,
@@ -1030,7 +1036,7 @@ export function Manager() {
           )}
 
           {vue === 'equipe' && (
-            <div className="manager-equipe">
+            <div className="manager-equipe" data-tuto="mgr-composition">
               <section className="carte manager-composition-tete">
                 <div>
                   <div className="eyebrow">{t('compo.feuilleEffectif', { feuille: composition.titulaires.length + composition.remplacants.length, effectif: effectifComplet.length })}</div>
@@ -1076,29 +1082,45 @@ export function Manager() {
               />
 
               </CadreCompositionManager>
-              <section className="carte manager-roles-visuels">
+              <section className="carte manager-roles-visuels" data-tuto="mgr-roles">
                 <div><b><Icone nom="profil" taille={16} />{t("ui.3cd9c1881580")}</b><span>{t("ui.b9e3c6abe1e3")}</span></div>
-                <label>
+                <label data-tuto="mgr-role-capitaine">
                   <span><Icone nom="brassard" taille={14} />{t("pj.capitaine")}</span>
                   <Selecteur
                     options={optionsCapitaines}
                     valeur={composition.capitaineId}
-                    onChange={(id) => definirComposition({ ...composition, capitaineId: id })}
+                    onChange={(id) => { noter('coach.capitaine'); definirComposition({ ...composition, capitaineId: id }); }}
                     recherche
                   />
                 </label>
-                <label>
+                <label data-tuto="mgr-role-buteur">
                   <span><Icone nom="cible" taille={14} />{t("compo.buteur")}</span>
                   <Selecteur
                     options={optionsButeurs}
                     valeur={composition.buteurId}
-                    onChange={(id) => definirComposition({ ...composition, buteurId: id })}
+                    onChange={(id) => { noter('coach.buteur'); definirComposition({ ...composition, buteurId: id }); }}
                     recherche
                   />
                 </label>
+                {/* Les autres rôles (Correctif 17) : vice-capitaine, buteur secondaire, engagements, drop, lanceurs. */}
+                {([
+                  ['viceCapitaineId', 'viceCapitaine', 'brassard'], ['buteur2Id', 'buteur2', 'poteaux'],
+                  ['engagementId', 'engagement', 'engagement'], ['droppeurId', 'droppeur', 'drop'],
+                  ['lanceurId', 'lanceur', 'lanceur'], ['lanceur2Id', 'lanceur2', 'lanceur'],
+                ] as const).map(([champ, role, icone]) => (
+                  <label key={champ} data-tuto={`role-${role}`}>
+                    <span><Icone nom={icone} taille={14} />{t(`rv.role.${role}`)}</span>
+                    <Selecteur
+                      options={optionsAutresRoles}
+                      valeur={composition[champ] ?? ''}
+                      onChange={(id) => definirComposition({ ...composition, [champ]: id || undefined })}
+                      recherche
+                    />
+                  </label>
+                ))}
               </section>
 
-              <section className="carte manager-plan-avant-match">
+              <section className="carte manager-plan-avant-match" data-tuto="mgr-tactique">
                 <div className="comp-tete"><b><Icone nom="entraineur" taille={16} />{t("ui.fa3d2c1f17c1")}</b><span>{t("ui.04d4427cc715")}</span></div>
                 <div className="manager-tactiques-selects">
                   <label><span>{t("compo.secteur.attaque")}</span><Selecteur options={optionsTactiques.attaque} valeur={manager.tactique.attaque} onChange={(v) => majTactique('attaque', v as TactiqueManager['attaque'])} /></label>
@@ -1112,7 +1134,7 @@ export function Manager() {
           )}
 
           {vue === 'match' && (
-            <div className="manager-match-centre">
+            <div className="manager-match-centre" data-tuto="mgr-match">
               {!afficheManager ? (
                 <section className="carte manager-match-vide"><span><Icone nom="calendrier" taille={32} /></span><h2>{t("ui.3ebc7b10db2b")}</h2><p>{t("ui.e046ca836960")}</p><button className="btn primaire" onClick={semaineManager}>{t("ui.96dc682c2bc8")}</button></section>
               ) : (
@@ -1133,7 +1155,7 @@ export function Manager() {
                   {resultatManager ? (
                     <div className="manager-match-joue"><b><Icone nom="check" taille={14} />{t("ui.0e747b62e94d")}</b><p>{tn("ui.d3b31a092ea5", resultatManager.essaisPour, { v0: resultatManager.essaisPour })}</p><button className="btn primaire" onClick={semaineManager}>{manager.semaine >= SEMAINES_PAR_SAISON ? t("mgr.cloreSaison") : t("ui.96dc682c2bc8")}</button></div>
                   ) : (
-                    <div className="manager-lancer-match"><p>{t("ui.4bb382ff1adf")}</p><div><button className="btn fantome" onClick={() => setVue('equipe')}><Icone nom="equipe" taille={16} />{t("ui.da1b992afed6")}</button><button className="btn primaire grand" onClick={() => setMatchOuvert(afficheManager)}><Icone nom="sifflet" taille={18} />{t("ui.db01ad9b4fe2")}</button></div></div>
+                    <div className="manager-lancer-match"><p>{t("ui.4bb382ff1adf")}</p><div><button className="btn fantome" onClick={() => setVue('equipe')}><Icone nom="equipe" taille={16} />{t("ui.da1b992afed6")}</button><button className="btn primaire grand" data-tuto="mgr-lancer" onClick={() => setMatchOuvert(afficheManager)}><Icone nom="sifflet" taille={18} />{t("ui.db01ad9b4fe2")}</button></div></div>
                   )}
                 </section>
               )}
@@ -1543,7 +1565,7 @@ export function Manager() {
           )}
 
           {vue === 'marche' && (
-            <div className="manager-marche">
+            <div className="manager-marche" data-tuto="mgr-marche">
               <div className="carte manager-marche-tete">
                 <div><div className="eyebrow">{t('mgr.baseMondiale')}</div><h2><Icone nom="monde" taille={22} /> {t('mgr.marcheTitre')}</h2><p>{t('mgr.marcheIntro')}</p></div>
                 {/* ⚠️ LA MASSE ENGAGÉE PASSE DEVANT LE PLAFOND. Un plafond seul
