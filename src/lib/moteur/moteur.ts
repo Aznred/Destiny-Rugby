@@ -34,7 +34,7 @@ import {
 import {
   PHASES_ARRETEES, ajouterCommentaire, disciplineVide,
   type ActionJoueur, type Aplatissage, type ConqueteAnimee, type ConsigneJoueur, type DisciplineMatch, type EtatMatch,
-  type IntentionPied, type Lancement, type MeleeDetaillee, type NiveauMatch, type OrdreBagarre,
+  type DuelRuck, type IntentionPied, type IssueTouche, type Lancement, type MeleeDetaillee, type NiveauMatch, type OrdreBagarre,
   type Phase, type PlanDeScore, type StyleJeu, type TMODecision, type TMOEtat, type TMOMotif, type TypeCommentaire, type Vol,
 } from './etat.js';
 import {
@@ -78,11 +78,11 @@ import { REGLAGES_IA } from './ia/reglages.js';
 import {
   REGLAGES_DIRECT, appelEnCours, chanceDeLeServir, choisirReceveur, cibleDePlaquage, classerCoupDePied,
   compterLeJeu, deplacerHumain, humainPilote, jugerAppel, majVueDirecte, memoriserSuggestion, noterBallonPerdu, pionHumain,
-  refroidirDirect,
+  plongeonDirige, refroidirDirect,
   type ActionDirecte, type CommandeDirecte, type DemandeDirecte, type PlanDePied,
 } from './direct.js';
 export {
-  activerDirect, commanderDirect, creerEtatDirect, demanderDirect, directActif, poserViseur,
+  activerDirect, commanderDirect, creerEtatDirect, demanderDirect, directActif, plongeonDirige, poserViseur,
 } from './direct.js';
 import {
   COMBINAISONS_TOUCHE, contextePenalite, creerResponsabilites, decisionDuCapitaine, defenseAuSifflet, humainTientLe,
@@ -90,6 +90,9 @@ import {
   type ChoixPenalite, type CombinaisonTouche, type DecisionCapitaine, type EtatResponsabilites, type LancerTouche,
   type OptionsResponsabilites, type QualiteLancer, type RolesEquipe,
 } from './responsabilites.js';
+import { REGLAGES_CONQUETE, conqueteLisible } from './conquete.js';
+import { apportDuGeste, appuyerPack, choisirSortieDuPack, majPack } from './pack.js';
+import { REGLAGES_ENDURANCE, coutEffort, enduranceDeuxReserves, sprintMaxDe } from './endurance.js';
 import { lectureLocale, ligneDePasseCoupee, lireLeSurnombre, niveauDeLecture, regarderDevant } from './ia/vision.js';
 import {
   AXE, LARGEUR, LONGUEUR, LIGNE_A, LIGNE_B, MILIEU, M22_A, M22_B, adverse, borner,
@@ -527,7 +530,12 @@ export function creerMatch(
       ...((cote === 'A' ? options.buteurAId : options.buteurBId) ? { buteur: (cote === 'A' ? options.buteurAId : options.buteurBId)! } : {}),
       ...(cote === 'A' ? o.A : o.B),
     });
-    responsabilites = creerResponsabilites(pions, { A: imposes('A'), B: imposes('B'), avatar: o.avatar });
+    // ⚠️ Niveau 4 : le talonneur lance en touche. Un joueur qui incarne le numéro 2 est le lanceur de son équipe, qu'un coéquipier
+    // passe mieux que lui ou non — c'est le métier du poste, pas une récompense de carrière.
+    const moiPion = pions.find((p) => p.moi);
+    const avatar = (options.ia ?? 1) >= 4 && moiPion?.numero === 2 && !(o.avatar ?? []).includes('lanceur')
+      ? [...(o.avatar ?? []).filter((r) => r !== 'lanceur2'), 'lanceur' as const] : o.avatar;
+    responsabilites = creerResponsabilites(pions, { A: imposes('A'), B: imposes('B'), avatar });
     for (const cote of ['A', 'B'] as Cote[]) {
       const capitaine = pionDuRole({ pions, responsabilites }, cote, 'capitaine');
       const buteur = pionDuRole({ pions, responsabilites }, cote, 'buteur');
@@ -597,6 +605,8 @@ export function creerMatch(
     ...(responsabilites ? { responsabilites } : {}),
   };
 
+  // Niveau 4 : endurance générale lente + barre de sprint (Correctif 23).
+  if (enduranceDeuxReserves(e)) for (const p of pions) { p.deuxReserves = true; p.sprint = 100; p.sprintMax = 100; }
   e.minuteur = dureeArret(e, 'coupEnvoi');
   e.cibleRenvoi = {
     x: MILIEU + sens(possession) * 30,
@@ -716,7 +726,19 @@ function tick(e: EtatMatch): void {
     if (p.surLeTerrain) {
       p.minutes += dtHorloge / 60;
       // On récupère un peu de souffle pendant les arrêts de jeu.
-      if (PHASES_ARRETEES.has(e.phase)) p.endurance = Math.min(100, p.endurance + dtHorloge * 0.055);
+      if (p.deuxReserves) {
+        // ⚠️ DEUX RÉSERVES (niveau 4) : l'endurance générale reprend un peu de souffle aux arrêts de jeu, et descend avec
+        // l'allure (fatigue condensée à l'échelle de l'horloge) et avec les efforts du jeu collectif.
+        if (PHASES_ARRETEES.has(e.phase)) p.endurance = Math.min(100, p.endurance + dtHorloge * REGLAGES_ENDURANCE.recupArretGenerale);
+        else if (!p.corps) {
+          const allure = Math.min(1, Math.hypot(p.vitesse.x, p.vitesse.y) / p.vitesseMax);
+          const k = REGLAGES_ENDURANCE.usureGenerale;
+          if (allure > 0.05 && fatigueCondensee > 0) p.endurance = Math.max(REGLAGES_ENDURANCE.plancher, p.endurance - p.usure * dt * allure ** 1.6 * 10 * fatigueCondensee * k);
+          const lien = REGLAGES_ENDURANCE.coutLien[p.role];
+          if (lien) p.endurance = Math.max(REGLAGES_ENDURANCE.plancher, p.endurance - lien * dt * (1 + fatigueCondensee));
+        }
+        p.sprintMax = sprintMaxDe(p.endurance);
+      } else if (PHASES_ARRETEES.has(e.phase)) p.endurance = Math.min(100, p.endurance + dtHorloge * 0.055);
       else if (fatigueCondensee > 0 && !p.corps) {
         // ⚠️ DIX MINUTES D'ÉCRAN, QUATRE-VINGTS D'EFFORT (IA par poste). `deplacer`
         // compte la dépense à la seconde simulée : un match condensé contient
@@ -783,6 +805,8 @@ function tick(e: EtatMatch): void {
   if (lectureLocale(e)) conduireLeSurnombre(e);
   if (e.direct?.actif) piloterDirect(e);
   else if (e.controle) piloterMonJoueur(e);
+  // Niveau 4 : le geste du joueur dans son pack — les temps, les appuis, la justesse.
+  if (e.direct) majPack(e);
   if (e.cadenceDetaillee) {
     if (e.phase === 'melee' && e.conquete?.melee) avancerMeleeDetaillee(e);
     if ((e.phase === 'tirAuBut' || e.phase === 'transformation') && e.tir?.etape && !e.tir.volLance) avancerTirDetaille(e);
@@ -795,6 +819,8 @@ function tick(e: EtatMatch): void {
       for (const p of e.pions) if (p.surLeTerrain) p.effort = Math.min(p.effort, .66);
     }
     if (e.phase === 'touche' && e.placementJoue) conduireLanceur(e);
+    // Niveau 4 : la touche est tranchée AVANT le saut, pour que ce qu'on voit soit ce qui se passe.
+    if (e.phase === 'touche' && conqueteLisible(e)) preparerLaTouche(e);
     // Son tir parti, le buteur regagne sa place en trottinant : il repartait au sprint.
     if (e.tir?.volLance && e.tir.buteur.surLeTerrain) e.tir.buteur.effort = Math.min(e.tir.buteur.effort, .6);
     // Idem pour une mêlée ou une touche qui attend ses joueurs : on s'y rend au
@@ -1023,7 +1049,7 @@ function tick(e: EtatMatch): void {
     return;
   }
 
-  if (!retenirLePlacement(e)) e.minuteur -= dt;
+  if (!retenirLePlacement(e) && !attendLeLancer(e)) e.minuteur -= dt;
   switch (e.phase) {
     case 'coupEnvoi': return phaseCoupEnvoi(e);
     case 'renvoi22': return phaseRenvoi22(e);
@@ -1081,7 +1107,7 @@ function piloterMonJoueur(e: EtatMatch): void {
       // ⚠️ LE SPRINT SE PAIE, SINON ON LE CHOISIT À CHAQUE CARTE. La dépense
       // s'ajoute à celle que `deplacer()` calcule déjà sur l'intensité de la
       // course : trois relances à fond dans la même mi-temps se sentent.
-      p.endurance = Math.max(0, p.endurance - DT * 1.4);
+      if (!p.deuxReserves) p.endurance = Math.max(0, p.endurance - DT * 1.4);
       break;
     case 'plaquage':
     case 'monter': {
@@ -1135,6 +1161,18 @@ function piloterMonJoueur(e: EtatMatch): void {
 function commandeHumaine(e: EtatMatch, p: Pion): CommandeDirecte {
   const d = e.direct!;
   const porteur = e.porteur;
+  // ═══ LE PLONGEON DIRIGÉ (Correctif 23) ═══════════════════════════════════════════════════════════════
+  // Le joueur se jette DANS UNE DIRECTION — celle de son stick au moment du geste — et non sur un porteur verrouillé. Une légère
+  // aide redresse le cap vers le porteur, mais seulement s'il est déjà dans le cône de la visée : trop tôt, ou dans la mauvaise
+  // direction, le plaqueur tombe dans le vide. Un attaquant qui crochète au bon moment le fait réellement manquer.
+  if (d.arme?.action === 'plaquage' && d.arme.cap !== undefined && e.sim < d.arme.jusqua) {
+    if (porteur && porteur.cote !== p.cote && !porteur.corps) {
+      const vers = Math.atan2(porteur.pos.y - p.pos.y, porteur.pos.x - p.pos.x);
+      let ecart = Math.atan2(Math.sin(vers - d.arme.cap), Math.cos(vers - d.arme.cap));
+      if (Math.abs(ecart) <= REGLAGES_DIRECT.aideLancerCone) d.arme.cap += borner(ecart, -REGLAGES_DIRECT.aideLancerVitesse * DT, REGLAGES_DIRECT.aideLancerVitesse * DT);
+    }
+    return { mx: Math.cos(d.arme.cap), my: Math.sin(d.arme.cap), sprint: true };
+  }
   if (d.arme?.action === 'plaquage' && e.sim < d.arme.jusqua && porteur && porteur.cote !== p.cote) {
     // Lancé sur le porteur : il vise où le porteur SERA, à l'allure d'un sprint — pas de téléportation.
     const dist = distance(p.pos, porteur.pos);
@@ -1186,6 +1224,7 @@ function decalageHumain(e: EtatMatch): Vec | null {
 function rayonDePlaquage(e: EtatMatch, d: Pion): number {
   if (!d.moi || !e.direct?.actif) return RAYON_PLAQUAGE;
   const a = e.direct.arme;
+  if (a?.action === 'plaquage' && a.cap !== undefined) return e.sim < a.jusqua ? REGLAGES_DIRECT.allongeLancer : 0;
   return a?.action === 'plaquage' && e.sim < a.jusqua ? REGLAGES_DIRECT.allongePlaquage : 0;
 }
 
@@ -1224,7 +1263,7 @@ function piloterDirect(e: EtatMatch): void {
     const fini = e.sim >= arme.jusqua - 1e-6;
     if (arme.action === 'plaquage') {
       if (porteMoi) d.arme = null;                                    // il a gagné le ballon
-      else if (fini) { d.arme = null; plaquageDansLeVide(e, p); }     // lancé, et personne au bout
+      else if (fini) { const cap = arme.cap; d.arme = null; plaquageDansLeVide(e, p, cap); }     // lancé, et personne au bout
     } else if (arme.action === 'raffut' || arme.action === 'crochet') {
       if (!porteMoi) { d.arme = null; if (e.intention?.type === arme.action) e.intention = null; }
       else if (fini) d.arme = null;
@@ -1246,6 +1285,16 @@ function piloterDirect(e: EtatMatch): void {
     const libre = humainPilote(e, p);
     for (const dem of file) {
       if (e.sim - (dem.t ?? e.sim) > R.patience + DT) continue;
+      // Le geste dans un pack se joue quand le jeu ne laisse pas le pion libre : c'est tout son intérêt.
+      if (dem.action === 'pousser') {
+        const pk = d.pack;
+        const ok = appuyerPack(e, dem.tr ?? dem.t);
+        // Au ruck, le premier appui est AUSSI le geste : le joueur se jette sur le ballon (et sa justesse fera la différence).
+        if (ok && pk?.type === 'ruck' && !pk.engage && libre) { pk.engage = true; executerDemande(e, p, { action: 'grattage', t: e.sim }); }
+        retourDirect(e, 'pousser', ok);
+        continue;
+      }
+      if (dem.action === 'quitter') { retourDirect(e, 'quitter', !!dem.sortie && choisirSortieDuPack(e, dem.sortie)); continue; }
       if (!libre) { retourDirect(e, dem.action, false, 'indisponible'); continue; }
       executerDemande(e, p, dem);
     }
@@ -1257,7 +1306,10 @@ function executerDemande(e: EtatMatch, p: Pion, dem: DemandeDirecte): boolean {
   const d = e.direct!;
   const v = d.vue;
   const R = REGLAGES_DIRECT;
-  const depense = (cout: number) => { p.endurance = Math.max(0, p.endurance - cout); };
+  // Deux réserves : un geste coûte un peu à l'endurance générale ET à la barre de sprint (on souffle après un plaquage).
+  const depense = (cout: number) => {
+    if (p.deuxReserves) { coutEffort(p, cout * 0.4); p.sprint = Math.max(0, p.sprint - cout * 2.2); } else p.endurance = Math.max(0, p.endurance - cout);
+  };
   switch (dem.action) {
     case 'passe': return passeDirecte(e, p, dem, false);
 
@@ -1316,6 +1368,7 @@ function executerDemande(e: EtatMatch, p: Pion, dem: DemandeDirecte): boolean {
     }
 
     case 'plaquage': {
+      if (plongeonDirige(e)) return plongeon(e, p, depense);
       const cible = cibleDePlaquage(e, p);
       if (!cible || !v.possible.plaquage) return retourDirect(e, 'plaquage', false, cible ? 'recharge' : 'tropLoin');
       d.arme = { action: 'plaquage', depuis: e.sim, jusqua: e.sim + R.dureePlaquage };
@@ -1433,11 +1486,38 @@ function passeDirecte(e: EtatMatch, p: Pion, dem: DemandeDirecte, tardive: boole
   return retourDirect(e, 'passe', ok, ok ? undefined : 'faute');
 }
 
+/**
+ * LE PLONGEON DIRIGÉ (Correctif 23, IA de niveau 4). Le bouton ne verrouille personne : il lance le joueur dans la direction
+ * de son stick (à défaut, de sa course, à défaut vers le porteur) pendant `dureeLancer`. Le contact ne se produit que si le
+ * porteur se trouve sur la trajectoire ; sinon le plaqueur tombe dans le vide (`plaquageDansLeVide`).
+ */
+function plongeon(e: EtatMatch, p: Pion, depense: (cout: number) => void): boolean {
+  const d = e.direct!;
+  const R = REGLAGES_DIRECT;
+  const porteur = e.porteur;
+  if (!porteur || porteur.cote === p.cote || e.phase !== 'jeuCourant' || porteur.corps || p.corps) return retourDirect(e, 'plaquage', false, 'tropLoin');
+  if ((d.recharges.plaquage ?? 0) > 0) return retourDirect(e, 'plaquage', false, 'recharge');
+  if (distance(p.pos, porteur.pos) > R.porteeLancer) return retourDirect(e, 'plaquage', false, 'tropLoin');
+  const c = d.commande;
+  const norme = Math.hypot(c.mx, c.my), allure = Math.hypot(p.vitesse.x, p.vitesse.y);
+  const cap = norme > 0.3 ? Math.atan2(c.my, c.mx)
+    : allure > 1.5 ? Math.atan2(p.vitesse.y, p.vitesse.x)
+      : Math.atan2(porteur.pos.y - p.pos.y, porteur.pos.x - p.pos.x);
+  d.arme = { action: 'plaquage', depuis: e.sim, jusqua: e.sim + R.dureeLancer, cap };
+  e.intention = { type: 'plaquage', restant: R.dureeLancer };
+  jouerGeste(e, p, 'plongeon', R.dureeLancer);
+  d.recharges.plaquage = R.rechargePlaquage + 0.5;
+  depense(R.coutPlaquage);
+  return retourDirect(e, 'plaquage', true);
+}
+
 /** Un plaquage lancé qui ne trouve personne : le plongeon dans le vide, et un long moment pour se relever. */
-function plaquageDansLeVide(e: EtatMatch, p: Pion): void {
+function plaquageDansLeVide(e: EtatMatch, p: Pion, capLance?: number): void {
   const porteur = e.porteur;
   if (!porteur || porteur.cote === p.cote || e.phase !== 'jeuCourant' || porteur.corps) return;
-  const dx = porteur.pos.x - p.pos.x, dy = porteur.pos.y - p.pos.y, n = Math.hypot(dx, dy) || 1;
+  // Plongeon dirigé : il tombe là où il s'est jeté, pas sur le porteur.
+  const cap = capLance;
+  const dx = cap !== undefined ? Math.cos(cap) : porteur.pos.x - p.pos.x, dy = cap !== undefined ? Math.sin(cap) : porteur.pos.y - p.pos.y, n = Math.hypot(dx, dy) || 1;
   declencherChute(p, { x: dx / n * 2.4, y: dy / n * 2.4 }, 1.7);
   jouerGeste(e, p, 'tackle_low', 2.3, 'manque');
   p.battu = Math.max(p.battu, 2.2);
@@ -4543,9 +4623,15 @@ export function probaPlaquage(
   // Le geste retranche donc DIRECTEMENT de la chance de plaquage, et il est
   // indexé sur l’attribut qui le porte : un ailier rapide sprinte, un pilier
   // raffute, et aucun des deux ne fait le métier de l’autre.
+  // Niveau 4 : une grosse percussion se prépare — un porteur nettement plus fort et plus lourd, lancé, perce plus souvent.
+  // Jamais garanti : le bonus plafonne, et il fond avec la fatigue et face à un défenseur qui plaque bien.
+  const percussion = conqueteLisible(e) && geste === 'raffut'
+    ? 0.05 * borner((porteur.puissance - defenseur.puissance) / 22 + ((porteur.poidsKg ?? 95) - (defenseur.poidsKg ?? 95)) / 35
+      + (Math.hypot(porteur.vitesse.x, porteur.vitesse.y) - 4) / 5, -0.6, 1.3) * (0.7 + 0.3 * porteur.endurance / 100)
+    : 0;
   const chance = borner(
     0.93 + (force - resistance) / 380 + elan + bonusLigne + bonusBotArcade - bonusDuGeste(porteur, geste) * efficaciteGeste
-      - avantageDuPorteur(e, porteur, defenseur),
+      - avantageDuPorteur(e, porteur, defenseur) - percussion,
     0.45, 0.99,
   );
   // Défense resserrée (ligue en ligne, règles 2) : une part des plaquages
@@ -4931,8 +5017,9 @@ function duelGagne(e: EtatMatch, porteur: Pion, defenseur: Pion, geste: ActionJo
     y: porteur.vitesse.y * .55 - direction * 1.3,
   }, 2.3);
   if (geste === 'raffut') {
-    const contact = gesteDeContact(porteur, defenseur);
-    const issue = issueRaffut(porteur, defenseur);
+    const grosse = conqueteLisible(e);
+    const contact = gesteDeContact(porteur, defenseur, grosse);
+    const issue = issueRaffut(porteur, defenseur, grosse);
     const percussion = borner(2.8 + (porteur.puissance - defenseur.puissance) / 20
       + ((porteur.poidsKg ?? 95) - (defenseur.poidsKg ?? 95)) / 50, 2, 5.8);
     if (issue === 'tombe') {
@@ -5142,7 +5229,96 @@ function formerRuck(
   }
 }
 
+// ═══ LE RUCK LISIBLE (Correctif 23, niveau 4) ════════════════════════════════════════════════════════════════════════
+// Un grattage ou un contre-ruck n'est plus une variable qui change : c'est une séquence que la scène joue (`ruck.duel`) — on voit
+// le défenseur arriver, se coucher sur le ballon, lutter contre les soutiens qui tentent de le déloger, puis se relever ballon
+// en main ; ou les défenseurs charger, percuter, repousser le groupe de quelques mètres. L'issue est décidée avant, appliquée après.
+
+/** Démarre la séquence : qui joue, combien de temps, jusqu'où ça pousse, et ce que ça donnera. */
+export function lancerLeDuelDuRuck(
+  e: EtatMatch, type: 'gratte' | 'contre', acteur: Pion, contreurs: Pion[], issue: DuelRuck['issue'],
+  avancee: number, fautif?: Pion, motif?: string,
+): void {
+  const ruck = e.ruck!;
+  const defense = adverse(ruck.attaque);
+  const origine = { x: e.ballon.x, y: e.ballon.y };
+  const joueurs = type === 'gratte' ? [acteur] : contreurs;
+  const loin = Math.max(...joueurs.map((p) => distance(p.pos, origine)));
+  // Il arrive en courant (6 m/s) ; jamais moins d'une demi-seconde, jamais plus de 1,8 s.
+  const approche = borner(loin / 6.2 + 0.25, 0.5, 1.8);
+  const poussee = type === 'contre' ? 1.5 : 0;
+  const duree = type === 'gratte' ? approche + 0.57 + 1.07 + 1.0 : approche + poussee + 0.5;
+  ruck.duel = {
+    type, acteurId: acteur.id, contreursIds: contreurs.map((p) => p.id), debut: e.sim, contact: e.sim + approche, poussee,
+    fin: e.sim + duree, issue, avancee, origine, fautifId: fautif?.id, motif,
+  };
+  e.minuteur = duree + 0.05;
+  ruck.eclair = false;
+  // Un grattage ou un contre-ruck coûte : on s'y jette de tout son poids (endurance générale et barre de sprint).
+  for (const p of joueurs) { coutEffort(p, type === 'gratte' ? REGLAGES_ENDURANCE.coutGrattage : REGLAGES_ENDURANCE.coutContreRuck); p.sprint = Math.max(0, p.sprint - 8); }
+  if (type === 'gratte') {
+    dire(e, 'ruck', defense, `${acteur.nom} arrive sur le ballon, se couche dessus et lutte pour le garder.`, 0, acteur.moi);
+  } else {
+    dire(e, 'ruck', defense, `Contre-ruck : ${nomClub(e, defense)} arrive lancé sur le regroupement et cherche à reculer les soutiens.`);
+    e.indicationJeu = { cle: 'contreRuck', cote: defense, t: e.sim };
+  }
+}
+
+/** La séquence est finie : on applique ce que la scène a montré, puis le ballon sort comme après n'importe quel ruck. */
+function appliquerLeDuelDuRuck(e: EtatMatch): void {
+  const ruck = e.ruck!;
+  const duel = ruck.duel!;
+  const attaque = ruck.attaque;
+  const defense = adverse(attaque);
+  const acteur = e.pions.find((p) => p.id === duel.acteurId)!;
+  const liberer = () => {
+    for (const p of e.pions) if (p.role === 'ruck' && p.surLeTerrain && p.sanction <= 0) { p.battu = Math.max(p.battu, 0.6); p.role = 'ligne'; }
+  };
+  switch (duel.issue) {
+    case 'turnover':
+      if (duel.type === 'gratte') {
+        acteur.stats.grattages += 1;
+        dire(e, 'ruck', defense, C.phrase(e.rng, C.RUCK_GRATTAGE, { nom: acteur.nom }), 0, acteur.moi);
+      } else dire(e, 'ruck', defense, `Contre-ruck puissant : ${nomClub(e, defense)} passe au-dessus du ballon.`);
+      noterBallonPerdu(e);
+      e.possession = defense;
+      e.phasesDepuisArret = 0;
+      e.dernierTurnover = { pion: acteur, t: e.t };
+      e.indicationJeu = { cle: duel.type === 'gratte' ? 'grattage' : 'turnover', cote: defense, t: e.sim };
+      pousserElan(e, defense, POUSSEES.turnover);
+      break;
+    case 'attaqueConserve':
+      e.ballonLent = true;
+      dire(e, 'ruck', attaque, `Le contre-ruck de ${nomClub(e, defense)} est repoussé : ${nomClub(e, attaque)} garde le ballon, mais il est ralenti.`);
+      break;
+    case 'instable': {
+      dire(e, 'ruck', null, 'Le ballon jaillit du regroupement : il est libre, la course est lancée.');
+      const sol = { ...e.ballon };
+      const s = sens(attaque);
+      liberer();
+      e.ruck = null;
+      e.placement = null;
+      return demarrerBallonLibre(e, {
+        de: sol, vers: { x: sol.x - s * (1.4 + e.rng() * 1.2), y: borner(sol.y + (e.rng() - 0.5) * 3, 1.2, LARGEUR - 1.2) },
+        duree: 0.3, ecoule: 0.3, hauteur: 0.1, type: 'passe', intention: 'passe', auteur: acteur, receveur: null,
+      });
+    }
+    case 'penalite': {
+      const fautif = duel.fautifId ? e.pions.find((p) => p.id === duel.fautifId) : undefined;
+      liberer();
+      e.ruck = null;
+      const pour = fautif && fautif.cote === attaque ? defense : attaque;
+      return siffler(e, pour, e.ballon, duel.motif ?? 'entrée par le côté au ruck', fautif);
+    }
+  }
+  const o = ruck.organisation;
+  const nettoyeurs = o ? o.attaque.map((id) => e.pions.find((p) => p.id === id)).filter((p): p is Pion => !!p) : [];
+  return terminerLeRuck(e, nettoyeurs);
+}
+
 function phaseRuck(e: EtatMatch): void {
+  // Niveau 4 : un grattage ou un contre-ruck qui s'achève est appliqué tel qu'on l'a vu.
+  if (conqueteLisible(e) && e.ruck?.duel && e.minuteur <= 0) return appliquerLeDuelDuRuck(e);
   const organisation = e.ruck?.organisation;
   const cahier = combinaisonSituation(e, 'ruck');
   // La sortie programmée prime sur la boîte automatique, même si le cahier
@@ -5290,12 +5466,16 @@ function phaseRuck(e: EtatMatch): void {
   // pénalité contre son camp — et à ce moment-là le carton devient possible,
   // comme pour n'importe quelle faute (`siffler`).
   const moi = e.pions.find((p) => p.moi);
+  let geste0 = false;
   const jeGratte = intentionEst(e, 'grattage') && !!moi && moi.cote === defense
     && moi.surLeTerrain && moi.sanction <= 0 && distance2(moi.pos, e.ballon) < 64;
   if (jeGratte && moi) {
     consommerIntention(e);
     gratteur = moi;
-    avantageDefense += 12;
+    // Niveau 4 : la qualité de son geste (parfait, correct, raté) fait la différence ; un geste raté le laisse mal placé.
+    const qGratte = e.direct?.pack?.type === 'ruck' ? e.direct.pack.temps[0]?.q : undefined;
+    avantageDefense += !conqueteLisible(e) || qGratte === undefined || qGratte === 1 ? 12 : qGratte === 2 ? 20 : 2;
+    if (conqueteLisible(e) && qGratte === 0) geste0 = true;
     dire(e, 'ruck', defense, C.texteMatch('grattagePlonge', { nom: moi.nom }), 0, true);
   }
 
@@ -5308,7 +5488,7 @@ function phaseRuck(e: EtatMatch): void {
   const protection = !iaParPoste(e) ? 1 : (arrives >= 2 ? REGLAGES_IA.protectionDeux
     : arrives === 1 ? REGLAGES_IA.protectionUn : REGLAGES_IA.protectionAucun) * (condense(e) ? 1 : REGLAGES_IA.protectionReel);
   const disciplineGratteur = gratteur?.discipline ?? 50;
-  const malPlace = !gratteur || distance(gratteur.pos, e.ballon) > 3.4;
+  const malPlace = !gratteur || distance(gratteur.pos, e.ballon) > 3.4 || geste0;
 
   // Le défenseur arrivé tard ou hors de ses appuis est sanctionné. Un vrai
   // spécialiste bien placé prend nettement moins ce risque.
@@ -5359,6 +5539,8 @@ function phaseRuck(e: EtatMatch): void {
 
   const chanceGrattage = borner(0.065 + equilibre / 170 + (jeGratte ? 0.06 : 0), 0.015, 0.34) * protection;
   if (gratteur && !malPlace && e.rng() < chanceGrattage) {
+    // Niveau 4 : le grattage se JOUE (il arrive, se couche sur le ballon, lutte, se relève) avant que le ballon ne change de camp.
+    if (conqueteLisible(e)) return lancerLeDuelDuRuck(e, 'gratte', gratteur, [], 'turnover', 0);
     gratteur.stats.grattages += 1;
     jouerGeste(e, gratteur, 'jackal', 2.2);
     dire(e, 'ruck', defense, C.phrase(e.rng, C.RUCK_GRATTAGE, { nom: gratteur.nom }), 0, gratteur.moi);
@@ -5368,6 +5550,8 @@ function phaseRuck(e: EtatMatch): void {
     e.dernierTurnover = { pion: gratteur, t: e.t };
     pousserElan(e, defense, POUSSEES.turnover);
   } else if (equilibre > 9 && prochesDefense.length >= 2 && e.rng() < 0.15 * protection) {
+    // Niveau 4 : les défenseurs chargent, percutent les soutiens et les repoussent — puis seulement le ballon change de camp.
+    if (conqueteLisible(e)) return lancerLeDuelDuRuck(e, 'contre', prochesDefense[0]!, prochesDefense.slice(0, 3), 'turnover', 1.8 + e.rng() * 1.4);
     const contreur = prochesDefense[0]!;
     noterBallonPerdu(e);
     e.possession = defense;
@@ -5375,6 +5559,14 @@ function phaseRuck(e: EtatMatch): void {
     e.dernierTurnover = { pion: contreur, t: e.t };
     dire(e, 'ruck', defense, `Contre-ruck puissant : ${nomClub(e, defense)} passe au-dessus du ballon.`);
     pousserElan(e, defense, POUSSEES.turnover);
+  } else if (conqueteLisible(e) && equilibre > 2 && prochesDefense.length >= 2 && e.rng() < REGLAGES_CONQUETE.contreRuckVisible * protection) {
+    // Un contre-ruck qui ne renverse pas forcément le ballon : il se voit quand même — et peut le garder, le faire sortir ou coûter une pénalité.
+    const t = e.rng();
+    const contreurs = prochesDefense.slice(0, Math.min(3, prochesDefense.length));
+    if (t < 0.60) return lancerLeDuelDuRuck(e, 'contre', contreurs[0]!, contreurs, 'attaqueConserve', -(0.4 + e.rng() * 0.9));
+    if (t < 0.84) return lancerLeDuelDuRuck(e, 'contre', contreurs[0]!, contreurs, 'instable', 0.3 + e.rng() * 0.6);
+    if (t < 0.93) return lancerLeDuelDuRuck(e, 'contre', contreurs[0]!, contreurs, 'penalite', 0.5 + e.rng() * 0.5, contreurs[0], 'entrée par le côté au ruck');
+    return lancerLeDuelDuRuck(e, 'contre', contreurs[0]!, contreurs, 'penalite', 0.3, nettoyeurs[0], 'soutien qui plonge au ruck');
   } else if (equilibre < -9) {
     e.ballonLent = false;
     dire(e, 'ruck', attaque, `Sortie rapide pour ${nomClub(e, attaque)} : les soutiens ont nettoyé juste à temps.`);
@@ -5383,6 +5575,11 @@ function phaseRuck(e: EtatMatch): void {
     dire(e, 'ruck', attaque, `Ballon ralenti, la défense de ${nomClub(e, defense)} a le temps de se replacer.`);
   }
 
+  return terminerLeRuck(e, nettoyeurs);
+}
+
+/** La sortie du ballon, une fois le duel du ruck tranché : relayeur, retards de la défense, reprise du jeu. */
+function terminerLeRuck(e: EtatMatch, nettoyeurs: Pion[]): void {
   // Les nettoyeurs.
   for (const p of nettoyeurs) if (distance2(p.pos, e.ballon) < 16) p.stats.rucksNettoyes += 1;
 
@@ -5502,16 +5699,41 @@ function deciderLaMontee(e: EtatMatch, attaque: Cote, lieu: Vec): void {
   if (e.rng() < chance) e.monteeSeul = { id: choisi.id, jusqua: e.sim + 2.4 };
 }
 
+/** Le joueur quitte le maul : il ramasse le ballon au fond et part, le passe au 9, ou se détache pour recevoir. Vrai si le maul est fini. */
+function sortirDuMaul(e: EtatMatch, moi: Pion, sortie: 'ramasser' | 'passer' | 'detacher'): boolean {
+  const cote = moi.cote;
+  const neuf = surLeTerrain(e, cote).find((p) => p.numero === 9 && p.sanction <= 0 && !p.corps && distance(p.pos, e.ballon) < 12);
+  if (sortie !== 'ramasser' && !neuf) return false;
+  for (const p of e.pions) if (p.role === 'maul') { p.role = 'ligne'; p.battu = Math.max(p.battu, 0.5); }
+  e.maul = null;
+  e.placement = null;
+  if (sortie === 'ramasser') {
+    dire(e, 'maul', cote, `${moi.nom} récupère le ballon au fond du maul et part seul.`, 0, true);
+    reprendreJeu(e, { x: e.ballon.x, y: e.ballon.y }, moi, 3);
+    return true;
+  }
+  dire(e, 'maul', cote, sortie === 'passer' ? `${moi.nom} sert le demi de mêlée au fond du maul.` : `${moi.nom} se détache du maul, le demi de mêlée le sert.`, 0, true);
+  reprendreJeu(e, { x: e.ballon.x, y: e.ballon.y }, undefined, 3, undefined, neuf);
+  if (sortie === 'detacher' && e.lancement && neuf) e.lancement.chaine = dedoublonner([neuf, moi, ...e.lancement.chaine.filter((p) => p !== neuf && p !== moi)]).slice(0, 6);
+  return true;
+}
+
 function phaseMaul(e: EtatMatch, dt: number): void {
   const cote = e.possession;
   const s = sens(cote);
   const mien = surLeTerrain(e, cote).filter((p) => p.avant);
   const adv = surLeTerrain(e, adverse(cote)).filter((p) => p.avant);
   const moy = (l: Pion[]) => (l.length ? l.reduce((a, b) => a + b.puissance, 0) / l.length : 50);
-  const poussee = moy(mien) - moy(adv);
+  let poussee = moy(mien) - moy(adv);
+  // Niveau 4 : le geste du joueur. Dans le maul qui porte, il pousse ; en face, il le ralentit — ou l'arrête.
+  const pk = conqueteLisible(e) && e.direct?.pack?.type === 'maul' ? e.direct.pack : undefined;
+  const moiMaul = pk ? e.pions.find((p) => p.moi) : undefined;
+  if (pk && moiMaul) poussee += (moiMaul.cote === cote ? 1 : -1) * apportDuGeste(moiMaul, pk) * 1.4;
+  if (pk && moiMaul?.cote === cote && pk.sortie && sortirDuMaul(e, moiMaul, pk.sortie)) return;
 
   const avance = borner(0.75 + poussee / 45, 0.1, 1.9);
   e.ballon.x += s * avance * dt;
+  if (conqueteLisible(e) && e.maul) e.maul.avance = (e.maul.avance ?? 0) + avance * dt;
   mien.forEach((p, i) => {
     p.role = 'maul';
     p.cible = { x: e.ballon.x - s * (0.42 + Math.floor(i / 3) * 0.72), y: borner(e.ballon.y + ((i % 3) - 1) * 0.76, 3, LARGEUR - 3) };
@@ -5539,6 +5761,13 @@ function phaseMaul(e: EtatMatch, dt: number): void {
     // une autre issue visible que « ruck » ou « essai ».
     if (e.rng() < (iaParPoste(e) ? 0.07 + 0.22 * tentation(e, adverse(cote), e.ballon) * (poussee > 0 ? 1 : 0.5) : 0.07)) {
       return siffler(e, cote, e.ballon, 'maul écroulé');
+    }
+    // Niveau 4 : un maul que la défense a arrêté net — il n'a presque pas bougé et le pack d'en face l'emporte — se joue en mêlée pour elle.
+    if (conqueteLisible(e) && (e.maul?.avance ?? 9) < 1.2 && poussee < -4 && e.rng() < borner(0.2 - poussee / 60, 0.2, 0.55)) {
+      dire(e, 'maul', adverse(cote), `Maul arrêté : ${nomClub(e, adverse(cote))} l'a stoppé net, mêlée pour ${nomClub(e, adverse(cote))}.`);
+      e.indicationJeu = { cle: 'melee', cote: adverse(cote), t: e.sim };
+      for (const p of e.pions) if (p.role === 'maul') p.role = 'ligne';
+      return arret(e, 'melee', adverse(cote), e.ballon);
     }
     // Le maul s'arrête : le 8 ou le 9 relance.
     formerRuck(e, e.ballon);
@@ -5672,6 +5901,14 @@ function lisser(k: number): number { const u = borner(k, 0, 1); return u * u * (
  */
 export function geometrieMelee(m: MeleeDetaillee, sim: number): { avance: number; angle: number; ecart: number } {
   const depuis = sim - m.etapeDepuis;
+  // Niveau 4 : la poussée est continue. Le dernier pas connu est prolongé à vitesse constante jusqu'au suivant, et le moteur comme
+  // l'affichage lisent la même position — la mêlée n'a pas de point d'arrivée fixé d'avance.
+  if (m.dyn && (m.etape === 'poussee' || m.etape === 'sortie')) {
+    const d = m.dyn;
+    const k = m.etape === 'sortie' ? 1 : lisser(depuis / Math.max(.1, m.ruptureApres ?? m.dureePoussee));
+    const tourne = d.tourne ? d.tourne.sens * 0.62 * lisser((depuis - d.tourne.depuis) / 1.5) : 0;
+    return { avance: d.a + d.v * borner(sim - d.t, 0, DT), angle: m.angleFinal * k + tourne, ecart: 0 };
+  }
   const k = m.etape === 'sortie' ? 1
     : m.etape === 'poussee' ? lisser(depuis / Math.max(.1, m.ruptureApres ?? m.dureePoussee)) : 0;
   const ecart = m.etape === 'placement' ? 1.4
@@ -5689,6 +5926,7 @@ export function geometrieMelee(m: MeleeDetaillee, sim: number): { avance: number
  * du spectateur avant que l'arbitre ne siffle.
  */
 function deciderMeleeDetaillee(e: EtatMatch, m: MeleeDetaillee): void {
+  if (conqueteLisible(e)) return preparerLaPoussee(e, m);
   const cote = m.introducteur;
   const oppose = adverse(cote);
   const mien = surLeTerrain(e, cote).filter((p) => p.avant);
@@ -5742,6 +5980,155 @@ function deciderMeleeDetaillee(e: EtatMatch, m: MeleeDetaillee): void {
   }
 }
 
+// ═══ LA MÊLÉE QUI POUSSE VRAIMENT (Correctif 23, niveau 4) ═══════════════════════════════════════════════════════════
+// Le duel est posé à l'introduction (`duel0`) mais la mêlée n'a plus d'arrivée fixée : elle avance, ou recule, à la vitesse que
+// donne le rapport de force du MOMENT — le sien plus ce que le geste du joueur y ajoute — et c'est cette position, en mètres, que
+// le moteur et la scène lisent. Au milieu de la poussée l'issue est tranchée (pénalité, écroulement, ballon renversé, départ du 8).
+// Un pack qui domine près de la ligne n'a pas à libérer le ballon : il continue, et si le ballon franchit la ligne, c'est un essai.
+
+/** Prépare la poussée : le duel, l'angle, rien d'autre — l'issue viendra à mi-chemin. */
+function preparerLaPoussee(e: EtatMatch, m: MeleeDetaillee): void {
+  const cote = m.introducteur;
+  const oppose = adverse(cote);
+  const mien = surLeTerrain(e, cote).filter((p) => p.avant);
+  const adv = surLeTerrain(e, oppose).filter((p) => p.avant);
+  const qte = e.bonusConqueteArcade?.type === 'melee' ? e.bonusConqueteArcade.scores : undefined;
+  const bonusArcade = ((qte?.[cote] ?? 0) - (qte?.[oppose] ?? 0)) * 8;
+  e.bonusConqueteArcade = null;
+  const dom = scoreMelee(e, mien, cote) - scoreMelee(e, adv, oppose) + bonusArcade;
+  const duel = dom + (e.rng() - 0.5) * 18;
+  m.dyn = { duel0: duel, bonus: 0, t: e.sim, a: 0, v: 0 };
+  m.duel = duel;
+  m.perdant = adverse(duel >= 0 ? cote : oppose);
+  m.talonneur = cote;
+  m.dureePoussee = TEMPS_MELEE.poussee;
+  m.avanceFinale = 0;
+  m.issue = 'stable';
+  const pilier = (l: Pion[], n: number) => l.find((p) => p.numero === n)?.puissance ?? 60;
+  const torsion = ((pilier(mien, 1) - pilier(adv, 3)) - (pilier(mien, 3) - pilier(adv, 1))) / 160;
+  m.angleFinal = borner(torsion, -0.14, 0.14);
+  if (e.conquete) e.conquete.pousseVers = Math.abs(duel) < 1 ? undefined : duel > 0 ? cote : oppose;
+}
+
+/** Mètres que le ballon, aux pieds du 8, doit encore parcourir pour franchir la ligne (négatif : déjà franchie). */
+function metresAvantLEssaiDeMelee(e: EtatMatch, m: MeleeDetaillee): number {
+  const s = sens(m.introducteur);
+  const ligne = m.introducteur === 'A' ? LIGNE_B : LIGNE_A;
+  return (ligne - e.ballon.x) * s;
+}
+
+/** Un pas de poussée : la vitesse suit le rapport de force du moment, la position s'en déduit. */
+function pousserLaMelee(e: EtatMatch, m: MeleeDetaillee): void {
+  const d = m.dyn!;
+  const R = REGLAGES_CONQUETE;
+  const depuis = e.sim - m.etapeDepuis;
+  d.bonus = bonusDuPack(e);
+  const duel = d.duel0 + d.bonus;
+  // Une mêlée sifflée ne pousse plus : elle s'arrête là où elle tombe.
+  const voulue = borner(duel * R.vitessePousseeParPoint, -1.9, 2.2) * (m.penalite ? 0.15 : 1);
+  d.v += (voulue - d.v) * (1 - Math.exp(-DT / R.inertiePoussee));
+  d.a = borner(d.a + d.v * DT, -R.recuMax, 40);
+  d.t = e.sim;
+  if (!d.decidee && depuis >= m.dureePoussee * R.decision) trancherLaMelee(e, m);
+  // Un pack qui garde son ballon aux pieds et pousse vers la ligne : on lui laisse le temps d'y aller.
+  if (d.garde && depuis >= m.dureePoussee - 0.12 && m.dureePoussee < R.poussee && d.v > 0.2 && metresAvantLEssaiDeMelee(e, m) > 0) {
+    m.dureePoussee += 0.6;
+    e.minuteur += 0.6;
+    e.dureeArret = (e.dureeArret ?? 0) + 0.6;
+  }
+}
+
+/** L'issue de la mêlée, tranchée à mi-poussée d'après le rapport de force du moment — les mêmes seuils que la mêlée d'origine. */
+function trancherLaMelee(e: EtatMatch, m: MeleeDetaillee): void {
+  const d = m.dyn!;
+  if (d.decidee) return;
+  d.decidee = true;
+  const R = REGLAGES_CONQUETE;
+  const cote = m.introducteur;
+  const oppose = adverse(cote);
+  const mien = surLeTerrain(e, cote).filter((p) => p.avant);
+  const adv = surLeTerrain(e, oppose).filter((p) => p.avant);
+  const depuis = e.sim - m.etapeDepuis;
+  const duel = d.duel0 + d.bonus;
+  m.duel = duel;
+  let gagnant = duel >= 0 ? cote : oppose;
+  // Le geste du joueur : une technique qui part de travers peut faire céder SON pack, quoi que dise le rapport de force.
+  const pack = e.direct?.pack;
+  const humain = pack?.type === 'melee' ? e.pions.find((p) => p.moi) : undefined;
+  let faute = false;
+  if (humain && pack && pack.score < 0.28 && pack.temps.filter((t) => t.q !== undefined).length >= 3 && e.rng() < 0.3) {
+    gagnant = adverse(humain.cote);
+    faute = true;
+  }
+  m.perdant = adverse(gagnant);
+  m.talonneur = cote;
+  // Le coup de talon du talonneur que conduit le joueur : bien donné, le ballon ne se renverse presque jamais ; raté, il se renverse plus souvent.
+  const qTalon = pack?.poste === 'talonneur' && humain?.cote === cote ? pack.temps[0]?.q : undefined;
+  const talonnage = qTalon === 2 ? 0.3 : qTalon === 0 ? 1.6 : 1;
+  const disciplinePerdant = moyenne(gagnant === cote ? adv : mien, (p) => p.discipline);
+  const chancePenalite = borner((Math.abs(duel) - 5) / 105 + (58 - disciplinePerdant) / 700, 0.015, 0.24)
+    * (humain && humain.cote === gagnant && pack && pack.score >= 0.7 ? 1.5 : 1);
+  const adverseDuJoueur = humain && humain.cote !== gagnant;
+  if (faute || ((Math.abs(duel) > 6 || (adverseDuJoueur && pack && pack.score >= 0.7 && duel * (humain!.cote === cote ? 1 : -1) > 3)) && e.rng() < chancePenalite)) {
+    const ecroulee = e.rng() >= 0.5;
+    m.penalite = { pour: gagnant, motif: ecroulee ? 'mêlée écroulée' : 'liaison perdue en mêlée' };
+    m.issue = ecroulee ? 'ecroulee' : 'relevee';
+    // Le pack dominé cède en pleine poussée : la mêlée s'arrête là où elle tombe, et l'arbitre siffle une fois les joueurs au sol.
+    m.ruptureApres = depuis + 1.2;
+    const ancien = m.dureePoussee;
+    m.dureePoussee = depuis + 2.2;
+    const ecoule = (e.dureeArret ?? DUREE_MELEE_DETAILLEE) - e.minuteur;
+    e.minuteur = Math.max(0.4, m.dureePoussee - depuis) + 0.3;
+    e.dureeArret = ecoule + e.minuteur;
+    void ancien;
+  } else if (Math.abs(duel) < 3.2 && e.rng() < 0.16) {
+    m.issue = 'tourne';
+    d.tourne = { depuis, sens: m.angleFinal >= 0 ? 1 : -1 };
+  } else if (duel < -7 && e.rng() < borner(0.20 + Math.abs(duel) / 90, 0.20, 0.48) * talonnage) {
+    m.contre = true;
+    m.talonneur = oppose;
+    m.issue = 'recule';
+  } else {
+    m.issue = Math.abs(d.v) < 0.12 ? 'stable' : d.v > 0 ? 'avance' : 'recule';
+  }
+  // Près de la ligne, un pack qui domine ne libère pas : le 8 garde le ballon et le pack poursuit sa poussée.
+  const reste = metresAvantLEssaiDeMelee(e, m);
+  if (!m.penalite && !m.contre && m.talonneur === cote && duel >= R.essaiSeuil && reste > 0 && reste <= R.essaiPortee + Math.max(0, d.a)) {
+    d.garde = true;
+    m.issue = 'avance';
+    dire(e, 'melee', cote, `Le pack de ${nomClub(e, cote)} domine à ${Math.round(reste)} mètres de la ligne : le 8 garde le ballon aux pieds et la poussée continue.`);
+  } else if (!m.penalite && !m.contre && !e.combinaisonPreparee && duel > 5 && e.rng() < 0.32) m.depart8 = true;
+  if (e.conquete) e.conquete.pousseVers = Math.abs(d.v) < 0.1 ? undefined : d.v > 0 ? cote : oppose;
+}
+
+/** L'essai de poussée : le ballon est passé, le 8 l'aplatit — la mêlée est finie, c'est la procédure habituelle d'un essai. */
+function essaiDeMelee(e: EtatMatch, m: MeleeDetaillee): void {
+  const cote = m.introducteur;
+  const liste = surLeTerrain(e, cote).filter((p) => p.sanction <= 0 && !p.corps);
+  const huit = liste.find((p) => p.numero === 8) ?? liste.filter((p) => p.avant).sort((a, b) => distance2(a.pos, e.ballon) - distance2(b.pos, e.ballon))[0];
+  if (!huit) return;
+  m.dyn!.essai = true;
+  dire(e, 'melee', cote, `ESSAI DE POUSSÉE ! Le pack de ${nomClub(e, cote)} a reculé toute la défense jusqu'à la ligne : ${huit.nom} aplatit le ballon.`, 0, huit.moi);
+  const adverses = surLeTerrain(e, adverse(cote));
+  e.conquete = null;
+  e.placement = null;
+  for (const p of e.pions) if (p.role === 'melee') { p.role = 'ligne'; stopper(p); }
+  // Aplatir au pied du pack, pas plonger : l'adversaire est encore dans la mêlée.
+  for (const p of adverses) p.battu = Math.max(p.battu, 2);
+  huit.pos = { x: e.ballon.x, y: e.ballon.y };
+  huit.pos.x = cote === 'A' ? Math.max(huit.pos.x, LIGNE_B + 0.1) : Math.min(huit.pos.x, LIGNE_A - 0.1);
+  tenterEssai(e, huit, 'maul');
+}
+
+/** Ce que le geste du joueur ajoute au rapport de force du pack, de −bonus à +bonus (voir `pack` de l'état direct). */
+function bonusDuPack(e: EtatMatch): number {
+  const p = e.direct?.pack;
+  const moi = e.pions.find((q) => q.moi);
+  if (!p || p.type !== 'melee' || !moi) return 0;
+  const signe = moi.cote === e.conquete?.melee?.introducteur ? 1 : -1;
+  return signe * apportDuGeste(moi, p);
+}
+
 /** Les étapes de la mêlée détaillée, puis les cibles des deux packs et des demis. */
 function avancerMeleeDetaillee(e: EtatMatch): void {
   const m = e.conquete!.melee!;
@@ -5763,6 +6150,7 @@ function avancerMeleeDetaillee(e: EtatMatch): void {
       e.dureeArret = ecoule + e.minuteur;
     }
   } else if (m.etape === 'poussee') {
+    if (m.dyn) pousserLaMelee(e, m);
     if (depuis >= m.dureePoussee) passer('sortie');
   }
   // La phase ne s'achève jamais avant que la poussée ait été jouée.
@@ -5772,8 +6160,10 @@ function avancerMeleeDetaillee(e: EtatMatch): void {
   const sI = sens(m.introducteur);
   const centre = { x: m.centre.x + sI * g.avance, y: m.centre.y };
   const cos = Math.cos(g.angle), sin = Math.sin(g.angle);
+  // Un pack qui pousse son ballon jusqu'à la ligne peut aller au-delà : l'essai de poussée est déclaré quand le ballon l'a franchie.
+  const plus = m.dyn?.garde ? 3 : 0;
   const tourner = (relX: number, relY: number): Vec => ({
-    x: borner(centre.x + relX * cos - relY * sin, LIGNE_A + 1, LIGNE_B - 1),
+    x: borner(centre.x + relX * cos - relY * sin, LIGNE_A + 1 - plus, LIGNE_B - 1 + plus),
     y: borner(centre.y + relX * sin + relY * cos, 2, LARGEUR - 2),
   });
   const ouvert = m.centre.y < AXE ? 1 : -1;
@@ -5811,11 +6201,26 @@ function avancerMeleeDetaillee(e: EtatMatch): void {
   const kBallon = m.etape === 'sortie' ? 1
     : m.etape === 'poussee' ? lisser((e.sim - m.etapeDepuis) / Math.max(.1, m.dureePoussee * 0.85)) : 0;
   e.ballon = tourner(-sT * 2.3 * kBallon, 0);
+  // Niveau 4 : le ballon a franchi la ligne, aux pieds du 8, sous la poussée du pack — c'est l'essai de poussée.
+  if (m.dyn?.garde && (m.etape === 'poussee' || m.etape === 'sortie') && !m.penalite && !m.contre && franchieLigne(e.ballon, m.introducteur)) essaiDeMelee(e, m);
 }
 
 /** Applique l'issue décidée à l'introduction : aucun tirage n'est refait ici. */
 function conclureMeleeDetaillee(e: EtatMatch, m: MeleeDetaillee): void {
+  if (m.dyn) {
+    if (!m.dyn.decidee) trancherLaMelee(e, m);
+    m.avanceFinale = m.dyn.a;
+    // Seize avants ont poussé : ça se paie.
+    for (const p of e.pions) if (p.role === 'melee' && p.surLeTerrain) { coutEffort(p, REGLAGES_ENDURANCE.coutPousseeMelee); p.sprint = Math.max(0, p.sprint - 10); }
+  }
   if (m.duel === undefined) deciderMeleeDetaillee(e, m);
+  // Niveau 4 : le 8 ou le flanker que conduit le joueur choisit sa sortie — ramasser et partir, ou servir le 9.
+  const pkSortie = m.dyn && e.direct?.pack?.type === 'melee' ? e.direct.pack : undefined;
+  const moiSortie = pkSortie ? e.pions.find((p) => p.moi) : undefined;
+  if (pkSortie?.sortie && moiSortie && moiSortie.cote === m.introducteur && !m.penalite && !m.contre && !m.dyn?.garde) {
+    if (pkSortie.sortie === 'ramasser' && moiSortie.numero === 8) m.depart8 = true;
+    else if (pkSortie.sortie === 'passer') m.depart8 = false;
+  }
   e.conquete = null;
   const cote = m.introducteur;
   const oppose = adverse(cote);
@@ -5876,6 +6281,15 @@ function conclureMeleeDetaillee(e: EtatMatch, m: MeleeDetaillee): void {
     return;
   }
   reprendreJeu(e, e.ballon, undefined, 5);
+  // Un flanker qui se détache : le 9 le sert dès la sortie (Correctif 23).
+  if (pkSortie?.sortie === 'detacher' && moiSortie && moiSortie.cote === e.possession && e.lancement && !m.penalite) {
+    const neuf = surLeTerrain(e, e.possession).find((p) => p.numero === 9 && p.sanction <= 0 && !p.corps);
+    if (neuf && moiSortie !== neuf) {
+      e.lancement.chaine = dedoublonner([neuf, moiSortie, ...e.lancement.chaine.filter((p) => p !== neuf && p !== moiSortie)]).slice(0, 6);
+      e.lancement.index = 0;
+      dire(e, 'melee', e.possession, `${moiSortie.nom} se détache de la mêlée : ${neuf.nom} le sert dans la foulée.`, 0, true);
+    }
+  }
 }
 
 function phaseMelee(e: EtatMatch): void {
@@ -5984,7 +6398,7 @@ function combinaisonAnnoncee(c: EtatMatch['conquete']): CombinaisonTouche {
  * LES SAUTEURS D'UN ALIGNEMENT, comme l'annonce de l'IA les choisit : le premier bloc, le milieu, le fond — celui dont
  * c'est le métier — et l'avant qui peut contourner l'alignement.
  */
-function sauteursDeLAlignement(e: EtatMatch, pour: Cote): { devant: Pion; milieu: Pion; fond: Pion; peeler?: Pion } | null {
+export function sauteursDeLAlignement(e: EtatMatch, pour: Cote): { devant: Pion; milieu: Pion; fond: Pion; peeler?: Pion } | null {
   const bord = e.ballon.y < AXE ? 0 : LARGEUR;
   const alignes = surLeTerrain(e, pour).filter((p) => p.role === 'alignement')
     .sort((a, b) => Math.abs(a.cible.y - bord) - Math.abs(b.cible.y - bord));
@@ -6091,9 +6505,249 @@ export function demanderToucheRapide(e: EtatMatch): boolean {
   return true;
 }
 
+// ═══ LA TOUCHE LISIBLE (Correctif 23, niveau 4) ══════════════════════════════════════════════════════════════════════
+// Une touche perdue se VOIT : l'adversaire monte, capte ou dévie réellement, et c'est seulement après que son 9 vient jouer le
+// ballon. Pour cela l'issue est tranchée avant le saut (`preparerLaTouche` → `conquete.issue`) ; la scène la lit ; à la fin de
+// la formation `conclureLaTouche` n'applique plus que ce qui a été vu. Quand c'est le joueur qui lance, le déroulé s'arrête
+// avant le saut (`attendLeLancer`) : il annonce, il lance, puis on voit ce que son lancer donne.
+
+/** Le déroulé de la touche attend-il le lancer du joueur ? (il s'arrête avant le saut, et reprend quand il a lancé ou que le chrono est écoulé) */
+function attendLeLancer(e: EtatMatch): boolean {
+  if (!conqueteLisible(e) || e.phase !== 'touche') return false;
+  const rv = e.responsabilites;
+  const a = rv?.attente;
+  if (!rv || !a || a.type !== 'touche' || rv.touche?.lancer || !e.conquete || e.conquete.rapide) return false;
+  if (avancementArret(e) < REGLAGES_CONQUETE.attenteLancer) return false;
+  if (!a.pret) { a.pret = true; a.depuis = e.sim; }
+  return e.sim - a.depuis < a.delai;
+}
+
+/** La pression du moment, de 0 à 1 : un match serré en fin de partie, une température qui monte. */
+function pressionDuMoment(e: EtatMatch, cote: Cote): number {
+  const serre = Math.abs(ecart(e, cote)) <= 7 && e.minute >= 65 ? 0.4 : 0;
+  return borner((e.tension ?? 0) / 90 + serre, 0, 1);
+}
+
+/** Le sauteur d'en face, celui que la scène fait monter : l'adversaire de l'alignement le plus proche du sauteur annoncé. */
+function sauteurAdverse(e: EtatMatch, cote: Cote, ref: Vec | undefined): Pion | undefined {
+  if (!ref) return undefined;
+  const adv = surLeTerrain(e, adverse(cote)).filter((p) => p.sanction <= 0 && !p.corps);
+  const alignes = adv.filter((p) => p.role === 'alignement');
+  const pool = alignes.length ? alignes : adv.filter((p) => p.avant);
+  return [...pool].sort((a, b) => Math.abs(a.pos.y - ref.y) - Math.abs(b.pos.y - ref.y))[0];
+}
+
+/** Décide, une fois formation avancée, ce que le saut va donner — et la pose dans la conquête pour que la scène la joue. */
+function preparerLaTouche(e: EtatMatch): void {
+  const c = e.conquete;
+  if (!c || c.type !== 'touche' || c.rapide || c.issue) return;
+  if (avancementArret(e) < REGLAGES_CONQUETE.tranchee) return;
+  // Le lanceur est attendu ; le receveur du lancer long, aussi.
+  if (attendLeLancer(e)) return;
+  trancherLaTouche(e);
+}
+
+function trancherLaTouche(e: EtatMatch): void {
+  const c = e.conquete;
+  if (!c || c.type !== 'touche' || c.issue) return;
+  const cote = e.possession;
+  const liste = surLeTerrain(e, cote);
+  const avants = liste.filter((p) => p.avant);
+  const rv = e.responsabilites;
+  const lanceur = (rv ? pionDuRole(e, cote, 'lanceur') : undefined) ?? liste.find((p) => p.numero === 2) ?? avants[0];
+  const sauteur = liste.find((p) => p.id === c.cibleId) ?? [...avants].sort((a, b) => b.detente - a.detente)[0] ?? liste[0];
+  if (!sauteur) return;
+  const horsAlignement = !!c.horsAlignement;
+  const zone = e.cadenceDetaillee && !horsAlignement ? c.combinaison : undefined;
+  const pression = pressionDuMoment(e, cote);
+  const lancerHumain: QualiteLancer | undefined = rv?.touche?.lancer
+    ? qualiteDuLancer(rv.touche.choix ?? rv.attente?.annoncee ?? 'milieu', rv.touche.lancer, lanceur, pression) : undefined;
+  // Le sauteur d'en face est celui que la scène montre en l'air : on le prend au même endroit.
+  const contre = sauteurAdverse(e, cote, horsAlignement ? c.reception : sauteur.pos);
+  const lifteurs = horsAlignement ? [] : avants.filter((p) => p !== sauteur && p !== lanceur)
+    .sort((a, b) => distance2(a.pos, sauteur.pos) - distance2(b.pos, sauteur.pos)).slice(0, 2);
+  const fraicheur = (p: Pion) => 0.74 + p.endurance / 385;
+  const scoreLance = (lanceur
+    ? (lanceur.passe * 0.55 + lanceur.vision * 0.30 + lanceur.discipline * 0.15) * fraicheur(lanceur)
+    : 45) + (lancerHumain?.delta ?? 0);
+  const scoreLevage = moyenne(lifteurs, (p) => (p.puissance * 0.58 + p.detente * 0.24 + p.vision * 0.18) * fraicheur(p));
+  const qte = e.bonusConqueteArcade?.type === 'touche' ? e.bonusConqueteArcade.scores : undefined;
+  const bonusAttaqueArcade = (qte?.[cote] ?? 0) * 7;
+  const bonusDefenseArcade = (qte?.[adverse(cote)] ?? 0) * 7;
+  e.bonusConqueteArcade = null;
+  // Le saut que le joueur a minuté (Correctif 23) : un bon timing de sauteur ou de lifteur vaut des points.
+  const pk = e.direct?.pack?.type === 'touche' ? e.direct.pack : undefined;
+  const moiPion = pk ? e.pions.find((p) => p.moi) : undefined;
+  const qSaut = pk?.temps[0]?.q ?? 1;
+  const poidsSaut = pk?.poste === 'sauteur' ? 1 : 0.7;
+  const bonusTiming = pk && moiPion ? (qSaut - 1) * 7.5 * poidsSaut * (moiPion.cote === cote ? 1 : -1) : 0;
+  const scoreReception = horsAlignement ? sauteur.passe * .55 + sauteur.vision * .45 : sauteur.detente;
+  const scoreAttaque = scoreLance * 0.38 + scoreReception * fraicheur(sauteur) * (horsAlignement ? .54 : .34)
+    + scoreLevage * (horsAlignement ? 0 : .20) + (e.cohesion?.[cote] ?? 50) * 0.08
+    + (c.combinaison === 'leurreDevant' ? 2.5 : 0) + bonusAttaqueArcade + bonusTiming
+    + (zone ? 4 : 0) + (zone === 'premierBloc' ? 3 : zone === 'fond' ? -2 : 0);
+  const scoreDefense = contre
+    ? (contre.detente * 0.50 + contre.vision * 0.30 + contre.puissance * 0.12
+      + (e.cohesion?.[contre.cote] ?? 50) * 0.08) * fraicheur(contre) + bonusDefenseArcade
+    : 45;
+  const qualiteLancer = scoreLance + (e.cohesion?.[cote] ?? 50) * 0.08;
+  const tirageLancer = e.rng();
+  const pasDroit = borner(0.048 - (qualiteLancer - 55) / 950, 0.010, 0.075) * (lancerHumain?.pasDroit ?? 1);
+  const mauvaiseLongueur = borner(0.065 - (qualiteLancer - 55) / 800, 0.018, 0.105)
+    * (zone === 'premierBloc' ? 0.55 : zone === 'fond' ? 1.6 : 1) * (lancerHumain?.longueur ?? 1);
+
+  const issue: IssueTouche = { type: 'gagnee', sauteurId: sauteur.id, contreurId: contre?.id, variante: 0, decideeA: e.sim };
+  const bord = e.ballon.y < AXE ? 0 : LARGEUR;
+  if (tirageLancer < pasDroit) {
+    issue.type = 'pasDroit';
+  } else if (tirageLancer < pasDroit + mauvaiseLongueur) {
+    const court = e.rng() < 0.5;
+    // « Court » : le ballon retombe entre le lanceur et le sauteur, du côté de la ligne de touche.
+    const versLaTouche = bord === 0 ? -1 : 1;
+    issue.type = court ? 'courte' : 'longue';
+    issue.point = {
+      x: sauteur.pos.x + (e.rng() - 0.5) * 1.5,
+      y: borner(sauteur.pos.y + (court ? versLaTouche : -versLaTouche) * (1.5 + e.rng() * 2), 1, LARGEUR - 1),
+    };
+  } else {
+    const duel = scoreAttaque - scoreDefense + (e.rng() - 0.5) * 22;
+    if (duel < -5.5 && contre) {
+      issue.type = 'perdue';
+      const t = e.rng();
+      issue.variante = t < REGLAGES_CONQUETE.varianteCapte ? 0 : t < REGLAGES_CONQUETE.varianteCapte + REGLAGES_CONQUETE.varianteArrache ? 1 : 2;
+    } else if (duel < 2 && contre && e.rng() < (zone ? 0.22 : 0.38)) {
+      issue.type = 'devie';
+      issue.variante = e.rng() < 0.5 ? 0 : 1;
+      // Tapé vers l'arrière, du côté de l'équipe qui contre.
+      const sD = sens(adverse(cote));
+      issue.point = {
+        x: bornerLong(sauteur.pos.x + sD * (2.4 + e.rng() * 2.4)),
+        y: borner((sauteur.pos.y + contre.pos.y) / 2 + (e.rng() - 0.5) * 2, 1, LARGEUR - 1),
+      };
+    }
+  }
+  c.issue = issue;
+}
+
+/** Applique l'issue que tout le monde a vue. Le ballon ne change de camp qu'entre les mains de celui qui l'a pris. */
+function conclureLaTouche(e: EtatMatch): void {
+  const c0 = e.conquete!;
+  // Le receveur d'un lancer long rejoint sa place avant que la phase ne se conclue.
+  if (c0.horsAlignement && c0.reception) {
+    const r = e.pions.find((p) => p.id === c0.cibleId);
+    if (r && distance2(r.pos, c0.reception) > .64) {
+      r.cible = { ...c0.reception };
+      if (e.placement) e.placement[r.id] = { ...c0.reception };
+      e.minuteur = .15;
+      return;
+    }
+  }
+  if (!c0.issue) trancherLaTouche(e);
+  const c = e.conquete!;
+  const issue = c.issue;
+  if (!issue) return clorePeriode(e);
+  const cote = e.possession;
+  const rv = e.responsabilites;
+  let lancerHumain = false;
+  if (rv?.attente?.type === 'touche') {
+    if (rv.touche?.lancer) lancerHumain = true; else rv.stats.chronosDepasses += 1;
+    rv.stats.touches += 1;
+    rv.attente = null; rv.touche = null; rv.offreToucheRapide = null;
+  }
+  const liste = surLeTerrain(e, cote);
+  const lanceur = (rv ? pionDuRole(e, cote, 'lanceur') : undefined) ?? liste.find((p) => p.numero === 2) ?? liste.find((p) => p.avant);
+  const sauteur = e.pions.find((p) => p.id === issue.sauteurId) ?? liste[0];
+  const contre = issue.contreurId ? e.pions.find((p) => p.id === issue.contreurId) : undefined;
+  const combinaison = c.combinaison, sortie = c.sortie, peelId = c.peelId, horsAlignement = !!c.horsAlignement;
+  e.conquete = null;
+  const balleLibre = (de: Vec, vers: Vec, hauteur: number, duree: number) => {
+    e.placement = null;
+    e.ballon = { ...de };
+    const faux: Vol = {
+      de: { ...de }, vers: { ...vers }, duree, ecoule: duree, hauteur, type: 'pied', intention: 'renvoi',
+      auteur: lanceur ?? sauteur, receveur: null,
+    };
+    demarrerBallonLibre(e, faux, 'touche');
+  };
+
+  switch (issue.type) {
+    case 'pasDroit':
+      dire(e, 'touche', adverse(cote), `${lanceur?.nom ?? 'Le lanceur'} n’est pas droit : mêlée pour ${nomClub(e, adverse(cote))}.`);
+      return arret(e, 'melee', adverse(cote), e.ballon);
+
+    case 'courte':
+    case 'longue': {
+      dire(e, 'touche', null, issue.type === 'courte' ? 'Lancer trop court : le ballon retombe devant le sauteur.' : 'Lancer trop long : le ballon dépasse le sauteur annoncé.');
+      const point = issue.point ?? { x: sauteur.pos.x, y: sauteur.pos.y };
+      return balleLibre(point, { x: point.x + sens(cote) * 2.5, y: point.y + 0.4 }, 0.45, 0.4);
+    }
+
+    case 'devie': {
+      const point = issue.point ?? { x: sauteur.pos.x, y: sauteur.pos.y };
+      dire(e, 'touche', null, `${contre?.nom ?? 'Un adversaire'} dévie le lancer du bout des doigts : ballon libre dans le couloir.`);
+      const de = contre ? { x: (sauteur.pos.x + contre.pos.x) / 2, y: (sauteur.pos.y + contre.pos.y) / 2 } : { x: sauteur.pos.x, y: sauteur.pos.y };
+      return balleLibre(de, point, 0.55, 0.35);
+    }
+
+    case 'perdue': {
+      const adv = adverse(cote);
+      if (!contre) {
+        // Personne d'en face à l'alignement : le ballon reste à lui, il n'y a pas de duel à montrer.
+        dire(e, 'touche', adv, C.phrase(e.rng, C.TOUCHE_PERDUE, { club: nomClub(e, adv), nom: '' }));
+        e.possession = adv; e.placement = null;
+        return reprendreJeu(e, e.ballon);
+      }
+      const texte = issue.variante === 1 ? `${contre.nom} arrache le ballon des mains de ${sauteur.nom} !`
+        : issue.variante === 2 ? `${contre.nom} monte plus haut et claque le ballon vers son demi de mêlée.`
+          : `${contre.nom} monte plus haut et capte le ballon : touche perdue pour ${nomClub(e, cote)}.`;
+      dire(e, 'touche', adv, texte, 0, contre.moi);
+      contre.stats.touchesGagnees += 1;
+      e.indicationJeu = { cle: 'touchePerdue', cote: adv, t: e.sim };
+      e.possession = adv;
+      e.placement = null;
+      e.ballonLent = false;
+      reprendreJeu(e, { x: contre.pos.x, y: contre.pos.y }, contre, 10);
+      // Tapé vers son 9 : le ballon part vraiment de ses mains vers celles du demi — pas d'apparition.
+      const neuf = surLeTerrain(e, adv).find((p) => p.numero === 9 && p.sanction <= 0 && !p.corps && distance(p.pos, contre.pos) < 14);
+      if (issue.variante === 2 && neuf && e.porteur === contre && neuf !== contre) {
+        if (e.lancement) { e.lancement.chaine = dedoublonner([contre, neuf, ...e.lancement.chaine.filter((p) => p !== contre && p !== neuf)]).slice(0, 6); e.lancement.index = 0; }
+        passerLeBallon(e, contre, neuf, 9);
+      }
+      return;
+    }
+
+    case 'gagnee': break;
+  }
+
+  // ── Touche gagnée : ce que faisait `phaseTouche` ────────────────────────────────────────────────
+  const zone = e.cadenceDetaillee && !horsAlignement ? combinaison : undefined;
+  dire(e, 'touche', cote, C.phrase(e.rng, C.TOUCHE_GAGNEE, { club: nomClub(e, cote), nom: sauteur.nom }), 0, sauteur.moi);
+  sauteur.stats.touchesGagnees += 1;
+  if (lancerHumain && rv) rv.stats.touchesGagnees += 1;
+  e.placement = null;
+  const pres = metresAvantLaLigne(e.ballon, cote) < 25;
+  const style = e.cadenceDetaillee ? e.styles?.[cote] : undefined;
+  const goutDuMaul = style === 'avants' ? 1.35 : style === 'large' || style === 'leurres' ? 0.7 : 1;
+  const maulAnnonce = iaParPoste(e) && !horsAlignement ? sortie === 'maul' : null;
+  if (!e.combinaisonPreparee && (maulAnnonce ?? e.rng() < (pres ? .62 : .18) * goutDuMaul)) {
+    e.phase = 'maul';
+    e.minuteur = 6 + e.rng() * 3;
+    e.porteur = null;
+    e.ballon = { x: sauteur.pos.x, y: sauteur.pos.y };
+    e.maul = { receveurId: sauteur.id, debut: e.sim };
+    dire(e, 'maul', cote, C.phrase(e.rng, C.MAUL, { club: nomClub(e, cote) }));
+    return;
+  }
+  e.gardeRuck = 0.5;
+  if (zone === 'premierBloc') e.ballonLent = true;
+  reprendreJeu(e, sauteur.pos, sauteur, 10);
+  if (zone && sortie && sortie !== 'maul' && e.porteur === sauteur && !e.combinaisonEnCours) sortirDeTouche(e, sauteur, sortie, peelId);
+}
+
 function phaseTouche(e: EtatMatch): void {
   if (e.conquete?.rapide) return phaseToucheRapide(e);
   if (e.minuteur > 0) return;
+  if (conqueteLisible(e) && e.conquete?.type === 'touche') return conclureLaTouche(e);
   const cote = e.possession;
   const liste = surLeTerrain(e, cote);
   const avants = liste.filter((p) => p.avant);

@@ -36,6 +36,8 @@
 
 import type { EtatMatch, IntentionPied } from './etat.js';
 import { vitesseDisponible, type Pion } from './entites.js';
+import { facteurAcceleration, pasEndurance, peutSprinter } from './endurance.js';
+import { sortiesPossibles } from './pack.js';
 import { attaquantLibre } from './ia/lecture.js';
 import { ligneDePasseCoupee } from './ia/vision.js';
 import { humainTientLe } from './responsabilites.js';
@@ -85,6 +87,15 @@ export const REGLAGES_DIRECT = {
   porteePlaquage: 3.4,
   allongePlaquage: 2.5,
   dureePlaquage: 0.9,
+  // ── Le plongeon dirigé (Correctif 23, niveau 4) : plus de plaquage « missile » ─────────────────────────────
+  /** On peut se jeter dès que le porteur adverse est à cette distance (m) : trop tôt, on tombe dans le vide. */
+  porteeLancer: 7.5,
+  /** Durée du plongeon (s) et allonge de contact pendant qu'il dure (m). */
+  dureeLancer: 0.72,
+  allongeLancer: 1.85,
+  /** Aide de visée légère : le cap peut se redresser vers le porteur de cette vitesse (rad/s), s'il est dans ce cône (rad). Jamais 90°. */
+  aideLancerVitesse: 0.5,
+  aideLancerCone: 0.5,
   /** Raffut et crochet : durée de l'armé (s) ; le geste n'agit qu'au contact. */
   dureeGeste: 1.3,
   /** Recharges (s simulées). */
@@ -133,13 +144,15 @@ export interface CommandeDirecte {
 }
 
 export type ActionDirecte =
-  | 'passe' | 'coupDePied' | 'raffut' | 'crochet' | 'plaquage' | 'grattage'
+  | 'pousser' | 'quitter' | 'passe' | 'coupDePied' | 'raffut' | 'crochet' | 'plaquage' | 'grattage'
   | 'appel' | 'feinte' | 'engager' | 'drop';
 
 export interface DemandeDirecte {
   action: ActionDirecte;
   /** Instant simulé de la demande, posé par `demanderDirect` : c'est ce qui la fait expirer. */
   t?: number;
+  /** Le même instant, au dixième de pas près : le pas de simulation en cours compris (c'est lui que le geste en rythme juge). */
+  tr?: number;
   /** Passe, crochet, feinte : de quel côté, en vecteur unitaire TERRAIN (le « gauche » de l'écran). */
   vers?: Vec;
   /** Passe sautée : un joueur de plus loin, plus de risque. */
@@ -148,6 +161,8 @@ export interface DemandeDirecte {
   visee?: { x: number; y: number; puissance: number; vif?: number };
   /** Coup de pied sans visée : le moteur choisit selon la situation (appui bref). */
   auto?: boolean;
+  /** Quitter un pack : ramasser et partir, passer au 9, se détacher (Correctif 23). */
+  sortie?: 'ramasser' | 'passer' | 'detacher';
 }
 
 /** Ce que l'appel du joueur dit à l'IA : où il se tient, et ce qu'il demande. */
@@ -224,7 +239,42 @@ export interface VueDirecte {
   arme: 'plaquage' | 'raffut' | 'crochet' | 'offload' | null;
 }
 
+/**
+ * LE GESTE DU JOUEUR DANS UN PACK (Correctif 23) : poussée de mêlée, poussée de maul. Le moteur pose une partition de TEMPS
+ * (`temps`) ; le joueur appuie en mesure (`pousser`), chaque appui reçoit une qualité (0 raté, 1 correct, 2 parfait), et la
+ * moyenne glissante (`score`, de 0 à 1) devient ce que le joueur ajoute — ou retire — à la force de son pack.
+ * Un temps non joué compte pour raté : on ne se contente pas de regarder.
+ */
+export type RolePack = 'pilier' | 'talonneur' | 'deuxieme' | 'troisieme' | 'huit';
+/** Le métier du geste : un avant dans un pack, un sauteur ou un lifteur en touche, un gratteur au ruck. */
+export type PosteGeste = RolePack | 'sauteur' | 'lifteur' | 'gratteur';
+export interface PackHumain {
+  type: 'melee' | 'maul' | 'touche' | 'ruck';
+  poste: PosteGeste;
+  /** Identifie la situation : un pack neuf repart de zéro. */
+  cle: string;
+  /** Ruck : le geste vit jusqu'à cet instant, même quand le regroupement est fini. */
+  finA?: number;
+  debut: number;
+  periode: number;
+  /** Les temps de la partition : instant, et qualité une fois joués. */
+  temps: { t: number; q?: 0 | 1 | 2 }[];
+  /** Justesse récente, de 0 à 1 (0,5 : correct). */
+  score: number;
+  derniere?: { t: number; q: 0 | 1 | 2 };
+  /** Les appuis reçus et non encore jugés (instants simulés). */
+  appuis: number[];
+  /** Grattage : le premier appui a engagé le joueur dans le regroupement. */
+  engage?: boolean;
+  /** Le joueur a choisi de sortir du pack (3ᵉ ligne qui se détache, 8 qui part ballon en main). */
+  sortie?: 'detacher' | 'ramasser' | 'passer';
+}
+
 export interface EtatDirect {
+  /** Le geste du joueur dans un pack, quand il en est. */
+  pack?: PackHumain;
+  /** Le numéro du ruck dont la fenêtre de grattage s'est refermée sans que le joueur se jette : elle ne revient pas. */
+  fermeRuck?: number;
   actif: boolean;
   commande: CommandeDirecte;
   file: DemandeDirecte[];
@@ -236,7 +286,7 @@ export interface EtatDirect {
    * Le geste armé qui attend son contact, et jusqu'à quand. `offload` : une passe
    * demandée avec un défenseur sur soi, jouée AU contact (`vers` : le côté voulu).
    */
-  arme: { action: 'plaquage' | 'raffut' | 'crochet' | 'offload'; jusqua: number; depuis: number; vers?: Vec } | null;
+  arme: { action: 'plaquage' | 'raffut' | 'crochet' | 'offload'; jusqua: number; depuis: number; vers?: Vec; /** Plongeon dirigé : le cap du joueur, en radians (terrain). */ cap?: number } | null;
   /** Un pas de côté en cours : décalage latéral ajouté à la course, sans toucher au cap. */
   pasDeCote: { vers: Vec; jusqua: number; vitesse: number } | null;
   /** Recharge de chaque geste, en secondes simulées. */
@@ -255,6 +305,8 @@ export interface EtatDirect {
   viseur: { x: number; y: number; puissance: number } | null;
   /** Ce que le tutoriel force (aucun effet hors tutoriel). */
   assistance?: { appelAssure?: boolean };
+  /** Le saut ou le lift que le joueur vient de minuter en touche (Correctif 23) : de 0 (raté) à 1 (parfait), consommé quand la touche se tranche. */
+  timingTouche?: { role: 'sauteur' | 'lifteur'; qualite: number; consomme?: boolean };
 }
 
 export function vueVide(): VueDirecte {
@@ -263,7 +315,7 @@ export function vueVide(): VueDirecte {
     horsJeu: false, cibleDePlaquage: null, ruckAPortee: false, contactImminent: false,
     possible: {
       passe: false, coupDePied: false, raffut: false, crochet: false, plaquage: false, grattage: false,
-      appel: false, feinte: false, engager: false, drop: false,
+      appel: false, feinte: false, engager: false, drop: false, pousser: false, quitter: false,
     },
     recharge: {}, arme: null,
   };
@@ -285,6 +337,9 @@ export function creerEtatDirect(): EtatDirect {
 const PHASES_OUVERTES = new Set(['jeuCourant', 'ballonEnLAir', 'ballonLibre']);
 
 export function directActif(e: Pick<EtatMatch, 'direct'>): boolean { return !!e.direct?.actif; }
+
+/** Le plaquage du joueur est un plongeon dirigé (Correctif 23, IA de niveau 4) : il peut être raté dans le vide. */
+export function plongeonDirige(e: Pick<EtatMatch, 'ia'>): boolean { return (e.ia ?? 1) >= 4; }
 
 /** Pourquoi ce pion n'obéit pas au joueur maintenant, ou `null` s'il obéit. */
 export function raisonSansControle(e: EtatMatch, p: Pion): RaisonDirect | null {
@@ -383,7 +438,7 @@ export function demanderDirect(e: EtatMatch, demande: DemandeDirecte): void {
   if (!d?.actif) return;
   // Une file courte : un joueur qui martèle un bouton ne planifie pas dix passes.
   if (d.file.length >= 4) d.file.shift();
-  d.file.push({ ...demande, t: e.sim });
+  d.file.push({ ...demande, t: e.sim, tr: e.sim + Math.min(e.reliquat ?? 0, 0.15) });
 }
 
 /** Le viseur d'un coup de pied en préparation (scène) ; `null` pour l'éteindre. */
@@ -408,6 +463,8 @@ export function refroidirDirect(e: EtatMatch, dt: number): void {
 /** Les efforts de sprint selon la fraîcheur : comme l'intention `sprint` des cartes. */
 export function effortDeSprint(p: Pion): number {
   const R = REGLAGES_DIRECT;
+  // Deux réserves : c'est la barre de sprint qui dit si l'on en a encore sous le pied, pas l'endurance générale.
+  if (p.deuxReserves) return p.sprint < 25 ? R.sprintMoyen : R.sprintFrais;
   return p.endurance < 25 ? R.sprintPlat : p.endurance < 45 ? R.sprintMoyen : R.sprintFrais;
 }
 
@@ -415,7 +472,7 @@ export function effortDeSprint(p: Pion): number {
 export function vitesseVoulue(p: Pion, norme: number, sprint: boolean): number {
   const R = REGLAGES_DIRECT;
   const disponible = vitesseDisponible(p);
-  const sprinte = sprint && p.endurance > 6 && norme > 0.2;
+  const sprinte = sprint && peutSprinter(p) && norme > 0.2;
   const plein = sprinte ? disponible * effortDeSprint(p) : disponible * R.course;
   // Une commande partielle donne une allure partielle ; sous 0,18 on ne bouge pas (zone morte).
   const k = norme < 0.18 ? 0 : sprinte ? 1 : Math.pow(borner((norme - 0.12) / 0.88, 0, 1), 0.85);
@@ -438,9 +495,9 @@ export function deplacerHumain(p: Pion, dt: number, cmd: CommandeDirecte, decala
   const R = REGLAGES_DIRECT;
   if (p.corps) return 0;
   const norme = Math.hypot(cmd.mx, cmd.my);
-  const sprinte = cmd.sprint && p.endurance > 6 && norme > 0.2;
+  const sprinte = cmd.sprint && peutSprinter(p) && norme > 0.2;
   let voulue = vitesseVoulue(p, norme, cmd.sprint);
-  const vivacite = 0.65 + 0.35 * (p.endurance / 100);
+  const vivacite = p.deuxReserves ? facteurAcceleration(p) : 0.65 + 0.35 * (p.endurance / 100);
   const acc = p.acceleration * vivacite * R.vivacite;
   const frein = Math.max(R.freinMin, acc * R.freinFacteur);
 
@@ -476,6 +533,11 @@ export function deplacerHumain(p: Pion, dt: number, cmd: CommandeDirecte, decala
 
   // L'endurance : la dépense de course du moteur, un peu atténuée, plus le sprint ; on souffle en marchant.
   p.stats.distanceParcourue += pas;
+  if (p.deuxReserves) {
+    // Les deux réserves : la course normale coûte peu, le sprint vide la barre, ralentir la recharge.
+    pasEndurance(p, dt, Math.min(1, pas / dt / p.vitesseMax), sprinte ? 1 : 0);
+    return pas;
+  }
   if (pas > 0) {
     const intensite = Math.min(1, pas / dt / p.vitesseMax);
     p.endurance = Math.max(0, p.endurance - p.usure * dt * intensite ** 1.6 * 10 * R.depense);
@@ -865,9 +927,12 @@ export function majVueDirecte(e: EtatMatch): void {
   poss.raffut = libre && v.porte && recharge('raffut') <= 0;
   poss.crochet = libre && v.porte && recharge('crochet') <= 0;
   poss.feinte = libre && v.porte && !p.avant && recharge('feinte') <= 0;
-  poss.plaquage = libre && !!cible && recharge('plaquage') <= 0;
+  // Niveau 4 : on peut se jeter dès que le porteur est à `porteeLancer` — la distance n'est plus une garantie de contact.
+  poss.plaquage = libre && recharge('plaquage') <= 0 && (!!cible || (plongeonDirige(e) && !!cibleDePlaquage(e, p, REGLAGES_DIRECT.porteeLancer)));
   poss.grattage = libre && v.ruckAPortee && !v.attaque && recharge('grattage') <= 0;
   poss.engager = libre && v.ruckAPortee && v.attaque;
+  poss.pousser = !!d.pack;
+  poss.quitter = !!d.pack && sortiesPossibles(d.pack).length > 0;
   poss.appel = libre && ouvert && !v.porte && (e.possession === p.cote || e.phase === 'ballonEnLAir') && recharge('appel') <= 0;
   // Le drop (Correctif 17) : seulement avec les responsabilités, au ballon, en jeu, à portée — et celui qui tient le rôle de droppeur
   // ou un pied sûr. Les autres le laissent à leur 10.

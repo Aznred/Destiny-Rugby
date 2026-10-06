@@ -440,8 +440,74 @@ function T(e) {
 	return w.size > 2e4 && w.clear(), w.set(t, a), a;
 }
 //#endregion
+//#region src/lib/moteur/endurance.ts
+var E = {
+	usureGenerale: .6,
+	recupArretGenerale: .055,
+	plancher: 12,
+	coutLien: {
+		ruck: .05,
+		melee: .09,
+		maul: .08,
+		alignement: .04
+	},
+	coutContreRuck: .45,
+	coutPercussion: .5,
+	coutGrattage: .35,
+	coutPousseeMelee: .3,
+	coutSprint: 6.3,
+	sprintMin: 35,
+	sprintPente: .65,
+	recupArret: 5.2,
+	recupPlancher: 1.1,
+	seuilVide: .8,
+	seuilRelance: 18,
+	recupFatigue: .55,
+	accelerationFatigue: .14,
+	allurePlancher: .9,
+	seuilSprintIA: .035
+};
+function D(e) {
+	return (e.ia ?? 1) >= 4;
+}
+function te(e) {
+	let t = E;
+	return Math.min(100, t.sprintMin + t.sprintPente * Math.max(0, Math.min(100, e)));
+}
+function ne(e) {
+	let t = E;
+	return t.allurePlancher + (1 - t.allurePlancher) * (Math.max(0, Math.min(100, e.endurance)) / 100);
+}
+function re(e) {
+	return e.deuxReserves ? !e.essoufle : e.endurance > 6;
+}
+function ie(e) {
+	return 1 - E.accelerationFatigue * (1 - Math.max(0, Math.min(100, e.endurance)) / 100);
+}
+function ae(e, t, n, r, i = 1) {
+	let a = E;
+	if (n > 0 && (e.endurance = Math.max(a.plancher, e.endurance - e.usure * t * n ** 1.6 * 10 * a.usureGenerale * i)), e.sprintMax = te(e.endurance), r > 0 && !e.essoufle) {
+		let n = 1 + (1 - e.endurance / 100) * .35;
+		e.sprint = Math.max(0, e.sprint - a.coutSprint * r * n * t), e.sprint <= a.seuilVide && (e.essoufle = !0);
+	} else {
+		let r = 1 - Math.min(1, n / .72), i = a.recupFatigue + (1 - a.recupFatigue) * (e.endurance / 100);
+		e.sprint = Math.min(e.sprintMax, e.sprint + (a.recupPlancher + (a.recupArret - a.recupPlancher) * r) * i * t), e.essoufle && e.sprint >= a.seuilRelance && (e.essoufle = !1);
+	}
+	e.sprint > e.sprintMax && (e.sprint = e.sprintMax);
+}
+function oe(e, t) {
+	e.deuxReserves && (e.endurance = Math.max(E.plancher, e.endurance - t), e.sprintMax = te(e.endurance));
+}
+function se(e, t) {
+	return !e.deuxReserves || !e.essoufle ? t : Math.min(t, 1);
+}
+function ce(e) {
+	let t = (e - 1 - E.seuilSprintIA) / .1;
+	return t <= 0 ? 0 : Math.min(1.2, t);
+}
+//#endregion
 //#region src/data/apparencesMatch.generated.ts
-var te = {
+var le = {
 	"a one lolofie": {
 		peau: "#a27051",
 		cheveux: "#221b19",
@@ -40271,7 +40337,7 @@ var te = {
 		coiffure: "short",
 		barbe: "short_beard"
 	}
-}, E = {
+}, ue = /* @__PURE__ */ new Map(), de = {
 	pilier_gauche: [
 		184,
 		119,
@@ -40347,26 +40413,26 @@ var te = {
 		92,
 		"arriere"
 	]
-}, ne = [
+}, fe = [
 	"#efc19d",
 	"#d99b72",
 	"#b87550",
 	"#8f573b",
 	"#633d2f",
 	"#4a3028"
-], re = [
+], pe = [
 	"#171311",
 	"#2c1d17",
 	"#4c2f20",
 	"#72503a",
 	"#b07d4f"
-], ie = [
+], me = [
 	"#49301f",
 	"#654530",
 	"#3e5361",
 	"#4f6247",
 	"#6c5435"
-], ae = [
+], he = [
 	"bald",
 	"buzz",
 	"short",
@@ -40378,7 +40444,7 @@ var te = {
 	"messy",
 	"long",
 	"dreadlocks"
-], oe = [
+], ge = [
 	"none",
 	"none",
 	"none",
@@ -40388,80 +40454,85 @@ var te = {
 	"short_beard",
 	"full_beard"
 ];
-function se(e) {
+function _e(e) {
 	return e.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]+/g, " ").trim().toLowerCase();
 }
-function ce(e) {
+function ve(e) {
 	let t = 2166136261;
 	for (let n = 0; n < e.length; n++) t = Math.imul(t ^ e.charCodeAt(n), 16777619);
 	return t >>> 0;
 }
-function le(e, t) {
-	let n = se(e), r = te[n], i = ce(`${n}:${t}`), [a, o, s] = E[t] ?? E.arriere;
+function ye(e, t) {
+	let n = _e(e), r = le[n], i = ve(`${n}:${t}`), [a, o, s] = de[t] ?? de.arriere, c = ue.get(n);
 	return {
-		tailleCm: r?.tailleCm ?? a + i % 15 - 7,
-		poidsKg: r?.poidsKg ?? o + (i >>> 4) % 19 - 9,
-		peau: r?.peau ?? ne[(i >>> 8) % ne.length],
-		yeux: r?.yeux ?? ie[(i >>> 6) % ie.length],
-		cheveux: r?.cheveux ?? re[(i >>> 12) % re.length],
-		coiffure: r?.coiffure ?? ae[(i >>> 16) % ae.length],
-		barbe: r?.barbe ?? oe[(i >>> 20) % oe.length],
+		...c?.equipement ? { equipement: c.equipement } : {},
+		...c?.coupeId === void 0 ? {} : { coupeId: c.coupeId },
+		...c?.barbeId === void 0 ? {} : { barbeId: c.barbeId },
+		...c?.couleurBarbe ? { couleurBarbe: c.couleurBarbe } : {},
+		...c?.morpho ? { morpho: c.morpho } : {},
+		tailleCm: c?.tailleCm ?? r?.tailleCm ?? a + i % 15 - 7,
+		poidsKg: c?.poidsKg ?? r?.poidsKg ?? o + (i >>> 4) % 19 - 9,
+		peau: c?.peau ?? r?.peau ?? fe[(i >>> 8) % fe.length],
+		yeux: r?.yeux ?? me[(i >>> 6) % me.length],
+		cheveux: c?.cheveux ?? r?.cheveux ?? pe[(i >>> 12) % pe.length],
+		coiffure: c?.coiffure ?? r?.coiffure ?? he[(i >>> 16) % he.length],
+		barbe: c?.barbe ?? r?.barbe ?? ge[(i >>> 20) % ge.length],
 		morphologie: s
 	};
 }
-function D(e, t) {
+function O(e, t) {
 	let n = e.x - t.x, r = e.y - t.y;
 	return Math.sqrt(n * n + r * r);
 }
-function O(e, t) {
+function k(e, t) {
 	let n = e.x - t.x, r = e.y - t.y;
 	return n * n + r * r;
 }
-function k(e, t, n) {
+function A(e, t, n) {
 	return e < t ? t : e > n ? n : e;
 }
-function ue(e, t, n) {
+function be(e, t, n) {
 	return e + (t - e) * n;
 }
-function A(e) {
+function j(e) {
 	return e === "A" ? 1 : -1;
 }
-function j(e) {
+function M(e) {
 	return e === "A" ? "B" : "A";
 }
-function de(e) {
+function xe(e) {
 	return e === "A" ? 111 : 11;
 }
-function fe(e) {
+function Se(e) {
 	return e === "A" ? 11 : 111;
 }
-function M(e, t) {
-	return (de(t) - e.x) * A(t);
+function N(e, t) {
+	return (xe(t) - e.x) * j(t);
 }
-function pe(e, t) {
-	return M(e, t) <= 22;
+function Ce(e, t) {
+	return N(e, t) <= 22;
 }
-function me(e, t) {
+function we(e, t) {
 	return t === "A" ? e.x <= 33 : e.x >= 89;
 }
-function he(e, t) {
+function Te(e, t) {
 	return t === "A" ? e.x < 61 : e.x > 61;
 }
-function ge(e, t) {
-	return M(e, t) <= 0;
+function Ee(e, t) {
+	return N(e, t) <= 0;
 }
-function _e(e) {
+function De(e) {
 	return e.y <= 0 || e.y >= 70;
 }
-function ve(e) {
+function Oe(e) {
 	return e.y < 35 ? 1 : -1;
 }
-function ye(e) {
+function ke(e) {
 	return e.y < 35 ? 70 - e.y : e.y;
 }
 //#endregion
 //#region src/lib/moteur/entites.ts
-function be() {
+function Ae() {
 	return {
 		metres: 0,
 		courses: 0,
@@ -40488,7 +40559,7 @@ function be() {
 		distanceParcourue: 0
 	};
 }
-var xe = [
+var je = [
 	"pilier_gauche",
 	"talonneur",
 	"pilier_droit",
@@ -40504,7 +40575,7 @@ var xe = [
 	"deuxieme_centre",
 	"ailier_droit",
 	"arriere"
-], Se = {
+], Me = {
 	pilier_gauche: 6.9,
 	talonneur: 7.3,
 	pilier_droit: 6.9,
@@ -40520,7 +40591,7 @@ var xe = [
 	deuxieme_centre: 8.7,
 	ailier_droit: 9.3,
 	arriere: 9
-}, Ce = {
+}, Ne = {
 	pilier_gauche: 3,
 	talonneur: 3.4,
 	pilier_droit: 3,
@@ -40537,15 +40608,15 @@ var xe = [
 	ailier_droit: 5,
 	arriere: 4.6
 };
-function we(e, t) {
+function Pe(e, t) {
 	return typeof e == "number" && Number.isFinite(e) ? e : t;
 }
-var Te = new Set(xe.slice(0, 8));
-function Ee(e, t, n, r, i) {
-	let a = t < 15 ? xe[t] ?? e.poste : e.poste, o = t < 15 ? t < 8 : Te.has(a), s = k(e.note, 20, 99), c = i ?? {
+var Fe = new Set(je.slice(0, 8));
+function Ie(e, t, n, r, i) {
+	let a = t < 15 ? je[t] ?? e.poste : e.poste, o = t < 15 ? t < 8 : Fe.has(a), s = A(e.note, 20, 99), c = i ?? {
 		...T(e),
 		jeuAuPied: e.jeuAuPied ?? T(e).jeuAuPied
-	}, l = le(e.nom, e.poste), u = we(c.vitesse, o ? s - 7 : s + 5), d = we(c.endurance, s);
+	}, l = ye(e.nom, e.poste), u = Pe(c.vitesse, o ? s - 7 : s + 5), d = Pe(c.endurance, s);
 	return {
 		id: `${n}${t}`,
 		sourceId: e.id,
@@ -40571,64 +40642,67 @@ function Ee(e, t, n, r, i) {
 			x: 0,
 			y: 35
 		},
-		vitesseMax: (Se[a] ?? 8) * (.61 + k(u, 5, 99) / 190),
-		acceleration: (Ce[a] ?? 4) * (.55 + k(u, 5, 99) / 145),
+		vitesseMax: (Me[a] ?? 8) * (.61 + A(u, 5, 99) / 190),
+		acceleration: (Ne[a] ?? 4) * (.55 + A(u, 5, 99) / 145),
 		endurance: 100,
+		sprint: 100,
+		sprintMax: 100,
 		battu: 0,
 		horsJeu: !1,
 		surLeTerrain: t < 15,
 		sanction: 0,
 		minutes: 0,
 		role: "ligne",
-		plaquage: we(c.plaquage, o ? s + 5 : s - 2),
-		evitement: we(c.vitesse, s) * .55 + we(c.mental, s) * .2 + (o ? 0 : 8),
-		puissance: we(c.force, o ? s + 6 : s - 2),
-		passe: we(c.passe, o ? s - 8 : s + 2),
-		pied: we(c.jeuAuPied, a === "demi_ouverture" || a === "arriere" ? s + 6 : a === "demi_melee" ? s : s - 14),
-		vision: we(c.vision, s),
-		discipline: we(c.mental, s),
+		plaquage: Pe(c.plaquage, o ? s + 5 : s - 2),
+		evitement: Pe(c.vitesse, s) * .55 + Pe(c.mental, s) * .2 + (o ? 0 : 8),
+		puissance: Pe(c.force, o ? s + 6 : s - 2),
+		passe: Pe(c.passe, o ? s - 8 : s + 2),
+		pied: Pe(c.jeuAuPied, a === "demi_ouverture" || a === "arriere" ? s + 6 : a === "demi_melee" ? s : s - 14),
+		vision: Pe(c.vision, s),
+		discipline: Pe(c.mental, s),
 		detente: o ? s + (a.startsWith("deuxieme_ligne") ? 10 : 0) : s - 10,
 		usure: .03 * (1.55 - d / 135),
 		effort: 1,
-		stats: be()
+		stats: Ae()
 	};
 }
-function De(e) {
-	return e.vitesseMax * (.58 + .42 * (e.endurance / 100));
+function Le(e) {
+	return e.deuxReserves ? e.vitesseMax * ne(e) : e.vitesseMax * (.58 + .42 * (e.endurance / 100));
 }
-var Oe = 7.5;
-function ke(e, t, n = !1) {
+var Re = 7.5;
+function ze(e, t, n = !1) {
 	if (e.corps) return 0;
-	let r = e.cible.x - e.pos.x, i = e.cible.y - e.pos.y, a = Math.sqrt(r * r + i * i), o = De(e) * e.effort, s = [
+	let r = e.cible.x - e.pos.x, i = e.cible.y - e.pos.y, a = Math.sqrt(r * r + i * i), o = e.deuxReserves ? se(e, e.effort) : e.effort, s = Le(e) * o, c = [
 		"ruck",
 		"maul",
 		"melee",
 		"alignement"
-	].includes(e.role) ? .08 : .7, c = a < s ? 0 : n ? Math.min(o, Math.sqrt(2 * Oe * .8 * Math.max(0, a - s * .5))) : Math.min(o, Math.max(0, a - s * .55) / .35), l = a < 1e-6 ? 0 : r / a * c, u = a < 1e-6 ? 0 : i / a * c, d = l - e.vitesse.x, f = u - e.vitesse.y, p = Math.sqrt(d * d + f * f), m = .65 + .35 * (e.endurance / 100), h = e.acceleration * m * t;
-	n && d * e.vitesse.x + f * e.vitesse.y < 0 && (h = Math.max(h, Oe * t)), p > h && p > 1e-6 && (d = d / p * h, f = f / p * h), e.vitesse.x += d, e.vitesse.y += f;
-	let g = Math.hypot(e.vitesse.x, e.vitesse.y) * t;
-	if (e.pos.x += e.vitesse.x * t, e.pos.y += e.vitesse.y * t, e.pos.x = k(e.pos.x, -1.5, 123.5), e.pos.y = k(e.pos.y, -1.5, 71.5), e.stats.distanceParcourue += g, g > 0) {
-		let n = Math.min(1, g / t / e.vitesseMax);
+	].includes(e.role) ? .08 : .7, l = a < c ? 0 : n ? Math.min(s, Math.sqrt(2 * Re * .8 * Math.max(0, a - c * .5))) : Math.min(s, Math.max(0, a - c * .55) / .35), u = a < 1e-6 ? 0 : r / a * l, d = a < 1e-6 ? 0 : i / a * l, f = u - e.vitesse.x, p = d - e.vitesse.y, m = Math.sqrt(f * f + p * p), h = e.deuxReserves ? ie(e) : .65 + .35 * (e.endurance / 100), g = e.acceleration * h * t;
+	n && f * e.vitesse.x + p * e.vitesse.y < 0 && (g = Math.max(g, Re * t)), m > g && m > 1e-6 && (f = f / m * g, p = p / m * g), e.vitesse.x += f, e.vitesse.y += p;
+	let _ = Math.hypot(e.vitesse.x, e.vitesse.y) * t;
+	if (e.pos.x += e.vitesse.x * t, e.pos.y += e.vitesse.y * t, e.pos.x = A(e.pos.x, -1.5, 123.5), e.pos.y = A(e.pos.y, -1.5, 71.5), e.stats.distanceParcourue += _, e.deuxReserves) return ae(e, t, Math.min(1, _ / t / e.vitesseMax), ce(o)), _;
+	if (_ > 0) {
+		let n = Math.min(1, _ / t / e.vitesseMax);
 		e.endurance = Math.max(0, e.endurance - e.usure * t * n ** 1.6 * 10);
 	}
-	return g;
+	return _;
 }
-function N(e) {
+function P(e) {
 	e.vitesse.x = 0, e.vitesse.y = 0;
 }
 //#endregion
 //#region src/lib/moteur/phasesArretees.ts
-var Ae = 2.5;
-function P(e) {
-	return k(e, Ae, 70 - Ae);
+var Be = 2.5;
+function Ve(e) {
+	return A(e, Be, 70 - Be);
 }
-function je(e, t) {
+function He(e, t) {
 	return e.filter((e) => e.surLeTerrain && e.cote === t && e.sanction <= 0);
 }
-function Me(e, t) {
+function Ue(e, t) {
 	return e.find((e) => e.numero === t);
 }
-var Ne = {
+var We = {
 	1: [.5, -.85],
 	2: [.4, 0],
 	3: [.5, .85],
@@ -40638,24 +40712,24 @@ var Ne = {
 	7: [1.8, 1.55],
 	8: [2.8, 0]
 };
-function Pe(e, t, n) {
+function Ge(e, t, n) {
 	let r = {}, i = t.y < 35 ? 1 : -1;
 	for (let a of ["A", "B"]) {
-		let o = A(a), s = je(e, a), c = a === n;
+		let o = j(a), s = He(e, a), c = a === n;
 		for (let e of s.filter((e) => e.avant).slice(0, 8)) {
-			let [n, i] = Ne[e.numero] ?? [2, 0];
+			let [n, i] = We[e.numero] ?? [2, 0];
 			e.role = "melee", r[e.id] = {
 				x: t.x - o * n,
-				y: P(t.y + i)
+				y: Ve(t.y + i)
 			};
 		}
-		let l = Me(s, 9);
+		let l = Ue(s, 9);
 		l && (r[l.id] = c ? {
 			x: t.x - o * .5,
-			y: P(t.y - i * 1.5)
+			y: Ve(t.y - i * 1.5)
 		} : {
 			x: t.x - o * 2.6,
-			y: P(t.y + i * 1.8)
+			y: Ve(t.y + i * 1.8)
 		});
 		let u = c ? 0 : -1.5;
 		for (let [e, n, a] of [
@@ -40680,14 +40754,14 @@ function Pe(e, t, n) {
 				4
 			]
 		]) {
-			let l = Me(s, e);
+			let l = Ue(s, e);
 			l && (r[l.id] = {
 				x: t.x - o * (n + u),
-				y: P(t.y + i * a * (c ? 1 : .85))
+				y: Ve(t.y + i * a * (c ? 1 : .85))
 			});
 		}
 		for (let e of [11, 14]) {
-			let n = Me(s, e);
+			let n = Ue(s, e);
 			n && (r[n.id] = {
 				x: t.x - o * (c ? 15 : 13),
 				y: e === 11 ? 6 : 64
@@ -40696,31 +40770,31 @@ function Pe(e, t, n) {
 	}
 	return r;
 }
-function Fe(e, t, n, r, i, a) {
+function Ke(e, t, n, r, i, a) {
 	let o = {}, s = t.y < 35 ? 0 : 70, c = s === 0 ? 1 : -1;
 	for (let l of ["A", "B"]) {
-		let u = A(l), d = je(e, l), f = l === n, p = (f && a ? d.find((e) => e.id === a) : void 0) ?? Me(d, 2), m = d.filter((e) => e.avant && e !== p), h = f && i ? y(i, m.map((e) => e.numero)) : void 0, g = h ? h.map((e) => m.find((t) => t.numero === e.numero)) : m.slice(0, Math.max(2, r)), _ = m.filter((e) => !g.includes(e));
+		let u = j(l), d = He(e, l), f = l === n, p = (f && a ? d.find((e) => e.id === a) : void 0) ?? Ue(d, 2), m = d.filter((e) => e.avant && e !== p), h = f && i ? y(i, m.map((e) => e.numero)) : void 0, g = h ? h.map((e) => m.find((t) => t.numero === e.numero)) : m.slice(0, Math.max(2, r)), _ = m.filter((e) => !g.includes(e));
 		p && (o[p.id] = f ? {
 			x: t.x,
 			y: s === 0 ? .7 : 69.3
 		} : {
 			x: t.x - u * 2.2,
-			y: P(s + c * 3)
+			y: Ve(s + c * 3)
 		}), g.forEach((e, n) => {
 			e.role = "alignement", o[e.id] = {
 				x: t.x - u * .44,
-				y: P(s + c * (h?.[n].distance ?? 5 + n * 1.55))
+				y: Ve(s + c * (h?.[n].distance ?? 5 + n * 1.55))
 			};
 		}), _.forEach((e, n) => {
 			e.role === "alignement" && (e.role = "ligne"), o[e.id] = {
 				x: t.x - u * (f ? 9 : 11),
-				y: P(s + c * (19 + n * 6))
+				y: Ve(s + c * (19 + n * 6))
 			};
 		});
-		let v = Me(d, 9);
+		let v = Ue(d, 9);
 		v && (o[v.id] = {
 			x: t.x - u * (f ? 3 : 4),
-			y: P(s + c * 8)
+			y: Ve(s + c * 8)
 		});
 		for (let [e, n, r] of [
 			[
@@ -40744,19 +40818,19 @@ function Fe(e, t, n, r, i, a) {
 				45
 			]
 		]) {
-			let i = Me(d, e);
+			let i = Ue(d, e);
 			i && (o[i.id] = {
 				x: t.x - u * (f ? n : Math.max(10.5, n - 2)),
-				y: P(s + c * r)
+				y: Ve(s + c * r)
 			});
 		}
 		for (let e of [11, 14]) {
-			let n = Me(d, e);
+			let n = Ue(d, e);
 			if (!n) continue;
 			let r = e === 11 && s === 0 || e === 14 && s === 70;
 			o[n.id] = r ? {
 				x: t.x - u * (f ? 24 : 20),
-				y: P(s + c * 13)
+				y: Ve(s + c * 13)
 			} : {
 				x: t.x - u * (f ? 16 : 12),
 				y: e === 11 ? 6 : 64
@@ -40765,31 +40839,31 @@ function Fe(e, t, n, r, i, a) {
 	}
 	return o;
 }
-function Ie(e, t, n) {
+function qe(e, t, n) {
 	let r = {};
 	for (let i of ["A", "B"]) {
-		let a = A(i), o = i === n;
-		je(e, i).filter((e) => e.avant && e.numero !== 9).sort((e, n) => (e.pos.x - t.x) ** 2 + (e.pos.y - t.y) ** 2 - ((n.pos.x - t.x) ** 2 + (n.pos.y - t.y) ** 2)).slice(0, o ? 3 : 2).forEach((e, n) => {
+		let a = j(i), o = i === n;
+		He(e, i).filter((e) => e.avant && e.numero !== 9).sort((e, n) => (e.pos.x - t.x) ** 2 + (e.pos.y - t.y) ** 2 - ((n.pos.x - t.x) ** 2 + (n.pos.y - t.y) ** 2)).slice(0, o ? 3 : 2).forEach((e, n) => {
 			e.role = "ruck", r[e.id] = {
 				x: t.x - a * (.75 + Math.floor(n / 2) * .9),
-				y: P(t.y + (n % 2 - .5) * 1.5)
+				y: Ve(t.y + (n % 2 - .5) * 1.5)
 			};
 		});
 	}
-	let i = je(e, n).find((e) => e.numero === 9);
+	let i = He(e, n).find((e) => e.numero === 9);
 	if (i) {
-		let e = A(n);
+		let e = j(n);
 		r[i.id] = {
 			x: t.x - e * 1.5,
-			y: P(t.y - 1.1)
+			y: Ve(t.y - 1.1)
 		};
 	}
 	return r;
 }
-function Le(e, t, n, r, i) {
+function Je(e, t, n, r, i) {
 	let a = {};
 	for (let o of ["A", "B"]) {
-		let s = A(o), c = je(e, o);
+		let s = j(o), c = He(e, o);
 		if (o === n) {
 			let e = (i ? c.find((e) => e.id === i) : void 0) ?? c.find((e) => e.numero === 10) ?? c[0], n = c.indexOf(e);
 			c.forEach((i, o) => {
@@ -40803,12 +40877,12 @@ function Le(e, t, n, r, i) {
 				let c = o - +(o > n);
 				a[i.id] = {
 					x: t - s * (1.5 + c % 3 * 1.6),
-					y: P(r.y + (c - 6) * 4.6)
+					y: Ve(r.y + (c - 6) * 4.6)
 				};
 			});
 		} else for (let e of c) e.avant ? a[e.id] = {
 			x: r.x - s * (e.numero % 3 * 3 - 3),
-			y: P(r.y + (e.numero % 4 - 1.5) * 6)
+			y: Ve(r.y + (e.numero % 4 - 1.5) * 6)
 		} : e.numero === 15 ? a[e.id] = {
 			x: t - s * 34,
 			y: 35
@@ -40817,72 +40891,72 @@ function Le(e, t, n, r, i) {
 			y: e.numero === 11 ? 9 : 61
 		} : a[e.id] = {
 			x: r.x - s * 11,
-			y: P(35 + (e.numero - 11.5) * 9)
+			y: Ve(35 + (e.numero - 11.5) * 9)
 		};
 	}
 	return a;
 }
-function Re(e, t, n, r) {
+function Ye(e, t, n, r) {
 	let i = {};
 	for (let a of ["A", "B"]) {
-		let o = A(a);
-		je(e, a).forEach((e, s) => {
+		let o = j(a);
+		He(e, a).forEach((e, s) => {
 			if (a === n) {
 				let n = r ? e.id === r : s === 0;
 				i[e.id] = n ? {
 					x: t.x,
-					y: P(t.y)
+					y: Ve(t.y)
 				} : {
 					x: t.x - o * (6 + s % 4 * 2.5),
-					y: P(t.y + (s % 7 - 3) * 5)
+					y: Ve(t.y + (s % 7 - 3) * 5)
 				};
 			} else {
 				let t = a === "A" ? 9 : 113;
 				i[e.id] = {
 					x: t,
-					y: P(35 + (s % 8 - 3.5) * 5.5)
+					y: Ve(35 + (s % 8 - 3.5) * 5.5)
 				};
 			}
 		});
 	}
 	return i;
 }
-function ze(e, t, n) {
+function Xe(e, t, n) {
 	let r = {};
 	for (let i of ["A", "B"]) {
-		let a = A(i);
-		je(e, i).forEach((e, o) => {
+		let a = j(i);
+		He(e, i).forEach((e, o) => {
 			r[e.id] = i === n ? {
 				x: t - a * (.8 + o % 4 * 1.4),
-				y: P(35 + (o % 8 - 3.5) * 6)
+				y: Ve(35 + (o % 8 - 3.5) * 6)
 			} : {
 				x: t - a * (11 + o % 5 * 4),
-				y: P(35 + (o % 9 - 4) * 6.5)
+				y: Ve(35 + (o % 9 - 4) * 6.5)
 			};
 		});
 	}
 	return r;
 }
-function Be(e, t, n, r) {
-	return Le(e, 61, t, n, r);
+function Ze(e, t, n, r) {
+	return Je(e, 61, t, n, r);
 }
 //#endregion
 //#region src/lib/moteur/combinaisons.ts
-function Ve(e, t, n) {
+function Qe(e, t, n) {
 	return e.pions.find((e) => e.cote === t && e.numero === n && e.surLeTerrain && e.sanction <= 0);
 }
-function He(e, t) {
-	let n = e.possession, r = b(e.plansCombinaisons?.[n] ?? [], t, n === "A" ? e.ballon.x - 11 : 111 - e.ballon.x, A(n) === 1 ? e.ballon.y : 70 - e.ballon.y);
+function $e(e, t) {
+	let n = e.possession, r = b(e.plansCombinaisons?.[n] ?? [], t, n === "A" ? e.ballon.x - 11 : 111 - e.ballon.x, j(n) === 1 ? e.ballon.y : 70 - e.ballon.y);
 	if (!r) return;
-	let i = r.variantes.filter((r) => Ve(e, n, t === "touche" ? r.sauteur : r.depart) && (t !== "touche" || Ve(e, n, 2)) && r.actions.every((t) => t.type !== "passe" || Ve(e, n, t.destinataire)));
+	let i = r.variantes.filter((r) => Qe(e, n, t === "touche" ? r.sauteur : r.depart) && (t !== "touche" || Qe(e, n, 2)) && r.actions.every((t) => t.type !== "passe" || Qe(e, n, t.destinataire)));
 	return i.length ? {
 		...r,
 		variantes: i
 	} : void 0;
 }
-function Ue(e, t) {
+function et(e, t) {
 	e.combinaisonEnCours = void 0, e.combinaisonPreparee = void 0;
-	let n = e.possession, r = A(n), i = He(e, t);
+	let n = e.possession, r = j(n), i = $e(e, t);
 	if (!i) return;
 	let a = x(i, e.rng);
 	if (e.combinaisonPreparee = {
@@ -40890,26 +40964,26 @@ function Ue(e, t) {
 		plan: i,
 		variante: a
 	}, t === "touche" && e.conquete) {
-		if (!Ve(e, n, 2)) {
+		if (!Qe(e, n, 2)) {
 			e.combinaisonPreparee = void 0;
 			return;
 		}
 		let t = h(a.touche);
-		e.combinaisonPreparee.origineConquete = { ...e.ballon }, e.placement = Fe(e.pions, e.ballon, n, t.alignes, a);
+		e.combinaisonPreparee.origineConquete = { ...e.ballon }, e.placement = Ke(e.pions, e.ballon, n, t.alignes, a);
 		for (let t of e.pions) {
 			let n = e.placement[t.id];
-			!n || !t.surLeTerrain || t.sanction > 0 || (t.pos = { ...n }, t.cible = { ...n }, delete t.corps, N(t));
+			!n || !t.surLeTerrain || t.sanction > 0 || (t.pos = { ...n }, t.cible = { ...n }, delete t.corps, P(t));
 		}
-		let i = Ve(e, n, a.sauteur);
+		let i = Qe(e, n, a.sauteur);
 		e.conquete.combinaison = t.feinte ? "leurreDevant" : t.distance <= 7 ? "premierBloc" : t.distance >= 11 ? "fond" : "milieu", e.conquete.cibleId = i.id, g(a) ? (e.conquete.horsAlignement = !0, e.conquete.reception = _(e.ballon, a, r)) : (delete e.conquete.horsAlignement, delete e.conquete.reception);
 	}
 }
-function We(e, t, n) {
+function tt(e, t, n) {
 	let r = e.combinaisonPreparee;
 	if (e.combinaisonPreparee = void 0, e.combinaisonEnCours = void 0, !r || r.cote !== e.possession) return !1;
-	let i = n ?? Ve(e, r.cote, r.variante.depart);
+	let i = n ?? Qe(e, r.cote, r.variante.depart);
 	if (!i) return !1;
-	let a = r.origineConquete ?? t, o = A(r.cote) === 1 ? a.y : 70 - a.y;
+	let a = r.origineConquete ?? t, o = j(r.cote) === 1 ? a.y : 70 - a.y;
 	return e.combinaisonEnCours = {
 		...r,
 		origine: { ...a },
@@ -40921,55 +40995,55 @@ function We(e, t, n) {
 		etapes: d(r.variante.actions)
 	}, e.lancement = {
 		type: "large",
-		chaine: [i, ...r.variante.actions.flatMap((t) => t.type === "passe" ? [Ve(e, r.cote, t.destinataire)] : [])],
+		chaine: [i, ...r.variante.actions.flatMap((t) => t.type === "passe" ? [Qe(e, r.cote, t.destinataire)] : [])],
 		index: 0,
 		libelle: `${r.plan.nom} · ${r.variante.nom}`
 	}, e.porteur = i, !0;
 }
-function Ge(e, t) {
-	let n = A(e.cote);
+function nt(e, t) {
+	let n = j(e.cote);
 	return {
-		x: k(e.origine.x + n * t.x, 9, 113),
-		y: k(e.origine.y + n * e.miroir * t.y, 1.5, 68.5)
+		x: A(e.origine.x + n * t.x, 9, 113),
+		y: A(e.origine.y + n * e.miroir * t.y, 1.5, 68.5)
 	};
 }
-function Ke(e) {
+function rt(e) {
 	let t = e.combinaisonEnCours;
 	if (!(!t || t.cote !== e.possession || e.phase !== "jeuCourant")) {
-		qe(e);
+		it(e);
 		for (let n of v(t.variante)) {
-			let r = Ve(e, t.cote, n.numero);
+			let r = Qe(e, t.cote, n.numero);
 			if (!r || r === e.porteur || e.vol?.receveur === r) continue;
-			let i = Ge(t, t.courses[r.numero] ?? n);
+			let i = nt(t, t.courses[r.numero] ?? n);
 			if (!t.courses[r.numero]) {
-				let n = A(t.cote);
+				let n = j(t.cote);
 				(i.x - e.ballon.x) * n > -.7 && (i.x = e.ballon.x - n * .7);
 			}
 			r.cible = i;
 		}
 		for (let [n, r] of Object.entries(t.courses)) {
-			let i = Ve(e, t.cote, Number(n));
-			i && i !== e.porteur && e.vol?.receveur !== i && (i.cible = Ge(t, r));
+			let i = Qe(e, t.cote, Number(n));
+			i && i !== e.porteur && e.vol?.receveur !== i && (i.cible = nt(t, r));
 		}
 	}
 }
-function qe(e) {
+function it(e) {
 	let t = e.combinaisonEnCours;
 	if (!(!t || t.cote !== e.possession || !(e.phase === "jeuCourant" || e.phase === "ballonEnLAir" && e.vol?.type === "passe"))) {
 		if (e.phase === "jeuCourant") for (let { action: e } of t.etapes[t.index]?.actions ?? []) e.type === "leurre" && (t.courses[e.numero] = e.destination);
 		for (let [n, r] of Object.entries(t.courses)) {
-			let i = Ve(e, t.cote, Number(n));
-			i && i !== e.porteur && i !== e.vol?.receveur && (i.cible = Ge(t, r));
+			let i = Qe(e, t.cote, Number(n));
+			i && i !== e.porteur && i !== e.vol?.receveur && (i.cible = nt(t, r));
 		}
 	}
 }
-function Je(e) {
+function at(e) {
 	let t = e.combinaisonEnCours, n = t?.etapes[t.index]?.actions.find((e) => e.action.type === "course")?.action;
-	return t && t.cote === e.porteur?.cote && n?.type === "course" ? Ge(t, n.destination) : void 0;
+	return t && t.cote === e.porteur?.cote && n?.type === "course" ? nt(t, n.destination) : void 0;
 }
 //#endregion
 //#region src/lib/moteur/etat.ts
-var Ye = /* @__PURE__ */ new Set([
+var ot = /* @__PURE__ */ new Set([
 	"coupEnvoi",
 	"renvoi22",
 	"melee",
@@ -40981,7 +41055,7 @@ var Ye = /* @__PURE__ */ new Set([
 	"apresEssai",
 	"miTemps"
 ]);
-function Xe() {
+function st() {
 	return {
 		provocations: 0,
 		bagarres: 0,
@@ -40993,7 +41067,7 @@ function Xe() {
 		blessure: null
 	};
 }
-function Ze(e, t, n, r, i = 0, a = !1) {
+function ct(e, t, n, r, i = 0, a = !1) {
 	e.commentaires.push({
 		seconde: Math.min(4800, Math.floor(e.t)),
 		minute: Math.min(80, Math.floor(e.t / 60)),
@@ -41008,7 +41082,7 @@ function Ze(e, t, n, r, i = 0, a = !1) {
 }
 //#endregion
 //#region src/data/commentairesMatch.ts
-var Qe = {
+var lt = {
 	en: {
 		essai: ["TRY! {nom} grounds the ball {precision}!"],
 		precision: [
@@ -41411,7 +41485,7 @@ var Qe = {
 			"ロッカーに戻れ。"
 		]
 	}
-}, $e = {
+}, ut = {
 	fr: {
 		renvoiEnButJoueur: "Renvoi d’en-but joué par {nom}.",
 		coupEnvoiMatch: "Coup d’envoi ! {clubA} reçoit {clubB}.",
@@ -41878,9 +41952,9 @@ var Qe = {
 //#endregion
 //#region src/lib/moteur/commentaire.ts
 function F(e, t, n = {}) {
-	let r = i(), a = Pt.get(t), o = r !== "fr" && a ? Qe[r][a] : t, s = o[Math.floor(e() * o.length)] ?? o[0] ?? "";
+	let r = i(), a = Gt.get(t), o = r !== "fr" && a ? lt[r][a] : t, s = o[Math.floor(e() * o.length)] ?? o[0] ?? "";
 	for (let e of Object.keys(n)) {
-		let t = e === "motif" ? Ft(String(n[e]), r) : n[e];
+		let t = e === "motif" ? Kt(String(n[e]), r) : n[e];
 		s = s.split(`{${e}}`).join(String(t));
 	}
 	return s.replace(/\{([^{}]*\|[^{}]*)\}/g, (t, n) => {
@@ -41888,7 +41962,7 @@ function F(e, t, n = {}) {
 		return r[Math.floor(e() * r.length)] ?? r[0];
 	});
 }
-var et = [
+var dt = [
 	"ESSAI ! {nom} plonge dans l’en-but {precision} !",
 	"ESSAI DE {nom} ! Il aplatit {precision}, {le stade explose|c’est magnifique|quelle fin d’action}.",
 	"Il y va… ESSAI ! {nom} {precision}, imparable.",
@@ -41901,7 +41975,7 @@ var et = [
 	"Turnover, relance, accélération : {nom} termine le travail {precision} !",
 	"{nom} ramasse au ras et s’arrache jusqu’à la ligne : ESSAI !",
 	"La défense glisse trop tard, {nom} déborde et aplatit {precision}."
-], tt = [
+], ft = [
 	"à la pointe du ballon",
 	"en coin",
 	"sous les poteaux",
@@ -41914,32 +41988,32 @@ var et = [
 	"sur une passe sautée",
 	"après un petit coup de pied à suivre",
 	"à la sortie d’un ruck rapide"
-], nt = [
+], pt = [
 	"Transformation de {nom}, {facile|sans trembler|au bout du pied}.",
 	"{nom} ajuste et transforme.",
 	"La transformation est bonne, {nom} ne tremble pas."
-], rt = [
+], mt = [
 	"{nom} manque la transformation, le ballon passe à côté.",
 	"Transformation ratée par {nom}, deux points perdus.",
 	"{nom} bute contre le poteau ! Elle est manquée."
-], it = [
+], ht = [
 	"💥 CONTRE ! {contreur} a jailli dès la course d’élan et contre la transformation de {nom} !",
 	"Incroyable contre de {contreur} ! La transformation de {nom} est déviée au sol.",
 	"{contreur} a surgi à pleine vitesse et contre le tir de {nom} au tee !"
-], at = [
+], gt = [
 	"Pénalité de {nom}, trois points de plus.",
 	"{nom} l’ajuste depuis {distance} mètres, c’est bon.",
 	"Trois points au pied de {nom}, {distance} mètres.",
 	"{nom} prend son temps et récompense la faute : trois points.",
 	"Le ballon fend les poteaux depuis {distance} mètres, signé {nom}.",
 	"{nom} ne laisse rien passer : pénalité réussie."
-], ot = [
+], _t = [
 	"{nom} manque la pénalité de {distance} mètres.",
 	"La pénalité de {nom} passe à côté, {distance} mètres.",
 	"Le ballon fuit à droite : échec de {nom}.",
 	"{nom} trouve le poteau, pas les trois points.",
 	"Tentative trop courte de {nom} depuis {distance} mètres."
-], st = ["DROP DE {nom} ! Trois points d’un geste.", "{nom} arme un drop… c’est passé !"], ct = [
+], vt = ["DROP DE {nom} ! Trois points d’un geste.", "{nom} arme un drop… c’est passé !"], yt = [
 	"Pénalité pour {club} : {motif}.",
 	"Coup de sifflet : {motif}. Pénalité pour {club}.",
 	"M. l’arbitre siffle {motif}, pénalité {club}.",
@@ -41948,7 +42022,7 @@ var et = [
 	"Le sifflet coupe l’action, {motif} contre la défense.",
 	"L’arbitre est formel : {motif}. Ballon à {club}.",
 	"La pression paie pour {club} : {motif}."
-], lt = [
+], bt = [
 	"hors-jeu",
 	"plaquage haut",
 	"ballon tenu au sol",
@@ -41965,17 +42039,17 @@ var et = [
 	"mêlée écroulée",
 	"maul écroulé",
 	"plaquage sans ballon"
-], ut = [
+], xt = [
 	"Gros plaquage de {nom} sur {cible} !",
 	"{nom} stoppe {cible} net.",
 	"{cible} est cueilli par {nom}.",
 	"Plaquage dominateur de {nom}, {cible} recule."
-], dt = [
+], St = [
 	"{nom} est dans l’intervalle, il est lancé !",
 	"Cadrage-débordement de {nom}, la ligne est franchie !",
 	"{nom} casse le premier rideau, il y a de l’espace !",
 	"Quelle accélération de {nom}, il est passé !"
-], ft = [
+], Ct = [
 	"Grattage de {nom} ! Ballon récupéré au sol.",
 	"{nom} est dans le ruck, il arrache le ballon !",
 	"Turnover ! {nom} sort le ballon du regroupement.",
@@ -41983,7 +42057,7 @@ var et = [
 	"Le soutien arrive trop tard : {nom} gratte ce ballon.",
 	"{nom} verrouille le ballon, turnover pour son équipe !",
 	"Quel contest de {nom} ! Le ruck change de camp."
-], pt = [
+], wt = [
 	"En-avant de {nom}, mêlée pour {club}.",
 	"Le ballon échappe à {nom}, en-avant.",
 	"Ballon perdu par {nom}, l’arbitre siffle l’en-avant.",
@@ -41991,67 +42065,67 @@ var et = [
 	"Passe trop dure, {nom} échappe le ballon. Mêlée adverse.",
 	"Sous la pression, {nom} commet l’en-avant.",
 	"Le ballon rebondit sur les mains de {nom} : mêlée pour {club}."
-], mt = [
+], Tt = [
 	"Passe en avant de {nom}, mêlée pour {club}.",
 	"Le ballon part devant sur la passe de {nom}, l’arbitre siffle.",
 	"{nom} a lâché sa passe en avant, mêlée {club}.",
 	"La passe de {nom} flotte vers l’avant : le juge de touche l’a vue.",
 	"{nom} force la transmission, son partenaire était devant.",
 	"Mouvement stoppé : passe en avant de {nom}."
-], ht = [
+], Et = [
 	"{nom} dégage en touche et rend cinquante mètres.",
 	"Chandelle de dégagement de {nom}, l’équipe respire.",
 	"{nom} tape par-dessus, le ballon file en touche."
-], gt = [
+], Dt = [
 	"{nom} occupe le terrain au pied.",
 	"Coup de pied de déplacement de {nom}, on inverse la pression.",
 	"{nom} rend le ballon mais gagne trente mètres."
-], _t = [
+], Ot = [
 	"Chandelle de {nom}, les avants montent dessus !",
 	"{nom} envoie un ballon haut, la course est lancée.",
 	"Box kick de {nom}, contestable."
-], vt = ["50/22 de {nom} ! La touche est pour eux !", "Quel coup de pied ! {nom} trouve le 50/22."], yt = ["{nom} tente le 50/22, le ballon sort trop tôt.", "Tentative de 50/22 manquée par {nom}."], bt = ["Coup de pied rasant de {nom} derrière la défense !", "{nom} glisse un ballon au sol dans le dos du rideau."], xt = ["Transversale de {nom} pour l’aile !", "{nom} renverse le jeu d’un coup de pied par-dessus."], St = [
+], kt = ["50/22 de {nom} ! La touche est pour eux !", "Quel coup de pied ! {nom} trouve le 50/22."], At = ["{nom} tente le 50/22, le ballon sort trop tôt.", "Tentative de 50/22 manquée par {nom}."], jt = ["Coup de pied rasant de {nom} derrière la défense !", "{nom} glisse un ballon au sol dans le dos du rideau."], Mt = ["Transversale de {nom} pour l’aile !", "{nom} renverse le jeu d’un coup de pied par-dessus."], Nt = [
 	"Touche de {club}, ballon propre pour {nom}.",
 	"{nom} prend l’alignement, ballon assuré.",
 	"Lancer précis, {nom} domine dans les airs pour {club}.",
 	"{club} varie l’alignement et trouve {nom} au premier bloc.",
 	"{nom} capte au fond de la touche, le maul peut se former.",
 	"Combinaison propre de {club}, ballon sécurisé par {nom}."
-], Ct = [
+], Pt = [
 	"Touche ratée ! {club} récupère l’alignement.",
 	"Lancer pas droit, le ballon change de camp.",
 	"{nom} contre en touche, quel timing !",
 	"Le lancer est trop long, {club} hérite du ballon.",
 	"Mauvaise coordination dans l’alignement : touche volée par {club}.",
 	"{nom} surgit devant le sauteur et subtilise le lancer !"
-], wt = [
+], Ft = [
 	"Mêlée solide de {club}, ballon sorti.",
 	"Ballon propre en sortie de mêlée pour {club}.",
 	"Les huit de {club} restent liés, la mêlée est maîtrisée.",
 	"{club} stabilise puis libère vite pour son demi de mêlée.",
 	"Introduction nette, talonnage propre : possession {club}.",
 	"Le pack de {club} absorbe la poussée et conserve son ballon."
-], Tt = [
+], It = [
 	"La mêlée de {club} recule, pénalité contre elle.",
 	"Mêlée dominatrice ! {club} avance et obtient la pénalité.",
 	"Le pack de {club} enfonce son vis-à-vis : bras tendu de l’arbitre.",
 	"Grosse poussée de {club}, la première ligne adverse se désunit.",
 	"{club} tourne la mêlée et gagne le coup de sifflet.",
 	"Les crampons labourent la pelouse : {club} prend nettement le dessus."
-], Et = [
+], Lt = [
 	"Ballon porté de {club}, ça avance !",
 	"Le maul se met en route pour {club}.",
 	"Les avants de {club} se lient autour du ballon et avancent.",
 	"Ballon caché au cœur du maul, {club} gagne mètre après mètre.",
 	"Le paquet de {club} change d’axe et repart vers la ligne.",
 	"Maul compact de {club}, la défense recule encore."
-], Dt = [
+], Rt = [
 	"ESSAI au terme du ballon porté ! {nom} pose le ballon.",
 	"Le maul enfonce tout : ESSAI de {nom} !",
 	"Le ballon porté traverse la ligne, {nom} aplatit derrière ses avants !",
 	"La défense s’écroule dans l’en-but : essai collectif conclu par {nom}.",
 	"Tout le pack pousse jusqu’au bout, {nom} libère le ballon et marque !"
-], Ot = ["CARTON JAUNE pour {nom} : {motif}. {club} à quatorze pour dix minutes.", "L’arbitre sort le jaune : {nom} quitte le terrain dix minutes."], kt = [
+], zt = ["CARTON JAUNE pour {nom} : {motif}. {club} à quatorze pour dix minutes.", "L’arbitre sort le jaune : {nom} quitte le terrain dix minutes."], Bt = [
 	"Tu tiens debout, toi ?",
 	"On t’attend, allez.",
 	"C’est tout ?",
@@ -42062,66 +42136,66 @@ var et = [
 	"Doucement, le vieux.",
 	"T’as fini ?",
 	"Retourne au vestiaire."
-], At = ["{entrant} remplace {sortant}.", "Changement pour {club} : {entrant} entre à la place de {sortant}."], jt = [
+], Vt = ["{entrant} remplace {sortant}.", "Changement pour {club} : {entrant} entre à la place de {sortant}."], Ht = [
 	"{nom} repart au ras, il gagne le premier mètre.",
 	"Pick and go de {nom}, ça pilonne.",
 	"{nom} plonge sur le ballon et repart dans l’axe.",
 	"Une passe courte au ras pour {nom}, encore deux mètres.",
 	"{nom} baisse les épaules et attaque le petit côté."
-], Mt = [
+], Ut = [
 	"{nom} percute au ras, la défense recule.",
 	"Un temps de plus par {nom} dans l’axe.",
 	"{nom} arrive lancé sur l’épaule intérieure du défenseur.",
 	"Course droite de {nom}, point de fixation créé.",
 	"{nom} gagne le duel au centre du terrain et présente vite."
-], Nt = [
+], Wt = [
 	"Le ballon voyage… {nom} le reçoit au large !",
 	"Ça écarte vite, {nom} est servi à l’aile !",
 	"Surnombre au large, le ballon file jusqu’à {nom} !"
-], Pt = /* @__PURE__ */ new Map([
-	[kt, "chambrage"],
-	[et, "essai"],
-	[tt, "precision"],
-	[nt, "transformation"],
-	[rt, "transformationRatee"],
-	[at, "penaliteBut"],
-	[ot, "penaliteRatee"],
-	[st, "drop"],
-	[ct, "penalite"],
-	[lt, "motif"],
-	[ut, "plaquage"],
-	[dt, "franchissement"],
-	[ft, "grattage"],
-	[pt, "enAvant"],
-	[mt, "passeAvant"],
-	[ht, "degagement"],
-	[gt, "occupation"],
-	[_t, "chandelle"],
-	[vt, "cinquanteVingtDeux"],
-	[yt, "cinquanteVingtDeuxRate"],
-	[bt, "rasant"],
-	[xt, "transversale"],
-	[St, "toucheGagnee"],
-	[Ct, "touchePerdue"],
-	[wt, "meleeGagnee"],
-	[Tt, "meleeDominee"],
-	[Et, "maul"],
-	[Dt, "maulEssai"],
-	[Ot, "carton"],
-	[At, "remplacement"],
-	[jt, "pickAndGo"],
-	[Mt, "percussion"],
-	[Nt, "ecartement"]
+], Gt = /* @__PURE__ */ new Map([
+	[Bt, "chambrage"],
+	[dt, "essai"],
+	[ft, "precision"],
+	[pt, "transformation"],
+	[mt, "transformationRatee"],
+	[gt, "penaliteBut"],
+	[_t, "penaliteRatee"],
+	[vt, "drop"],
+	[yt, "penalite"],
+	[bt, "motif"],
+	[xt, "plaquage"],
+	[St, "franchissement"],
+	[Ct, "grattage"],
+	[wt, "enAvant"],
+	[Tt, "passeAvant"],
+	[Et, "degagement"],
+	[Dt, "occupation"],
+	[Ot, "chandelle"],
+	[kt, "cinquanteVingtDeux"],
+	[At, "cinquanteVingtDeuxRate"],
+	[jt, "rasant"],
+	[Mt, "transversale"],
+	[Nt, "toucheGagnee"],
+	[Pt, "touchePerdue"],
+	[Ft, "meleeGagnee"],
+	[It, "meleeDominee"],
+	[Lt, "maul"],
+	[Rt, "maulEssai"],
+	[zt, "carton"],
+	[Vt, "remplacement"],
+	[Ht, "pickAndGo"],
+	[Ut, "percussion"],
+	[Wt, "ecartement"]
 ]);
-function Ft(e, t) {
+function Kt(e, t) {
 	if (t === "fr") return e;
-	let n = lt.indexOf(e);
-	return n >= 0 ? Qe[t].motif[n] ?? e : e;
+	let n = bt.indexOf(e);
+	return n >= 0 ? lt[t].motif[n] ?? e : e;
 }
 function I(e, t = {}) {
-	let n = i(), r = $e[n][e];
+	let n = i(), r = ut[n][e];
 	for (let [e, i] of Object.entries(t)) {
-		let t = e === "motif" ? Ft(String(i), n) : i;
+		let t = e === "motif" ? Kt(String(i), n) : i;
 		r = r.split(`{${e}}`).join(String(t));
 	}
 	return r;
@@ -42139,7 +42213,7 @@ function L(e, t, n, r = 1.2, i) {
 		...i ? { variante: i } : {}
 	});
 }
-function It() {
+function qt() {
 	return {
 		pos: {
 			x: 54,
@@ -42152,19 +42226,20 @@ function It() {
 		regard: 0
 	};
 }
-function Lt(e) {
+function Jt(e) {
 	if (e.porteur) return e.porteur.id;
+	if (e.phase === "ruck" && e.ruck?.duel?.balle) return e.ruck.duel.balle;
 	if (!e.piedPrepare || e.vol) return;
 	let t = e.pions.find((t) => t.id === e.piedPrepare.auteurId && t.surLeTerrain && t.sanction <= 0);
 	return t && !t.corps && Math.hypot(t.pos.x - e.piedPrepare.depuis.x, t.pos.y - e.piedPrepare.depuis.y) < 1 ? t.id : void 0;
 }
-function Rt(e, t) {
-	let n = e.arbitre ??= It(), r = e.porteur?.vitesse ?? {
+function Yt(e, t) {
+	let n = e.arbitre ??= qt(), r = e.porteur?.vitesse ?? {
 		x: 0,
 		y: 0
 	}, i = {
-		x: k(e.ballon.x + r.x * .6 - A(e.possession) * 7, 2, 120),
-		y: k(e.ballon.y + r.y * .5 + (e.ballon.y > 35 ? -8 : 8), 3, 67)
+		x: A(e.ballon.x + r.x * .6 - j(e.possession) * 7, 2, 120),
+		y: A(e.ballon.y + r.y * .5 + (e.ballon.y > 35 ? -8 : 8), 3, 67)
 	};
 	for (let t of e.pions) {
 		if (!t.surLeTerrain) continue;
@@ -42172,12 +42247,12 @@ function Rt(e, t) {
 		a < 3 && a > .001 && (i.x += e / a * (3 - a) * 2, i.y += r / a * (3 - a) * 2);
 	}
 	let a = i.x - n.pos.x, o = i.y - n.pos.y, s = Math.max(.001, Math.hypot(a, o)), c = Math.min(7.6, s * 1.4), l = a / s * c - n.vitesse.x, u = o / s * c - n.vitesse.y, d = Math.min(1, 4.8 * t / Math.max(.001, Math.hypot(l, u)));
-	n.vitesse.x += l * d, n.vitesse.y += u * d, n.pos.x = k(n.pos.x + n.vitesse.x * t, 1, 121), n.pos.y = k(n.pos.y + n.vitesse.y * t, 1, 69);
+	n.vitesse.x += l * d, n.vitesse.y += u * d, n.pos.x = A(n.pos.x + n.vitesse.x * t, 1, 121), n.pos.y = A(n.pos.y + n.vitesse.y * t, 1, 69);
 	let f = Math.atan2(e.ballon.y - n.pos.y, e.ballon.x - n.pos.x), p = Math.atan2(Math.sin(f - n.regard), Math.cos(f - n.regard));
-	n.regard += k(p, -2.8 * t, 2.8 * t);
+	n.regard += A(p, -2.8 * t, 2.8 * t);
 }
-function zt(e, t, n) {
-	let r = e.arbitre ??= It(), i = t.x - r.pos.x, a = t.y - r.pos.y, o = Math.hypot(i, a);
+function Xt(e, t, n) {
+	let r = e.arbitre ??= qt(), i = t.x - r.pos.x, a = t.y - r.pos.y, o = Math.hypot(i, a);
 	if (o > 42) return 0;
 	let s = (i * Math.cos(r.regard) + a * Math.sin(r.regard)) / Math.max(.01, o);
 	if (s < -.15 && o > 3) return 0;
@@ -42187,12 +42262,12 @@ function zt(e, t, n) {
 		let e = ((t.pos.x - r.pos.x) * i + (t.pos.y - r.pos.y) * a) / Math.max(.01, o * o);
 		e > .08 && e < .87 && Math.hypot(t.pos.x - r.pos.x - e * i, t.pos.y - r.pos.y - e * a) < .65 && c++;
 	}
-	return k((1 - o / 55) * (.35 + .65 * Math.max(0, s)) * .64 ** c, 0, .98);
+	return A((1 - o / 55) * (.35 + .65 * Math.max(0, s)) * .64 ** c, 0, .98);
 }
-function R(e, t, n = 1.5) {
+function Zt(e, t, n = 1.5) {
 	let r = Math.hypot(t.x, t.y);
 	t = r < .01 ? {
-		x: A(e.cote) * .01,
+		x: j(e.cote) * .01,
 		y: 0
 	} : {
 		x: t.x * Math.min(1, 6 / r),
@@ -42219,7 +42294,7 @@ function R(e, t, n = 1.5) {
 		}))
 	}, e.battu = Math.max(e.battu, n);
 }
-function Bt(e, t) {
+function Qt(e, t) {
 	for (let n of e.pions) {
 		let r = n.corps;
 		if (!r || !n.surLeTerrain) continue;
@@ -42230,7 +42305,7 @@ function Bt(e, t) {
 		let i = { ...n.pos }, a = e.pions.filter((e) => e !== n && e.surLeTerrain && e.sanction <= 0 && Math.abs(e.pos.x - n.pos.x) < 4 && Math.abs(e.pos.y - n.pos.y) < 4), o = t / 5;
 		for (let e = 0; e < 5; e++) {
 			for (let e of r.points) {
-				e.vx *= Math.exp(-2.8 * o), e.vy *= Math.exp(-2.8 * o), e.x = k(e.x + e.vx * o, .2, 121.8), e.y = k(e.y + e.vy * o, .2, 69.8);
+				e.vx *= Math.exp(-2.8 * o), e.vy *= Math.exp(-2.8 * o), e.x = A(e.x + e.vx * o, .2, 121.8), e.y = A(e.y + e.vy * o, .2, 69.8);
 				for (let t of a) {
 					if (t === n || !t.surLeTerrain || t.sanction > 0) continue;
 					let r = e.x - t.pos.x, i = e.y - t.pos.y, a = Math.hypot(r, i);
@@ -42288,7 +42363,7 @@ function Bt(e, t) {
 	let n = e.phase === "ruck" ? e.pions.find((t) => t.id === e.ruck?.porteurId) : void 0;
 	n?.corps && n.corps.age < 1.35 && (e.ballon = { ...n.pos });
 }
-function Vt(e) {
+function $t(e) {
 	if (e.phase !== "jeuCourant" || e.tension < 40 || e.sim < (e.incidentApres ?? 0)) return null;
 	e.incidentApres = e.sim + 2;
 	let t = e.pions.filter((e) => e.surLeTerrain && e.sanction <= 0);
@@ -42297,11 +42372,11 @@ function Vt(e) {
 		let r = t.find((e) => e.cote !== n.cote && Math.hypot(e.pos.x - n.pos.x, e.pos.y - n.pos.y) < 1.35);
 		if (!r || e.rng() > .009 * (e.tension / 80) * (1.35 - n.discipline / 100)) continue;
 		let i = Math.hypot(r.vitesse.x, r.vitesse.y) > 2.8, a = !!r.corps, o = a && e.rng() < .06 && e.tension > 65 && n.discipline < 40, s = !a && !i && e.rng() < .05 && e.tension > 65 && n.discipline < 40, c = o ? "coup de pied au sol" : a ? "geste dangereux au sol" : s ? "coup de poing" : i ? "croche-pied" : "bousculade sans ballon", l = o && e.rng() < .4 || s && e.rng() < .35;
-		L(e, n, a ? "foul_kick" : i ? "foul_trip" : "foul_punch", 1.2, c === "bousculade sans ballon" ? "bousculade" : void 0), L(e, r, !a && i ? "reaction_trip" : "reaction_hit", 1.4), R(r, {
+		L(e, n, a ? "foul_kick" : i ? "foul_trip" : "foul_punch", 1.2, c === "bousculade sans ballon" ? "bousculade" : void 0), L(e, r, !a && i ? "reaction_trip" : "reaction_hit", 1.4), Zt(r, {
 			x: (r.pos.x - n.pos.x) * 2,
 			y: (r.pos.y - n.pos.y) * 2
 		}, 1.7), e.incidentApres = e.sim + 90;
-		let u = e.rng() < zt(e, r.pos);
+		let u = e.rng() < Xt(e, r.pos);
 		return (e.fautesVues ??= {})[n.id] = u, {
 			fautif: n,
 			victime: r,
@@ -42314,28 +42389,28 @@ function Vt(e) {
 }
 //#endregion
 //#region src/lib/moteur/ia/lecture.ts
-function z(e) {
+function R(e) {
 	return (e.ia ?? 1) >= 2;
 }
-function Ht(e) {
+function en(e) {
 	return !!e.carriereDixMinutes;
 }
-function Ut(e, t) {
+function tn(e, t) {
 	return t.surLeTerrain && t.sanction <= 0 && !t.corps && t.battu <= .4 && t.role !== "ruck" && !((e.retards?.[t.id] ?? 0) > e.sim);
 }
-function B(e) {
+function z(e) {
 	return e.surLeTerrain && e.sanction <= 0 && !e.corps && e.role !== "ruck";
 }
-function Wt(e) {
+function nn(e) {
 	return e.att - e.def;
 }
-function Gt(e, t, n) {
+function rn(e, t, n) {
 	let r = 60;
-	for (let i of e.pions) i.cote !== t || !i.surLeTerrain || i.sanction > 0 || i.corps || (r = Math.min(r, D(i.pos, n)));
+	for (let i of e.pions) i.cote !== t || !i.surLeTerrain || i.sanction > 0 || i.corps || (r = Math.min(r, O(i.pos, n)));
 	return r;
 }
-function Kt(e, t, n = e.ballon, r = e.ouvert, i) {
-	let a = A(t), o = j(t), s = (e) => (e.pos.y - n.y) * r, c = (e) => (e.pos.x - n.x) * a, l = r === 1 ? 70 - n.y : n.y, u = 70 - l, d = k(l * .62, 16, 26), f = {
+function an(e, t, n = e.ballon, r = e.ouvert, i) {
+	let a = j(t), o = M(t), s = (e) => (e.pos.y - n.y) * r, c = (e) => (e.pos.x - n.x) * a, l = r === 1 ? 70 - n.y : n.y, u = 70 - l, d = A(l * .62, 16, 26), f = {
 		att: 0,
 		def: 0
 	}, p = {
@@ -42354,7 +42429,7 @@ function Kt(e, t, n = e.ballon, r = e.ouvert, i) {
 	for (let t of e.pions) {
 		if (t.cote !== o || !t.surLeTerrain || t.sanction > 0) continue;
 		let n = c(t);
-		if (!Ut(e, t)) {
+		if (!tn(e, t)) {
 			Math.abs(n) < 14 && Math.abs(s(t)) < 30 && y++;
 			continue;
 		}
@@ -42371,7 +42446,7 @@ function Kt(e, t, n = e.ballon, r = e.ouvert, i) {
 		g(r).def++, Math.abs(r) < 4.5 && (r >= 0 ? _.ouvert++ : _.ferme++);
 	}
 	for (let n of e.pions) {
-		if (n.cote !== t || n === i || !B(n)) continue;
+		if (n.cote !== t || n === i || !z(n)) continue;
 		let e = -c(n);
 		if (e < -1.2 || e > 24) continue;
 		let r = s(n);
@@ -42391,13 +42466,13 @@ function Kt(e, t, n = e.ballon, r = e.ouvert, i) {
 	}
 	let w = v.length ? x / v.length : 12, T = {
 		x: n.x + a * (w + 9),
-		y: k(n.y + r * (l - 6), 3, 67)
-	}, te = {
-		x: n.x + a * (w + 15),
-		y: k(n.y + r * Math.min(14, l * .45), 3, 67)
+		y: A(n.y + r * (l - 6), 3, 67)
 	}, E = {
+		x: n.x + a * (w + 15),
+		y: A(n.y + r * Math.min(14, l * .45), 3, 67)
+	}, D = {
 		x: n.x + a * (w + 8),
-		y: k(n.y + r * Math.min(8, l * .3), 3, 67)
+		y: A(n.y + r * Math.min(8, l * .3), 3, 67)
 	};
 	return {
 		ras: f,
@@ -42413,863 +42488,61 @@ function Kt(e, t, n = e.ballon, r = e.ouvert, i) {
 		monteeRapide: e.systeme === "blitz" || w < 4.2,
 		profondeurRideau: w,
 		trou: S,
-		espaceAile: Gt(e, o, T),
-		espaceDerriere: Gt(e, o, te),
-		espaceJusteDerriere: Gt(e, o, E)
+		espaceAile: rn(e, o, T),
+		espaceDerriere: rn(e, o, E),
+		espaceJusteDerriere: rn(e, o, D)
 	};
 }
-function qt(e, t) {
-	let n = M(e, t);
+function on(e, t) {
+	let n = N(e, t);
 	return n >= 78 ? "ses22" : n >= 50 ? "sonCamp" : n >= 40 ? "milieu" : n >= 22 ? "campAdverse" : n >= 7 ? "zoneDeMarque" : "ligne";
 }
-function Jt(e, t, n = e.ballon) {
-	let r = t === "A" ? e.scoreA - e.scoreB : e.scoreB - e.scoreA, i = Math.max(0, 80 - e.minute), a = qt(n, t), o = "normal";
+function sn(e, t, n = e.ballon) {
+	let r = t === "A" ? e.scoreA - e.scoreB : e.scoreB - e.scoreA, i = Math.max(0, 80 - e.minute), a = on(n, t), o = "normal";
 	return e.sirene || i <= 8 ? o = r > 0 ? "gestion" : r >= -3 ? "troisPoints" : "urgence" : i <= 20 && r <= -9 ? o = "urgence" : i <= 14 && r >= 1 && r <= 7 && a !== "zoneDeMarque" && a !== "ligne" ? o = "gestion" : a === "ses22" && (o = "prudent"), {
 		zone: a,
 		posture: o,
 		diff: r,
 		restantes: i,
-		distLigne: M(n, t)
+		distLigne: N(n, t)
 	};
 }
-function Yt(e, t) {
-	return M(e, t) < 36 && Math.abs(e.y - 35) < 17;
-}
-//#endregion
-//#region src/lib/moteur/ia/vision.ts
-function Xt(e) {
-	return (e.ia ?? 1) >= 3;
-}
-var Zt = 14, Qt = 1.25;
-function $t(e) {
-	return {
-		x: e.pos.x + e.vitesse.x * .3,
-		y: e.pos.y + e.vitesse.y * .3
-	};
-}
-function en(e, t, n) {
-	let r = A(e.cote), i = Math.cos(n) * r, a = Math.sin(n), o = Zt, s = null;
-	for (let n of t) {
-		let t = $t(n), r = t.x - e.pos.x, c = t.y - e.pos.y, l = r * i + c * a;
-		l < .4 || l > o || Math.abs(-r * a + c * i) < Qt && (o = l, s = n);
-	}
-	if (a !== 0) {
-		let t = a > 0 ? (68.5 - e.pos.y) / a : (1.5 - e.pos.y) / a;
-		t >= 0 && t < o && (o = t, s = null);
-	}
-	return {
-		angle: n,
-		libre: o,
-		defenseur: s
-	};
-}
-function tn(e, t) {
-	let n = A(t.cote), r = e.pions.filter((n) => n.cote !== t.cote && n.surLeTerrain && Ut(e, n)), i = {
-		gauche: en(t, r, -.42),
-		axe: en(t, r, 0),
-		droite: en(t, r, .42)
-	}, a = null, o = Infinity, s = [];
-	for (let e of r) {
-		let r = $t(e), i = (r.x - t.pos.x) * n;
-		if (i < -.8 || i > 13) continue;
-		let c = Math.hypot(r.x - t.pos.x, r.y - t.pos.y);
-		c < o && Math.abs(r.y - t.pos.y) < 6 + i * .35 && (o = c, a = e), Math.abs(r.y - t.pos.y) < 16 && s.push({
-			d: e,
-			y: r.y,
-			avant: i
-		});
-	}
-	s.sort((e, t) => e.y - t.y);
-	let c = null, l = 0;
-	for (let e = 0; e <= s.length; e++) {
-		let i = s[e - 1], a = s[e];
-		if (!i && !a) break;
-		let o = i ? i.y : 0, u = a ? a.y : 70, d = u - o - (i ? 1 : 1.5) - (a ? 1 : 1.5);
-		if (d < 2.6) continue;
-		let f = i && a ? (o + u) / 2 : i ? Math.min(67.5, o + 1 + Math.min(4.5, d / 2)) : Math.max(2.5, u - 1 - Math.min(4.5, d / 2)), p = Math.max(1.5, ((i?.avant ?? a.avant) + (a?.avant ?? i.avant)) / 2), m = Math.abs(f - t.pos.y);
-		if (m > 1.2 + p * .95) continue;
-		let h = 0;
-		for (let e of r) {
-			let r = (e.pos.x - t.pos.x) * n;
-			r > p + 1.5 && r < p + 16 && Math.abs(e.pos.y - f) < 7 && h++;
-		}
-		let g = Math.min(d, 9) - m * .55 - h * .9 + (!i || !a ? -.6 : 0);
-		g > l && (l = g, c = {
-			largeur: d,
-			y: f,
-			profondeur: p,
-			couverture: h,
-			bords: [i?.d ?? null, a?.d ?? null]
-		});
-	}
-	return {
-		rayons: i,
-		devant: a,
-		distance: a ? o : 99,
-		intervalle: c
-	};
-}
-function nn(e) {
-	let t = e.numero === 10 ? .14 : e.numero === 9 || e.numero === 12 || e.numero === 15 ? .08 : e.numero === 13 || e.numero === 11 || e.numero === 14 ? .04 : e.numero >= 6 && e.numero <= 8 ? -.04 : -.14;
-	return Math.max(.05, Math.min(1, (e.vision - 35) / 55 + t));
-}
-function rn(e, t) {
-	let n = A(t.cote), r = null, i = 0;
-	for (let a of [1, -1]) {
-		let o = e.pions.filter((e) => {
-			if (e === t || e.cote !== t.cote || !B(e)) return !1;
-			let r = (e.pos.y - t.pos.y) * a, i = (t.pos.x - e.pos.x) * n;
-			return r >= 2.5 && r <= 24 && i >= -.4 && i <= 10;
-		}).sort((e, n) => Math.abs(e.pos.y - t.pos.y) - Math.abs(n.pos.y - t.pos.y)).slice(0, 3);
-		if (!o.length) continue;
-		let s = o[o.length - 1].pos.y, c = e.pions.filter((r) => {
-			if (r.cote === t.cote || !r.surLeTerrain || !Ut(e, r)) return !1;
-			let i = (r.pos.x - t.pos.x) * n, o = (r.pos.y - t.pos.y) * a;
-			return i >= -1.2 && i <= 14 && o >= -3 && o <= (s - t.pos.y) * a + 5;
-		}).sort((e, n) => Math.abs(e.pos.y - t.pos.y) - Math.abs(n.pos.y - t.pos.y));
-		if (!c.length || c.length > 2) continue;
-		let l = 1 + o.length - c.length;
-		l >= 1 && l > i && (i = l, r = {
-			cote: a,
-			soutiens: o,
-			defenseurs: c
-		});
-	}
-	return r;
-}
-function an(e, t, n, r = j(t.cote)) {
-	let i = n.pos.x - t.pos.x, a = n.pos.y - t.pos.y, o = i * i + a * a || 1;
-	for (let n of e.pions) {
-		if (n.cote !== r || !n.surLeTerrain || !Ut(e, n)) continue;
-		let s = $t(n), c = ((s.x - t.pos.x) * i + (s.y - t.pos.y) * a) / o;
-		if (!(c < .2 || c > .92) && Math.hypot(s.x - (t.pos.x + i * c), s.y - (t.pos.y + a * c)) < 1.3) return n;
-	}
-	return null;
-}
-//#endregion
-//#region src/lib/moteur/responsabilites.ts
-var on = [
-	"capitaine",
-	"viceCapitaine",
-	"buteur",
-	"buteur2",
-	"engagement",
-	"droppeur",
-	"lanceur",
-	"lanceur2"
-], sn = (e) => e.distance < 50 && e.angle < 26;
 function cn(e, t) {
-	let n = (t) => {
-		let n = e.pions.filter((e) => e.cote === t && e.avant && e.surLeTerrain && e.sanction <= 0);
-		return {
-			n: n.length,
-			m: n.length ? n.reduce((e, t) => e + t.puissance, 0) / n.length : 0
-		};
-	}, r = n(t), i = n(j(t));
-	return r.m - i.m + (r.n - i.n) * 4;
-}
-function ln(e, t, n) {
-	let r = Kt(e, t, n);
-	return {
-		rideau: r.rideau,
-		retardataires: r.retardataires
-	};
-}
-function un(e, t) {
-	let n = Jt(e, t.cote, t.lieu), r = sn(t) && t.buteurPresent, i = n.diff, a = e.sirene || n.restantes <= 8, o = {
-		choix: "touche",
-		raison: "tropLoin"
-	}, s = cn(e, t.cote), c = t.defense, l = !!c && (c.retardataires >= 3 || c.rideau <= 3);
-	if (a) return i > 0 ? r && t.chance >= .55 && i <= 4 ? {
-		choix: "points",
-		raison: "seMettreALAbri"
-	} : r && t.chance >= .7 && i <= 7 ? {
-		choix: "points",
-		raison: "allongerLAvance"
-	} : {
-		choix: "touche",
-		raison: "vaincreLaMontre"
-	} : i >= -3 ? r && t.chance >= .3 ? {
-		choix: "points",
-		raison: i === 0 ? "passerDevant" : i === -3 ? "egaliser" : "passerDevant"
-	} : l && t.distance < 35 ? {
-		choix: "rapide",
-		raison: "defenseDesorganisee"
-	} : {
-		choix: "touche",
-		raison: r ? "buteurHesitant" : "tropLoin"
-	} : l && t.distance < 40 ? {
-		choix: "rapide",
-		raison: "defenseDesorganisee"
-	} : s >= 5 && t.distance <= 28 ? {
-		choix: "melee",
-		raison: "meleeDominante"
-	} : {
-		choix: "touche",
-		raison: "chercherLEssai"
-	};
-	if (l && t.distance < 38 && !(r && t.chance >= .85 && t.distance > 20)) return {
-		choix: "rapide",
-		raison: "defenseDesorganisee"
-	};
-	if (s >= 5 && t.distance <= 28 && t.chance < .9) return {
-		choix: "melee",
-		raison: "meleeDominante"
-	};
-	if (t.consigne === "points") return r ? {
-		choix: "points",
-		raison: "consignePoints"
-	} : o;
-	if (t.consigne === "touche") return t.distance <= 7 ? {
-		choix: "melee",
-		raison: "consigneTouche"
-	} : {
-		choix: "touche",
-		raison: "consigneTouche"
-	};
-	if (r) {
-		let e = dn(n.posture) ? .55 : .5;
-		return t.chance >= .8 && t.distance > 15 || t.chance >= e + (t.distance < 20 ? .05 : 0) || t.chance >= .4 && n.posture === "prudent" ? {
-			choix: "points",
-			raison: "buteurSur"
-		} : {
-			choix: "touche",
-			raison: "buteurHesitant"
-		};
-	}
-	return t.distance <= 7 ? {
-		choix: "melee",
-		raison: "tenirLeBallon"
-	} : {
-		choix: "touche",
-		raison: "gagnerDuTerrain"
-	};
-}
-var dn = (e) => e === "urgence" || e === "troisPoints";
-function fn() {
-	return {
-		decisions: 0,
-		decisionsConformes: 0,
-		tirs: 0,
-		tirsReussis: 0,
-		transformations: 0,
-		transformationsReussies: 0,
-		drops: 0,
-		dropsReussis: 0,
-		engagements: 0,
-		engagementsReussis: 0,
-		touches: 0,
-		touchesGagnees: 0,
-		toucheRapides: 0,
-		chronosDepasses: 0
-	};
-}
-var pn = {
-	avant: .34,
-	milieu: .55,
-	fond: .78,
-	maul: .34,
-	leurreAvant: .78,
-	leurreMilieu: .55,
-	sortieRapide: .7
-};
-function mn(e, t) {
-	let n = Math.abs(Math.max(0, Math.min(1, t.puissance)) - pn[e]), r = 1 - Math.max(0, Math.min(1, t.geste));
-	return {
-		delta: 14 - n * 70 - r * 20,
-		pasDroit: 1 + 1.5 * r,
-		longueur: 1 + 5 * Math.max(0, n - .1)
-	};
-}
-var hn = [
-	"avant",
-	"milieu",
-	"fond",
-	"maul",
-	"leurreAvant",
-	"leurreMilieu",
-	"sortieRapide"
-];
-function gn(e) {
-	let t = [
-		8,
-		9,
-		10,
-		2,
-		4,
-		5,
-		6,
-		7,
-		12,
-		13,
-		15
-	].indexOf(e.numero);
-	return e.discipline * .5 + e.vision * .3 + (t < 0 ? 0 : (11 - t) * .35);
-}
-var _n = (e, t) => e.filter((e) => e.cote === t && e.numero <= 15);
-function vn(e, t, n = {}, r) {
-	let i = {}, a = _n(e, t), o = (e) => !!e && Object.values(i).includes(e), s = (n) => !!n && e.some((e) => e.cote === t && e.sourceId === n);
-	for (let e of on) s(n[e]) && (i[e] = n[e]);
-	let c = (e, t) => [...t].sort((t, n) => e(t, n) || t.numero - n.numero)[0], l = (e, t = () => !1) => {
-		let n = a.filter((e) => !t(e));
-		return (c(e, n.filter((e) => e.sourceId !== r)) ?? c(e, n))?.sourceId;
-	}, u = (e, t) => {
-		let n = a.filter(t);
-		return (c(e, n.filter((e) => e.sourceId !== r)) ?? c(e, n))?.sourceId;
-	}, d = (e, t) => gn(t) - gn(e), f = (e, t) => t.pied - e.pied, p = (e, t) => t.passe - e.passe;
-	i.capitaine ??= l(d), i.viceCapitaine ??= l(d, (e) => o(e.sourceId)) ?? l(d, (e) => e.sourceId === i.capitaine), i.buteur ??= l(f, (e) => e.numero <= 3), i.buteur2 ??= l(f, (e) => e.sourceId === i.buteur || e.numero <= 3);
-	let m = a.find((e) => e.sourceId === i.buteur);
-	i.engagement ??= m && !m.avant && m.sourceId !== r ? m.sourceId : u(f, (e) => [
-		10,
-		15,
-		9
-	].includes(e.numero));
-	let h = a.filter((e) => [
-		10,
-		9,
-		12,
-		15
-	].includes(e.numero) && e.sourceId !== r), g = h.find((e) => e.numero === 10), _ = c(f, h);
-	i.droppeur ??= (g && _ && _.pied - g.pied >= 8 ? _ : g ?? _)?.sourceId ?? u(f, (e) => [
-		10,
-		9,
-		12,
-		15
-	].includes(e.numero));
-	let v = a.find((e) => e.numero === 2 && e.sourceId !== r);
-	return i.lanceur ??= v?.sourceId ?? l(p, (e) => !e.avant) ?? a.find((e) => e.numero === 2)?.sourceId, i.lanceur2 ??= u(p, (e) => [
-		6,
-		7,
-		8
-	].includes(e.numero) && e.sourceId !== i.lanceur) ?? l(p, (e) => !e.avant || e.sourceId === i.lanceur), i;
-}
-function yn(e, t) {
-	let n = t.avatar ?? [], r = e.find((e) => e.moi), i = (i) => {
-		let a = { ...i === "A" ? t.A : t.B };
-		if (r && r.cote === i) for (let e of n) a[e] = r.sourceId;
-		for (let [e, t] of [
-			["capitaine", "viceCapitaine"],
-			["buteur", "buteur2"],
-			["lanceur", "lanceur2"]
-		]) a[e] && a[e] === a[t] && delete a[t];
-		return vn(e, i, a, r && r.cote === i ? r.sourceId : void 0);
-	};
-	return {
-		roles: {
-			A: i("A"),
-			B: i("B")
-		},
-		avatar: n,
-		attente: null,
-		derniere: null,
-		engagement: null,
-		touche: null,
-		offreToucheRapide: null,
-		stats: fn()
-	};
-}
-var bn = (e) => !!e && e.surLeTerrain && e.sanction <= 0;
-function xn(e, t, n) {
-	let r = e.responsabilites;
-	if (!r) return;
-	let i = r.roles[t], a = (n) => {
-		let r = n ? e.pions.find((e) => e.cote === t && e.sourceId === n) : void 0;
-		return bn(r) ? r : void 0;
-	}, o = e.pions.filter((e) => e.cote === t && bn(e)), s = (e, t = () => !0) => [...o].filter(t).sort((t, n) => e(t, n) || t.numero - n.numero)[0], c = (e, t) => t.pied - e.pied;
-	switch (n) {
-		case "capitaine": return a(i.capitaine) ?? a(i.viceCapitaine) ?? s((e, t) => gn(t) - gn(e));
-		case "viceCapitaine": return a(i.viceCapitaine) ?? a(i.capitaine) ?? s((e, t) => gn(t) - gn(e));
-		case "buteur": return a(i.buteur) ?? a(i.buteur2) ?? s(c);
-		case "buteur2": return a(i.buteur2) ?? a(i.buteur) ?? s(c);
-		case "engagement": return a(i.engagement) ?? a(i.buteur) ?? a(i.buteur2) ?? o.find((e) => e.numero === 10) ?? s(c, (e) => !e.avant);
-		case "droppeur": return a(i.droppeur) ?? o.find((e) => e.numero === 10) ?? a(i.buteur) ?? s(c, (e) => !e.avant);
-		case "lanceur": return a(i.lanceur) ?? a(i.lanceur2) ?? o.find((e) => e.numero === 2) ?? s((e, t) => t.passe - e.passe, (e) => e.avant);
-		case "lanceur2": return a(i.lanceur2) ?? a(i.lanceur) ?? o.find((e) => e.numero === 2) ?? s((e, t) => t.passe - e.passe, (e) => e.avant);
-	}
-}
-function Sn(e) {
-	if (e.direct?.actif) return e.pions.find((e) => e.moi);
-}
-function Cn(e, t, n) {
-	if (!e.responsabilites) return !1;
-	let r = Sn(e);
-	return !r || !bn(r) || n && r.cote !== n ? !1 : xn(e, r.cote, t) === r;
-}
-function wn(e) {
-	if (!(!e.responsabilites || e.tir)) for (let t of ["A", "B"]) {
-		let n = xn(e, t, "capitaine"), r = xn(e, t, "buteur");
-		for (let i of e.pions) i.cote === t && (i.capitaine = i === n, i.buteur = i === r);
-	}
-}
-function Tn(e, t, n, r) {
-	let i = xn(e, t, "buteur");
-	return {
-		cote: t,
-		lieu: n,
-		...r,
-		buteurPresent: !!i,
-		consigne: e.tactiques[t]?.penalites ?? "mixte",
-		defense: e.penalite?.defense
-	};
+	return N(e, t) < 36 && Math.abs(e.y - 35) < 17;
 }
 //#endregion
-//#region src/lib/moteur/direct.ts
-var V = {
-	course: .8,
-	sprintFrais: 1.12,
-	sprintMoyen: 1.07,
-	sprintPlat: 1.02,
-	plafondVitesse: 10.9,
-	vivacite: 1.2,
-	agilite: 2.1,
-	virageMax: 11,
-	freinMin: 7.5,
-	freinFacteur: 1.7,
-	coutSprint: 1.4,
-	depense: .7,
-	recuperation: .28,
-	patience: .55,
-	porteePasse: 22,
-	porteePasseSautee: 32,
-	risqueSautee: .07,
-	porteePlaquage: 3.4,
-	allongePlaquage: 2.5,
-	dureePlaquage: .9,
-	dureeGeste: 1.3,
-	rechargePlaquage: 1.1,
-	rechargeRaffut: 1.2,
-	rechargeCrochet: 1,
-	rechargeFeinte: 2.2,
-	rechargeAppel: 2.6,
-	rechargeGrattage: 4,
-	rechargeDrop: 6,
-	porteeDrop: 50,
-	coutPlaquage: 2.2,
-	coutRaffut: 1.4,
-	coutCrochet: 1.4,
-	coutGrattage: 3,
-	porteeRuck: 4.6,
-	dureeAppel: 5,
-	chanceAppel: .34,
-	seuilAppel: .12,
-	ecartPoste: 16,
-	delaiCompensation: 3.5
+//#region src/lib/moteur/conquete.ts
+function ln(e) {
+	return (e.ia ?? 1) >= 4;
+}
+var un = {
+	tranchee: .42,
+	attenteLancer: .38,
+	varianteCapte: .4,
+	varianteArrache: .3,
+	contreRuckVisible: .16,
+	vitessePousseeParPoint: .055,
+	inertiePoussee: .5,
+	recuMax: 4.2,
+	decision: .45,
+	essaiPortee: 7,
+	essaiSeuil: 11,
+	poussee: 9,
+	periodeMelee: .85,
+	periodeMaul: .72,
+	fenetreParfaite: .11,
+	fenetreCorrecte: .26,
+	bonusMelee: {
+		pilier: 13,
+		talonneur: 11,
+		deuxieme: 16,
+		troisieme: 9,
+		huit: 10
+	}
 };
-function En() {
-	return {
-		libre: !1,
-		raison: "banc",
-		porte: !1,
-		attaque: !1,
-		suggestion: null,
-		ecart: 0,
-		horsPoste: !1,
-		horsJeu: !1,
-		cibleDePlaquage: null,
-		ruckAPortee: !1,
-		contactImminent: !1,
-		possible: {
-			passe: !1,
-			coupDePied: !1,
-			raffut: !1,
-			crochet: !1,
-			plaquage: !1,
-			grattage: !1,
-			appel: !1,
-			feinte: !1,
-			engager: !1,
-			drop: !1
-		},
-		recharge: {},
-		arme: null
-	};
-}
-var Dn = /* @__PURE__ */ new Set([
-	"jeuCourant",
-	"ballonEnLAir",
-	"ballonLibre"
-]);
-function On(e, t) {
-	if (!t.surLeTerrain) return "banc";
-	if (t.sanction > 0) return "carton";
-	if (t.corps) return "sol";
-	if (e.direct && e.sim < e.direct.tenuJusqua) return "engage";
-	switch (e.phase) {
-		case "jeuCourant":
-		case "ballonEnLAir":
-		case "ballonLibre": break;
-		case "ruck":
-			if (t.role === "ruck") return "ruck";
-			break;
-		case "melee": return "melee";
-		case "touche": return "touche";
-		case "maul": return "maul";
-		case "penalite": return "penalite";
-		case "tirAuBut":
-		case "transformation": return "tir";
-		case "aplatissage":
-		case "apresEssai":
-		case "tmo": return "essai";
-		case "miTemps":
-		case "fini": return "mitemps";
-		default: return "arret";
-	}
-	return e.piedPrepare?.auteurId === t.id ? "pied" : null;
-}
-function kn(e, t) {
-	return !!e.direct?.actif && t.moi && On(e, t) === null;
-}
-function An(e) {
-	let t = e.direct;
-	if (!t?.actif || !e.ruck?.porteurId) return;
-	let n = e.pions.find((e) => e.moi);
-	n && n.id === e.ruck.porteurId && (t.stats.ballonsPerdus += 1);
-}
-function jn(e) {
-	if (!e.direct?.actif) return null;
-	for (let t of e.pions) if (t.moi) return t;
-	return null;
-}
-function Mn(e, t) {
-	let n = e.direct;
-	if (n) for (let e of Object.keys(n.recharges)) {
-		let r = (n.recharges[e] ?? 0) - t;
-		r <= 0 ? delete n.recharges[e] : n.recharges[e] = r;
-	}
-}
-function Nn(e) {
-	let t = V;
-	return e.endurance < 25 ? t.sprintPlat : e.endurance < 45 ? t.sprintMoyen : t.sprintFrais;
-}
-function Pn(e, t, n) {
-	let r = V, i = De(e), a = n && e.endurance > 6 && t > .2, o = a ? i * Nn(e) : i * r.course, s = t < .18 ? 0 : a ? 1 : k((t - .12) / .88, 0, 1) ** .85;
-	return Math.min(r.plafondVitesse, o * s);
-}
-var Fn = (e) => Math.atan2(Math.sin(e), Math.cos(e));
-function In(e, t, n, r) {
-	let i = V;
-	if (e.corps) return 0;
-	let a = Math.hypot(n.mx, n.my), o = n.sprint && e.endurance > 6 && a > .2, s = Pn(e, a, n.sprint), c = .65 + .35 * (e.endurance / 100), l = e.acceleration * c * i.vivacite, u = Math.max(i.freinMin, l * i.freinFacteur), d = Math.hypot(e.vitesse.x, e.vitesse.y), f = a >= .18, p = f ? Math.atan2(n.my, n.mx) : 0, m = d > .3 ? Math.atan2(e.vitesse.y, e.vitesse.x) : p;
-	if (f) {
-		let e = Fn(p - m), n = Math.min(i.virageMax, l * i.agilite / Math.max(d, 2.5)), r = k(e, -n * t, n * t);
-		m += r;
-		let a = k((Math.abs(e) - Math.abs(r) - .35) / 2.05, 0, 1);
-		s *= 1 - .65 * a * a * (3 - 2 * a);
-	}
-	let h = s > d ? Math.min(s, d + l * t) : Math.max(s, d - u * t);
-	e.vitesse.x = Math.cos(m) * h, e.vitesse.y = Math.sin(m) * h, h < .02 && (e.vitesse.x = 0, e.vitesse.y = 0);
-	let g = e.pos.x, _ = e.pos.y, v = r ? r.x * t : 0, y = r ? r.y * t : 0;
-	e.pos.x = k(e.pos.x + e.vitesse.x * t + v, -1.5, 123.5), e.pos.y = k(e.pos.y + e.vitesse.y * t + y, -1.5, 71.5);
-	let b = Math.hypot(e.pos.x - g, e.pos.y - _);
-	if (e.cible = {
-		x: e.pos.x + e.vitesse.x * .6,
-		y: e.pos.y + e.vitesse.y * .6
-	}, e.effort = Math.min(1.2, h / Math.max(1, De(e))), e.stats.distanceParcourue += b, b > 0) {
-		let n = Math.min(1, b / t / e.vitesseMax);
-		e.endurance = Math.max(0, e.endurance - e.usure * t * n ** 1.6 * 10 * i.depense), n < .36 && (e.endurance = Math.min(100, e.endurance + i.recuperation * t * (1 - n / .36)));
-	} else e.endurance = Math.min(100, e.endurance + i.recuperation * t);
-	return o && (e.endurance = Math.max(0, e.endurance - i.coutSprint * t)), b;
-}
-function Ln(e, t, n, r = !1) {
-	let i = A(t.cote), a = r ? V.porteePasseSautee : V.porteePasse, o = Math.hypot(n.x, n.y) || 1, s = n.x / o, c = n.y / o, l = [];
-	for (let n of e.pions) {
-		if (n === t || n.cote !== t.cote || !B(n)) continue;
-		let r = n.pos.x - t.pos.x, o = n.pos.y - t.pos.y, u = Math.hypot(r, o);
-		if (u < 1.4 || u > a) continue;
-		let d = -r * i;
-		if (d < -.5) continue;
-		let f = r * s + o * c;
-		f < 1 || f < u * .26 || l.push({
-			pion: n,
-			distance: u,
-			retrait: d,
-			lateral: f,
-			coupee: !!an(e, t, n)
-		});
-	}
-	return l.sort((e, t) => e.distance - t.distance);
-}
-function Rn(e, t, n, r) {
-	let i = Ln(e, t, n, r);
-	if (!i.length) return null;
-	let a = i.filter((e) => !e.coupee), o = a.length ? a : i;
-	return r ? (o.filter((e) => e.distance >= 8 && e.pion !== i[0]?.pion)[0] ?? o[o.length - 1])?.pion ?? null : o[0]?.pion ?? null;
-}
-function zn(e) {
-	return 24 + e.pied / 3.2;
-}
-function Bn(e, t) {
-	let n = A(t.cote), r = Infinity;
-	for (let i of e.pions) {
-		if (i.cote === t.cote || !i.surLeTerrain || i.sanction > 0 || i.corps) continue;
-		let e = (i.pos.x - t.pos.x) * n;
-		e < -.3 || Math.abs(i.pos.y - t.pos.y) > 7 + e * .4 || (r = Math.min(r, O(i.pos, t.pos)));
-	}
-	return r === Infinity ? 99 : Math.sqrt(r);
-}
-function Vn(e, t) {
-	return t < 0 ? -1 : t > 0 ? 71 : e.pos.y < 35 ? -1 : 71;
-}
-function Hn(e, t, n) {
-	let r = A(t.cote), i = zn(t), a = Bn(e, t), o = M(t.pos, t.cote), s = me(t.pos, t.cote), c = he(t.pos, t.cote), l = (e) => k(e, 12, 110);
-	if (!n.visee) {
-		let n = e.ouvert;
-		if (s) {
-			let e = Math.min(i, 46);
-			return {
-				intention: "degagement",
-				arrivee: {
-					x: l(t.pos.x + r * e),
-					y: Vn(t, t.pos.y < 35 ? -1 : 1)
-				},
-				duree: 2.7,
-				hauteur: .5,
-				libelle: "degagement"
-			};
-		}
-		if (a < 9 && !t.avant && o > 12) return {
-			intention: "parDessus",
-			arrivee: {
-				x: l(t.pos.x + r * 11),
-				y: k(t.pos.y + n * 3, 3, 67)
-			},
-			duree: 1.2,
-			hauteur: .5,
-			libelle: "parDessus"
-		};
-		if (o < 30) return {
-			intention: "rasant",
-			arrivee: {
-				x: l(t.pos.x + r * 14),
-				y: k(t.pos.y + n * 5, 4, 66)
-			},
-			duree: 1.35,
-			hauteur: .1,
-			libelle: "rasant"
-		};
-		if (t.numero === 9) return {
-			intention: "chandelle",
-			arrivee: {
-				x: l(t.pos.x + r * 22),
-				y: k(t.pos.y + n * 7, 4, 66)
-			},
-			duree: 3.2,
-			hauteur: 1,
-			libelle: "chandelle"
-		};
-		let c = Math.min(i, 44);
-		return {
-			intention: "occupation",
-			arrivee: {
-				x: l(t.pos.x + r * c),
-				y: k(t.pos.y + n * 6, 4, 66)
-			},
-			duree: 1.4 + c / 24,
-			hauteur: .55,
-			libelle: "occupation"
-		};
-	}
-	let u = n.visee, d = Math.hypot(u.x, u.y) || 1, f = u.x / d, p = u.y / d, m = k(u.puissance, 0, 1), h = f * r, g = Math.acos(k(h, -1, 1)) * 180 / Math.PI, _ = k(5 + (i * 1.08 - 5) * m ** .9, 5, i * 1.1), v = (e) => ({
-		x: l(t.pos.x + f * e),
-		y: k(t.pos.y + p * e, -1, 71)
-	});
-	if (h < .08) {
-		let e = k(_ * .5, 6, 18);
-		return {
-			intention: "rasant",
-			arrivee: {
-				x: l(t.pos.x + r * e),
-				y: k(t.pos.y + p * e, 3, 67)
-			},
-			duree: .9 + e / 22,
-			hauteur: .1,
-			libelle: "rasant"
-		};
-	}
-	if (m < .3) {
-		let e = k(_, 7, 14), n = v(e);
-		return g < 55 && a < 12 && !t.avant ? {
-			intention: "parDessus",
-			arrivee: {
-				x: n.x,
-				y: k(n.y, 3, 67)
-			},
-			duree: 1.2,
-			hauteur: .5,
-			libelle: "parDessus"
-		} : {
-			intention: "rasant",
-			arrivee: {
-				x: n.x,
-				y: k(n.y, 3, 67)
-			},
-			duree: .9 + e / 22,
-			hauteur: .1,
-			libelle: "rasant"
-		};
-	}
-	if (g > 38 && g < 105 && m >= .4 && m <= .88 && !t.avant) {
-		let n = e.pions.filter((e) => e !== t && e.cote === t.cote && B(e) && (e.pos.x - t.pos.x) * r <= .6 && (e.pos.y - t.pos.y) * p > 0 && Math.abs(e.pos.y - t.pos.y) > 9).sort((e, n) => Math.abs(n.pos.y - t.pos.y) - Math.abs(e.pos.y - t.pos.y))[0];
-		if (n) {
-			let e = k(1.55 + Math.abs(n.pos.y - t.pos.y) / 30, 1.8, 2.9), i = Math.min(n.vitesseMax * e * .62, 18);
-			return {
-				intention: "transversale",
-				arrivee: {
-					x: l(n.pos.x + r * i * .7),
-					y: k(n.pos.y, 3.5, 66.5)
-				},
-				duree: e,
-				hauteur: .9,
-				libelle: "transversale"
-			};
-		}
-	}
-	if (m < .62 && g < 60) {
-		let e = k(_, 14, 30), t = v(e);
-		return {
-			intention: "chandelle",
-			arrivee: {
-				x: t.x,
-				y: k(t.y, 4, 66)
-			},
-			duree: 3.1 + e / 80,
-			hauteur: 1,
-			libelle: "chandelle"
-		};
-	}
-	let y = Math.abs(p) > .3 ? p < 0 ? t.pos.y / -p : (70 - t.pos.y) / p : Infinity;
-	if (m >= .5 && y <= _ * 1.03) {
-		let e = {
-			x: l(t.pos.x + f * y),
-			y: Vn(t, p)
-		}, n = M(e, t.cote), r = c && !s && n <= 22 && n > -1;
-		return {
-			intention: r ? "cinquanteVingtDeux" : "degagement",
-			arrivee: e,
-			duree: r ? 2.8 : k(1.3 + y / 24, 1.5, 3.1),
-			hauteur: r ? .6 : .5,
-			libelle: r ? "cinquanteVingtDeux" : "degagement"
-		};
-	}
-	let b = v(_);
-	return {
-		intention: "occupation",
-		arrivee: {
-			x: b.x,
-			y: k(b.y, 2, 68)
-		},
-		duree: k(1.3 + _ / 24, 1.5, 3.1),
-		hauteur: .25 + .4 * m,
-		libelle: "occupation"
-	};
-}
-function Un(e, t, n) {
-	let r = n ? n.pos : e.ballon, i = A(t.cote), a = (r.x - t.pos.x) * i, o = Math.abs(t.pos.y - r.y), s = D(t.pos, r), c = 60;
-	for (let n of e.pions) n.cote === t.cote || !n.surLeTerrain || n.sanction > 0 || n.corps || (c = Math.min(c, D(t.pos, n.pos)));
-	let l = k((c - 1.6) / 6, 0, 1), u = k(1 - Math.max(0, -a) / 2.5, 0, 1) * k(1 - Math.max(0, a - 12) / 10, .2, 1), d = k(1 - Math.max(0, s - 16) / 14, 0, 1), f = t.vitesse.x * i, p = 99;
-	for (let n of e.pions) {
-		if (n.cote === t.cote || !n.surLeTerrain || n.sanction > 0 || n.corps) continue;
-		let e = (n.pos.x - t.pos.x) * i;
-		e > 0 && Math.abs(n.pos.y - t.pos.y) < 5 + e * .25 && (p = Math.min(p, e));
-	}
-	let m = "soutien";
-	o > 14 ? m = "large" : e.cellule && t.avant && a > 0 ? m = "cellule" : f > 4.2 && a >= -.5 && a < 10 && p > 7 ? m = "profondeur" : o > 6 && a > 1.5 && (m = "intervalle");
-	let h = m === "large" ? 1.06 : m === "intervalle" ? 1.1 : m === "profondeur" ? 1.12 : 1;
-	return {
-		force: k(k(l * .7 + .3 * u * d * Math.min(1, l * 2 + .25), 0, 1) * h * (a < -.5 ? 0 : 1), 0, 1),
-		type: m
-	};
-}
-function Wn(e) {
-	let t = e.direct?.appel;
-	return t && e.sim < t.fin ? t : null;
-}
-function Gn(e, t, n) {
-	if (!Wn(e) || t === n || t.cote !== n.cote) return 0;
-	let r = A(t.cote);
-	if ((n.pos.x - t.pos.x) * r > .5 || !B(n) || n.battu > .3) return 0;
-	let i = D(t.pos, n.pos);
-	if (i < 2 || i > V.porteePasse) return 0;
-	let { force: a } = Un(e, n, t), o = e.direct?.assistance?.appelAssure ? .6 : 0;
-	return an(e, t, n) ? Math.max(0, a - .45) * V.chanceAppel * .4 : a < V.seuilAppel && !o ? 0 : k(a ** 1.6 * V.chanceAppel + o, 0, .9);
-}
-function Kn(e, t, n = V.porteePlaquage) {
-	let r = e.porteur;
-	return !r || r.cote === t.cote || e.phase !== "jeuCourant" || r.corps ? null : D(t.pos, r.pos) <= n ? r : null;
-}
-function qn(e, t, n = V.porteeRuck) {
-	return e.phase === "ruck" && !!e.ruck && D(t.pos, e.ballon) <= n;
-}
-function Jn(e) {
-	let t = e.direct;
-	if (!t?.actif) return;
-	let n = e.pions.find((e) => e.moi);
-	!n || !n.surLeTerrain || n === e.porteur || (t.suggestion = {
-		x: k(n.cible.x, 7, 115),
-		y: k(n.cible.y, 2, 68)
-	}, t.suggestionA = e.sim);
-}
-function Yn(e) {
-	let t = e.direct;
-	return !t?.actif || !t.suggestion || e.sim - t.suggestionA > 2.5 ? null : t.suggestion;
-}
-function Xn(e) {
-	let t = e.direct;
-	if (!t?.actif) return;
-	let n = e.pions.find((e) => e.moi), r = t.vue = En();
-	if (!n) return;
-	let i = On(e, n);
-	r.libre = i === null, r.raison = i, r.porte = e.porteur === n, r.attaque = e.possession === n.cote, r.horsJeu = n.horsJeu;
-	let a = Yn(e);
-	r.suggestion = a, r.ecart = a ? D(n.pos, a) : 0, r.horsPoste = !!a && !r.porte && r.ecart > V.ecartPoste;
-	let o = (e) => Math.max(0, t.recharges[e] ?? 0), s = r.libre && n.battu <= 0, c = Dn.has(e.phase), l = s ? Kn(e, n) : null;
-	if (r.cibleDePlaquage = l?.id ?? null, r.ruckAPortee = s && qn(e, n), r.porte) {
-		let t = A(n.cote);
-		for (let i of e.pions) if (!(i.cote === n.cote || !i.surLeTerrain || i.sanction > 0 || i.corps || i.battu > 0) && (i.pos.x - n.pos.x) * t > -.6 && O(i.pos, n.pos) < 5.76) {
-			r.contactImminent = !0;
-			break;
-		}
-	}
-	let u = r.possible;
-	u.passe = s && r.porte && e.phase === "jeuCourant" && !e.vol, u.coupDePied = s && r.porte && e.phase === "jeuCourant" && !e.vol, u.raffut = s && r.porte && o("raffut") <= 0, u.crochet = s && r.porte && o("crochet") <= 0, u.feinte = s && r.porte && !n.avant && o("feinte") <= 0, u.plaquage = s && !!l && o("plaquage") <= 0, u.grattage = s && r.ruckAPortee && !r.attaque && o("grattage") <= 0, u.engager = s && r.ruckAPortee && r.attaque, u.appel = s && c && !r.porte && (e.possession === n.cote || e.phase === "ballonEnLAir") && o("appel") <= 0, u.drop = s && r.porte && !!e.responsabilites && e.phase === "jeuCourant" && !e.vol && o("drop") <= 0 && M(n.pos, n.cote) < V.porteeDrop && (Cn(e, "droppeur") || n.pied >= 55), r.recharge = {
-		plaquage: o("plaquage"),
-		raffut: o("raffut"),
-		crochet: o("crochet"),
-		feinte: o("feinte"),
-		appel: o("appel"),
-		grattage: o("grattage"),
-		drop: o("drop")
-	}, r.arme = t.arme && e.sim < t.arme.jusqua ? t.arme.action : null;
-}
-function Zn(e) {
-	let t = e.direct;
-	if (!t?.actif || t.horsPosteDepuis < 0 || e.sim - t.horsPosteDepuis < V.delaiCompensation) return null;
-	let n = e.pions.find((e) => e.moi);
-	return n && n.surLeTerrain && n.cote !== e.possession && e.phase === "jeuCourant" ? n : null;
-}
-function Qn(e, t) {
-	let n = e.direct;
-	if (!n?.actif) return;
-	let r = e.pions.find((e) => e.moi);
-	if (!r || !kn(e, r) || !Dn.has(e.phase)) {
-		n.horsPosteDepuis = -1;
-		return;
-	}
-	let i = n.stats;
-	i.tempsJeu += t;
-	let a = n.vue;
-	if (e.porteur !== r) {
-		a.suggestion && (a.ecart <= V.ecartPoste ? (i.tempsAuPoste += t, n.horsPosteDepuis = -1) : (i.tempsHorsPoste += t, n.horsPosteDepuis < 0 && (n.horsPosteDepuis = e.sim)));
-		let o = e.porteur;
-		if (o && o.cote === r.cote && !r.horsJeu) {
-			let e = A(r.cote), n = (o.pos.x - r.pos.x) * e, a = D(r.pos, o.pos);
-			n > -.5 && n < 14 && a > 2 && a < 16 && (i.tempsSoutien += t);
-		}
-	} else n.horsPosteDepuis = -1;
-}
 //#endregion
 //#region src/lib/moteur/ia/postes.ts
-function $n(e) {
+function dn(e) {
 	switch (e.numero) {
 		case 1:
 		case 3: return "pilier";
@@ -43289,7 +42562,7 @@ function $n(e) {
 		default: return e.avant ? "deuxiemeLigne" : "centre";
 	}
 }
-var er = {
+var fn = {
 	pilier: {
 		place: "proche",
 		porte: 1,
@@ -43381,54 +42654,1083 @@ var er = {
 		largeurMax: 70
 	}
 };
-function tr(e) {
-	return er[$n(e)];
+function pn(e) {
+	return fn[dn(e)];
 }
-function nr(e, t, n, r) {
-	let i = tr(e), a = r;
+function mn(e, t, n, r) {
+	let i = pn(e), a = r;
 	return i.place !== t && (a += i.place === "bord" ? 6 : t === "bord" ? 22 : 9), n > i.largeurMax && (a += (n - i.largeurMax) * 2.2), a;
 }
-function rr(e) {
+function hn(e) {
 	let t, n = Infinity;
 	for (let r of e) {
-		let e = (r.stats.courses + 1) / tr(r).porte - r.endurance / 400;
+		let e = (r.stats.courses + 1) / pn(r).porte - r.endurance / 400;
 		e < n && (n = e, t = r);
 	}
 	return t;
 }
 //#endregion
+//#region src/lib/moteur/pack.ts
+function gn(e) {
+	return e === 1 || e === 3 ? "pilier" : e === 2 ? "talonneur" : e === 4 || e === 5 ? "deuxieme" : e === 6 || e === 7 ? "troisieme" : e === 8 ? "huit" : null;
+}
+var _n = .4;
+function vn(e, t) {
+	let n = pn(e), r = t === "ruck" ? n.gratte / 12 : t === "touche" ? n.saute / 8 : n.soutienRuck / 18;
+	return 1 + Math.min(.45, Math.max(0, r)) + (e.endurance - 60) / 400;
+}
+function yn(e) {
+	let t = e.conquete;
+	if (!t || t.type !== "touche" || t.rapide || t.issue) return null;
+	let n = e.dureeArret ?? 6.5, r = e.minuteur - n * .65;
+	return r > .4 ? e.sim + r : null;
+}
+function bn(e, t) {
+	return e.pions.filter((e) => e.cote === t.cote && e !== t && e.role === "alignement" && e.surLeTerrain && e.sanction <= 0).sort((e, n) => k(e.pos, t.pos) - k(n.pos, t.pos)).slice(0, 2);
+}
+function xn(e, t) {
+	if (!t.surLeTerrain || t.sanction > 0 || t.corps) return null;
+	let n = gn(t.numero), r = e.phase === "melee" ? e.conquete?.melee : void 0;
+	if (r?.dyn && t.role === "melee" && n) return r.etape === "placement" || r.etape === "liaison" ? null : r.etape === "poussee" || r.etape === "sortie" ? {
+		type: "melee",
+		cle: `melee:${r.debut}`,
+		poste: n,
+		premier: r.etapeDepuis + .5,
+		periode: un.periodeMelee,
+		continu: r.etape === "poussee" && !r.penalite
+	} : n === "talonneur" && t.cote === r.introducteur && r.etape === "introduction" ? {
+		type: "melee",
+		cle: `melee:${r.debut}`,
+		poste: n,
+		premier: r.etapeDepuis + .7,
+		periode: 99,
+		continu: !1,
+		fixes: [r.etapeDepuis + .7]
+	} : {
+		type: "melee",
+		cle: `melee:${r.debut}`,
+		poste: n,
+		premier: 1e9,
+		periode: 99,
+		continu: !1,
+		fixes: []
+	};
+	if (e.phase === "maul" && t.role === "maul" && n) {
+		let t = e.maul?.debut ?? Math.floor(e.t / 40) * 40;
+		return {
+			type: "maul",
+			cle: `maul:${t}`,
+			poste: n,
+			premier: t + 1.1,
+			periode: un.periodeMaul,
+			continu: !0
+		};
+	}
+	if (e.phase === "ruck" && e.ruck && !e.ruck.duel && t.cote !== e.ruck.attaque && k(t.pos, e.ballon) <= (B.porteeRuck + 1.5) ** 2 && e.minuteur > .5) return {
+		type: "ruck",
+		cle: `ruck:${e.compteurs.rucks}`,
+		poste: "gratteur",
+		premier: e.sim + 1,
+		periode: 99,
+		continu: !1
+	};
+	if (e.phase === "touche" && e.conquete && !e.conquete.rapide && !e.conquete.issue && !e.conquete.horsAlignement && t.role === "alignement") {
+		let n = e.pions.find((t) => t.id === e.conquete.cibleId), r = `touche:${e.compteurs.touches}:${e.conquete.cibleId}`, i = e.direct?.pack?.cle === r ? e.direct.pack.temps[0]?.t : void 0, a = 1 - e.minuteur / (e.dureeArret ?? 6.5) > .001, o = i ?? (a ? yn(e) : null);
+		if (o !== null && n) {
+			if (t.id === n.id) return {
+				type: "touche",
+				cle: r,
+				poste: "sauteur",
+				premier: o,
+				periode: 99,
+				continu: !1,
+				fixes: [o]
+			};
+			if (bn(e, n).some((e) => e.id === t.id)) return {
+				type: "touche",
+				cle: r,
+				poste: "lifteur",
+				premier: o,
+				periode: 99,
+				continu: !1,
+				fixes: [o]
+			};
+			if (t.cote !== n.cote) {
+				let i = e.pions.filter((e) => e.cote === t.cote && e.role === "alignement" && e.surLeTerrain && e.sanction <= 0).sort((e, t) => Math.abs(e.pos.y - n.pos.y) - Math.abs(t.pos.y - n.pos.y))[0];
+				if (i?.id === t.id) return {
+					type: "touche",
+					cle: r,
+					poste: "sauteur",
+					premier: o,
+					periode: 99,
+					continu: !1,
+					fixes: [o]
+				};
+				if (i && bn(e, i).some((e) => e.id === t.id)) return {
+					type: "touche",
+					cle: r,
+					poste: "lifteur",
+					premier: o,
+					periode: 99,
+					continu: !1,
+					fixes: [o]
+				};
+			}
+		}
+	}
+	return null;
+}
+function Sn(e) {
+	return {
+		type: e.type,
+		poste: e.poste,
+		debut: e.premier,
+		periode: e.periode,
+		cle: e.cle,
+		temps: [],
+		score: .5,
+		appuis: []
+	};
+}
+function Cn(e) {
+	let t = e.direct;
+	if (!t) return;
+	let n = t.actif && ln(e) ? e.pions.find((e) => e.moi) : void 0, r = n ? xn(e, n) : null;
+	if (t.pack?.type === "ruck" && t.pack.engage && e.phase === "ruck" && e.ruck && !e.ruck.duel && n) {
+		wn(e, t.pack, n);
+		return;
+	}
+	if (!r || !n || r.type === "ruck" && t.fermeRuck === e.compteurs.rucks) {
+		delete t.pack;
+		return;
+	}
+	(!t.pack || t.pack.cle !== r.cle) && (t.pack = Sn(r));
+	let i = t.pack;
+	if (i.poste = r.poste, r.type === "ruck") i.temps.length || i.temps.push({ t: r.premier });
+	else if (r.fixes) for (let e of r.fixes) i.temps.some((t) => Math.abs(t.t - e) < .2) || i.temps.push({ t: e });
+	else if (r.continu) {
+		let t = i.temps.length ? i.temps[i.temps.length - 1].t : r.premier - r.periode;
+		for (; t + r.periode < e.sim + 2.6;) t += r.periode, i.temps.push({ t });
+	}
+	if (wn(e, i, n), i.type === "ruck" && !i.engage && i.temps[0]?.q !== void 0 && e.sim > i.temps[0].t + .8) {
+		t.fermeRuck = e.compteurs.rucks, delete t.pack;
+		return;
+	}
+	for (; i.temps.length > 8 && i.temps[0].t < e.sim - 3.5;) i.temps.shift();
+}
+function wn(e, t, n) {
+	let r = un, i = n ? vn(n, t.type) : 1, a = r.fenetreParfaite * i, o = r.fenetreCorrecte * i, s = (n, r) => {
+		n.q = r, t.derniere = {
+			t: e.sim,
+			q: r
+		}, t.score = t.score * .6 + r / 2 * _n;
+	};
+	for (let n of t.appuis.splice(0)) {
+		let r = t.temps.filter((e) => e.q === void 0).sort((e, t) => Math.abs(e.t - n) - Math.abs(t.t - n))[0];
+		t.type === "ruck" && r ? s(r, Math.abs(r.t - n) <= a ? 2 : +(Math.abs(r.t - n) <= o)) : r && Math.abs(r.t - n) <= o ? s(r, Math.abs(r.t - n) <= a ? 2 : 1) : (t.score = Math.max(0, t.score - .05), t.derniere = {
+			t: e.sim,
+			q: 0
+		});
+	}
+	for (let n of t.temps) n.q === void 0 && e.sim > n.t + o && s(n, 0);
+}
+function Tn(e, t) {
+	let n = e.direct?.pack;
+	return n ? (n.appuis.push(t ?? e.sim), !0) : !1;
+}
+function En(e, t) {
+	let n = e.direct?.pack;
+	return !n || !Dn(n).includes(t) ? !1 : (n.sortie = t, !0);
+}
+function Dn(e) {
+	return e.type !== "melee" && e.type !== "maul" ? [] : e.poste === "huit" ? ["ramasser", "passer"] : e.poste === "troisieme" ? ["detacher"] : e.type === "maul" && (e.poste === "deuxieme" || e.poste === "talonneur") ? ["passer"] : [];
+}
+function On(e, t) {
+	let n = un.bonusMelee[t.poste] ?? 8, r = (.7 + .3 * Math.min(1.3, Math.max(.4, e.puissance / 80))) * (.75 + .25 * e.endurance / 100);
+	return (t.score - .5) * 2 * n * r;
+}
+//#endregion
+//#region src/lib/moteur/ia/vision.ts
+function kn(e) {
+	return (e.ia ?? 1) >= 3;
+}
+var An = 14, jn = 1.25;
+function Mn(e) {
+	return {
+		x: e.pos.x + e.vitesse.x * .3,
+		y: e.pos.y + e.vitesse.y * .3
+	};
+}
+function Nn(e, t, n) {
+	let r = j(e.cote), i = Math.cos(n) * r, a = Math.sin(n), o = An, s = null;
+	for (let n of t) {
+		let t = Mn(n), r = t.x - e.pos.x, c = t.y - e.pos.y, l = r * i + c * a;
+		l < .4 || l > o || Math.abs(-r * a + c * i) < jn && (o = l, s = n);
+	}
+	if (a !== 0) {
+		let t = a > 0 ? (68.5 - e.pos.y) / a : (1.5 - e.pos.y) / a;
+		t >= 0 && t < o && (o = t, s = null);
+	}
+	return {
+		angle: n,
+		libre: o,
+		defenseur: s
+	};
+}
+function Pn(e, t) {
+	let n = j(t.cote), r = e.pions.filter((n) => n.cote !== t.cote && n.surLeTerrain && tn(e, n)), i = {
+		gauche: Nn(t, r, -.42),
+		axe: Nn(t, r, 0),
+		droite: Nn(t, r, .42)
+	}, a = null, o = Infinity, s = [];
+	for (let e of r) {
+		let r = Mn(e), i = (r.x - t.pos.x) * n;
+		if (i < -.8 || i > 13) continue;
+		let c = Math.hypot(r.x - t.pos.x, r.y - t.pos.y);
+		c < o && Math.abs(r.y - t.pos.y) < 6 + i * .35 && (o = c, a = e), Math.abs(r.y - t.pos.y) < 16 && s.push({
+			d: e,
+			y: r.y,
+			avant: i
+		});
+	}
+	s.sort((e, t) => e.y - t.y);
+	let c = null, l = 0;
+	for (let e = 0; e <= s.length; e++) {
+		let i = s[e - 1], a = s[e];
+		if (!i && !a) break;
+		let o = i ? i.y : 0, u = a ? a.y : 70, d = u - o - (i ? 1 : 1.5) - (a ? 1 : 1.5);
+		if (d < 2.6) continue;
+		let f = i && a ? (o + u) / 2 : i ? Math.min(67.5, o + 1 + Math.min(4.5, d / 2)) : Math.max(2.5, u - 1 - Math.min(4.5, d / 2)), p = Math.max(1.5, ((i?.avant ?? a.avant) + (a?.avant ?? i.avant)) / 2), m = Math.abs(f - t.pos.y);
+		if (m > 1.2 + p * .95) continue;
+		let h = 0;
+		for (let e of r) {
+			let r = (e.pos.x - t.pos.x) * n;
+			r > p + 1.5 && r < p + 16 && Math.abs(e.pos.y - f) < 7 && h++;
+		}
+		let g = Math.min(d, 9) - m * .55 - h * .9 + (!i || !a ? -.6 : 0);
+		g > l && (l = g, c = {
+			largeur: d,
+			y: f,
+			profondeur: p,
+			couverture: h,
+			bords: [i?.d ?? null, a?.d ?? null]
+		});
+	}
+	return {
+		rayons: i,
+		devant: a,
+		distance: a ? o : 99,
+		intervalle: c
+	};
+}
+function Fn(e) {
+	let t = e.numero === 10 ? .14 : e.numero === 9 || e.numero === 12 || e.numero === 15 ? .08 : e.numero === 13 || e.numero === 11 || e.numero === 14 ? .04 : e.numero >= 6 && e.numero <= 8 ? -.04 : -.14;
+	return Math.max(.05, Math.min(1, (e.vision - 35) / 55 + t));
+}
+function In(e, t) {
+	let n = j(t.cote), r = null, i = 0;
+	for (let a of [1, -1]) {
+		let o = e.pions.filter((e) => {
+			if (e === t || e.cote !== t.cote || !z(e)) return !1;
+			let r = (e.pos.y - t.pos.y) * a, i = (t.pos.x - e.pos.x) * n;
+			return r >= 2.5 && r <= 24 && i >= -.4 && i <= 10;
+		}).sort((e, n) => Math.abs(e.pos.y - t.pos.y) - Math.abs(n.pos.y - t.pos.y)).slice(0, 3);
+		if (!o.length) continue;
+		let s = o[o.length - 1].pos.y, c = e.pions.filter((r) => {
+			if (r.cote === t.cote || !r.surLeTerrain || !tn(e, r)) return !1;
+			let i = (r.pos.x - t.pos.x) * n, o = (r.pos.y - t.pos.y) * a;
+			return i >= -1.2 && i <= 14 && o >= -3 && o <= (s - t.pos.y) * a + 5;
+		}).sort((e, n) => Math.abs(e.pos.y - t.pos.y) - Math.abs(n.pos.y - t.pos.y));
+		if (!c.length || c.length > 2) continue;
+		let l = 1 + o.length - c.length;
+		l >= 1 && l > i && (i = l, r = {
+			cote: a,
+			soutiens: o,
+			defenseurs: c
+		});
+	}
+	return r;
+}
+function Ln(e, t, n, r = M(t.cote)) {
+	let i = n.pos.x - t.pos.x, a = n.pos.y - t.pos.y, o = i * i + a * a || 1;
+	for (let n of e.pions) {
+		if (n.cote !== r || !n.surLeTerrain || !tn(e, n)) continue;
+		let s = Mn(n), c = ((s.x - t.pos.x) * i + (s.y - t.pos.y) * a) / o;
+		if (!(c < .2 || c > .92) && Math.hypot(s.x - (t.pos.x + i * c), s.y - (t.pos.y + a * c)) < 1.3) return n;
+	}
+	return null;
+}
+//#endregion
+//#region src/lib/moteur/responsabilites.ts
+var Rn = [
+	"capitaine",
+	"viceCapitaine",
+	"buteur",
+	"buteur2",
+	"engagement",
+	"droppeur",
+	"lanceur",
+	"lanceur2"
+], zn = (e) => e.distance < 50 && e.angle < 26;
+function Bn(e, t) {
+	let n = (t) => {
+		let n = e.pions.filter((e) => e.cote === t && e.avant && e.surLeTerrain && e.sanction <= 0);
+		return {
+			n: n.length,
+			m: n.length ? n.reduce((e, t) => e + t.puissance, 0) / n.length : 0
+		};
+	}, r = n(t), i = n(M(t));
+	return r.m - i.m + (r.n - i.n) * 4;
+}
+function Vn(e, t, n) {
+	let r = an(e, t, n);
+	return {
+		rideau: r.rideau,
+		retardataires: r.retardataires
+	};
+}
+function Hn(e, t) {
+	let n = sn(e, t.cote, t.lieu), r = zn(t) && t.buteurPresent, i = n.diff, a = e.sirene || n.restantes <= 8, o = {
+		choix: "touche",
+		raison: "tropLoin"
+	}, s = Bn(e, t.cote), c = t.defense, l = !!c && (c.retardataires >= 3 || c.rideau <= 3);
+	if (a) return i > 0 ? r && t.chance >= .55 && i <= 4 ? {
+		choix: "points",
+		raison: "seMettreALAbri"
+	} : r && t.chance >= .7 && i <= 7 ? {
+		choix: "points",
+		raison: "allongerLAvance"
+	} : {
+		choix: "touche",
+		raison: "vaincreLaMontre"
+	} : i >= -3 ? r && t.chance >= .3 ? {
+		choix: "points",
+		raison: i === 0 ? "passerDevant" : i === -3 ? "egaliser" : "passerDevant"
+	} : l && t.distance < 35 ? {
+		choix: "rapide",
+		raison: "defenseDesorganisee"
+	} : {
+		choix: "touche",
+		raison: r ? "buteurHesitant" : "tropLoin"
+	} : l && t.distance < 40 ? {
+		choix: "rapide",
+		raison: "defenseDesorganisee"
+	} : s >= 5 && t.distance <= 28 ? {
+		choix: "melee",
+		raison: "meleeDominante"
+	} : {
+		choix: "touche",
+		raison: "chercherLEssai"
+	};
+	if (l && t.distance < 38 && !(r && t.chance >= .85 && t.distance > 20)) return {
+		choix: "rapide",
+		raison: "defenseDesorganisee"
+	};
+	if (s >= 5 && t.distance <= 28 && t.chance < .9) return {
+		choix: "melee",
+		raison: "meleeDominante"
+	};
+	if (t.consigne === "points") return r ? {
+		choix: "points",
+		raison: "consignePoints"
+	} : o;
+	if (t.consigne === "touche") return t.distance <= 7 ? {
+		choix: "melee",
+		raison: "consigneTouche"
+	} : {
+		choix: "touche",
+		raison: "consigneTouche"
+	};
+	if (r) {
+		let e = Un(n.posture) ? .55 : .5;
+		return t.chance >= .8 && t.distance > 15 || t.chance >= e + (t.distance < 20 ? .05 : 0) || t.chance >= .4 && n.posture === "prudent" ? {
+			choix: "points",
+			raison: "buteurSur"
+		} : {
+			choix: "touche",
+			raison: "buteurHesitant"
+		};
+	}
+	return t.distance <= 7 ? {
+		choix: "melee",
+		raison: "tenirLeBallon"
+	} : {
+		choix: "touche",
+		raison: "gagnerDuTerrain"
+	};
+}
+var Un = (e) => e === "urgence" || e === "troisPoints";
+function Wn() {
+	return {
+		decisions: 0,
+		decisionsConformes: 0,
+		tirs: 0,
+		tirsReussis: 0,
+		transformations: 0,
+		transformationsReussies: 0,
+		drops: 0,
+		dropsReussis: 0,
+		engagements: 0,
+		engagementsReussis: 0,
+		touches: 0,
+		touchesGagnees: 0,
+		toucheRapides: 0,
+		chronosDepasses: 0
+	};
+}
+var Gn = {
+	avant: .34,
+	milieu: .55,
+	fond: .78,
+	maul: .34,
+	leurreAvant: .78,
+	leurreMilieu: .55,
+	sortieRapide: .7
+};
+function Kn(e, t, n, r = 0) {
+	let i = Math.abs(Math.max(0, Math.min(1, t.puissance)) - Gn[e]), a = 1 - Math.max(0, Math.min(1, t.geste));
+	if (!n) return {
+		delta: 14 - i * 70 - a * 20,
+		pasDroit: 1 + 1.5 * a,
+		longueur: 1 + 5 * Math.max(0, i - .1)
+	};
+	let o = n.passe * .55 + n.vision * .3 + n.discipline * .15, s = Math.max(0, 1 - n.endurance / 100), c = .8 + Gn[e] * .55, l = i + (Math.max(0, (68 - o) / 420) + s * .07 + r * .05 + (c - 1) * .04);
+	return {
+		delta: 14 - l * 70 - a * 20 + (o - 60) / 9,
+		pasDroit: (1 + 1.5 * a) * (1 + r * .25 + s * .3),
+		longueur: (1 + 5 * Math.max(0, l - .1)) * c
+	};
+}
+var qn = [
+	"avant",
+	"milieu",
+	"fond",
+	"maul",
+	"leurreAvant",
+	"leurreMilieu",
+	"sortieRapide"
+];
+function Jn(e) {
+	let t = [
+		8,
+		9,
+		10,
+		2,
+		4,
+		5,
+		6,
+		7,
+		12,
+		13,
+		15
+	].indexOf(e.numero);
+	return e.discipline * .5 + e.vision * .3 + (t < 0 ? 0 : (11 - t) * .35);
+}
+var Yn = (e, t) => e.filter((e) => e.cote === t && e.numero <= 15);
+function Xn(e, t, n = {}, r) {
+	let i = {}, a = Yn(e, t), o = (e) => !!e && Object.values(i).includes(e), s = (n) => !!n && e.some((e) => e.cote === t && e.sourceId === n);
+	for (let e of Rn) s(n[e]) && (i[e] = n[e]);
+	let c = (e, t) => [...t].sort((t, n) => e(t, n) || t.numero - n.numero)[0], l = (e, t = () => !1) => {
+		let n = a.filter((e) => !t(e));
+		return (c(e, n.filter((e) => e.sourceId !== r)) ?? c(e, n))?.sourceId;
+	}, u = (e, t) => {
+		let n = a.filter(t);
+		return (c(e, n.filter((e) => e.sourceId !== r)) ?? c(e, n))?.sourceId;
+	}, d = (e, t) => Jn(t) - Jn(e), f = (e, t) => t.pied - e.pied, p = (e, t) => t.passe - e.passe;
+	i.capitaine ??= l(d), i.viceCapitaine ??= l(d, (e) => o(e.sourceId)) ?? l(d, (e) => e.sourceId === i.capitaine), i.buteur ??= l(f, (e) => e.numero <= 3), i.buteur2 ??= l(f, (e) => e.sourceId === i.buteur || e.numero <= 3);
+	let m = a.find((e) => e.sourceId === i.buteur);
+	i.engagement ??= m && !m.avant && m.sourceId !== r ? m.sourceId : u(f, (e) => [
+		10,
+		15,
+		9
+	].includes(e.numero));
+	let h = a.filter((e) => [
+		10,
+		9,
+		12,
+		15
+	].includes(e.numero) && e.sourceId !== r), g = h.find((e) => e.numero === 10), _ = c(f, h);
+	i.droppeur ??= (g && _ && _.pied - g.pied >= 8 ? _ : g ?? _)?.sourceId ?? u(f, (e) => [
+		10,
+		9,
+		12,
+		15
+	].includes(e.numero));
+	let v = a.find((e) => e.numero === 2 && e.sourceId !== r);
+	return i.lanceur ??= v?.sourceId ?? l(p, (e) => !e.avant) ?? a.find((e) => e.numero === 2)?.sourceId, i.lanceur2 ??= u(p, (e) => [
+		6,
+		7,
+		8
+	].includes(e.numero) && e.sourceId !== i.lanceur) ?? l(p, (e) => !e.avant || e.sourceId === i.lanceur), i;
+}
+function Zn(e, t) {
+	let n = t.avatar ?? [], r = e.find((e) => e.moi), i = (i) => {
+		let a = { ...i === "A" ? t.A : t.B };
+		if (r && r.cote === i) for (let e of n) a[e] = r.sourceId;
+		for (let [e, t] of [
+			["capitaine", "viceCapitaine"],
+			["buteur", "buteur2"],
+			["lanceur", "lanceur2"]
+		]) a[e] && a[e] === a[t] && delete a[t];
+		return Xn(e, i, a, r && r.cote === i ? r.sourceId : void 0);
+	};
+	return {
+		roles: {
+			A: i("A"),
+			B: i("B")
+		},
+		avatar: n,
+		attente: null,
+		derniere: null,
+		engagement: null,
+		touche: null,
+		offreToucheRapide: null,
+		stats: Wn()
+	};
+}
+var Qn = (e) => !!e && e.surLeTerrain && e.sanction <= 0;
+function $n(e, t, n) {
+	let r = e.responsabilites;
+	if (!r) return;
+	let i = r.roles[t], a = (n) => {
+		let r = n ? e.pions.find((e) => e.cote === t && e.sourceId === n) : void 0;
+		return Qn(r) ? r : void 0;
+	}, o = e.pions.filter((e) => e.cote === t && Qn(e)), s = (e, t = () => !0) => [...o].filter(t).sort((t, n) => e(t, n) || t.numero - n.numero)[0], c = (e, t) => t.pied - e.pied;
+	switch (n) {
+		case "capitaine": return a(i.capitaine) ?? a(i.viceCapitaine) ?? s((e, t) => Jn(t) - Jn(e));
+		case "viceCapitaine": return a(i.viceCapitaine) ?? a(i.capitaine) ?? s((e, t) => Jn(t) - Jn(e));
+		case "buteur": return a(i.buteur) ?? a(i.buteur2) ?? s(c);
+		case "buteur2": return a(i.buteur2) ?? a(i.buteur) ?? s(c);
+		case "engagement": return a(i.engagement) ?? a(i.buteur) ?? a(i.buteur2) ?? o.find((e) => e.numero === 10) ?? s(c, (e) => !e.avant);
+		case "droppeur": return a(i.droppeur) ?? o.find((e) => e.numero === 10) ?? a(i.buteur) ?? s(c, (e) => !e.avant);
+		case "lanceur": return a(i.lanceur) ?? a(i.lanceur2) ?? o.find((e) => e.numero === 2) ?? s((e, t) => t.passe - e.passe, (e) => e.avant);
+		case "lanceur2": return a(i.lanceur2) ?? a(i.lanceur) ?? o.find((e) => e.numero === 2) ?? s((e, t) => t.passe - e.passe, (e) => e.avant);
+	}
+}
+function er(e) {
+	if (e.direct?.actif) return e.pions.find((e) => e.moi);
+}
+function tr(e, t, n) {
+	if (!e.responsabilites) return !1;
+	let r = er(e);
+	return !r || !Qn(r) || n && r.cote !== n ? !1 : $n(e, r.cote, t) === r;
+}
+function nr(e) {
+	if (!(!e.responsabilites || e.tir)) for (let t of ["A", "B"]) {
+		let n = $n(e, t, "capitaine"), r = $n(e, t, "buteur");
+		for (let i of e.pions) i.cote === t && (i.capitaine = i === n, i.buteur = i === r);
+	}
+}
+function rr(e, t, n, r) {
+	let i = $n(e, t, "buteur");
+	return {
+		cote: t,
+		lieu: n,
+		...r,
+		buteurPresent: !!i,
+		consigne: e.tactiques[t]?.penalites ?? "mixte",
+		defense: e.penalite?.defense
+	};
+}
+//#endregion
+//#region src/lib/moteur/direct.ts
+var B = {
+	course: .8,
+	sprintFrais: 1.12,
+	sprintMoyen: 1.07,
+	sprintPlat: 1.02,
+	plafondVitesse: 10.9,
+	vivacite: 1.2,
+	agilite: 2.1,
+	virageMax: 11,
+	freinMin: 7.5,
+	freinFacteur: 1.7,
+	coutSprint: 1.4,
+	depense: .7,
+	recuperation: .28,
+	patience: .55,
+	porteePasse: 22,
+	porteePasseSautee: 32,
+	risqueSautee: .07,
+	porteePlaquage: 3.4,
+	allongePlaquage: 2.5,
+	dureePlaquage: .9,
+	porteeLancer: 7.5,
+	dureeLancer: .72,
+	allongeLancer: 1.85,
+	aideLancerVitesse: .5,
+	aideLancerCone: .5,
+	dureeGeste: 1.3,
+	rechargePlaquage: 1.1,
+	rechargeRaffut: 1.2,
+	rechargeCrochet: 1,
+	rechargeFeinte: 2.2,
+	rechargeAppel: 2.6,
+	rechargeGrattage: 4,
+	rechargeDrop: 6,
+	porteeDrop: 50,
+	coutPlaquage: 2.2,
+	coutRaffut: 1.4,
+	coutCrochet: 1.4,
+	coutGrattage: 3,
+	porteeRuck: 4.6,
+	dureeAppel: 5,
+	chanceAppel: .34,
+	seuilAppel: .12,
+	ecartPoste: 16,
+	delaiCompensation: 3.5
+};
+function ir() {
+	return {
+		libre: !1,
+		raison: "banc",
+		porte: !1,
+		attaque: !1,
+		suggestion: null,
+		ecart: 0,
+		horsPoste: !1,
+		horsJeu: !1,
+		cibleDePlaquage: null,
+		ruckAPortee: !1,
+		contactImminent: !1,
+		possible: {
+			passe: !1,
+			coupDePied: !1,
+			raffut: !1,
+			crochet: !1,
+			plaquage: !1,
+			grattage: !1,
+			appel: !1,
+			feinte: !1,
+			engager: !1,
+			drop: !1,
+			pousser: !1,
+			quitter: !1
+		},
+		recharge: {},
+		arme: null
+	};
+}
+var ar = /* @__PURE__ */ new Set([
+	"jeuCourant",
+	"ballonEnLAir",
+	"ballonLibre"
+]);
+function or(e) {
+	return (e.ia ?? 1) >= 4;
+}
+function sr(e, t) {
+	if (!t.surLeTerrain) return "banc";
+	if (t.sanction > 0) return "carton";
+	if (t.corps) return "sol";
+	if (e.direct && e.sim < e.direct.tenuJusqua) return "engage";
+	switch (e.phase) {
+		case "jeuCourant":
+		case "ballonEnLAir":
+		case "ballonLibre": break;
+		case "ruck":
+			if (t.role === "ruck") return "ruck";
+			break;
+		case "melee": return "melee";
+		case "touche": return "touche";
+		case "maul": return "maul";
+		case "penalite": return "penalite";
+		case "tirAuBut":
+		case "transformation": return "tir";
+		case "aplatissage":
+		case "apresEssai":
+		case "tmo": return "essai";
+		case "miTemps":
+		case "fini": return "mitemps";
+		default: return "arret";
+	}
+	return e.piedPrepare?.auteurId === t.id ? "pied" : null;
+}
+function cr(e, t) {
+	return !!e.direct?.actif && t.moi && sr(e, t) === null;
+}
+function lr(e) {
+	let t = e.direct;
+	if (!t?.actif || !e.ruck?.porteurId) return;
+	let n = e.pions.find((e) => e.moi);
+	n && n.id === e.ruck.porteurId && (t.stats.ballonsPerdus += 1);
+}
+function ur(e) {
+	if (!e.direct?.actif) return null;
+	for (let t of e.pions) if (t.moi) return t;
+	return null;
+}
+function dr(e, t) {
+	let n = e.direct;
+	if (n) for (let e of Object.keys(n.recharges)) {
+		let r = (n.recharges[e] ?? 0) - t;
+		r <= 0 ? delete n.recharges[e] : n.recharges[e] = r;
+	}
+}
+function fr(e) {
+	let t = B;
+	return e.deuxReserves ? e.sprint < 25 ? t.sprintMoyen : t.sprintFrais : e.endurance < 25 ? t.sprintPlat : e.endurance < 45 ? t.sprintMoyen : t.sprintFrais;
+}
+function pr(e, t, n) {
+	let r = B, i = Le(e), a = n && re(e) && t > .2, o = a ? i * fr(e) : i * r.course, s = t < .18 ? 0 : a ? 1 : A((t - .12) / .88, 0, 1) ** .85;
+	return Math.min(r.plafondVitesse, o * s);
+}
+var mr = (e) => Math.atan2(Math.sin(e), Math.cos(e));
+function hr(e, t, n, r) {
+	let i = B;
+	if (e.corps) return 0;
+	let a = Math.hypot(n.mx, n.my), o = n.sprint && re(e) && a > .2, s = pr(e, a, n.sprint), c = e.deuxReserves ? ie(e) : .65 + .35 * (e.endurance / 100), l = e.acceleration * c * i.vivacite, u = Math.max(i.freinMin, l * i.freinFacteur), d = Math.hypot(e.vitesse.x, e.vitesse.y), f = a >= .18, p = f ? Math.atan2(n.my, n.mx) : 0, m = d > .3 ? Math.atan2(e.vitesse.y, e.vitesse.x) : p;
+	if (f) {
+		let e = mr(p - m), n = Math.min(i.virageMax, l * i.agilite / Math.max(d, 2.5)), r = A(e, -n * t, n * t);
+		m += r;
+		let a = A((Math.abs(e) - Math.abs(r) - .35) / 2.05, 0, 1);
+		s *= 1 - .65 * a * a * (3 - 2 * a);
+	}
+	let h = s > d ? Math.min(s, d + l * t) : Math.max(s, d - u * t);
+	e.vitesse.x = Math.cos(m) * h, e.vitesse.y = Math.sin(m) * h, h < .02 && (e.vitesse.x = 0, e.vitesse.y = 0);
+	let g = e.pos.x, _ = e.pos.y, v = r ? r.x * t : 0, y = r ? r.y * t : 0;
+	e.pos.x = A(e.pos.x + e.vitesse.x * t + v, -1.5, 123.5), e.pos.y = A(e.pos.y + e.vitesse.y * t + y, -1.5, 71.5);
+	let b = Math.hypot(e.pos.x - g, e.pos.y - _);
+	if (e.cible = {
+		x: e.pos.x + e.vitesse.x * .6,
+		y: e.pos.y + e.vitesse.y * .6
+	}, e.effort = Math.min(1.2, h / Math.max(1, Le(e))), e.stats.distanceParcourue += b, e.deuxReserves) return ae(e, t, Math.min(1, b / t / e.vitesseMax), +!!o), b;
+	if (b > 0) {
+		let n = Math.min(1, b / t / e.vitesseMax);
+		e.endurance = Math.max(0, e.endurance - e.usure * t * n ** 1.6 * 10 * i.depense), n < .36 && (e.endurance = Math.min(100, e.endurance + i.recuperation * t * (1 - n / .36)));
+	} else e.endurance = Math.min(100, e.endurance + i.recuperation * t);
+	return o && (e.endurance = Math.max(0, e.endurance - i.coutSprint * t)), b;
+}
+function gr(e, t, n, r = !1) {
+	let i = j(t.cote), a = r ? B.porteePasseSautee : B.porteePasse, o = Math.hypot(n.x, n.y) || 1, s = n.x / o, c = n.y / o, l = [];
+	for (let n of e.pions) {
+		if (n === t || n.cote !== t.cote || !z(n)) continue;
+		let r = n.pos.x - t.pos.x, o = n.pos.y - t.pos.y, u = Math.hypot(r, o);
+		if (u < 1.4 || u > a) continue;
+		let d = -r * i;
+		if (d < -.5) continue;
+		let f = r * s + o * c;
+		f < 1 || f < u * .26 || l.push({
+			pion: n,
+			distance: u,
+			retrait: d,
+			lateral: f,
+			coupee: !!Ln(e, t, n)
+		});
+	}
+	return l.sort((e, t) => e.distance - t.distance);
+}
+function _r(e, t, n, r) {
+	let i = gr(e, t, n, r);
+	if (!i.length) return null;
+	let a = i.filter((e) => !e.coupee), o = a.length ? a : i;
+	return r ? (o.filter((e) => e.distance >= 8 && e.pion !== i[0]?.pion)[0] ?? o[o.length - 1])?.pion ?? null : o[0]?.pion ?? null;
+}
+function vr(e) {
+	return 24 + e.pied / 3.2;
+}
+function yr(e, t) {
+	let n = j(t.cote), r = Infinity;
+	for (let i of e.pions) {
+		if (i.cote === t.cote || !i.surLeTerrain || i.sanction > 0 || i.corps) continue;
+		let e = (i.pos.x - t.pos.x) * n;
+		e < -.3 || Math.abs(i.pos.y - t.pos.y) > 7 + e * .4 || (r = Math.min(r, k(i.pos, t.pos)));
+	}
+	return r === Infinity ? 99 : Math.sqrt(r);
+}
+function br(e, t) {
+	return t < 0 ? -1 : t > 0 ? 71 : e.pos.y < 35 ? -1 : 71;
+}
+function xr(e, t, n) {
+	let r = j(t.cote), i = vr(t), a = yr(e, t), o = N(t.pos, t.cote), s = we(t.pos, t.cote), c = Te(t.pos, t.cote), l = (e) => A(e, 12, 110);
+	if (!n.visee) {
+		let n = e.ouvert;
+		if (s) {
+			let e = Math.min(i, 46);
+			return {
+				intention: "degagement",
+				arrivee: {
+					x: l(t.pos.x + r * e),
+					y: br(t, t.pos.y < 35 ? -1 : 1)
+				},
+				duree: 2.7,
+				hauteur: .5,
+				libelle: "degagement"
+			};
+		}
+		if (a < 9 && !t.avant && o > 12) return {
+			intention: "parDessus",
+			arrivee: {
+				x: l(t.pos.x + r * 11),
+				y: A(t.pos.y + n * 3, 3, 67)
+			},
+			duree: 1.2,
+			hauteur: .5,
+			libelle: "parDessus"
+		};
+		if (o < 30) return {
+			intention: "rasant",
+			arrivee: {
+				x: l(t.pos.x + r * 14),
+				y: A(t.pos.y + n * 5, 4, 66)
+			},
+			duree: 1.35,
+			hauteur: .1,
+			libelle: "rasant"
+		};
+		if (t.numero === 9) return {
+			intention: "chandelle",
+			arrivee: {
+				x: l(t.pos.x + r * 22),
+				y: A(t.pos.y + n * 7, 4, 66)
+			},
+			duree: 3.2,
+			hauteur: 1,
+			libelle: "chandelle"
+		};
+		let c = Math.min(i, 44);
+		return {
+			intention: "occupation",
+			arrivee: {
+				x: l(t.pos.x + r * c),
+				y: A(t.pos.y + n * 6, 4, 66)
+			},
+			duree: 1.4 + c / 24,
+			hauteur: .55,
+			libelle: "occupation"
+		};
+	}
+	let u = n.visee, d = Math.hypot(u.x, u.y) || 1, f = u.x / d, p = u.y / d, m = A(u.puissance, 0, 1), h = f * r, g = Math.acos(A(h, -1, 1)) * 180 / Math.PI, _ = A(5 + (i * 1.08 - 5) * m ** .9, 5, i * 1.1), v = (e) => ({
+		x: l(t.pos.x + f * e),
+		y: A(t.pos.y + p * e, -1, 71)
+	});
+	if (h < .08) {
+		let e = A(_ * .5, 6, 18);
+		return {
+			intention: "rasant",
+			arrivee: {
+				x: l(t.pos.x + r * e),
+				y: A(t.pos.y + p * e, 3, 67)
+			},
+			duree: .9 + e / 22,
+			hauteur: .1,
+			libelle: "rasant"
+		};
+	}
+	if (m < .3) {
+		let e = A(_, 7, 14), n = v(e);
+		return g < 55 && a < 12 && !t.avant ? {
+			intention: "parDessus",
+			arrivee: {
+				x: n.x,
+				y: A(n.y, 3, 67)
+			},
+			duree: 1.2,
+			hauteur: .5,
+			libelle: "parDessus"
+		} : {
+			intention: "rasant",
+			arrivee: {
+				x: n.x,
+				y: A(n.y, 3, 67)
+			},
+			duree: .9 + e / 22,
+			hauteur: .1,
+			libelle: "rasant"
+		};
+	}
+	if (g > 38 && g < 105 && m >= .4 && m <= .88 && !t.avant) {
+		let n = e.pions.filter((e) => e !== t && e.cote === t.cote && z(e) && (e.pos.x - t.pos.x) * r <= .6 && (e.pos.y - t.pos.y) * p > 0 && Math.abs(e.pos.y - t.pos.y) > 9).sort((e, n) => Math.abs(n.pos.y - t.pos.y) - Math.abs(e.pos.y - t.pos.y))[0];
+		if (n) {
+			let e = A(1.55 + Math.abs(n.pos.y - t.pos.y) / 30, 1.8, 2.9), i = Math.min(n.vitesseMax * e * .62, 18);
+			return {
+				intention: "transversale",
+				arrivee: {
+					x: l(n.pos.x + r * i * .7),
+					y: A(n.pos.y, 3.5, 66.5)
+				},
+				duree: e,
+				hauteur: .9,
+				libelle: "transversale"
+			};
+		}
+	}
+	if (m < .62 && g < 60) {
+		let e = A(_, 14, 30), t = v(e);
+		return {
+			intention: "chandelle",
+			arrivee: {
+				x: t.x,
+				y: A(t.y, 4, 66)
+			},
+			duree: 3.1 + e / 80,
+			hauteur: 1,
+			libelle: "chandelle"
+		};
+	}
+	let y = Math.abs(p) > .3 ? p < 0 ? t.pos.y / -p : (70 - t.pos.y) / p : Infinity;
+	if (m >= .5 && y <= _ * 1.03) {
+		let e = {
+			x: l(t.pos.x + f * y),
+			y: br(t, p)
+		}, n = N(e, t.cote), r = c && !s && n <= 22 && n > -1;
+		return {
+			intention: r ? "cinquanteVingtDeux" : "degagement",
+			arrivee: e,
+			duree: r ? 2.8 : A(1.3 + y / 24, 1.5, 3.1),
+			hauteur: r ? .6 : .5,
+			libelle: r ? "cinquanteVingtDeux" : "degagement"
+		};
+	}
+	let b = v(_);
+	return {
+		intention: "occupation",
+		arrivee: {
+			x: b.x,
+			y: A(b.y, 2, 68)
+		},
+		duree: A(1.3 + _ / 24, 1.5, 3.1),
+		hauteur: .25 + .4 * m,
+		libelle: "occupation"
+	};
+}
+function Sr(e, t, n) {
+	let r = n ? n.pos : e.ballon, i = j(t.cote), a = (r.x - t.pos.x) * i, o = Math.abs(t.pos.y - r.y), s = O(t.pos, r), c = 60;
+	for (let n of e.pions) n.cote === t.cote || !n.surLeTerrain || n.sanction > 0 || n.corps || (c = Math.min(c, O(t.pos, n.pos)));
+	let l = A((c - 1.6) / 6, 0, 1), u = A(1 - Math.max(0, -a) / 2.5, 0, 1) * A(1 - Math.max(0, a - 12) / 10, .2, 1), d = A(1 - Math.max(0, s - 16) / 14, 0, 1), f = t.vitesse.x * i, p = 99;
+	for (let n of e.pions) {
+		if (n.cote === t.cote || !n.surLeTerrain || n.sanction > 0 || n.corps) continue;
+		let e = (n.pos.x - t.pos.x) * i;
+		e > 0 && Math.abs(n.pos.y - t.pos.y) < 5 + e * .25 && (p = Math.min(p, e));
+	}
+	let m = "soutien";
+	o > 14 ? m = "large" : e.cellule && t.avant && a > 0 ? m = "cellule" : f > 4.2 && a >= -.5 && a < 10 && p > 7 ? m = "profondeur" : o > 6 && a > 1.5 && (m = "intervalle");
+	let h = m === "large" ? 1.06 : m === "intervalle" ? 1.1 : m === "profondeur" ? 1.12 : 1;
+	return {
+		force: A(A(l * .7 + .3 * u * d * Math.min(1, l * 2 + .25), 0, 1) * h * (a < -.5 ? 0 : 1), 0, 1),
+		type: m
+	};
+}
+function Cr(e) {
+	let t = e.direct?.appel;
+	return t && e.sim < t.fin ? t : null;
+}
+function wr(e, t, n) {
+	if (!Cr(e) || t === n || t.cote !== n.cote) return 0;
+	let r = j(t.cote);
+	if ((n.pos.x - t.pos.x) * r > .5 || !z(n) || n.battu > .3) return 0;
+	let i = O(t.pos, n.pos);
+	if (i < 2 || i > B.porteePasse) return 0;
+	let { force: a } = Sr(e, n, t), o = e.direct?.assistance?.appelAssure ? .6 : 0;
+	return Ln(e, t, n) ? Math.max(0, a - .45) * B.chanceAppel * .4 : a < B.seuilAppel && !o ? 0 : A(a ** 1.6 * B.chanceAppel + o, 0, .9);
+}
+function Tr(e, t, n = B.porteePlaquage) {
+	let r = e.porteur;
+	return !r || r.cote === t.cote || e.phase !== "jeuCourant" || r.corps ? null : O(t.pos, r.pos) <= n ? r : null;
+}
+function Er(e, t, n = B.porteeRuck) {
+	return e.phase === "ruck" && !!e.ruck && O(t.pos, e.ballon) <= n;
+}
+function Dr(e) {
+	let t = e.direct;
+	if (!t?.actif) return;
+	let n = e.pions.find((e) => e.moi);
+	!n || !n.surLeTerrain || n === e.porteur || (t.suggestion = {
+		x: A(n.cible.x, 7, 115),
+		y: A(n.cible.y, 2, 68)
+	}, t.suggestionA = e.sim);
+}
+function Or(e) {
+	let t = e.direct;
+	return !t?.actif || !t.suggestion || e.sim - t.suggestionA > 2.5 ? null : t.suggestion;
+}
+function kr(e) {
+	let t = e.direct;
+	if (!t?.actif) return;
+	let n = e.pions.find((e) => e.moi), r = t.vue = ir();
+	if (!n) return;
+	let i = sr(e, n);
+	r.libre = i === null, r.raison = i, r.porte = e.porteur === n, r.attaque = e.possession === n.cote, r.horsJeu = n.horsJeu;
+	let a = Or(e);
+	r.suggestion = a, r.ecart = a ? O(n.pos, a) : 0, r.horsPoste = !!a && !r.porte && r.ecart > B.ecartPoste;
+	let o = (e) => Math.max(0, t.recharges[e] ?? 0), s = r.libre && n.battu <= 0, c = ar.has(e.phase), l = s ? Tr(e, n) : null;
+	if (r.cibleDePlaquage = l?.id ?? null, r.ruckAPortee = s && Er(e, n), r.porte) {
+		let t = j(n.cote);
+		for (let i of e.pions) if (!(i.cote === n.cote || !i.surLeTerrain || i.sanction > 0 || i.corps || i.battu > 0) && (i.pos.x - n.pos.x) * t > -.6 && k(i.pos, n.pos) < 5.76) {
+			r.contactImminent = !0;
+			break;
+		}
+	}
+	let u = r.possible;
+	u.passe = s && r.porte && e.phase === "jeuCourant" && !e.vol, u.coupDePied = s && r.porte && e.phase === "jeuCourant" && !e.vol, u.raffut = s && r.porte && o("raffut") <= 0, u.crochet = s && r.porte && o("crochet") <= 0, u.feinte = s && r.porte && !n.avant && o("feinte") <= 0, u.plaquage = s && o("plaquage") <= 0 && (!!l || or(e) && !!Tr(e, n, B.porteeLancer)), u.grattage = s && r.ruckAPortee && !r.attaque && o("grattage") <= 0, u.engager = s && r.ruckAPortee && r.attaque, u.pousser = !!t.pack, u.quitter = !!t.pack && Dn(t.pack).length > 0, u.appel = s && c && !r.porte && (e.possession === n.cote || e.phase === "ballonEnLAir") && o("appel") <= 0, u.drop = s && r.porte && !!e.responsabilites && e.phase === "jeuCourant" && !e.vol && o("drop") <= 0 && N(n.pos, n.cote) < B.porteeDrop && (tr(e, "droppeur") || n.pied >= 55), r.recharge = {
+		plaquage: o("plaquage"),
+		raffut: o("raffut"),
+		crochet: o("crochet"),
+		feinte: o("feinte"),
+		appel: o("appel"),
+		grattage: o("grattage"),
+		drop: o("drop")
+	}, r.arme = t.arme && e.sim < t.arme.jusqua ? t.arme.action : null;
+}
+function Ar(e) {
+	let t = e.direct;
+	if (!t?.actif || t.horsPosteDepuis < 0 || e.sim - t.horsPosteDepuis < B.delaiCompensation) return null;
+	let n = e.pions.find((e) => e.moi);
+	return n && n.surLeTerrain && n.cote !== e.possession && e.phase === "jeuCourant" ? n : null;
+}
+function jr(e, t) {
+	let n = e.direct;
+	if (!n?.actif) return;
+	let r = e.pions.find((e) => e.moi);
+	if (!r || !cr(e, r) || !ar.has(e.phase)) {
+		n.horsPosteDepuis = -1;
+		return;
+	}
+	let i = n.stats;
+	i.tempsJeu += t;
+	let a = n.vue;
+	if (e.porteur !== r) {
+		a.suggestion && (a.ecart <= B.ecartPoste ? (i.tempsAuPoste += t, n.horsPosteDepuis = -1) : (i.tempsHorsPoste += t, n.horsPosteDepuis < 0 && (n.horsPosteDepuis = e.sim)));
+		let o = e.porteur;
+		if (o && o.cote === r.cote && !r.horsJeu) {
+			let e = j(r.cote), n = (o.pos.x - r.pos.x) * e, a = O(r.pos, o.pos);
+			n > -.5 && n < 14 && a > 2 && a < 16 && (i.tempsSoutien += t);
+		}
+	} else n.horsPosteDepuis = -1;
+}
+//#endregion
 //#region src/lib/moteur/tactique.ts
-function H(e, t) {
+function V(e, t) {
 	let n = [];
 	for (let r of e.pions) r.cote === t && r.surLeTerrain && n.push(r);
 	return n;
 }
-function ir(e, t) {
+function Mr(e, t) {
 	for (let n of e) if (n.numero === t) return n;
 }
-var ar = 3.2;
+var Nr = 3.2;
+function H(e) {
+	return A(e, Nr, 70 - Nr);
+}
+var Pr = 1.5;
 function U(e) {
-	return k(e, ar, 70 - ar);
+	return A(e, 11 + Pr, 111 - Pr);
 }
-var or = 1.5;
-function W(e) {
-	return k(e, 11 + or, 111 - or);
-}
-function sr(e, t) {
+function Fr(e, t) {
 	let n = e.length;
 	if (n < 2) {
-		n === 1 && (e[0].cible.y = U(e[0].cible.y));
+		n === 1 && (e[0].cible.y = H(e[0].cible.y));
 		return;
 	}
-	let r = ar, i = 70 - ar, a = Math.min(t, (i - r) / (n - 1)), o = [...e].sort((e, t) => e.cible.y - t.cible.y), s = o.map((e) => k(e.cible.y, r, i));
+	let r = Nr, i = 70 - Nr, a = Math.min(t, (i - r) / (n - 1)), o = [...e].sort((e, t) => e.cible.y - t.cible.y), s = o.map((e) => A(e.cible.y, r, i));
 	for (let e = 1; e < n; e++) s[e] < s[e - 1] + a && (s[e] = s[e - 1] + a);
 	if (s[n - 1] > i) {
 		s[n - 1] = i;
 		for (let e = n - 2; e >= 0; e--) s[e] > s[e + 1] - a && (s[e] = s[e + 1] - a);
 	}
-	for (let e = 0; e < n; e++) o[e].cible.y = k(s[e], r, i);
+	for (let e = 0; e < n; e++) o[e].cible.y = A(s[e], r, i);
 }
-var cr = {
+var Ir = {
 	9: 1.2,
 	10: 5.5,
 	12: 6.8,
@@ -43436,7 +43738,7 @@ var cr = {
 	11: 9.2,
 	14: 9.2,
 	15: 12.5
-}, lr = [
+}, Lr = [
 	"proche",
 	"proche",
 	"proche",
@@ -43446,8 +43748,8 @@ var cr = {
 	"lointaine",
 	"bord"
 ];
-function ur(e, t, n, r, i, a) {
-	let o = A(t), s = ue((e.origine ?? n).y, n.y, .3), c = e.ouvert, l = (c === 1 ? 70 - s : s) < 14 ? -c : c, u = l === 1 ? 70 - s : s, d = 70 - u, f = (e, t) => U(s + l * e * Math.min(t, Math.max(2, (e === 1 ? u : d) - ar - 1))), p = M(n, t) < 15, m = p ? .6 : me(n, t) ? 1.25 : 1, h = p ? Math.min(4.5, u * .4) : k(u * .22, 6.5, 12), g = u >= 34 && !p, _ = g ? k(u * .5, h + 9, 27) : k(d * .32, 4.5, 12), v = g ? 1 : -1, y = 1.7, b = [
+function Rr(e, t, n, r, i, a) {
+	let o = j(t), s = be((e.origine ?? n).y, n.y, .3), c = e.ouvert, l = (c === 1 ? 70 - s : s) < 14 ? -c : c, u = l === 1 ? 70 - s : s, d = 70 - u, f = (e, t) => H(s + l * e * Math.min(t, Math.max(2, (e === 1 ? u : d) - Nr - 1))), p = N(n, t) < 15, m = p ? .6 : we(n, t) ? 1.25 : 1, h = p ? Math.min(4.5, u * .4) : A(u * .22, 6.5, 12), g = u >= 34 && !p, _ = g ? A(u * .5, h + 9, 27) : A(d * .32, 4.5, 12), v = g ? 1 : -1, y = 1.7, b = [
 		{
 			cote: 1,
 			d: h,
@@ -43512,13 +43814,13 @@ function ur(e, t, n, r, i, a) {
 		if (S = {
 			cle: ee,
 			places: {}
-		}, z(e)) {
-			let e = /* @__PURE__ */ new Set(), n = [...x].sort((e, t) => tr(e).largeurMax - tr(t).largeurMax);
+		}, R(e)) {
+			let e = /* @__PURE__ */ new Set(), n = [...x].sort((e, t) => pn(e).largeurMax - pn(t).largeurMax);
 			for (let r of n.slice(0, t)) {
 				let n = (r.pos.y - s) * l, i = -1, a = Infinity;
 				for (let o = 0; o < t; o++) {
 					if (e.has(o)) continue;
-					let t = nr(r, lr[o], b[o].d, Math.abs(n - b[o].cote * b[o].d));
+					let t = mn(r, Lr[o], b[o].d, Math.abs(n - b[o].cote * b[o].d));
 					t < a && (a = t, i = o);
 				}
 				i >= 0 && (e.add(i), S.places[r.id] = i);
@@ -43537,70 +43839,70 @@ function ur(e, t, n, r, i, a) {
 	for (let e of r) {
 		let t = a.get(e);
 		if (t != null) {
-			fr(e, n, o, c, t);
+			Br(e, n, o, c, t);
 			continue;
 		}
 		if (e.role === "ruck") continue;
 		let r = b[S.places[e.id] ?? b.length - 1];
 		e.role = r.role, e.cible = {
-			x: W(n.x - o * r.dx * m),
+			x: U(n.x - o * r.dx * m),
 			y: f(r.cote, r.d)
 		};
 	}
-	let C = e.lancement, w = !!C && (C.type === "large" || C.type === "saute"), T = u < 16, te = [], E = (e, t, r, i, a = !0) => {
+	let C = e.lancement, w = !!C && (C.type === "large" || C.type === "saute"), T = u < 16, E = [], D = (e, t, r, i, a = !0) => {
 		e.cible = {
-			x: W(n.x - o * i * m),
+			x: U(n.x - o * i * m),
 			y: f(t, r)
-		}, a && t === 1 && te.push(e);
+		}, a && t === 1 && E.push(e);
 	};
 	for (let e of i) switch (e.numero) {
 		case 9:
 			e.role = "demi", e.cible = {
-				x: W(n.x - o * 1.4),
-				y: U(n.y - l * 1.6)
+				x: U(n.x - o * 1.4),
+				y: H(n.y - l * 1.6)
 			};
 			break;
 		case 10:
-			e.role = "ouvreur", E(e, 1, T ? u * .5 : h + 2.6, 6.2);
+			e.role = "ouvreur", D(e, 1, T ? u * .5 : h + 2.6, 6.2);
 			break;
 		case 12:
-			e.role = "ligne", T ? E(e, -1, d * .22, 6.8) : E(e, 1, Math.max(h + 9, u * .42), 7.4);
+			e.role = "ligne", T ? D(e, -1, d * .22, 6.8) : D(e, 1, Math.max(h + 9, u * .42), 7.4);
 			break;
 		case 13:
-			e.role = "ligne", u < 30 ? E(e, -1, d * (T ? .45 : .36), 7.6) : E(e, 1, Math.max(h + 16, u * .6), 8.6);
+			e.role = "ligne", u < 30 ? D(e, -1, d * (T ? .45 : .36), 7.6) : D(e, 1, Math.max(h + 16, u * .6), 8.6);
 			break;
 		case 15:
-			e.role = w ? "ligne" : "arriere", w && u >= 30 ? E(e, 1, u * .8, 9.6) : E(e, u >= 22 ? 1 : -1, Math.min((u >= 22 ? u : d) * .3, 16), me(n, t) ? 20 : 15, !1);
+			e.role = w ? "ligne" : "arriere", w && u >= 30 ? D(e, 1, u * .8, 9.6) : D(e, u >= 22 ? 1 : -1, Math.min((u >= 22 ? u : d) * .3, 16), we(n, t) ? 20 : 15, !1);
 			break;
 		default: {
 			let t = e.numero === 11 ? 0 : 70, r = (t === 0 ? -1 : 1) === l;
 			e.role = r ? "ligne" : "aileFerme", e.cible = {
-				x: W(n.x - o * (r ? 9.5 : 12) * m),
-				y: U(t + (t === 0 ? 4.5 : -4.5))
+				x: U(n.x - o * (r ? 9.5 : 12) * m),
+				y: H(t + (t === 0 ? 4.5 : -4.5))
 			};
 		}
 	}
-	sr(te, 5);
+	Fr(E, 5);
 }
-function dr(e, t, n) {
-	let r = A(n), i = e.ouvert, a = e.porteur && e.porteur.cote === n ? e.porteur : null, o = a ? a.pos : e.ballon, s = e.origine ? ue(e.origine.y, o.y, .48) : o.y, c = e.lancement, l = /* @__PURE__ */ new Map();
+function zr(e, t, n) {
+	let r = j(n), i = e.ouvert, a = e.porteur && e.porteur.cote === n ? e.porteur : null, o = a ? a.pos : e.ballon, s = e.origine ? be(e.origine.y, o.y, .48) : o.y, c = e.lancement, l = /* @__PURE__ */ new Map();
 	if (c && a) for (let e = c.index + 1; e < c.chaine.length; e++) l.has(c.chaine[e]) || l.set(c.chaine[e], e - c.index);
 	let u = [], d = [];
 	for (let e of t) e !== a && (e.avant ? u : d).push(e);
-	let f = k((i === 1 ? 70 - s : s) / 42, .7, 1);
-	u.sort((e, t) => O(o, e.pos) - O(o, t.pos));
+	let f = A((i === 1 ? 70 - s : s) / 42, .7, 1);
+	u.sort((e, t) => k(o, e.pos) - k(o, t.pos));
 	let p = u;
 	if (a && a.avant) {
 		let e = u.filter((e) => !l.has(e)).slice(0, 2);
 		e[0] && (e[0].role = "podRas", e[0].cible = {
-			x: W(a.pos.x - r * 1.2),
-			y: U(a.pos.y - i * 1.8)
+			x: U(a.pos.x - r * 1.2),
+			y: H(a.pos.y - i * 1.8)
 		}), e[1] && (e[1].role = "podRas", e[1].cible = {
-			x: W(a.pos.x - r * 1.2),
-			y: U(a.pos.y + i * 1.8)
+			x: U(a.pos.x - r * 1.2),
+			y: H(a.pos.y + i * 1.8)
 		}), p = u.filter((t) => !e.includes(t));
 	}
-	if (e.cadenceDetaillee) ur(e, n, o, p, d, l);
+	if (e.cadenceDetaillee) Rr(e, n, o, p, d, l);
 	else {
 		let e = Math.max(1.4, 1.8 * f), t = 12 * f, n = 24 * f, a = [
 			{
@@ -43647,23 +43949,23 @@ function dr(e, t, n) {
 		for (let e = 0; e < p.length; e++) {
 			let t = p[e], n = l.get(t);
 			if (n != null) {
-				fr(t, o, r, i, n);
+				Br(t, o, r, i, n);
 				continue;
 			}
 			let c = a[e] ?? a[a.length - 1];
 			t.role = c.role, t.cible = {
-				x: W(o.x - r * c.dx),
-				y: U(s + i * c.dy)
+				x: U(o.x - r * c.dx),
+				y: H(s + i * c.dy)
 			};
 		}
 		let u = !!c && (c.type === "large" || c.type === "saute"), m = [];
 		for (let e of d) {
-			let t = cr[e.numero] ?? 12, n;
+			let t = Ir[e.numero] ?? 12, n;
 			switch (e.numero) {
 				case 9:
 					e.role = "demi", e.cible = {
-						x: W(o.x - r * 1.4),
-						y: U(o.y - i * 1.6)
+						x: U(o.x - r * 1.4),
+						y: H(o.y - i * 1.6)
 					};
 					continue;
 				case 10:
@@ -43681,68 +43983,68 @@ function dr(e, t, n) {
 				default: {
 					let n = e.numero === 11 ? 0 : 70, a = i === 1 ? 70 : 0;
 					n === a ? (e.role = "ligne", e.cible = {
-						x: W(o.x - r * t),
-						y: U(a + (i === 1 ? -5 : 5))
+						x: U(o.x - r * t),
+						y: H(a + (i === 1 ? -5 : 5))
 					}) : (e.role = "aileFerme", e.cible = {
-						x: W(o.x - r * (t + 6)),
-						y: U(n + (n === 0 ? 9 : -9))
+						x: U(o.x - r * (t + 6)),
+						y: H(n + (n === 0 ? 9 : -9))
 					});
 					continue;
 				}
 			}
 			e.cible = {
-				x: W(o.x - r * t),
+				x: U(o.x - r * t),
 				y: s + i * n
 			}, m.push(e);
 		}
-		sr(m, 5);
+		Fr(m, 5);
 	}
-	for (let e of t) e !== a && (e.cible.x - o.x) * r > -.6 && (e.cible.x = W(o.x - r * .6));
+	for (let e of t) e !== a && (e.cible.x - o.x) * r > -.6 && (e.cible.x = U(o.x - r * .6));
 }
-function fr(e, t, n, r, i) {
+function Br(e, t, n, r, i) {
 	e.role = "ligne", e.cible = {
-		x: W(t.x - n * (1.6 + i * 1.5)),
-		y: U(t.y + i * 8.5 * r)
+		x: U(t.x - n * (1.6 + i * 1.5)),
+		y: H(t.y + i * 8.5 * r)
 	};
 }
-function pr(e, t, n) {
-	let r = A(j(n)), i = e.ouvert, a = e.porteur, o = a ? a.pos : e.ballon, s = e.systeme, c = t.filter((e) => e.sanction <= 0);
+function Vr(e, t, n) {
+	let r = j(M(n)), i = e.ouvert, a = e.porteur, o = a ? a.pos : e.ballon, s = e.systeme, c = t.filter((e) => e.sanction <= 0);
 	if (!c.length) return;
-	let l = M(o, j(n)), u = l > 55 ? 30 : l > 30 ? 21 : l > 18 ? 15 : 9, d = ir(c, 15), f = i === 1 ? ir(c, 11) : ir(c, 14), p = ir(c, 9), m = p && p.battu <= 0 ? p : [...c].filter((e) => e !== d && e !== f && e.battu <= 0).sort((e, t) => O(e.pos, o) - O(t.pos, o))[0], h = /* @__PURE__ */ new Set();
+	let l = N(o, M(n)), u = l > 55 ? 30 : l > 30 ? 21 : l > 18 ? 15 : 9, d = Mr(c, 15), f = i === 1 ? Mr(c, 11) : Mr(c, 14), p = Mr(c, 9), m = p && p.battu <= 0 ? p : [...c].filter((e) => e !== d && e !== f && e.battu <= 0).sort((e, t) => k(e.pos, o) - k(t.pos, o))[0], h = /* @__PURE__ */ new Set();
 	if (d) {
 		d.role = "rideau2";
 		let e = l < 55 && Math.abs(o.y - 35) > 12;
 		d.cible = {
-			x: W(o.x + r * u),
-			y: U(ue(o.y, 35, e ? .16 : .55))
+			x: U(o.x + r * u),
+			y: H(be(o.y, 35, e ? .16 : .55))
 		}, h.add(d);
 	}
 	if (f) {
 		f.role = "rideau2";
 		let e = f.numero === 11 ? 0 : 70;
 		f.cible = {
-			x: W(o.x + r * u * .72),
-			y: U(e + (e === 0 ? 13 : -13))
+			x: U(o.x + r * u * .72),
+			y: H(e + (e === 0 ? 13 : -13))
 		}, h.add(f);
 	}
 	if (m) {
-		let t = a?.numero === 9 && O(a.pos, e.origine) < 225, n = e.phase === "ruck" || t;
-		m.role = t ? "chasseur" : "sentinelle", m.cible = t && a ? mr(m, a) : {
-			x: W(o.x + r * (n ? 1.8 : 8.5)),
-			y: U(o.y - i * (n ? 1.6 : 4))
+		let t = a?.numero === 9 && k(a.pos, e.origine) < 225, n = e.phase === "ruck" || t;
+		m.role = t ? "chasseur" : "sentinelle", m.cible = t && a ? Hr(m, a) : {
+			x: U(o.x + r * (n ? 1.8 : 8.5)),
+			y: H(o.y - i * (n ? 1.6 : 4))
 		}, h.add(m);
 	}
 	let g = c.filter((e) => !h.has(e));
-	if (z(e)) {
-		for (let t of g) Ut(e, t) || (t.role = "rideau1", t.cible = {
-			x: W(e.ligneDef),
-			y: U(t.pos.y)
+	if (R(e)) {
+		for (let t of g) tn(e, t) || (t.role = "rideau1", t.cible = {
+			x: U(e.ligneDef),
+			y: H(t.pos.y)
 		});
-		g = g.filter((t) => Ut(e, t));
+		g = g.filter((t) => tn(e, t));
 	}
 	if (!g.length) return;
 	let _ = i === 1 ? 70 - o.y : o.y, v = 70 - _, y = Math.round(g.length * v / 70 / 1.7);
-	y = k(y, 1, 3);
+	y = A(y, 1, 3);
 	let b = Math.max(1, g.length - y), x = [];
 	for (let e = y - 1; e >= 0; e--) x.push(o.y - i * (2.2 + e * 5.2));
 	let ee = Math.max(10, _ - 7), S = Math.min(5.4, ee / Math.max(1, b - .5));
@@ -43751,38 +44053,38 @@ function pr(e, t, n) {
 	for (let t = 0; t < w.length; t++) {
 		let n = w[t];
 		n.role = "rideau1";
-		let a = Math.abs(t - (y - .5)), c = k(s === "blitz" ? -r * a * .12 : s === "glissee" ? r * a * .14 : r * a * .08, -.85, .85);
+		let a = Math.abs(t - (y - .5)), c = A(s === "blitz" ? -r * a * .12 : s === "glissee" ? r * a * .14 : r * a * .08, -.85, .85);
 		n.cible = {
-			x: W(e.ligneDef + c),
+			x: U(e.ligneDef + c),
 			y: (x[t] ?? o.y) + i * C
-		}, e.monteeSeul?.id === n.id && e.sim < e.monteeSeul.jusqua && (n.cible.x = W(e.ligneDef - r * 3.4));
+		}, e.monteeSeul?.id === n.id && e.sim < e.monteeSeul.jusqua && (n.cible.x = U(e.ligneDef - r * 3.4));
 	}
-	let T = Math.abs(e.ballon.x - fe(n));
-	if (sr(w, T < 8 ? 2.3 : T < 16 ? 3.2 : 4.2), !a || a.cote === n) return;
-	let te = g.filter((e) => e.battu <= 0);
-	te.sort((e, t) => O(e.pos, a.pos) - O(t.pos, a.pos));
-	let E = e.defenseArcadeCote === n, ne = (T < 8 ? 5 : T < 16 ? 4 : 3) + +!!E, re = te.filter((e) => (e.pos.x - a.pos.x) * r >= -1.5).slice(0, ne);
-	for (let e of re) e.cible = mr(e, a), e.role = "chasseur";
-	let ie = 0;
-	for (let e of g) (e.pos.x - a.pos.x) * r < -.5 && ie++;
-	let ae = T < 8, oe = !!a && (a.numero === 11 || a.numero === 14) && Math.abs(a.pos.y - 35) > 18;
-	if (!(ae || ie >= Math.ceil(g.length * .35) || oe && d && O(d.pos, a.pos) < 900)) return;
-	for (let e of h) e.battu > 0 || e === m && O(e.pos, a.pos) > 900 || (e.cible = mr(e, a), e.role = "chasseur");
-	let se = g.filter((e) => e.battu <= 0 && !re.includes(e) && O(e.pos, a.pos) < 625).sort((e, t) => O(e.pos, a.pos) - O(t.pos, a.pos)).slice(0, 4);
-	for (let e of se) e.cible = mr(e, a), e.role = "chasseur";
+	let T = Math.abs(e.ballon.x - Se(n));
+	if (Fr(w, T < 8 ? 2.3 : T < 16 ? 3.2 : 4.2), !a || a.cote === n) return;
+	let E = g.filter((e) => e.battu <= 0);
+	E.sort((e, t) => k(e.pos, a.pos) - k(t.pos, a.pos));
+	let D = e.defenseArcadeCote === n, te = (T < 8 ? 5 : T < 16 ? 4 : 3) + +!!D, ne = E.filter((e) => (e.pos.x - a.pos.x) * r >= -1.5).slice(0, te);
+	for (let e of ne) e.cible = Hr(e, a), e.role = "chasseur";
+	let re = 0;
+	for (let e of g) (e.pos.x - a.pos.x) * r < -.5 && re++;
+	let ie = T < 8, ae = !!a && (a.numero === 11 || a.numero === 14) && Math.abs(a.pos.y - 35) > 18;
+	if (!(ie || re >= Math.ceil(g.length * .35) || ae && d && k(d.pos, a.pos) < 900)) return;
+	for (let e of h) e.battu > 0 || e === m && k(e.pos, a.pos) > 900 || (e.cible = Hr(e, a), e.role = "chasseur");
+	let oe = g.filter((e) => e.battu <= 0 && !ne.includes(e) && k(e.pos, a.pos) < 625).sort((e, t) => k(e.pos, a.pos) - k(t.pos, a.pos)).slice(0, 4);
+	for (let e of oe) e.cible = Hr(e, a), e.role = "chasseur";
 }
-function mr(e, t) {
-	let n = k(D(e.pos, t.pos) / Math.max(4, e.vitesseMax), 0, 1.6);
+function Hr(e, t) {
+	let n = A(O(e.pos, t.pos) / Math.max(4, e.vitesseMax), 0, 1.6);
 	return {
 		x: t.pos.x + t.vitesse.x * n,
-		y: U(t.pos.y + t.vitesse.y * n)
+		y: H(t.pos.y + t.vitesse.y * n)
 	};
 }
-function hr(e) {
-	let t = e.phase === "melee" || e.phase === "touche" ? new Map(e.pions.filter((e) => e.role === "melee" || e.role === "alignement").map((e) => [e.id, e.role])) : null, n = e.phase === "ruck" ? new Set(e.pions.filter((e) => e.role === "ruck").map((e) => e.id)) : null, r = H(e, e.possession), i = H(e, j(e.possession));
-	dr(e, r, e.possession), pr(e, i, j(e.possession));
-	let a = Zn(e);
-	if (a && pr(e, i.filter((e) => e !== a), j(e.possession)), Ke(e), t) for (let n of e.pions) {
+function Ur(e) {
+	let t = e.phase === "melee" || e.phase === "touche" ? new Map(e.pions.filter((e) => e.role === "melee" || e.role === "alignement").map((e) => [e.id, e.role])) : null, n = e.phase === "ruck" ? new Set(e.pions.filter((e) => e.role === "ruck").map((e) => e.id)) : null, r = V(e, e.possession), i = V(e, M(e.possession));
+	zr(e, r, e.possession), Vr(e, i, M(e.possession));
+	let a = Ar(e);
+	if (a && Vr(e, i.filter((e) => e !== a), M(e.possession)), rt(e), t) for (let n of e.pions) {
 		let e = t.get(n.id);
 		e && (n.role = e);
 	}
@@ -43790,18 +44092,18 @@ function hr(e) {
 	if (e.phase === "ballonEnLAir" && e.vol?.type === "pied") {
 		let t = e.vol, n = t.vers, r = t.auteur;
 		r && r.surLeTerrain && r.sanction <= 0 && (r.role = "chasseur", r.cible = { ...n }, r.effort = 1.1);
-		let i = H(e, r.cote).filter((e) => e !== r && !e.horsJeu && e.sanction <= 0).sort((e, t) => O(e.pos, n) - O(t.pos, n)).slice(0, 2);
+		let i = V(e, r.cote).filter((e) => e !== r && !e.horsJeu && e.sanction <= 0).sort((e, t) => k(e.pos, n) - k(t.pos, n)).slice(0, 2);
 		for (let e of i) e.role = "chasseur", e.cible = { ...n }, e.effort = 1.1;
-		let a = H(e, j(r.cote)).filter((e) => e.sanction <= 0).sort((e, t) => O(e.pos, n) - O(t.pos, n)).slice(0, 2);
+		let a = V(e, M(r.cote)).filter((e) => e.sanction <= 0).sort((e, t) => k(e.pos, n) - k(t.pos, n)).slice(0, 2);
 		for (let e of a) e.role = "chasseur", e.cible = { ...n }, e.effort = 1.1;
 	}
-	vr(e);
-	let o = Ye.has(e.phase);
+	Kr(e);
+	let o = ot.has(e.phase);
 	for (let t of e.pions) {
 		if (!t.surLeTerrain) continue;
-		if (t.role !== "chasseur" && (t.cible.x = W(t.cible.x)), t.horsJeu && e.phase === "ballonEnLAir") {
+		if (t.role !== "chasseur" && (t.cible.x = U(t.cible.x)), t.horsJeu && e.phase === "ballonEnLAir") {
 			let n = e.vol?.type === "pied" ? e.vol.auteur : null;
-			n && n.cote === t.cote && (t.cible.x = k(n.pos.x - A(t.cote) * 2, .5, 121.5), t.cible.y = k(t.cible.y, 4, 66)), t.effort = .55;
+			n && n.cote === t.cote && (t.cible.x = A(n.pos.x - j(t.cote) * 2, .5, 121.5), t.cible.y = A(t.cible.y, 4, 66)), t.effort = .55;
 			continue;
 		}
 		if (o) {
@@ -43812,15 +44114,15 @@ function hr(e) {
 			t.effort = e.echappee ? 1.15 : e.defenseArcadeCote === t.cote ? 1.14 : 1.06, t.effort > 1 && t.endurance < 50 && (t.effort = 1 + (t.effort - 1) * (t.endurance / 50));
 			continue;
 		}
-		let n = O(t.pos, e.ballon);
-		t.effort = n < 400 ? 1 : n < 1600 ? .8 : .64, O(t.pos, t.cible) > 100 && (t.effort = Math.max(t.effort, .86));
+		let n = k(t.pos, e.ballon);
+		t.effort = n < 400 ? 1 : n < 1600 ? .8 : .64, k(t.pos, t.cible) > 100 && (t.effort = Math.max(t.effort, .86));
 		let r = e.tactiques[t.cote]?.rythme;
 		t.effort *= r === "intense" ? 1.08 : r === "gestion" ? .92 : 1, t.effort > 1 && t.endurance < 50 && (t.effort = 1 + (t.effort - 1) * (t.endurance / 50));
 	}
-	e.porteur && (e.porteur.effort = e.echappee?.pion === e.porteur ? e.porteur.endurance < 30 ? 1.04 : e.porteur.endurance < 50 ? 1.09 : 1.15 : 1), _r(e, o);
+	e.porteur && (e.porteur.effort = e.echappee?.pion === e.porteur ? e.porteur.endurance < 30 ? 1.04 : e.porteur.endurance < 50 ? 1.09 : 1.15 : 1), Gr(e, o);
 }
-var gr = 2.2;
-function _r(e, t) {
+var Wr = 2.2;
+function Gr(e, t) {
 	let n = [];
 	for (let r of e.pions) !r.surLeTerrain || r.sanction > 0 || e.tir?.buteur === r && !e.tir.volLance || r.moi && e.direct?.actif && !r.corps || r.role !== "ruck" && r.role !== "melee" && r.role !== "alignement" && r.role !== "maul" && (t && (e.phase === "melee" || e.phase === "touche") || n.push(r));
 	let r = e.placementJoue ? n.map((e) => ({
@@ -43831,9 +44133,9 @@ function _r(e, t) {
 		let t = n[e];
 		for (let r = e + 1; r < n.length; r++) {
 			let e = n[r], i = e.pos.x - t.pos.x, a = e.pos.y - t.pos.y, o = i * i + a * a;
-			if (o >= gr * gr) continue;
-			let s = Math.sqrt(o) || .001, c = (gr - s) * .5, l = i / s, u = a / s;
-			t.pos.x -= l * c, t.pos.y -= u * c, e.pos.x += l * c, e.pos.y += u * c, t.pos.y = U(t.pos.y), e.pos.y = U(e.pos.y);
+			if (o >= Wr * Wr) continue;
+			let s = Math.sqrt(o) || .001, c = (Wr - s) * .5, l = i / s, u = a / s;
+			t.pos.x -= l * c, t.pos.y -= u * c, e.pos.x += l * c, e.pos.y += u * c, t.pos.y = H(t.pos.y), e.pos.y = H(e.pos.y);
 		}
 	}
 	if (r) {
@@ -43844,31 +44146,31 @@ function _r(e, t) {
 		});
 	}
 }
-function vr(e) {
+function Kr(e) {
 	let t = e.consigne;
 	if (!t) return;
 	let n = e.pions.find((e) => e.moi && e.surLeTerrain);
 	if (!n || n === e.porteur) return;
-	let r = A(n.cote);
+	let r = j(n.cote);
 	n.cible = {
 		x: n.cible.x + r * t.profondeur,
-		y: U(n.cible.y + t.largeur * e.ouvert)
+		y: H(n.cible.y + t.largeur * e.ouvert)
 	}, t.agressivite > .65 && e.possession === n.cote && (n.cible = {
-		x: ue(n.cible.x, e.ballon.x - r * 2, .5),
-		y: U(ue(n.cible.y, e.ballon.y, .5))
+		x: be(n.cible.x, e.ballon.x - r * 2, .5),
+		y: H(be(n.cible.y, e.ballon.y, .5))
 	});
 }
-function yr(e, t) {
+function qr(e, t) {
 	let n = e.tactiques[t]?.defense;
 	if (n) return n;
 	let r = e.ballon;
-	if (M(r, j(t)) > 78) return "repli";
-	if (Math.abs(r.x - fe(t)) < 24 || Math.abs(r.y - 35) > 19) return "glissee";
+	if (N(r, M(t)) > 78) return "repli";
+	if (Math.abs(r.x - Se(t)) < 24 || Math.abs(r.y - 35) > 19) return "glissee";
 	let i = t === "A" ? e.scoreA - e.scoreB : e.scoreB - e.scoreA;
 	return e.minute > 58 && i < 0 || e.rng() < .62 ? "blitz" : "glissee";
 }
-function br(e, t) {
-	let n = e.systeme === "blitz" ? 5.2 : e.systeme === "glissee" ? 3.8 : 2.6, r = H(e, t);
+function Jr(e, t) {
+	let n = e.systeme === "blitz" ? 5.2 : e.systeme === "glissee" ? 3.8 : 2.6, r = V(e, t);
 	if (!r.length) return n;
 	let i = 0;
 	for (let e of r) i += e.endurance;
@@ -43876,77 +44178,77 @@ function br(e, t) {
 	let a = e.tactiques[t]?.rythme;
 	return n * (a === "intense" ? 1.08 : a === "gestion" ? .92 : 1) * (.72 + i / 360);
 }
-function xr(e) {
+function Yr(e) {
 	let t = e.ouvert, n = e.ballon.y + t * 14, r = (e) => (e.pos.y - n) * t > 0, i = 0, a = 0;
 	for (let t of e.pions) !t.surLeTerrain || t.sanction > 0 || !r(t) || (t.cote === e.possession ? i++ : a++);
 	return i - a;
 }
-function Sr(e) {
-	let t = ve(e.ballon);
+function Xr(e) {
+	let t = Oe(e.ballon);
 	return e.phasesDepuisArret >= 2 && e.rng() < .3 ? t === 1 ? -1 : 1 : t;
 }
 //#endregion
 //#region src/lib/moteur/bagarre.ts
-function Cr(e) {
+function Zr(e) {
 	let t = e.pions.find((e) => e.moi);
 	return t && t.surLeTerrain && t.sanction <= 0 ? t : void 0;
 }
-function wr(e, t, n) {
+function Qr(e, t, n) {
 	let r, i = n * n;
-	for (let n of H(e, j(t.cote))) {
+	for (let n of V(e, M(t.cote))) {
 		if (n.sanction > 0) continue;
-		let e = O(n.pos, t.pos);
+		let e = k(n.pos, t.pos);
 		e < i && (i = e, r = n);
 	}
 	return r;
 }
-function Tr(e, t) {
-	e.tension = k(e.tension + t, 0, 100);
+function $r(e, t) {
+	e.tension = A(e.tension + t, 0, 100);
 }
-function Er(e, t) {
+function ei(e, t) {
 	e.tension > 0 && (e.tension = Math.max(0, e.tension - t * .42));
 }
-function Dr(e, t, n) {
+function ti(e, t, n) {
 	return (e === "amateur" ? .22 + t / 320 : .012 + t / 2600) / (1 + 2 * n);
 }
-var Or = 3, kr = 4;
-function Ar(e, t, n, r = 2.8) {
+var ni = 3, ri = 4;
+function ii(e, t, n, r = 2.8) {
 	let i = e.bulles.findIndex((e) => e.pion === t);
 	i >= 0 && e.bulles.splice(i, 1), e.bulles.push({
 		pion: t,
 		texte: n,
 		restant: r
-	}), e.bulles.length > kr && e.bulles.shift();
+	}), e.bulles.length > ri && e.bulles.shift();
 }
-function jr(e, t) {
+function ai(e, t) {
 	if (e.bulles.length) {
 		for (let n of e.bulles) n.restant -= t;
 		e.bulles = e.bulles.filter((e) => e.restant > 0 && e.pion.surLeTerrain && e.pion.sanction <= 0);
 	}
 }
-var Mr = 9;
-function Nr(e, t) {
+var oi = 9;
+function si(e, t) {
 	if (e.fini || e.bagarre || (e.prochaineFriction -= t, e.prochaineFriction > 0)) return;
-	e.prochaineFriction = Mr;
+	e.prochaineFriction = oi;
 	let n = e.tension / 100, r = (e.niveau === "amateur" ? .3 : .16) * (.35 + n);
 	if (e.rng() >= r) return;
-	let i = Cr(e), a = i && e.rng() < .55 ? wr(e, i, 12) : Pr(e);
+	let i = Zr(e), a = i && e.rng() < .55 ? Qr(e, i, 12) : ci(e);
 	if (!a) return;
-	let o = wr(e, a, 10);
-	o && Fr(e, a, o);
+	let o = Qr(e, a, 10);
+	o && li(e, a, o);
 }
-function Pr(e) {
+function ci(e) {
 	let t = e.pions.filter((e) => e.surLeTerrain && e.sanction <= 0);
 	return t[Math.floor(e.rng() * t.length)];
 }
-function Fr(e, t, n) {
-	Ar(e, t, F(e.rng, kt)), Tr(e, e.niveau === "amateur" ? 9 : 5), e.rng() < .35 + (100 - n.discipline) / 220 && (Ar(e, n, F(e.rng, kt), 2.4), Tr(e, 4));
-	let r = Cr(e);
-	if (!r || t !== r && n !== r || e.discipline.bagarres >= Or) return;
-	let i = t === r ? n : t, a = Dr(e.niveau, e.tension, e.discipline.bagarres) * (1.35 - i.discipline / 150);
-	e.rng() < a && Rr(e, "adversaire", !1, i);
+function li(e, t, n) {
+	ii(e, t, F(e.rng, Bt)), $r(e, e.niveau === "amateur" ? 9 : 5), e.rng() < .35 + (100 - n.discipline) / 220 && (ii(e, n, F(e.rng, Bt), 2.4), $r(e, 4));
+	let r = Zr(e);
+	if (!r || t !== r && n !== r || e.discipline.bagarres >= ni) return;
+	let i = t === r ? n : t, a = ti(e.niveau, e.tension, e.discipline.bagarres) * (1.35 - i.discipline / 150);
+	e.rng() < a && fi(e, "adversaire", !1, i);
 }
-function Ir(e, t) {
+function ui(e, t) {
 	let n = 1 - t.endurance / 100, r = (e.niveau === "amateur" ? .011 : .006) * (.5 + n) * (.6 + e.tension / 70) * (1.4 - t.discipline / 150);
 	if (e.rng() >= r) return null;
 	let i = t.puissance > 75 && e.rng() < .015, a = i || e.rng() < .66;
@@ -43956,19 +44258,19 @@ function Ir(e, t) {
 		haut: a
 	};
 }
-function Lr(e, t, n, r) {
-	Tr(e, r.haut ? 26 : 16), Ar(e, n, F(e.rng, kt), 2.6);
-	let i = Cr(e);
-	if (!i || e.bagarre || e.discipline.bagarres >= Or) return;
+function di(e, t, n, r) {
+	$r(e, r.haut ? 26 : 16), ii(e, n, F(e.rng, Bt), 2.6);
+	let i = Zr(e);
+	if (!i || e.bagarre || e.discipline.bagarres >= ni) return;
 	let a = n === i;
 	if (!a && t !== i) return;
-	let o = a ? t : n, s = Dr(e.niveau, e.tension, e.discipline.bagarres) * (r.haut ? 2.4 : 1.2) * (1.35 - o.discipline / 150);
-	e.rng() >= s || Rr(e, "adversaire", !1, o);
+	let o = a ? t : n, s = ti(e.niveau, e.tension, e.discipline.bagarres) * (r.haut ? 2.4 : 1.2) * (1.35 - o.discipline / 150);
+	e.rng() >= s || fi(e, "adversaire", !1, o);
 }
-function Rr(e, t, n, r) {
-	let i = Cr(e);
+function fi(e, t, n, r) {
+	let i = Zr(e);
 	if (i) {
-		e.discipline.bagarres += 1, n && (e.discipline.coupsPortes += 1), Tr(e, 30), Ze(e, "carton", i.cote, I("bagarreDebut", {
+		e.discipline.bagarres += 1, n && (e.discipline.coupsPortes += 1), $r(e, 30), ct(e, "carton", i.cote, I("bagarreDebut", {
 			nom: i.nom,
 			cible: r.nom
 		}), 0, !0), e.bagarre = {
@@ -43979,13 +44281,13 @@ function Rr(e, t, n, r) {
 			ordre: null,
 			resume: [I("bagarreGenerale")]
 		}, e.phase = "bagarre", e.porteur = null, e.vol = null, e.placement = null;
-		for (let t of e.pions) N(t);
+		for (let t of e.pions) P(t);
 	}
 }
-function zr(e, t) {
+function pi(e, t) {
 	e.bagarre && !e.bagarre.ordre && (e.bagarre.ordre = t);
 }
-function Br(e) {
+function mi(e) {
 	let t = e.bagarre, n = e.pions.find((e) => e.moi), r = {
 		x: e.ballon.x,
 		y: e.ballon.y
@@ -43996,14 +44298,14 @@ function Br(e) {
 		motif: "antijeu"
 	};
 	let i = t.ordre ?? "reculer", a = t.origine === "moi" ? 2.4 : 0;
-	t.coupPorte && (a += 1), a += Vr[i];
+	t.coupPorte && (a += 1), a += hi[i];
 	let o = i === "tous";
-	o && Tr(e, 20);
-	let s = e.niveau === "amateur", c = t.coupPorte ? "coup de poing" : o ? "bagarre générale" : "antijeu", l = e.fautesVues?.[n.id] ?? e.rng() < zt(e, n.pos, n.id), u = (t.origine === "adversaire" || o) && (e.fautesVues?.[t.adversaire.id] ?? e.rng() < zt(e, t.adversaire.pos, t.adversaire.id)), d = l ? Hr(e, a, s) : null;
-	d && Ur(e, n, d === "rouge", c, t.resume);
-	let f = t.origine === "adversaire" ? Hr(e, 2.4 + Vr.reculer, s) : Hr(e, o ? 1.6 : .9, s);
-	u && f && Ur(e, t.adversaire, f === "rouge", c, t.resume), Gr(e, t, i);
-	let p = a >= 2 ? j(n.cote) : t.origine === "adversaire" && a <= .5 ? n.cote : e.possession;
+	o && $r(e, 20);
+	let s = e.niveau === "amateur", c = t.coupPorte ? "coup de poing" : o ? "bagarre générale" : "antijeu", l = e.fautesVues?.[n.id] ?? e.rng() < Xt(e, n.pos, n.id), u = (t.origine === "adversaire" || o) && (e.fautesVues?.[t.adversaire.id] ?? e.rng() < Xt(e, t.adversaire.pos, t.adversaire.id)), d = l ? gi(e, a, s) : null;
+	d && _i(e, n, d === "rouge", c, t.resume);
+	let f = t.origine === "adversaire" ? gi(e, 2.4 + hi.reculer, s) : gi(e, o ? 1.6 : .9, s);
+	u && f && _i(e, t.adversaire, f === "rouge", c, t.resume), yi(e, t, i);
+	let p = a >= 2 ? M(n.cote) : t.origine === "adversaire" && a <= .5 ? n.cote : e.possession;
 	return e.fautesVues && (delete e.fautesVues[n.id], delete e.fautesVues[t.adversaire.id]), {
 		pour: p,
 		lieu: r,
@@ -44011,31 +44313,31 @@ function Br(e) {
 		fauteVue: l || u
 	};
 }
-var Vr = {
+var hi = {
 	tous: 1.2,
 	proteger: .4,
 	calmer: -1.2,
 	reculer: -2.2
 };
-function Hr(e, t, n) {
+function gi(e, t, n) {
 	if (t <= 0) return null;
 	let r = e.rng();
 	return t < 1.5 ? n ? r < .52 ? "jaune" : null : r < .3 ? "jaune" : null : t < 2.8 ? n ? r < .04 ? "rouge" : r < .7 ? "jaune" : null : r < .06 ? "rouge" : r < .65 ? "jaune" : null : n ? r < .15 ? "rouge" : "jaune" : r < .2 ? "rouge" : "jaune";
 }
-function Ur(e, t, n, r, i) {
+function _i(e, t, n, r, i) {
 	n ||= t.stats.cartonsJaunes > 0, t.surLeTerrain = !1, t.sanction = n ? 99999 : 600, n ? t.stats.cartonsRouges += 1 : t.stats.cartonsJaunes += 1, t.motifCarton = r, t.moi && (n ? e.discipline.rouges += 1 : e.discipline.jaunes += 1, e.discipline.motif = r);
 	let a = t.cote === "A" ? e.clubA : e.clubB, o = n ? I("cartonRouge", {
 		nom: t.nom,
 		motif: r,
 		club: a
-	}) : F(e.rng, Ot, {
+	}) : F(e.rng, zt, {
 		nom: t.nom,
 		motif: r,
 		club: a
 	});
-	Ze(e, "carton", t.cote, o, 0, t.moi), i.push(o);
+	ct(e, "carton", t.cote, o, 0, t.moi), i.push(o);
 }
-var Wr = [
+var vi = [
 	{
 		nom: "Arcade ouverte",
 		min: 1,
@@ -44061,12 +44363,12 @@ var Wr = [
 		poids: 8
 	}
 ];
-function Gr(e, t, n) {
+function yi(e, t, n) {
 	if (n === "reculer") return;
 	let r = (t.coupPorte ? .13 : .05) + (n === "tous" ? .05 : 0);
 	if (e.rng() >= r) return;
-	let i = e.rng() * Wr.reduce((e, t) => e + t.poids, 0), a = Wr[0];
-	for (let e of Wr) if (i -= e.poids, i <= 0) {
+	let i = e.rng() * vi.reduce((e, t) => e + t.poids, 0), a = vi[0];
+	for (let e of vi) if (i -= e.poids, i <= 0) {
 		a = e;
 		break;
 	}
@@ -44076,7 +44378,7 @@ function Gr(e, t, n) {
 		semaines: o
 	}, t.resume.push(`🚑 ${a.nom}`);
 }
-function Kr(e) {
+function bi(e) {
 	let t = e.discipline, n = e.niveau === "amateur", r = (t, n) => t + Math.floor(e.rng() * (n - t + 1));
 	if (t.rouges > 0) {
 		let e = t.motif || "antijeu";
@@ -44093,7 +44395,7 @@ function Kr(e) {
 }
 //#endregion
 //#region src/lib/moteur/controle.ts
-var qr = (e) => !e.avant && e.pied >= 50;
+var xi = (e) => !e.avant && e.pied >= 50;
 new Map([
 	{
 		id: "sprint",
@@ -44174,7 +44476,7 @@ new Map([
 		duree: 1.4,
 		recharge: 40,
 		cout: 2,
-		pour: qr
+		pour: xi
 	},
 	{
 		id: "chandelle",
@@ -44185,7 +44487,7 @@ new Map([
 		duree: 1.4,
 		recharge: 14,
 		cout: 1,
-		pour: qr
+		pour: xi
 	},
 	{
 		id: "percussion",
@@ -44352,24 +44654,24 @@ new Map([
 		cout: 0
 	}
 ].map((e) => [e.id, e]));
-function Jr(e, t) {
+function Si(e, t) {
 	let n = e.lancement, r = n && n.index + 1 < n.chaine.length ? n.chaine[n.index + 1] : null;
-	if (r && r.surLeTerrain && r.sanction <= 0 && O(t.pos, r.pos) <= 196) return r;
+	if (r && r.surLeTerrain && r.sanction <= 0 && k(t.pos, r.pos) <= 196) return r;
 	let i = t.cote === "A" ? 1 : -1;
-	return H(e, t.cote).filter((e) => e !== t && e.sanction <= 0 && (e.pos.x - t.pos.x) * i <= .6 && O(e.pos, t.pos) <= 196).sort((e, n) => O(e.pos, t.pos) - O(n.pos, t.pos))[0];
+	return V(e, t.cote).filter((e) => e !== t && e.sanction <= 0 && (e.pos.x - t.pos.x) * i <= .6 && k(e.pos, t.pos) <= 196).sort((e, n) => k(e.pos, t.pos) - k(n.pos, t.pos))[0];
 }
-function Yr(e, t, n) {
+function Ci(e, t, n) {
 	let r = t.cote === "A" ? 1 : -1, i = n * r;
-	return H(e, t.cote).filter((e) => e !== t && e.sanction <= 0 && (e.pos.x - t.pos.x) * r <= .6 && (e.pos.y - t.pos.y) * i > 1 && O(e.pos, t.pos) <= 196).sort((e, n) => O(e.pos, t.pos) - O(n.pos, t.pos))[0];
+	return V(e, t.cote).filter((e) => e !== t && e.sanction <= 0 && (e.pos.x - t.pos.x) * r <= .6 && (e.pos.y - t.pos.y) * i > 1 && k(e.pos, t.pos) <= 196).sort((e, n) => k(e.pos, t.pos) - k(n.pos, t.pos))[0];
 }
-function Xr(e, ...t) {
+function wi(e, ...t) {
 	return e.controle && !!e.intention && t.includes(e.intention.type);
 }
-function Zr(e) {
+function Ti(e) {
 	e.intention = null;
 }
-function Qr(e, t) {
-	let n = t.cote === "A" ? 1 : -1, r = H(e, j(t.cote)).filter((e) => e.sanction <= 0 && e.battu <= 0 && (e.pos.x - t.pos.x) * n > -1 && (e.pos.x - t.pos.x) * n < 20).map((e) => e.pos.y).sort((e, t) => e - t);
+function Ei(e, t) {
+	let n = t.cote === "A" ? 1 : -1, r = V(e, M(t.cote)).filter((e) => e.sanction <= 0 && e.battu <= 0 && (e.pos.x - t.pos.x) * n > -1 && (e.pos.x - t.pos.x) * n < 20).map((e) => e.pos.y).sort((e, t) => e - t);
 	if (!r.length) return 70;
 	let i = [
 		0,
@@ -44381,14 +44683,14 @@ function Qr(e, t) {
 	for (let e = Math.max(0, a - 1); e <= Math.min(i.length - 2, a + 1); e++) o = Math.max(o, i[e + 1] - i[e]);
 	return o < 4 ? 0 : o;
 }
-function $r(e, t) {
+function Di(e, t) {
 	let n = t.cote === "A" ? 1 : -1, r = Infinity;
-	for (let i of H(e, j(t.cote))) i.sanction > 0 || i.battu > 0 || (i.pos.x - t.pos.x) * n < -.2 || (r = Math.min(r, O(i.pos, t.pos)));
+	for (let i of V(e, M(t.cote))) i.sanction > 0 || i.battu > 0 || (i.pos.x - t.pos.x) * n < -.2 || (r = Math.min(r, k(i.pos, t.pos)));
 	return r === Infinity ? 99 : Math.sqrt(r);
 }
 //#endregion
 //#region src/lib/moteur/elan.ts
-var ei = {
+var Oi = {
 	turnover: .5,
 	percee: .26,
 	essai: .42,
@@ -44396,30 +44698,30 @@ var ei = {
 	enAvant: -.24,
 	penalite: -.14
 };
-function ti(e, t) {
+function ki(e, t) {
 	return t === "A" ? e.elan : -e.elan;
 }
-function ni(e, t, n) {
+function Ai(e, t, n) {
 	let r = (t === "A" ? 1 : -1) * n, i = r > 0 ? 1 - e.elan : 1 + e.elan;
 	e.elan = Math.max(-1, Math.min(1, e.elan + r * Math.min(1, i / 1.2)));
 }
-function ri(e, t) {
+function ji(e, t) {
 	e.elan *= .5 ** (t / 40), Math.abs(e.elan) < .002 && (e.elan = 0);
 }
-var ii = .06;
-function ai(e, t) {
-	return ti(e, t) * ii;
+var Mi = .06;
+function Ni(e, t) {
+	return ki(e, t) * Mi;
 }
 //#endregion
 //#region src/lib/moteur/plan.ts
-var oi = 6.7, si = .3;
-function ci(e, t) {
+var Pi = 6.7, Fi = .3;
+function Ii(e, t) {
 	if (e <= 0) return {
 		essaisTransformes: 0,
 		essaisSecs: 0,
 		penalites: 0
 	};
-	let n = e / oi, r = e * si / 3, i = {
+	let n = e / Pi, r = e * Fi / 3, i = {
 		essaisTransformes: 0,
 		essaisSecs: 0,
 		penalites: 0
@@ -44438,16 +44740,16 @@ function ci(e, t) {
 }
 //#endregion
 //#region src/lib/moteur/regroupements.ts
-function li(e) {
+function Li(e) {
 	if (!e.ruck) return;
 	let t = !!e.cadenceDetaillee, n = (n) => {
-		if (!t) return D(n.pos, e.ballon);
+		if (!t) return O(n.pos, e.ballon);
 		let r = {
 			x: n.pos.x + n.vitesse.x * .45,
 			y: n.pos.y + n.vitesse.y * .45
 		};
-		return D(r, e.ballon) + Math.max(0, (r.x - e.ballon.x) * A(n.cote)) * 1.2;
-	}, r = z(e), i = (t, n) => t.avant || r && t.numero !== 9 && t.numero !== 10 && D(t.pos, e.ballon) < (n ? 6 : 3.5), a = (e, t) => r ? t ? tr(e).soutienRuck : tr(e).gratte * .5 : 0, o = (r) => e.pions.filter((n) => n.surLeTerrain && n.sanction <= 0 && !(n.moi && e.direct?.actif) && i(n, r) && (!t || !n.corps) && n.cote === e.possession === r && n.id !== e.ruck?.porteurId && n.id !== e.ruck?.plaqueurId).map((e) => ({
+		return O(r, e.ballon) + Math.max(0, (r.x - e.ballon.x) * j(n.cote)) * 1.2;
+	}, r = R(e), i = (t, n) => t.avant || r && t.numero !== 9 && t.numero !== 10 && O(t.pos, e.ballon) < (n ? 6 : 3.5), a = (e, t) => r ? t ? pn(e).soutienRuck : pn(e).gratte * .5 : 0, o = (r) => e.pions.filter((n) => n.surLeTerrain && n.sanction <= 0 && !(n.moi && e.direct?.actif) && i(n, r) && (!t || !n.corps) && n.cote === e.possession === r && n.id !== e.ruck?.porteurId && n.id !== e.ruck?.plaqueurId).map((e) => ({
 		p: e,
 		c: n(e) - a(e, r)
 	})).sort((e, t) => e.c - t.c).slice(0, r ? 3 : 2).map((e) => e.p.id);
@@ -44460,57 +44762,99 @@ function li(e) {
 		animations: {}
 	};
 }
-var ui = 20, di = 9;
-function fi(e) {
+var Ri = 20, zi = 9;
+function Bi(e) {
 	let t = e.ruck;
 	if (!t) return;
-	t.organisation || li(e);
+	t.organisation || Li(e);
 	let n = t.organisation, r = /* @__PURE__ */ new Set([
 		...n.attaque,
 		...n.defense,
 		t.porteurId,
 		t.plaqueurId
-	]), i = (t) => t.surLeTerrain && t.sanction <= 0 && !t.corps && t.cote === e.possession && !r.has(t.id) && (!(t.moi && e.direct?.actif) || D(t.pos, e.ballon) <= 2.6), a = n.relayeurId ? e.pions.find((e) => e.id === n.relayeurId) : void 0, o = e.pions.find((t) => t.numero === 9 && t.cote === e.possession);
-	if (o && i(o) && D(o.pos, e.ballon) <= (e.cadenceDetaillee ? di : ui) && !(a && a !== o && i(a) && D(a.pos, e.ballon) < 2.5)) return n.relayeurId = o.id, o;
+	]), i = (t) => t.surLeTerrain && t.sanction <= 0 && !t.corps && t.cote === e.possession && !r.has(t.id) && (!(t.moi && e.direct?.actif) || O(t.pos, e.ballon) <= 2.6), a = n.relayeurId ? e.pions.find((e) => e.id === n.relayeurId) : void 0, o = e.pions.find((t) => t.numero === 9 && t.cote === e.possession);
+	if (o && i(o) && O(o.pos, e.ballon) <= (e.cadenceDetaillee ? zi : Ri) && !(a && a !== o && i(a) && O(a.pos, e.ballon) < 2.5)) return n.relayeurId = o.id, o;
 	if (a && i(a)) return a;
-	let s = A(e.possession), c = e.pions.filter((e) => i(e) && e.numero !== 9), l, u = Infinity;
+	let s = j(e.possession), c = e.pions.filter((e) => i(e) && e.numero !== 9), l, u = Infinity;
 	for (let t of c) {
-		let n = Math.max(0, (t.pos.x - e.ballon.x) * s), r = D(t.pos, e.ballon) + n * .8 - t.passe * .03;
+		let n = Math.max(0, (t.pos.x - e.ballon.x) * s), r = O(t.pos, e.ballon) + n * .8 - t.passe * .03;
 		r < u && (u = r, l = t);
 	}
-	if (e.cadenceDetaillee && (!l || D(l.pos, e.ballon) > 6)) {
+	if (e.cadenceDetaillee && (!l || O(l.pos, e.ballon) > 6)) {
 		let r = (e.possession === t.attaque ? n.attaque : n.defense).map((t) => e.pions.find((e) => e.id === t)).filter((e) => !!e && e.surLeTerrain && e.sanction <= 0 && !e.corps), i = r[r.length - 1];
 		i && (l = i);
 	}
 	return n.relayeurId = l?.id, l;
 }
-function pi(e, t = 3.2) {
+function Vi(e, t = 3.2) {
 	let n = e.ruck, r, i = t;
 	for (let t of e.pions) {
 		if (!t.surLeTerrain || t.sanction > 0 || t.corps || t.cote !== e.possession || t.id === n?.porteurId) continue;
-		let a = D(t.pos, e.ballon);
+		let a = O(t.pos, e.ballon);
 		a < i && (i = a, r = t);
 	}
 	return r && n?.organisation && (n.organisation.relayeurId = r.id), r;
 }
-function mi(e, t) {
-	if (e.phase !== "ruck" || !e.ruck || t.numero !== 9 || t.cote !== e.possession || (e.ruck.organisation || li(e), fi(e) !== t)) return !1;
+function Hi(e, t) {
+	if (e.phase !== "ruck" || !e.ruck || t.numero !== 9 || t.cote !== e.possession || (e.ruck.organisation || Li(e), Bi(e) !== t)) return !1;
 	let n = e.ruck.organisation;
 	return n.attaque.length < 2 ? !1 : (n.chenille ??= {
 		neufId: t.id,
 		debut: e.sim
 	}, n.chenilleEssayee = !0, e.minuteur = Math.max(e.minuteur, 4.5), e.ballonLent = !0, !0);
 }
-function hi(e) {
+var Ui = (e) => {
+	let t = A(e, 0, 1);
+	return t * t * (3 - 2 * t);
+};
+function Wi(e) {
+	let t = e.ruck?.duel;
+	if (!t || t.type !== "contre") return;
+	let n = j(e.ruck.attaque), r = Ui((e.sim - t.contact) / Math.max(.1, t.poussee));
+	e.ballon = {
+		x: A(t.origine.x - n * t.avancee * r, 11.5, 110.5),
+		y: t.origine.y
+	};
+}
+function Gi(e) {
+	let t = e.ruck?.duel;
+	if (!t) return;
+	let n = j(e.possession), r = (t) => e.pions.find((e) => e.id === t && e.surLeTerrain && e.sanction <= 0 && !e.corps);
+	e.placement ??= {};
+	let i = (t, n, r) => {
+		t.role = "ruck", t.cible = {
+			x: A(n.x, 11.5, 110.5),
+			y: A(n.y, 1.2, 68.8)
+		}, t.effort = Math.max(t.effort, r), e.placement[t.id] = { ...t.cible };
+	}, a = e.sim < t.contact;
+	if (t.type === "gratte") {
+		let o = r(t.acteurId);
+		if (!o) return;
+		i(o, {
+			x: e.ballon.x + n * .3,
+			y: e.ballon.y
+		}, a ? 1.12 : 1), e.sim >= t.contact + .57 + 1.07 && !t.balle && (t.balle = t.acteurId);
+		return;
+	}
+	let o = t.contreursIds.map(r).filter((e) => !!e);
+	o.forEach((t, r) => {
+		let s = (r - (o.length - 1) / 2) * .62;
+		i(t, {
+			x: e.ballon.x + n * (.55 + r % 2 * .3),
+			y: e.ballon.y + s
+		}, a ? 1.2 : 1);
+	});
+}
+function Ki(e) {
 	if (e.phase !== "ruck" || !e.ruck) return;
-	e.ruck.organisation || li(e);
-	let t = e.ruck.organisation, n = A(e.possession), r = t.chenille ? t.origine : e.ballon;
+	e.ruck.organisation || Li(e), Wi(e);
+	let t = e.ruck.organisation, n = j(e.possession), r = t.chenille ? t.origine : e.ballon;
 	e.placement ??= {};
 	let i = (n, r) => {
 		let i = e.pions.find((e) => e.id === n && e.surLeTerrain && e.sanction <= 0);
 		i && (i.moi && e.direct?.actif && !t.attaque.includes(n) && !t.defense.includes(n) || (i.role = "ruck", i.cible = {
-			x: k(r.x, 11.5, 110.5),
-			y: k(r.y, 1.2, 68.8)
+			x: A(r.x, 11.5, 110.5),
+			y: A(r.y, 1.2, 68.8)
 		}, e.placement[n] = { ...i.cible }));
 	};
 	t.attaque.forEach((e, a) => i(e, t.chenille ? {
@@ -44526,7 +44870,7 @@ function hi(e) {
 		x: r.x - n * .7,
 		y: r.y
 	});
-	let a = t.relayeurId, o = fi(e);
+	let a = t.relayeurId, o = Bi(e);
 	if (a && a !== o?.id) {
 		delete e.placement[a];
 		let t = e.pions.find((e) => e.id === a);
@@ -44538,9 +44882,9 @@ function hi(e) {
 	} : {
 		x: r.x - n * (t.chenille ? 3.45 : 1.65),
 		y: r.y - .35
-	}), o.effort = Math.max(o.effort, .95));
+	}), o.effort = Math.max(o.effort, .95)), Gi(e);
 }
-function gi(e, t) {
+function qi(e, t) {
 	let n = e.phase === "ruck" ? e.ruck?.organisation : void 0;
 	if (!n) return;
 	let r = (t) => e.pions.find((e) => e.id === t && e.surLeTerrain && e.sanction <= 0), i = (t, r, i = 1.1) => {
@@ -44550,7 +44894,7 @@ function gi(e, t) {
 	for (let e of [...n.attaque, ...n.defense]) {
 		let t = r(e);
 		if (!t || t.corps) continue;
-		if (D(t.pos, t.cible) > 1) {
+		if (O(t.pos, t.cible) > 1) {
 			i(t, "support_arrive", .75);
 			continue;
 		}
@@ -44560,13 +44904,13 @@ function gi(e, t) {
 	if (!n.chenille) for (let t of n.attaque) {
 		let i = r(t);
 		if (!i || i.corps) continue;
-		let a = n.defense.map(r).find((e) => e && !e.corps && D(i.pos, e.pos) < .95);
+		let a = n.defense.map(r).find((e) => e && !e.corps && O(i.pos, e.pos) < .95);
 		if (!a) continue;
 		let o = `${i.id}:${a.id}`;
 		if (n.contacts.includes(o)) continue;
 		n.contacts.push(o);
-		let s = Math.hypot(i.vitesse.x - a.vitesse.x, i.vitesse.y - a.vitesse.y), c = a.pos.x - i.pos.x, l = a.pos.y - i.pos.y, u = Math.max(.1, Math.hypot(c, l)), d = k(1.5 + s * .35 + (i.puissance - a.puissance) / 60, 1, 3.8);
-		L(e, i, "clearout_drive", 1.25), n.animations[i.id] = e.sim + 1.25, L(e, a, "contact_brace", 1.25), n.animations[a.id] = e.sim + 1.25, a.vitesse.x += c / u * d, a.vitesse.y += l / u * d, i.vitesse.x -= c / u * d * .25, i.vitesse.y -= l / u * d * .25, s > 1.8 && i.puissance > a.puissance + 8 && R(a, {
+		let s = Math.hypot(i.vitesse.x - a.vitesse.x, i.vitesse.y - a.vitesse.y), c = a.pos.x - i.pos.x, l = a.pos.y - i.pos.y, u = Math.max(.1, Math.hypot(c, l)), d = A(1.5 + s * .35 + (i.puissance - a.puissance) / 60, 1, 3.8);
+		L(e, i, "clearout_drive", 1.25), n.animations[i.id] = e.sim + 1.25, L(e, a, "contact_brace", 1.25), n.animations[a.id] = e.sim + 1.25, a.vitesse.x += c / u * d, a.vitesse.y += l / u * d, i.vitesse.x -= c / u * d * .25, i.vitesse.y -= l / u * d * .25, s > 1.8 && i.puissance > a.puissance + 8 && Zt(a, {
 			x: c / u * d,
 			y: l / u * d
 		}, 1.65);
@@ -44577,9 +44921,9 @@ function gi(e, t) {
 			delete n.chenille;
 			return;
 		}
-		let a = n.attaque.map(r).filter((e) => !!e), o = a.length >= 2 && a.every((e) => !e.corps && D(e.pos, e.cible) < .95) && D(t.pos, t.cible) < .8;
+		let a = n.attaque.map(r).filter((e) => !!e), o = a.length >= 2 && a.every((e) => !e.corps && O(e.pos, e.cible) < .95) && O(t.pos, t.cible) < .8;
 		o ? n.chenille.pretDepuis === void 0 && (n.chenille.pretDepuis = e.sim) : delete n.chenille.pretDepuis;
-		let s = n.chenille.pretDepuis === void 0 ? 0 : k((e.sim - n.chenille.pretDepuis) / 1.2, 0, 1);
+		let s = n.chenille.pretDepuis === void 0 ? 0 : A((e.sim - n.chenille.pretDepuis) / 1.2, 0, 1);
 		e.ballon = {
 			x: n.origine.x + (t.pos.x - n.origine.x) * s,
 			y: n.origine.y + (t.pos.y - n.origine.y) * s
@@ -44588,7 +44932,7 @@ function gi(e, t) {
 }
 //#endregion
 //#region src/lib/moteur/routinesButeur.ts
-var _i = [
+var Ji = [
 	{
 		id: "wilkinson",
 		nom: "La Prière de Jonny",
@@ -44889,7 +45233,7 @@ var _i = [
 			"{nom} s’incline respectueusement face à la barre transversale avant le coup décisif."
 		]
 	}
-], vi = new Map(_i.map((e) => [e.id, e])), yi = {
+], Yi = new Map(Ji.map((e) => [e.id, e])), Xi = {
 	wilkinson: "wilkinson",
 	carter: "wilkinson",
 	farrell: "farrell",
@@ -44910,40 +45254,40 @@ var _i = [
 	cook: "crabe_cook",
 	russell: "danseur_etoile"
 };
-function bi(e) {
+function Zi(e) {
 	let t = 0;
 	for (let n = 0; n < e.length; n++) t = (t << 5) - t + e.charCodeAt(n), t |= 0;
 	return Math.abs(t);
 }
-function xi(e) {
-	if (e.routineButeur && vi.has(e.routineButeur)) return vi.get(e.routineButeur);
+function Qi(e) {
+	if (e.routineButeur && Yi.has(e.routineButeur)) return Yi.get(e.routineButeur);
 	let t = (e.nom ?? "").toLowerCase();
-	for (let [e, n] of Object.entries(yi)) if (t.includes(e)) {
-		let e = vi.get(n);
+	for (let [e, n] of Object.entries(Xi)) if (t.includes(e)) {
+		let e = Yi.get(n);
 		if (e) return e;
 	}
-	return _i[bi(e.sourceId || e.id || e.nom || "buteur") % _i.length];
+	return Ji[Zi(e.sourceId || e.id || e.nom || "buteur") % Ji.length];
 }
 //#endregion
 //#region src/lib/moteur/duels.ts
-var Si = (e) => e.poidsKg ?? (e.avant ? 108 : 90), Ci = (e) => Math.hypot(e.vitesse.x, e.vitesse.y);
-function wi(e) {
-	let t = Ci(e);
+var $i = (e) => e.poidsKg ?? (e.avant ? 108 : 90), ea = (e) => Math.hypot(e.vitesse.x, e.vitesse.y);
+function ta(e) {
+	let t = ea(e);
 	return t > .6 ? {
 		x: e.vitesse.x / t,
 		y: e.vitesse.y / t
 	} : {
-		x: A(e.cote),
+		x: j(e.cote),
 		y: 0
 	};
 }
-function Ti(e, t) {
-	return (t.plaquage + t.puissance) / 2 - (e.puissance * .62 + e.evitement * .38) + (Si(t) - Si(e)) / 6;
+function na(e, t) {
+	return (t.plaquage + t.puissance) / 2 - (e.puissance * .62 + e.evitement * .38) + ($i(t) - $i(e)) / 6;
 }
-function Ei(e, t, n) {
-	let r = wi(e), i = t.pos.x - e.pos.x, a = t.pos.y - e.pos.y, o = Math.max(.01, Math.hypot(i, a)), s = (i * r.x + a * r.y) / o, c = s > .45 ? "face" : s < -.3 ? "dos" : "cote", l = ((e.vitesse.x - t.vitesse.x) * i + (e.vitesse.y - t.vitesse.y) * a) / o, u = Ti(e, t), d = Ci(e), f = Ci(t), p;
+function ra(e, t, n) {
+	let r = ta(e), i = t.pos.x - e.pos.x, a = t.pos.y - e.pos.y, o = Math.max(.01, Math.hypot(i, a)), s = (i * r.x + a * r.y) / o, c = s > .45 ? "face" : s < -.3 ? "dos" : "cote", l = ((e.vitesse.x - t.vitesse.x) * i + (e.vitesse.y - t.vitesse.y) * a) / o, u = na(e, t), d = ea(e), f = ea(t), p;
 	p = c === "dos" ? o > .95 && f > 5.5 ? "poursuite" : "arriere" : c === "cote" ? u < -7 || d > 6.5 && o > .9 ? "jambes" : "cote" : l >= 6.2 && u >= 5.5 && f >= 2.8 ? "dominant" : u >= 9 && d < 4 ? "debout" : u <= -8 ? "jambes" : u <= -3 && d >= 4.5 ? "accroche" : n > 0 ? "taille" : "haut";
-	let m = p === "dominant" ? k(.7 + (l - 6.2) * .22 + u / 14, .7, 2.4) : p === "accroche" ? -k(.6 - u / 9 + (d - 4.5) * .2, .6, 1.8) : 0;
+	let m = p === "dominant" ? A(.7 + (l - 6.2) * .22 + u / 14, .7, 2.4) : p === "accroche" ? -A(.6 - u / 9 + (d - 4.5) * .2, .6, 1.8) : 0;
 	return {
 		type: p,
 		angle: c,
@@ -44952,21 +45296,23 @@ function Ei(e, t, n) {
 		recul: m
 	};
 }
-function Di(e, t) {
-	let n = (e.puissance - t.puissance) / 9 + (Si(e) - Si(t)) / 13 + (Ci(e) - 4.5) / 2.6;
-	return n >= 2.1 && Ci(e) >= 5.2 ? "tombe" : n >= .7 ? "equilibre" : "repousse";
+function ia(e, t, n = !1) {
+	let r = (e.puissance - t.puissance) / 9 + ($i(e) - $i(t)) / 13 + (ea(e) - 4.5) / 2.6;
+	if (!n) return r >= 2.1 && ea(e) >= 5.2 ? "tombe" : r >= .7 ? "equilibre" : "repousse";
+	let i = .8 + .2 * Math.max(0, Math.min(100, e.endurance)) / 100, a = .9 + .1 * Math.max(0, Math.min(100, t.plaquage)) / 100, o = r * i / a;
+	return o >= 1.6 && ea(e) >= 4.6 ? "tombe" : o >= .5 ? "equilibre" : "repousse";
 }
-function Oi(e, t) {
-	return e.avant || Si(e) >= 104 ? "percussion" : Si(t) > Si(e) + 6 ? "epaule" : "torse";
+function aa(e, t, n = !1) {
+	return e.avant || $i(e) >= 104 || n && e.puissance >= 74 && $i(e) >= 94 ? "percussion" : $i(t) > $i(e) + 6 ? "epaule" : "torse";
 }
-function ki(e, t) {
-	return (e.evitement - t.plaquage) / 12 + (Ci(t) - 3) / 2.2 + (e.vitesseMax - t.vitesseMax) / 1.5 >= .9 ? "contrepied" : "elimine";
+function oa(e, t) {
+	return (e.evitement - t.plaquage) / 12 + (ea(t) - 3) / 2.2 + (e.vitesseMax - t.vitesseMax) / 1.5 >= .9 ? "contrepied" : "elimine";
 }
-function Ai(e, t, n, r) {
-	return Ci(e) < 3.6 ? "feinte" : e.evitement >= 76 && r > 0 ? "double" : t === n ? "exterieur" : "interieur";
+function sa(e, t, n, r) {
+	return ea(e) < 3.6 ? "feinte" : e.evitement >= 76 && r > 0 ? "double" : t === n ? "exterieur" : "interieur";
 }
-function ji(e, t, n, r, i) {
-	return k((.008 + e.passe / 2900 + e.vision / 5800 + Math.max(0, e.puissance - 60) / 2400 + (i ? .07 : 0)) * {
+function ca(e, t, n, r, i) {
+	return A((.008 + e.passe / 2900 + e.vision / 5800 + Math.max(0, e.puissance - 60) / 2400 + (i ? .07 : 0)) * {
 		jambes: 1.55,
 		poursuite: 1.45,
 		accroche: 1.4,
@@ -44978,16 +45324,16 @@ function ji(e, t, n, r, i) {
 		dominant: .2
 	}[t.type] * (n ? 1.3 : .55) * (r >= 2 ? .55 : 1), 0, .3);
 }
-function Mi(e, t, n) {
-	return k(.09 + (70 - e.passe) / 260 + (t.type === "dominant" ? .2 : t.type === "haut" || t.type === "debout" ? .08 : 0) + Math.max(0, n - 1) * .06 + Math.max(0, 50 - e.endurance) / 300, .05, .5);
+function la(e, t, n) {
+	return A(.09 + (70 - e.passe) / 260 + (t.type === "dominant" ? .2 : t.type === "haut" || t.type === "debout" ? .08 : 0) + Math.max(0, n - 1) * .06 + Math.max(0, 50 - e.endurance) / 300, .05, .5);
 }
-function Ni(e, t, n) {
+function ua(e, t, n) {
 	return e.type === "jambes" || e.type === "poursuite" ? "sol" : t && n > 0 ? "dos" : e.type === "accroche" || e.type === "cote" ? "une-main" : "deux-mains";
 }
 //#endregion
 //#region src/lib/moteur/trajectoire.ts
-var Pi = 9.81;
-function Fi(e, t = 0) {
+var da = 9.81;
+function fa(e, t = 0) {
 	if (e.rebond && e.ecoule + t > e.duree) {
 		let n = e.ricochet ? e.ricochet.vers : e.vers, r = Math.min(1, (e.ecoule + t - e.duree) / Math.max(.05, e.rebond.duree));
 		return {
@@ -44998,7 +45344,7 @@ function Fi(e, t = 0) {
 	}
 	let n = Math.max(0, Math.min(e.duree, e.ecoule + t));
 	if (e.ricochet && n > e.ricochet.t) {
-		let t = Fi({
+		let t = fa({
 			...e,
 			ricochet: void 0,
 			ecoule: e.ricochet.t
@@ -45009,39 +45355,39 @@ function Fi(e, t = 0) {
 			hauteur: Math.max(.12, t.hauteur * (1 - r * r) + .9 * r * (1 - r))
 		};
 	}
-	let r = n, i = r / Math.max(.001, e.duree), a = e.type === "pied", o = a ? (1 - Math.exp(-.18 * r)) / (1 - Math.exp(-.18 * e.duree)) : i, s = e.intention === "rasant", c = a ? .26 : 1.05, l = a ? .12 : 1.05, u = a && !s ? c + ((l - c) / e.duree + .5 * Pi * e.duree) * r - .5 * Pi * r * r : c + (l - c) * i + 4 * Math.max(.08, e.hauteur) * i * (1 - i), d = e.derive?.x ?? 0, f = e.derive?.y ?? 0;
+	let r = n, i = r / Math.max(.001, e.duree), a = e.type === "pied", o = a ? (1 - Math.exp(-.18 * r)) / (1 - Math.exp(-.18 * e.duree)) : i, s = e.intention === "rasant", c = a ? .26 : 1.05, l = a ? .12 : 1.05, u = a && !s ? c + ((l - c) / e.duree + .5 * da * e.duree) * r - .5 * da * r * r : c + (l - c) * i + 4 * Math.max(.08, e.hauteur) * i * (1 - i), d = e.derive?.x ?? 0, f = e.derive?.y ?? 0;
 	return {
 		x: e.de.x + (e.vers.x - d - e.de.x) * o + d * i * i,
 		y: e.de.y + (e.vers.y - f - e.de.y) * o + f * i * i,
 		hauteur: u
 	};
 }
-var Ii = 2.8;
-function Li(e, t) {
-	return .26 + (-.14 / e + .5 * Pi * e) * t - .5 * Pi * t * t;
+var pa = 2.8;
+function ma(e, t) {
+	return .26 + (-.14 / e + .5 * da * e) * t - .5 * da * t * t;
 }
-function Ri(e, t) {
+function ha(e, t) {
 	let n = ((t === "A" ? 111 : 11) - e.de.x) / (e.vers.x - e.de.x);
 	if (!Number.isFinite(n) || n <= 0 || n > 1) return null;
 	let r = -Math.log(1 - n * (1 - Math.exp(-.18 * e.duree))) / .18, i = e.derive?.y ?? 0, a = r / e.duree;
 	return {
 		ecart: e.de.y + (e.vers.y - i - e.de.y) * n + i * a * a - 35,
-		hauteur: Li(e.duree, r),
+		hauteur: ma(e.duree, r),
 		t: r
 	};
 }
-function zi(e, t) {
-	let n = Ri(e, t);
+function ga(e, t) {
+	let n = ha(e, t);
 	if (!n) return !1;
 	if (e.ricochet) {
-		let r = A(t), i = t === "A" ? 111 : 11;
+		let r = j(t), i = t === "A" ? 111 : 11;
 		return n.hauteur > 3 && (e.ricochet.vers.x - i) * r > 0 && Math.abs(e.ricochet.vers.y - 35) < 2.8;
 	}
 	return Math.abs(n.ecart) < 2.8 && n.hauteur > 3;
 }
-var Bi = (e) => Math.max(1.65, Math.min(2.55, e));
-function Vi(e, t, n, r, i, a) {
-	let o = A(t), s = t === "A" ? 111 : 11, c = Math.max(1, (s - e.x) * o);
+var _a = (e) => Math.max(1.65, Math.min(2.55, e));
+function va(e, t, n, r, i, a) {
+	let o = j(t), s = t === "A" ? 111 : 11, c = Math.max(1, (s - e.x) * o);
 	if (!n && c > 36 && i < .34) {
 		let t = {
 			x: s - o * (1.5 + a * 5),
@@ -45049,7 +45395,7 @@ function Vi(e, t, n, r, i, a) {
 		};
 		return {
 			vers: t,
-			duree: Bi(1.35 + Math.hypot(t.x - e.x, t.y - e.y) / 34),
+			duree: _a(1.35 + Math.hypot(t.x - e.x, t.y - e.y) / 34),
 			issue: "court"
 		};
 	}
@@ -45058,8 +45404,8 @@ function Vi(e, t, n, r, i, a) {
 	let p = {
 		x: s + o * d,
 		y: f(d)
-	}, m = Bi(1.35 + Math.hypot(p.x - e.x, p.y - e.y) / 34);
-	if (n) for (; m < 3.6 && (Ri({
+	}, m = _a(1.35 + Math.hypot(p.x - e.x, p.y - e.y) / 34);
+	if (n) for (; m < 3.6 && (ha({
 		de: e,
 		vers: p,
 		duree: m
@@ -45070,8 +45416,8 @@ function Vi(e, t, n, r, i, a) {
 		issue: n ? "dedans" : l < 0 ? "gauche" : "droite"
 	};
 }
-function Hi(e, t, n, r, i, a, o) {
-	let s = A(t), c = t === "A" ? 111 : 11, l = Math.max(1, (c - e.x) * s), u = Math.hypot(l, e.y - 35), d = Math.max(0, -o.ventDos), f = Math.max(0, o.ventDos), p = 1.3 + u / 33 + o.style * .2 - (o.puissance - 70) / 190 + d * .022 - f * .012 + (a - .5) * .22, m = Math.max(1.5, Math.min(3.05, p)), h = l > 34 - d * 1.2;
+function ya(e, t, n, r, i, a, o) {
+	let s = j(t), c = t === "A" ? 111 : 11, l = Math.max(1, (c - e.x) * s), u = Math.hypot(l, e.y - 35), d = Math.max(0, -o.ventDos), f = Math.max(0, o.ventDos), p = 1.3 + u / 33 + o.style * .2 - (o.puissance - 70) / 190 + d * .022 - f * .012 + (a - .5) * .22, m = Math.max(1.5, Math.min(3.05, p)), h = l > 34 - d * 1.2;
 	if (!n && h && i < .3 + d * .035) {
 		let e = {
 			x: c - s * (1.2 + a * 6 + d * .4),
@@ -45088,7 +45434,7 @@ function Hi(e, t, n, r, i, a, o) {
 		};
 	}
 	let g = Math.abs(o.ventTravers) > 1.5 ? Math.sign(o.ventTravers) : 0, _ = g ? r < .76 ? g : -g : r < .5 ? -1 : 1, v = .55 + (100 - o.precision) / 90 + o.pression * .25 + (100 - o.fraicheur) / 260, y = r < .5 ? -1 : 1, b = a > .955 || !n && i > .9 && a > .7, x;
-	x = b ? (n ? y : _) * 2.76 : n ? y * Math.min(2.55, i ** 1.5 * Ii * Math.min(1.25, v)) : _ * (3.15 + (i < .55 ? i * 2.2 : .9 + (i - .55) * 17));
+	x = b ? (n ? y : _) * 2.76 : n ? y * Math.min(2.55, i ** 1.5 * pa * Math.min(1.25, v)) : _ * (3.15 + (i < .55 ? i * 2.2 : .9 + (i - .55) * 17));
 	let ee = !n && !b && h && a < .22;
 	ee && (x = (i - .5) * 3.6);
 	let S = Math.min(9.5, 5 + a * 4.5 + f * .25), C = 1.5, w = 68.5;
@@ -45101,7 +45447,7 @@ function Hi(e, t, n, r, i, a, o) {
 		return (35 + x - e.y - a * i * i) / r + e.y + a;
 	};
 	for (; S > 1 && (T(S, m) < C || T(S, m) > w);) S -= .5;
-	let te = (t) => ({
+	let E = (t) => ({
 		de: e,
 		vers: {
 			x: c + s * S,
@@ -45112,11 +45458,11 @@ function Hi(e, t, n, r, i, a, o) {
 			x: 0,
 			y: o.ventTravers * .5 * .11 * t * t
 		}
-	}), E = te(m);
-	if (n || b) for (; m < 3.6 && (Ri(E, t)?.hauteur ?? 0) < 3 + (b ? 1.4 : .7);) m += .08, E = te(m);
-	else if (ee) for (; m > 1.25 && (Ri(E, t)?.hauteur ?? 0) > 2.5;) m -= .06, E = te(m);
+	}), D = E(m);
+	if (n || b) for (; m < 3.6 && (ha(D, t)?.hauteur ?? 0) < 3 + (b ? 1.4 : .7);) m += .08, D = E(m);
+	else if (ee) for (; m > 1.25 && (ha(D, t)?.hauteur ?? 0) > 2.5;) m -= .06, D = E(m);
 	if (b) {
-		let e = Ri(E, t), r = n, a = r ? {
+		let e = ha(D, t), r = n, a = r ? {
 			x: c + s * (2 + i * 3),
 			y: 35 + Math.sign(x) * (1 + i * 1.2)
 		} : {
@@ -45124,10 +45470,10 @@ function Hi(e, t, n, r, i, a, o) {
 			y: 35 + Math.sign(x) * (3.8 + i * 3.5)
 		};
 		return {
-			vers: E.vers,
+			vers: D.vers,
 			duree: m,
 			issue: r ? "poteauRentrant" : "poteauSortant",
-			derive: E.derive,
+			derive: D.derive,
 			ricochet: {
 				t: e.t,
 				vers: a
@@ -45135,15 +45481,15 @@ function Hi(e, t, n, r, i, a, o) {
 		};
 	}
 	return {
-		vers: E.vers,
+		vers: D.vers,
 		duree: m,
 		issue: n ? "dedans" : ee ? "sousLaBarre" : _ < 0 ? "gauche" : "droite",
-		derive: E.derive
+		derive: D.derive
 	};
 }
 //#endregion
 //#region src/lib/moteur/tirHumain.ts
-var Ui = {
+var ba = {
 	porteeDeBase: 44,
 	porteeParPuissance: .45,
 	porteeParPied: .1,
@@ -45158,40 +45504,40 @@ var Ui = {
 	coutEffet: .3,
 	poteau: .1
 };
-function Wi(e) {
-	let t = k((1 + k(e, .01, .995)) / 2, .5, .9975), n = Math.sqrt(-2 * Math.log(1 - t));
+function xa(e) {
+	let t = A((1 + A(e, .01, .995)) / 2, .5, .9975), n = Math.sqrt(-2 * Math.log(1 - t));
 	return n - (2.515517 + .802853 * n + .010328 * n * n) / (1 + 1.432788 * n + .189269 * n * n + .001308 * n * n * n);
 }
-function Gi(e, t) {
+function Sa(e, t) {
 	return Math.sqrt(-2 * Math.log(Math.max(1e-9, e))) * Math.cos(2 * Math.PI * t);
 }
-function Ki(e) {
-	let t = Ui, n = Math.max(0, e.ventDos), r = Math.max(0, -e.ventDos);
-	return k(t.porteeDeBase + (e.puissance - 50) * t.porteeParPuissance + (e.precision - 60) * t.porteeParPied + n * .9 - r * 1.1 - (100 - e.fraicheur) * .05, 36, 66);
+function Ca(e) {
+	let t = ba, n = Math.max(0, e.ventDos), r = Math.max(0, -e.ventDos);
+	return A(t.porteeDeBase + (e.puissance - 50) * t.porteeParPuissance + (e.precision - 60) * t.porteeParPied + n * .9 - r * 1.1 - (100 - e.fraicheur) * .05, 36, 66);
 }
-function qi(e, t) {
-	let n = Math.max(1, ((t === "A" ? 111 : 11) - e.x) * A(t));
+function wa(e, t) {
+	let n = Math.max(1, ((t === "A" ? 111 : 11) - e.x) * j(t));
 	return {
 		devant: n,
 		droite: Math.hypot(n, e.y - 35)
 	};
 }
-var Ji = (e, t) => e * (Ui.porteeMinimale + (1 - Ui.porteeMinimale) * k(t, 0, 1));
-function Yi(e, t, n) {
-	let r = Ui;
-	return ((qi(e, t).droite + r.margeBarre) / Ki(n) - r.porteeMinimale) / (1 - r.porteeMinimale);
+var Ta = (e, t) => e * (ba.porteeMinimale + (1 - ba.porteeMinimale) * A(t, 0, 1));
+function Ea(e, t, n) {
+	let r = ba;
+	return ((wa(e, t).droite + r.margeBarre) / Ca(n) - r.porteeMinimale) / (1 - r.porteeMinimale);
 }
-function Xi(e, t) {
+function Da(e, t) {
 	return e.ventTravers * .5 * .11 * t * t;
 }
-function Zi(e, t, n) {
-	let r = Ui, i = Ui.dispersionBase * Ii / Math.max(.5, Wi(e)), a = r.geste0 + (r.geste1 - r.geste0) * k(t.geste, 0, 1), o = 1 + .5 * Math.max(0, k(t.puissance, 0, 1) - r.forceExcessive) / (1 - r.forceExcessive), s = 1 + r.coutEffet * Math.abs(k(t.effet, -1, 1));
+function Oa(e, t, n) {
+	let r = ba, i = ba.dispersionBase * pa / Math.max(.5, xa(e)), a = r.geste0 + (r.geste1 - r.geste0) * A(t.geste, 0, 1), o = 1 + .5 * Math.max(0, A(t.puissance, 0, 1) - r.forceExcessive) / (1 - r.forceExcessive), s = 1 + r.coutEffet * Math.abs(A(t.effet, -1, 1));
 	return i * a * o * s * n;
 }
-function Qi(e, t, n, r, i, a, o, s, c) {
-	let l = Ui, u = A(t), d = t === "A" ? 111 : 11, { devant: f, droite: p } = qi(e, t), m = Ji(Ki(r), k(n.puissance, 0, 1)), h = p + l.margeBarre, g = m * (1 + Gi(s, c) * .012 * (1 + (100 - r.precision) / 90)), _ = Math.max(0, h - g), v = Zi(i, n, 1), y = Gi(a, o) * v, b = 1.3 + p / 33 + r.style * .2 - (r.puissance - 70) / 190 + Math.max(0, -r.ventDos) * .022 - Math.max(0, r.ventDos) * .012, x = Math.max(1.5, Math.min(3.05, b));
+function ka(e, t, n, r, i, a, o, s, c) {
+	let l = ba, u = j(t), d = t === "A" ? 111 : 11, { devant: f, droite: p } = wa(e, t), m = Ta(Ca(r), A(n.puissance, 0, 1)), h = p + l.margeBarre, g = m * (1 + Sa(s, c) * .012 * (1 + (100 - r.precision) / 90)), _ = Math.max(0, h - g), v = Oa(i, n, 1), y = Sa(a, o) * v, b = 1.3 + p / 33 + r.style * .2 - (r.puissance - 70) / 190 + Math.max(0, -r.ventDos) * .022 - Math.max(0, r.ventDos) * .012, x = Math.max(1.5, Math.min(3.05, b));
 	if (_ >= l.manqueCourt) {
-		let t = k(g / p, .2, .97), i = 35 + k(n.ecart, -8, 8) + y * .4;
+		let t = A(g / p, .2, .97), i = 35 + A(n.ecart, -8, 8) + y * .4;
 		return {
 			vers: {
 				x: e.x + (d - e.x) * t,
@@ -45200,7 +45546,7 @@ function Qi(e, t, n, r, i, a, o, s, c) {
 			duree: Math.max(1.6, x - .15),
 			derive: {
 				x: 0,
-				y: Xi(r, x)
+				y: Da(r, x)
 			},
 			issue: "court",
 			reussi: !1,
@@ -45209,8 +45555,8 @@ function Qi(e, t, n, r, i, a, o, s, c) {
 			sigma: v
 		};
 	}
-	let ee = 35 + k(n.ecart, -9, 9) + y, S = Math.max(2.5, Math.min(34, g - p)), C = (t, n) => {
-		let i = f / (f + t), a = Xi(r, n);
+	let ee = 35 + A(n.ecart, -9, 9) + y, S = Math.max(2.5, Math.min(34, g - p)), C = (t, n) => {
+		let i = f / (f + t), a = Da(r, n);
 		return (ee - e.y) / i + e.y + a;
 	};
 	for (; S > 1 && (C(S, x) < -11 || C(S, x) > 81);) S -= .5;
@@ -45223,23 +45569,23 @@ function Qi(e, t, n, r, i, a, o, s, c) {
 		duree: t,
 		derive: {
 			x: 0,
-			y: Xi(r, t)
+			y: Da(r, t)
 		}
-	}), T = w(x), te = _ > l.manqueTolere;
-	if (te) for (; x > 1.25 && (Ri(T, t)?.hauteur ?? 0) > 2.5;) x -= .06, T = w(x);
-	else for (; x < 3.6 && (Ri(T, t)?.hauteur ?? 0) < 3.7;) x += .08, T = w(x);
-	let E = Ri(T, t), ne = E ? E.ecart : null;
-	if (!te && E && Math.abs(Math.abs(E.ecart) - 2.8) < l.poteau && E.hauteur > 3 && E) {
-		let e = Math.abs(E.ecart) < Ii, n = Math.sign(E.ecart) || 1, r = e ? {
+	}), T = w(x), E = _ > l.manqueTolere;
+	if (E) for (; x > 1.25 && (ha(T, t)?.hauteur ?? 0) > 2.5;) x -= .06, T = w(x);
+	else for (; x < 3.6 && (ha(T, t)?.hauteur ?? 0) < 3.7;) x += .08, T = w(x);
+	let D = ha(T, t), te = D ? D.ecart : null;
+	if (!E && D && Math.abs(Math.abs(D.ecart) - 2.8) < l.poteau && D.hauteur > 3 && D) {
+		let e = Math.abs(D.ecart) < pa, n = Math.sign(D.ecart) || 1, r = e ? {
 			x: d + u * (2 + s * 3),
 			y: 35 + n * (1 + c * 1.2)
 		} : {
 			x: d + u * (s < .5 ? -(1.5 + s * 5) : 1.5 + s * 3),
-			y: 35 + n * (Ii + 1 + c * 3.5)
+			y: 35 + n * (pa + 1 + c * 3.5)
 		}, i = {
-			t: E.t,
+			t: D.t,
 			vers: r
-		}, a = zi({
+		}, a = ga({
 			...T,
 			ricochet: i
 		}, t);
@@ -45250,26 +45596,26 @@ function Qi(e, t, n, r, i, a, o, s, c) {
 			ricochet: i,
 			issue: e ? "poteauRentrant" : "poteauSortant",
 			reussi: a,
-			ecartFinal: ne,
+			ecartFinal: te,
 			manque: _,
 			sigma: v
 		};
 	}
-	let re = zi(T, t), ie = re ? "dedans" : te ? "sousLaBarre" : (E?.ecart ?? 0) < 0 ? "gauche" : "droite";
+	let ne = ga(T, t), re = ne ? "dedans" : E ? "sousLaBarre" : (D?.ecart ?? 0) < 0 ? "gauche" : "droite";
 	return {
 		vers: T.vers,
 		duree: x,
 		derive: T.derive,
-		issue: ie,
-		reussi: re,
-		ecartFinal: ne,
+		issue: re,
+		reussi: ne,
+		ecartFinal: te,
 		manque: _,
 		sigma: v
 	};
 }
-var $i = (e, t, n) => k(40 + (e - 50) * .4 + (t - 60) * .15 - (100 - n) * .04, 30, 54);
-function ea(e, t, n, r, i, a, o, s) {
-	let c = A(e), l = k(t.distance, 10.5, 52), u = $i(n.puissance, n.pied, n.endurance), d = Math.max(0, l - u), f = Math.min(l, u) - d * .5, p = 1.25 - .5 * k(t.geste, 0, 1), m = f * (.035 + (100 - n.pied) / 1400) * (1 + r * .3) * p + (100 - n.endurance) * .01, h = Math.max(10.5, f + Gi(o, s) * m * .7), g = k(35 + k(t.ecart, -34, 34) + Gi(i, a) * m, -2, 72), _ = 1.9 + k(t.hauteur, 0, 1) * 1.7 + h / 60;
+var Aa = (e, t, n) => A(40 + (e - 50) * .4 + (t - 60) * .15 - (100 - n) * .04, 30, 54);
+function ja(e, t, n, r, i, a, o, s) {
+	let c = j(e), l = A(t.distance, 10.5, 52), u = Aa(n.puissance, n.pied, n.endurance), d = Math.max(0, l - u), f = Math.min(l, u) - d * .5, p = 1.25 - .5 * A(t.geste, 0, 1), m = f * (.035 + (100 - n.pied) / 1400) * (1 + r * .3) * p + (100 - n.endurance) * .01, h = Math.max(10.5, f + Sa(o, s) * m * .7), g = A(35 + A(t.ecart, -34, 34) + Sa(i, a) * m, -2, 72), _ = 1.9 + A(t.hauteur, 0, 1) * 1.7 + h / 60;
 	return {
 		arrivee: {
 			x: 61 + c * h,
@@ -45283,7 +45629,7 @@ function ea(e, t, n, r, i, a, o, s) {
 }
 //#endregion
 //#region src/lib/moteur/vent.ts
-function ta(e) {
+function Ma(e) {
 	let t = l("vent#" + e), n = t(), r = n < .34 ? t() * 2 : n < .8 ? 2 + t() * 4 : 6 + t() * 5;
 	return {
 		direction: t() * Math.PI * 2,
@@ -45291,12 +45637,12 @@ function ta(e) {
 		graine: Math.floor(t() * 1e6)
 	};
 }
-function na(e, t) {
+function Na(e, t) {
 	let n = e.ventGraine ?? 0;
 	return 1 + .22 * Math.sin(.19 * t + n * .0137) + .13 * Math.sin(.071 * t + n * .0291);
 }
-function ra(e, t) {
-	let n = (e.ventForce ?? 0) * na(e, t);
+function Pa(e, t) {
+	let n = (e.ventForce ?? 0) * Na(e, t);
 	if (n <= 0) return {
 		x: 0,
 		y: 0
@@ -45307,21 +45653,21 @@ function ra(e, t) {
 		y: Math.sin(e.ventDirection ?? 0) * n * r
 	};
 }
-function ia(e) {
+function Fa(e) {
 	let t = e.ventForce ?? 0, n = e.cotesInverses ? -1 : 1;
 	return {
 		x: Math.cos(e.ventDirection ?? 0) * t * n,
 		y: Math.sin(e.ventDirection ?? 0) * t * n
 	};
 }
-var aa = {
+var Ia = {
 	rasant: .12,
 	parDessus: .55,
 	chandelle: 1.25,
 	transversale: 1.1
 };
-function oa(e, t, n) {
-	let r = .055 * t * t * (aa[n] ?? 1);
+function La(e, t, n) {
+	let r = .055 * t * t * (Ia[n] ?? 1);
 	return {
 		x: e.x * r,
 		y: e.y * r
@@ -45329,7 +45675,7 @@ function oa(e, t, n) {
 }
 //#endregion
 //#region src/lib/moteur/ia/reglages.ts
-var G = {
+var W = {
 	lance: .09,
 	subit: .04,
 	travers: .05,
@@ -45373,7 +45719,7 @@ var G = {
 	protectionReel: 1.4,
 	soutiensReel: 3,
 	cartonsReel: .35
-}, sa = {
+}, Ra = {
 	equilibre: {
 		avants: 1,
 		mains: 1,
@@ -45405,18 +45751,18 @@ var G = {
 		leurres: 1.75
 	}
 };
-function ca(e, t) {
+function za(e, t) {
 	let n = e.tactiques[t]?.attaque;
-	return n === "avants" ? sa.avants : n === "large" ? sa.large : n === "occupation" ? sa.pied : n === "equilibre" ? sa.equilibre : sa[e.styles?.[t] ?? "equilibre"];
+	return n === "avants" ? Ra.avants : n === "large" ? Ra.large : n === "occupation" ? Ra.pied : n === "equilibre" ? Ra.equilibre : Ra[e.styles?.[t] ?? "equilibre"];
 }
-var la = [
+var Ba = [
 	"ses22",
 	"sonCamp",
 	"milieu",
 	"campAdverse",
 	"zoneDeMarque",
 	"ligne"
-], ua = {
+], Va = {
 	pickAndGo: [
 		.25,
 		.45,
@@ -45537,8 +45883,8 @@ var la = [
 		0,
 		0
 	]
-}, da = (e, t) => ua[e][la.indexOf(t)];
-function fa(e, t) {
+}, Ha = (e, t) => Va[e][Ba.indexOf(t)];
+function Ua(e, t) {
 	let n = 0;
 	for (let e of t) n += e.poids;
 	if (n <= 0) return;
@@ -45546,27 +45892,27 @@ function fa(e, t) {
 	for (let e of t) if (r -= e.poids, r <= 0) return e;
 	return t[t.length - 1];
 }
-var pa = (...e) => e.filter((e) => !!e);
-function ma(e, t, n, r) {
-	return r.zone === "ses22" ? "degagement" : n.fond <= 1 && t.pied > 66 && he(t.pos, t.cote) && e.rng() < .3 ? "cinquanteVingtDeux" : e.ballonLent || n.fond >= 3 ? "chandelle" : "occupation";
+var Wa = (...e) => e.filter((e) => !!e);
+function Ga(e, t, n, r) {
+	return r.zone === "ses22" ? "degagement" : n.fond <= 1 && t.pied > 66 && Te(t.pos, t.cote) && e.rng() < .3 ? "cinquanteVingtDeux" : e.ballonLent || n.fond >= 3 ? "chandelle" : "occupation";
 }
-function ha(e, t, n, r) {
-	let i = n.distributeur, a = Kt(e, t, e.ballon, e.ouvert, i), o = Jt(e, t), s = ca(e, t), c = A(t), l = !e.ballonLent, u = e.avantage ?? 0, d = e.phasesDepuisArret, f = o.zone === "ses22" || o.zone === "sonCamp", p = (e) => !!e && e !== i && B(e), m = o.zone, h = o.posture, g = s.mains * (l ? 1.3 : .72) * (1 + .14 * Math.max(0, u)) * (a.retardataires >= 2 ? 1.25 : 1) * (h === "prudent" ? .55 : h === "gestion" ? .2 : h === "urgence" ? 1.45 : h === "troisPoints" ? .6 : 1), _ = s.avants * (l ? .95 : 1.2) * (h === "gestion" ? 2.3 : h === "troisPoints" ? 1.4 : 1), v = s.leurres * (l ? 1.2 : .8) * (r ? 1.5 : 1) * (h === "prudent" ? .5 : h === "gestion" ? .15 : 1), y = s.pied * (l ? .7 : 1.3) * (d >= 5 && m !== "zoneDeMarque" && m !== "ligne" ? 1.45 : 1) * (h === "urgence" ? .05 : h === "gestion" ? f ? 1.5 : .5 : h === "prudent" ? 1.25 : 1) * (m === "ses22" ? 1 : Ht(e) ? G.occupationCondensee : G.piedReel), b = a.milieu.att + a.large.att - a.milieu.def - a.large.def, x = Wt(a.large), ee = [], S = (e, t, n) => {
+function Ka(e, t, n, r) {
+	let i = n.distributeur, a = an(e, t, e.ballon, e.ouvert, i), o = sn(e, t), s = za(e, t), c = j(t), l = !e.ballonLent, u = e.avantage ?? 0, d = e.phasesDepuisArret, f = o.zone === "ses22" || o.zone === "sonCamp", p = (e) => !!e && e !== i && z(e), m = o.zone, h = o.posture, g = s.mains * (l ? 1.3 : .72) * (1 + .14 * Math.max(0, u)) * (a.retardataires >= 2 ? 1.25 : 1) * (h === "prudent" ? .55 : h === "gestion" ? .2 : h === "urgence" ? 1.45 : h === "troisPoints" ? .6 : 1), _ = s.avants * (l ? .95 : 1.2) * (h === "gestion" ? 2.3 : h === "troisPoints" ? 1.4 : 1), v = s.leurres * (l ? 1.2 : .8) * (r ? 1.5 : 1) * (h === "prudent" ? .5 : h === "gestion" ? .15 : 1), y = s.pied * (l ? .7 : 1.3) * (d >= 5 && m !== "zoneDeMarque" && m !== "ligne" ? 1.45 : 1) * (h === "urgence" ? .05 : h === "gestion" ? f ? 1.5 : .5 : h === "prudent" ? 1.25 : 1) * (m === "ses22" ? 1 : en(e) ? W.occupationCondensee : W.piedReel), b = a.milieu.att + a.large.att - a.milieu.def - a.large.def, x = nn(a.large), ee = [], S = (e, t, n) => {
 		t > .002 && ee.push({
 			jeu: e,
 			poids: t,
 			faire: n
 		});
 	}, C = a.gardes.ouvert + a.gardes.ferme;
-	if ((n.auRas || n.percuteur) && S("pickAndGo", da("pickAndGo", m) * _ * (C <= 1 ? 1.6 : 1) * (l ? .9 : 1.2), () => ({
+	if ((n.auRas || n.percuteur) && S("pickAndGo", Ha("pickAndGo", m) * _ * (C <= 1 ? 1.6 : 1) * (l ? .9 : 1.2), () => ({
 		type: "pickAndGo",
-		chaine: n.auRas ? pa(n.auRas) : pa(i, n.percuteur),
+		chaine: n.auRas ? Wa(n.auRas) : Wa(i, n.percuteur),
 		index: 0,
 		jeu: "pickAndGo",
 		libelle: "pick and go"
 	})), i.numero === 9) {
 		let t = a.gardes.ouvert === 0 || a.gardes.ferme === 0, n = a.gardes.ouvert === 0 ? e.ouvert : a.gardes.ferme === 0 && a.espaceFerme > 7 ? -e.ouvert : e.ouvert;
-		S("departNeuf", da("departNeuf", m) * (t ? 2.6 : .7) * (l ? 1.5 : .3) * (.55 + i.evitement / 150) * (h === "gestion" ? .3 : 1), () => ({
+		S("departNeuf", Ha("departNeuf", m) * (t ? 2.6 : .7) * (l ? 1.5 : .3) * (.55 + i.evitement / 150) * (h === "gestion" ? .3 : 1), () => ({
 			type: "pickAndGo",
 			chaine: [i],
 			index: 0,
@@ -45577,7 +45923,7 @@ function ha(e, t, n, r) {
 	}
 	if (p(n.percuteur)) {
 		let e = n.percuteur;
-		S("cellule", da("cellule", m) * _ * (a.ras.def <= a.ras.att ? 1.2 : 1), () => ({
+		S("cellule", Ha("cellule", m) * _ * (a.ras.def <= a.ras.att ? 1.2 : 1), () => ({
 			type: "ras",
 			chaine: [i, e],
 			index: 0,
@@ -45585,7 +45931,7 @@ function ha(e, t, n, r) {
 			libelle: "cellule d’avants au ras"
 		}));
 		let t = n.bloc.find((t) => t !== e && p(t));
-		t && S("relais", da("relais", m) * _ * Math.sqrt(s.leurres) * (a.ras.def >= 3 ? 1.35 : 1), () => ({
+		t && S("relais", Ha("relais", m) * _ * Math.sqrt(s.leurres) * (a.ras.def >= 3 ? 1.35 : 1), () => ({
 			type: "ras",
 			chaine: [
 				i,
@@ -45599,7 +45945,7 @@ function ha(e, t, n, r) {
 	}
 	if (p(n.dix) && p(n.percuteurLoin)) {
 		let e = n.dix, t = n.percuteurLoin;
-		S("celluleLoin", da("celluleLoin", m) * _ * (a.milieu.def <= a.milieu.att ? 1.25 : 1), () => ({
+		S("celluleLoin", Ha("celluleLoin", m) * _ * (a.milieu.def <= a.milieu.att ? 1.25 : 1), () => ({
 			type: "pod",
 			chaine: [
 				i,
@@ -45612,8 +45958,8 @@ function ha(e, t, n, r) {
 		}));
 	}
 	if (p(n.dix) && p(n.douze)) {
-		let t = n.dix, r = n.douze, s = pa(i, t, r, p(n.treize) ? n.treize : void 0, p(n.ailierOuvert) ? n.ailierOuvert : void 0), c = a.espaceOuvert >= 20, l = !!e.cadenceDetaillee;
-		if (l && n.bloc.length === 3 && o.distLigne >= 10 && S("ecran", da("ecran", m) * v * Math.sqrt(g) * (1 + .18 * Math.max(0, a.ras.def - 2)), () => ({
+		let t = n.dix, r = n.douze, s = Wa(i, t, r, p(n.treize) ? n.treize : void 0, p(n.ailierOuvert) ? n.ailierOuvert : void 0), c = a.espaceOuvert >= 20, l = !!e.cadenceDetaillee;
+		if (l && n.bloc.length === 3 && o.distLigne >= 10 && S("ecran", Ha("ecran", m) * v * Math.sqrt(g) * (1 + .18 * Math.max(0, a.ras.def - 2)), () => ({
 			type: "large",
 			structure: "ecran",
 			leurres: [...n.bloc],
@@ -45622,7 +45968,7 @@ function ha(e, t, n, r) {
 			relecture: !0,
 			jeu: "ecran",
 			libelle: "passe derrière le bloc d’avants"
-		})), S("ouvreur", da("ouvreur", m) * g ** .6 * (a.trou && a.trou.lateral < 26 ? 1.25 : 1), () => ({
+		})), S("ouvreur", Ha("ouvreur", m) * g ** .6 * (a.trou && a.trou.lateral < 26 ? 1.25 : 1), () => ({
 			type: "large",
 			chaine: [
 				i,
@@ -45633,7 +45979,7 @@ function ha(e, t, n, r) {
 			relecture: !0,
 			jeu: "ouvreur",
 			libelle: "un temps sur les centres"
-		})), c && p(n.ailierOuvert) && S("large", da("large", m) * g * (1 + .5 * Math.max(0, x)) * (a.large.def === 0 && a.large.att >= 1 ? 1.6 : 1) * (b < 0 ? .6 : 1), () => ({
+		})), c && p(n.ailierOuvert) && S("large", Ha("large", m) * g * (1 + .5 * Math.max(0, x)) * (a.large.def === 0 && a.large.att >= 1 ? 1.6 : 1) * (b < 0 ? .6 : 1), () => ({
 			type: "large",
 			chaine: s,
 			index: 0,
@@ -45643,9 +45989,9 @@ function ha(e, t, n, r) {
 			libelle: "jeu déployé jusqu’à l’aile"
 		})), c && p(n.treize) && a.espaceOuvert >= 24) {
 			let e = n.treize;
-			S("saute", da("saute", m) * g * Math.sqrt(v) * (b >= 1 ? 1.5 : 1) * (a.monteeRapide ? 1.3 : 1), () => ({
+			S("saute", Ha("saute", m) * g * Math.sqrt(v) * (b >= 1 ? 1.5 : 1) * (a.monteeRapide ? 1.3 : 1), () => ({
 				type: "saute",
-				chaine: pa(i, t, e, p(n.ailierOuvert) ? n.ailierOuvert : void 0),
+				chaine: Wa(i, t, e, p(n.ailierOuvert) ? n.ailierOuvert : void 0),
 				index: 0,
 				tempo: "vite",
 				jeu: "saute",
@@ -45654,9 +46000,9 @@ function ha(e, t, n, r) {
 		}
 		if (c && p(n.quinze) && a.espaceOuvert >= 26) {
 			let e = n.quinze;
-			S("arriere", da("arriere", m) * g * Math.sqrt(v) * (b >= 0 ? 1.3 : .8), () => ({
+			S("arriere", Ha("arriere", m) * g * Math.sqrt(v) * (b >= 0 ? 1.3 : .8), () => ({
 				type: "large",
-				chaine: pa(i, t, r, e, p(n.ailierOuvert) ? n.ailierOuvert : void 0),
+				chaine: Wa(i, t, r, e, p(n.ailierOuvert) ? n.ailierOuvert : void 0),
 				index: 0,
 				leurres: p(n.treize) ? [n.treize] : void 0,
 				relecture: !0,
@@ -45664,7 +46010,7 @@ function ha(e, t, n, r) {
 				libelle: "l’arrière s’intercale"
 			}));
 		}
-		if (l && o.distLigne >= 10 && d <= 4 && (S("croisee", da("croisee", m) * v * (e.systeme === "glissee" ? 1.5 : 1), () => ({
+		if (l && o.distLigne >= 10 && d <= 4 && (S("croisee", Ha("croisee", m) * v * (e.systeme === "glissee" ? 1.5 : 1), () => ({
 			type: "large",
 			structure: "croisee",
 			chaine: [
@@ -45677,21 +46023,21 @@ function ha(e, t, n, r) {
 			libelle: "croisée ouvreur – centre"
 		})), p(n.treize))) {
 			let e = n.treize;
-			S("redoublee", da("redoublee", m) * v, () => ({
+			S("redoublee", Ha("redoublee", m) * v, () => ({
 				type: "large",
 				structure: "redoublee",
 				index: 0,
 				jeu: "redoublee",
 				libelle: "redoublée de l’ouvreur",
-				chaine: pa(i, t, r, t, e, p(n.ailierOuvert) ? n.ailierOuvert : void 0)
+				chaine: Wa(i, t, r, t, e, p(n.ailierOuvert) ? n.ailierOuvert : void 0)
 			}));
 		}
 	}
 	if (a.espaceFerme >= 10) {
 		let t = n.liste.filter((t) => p(t) && (t.pos.y - e.ballon.y) * e.ouvert < -3 && (e.ballon.x - t.pos.x) * c > .3 && (e.ballon.x - t.pos.x) * c < 16).sort((t, n) => Math.abs(t.pos.y - e.ballon.y) - Math.abs(n.pos.y - e.ballon.y)).slice(0, 3);
 		if (t.length) {
-			let n = Wt(a.ferme);
-			S("ferme", da("ferme", m) * Math.sqrt(g) * (n < 0 ? .25 : 1 + .8 * n) * (a.ferme.def === 0 ? 2.2 : 1) * (a.gardes.ferme === 0 ? 1.4 : 1) * ((e.serieCote?.n ?? 0) >= 2 ? 1.3 : 1), () => ({
+			let n = nn(a.ferme);
+			S("ferme", Ha("ferme", m) * Math.sqrt(g) * (n < 0 ? .25 : 1 + .8 * n) * (a.ferme.def === 0 ? 2.2 : 1) * (a.gardes.ferme === 0 ? 1.4 : 1) * ((e.serieCote?.n ?? 0) >= 2 ? 1.3 : 1), () => ({
 				type: "large",
 				chaine: [i, ...t],
 				index: 0,
@@ -45701,7 +46047,7 @@ function ha(e, t, n, r) {
 			}));
 		}
 	}
-	i.numero === 9 && i.pied >= 48 && S("boxKick", da("boxKick", m) * y * (.55 + i.pied / 160) * (a.fond <= 1 ? 1.3 : 1), () => ({
+	i.numero === 9 && i.pied >= 48 && S("boxKick", Ha("boxKick", m) * y * (.55 + i.pied / 160) * (a.fond <= 1 ? 1.3 : 1), () => ({
 		type: "pied",
 		chaine: [i],
 		index: 0,
@@ -45711,18 +46057,18 @@ function ha(e, t, n, r) {
 		libelle: "coup de pied du demi de mêlée"
 	}));
 	let w = [n.dix, n.quinze].filter(p).sort((e, t) => t.pied - e.pied)[0];
-	w && S("piedOuvreur", da("piedOuvreur", m) * y * (.55 + w.pied / 160), () => ({
+	w && S("piedOuvreur", Ha("piedOuvreur", m) * y * (.55 + w.pied / 160), () => ({
 		type: "pied",
 		chaine: [i, w],
 		index: 0,
 		botteur: w,
-		intention: ma(e, w, a, o),
+		intention: Ga(e, w, a, o),
 		jeu: "piedOuvreur",
 		libelle: m === "ses22" ? "sortir de ses 22" : "occupation au pied"
 	}));
 	let T = [n.dix, n.quinze].filter((e) => !!e && p(e) && e.pied >= 55).sort((e, t) => t.pied - e.pied)[0];
-	if (T && Yt(e.ballon, t)) {
-		let t = T, n = Ht(e) ? 3 : 6, r = Math.abs(o.diff) <= 7, a = h === "troisPoints" ? d >= 2 ? 4 : 1.2 : 0;
+	if (T && cn(e.ballon, t)) {
+		let t = T, n = en(e) ? 3 : 6, r = Math.abs(o.diff) <= 7, a = h === "troisPoints" ? d >= 2 ? 4 : 1.2 : 0;
 		e.periode === 1 && e.minute >= 38 && d >= 2 && (a = Math.max(a, r ? 1.1 : .5)), d >= n && (e.avantage ?? 0) <= 0 && o.distLigne < 32 && (a = Math.max(a, (r ? .9 : .4) * (t.pied / 70))), o.restantes <= 12 && o.diff >= 1 && o.diff <= 4 && d >= 2 && (a = Math.max(a, .8)), a ||= o.restantes <= 25 && Math.abs(o.diff) <= 3 ? .14 : t.pied >= 72 ? .035 : 0;
 		let s = Math.abs(e.ballon.y - 35);
 		a *= (s < 8 ? 1.3 : s > 13 ? .45 : 1) * (o.distLigne < 26 ? 1.2 : 1) * (h === "urgence" ? .05 : 1), S("drop", a, () => ({
@@ -45735,13 +46081,13 @@ function ha(e, t, n, r) {
 			libelle: "drop"
 		}));
 	}
-	let te = fa(e, ee);
-	return te ? te.faire() : null;
+	let E = Ua(e, ee);
+	return E ? E.faire() : null;
 }
-function ga(e, t, n) {
+function qa(e, t, n) {
 	let r = e.lancement;
 	if (!r) return null;
-	let i = t.cote, a = A(i), o = Kt(e, i, t.pos, e.ouvert, t), s = Jt(e, i, t.pos), c = ca(e, i), l = r.chaine.slice(r.index + 1), u = o.milieu.att + o.large.att + o.ras.att - o.milieu.def - o.large.def - o.ras.def, d = s.zone, f = d === "campAdverse" || d === "zoneDeMarque", p = t.pied, m = Ht(e) ? 1 : G.piedReel, h = m * c.pied * (s.posture === "urgence" ? d === "zoneDeMarque" ? .5 : .12 : s.posture === "gestion" || s.posture === "prudent" ? .3 : 1), g = [{
+	let i = t.cote, a = j(i), o = an(e, i, t.pos, e.ouvert, t), s = sn(e, i, t.pos), c = za(e, i), l = r.chaine.slice(r.index + 1), u = o.milieu.att + o.large.att + o.ras.att - o.milieu.def - o.large.def - o.ras.def, d = s.zone, f = d === "campAdverse" || d === "zoneDeMarque", p = t.pied, m = en(e) ? 1 : W.piedReel, h = m * c.pied * (s.posture === "urgence" ? d === "zoneDeMarque" ? .5 : .12 : s.posture === "gestion" || s.posture === "prudent" ? .3 : 1), g = [{
 		r: null,
 		poids: 1 + (u >= 1 ? .6 : 0)
 	}], _ = (e, t) => {
@@ -45749,11 +46095,11 @@ function ga(e, t, n) {
 			r: e,
 			poids: t
 		});
-	}, v = e.pions.find((n) => n.cote === i && B(n) && (n.numero === 11 || n.numero === 14) && (n.pos.y - t.pos.y) * e.ouvert > 16 && (n.pos.x - t.pos.x) * a <= .5);
+	}, v = e.pions.find((n) => n.cote === i && z(n) && (n.numero === 11 || n.numero === 14) && (n.pos.y - t.pos.y) * e.ouvert > 16 && (n.pos.x - t.pos.x) * a <= .5);
 	if (v && p >= 58 && d !== "ses22" && o.espaceAile >= 8 && _({
 		type: "pied",
 		intention: "transversale"
-	}, .5 * h * ((p - 50) / 30) * Math.min(1.6, o.espaceAile / 10) * (Wt(o.large) >= 1 ? .45 : 1.2) * (o.monteeRapide ? 1.3 : .9) * (d === "zoneDeMarque" ? 1.5 : d === "sonCamp" ? .4 : 1) * (v.vitesseMax / 9)), p >= 55 && (f || d === "milieu") && o.profondeurRideau < 7.5 && o.espaceDerriere >= 9 && _({
+	}, .5 * h * ((p - 50) / 30) * Math.min(1.6, o.espaceAile / 10) * (nn(o.large) >= 1 ? .45 : 1.2) * (o.monteeRapide ? 1.3 : .9) * (d === "zoneDeMarque" ? 1.5 : d === "sonCamp" ? .4 : 1) * (v.vitesseMax / 9)), p >= 55 && (f || d === "milieu") && o.profondeurRideau < 7.5 && o.espaceDerriere >= 9 && _({
 		type: "pied",
 		intention: "rasant"
 	}, .42 * h * Math.min(1.7, o.espaceDerriere / 12) * (d === "zoneDeMarque" ? 1.6 : d === "campAdverse" ? 1 : .5) * (o.fond <= 1 ? 1.4 : .8)), p >= 55 && d !== "ses22" && o.monteeRapide && n < 9 && o.espaceJusteDerriere >= 7 && _({
@@ -45762,8 +46108,8 @@ function ga(e, t, n) {
 	}, .36 * h * Math.min(1.6, o.espaceJusteDerriere / 9) * (f || d === "milieu" ? 1 : .6)), (d === "sonCamp" || d === "milieu") && u <= -1 && e.phasesDepuisArret >= 3 && p >= 52 && _({
 		type: "pied",
 		intention: o.fond <= 1 ? "occupation" : "chandelle"
-	}, .5 * m * c.pied * (s.posture === "urgence" ? .05 : s.posture === "gestion" ? 1.6 : 1)), l.length >= 2 && B(l[1]) && D(t.pos, l[1].pos) < 26) {
-		let n = Gt(e, j(i), l[0].pos) < 4.5, r = Gt(e, j(i), l[1].pos) > 6;
+	}, .5 * m * c.pied * (s.posture === "urgence" ? .05 : s.posture === "gestion" ? 1.6 : 1)), l.length >= 2 && z(l[1]) && O(t.pos, l[1].pos) < 26) {
+		let n = rn(e, M(i), l[0].pos) < 4.5, r = rn(e, M(i), l[1].pos) > 6;
 		n && r && _({
 			type: "saute",
 			chaine: [t, ...l.slice(1)]
@@ -45776,10 +46122,10 @@ function ga(e, t, n) {
 	for (let e of g) if (b -= e.poids, b <= 0) return e.r;
 	return null;
 }
-function _a(e, t) {
-	let n = t.cote, r = A(n), i = Jt(e, n, t.pos), a = ca(e, n), o = Kt(e, n, t.pos, e.ouvert, t), s = 60;
-	for (let i of e.pions) i.cote === n || !i.surLeTerrain || i.sanction > 0 || i.corps || (i.pos.x - t.pos.x) * r < -1 || (s = Math.min(s, D(i.pos, t.pos)));
-	let c = e.pions.filter((e) => e.cote === n && e !== t && B(e) && !e.avant && (e.pos.x - t.pos.x) * r <= .5 && D(e.pos, t.pos) < 22).sort((e, n) => D(e.pos, t.pos) - D(n.pos, t.pos)).slice(0, 2), l = i.posture === "urgence", u = i.posture === "gestion", d = [];
+function Ja(e, t) {
+	let n = t.cote, r = j(n), i = sn(e, n, t.pos), a = za(e, n), o = an(e, n, t.pos, e.ouvert, t), s = 60;
+	for (let i of e.pions) i.cote === n || !i.surLeTerrain || i.sanction > 0 || i.corps || (i.pos.x - t.pos.x) * r < -1 || (s = Math.min(s, O(i.pos, t.pos)));
+	let c = e.pions.filter((e) => e.cote === n && e !== t && z(e) && !e.avant && (e.pos.x - t.pos.x) * r <= .5 && O(e.pos, t.pos) < 22).sort((e, n) => O(e.pos, t.pos) - O(n.pos, t.pos)).slice(0, 2), l = i.posture === "urgence", u = i.posture === "gestion", d = [];
 	d.push({
 		poids: (s > 14 ? 1.5 : s > 8 ? .7 : .15) * a.mains * (i.zone === "ses22" ? .4 : 1) * (l ? 1.8 : u ? .4 : 1),
 		faire: () => ({
@@ -45791,7 +46137,7 @@ function _a(e, t) {
 			tempo: s > 14 ? void 0 : "vite"
 		})
 	}), t.pied >= 48 && d.push({
-		poids: (s > 5 ? 1 : .35) * a.pied * (i.zone === "ses22" ? 2.4 : i.zone === "sonCamp" ? 1.15 : .3) * (l ? .08 : u ? 1.6 : 1) * (i.zone === "ses22" ? 1 : Ht(e) ? G.occupationCondensee : G.piedReel),
+		poids: (s > 5 ? 1 : .35) * a.pied * (i.zone === "ses22" ? 2.4 : i.zone === "sonCamp" ? 1.15 : .3) * (l ? .08 : u ? 1.6 : 1) * (i.zone === "ses22" ? 1 : en(e) ? W.occupationCondensee : W.piedReel),
 		faire: () => ({
 			type: "pied",
 			chaine: [t],
@@ -45813,11 +46159,11 @@ function _a(e, t) {
 }
 //#endregion
 //#region src/lib/moteur/ia/arbitrage.ts
-function va(e) {
+function Ya(e) {
 	let t = e.toLowerCase();
 	return t.includes("coup de p") || t.includes("brutalité") || t.includes("bousculade") || t.includes("geste dangereux") ? "brutalite" : t.includes("plaquage") || t.includes("croche") ? "plaquage" : t.includes("hors-jeu") ? "horsJeu" : t.includes("maul") ? "maul" : t.includes("mêlée") ? "melee" : t.includes("volontaire") || t.includes("antijeu") || t.includes("obstruction") ? "antijeu" : t.includes("ruck") || t.includes("ballon gardé") || t.includes("relève") || t.includes("roule") || t.includes("mains") || t.includes("sol") ? "ruck" : "divers";
 }
-function ya(e, t) {
+function Xa(e, t) {
 	return e.arbitrage ??= {
 		A: {
 			fautes: [],
@@ -45829,15 +46175,15 @@ function ya(e, t) {
 		}
 	}, e.arbitrage[t];
 }
-var ba = 900;
-function xa(e, t, n, r) {
-	let i = ya(e, t), a = va(r), o = Math.abs(n.x - fe(t));
+var Za = 900;
+function Qa(e, t, n, r) {
+	let i = Xa(e, t), a = Ya(r), o = Math.abs(n.x - Se(t));
 	i.fautes = i.fautes.filter((t) => e.t - t.t < 1500), i.fautes.push({
 		t: e.t,
 		deSaLigne: o,
 		famille: a
 	});
-	let s = i.fautes.filter((t) => e.t - t.t < ba), c = s.filter((e) => e.deSaLigne < 30).length, l = s.filter((e) => e.famille === a).length;
+	let s = i.fautes.filter((t) => e.t - t.t < Za), c = s.filter((e) => e.deSaLigne < 30).length, l = s.filter((e) => e.famille === a).length;
 	if (a === "brutalite") return {
 		avertissement: !1,
 		cartonRepete: !1,
@@ -45845,7 +46191,7 @@ function xa(e, t, n, r) {
 		famille: a,
 		recentes: s.length
 	};
-	let u = i.avertiA !== void 0 && e.t - i.avertiA < ba;
+	let u = i.avertiA !== void 0 && e.t - i.avertiA < Za;
 	if (u && (o < 45 || l >= 2)) return i.avertiA = void 0, i.cartonsRepetes += 1, i.fautes = i.fautes.filter((t) => e.t - t.t < 60), {
 		avertissement: !1,
 		cartonRepete: !0,
@@ -45853,7 +46199,7 @@ function xa(e, t, n, r) {
 		famille: a,
 		recentes: s.length
 	};
-	let d = Ht(e) ? G.serieCondense : G.serieTempsReel;
+	let d = en(e) ? W.serieCondense : W.serieTempsReel;
 	return (c >= d || l >= d || s.length >= d + 2) && !u ? (i.avertiA = e.t, {
 		avertissement: !0,
 		cartonRepete: !1,
@@ -45868,8 +46214,8 @@ function xa(e, t, n, r) {
 		recentes: s.length
 	};
 }
-function Sa(e, t, n) {
-	let r = t.toLowerCase(), i = (e.niveau === "amateur" ? 1.5 : 1) * (Ht(e) ? 1 : G.cartonsReel), a = n.deSaLigne < 12 ? 1 : n.deSaLigne < 24 ? .45 : 0;
+function $a(e, t, n) {
+	let r = t.toLowerCase(), i = (e.niveau === "amateur" ? 1.5 : 1) * (en(e) ? 1 : W.cartonsReel), a = n.deSaLigne < 12 ? 1 : n.deSaLigne < 24 ? .45 : 0;
 	return r.includes("coup de poing") || r.includes("brutalité") ? {
 		jaune: 1,
 		rouge: .45
@@ -45914,16 +46260,16 @@ function Sa(e, t, n) {
 		rouge: 0
 	};
 }
-function Ca(e, t, n) {
-	let r = Math.abs(n.x - fe(t)), i = r < 8 ? 1 : r < 15 ? .7 : r < 26 ? .35 : .1, a = Math.max(0, e.avantage ?? 0) * .12 + (e.ballonLent ? 0 : .12);
+function eo(e, t, n) {
+	let r = Math.abs(n.x - Se(t)), i = r < 8 ? 1 : r < 15 ? .7 : r < 26 ? .35 : .1, a = Math.max(0, e.avantage ?? 0) * .12 + (e.ballonLent ? 0 : .12);
 	return Math.min(1, i + a);
 }
-function wa(e) {
-	return Ht(e) ? G.fautesCondense : G.fautesTempsReel;
+function to(e) {
+	return en(e) ? W.fautesCondense : W.fautesTempsReel;
 }
 //#endregion
 //#region src/lib/moteur/moteur.ts
-var K = .15, Ta = 2400, Ea = 1.6, Da = {
+var G = .15, no = 2400, ro = 1.6, io = {
 	melee: {
 		visuel: 6.2,
 		horloge: 50,
@@ -45980,22 +46326,22 @@ var K = .15, Ta = 2400, Ea = 1.6, Da = {
 		direct: 6
 	}
 };
-function Oa(e, t = !1) {
+function ao(e, t = !1) {
 	if (t) return 1;
-	let n = Da[e];
+	let n = io[e];
 	return n ? n.horloge / n.visuel : 1;
 }
-function ka(e, t) {
-	let n = Da[t], r = n ? e.tempsReel ? n.direct : n.visuel : 3;
-	return e.cadenceDetaillee && t === "melee" && (r = ja), e.dureeArret = r, r;
+function oo(e, t) {
+	let n = io[t], r = n ? e.tempsReel ? n.direct : n.visuel : 3;
+	return e.cadenceDetaillee && t === "melee" && (r = co), e.dureeArret = r, r;
 }
-var Aa = {
+var so = {
 	liaison: 3.6,
 	impact: 1.2,
 	introduction: 1.6,
 	poussee: 3.6,
 	sortie: 1
-}, ja = Aa.liaison + Aa.impact + Aa.introduction + Aa.poussee + Aa.sortie, Ma = {
+}, co = so.liaison + so.impact + so.introduction + so.poussee + so.sortie, lo = {
 	celebration: 6,
 	ramassage: 1.5,
 	pose: 9.6,
@@ -46004,27 +46350,27 @@ var Aa = {
 	poseHumain: 2.4,
 	elanHumain: 2.25
 };
-function Na(e) {
-	let t = Da[e.phase], n = Pa(e);
+function uo(e) {
+	let t = io[e.phase], n = fo(e);
 	if (!t) return n;
-	let r = e.phase === "melee" ? ja : t.visuel;
+	let r = e.phase === "melee" ? co : t.visuel;
 	return Math.min(n, t.horloge / Math.max(1, r));
 }
-function Pa(e) {
-	return z(e) ? G.horlogeCondensee : 8;
+function fo(e) {
+	return R(e) ? W.horlogeCondensee : 8;
 }
-function Fa(e) {
+function po(e) {
 	let t = e.dureeArret ?? 0;
-	return t > 0 ? k(1 - e.minuteur / t, 0, 1) : 1;
+	return t > 0 ? A(1 - e.minuteur / t, 0, 1) : 1;
 }
-function Ia(e) {
-	let t = Fa(e);
+function mo(e) {
+	let t = po(e);
 	if (e.conquete && (e.conquete.progression = t), e.phase === "melee") {
 		if (e.conquete?.melee) return;
-		let n = Math.max(0, 1 - t / .45) * 1.7, r = (t) => H(e, t).filter((e) => e.avant), i = Ws(e, r(e.possession), e.possession) - Ws(e, r(j(e.possession)), j(e.possession)), a = e.bonusConqueteArcade?.type === "melee" ? e.bonusConqueteArcade.scores : void 0, o = k((i + ((a?.[e.possession] ?? 0) - (a?.[j(e.possession)] ?? 0)) * 8) / 10, -1, 1), s = Math.abs(o) < .16 ? 0 : Math.abs(o) < .35 ? o < 0 ? -.35 : .35 : o, c = Math.max(0, t - .48) / .52 * s * 4 * A(e.possession);
-		e.conquete && (e.conquete.pousseVers = s === 0 ? void 0 : s > 0 ? e.possession : j(e.possession));
+		let n = Math.max(0, 1 - t / .45) * 1.7, r = (t) => V(e, t).filter((e) => e.avant), i = Mc(e, r(e.possession), e.possession) - Mc(e, r(M(e.possession)), M(e.possession)), a = e.bonusConqueteArcade?.type === "melee" ? e.bonusConqueteArcade.scores : void 0, o = A((i + ((a?.[e.possession] ?? 0) - (a?.[M(e.possession)] ?? 0)) * 8) / 10, -1, 1), s = Math.abs(o) < .16 ? 0 : Math.abs(o) < .35 ? o < 0 ? -.35 : .35 : o, c = Math.max(0, t - .48) / .52 * s * 4 * j(e.possession);
+		e.conquete && (e.conquete.pousseVers = s === 0 ? void 0 : s > 0 ? e.possession : M(e.possession));
 		for (let t of e.pions) !t.surLeTerrain || t.role !== "melee" || (t.cible = {
-			x: t.cible.x - A(t.cote) * n + c,
+			x: t.cible.x - j(t.cote) * n + c,
 			y: t.cible.y
 		});
 		return;
@@ -46035,34 +46381,34 @@ function Ia(e) {
 			if (!t.surLeTerrain || t.role !== "alignement") continue;
 			let e = Math.abs(t.cible.y - n);
 			t.cible = {
-				x: t.cible.x - A(t.cote) * i * .8,
-				y: k(n + r * (e * (1 + i * .14)), 2.5, 67.5)
+				x: t.cible.x - j(t.cote) * i * .8,
+				y: A(n + r * (e * (1 + i * .14)), 2.5, 67.5)
 			};
 		}
 		let a = e.conquete;
 		if (a?.type === "touche") {
-			let i = H(e, e.possession).filter((e) => e.role === "alignement").sort((e, t) => Math.abs(e.cible.y - n) - Math.abs(t.cible.y - n)), o = H(e, e.possession).find((e) => e.id === a.cibleId), s = a.leurreId ? i.find((e) => e.id === a.leurreId && e !== o) : a.combinaison === "leurreDevant" ? i.find((e) => e !== o) : void 0, c = Math.sin(Math.PI * k((t - .3) / .48, 0, 1));
-			if (s && (s.cible.y = k(s.cible.y + r * 2.2 * c, 2.5, 67.5)), o) {
+			let i = V(e, e.possession).filter((e) => e.role === "alignement").sort((e, t) => Math.abs(e.cible.y - n) - Math.abs(t.cible.y - n)), o = V(e, e.possession).find((e) => e.id === a.cibleId), s = a.leurreId ? i.find((e) => e.id === a.leurreId && e !== o) : a.combinaison === "leurreDevant" ? i.find((e) => e !== o) : void 0, c = Math.sin(Math.PI * A((t - .3) / .48, 0, 1));
+			if (s && (s.cible.y = A(s.cible.y + r * 2.2 * c, 2.5, 67.5)), o) {
 				if (a.horsAlignement && a.reception) {
-					let n = e.placement?.[o.id] ?? o.pos, r = k((t - .52) / .43, 0, 1);
+					let n = e.placement?.[o.id] ?? o.pos, r = A((t - .52) / .43, 0, 1);
 					o.cible = {
 						x: n.x + (a.reception.x - n.x) * r,
 						y: n.y + (a.reception.y - n.y) * r
 					};
 					return;
 				}
-				o.cible.y = k(o.cible.y - r * 1.25 * c, 2.5, 67.5), o.cible.x += A(o.cote) * .55 * Math.sin(Math.PI * k((t - .62) / .34, 0, 1));
-				let s = i.filter((e) => e !== o).sort((e, t) => Math.abs(e.cible.y - o.cible.y) - Math.abs(t.cible.y - o.cible.y)).slice(0, 2), l = k((t - .48) / .28, 0, 1);
+				o.cible.y = A(o.cible.y - r * 1.25 * c, 2.5, 67.5), o.cible.x += j(o.cote) * .55 * Math.sin(Math.PI * A((t - .62) / .34, 0, 1));
+				let s = i.filter((e) => e !== o).sort((e, t) => Math.abs(e.cible.y - o.cible.y) - Math.abs(t.cible.y - o.cible.y)).slice(0, 2), l = A((t - .48) / .28, 0, 1);
 				s.forEach((e, t) => {
 					let n = t === 0 ? -1 : 1;
 					e.cible.x += (o.cible.x - e.cible.x) * l * .72, e.cible.y += (o.cible.y + r * n * .62 - e.cible.y) * l;
 				});
 				let u = a.sortie === "peel" ? i.find((e) => e.id === a.peelId) : void 0;
 				if (u && u !== o && !s.includes(u)) {
-					let e = k((t - .66) / .3, 0, 1), a = Math.max(...i.map((e) => Math.abs(e.cible.y - n)));
+					let e = A((t - .66) / .3, 0, 1), a = Math.max(...i.map((e) => Math.abs(e.cible.y - n)));
 					u.cible = {
-						x: u.cible.x + (o.cible.x - A(u.cote) * 1.9 - u.cible.x) * e,
-						y: u.cible.y + (k(n + r * (a + 2.4), 2.5, 67.5) - u.cible.y) * e
+						x: u.cible.x + (o.cible.x - j(u.cote) * 1.9 - u.cible.x) * e,
+						y: u.cible.y + (A(n + r * (a + 2.4), 2.5, 67.5) - u.cible.y) * e
 					};
 				}
 			}
@@ -46073,12 +46419,12 @@ function Ia(e) {
 		if (e.tir.etape) return;
 		let n = e.tir.buteur;
 		if (!n.surLeTerrain) return;
-		let r = e.tir.routine ?? xi(n), i = r.reculMetres, a = r.decalageLateral, o = t < .25 ? 0 : t < .5 ? (t - .25) / .25 * i : t < .92 ? i : Math.max(0, (1 - t) / .08) * i, s = t < .25 ? 0 : t < .5 ? (t - .25) / .25 * a : t < .92 ? a : Math.max(0, (1 - t) / .08) * a, c = e.tir.lieu ?? e.ballon, l = (n.cote === "A" ? 111 : 11) - c.x, u = 35 - c.y, d = Math.max(.01, Math.hypot(l, u)), f = l / d, p = u / d;
+		let r = e.tir.routine ?? Qi(n), i = r.reculMetres, a = r.decalageLateral, o = t < .25 ? 0 : t < .5 ? (t - .25) / .25 * i : t < .92 ? i : Math.max(0, (1 - t) / .08) * i, s = t < .25 ? 0 : t < .5 ? (t - .25) / .25 * a : t < .92 ? a : Math.max(0, (1 - t) / .08) * a, c = e.tir.lieu ?? e.ballon, l = (n.cote === "A" ? 111 : 11) - c.x, u = 35 - c.y, d = Math.max(.01, Math.hypot(l, u)), f = l / d, p = u / d;
 		if (n.cible = {
 			x: c.x - f * o - p * s,
-			y: k(c.y - p * o + f * s, 2.5, 67.5)
+			y: A(c.y - p * o + f * s, 2.5, 67.5)
 		}, t >= .92 && (n.effort = 1.1), e.phase === "transformation" && t >= .96) {
-			let t = H(e, j(n.cote)).filter((e) => e.sanction <= 0).sort((t, n) => O(t.pos, e.ballon) - O(n.pos, e.ballon));
+			let t = V(e, M(n.cote)).filter((e) => e.sanction <= 0).sort((t, n) => k(t.pos, e.ballon) - k(n.pos, e.ballon));
 			for (let n of t.slice(0, 3)) n.role = "chasseur", n.cible = {
 				x: e.ballon.x,
 				y: e.ballon.y
@@ -46090,8 +46436,8 @@ function Ia(e) {
 		}
 	}
 }
-function La(e, t) {
-	let n = ci(e, t);
+function ho(e, t) {
+	let n = Ii(e, t);
 	return {
 		essaisTransformes: n.essaisTransformes,
 		essaisSecs: n.essaisSecs,
@@ -46100,7 +46446,7 @@ function La(e, t) {
 		marques: 0
 	};
 }
-var Ra = [
+var go = [
 	"talonneur",
 	"pilier_gauche",
 	"pilier_droit",
@@ -46110,12 +46456,12 @@ var Ra = [
 	"demi_ouverture",
 	"deuxieme_centre"
 ];
-function za(e) {
+function _o(e) {
 	let t = [...e].sort((e, t) => t.note - e.note), n = /* @__PURE__ */ new Set(), r = (e, r) => {
 		let i = c[e]?.famille, a = (c[e]?.categorie ?? "Avant") === "Avant", o = t.find((t) => !n.has(t) && t.poste === e) ?? t.find((e) => !n.has(e) && c[e.poste]?.famille === i) ?? t.find((e) => !n.has(e) && (c[e.poste]?.categorie ?? "Avant") === "Avant" === a) ?? (r ? t.find((e) => !n.has(e)) : void 0);
 		return o && n.add(o), o;
 	}, i = [];
-	for (let e of xe) {
+	for (let e of je) {
 		let t = r(e, !0);
 		if (!t) break;
 		i.push({
@@ -46124,7 +46470,7 @@ function za(e) {
 		});
 	}
 	let a = [];
-	for (let e of Ra) {
+	for (let e of go) {
 		let t = r(e, !1);
 		t && a.push({
 			...t,
@@ -46133,16 +46479,16 @@ function za(e) {
 	}
 	return [...i, ...a];
 }
-function Ba(e, t, n, r, i, a, o, s, u = {}) {
+function vo(e, t, n, r, i, a, o, s, u = {}) {
 	let d = u.rng ?? l("moteur2#" + o), f = [], p = (e, t, n) => {
-		let r = t === "A" ? u.compositionA : u.compositionB, i = r?.length ? r.slice(0, 23) : za(e);
+		let r = t === "A" ? u.compositionA : u.compositionB, i = r?.length ? r.slice(0, 23) : _o(e);
 		if (s && s.club === n) {
 			let e;
 			if (s.titulaire === !1) {
-				let t = c[s.poste]?.famille, n = Ra.findIndex((e) => e === s.poste), r = Ra.findIndex((e) => c[e]?.famille === t);
-				e = 15 + k(n >= 0 ? n : r >= 0 ? r : 7, 0, 7);
+				let t = c[s.poste]?.famille, n = go.findIndex((e) => e === s.poste), r = go.findIndex((e) => c[e]?.famille === t);
+				e = 15 + A(n >= 0 ? n : r >= 0 ? r : 7, 0, 7);
 			} else {
-				let t = xe.indexOf(s.poste);
+				let t = je.indexOf(s.poste);
 				e = t >= 0 ? t : 9;
 			}
 			i[e] && (i[e] = {
@@ -46152,7 +46498,7 @@ function Ba(e, t, n, r, i, a, o, s, u = {}) {
 			});
 		}
 		i.forEach((e, r) => {
-			let i = !!s && s.club === n && e.nom === s.nom, a = Ee(e, r, t, i, i ? s.attributs : void 0), o = t === "A" ? u.capitaineAId : u.capitaineBId, c = t === "A" ? u.buteurAId : u.buteurBId;
+			let i = !!s && s.club === n && e.nom === s.nom, a = Ie(e, r, t, i, i ? s.attributs : void 0), o = t === "A" ? u.capitaineAId : u.capitaineBId, c = t === "A" ? u.buteurAId : u.buteurBId;
 			a.capitaine = !!o && a.sourceId === o, a.buteur = !!c && a.sourceId === c, a.routineButeur = e.routineButeur, a.capitaine && (a.discipline += 4), f.push(a);
 		});
 	};
@@ -46163,17 +46509,17 @@ function Ba(e, t, n, r, i, a, o, s, u = {}) {
 			...(t === "A" ? u.capitaineAId : u.capitaineBId) ? { capitaine: t === "A" ? u.capitaineAId : u.capitaineBId } : {},
 			...(t === "A" ? u.buteurAId : u.buteurBId) ? { buteur: t === "A" ? u.buteurAId : u.buteurBId } : {},
 			...t === "A" ? e.A : e.B
-		});
-		m = yn(f, {
+		}), n = f.find((e) => e.moi), r = (u.ia ?? 1) >= 4 && n?.numero === 2 && !(e.avatar ?? []).includes("lanceur") ? [...(e.avatar ?? []).filter((e) => e !== "lanceur2"), "lanceur"] : e.avatar;
+		m = Zn(f, {
 			A: t("A"),
 			B: t("B"),
-			avatar: e.avatar
+			avatar: r
 		});
 		for (let e of ["A", "B"]) {
-			let t = xn({
+			let t = $n({
 				pions: f,
 				responsabilites: m
-			}, e, "capitaine"), n = xn({
+			}, e, "capitaine"), n = $n({
 				pions: f,
 				responsabilites: m
 			}, e, "buteur");
@@ -46191,7 +46537,7 @@ function Ba(e, t, n, r, i, a, o, s, u = {}) {
 		periode: 1,
 		sirene: !1,
 		phase: "coupEnvoi",
-		minuteur: Da.coupEnvoi.visuel,
+		minuteur: io.coupEnvoi.visuel,
 		pions: f,
 		ballon: {
 			x: 61,
@@ -46225,8 +46571,8 @@ function Ba(e, t, n, r, i, a, o, s, u = {}) {
 		gardeRuck: 0,
 		scoreA: 0,
 		scoreB: 0,
-		planA: La(i, d),
-		planB: La(a, d),
+		planA: ho(i, d),
+		planB: ho(a, d),
 		cibleBaseA: i,
 		cibleBaseB: a,
 		ajustementTactiqueA: 0,
@@ -46262,10 +46608,10 @@ function Ba(e, t, n, r, i, a, o, s, u = {}) {
 		placementJoue: u.placementJoue,
 		resserrement: u.resserrement,
 		ia: u.ia,
-		...(u.ia ?? 1) >= 2 && u.vent !== null ? yc(u.vent ?? ta(o)) : {},
+		...(u.ia ?? 1) >= 2 && u.vent !== null ? pl(u.vent ?? Ma(o)) : {},
 		styles: u.cadenceDetaillee || (u.ia ?? 1) >= 2 ? {
-			A: Zo(e),
-			B: Zo(t)
+			A: ks(e),
+			B: ks(t)
 		} : void 0,
 		scoreSurTerrain: u.scoreSurTerrain ?? !0,
 		meteoTir: u.meteoTir,
@@ -46282,13 +46628,14 @@ function Ba(e, t, n, r, i, a, o, s, u = {}) {
 		bagarre: null,
 		bulles: [],
 		prochaineFriction: 12,
-		discipline: Xe(),
+		discipline: st(),
 		...m ? { responsabilites: m } : {}
 	};
-	g.minuteur = ka(g, "coupEnvoi"), g.cibleRenvoi = {
-		x: 61 + A(h) * 30,
-		y: k(35 + (d() < .5 ? 1 : -1) * 16, 8, 62)
-	}, g.placement = Be(f, h, g.cibleRenvoi, g.responsabilites ? xn(g, h, "engagement")?.id : void 0);
+	if (D(g)) for (let e of f) e.deuxReserves = !0, e.sprint = 100, e.sprintMax = 100;
+	g.minuteur = oo(g, "coupEnvoi"), g.cibleRenvoi = {
+		x: 61 + j(h) * 30,
+		y: A(35 + (d() < .5 ? 1 : -1) * 16, 8, 62)
+	}, g.placement = Ze(f, h, g.cibleRenvoi, g.responsabilites ? $n(g, h, "engagement")?.id : void 0);
 	for (let e of f) {
 		let t = g.placement[e.id];
 		t && (e.pos = {
@@ -46297,144 +46644,153 @@ function Ba(e, t, n, r, i, a, o, s, u = {}) {
 		}, e.cible = {
 			x: t.x,
 			y: t.y
-		}, N(e));
+		}, P(e));
 	}
-	return J(g, "jalon", null, I("coupEnvoiMatch", {
+	return q(g, "jalon", null, I("coupEnvoiMatch", {
 		clubA: e,
 		clubB: t
 	})), (u.cohesionA !== void 0 || u.cohesionB !== void 0) && (g.cohesion = {
 		A: u.cohesionA,
 		B: u.cohesionB
-	}), u.tactiqueA && il(g, "A", u.tactiqueA, !1), u.tactiqueB && il(g, "B", u.tactiqueB, !1), g;
+	}), u.tactiqueA && Zl(g, "A", u.tactiqueA, !1), u.tactiqueB && Zl(g, "B", u.tactiqueB, !1), g;
 }
-function Va(e, t) {
+function yo(e, t) {
 	if (e.fini) return;
 	e.reliquat += t;
 	let n = 0;
 	for (; e.reliquat >= .15 && !e.fini && n++ < 4e4;) {
-		e.reliquat -= K, Ha(e), e.direct?.actif && Xn(e);
+		e.reliquat -= G, bo(e), e.direct?.actif && kr(e);
 		let t = e.vol;
-		if (e.phase === "ballonEnLAir" && t?.type === "pied") for (let n of e.pions) !n.surLeTerrain || !n.horsJeu || n.cote !== t.auteur.cote || (n.cible.x = k(t.auteur.pos.x - A(n.cote) * 2, .5, 121.5), n.cible.y = k(n.cible.y, 4, 66), n.effort = .55);
+		if (e.phase === "ballonEnLAir" && t?.type === "pied") for (let n of e.pions) !n.surLeTerrain || !n.horsJeu || n.cote !== t.auteur.cote || (n.cible.x = A(t.auteur.pos.x - j(n.cote) * 2, .5, 121.5), n.cible.y = A(n.cible.y, 4, 66), n.effort = .55);
 		e.apresPas?.(e);
 	}
 }
-function Ha(e) {
-	let t = K;
-	e.sim += t, Rt(e, t), Bt(e, t), e.sifflet && (e.sifflet.restant -= t, e.sifflet.restant <= 0 && (e.sifflet = null)), e.grosImpact && (e.grosImpact.restant -= t, e.grosImpact.restant <= 0 && (e.grosImpact = null)), e.dernierReplayEssai && (e.dernierReplayEssai.restant -= t, e.dernierReplayEssai.restant <= 0 && (e.dernierReplayEssai = null)), ri(e, t), e.echappee && (e.echappee.restant -= t, (e.echappee.restant <= 0 || e.porteur !== e.echappee.pion) && (e.echappee = null));
-	let n = e.responsabilites?.attente ? 0 : t * (e.dureeReelleArcade ? e.phase === "miTemps" ? 0 : 4800 / e.dureeReelleArcade : e.carriereDixMinutes ? e.cadenceDetaillee ? Na(e) : Pa(e) : Oa(e.phase, e.tempsReel));
+function bo(e) {
+	let t = G;
+	e.sim += t, Yt(e, t), Qt(e, t), e.sifflet && (e.sifflet.restant -= t, e.sifflet.restant <= 0 && (e.sifflet = null)), e.grosImpact && (e.grosImpact.restant -= t, e.grosImpact.restant <= 0 && (e.grosImpact = null)), e.dernierReplayEssai && (e.dernierReplayEssai.restant -= t, e.dernierReplayEssai.restant <= 0 && (e.dernierReplayEssai = null)), ji(e, t), e.echappee && (e.echappee.restant -= t, (e.echappee.restant <= 0 || e.porteur !== e.echappee.pion) && (e.echappee = null));
+	let n = e.responsabilites?.attente ? 0 : t * (e.dureeReelleArcade ? e.phase === "miTemps" ? 0 : 4800 / e.dureeReelleArcade : e.carriereDixMinutes ? e.cadenceDetaillee ? uo(e) : fo(e) : ao(e.phase, e.tempsReel));
 	e.t += n, e.minute = Math.min(80, Math.floor(e.t / 60));
-	let r = e.periode * Ta;
-	if (!e.sirene && e.t >= r && (e.sirene = !0, J(e, "jalon", null, I(e.periode === 1 ? "sirenePremiere" : "sireneFinale"))), e.sirene && !e.finSurSortieOuEnAvant && e.t > r + 360) return Qc(e);
-	let i = z(e) && Ht(e) ? G.fatigueCondensee : 0;
+	let r = e.periode * no;
+	if (!e.sirene && e.t >= r && (e.sirene = !0, q(e, "jalon", null, I(e.periode === 1 ? "sirenePremiere" : "sireneFinale"))), e.sirene && !e.finSurSortieOuEnAvant && e.t > r + 360) return Gl(e);
+	let i = R(e) && en(e) ? W.fatigueCondensee : 0;
 	for (let r of e.pions) {
-		if (r.surLeTerrain && r.numero > 15 && (r.numeroMaillot ??= r.numero, r.numero = xe.indexOf(r.poste) + 1), r.battu > 0 && (r.battu = Math.max(0, r.battu - t)), r.sanction > 0) {
-			r.sanction = Math.max(0, r.sanction - n), r.sanction === 0 && !r.surLeTerrain && (r.surLeTerrain = !0, r.pos = z(e) ? {
+		if (r.surLeTerrain && r.numero > 15 && (r.numeroMaillot ??= r.numero, r.numero = je.indexOf(r.poste) + 1), r.battu > 0 && (r.battu = Math.max(0, r.battu - t)), r.sanction > 0) {
+			r.sanction = Math.max(0, r.sanction - n), r.sanction === 0 && !r.surLeTerrain && (r.surLeTerrain = !0, r.pos = R(e) ? {
 				x: 61 + (r.cote === "A" ? -9 : 9) * (e.cotesInverses ? -1 : 1),
 				y: e.cotesInverses ? .3 : 69.7
 			} : {
 				x: e.ballon.x,
 				y: r.numero <= 8 ? 4 : 66
-			}, N(r));
+			}, P(r));
 			continue;
 		}
 		if (r.surLeTerrain) {
-			if (r.minutes += n / 60, Ye.has(e.phase)) r.endurance = Math.min(100, r.endurance + n * .055);
+			if (r.minutes += n / 60, r.deuxReserves) {
+				if (ot.has(e.phase)) r.endurance = Math.min(100, r.endurance + n * E.recupArretGenerale);
+				else if (!r.corps) {
+					let e = Math.min(1, Math.hypot(r.vitesse.x, r.vitesse.y) / r.vitesseMax), n = E.usureGenerale;
+					e > .05 && i > 0 && (r.endurance = Math.max(E.plancher, r.endurance - r.usure * t * e ** 1.6 * 10 * i * n));
+					let a = E.coutLien[r.role];
+					a && (r.endurance = Math.max(E.plancher, r.endurance - a * t * (1 + i)));
+				}
+				r.sprintMax = te(r.endurance);
+			} else if (ot.has(e.phase)) r.endurance = Math.min(100, r.endurance + n * .055);
 			else if (i > 0 && !r.corps) {
 				let e = Math.min(1, Math.hypot(r.vitesse.x, r.vitesse.y) / r.vitesseMax);
 				e > .05 && (r.endurance = Math.max(0, r.endurance - r.usure * t * e ** 1.6 * 10 * i));
 			}
 		}
 	}
-	(e.minute >= 48 || Object.keys(e.remplacementsDemandes).length > 0) && Zc(e), e.responsabilites && (wn(e), Gs(e), Qs(e)), e.intention && (e.intention.restant -= t, e.intention.restant <= 0 && (e.intention = null));
+	(e.minute >= 48 || Object.keys(e.remplacementsDemandes).length > 0) && Wl(e), e.responsabilites && (nr(e), Nc(e), Bc(e)), e.intention && (e.intention.restant -= t, e.intention.restant <= 0 && (e.intention = null));
 	for (let n of Object.keys(e.recharges)) {
 		let r = (e.recharges[n] ?? 0) - t;
 		r <= 0 ? delete e.recharges[n] : e.recharges[n] = r;
 	}
-	if (Er(e, t), jr(e, t), Nr(e, t), e.compteur++ % 3 == 0) {
-		if (hr(e), e.placement) for (let t of e.pions) {
+	if (ei(e, t), ai(e, t), si(e, t), e.compteur++ % 3 == 0) {
+		if (Ur(e), e.placement) for (let t of e.pions) {
 			let n = e.placement[t.id];
 			n && t.surLeTerrain && !(t.horsJeu && e.phase === "ballonEnLAir" && e.vol?.type === "pied") && (t.cible = n);
 		}
-		e.direct?.actif && Jn(e), e.minuteur > 0 && Ia(e);
+		e.direct?.actif && Dr(e), e.minuteur > 0 && mo(e);
 	}
-	if (qe(e), z(e) && Io(e), Xt(e) && No(e), e.direct?.actif ? Xa(e) : e.controle && Ua(e), e.cadenceDetaillee) {
-		if (e.phase === "melee" && e.conquete?.melee && Bs(e), (e.phase === "tirAuBut" || e.phase === "transformation") && e.tir?.etape && !e.tir.volLance && jc(e), ps(e), os(e), lc(e), sc(e), e.phase === "coupEnvoi" || e.phase === "renvoi22") for (let t of e.pions) t.surLeTerrain && (t.effort = Math.min(t.effort, .66));
-		if (e.phase === "touche" && e.placementJoue && oo(e), e.tir?.volLance && e.tir.buteur.surLeTerrain && (e.tir.buteur.effort = Math.min(e.tir.buteur.effort, .6)), e.placementJoue && e.attentePlacement && !e.attentePlacement.pret && (e.phase === "melee" || e.phase === "touche")) for (let t of e.pions) t.surLeTerrain && (t.effort = Math.min(t.effort, (O(t.pos, t.cible) > 196 ? 6.2 : 4.8) / Math.max(4, t.vitesseMax)));
+	if (it(e), R(e) && ms(e), kn(e) && ds(e), e.direct?.actif ? Oo(e) : e.controle && xo(e), e.direct && Cn(e), e.cadenceDetaillee) {
+		if (e.phase === "melee" && e.conquete?.melee && Oc(e), (e.phase === "tirAuBut" || e.phase === "transformation") && e.tir?.etape && !e.tir.volLance && Tl(e), Gs(e), Rs(e), rl(e), tl(e), e.phase === "coupEnvoi" || e.phase === "renvoi22") for (let t of e.pions) t.surLeTerrain && (t.effort = Math.min(t.effort, .66));
+		if (e.phase === "touche" && e.placementJoue && zo(e), e.phase === "touche" && ln(e) && Wc(e), e.tir?.volLance && e.tir.buteur.surLeTerrain && (e.tir.buteur.effort = Math.min(e.tir.buteur.effort, .6)), e.placementJoue && e.attentePlacement && !e.attentePlacement.pret && (e.phase === "melee" || e.phase === "touche")) for (let t of e.pions) t.surLeTerrain && (t.effort = Math.min(t.effort, (k(t.pos, t.cible) > 196 ? 6.2 : 4.8) / Math.max(4, t.vitesseMax)));
 	}
 	if (e.vol?.type === "passe" && e.vol.receveur?.surLeTerrain) {
-		let t = e.vol, n = t.receveur, r = A(n.cote), i = t.duree - t.ecoule;
+		let t = e.vol, n = t.receveur, r = j(n.cote), i = t.duree - t.ecoule;
 		if (e.cadenceDetaillee) {
-			let e = D(n.pos, t.vers) / Math.max(.12, i), a = e > 1.8 ? 3 : i < .3 ? 1.2 : 0;
+			let e = O(n.pos, t.vers) / Math.max(.12, i), a = e > 1.8 ? 3 : i < .3 ? 1.2 : 0;
 			n.cible = {
-				x: k(t.vers.x + r * a, .5, 121.5),
+				x: A(t.vers.x + r * a, .5, 121.5),
 				y: t.vers.y
-			}, n.effort = k(e / De(n) * 1.12, .3, 1.1);
+			}, n.effort = A(e / Le(n) * 1.12, .3, 1.1);
 		} else n.cible = { ...t.vers }, n.effort = Math.max(n.effort, 1.04);
-		let a = e.cadenceDetaillee && i > .4 ? [] : H(e, j(n.cote)).filter((e) => e.sanction <= 0 && e.battu <= 0 && (e.pos.x - t.vers.x) * r > -2).sort((e, n) => O(e.pos, t.vers) - O(n.pos, t.vers)).slice(0, 2);
+		let a = e.cadenceDetaillee && i > .4 ? [] : V(e, M(n.cote)).filter((e) => e.sanction <= 0 && e.battu <= 0 && (e.pos.x - t.vers.x) * r > -2).sort((e, n) => k(e.pos, t.vers) - k(n.pos, t.vers)).slice(0, 2);
 		for (let e of a) e.cible = {
 			x: t.vers.x + r * 1.1,
 			y: t.vers.y
 		}, e.role = "chasseur", e.effort = Math.max(e.effort, 1.1);
 	}
 	if (e.phase === "ballonEnLAir" && e.vol?.type === "pied") {
-		let t = e.vol.vers, n = H(e, j(e.vol.auteur.cote)).filter((e) => e.sanction <= 0).sort((e, n) => O(e.pos, t) - e.detente * .035 - (O(n.pos, t) - n.detente * .035)), r = e.vol.receveur?.surLeTerrain && e.vol.receveur.sanction <= 0 ? e.vol.receveur : n[0];
+		let t = e.vol.vers, n = V(e, M(e.vol.auteur.cote)).filter((e) => e.sanction <= 0).sort((e, n) => k(e.pos, t) - e.detente * .035 - (k(n.pos, t) - n.detente * .035)), r = e.vol.receveur?.surLeTerrain && e.vol.receveur.sanction <= 0 ? e.vol.receveur : n[0];
 		e.vol.receveur = r ?? null;
 		let i = n.filter((e) => e !== r), a = i[0];
 		if (r) {
 			r.cible = { ...t }, r.role = "chasseur";
 			let n = Math.max(.35, e.vol.duree - e.vol.ecoule);
-			r.effort = k(D(r.pos, t) / (n * r.vitesseMax) * 1.3, .35, 1.12);
+			r.effort = A(O(r.pos, t) / (n * r.vitesseMax) * 1.3, .35, 1.12);
 		}
 		a && (a.cible = {
-			x: k(t.x - A(a.cote) * 3.5, 1, 121),
-			y: k(t.y + (a.pos.y < t.y ? -3 : 3), 2, 68)
+			x: A(t.x - j(a.cote) * 3.5, 1, 121),
+			y: A(t.y + (a.pos.y < t.y ? -3 : 3), 2, 68)
 		}, a.role = "chasseur", a.effort = Math.max(a.effort, 1.04));
-		let o = 2.1 + 2.4 * (1 - k(e.vol.ecoule / e.vol.duree, 0, 1));
+		let o = 2.1 + 2.4 * (1 - A(e.vol.ecoule / e.vol.duree, 0, 1));
 		i.slice(1, 4).forEach((e, n) => {
 			e.cible = {
-				x: k(t.x - A(e.cote) * (2 + n * 1.4), 1, 121),
-				y: k(t.y + (n % 2 ? -1 : 1) * o, 2, 68)
+				x: A(t.x - j(e.cote) * (2 + n * 1.4), 1, 121),
+				y: A(t.y + (n % 2 ? -1 : 1) * o, 2, 68)
 			}, e.effort = .75;
 		});
 	}
 	if (e.aide = 0, (e.phase === "jeuCourant" || e.phase === "ruck" || e.phase === "maul") && (e.possession === "A" ? e.compteurs.tempsA += t : e.compteurs.tempsB += t), e.phase === "jeuCourant" && e.porteur) if (e.gardeRuck > 0) e.gardeRuck -= t;
 	else {
-		let n = A(e.possession);
-		e.ligneDef -= n * br(e, j(e.possession)) * t;
+		let n = j(e.possession);
+		e.ligneDef -= n * Jr(e, M(e.possession)) * t;
 		let r = e.porteur.pos.x + n * .6;
 		(e.ligneDef - r) * n < 0 && (e.ligneDef = r);
 	}
 	if (e.vol) {
-		e.vol.type === "pied" && Co(e, e.vol.auteur), e.vol.ecoule += t;
-		let n = Fi(e.vol);
+		e.vol.type === "pied" && ts(e, e.vol.auteur), e.vol.ecoule += t;
+		let n = fa(e.vol);
 		e.ballon = {
 			x: n.x,
 			y: n.y
 		};
 	}
-	hi(e);
+	Ki(e);
 	for (let n of e.pions) if (!(!n.surLeTerrain || n.sanction > 0)) {
-		if (n !== e.porteur && kn(e, n)) {
-			In(n, t, Wa(e, n), Ka(e));
+		if (n !== e.porteur && cr(e, n)) {
+			hr(n, t, So(e, n), wo(e));
 			continue;
 		}
 		if (n !== e.porteur) {
 			if (e.tir?.buteur === n && e.tir.frappeDepuis !== void 0 && !e.tir.volLance) {
-				N(n);
+				P(n);
 				continue;
 			}
-			e.cellule?.accroches?.includes(n.id) || (z(e) && (n.effort = Math.min(n.effort, 10.9 / Math.max(1, De(n)))), ke(n, t, !!e.cadenceDetaillee && (n.role === "ruck" || e.vol?.type === "passe" && e.vol.receveur === n)));
+			e.cellule?.accroches?.includes(n.id) || (R(e) && (n.effort = Math.min(n.effort, 10.9 / Math.max(1, Le(n)))), ze(n, t, !!e.cadenceDetaillee && (n.role === "ruck" || e.vol?.type === "passe" && e.vol.receveur === n)));
 		}
 	}
-	(e.phase !== "jeuCourant" || !e.porteur) && po(e), gi(e, t);
-	let a = Vt(e);
+	(e.phase !== "jeuCourant" || !e.porteur) && Go(e), qi(e, t);
+	let a = $t(e);
 	if (a) {
-		if (e.compteurs.irregularites += 1, Tr(e, 14), a.motif.includes("coup de") || a.rouge || e.rng() < .2) {
-			Oc(e, a.fautif, a.victime, a.motif, a.rouge ? "carton_rouge" : "carton_jaune");
+		if (e.compteurs.irregularites += 1, $r(e, 14), a.motif.includes("coup de") || a.rouge || e.rng() < .2) {
+			Sl(e, a.fautif, a.victime, a.motif, a.rouge ? "carton_rouge" : "carton_jaune");
 			return;
 		}
-		if (a.vu) return $(e, a.victime.cote, a.victime.pos, a.motif, a.fautif, a.rouge ? "rouge" : "jaune");
-		J(e, "jeu", null, `Un ${a.motif} échappe au regard de l’arbitre, le jeu continue.`);
+		if (a.vu) return Q(e, a.victime.cote, a.victime.pos, a.motif, a.fautif, a.rouge ? "rouge" : "jaune");
+		q(e, "jeu", null, `Un ${a.motif} échappe au regard de l’arbitre, le jeu continue.`);
 	}
 	if (e.piedPrepare) {
 		let n = e.piedPrepare, r = e.pions.find((e) => e.id === n.auteurId && e.surLeTerrain && e.sanction <= 0);
@@ -46444,7 +46800,7 @@ function Ha(e) {
 		}
 		n.debut ??= e.sim;
 		let i = e.sim - n.debut >= (n.rapideArcade ? .55 : e.cadenceDetaillee && r !== e.porteur ? 12 : 1.2);
-		if (r.cible = { ...n.depuis }, r === e.porteur && (ke(r, t), e.ballon = { ...r.pos }), !i && (D(r.pos, n.depuis) > .75 || r.corps)) {
+		if (r.cible = { ...n.depuis }, r === e.porteur && (ze(r, t), e.ballon = { ...r.pos }), !i && (O(r.pos, n.depuis) > .75 || r.corps)) {
 			delete n.pretDepuis;
 			return;
 		}
@@ -46454,54 +46810,54 @@ function Ha(e) {
 		delete e.piedPrepare, e.placement && (delete e.placement[r.id], Object.keys(e.placement).length === 0 && (e.placement = null));
 		let { arrivee: s, duree: c, hauteur: l, courbe: u } = n;
 		if (n.intention === "drop" && e.dropEnCours?.humain && e.dropEnCours.auteurId === r.id) {
-			let t = no(e, r), n = e.dropEnCours.reussi;
+			let t = Fo(e, r), n = e.dropEnCours.reussi;
 			if (t) {
-				let i = A(r.cote);
+				let i = j(r.cote);
 				s = {
-					x: k(r.pos.x + i * (1.5 + e.rng() * 2.5), 1, 121),
-					y: k(r.pos.y + (e.rng() - .5) * 5, 1, 69)
+					x: A(r.pos.x + i * (1.5 + e.rng() * 2.5), 1, 121),
+					y: A(r.pos.y + (e.rng() - .5) * 5, 1, 69)
 				}, c = .45, l = .3, u = {}, e.dropEnCours = {
 					auteurId: r.id,
 					reussi: !1,
 					issue: "contre",
 					humain: !0
-				}, n && e.responsabilites && --e.responsabilites.stats.dropsReussis, L(e, t, "charge_down", 1.4), J(e, "pied", r.cote, o("rv.fil.dropContre", {
+				}, n && e.responsabilites && --e.responsabilites.stats.dropsReussis, L(e, t, "charge_down", 1.4), q(e, "pied", r.cote, o("rv.fil.dropContre", {
 					nom: r.nom,
 					contreur: t.nom
 				}), 0, !0);
 			}
 		}
-		X(e, r, s, n.intention, c, l, r.pos, !0, u);
+		Y(e, r, s, n.intention, c, l, r.pos, !0, u);
 		return;
 	}
-	switch (co(e) || (e.minuteur -= t), e.phase) {
-		case "coupEnvoi": return vo(e);
-		case "renvoi22": return yo(e);
-		case "jeuCourant": return ko(e, t);
-		case "ballonEnLAir": return Eo(e);
-		case "ballonLibre": return Oo(e, t);
-		case "ruck": return Ns(e);
-		case "maul": return Is(e, t);
-		case "melee": return Hs(e);
-		case "touche": return $s(e);
-		case "penalite": return vc(e);
-		case "tirAuBut": return Tc(e);
-		case "transformation": return Ec(e);
-		case "aplatissage": return Nc(e);
-		case "tmo": return Mc(e);
-		case "apresEssai": return Pc(e);
-		case "miTemps": return $c(e);
-		case "bagarre": return io(e);
+	switch (!Vo(e) && !Vc(e) && (e.minuteur -= t), e.phase) {
+		case "coupEnvoi": return Xo(e);
+		case "renvoi22": return Zo(e);
+		case "jeuCourant": return ss(e, t);
+		case "ballonEnLAir": return is(e);
+		case "ballonLibre": return os(e, t);
+		case "ruck": return pc(e);
+		case "maul": return vc(e, t);
+		case "melee": return Ac(e);
+		case "touche": return qc(e);
+		case "penalite": return fl(e);
+		case "tirAuBut": return yl(e);
+		case "transformation": return bl(e);
+		case "aplatissage": return Dl(e);
+		case "tmo": return El(e);
+		case "apresEssai": return Ol(e);
+		case "miTemps": return Kl(e);
+		case "bagarre": return Lo(e);
 		default: return;
 	}
 }
-function Ua(e) {
+function xo(e) {
 	let t = e.pions.find((e) => e.moi);
 	if (!t || !t.surLeTerrain || t.sanction > 0) return;
-	let n = A(t.cote), r = e.porteur;
+	let n = j(t.cote), r = e.porteur;
 	if (e.intention) switch (e.intention.type) {
 		case "sprint":
-			t.effort = t.endurance < 25 ? 1.02 : t.endurance < 45 ? 1.07 : 1.12, t.endurance = Math.max(0, t.endurance - K * 1.4);
+			t.effort = t.endurance < 25 ? 1.02 : t.endurance < 45 ? 1.07 : 1.12, t.deuxReserves || (t.endurance = Math.max(0, t.endurance - G * 1.4));
 			break;
 		case "plaquage":
 		case "monter": {
@@ -46515,7 +46871,7 @@ function Ua(e) {
 		case "soutien":
 			r && r.cote === t.cote && r !== t && (t.cible = {
 				x: r.pos.x - n * 2.2,
-				y: k(r.pos.y + 1.4 * e.ouvert, 2.5, 67.5)
+				y: A(r.pos.y + 1.4 * e.ouvert, 2.5, 67.5)
 			}, t.effort = 1.08);
 			break;
 		case "grattage":
@@ -46529,14 +46885,25 @@ function Ua(e) {
 			break;
 		case "appel": e.possession === t.cote && r && r !== t && (t.cible = {
 			x: r.pos.x - n * 3.5,
-			y: k(r.pos.y + 7 * e.ouvert, 2.5, 67.5)
+			y: A(r.pos.y + 7 * e.ouvert, 2.5, 67.5)
 		}, t.effort = 1.05);
 	}
 }
-function Wa(e, t) {
+function So(e, t) {
 	let n = e.direct, r = e.porteur;
+	if (n.arme?.action === "plaquage" && n.arme.cap !== void 0 && e.sim < n.arme.jusqua) {
+		if (r && r.cote !== t.cote && !r.corps) {
+			let e = Math.atan2(r.pos.y - t.pos.y, r.pos.x - t.pos.x), i = Math.atan2(Math.sin(e - n.arme.cap), Math.cos(e - n.arme.cap));
+			Math.abs(i) <= B.aideLancerCone && (n.arme.cap += A(i, -B.aideLancerVitesse * G, B.aideLancerVitesse * G));
+		}
+		return {
+			mx: Math.cos(n.arme.cap),
+			my: Math.sin(n.arme.cap),
+			sprint: !0
+		};
+	}
 	if (n.arme?.action === "plaquage" && e.sim < n.arme.jusqua && r && r.cote !== t.cote) {
-		let e = k(D(t.pos, r.pos) / Math.max(6, De(t) * 1.1), 0, .45), n = r.pos.x + r.vitesse.x * e - t.pos.x, i = r.pos.y + r.vitesse.y * e - t.pos.y, a = Math.hypot(n, i) || 1;
+		let e = A(O(t.pos, r.pos) / Math.max(6, Le(t) * 1.1), 0, .45), n = r.pos.x + r.vitesse.x * e - t.pos.x, i = r.pos.y + r.vitesse.y * e - t.pos.y, a = Math.hypot(n, i) || 1;
 		return {
 			mx: n / a,
 			my: i / a,
@@ -46545,43 +46912,43 @@ function Wa(e, t) {
 	}
 	return n.commande;
 }
-function Ga(e, t, n) {
+function Co(e, t, n) {
 	let r = e.direct, i = n.chaine.findIndex((e, t) => t > n.index && e.moi);
 	if (i < 0) {
 		r.attenteChaine = void 0;
 		return;
 	}
-	let a = n.chaine[i], o = A(t.cote);
-	if (r.vue.libre && (a.pos.x - t.pos.x) * o <= .8 && D(a.pos, t.pos) <= V.porteePasse + 4) {
+	let a = n.chaine[i], o = j(t.cote);
+	if (r.vue.libre && (a.pos.x - t.pos.x) * o <= .8 && O(a.pos, t.pos) <= B.porteePasse + 4) {
 		r.attenteChaine = void 0;
 		return;
 	}
 	r.attenteChaine ??= e.sim, e.sim - r.attenteChaine >= 1 && (n.chaine.splice(i, 1), r.attenteChaine = void 0);
 }
-function Ka(e) {
+function wo(e) {
 	let t = e.direct?.pasDeCote;
 	if (!t) return null;
 	if (e.sim >= t.jusqua) return e.direct.pasDeCote = null, null;
-	let n = k((t.jusqua - e.sim) / .34, 0, 1), r = t.vitesse * Math.sin(Math.PI * (1 - n));
+	let n = A((t.jusqua - e.sim) / .34, 0, 1), r = t.vitesse * Math.sin(Math.PI * (1 - n));
 	return {
 		x: t.vers.x * r,
 		y: t.vers.y * r
 	};
 }
-function qa(e, t) {
-	if (!t.moi || !e.direct?.actif) return Ea;
+function To(e, t) {
+	if (!t.moi || !e.direct?.actif) return ro;
 	let n = e.direct.arme;
-	return n?.action === "plaquage" && e.sim < n.jusqua ? V.allongePlaquage : 0;
+	return n?.action === "plaquage" && n.cap !== void 0 ? e.sim < n.jusqua ? B.allongeLancer : 0 : n?.action === "plaquage" && e.sim < n.jusqua ? B.allongePlaquage : 0;
 }
-function Ja(e, t) {
+function Eo(e, t) {
 	let n = e.direct;
 	return !n?.actif || !t.moi || n.arme?.action !== "offload" || e.sim >= n.arme.jusqua ? null : { vers: n.arme.vers };
 }
-function Ya(e) {
+function Do(e) {
 	let t = e.direct?.arme;
 	return t ? e.sim - t.depuis <= .85 ? 1 : .8 : 1;
 }
-function q(e, t, n, r) {
+function K(e, t, n, r) {
 	return e.direct && (e.direct.retour = {
 		action: t,
 		ok: n,
@@ -46589,15 +46956,21 @@ function q(e, t, n, r) {
 		t: e.sim
 	}), n;
 }
-function Xa(e) {
+function Oo(e) {
 	let t = e.direct;
-	Mn(e, K);
+	dr(e, G);
 	let n = e.pions.find((e) => e.moi);
 	if (!n) return;
-	let r = V, i = t.arme;
+	let r = B, i = t.arme;
 	if (i) {
 		let r = e.porteur === n, a = e.sim >= i.jusqua - 1e-6;
-		i.action === "plaquage" ? r ? t.arme = null : a && (t.arme = null, $a(e, n)) : i.action === "raffut" || i.action === "crochet" ? r ? a && (t.arme = null) : (t.arme = null, e.intention?.type === i.action && (e.intention = null)) : r ? a && (t.arme = null, Qa(e, n, {
+		if (i.action === "plaquage") {
+			if (r) t.arme = null;
+			else if (a) {
+				let r = i.cap;
+				t.arme = null, Mo(e, n, r);
+			}
+		} else i.action === "raffut" || i.action === "crochet" ? r ? a && (t.arme = null) : (t.arme = null, e.intention?.type === i.action && (e.intention = null)) : r ? a && (t.arme = null, Ao(e, n, {
 			action: "passe",
 			vers: i.vers
 		}, !0)) : t.arme = null;
@@ -46605,28 +46978,40 @@ function Xa(e) {
 	if (t.appel && (e.porteur === n ? (t.appel.servi = !0, t.stats.appelsServis += 1, t.appel = null) : e.sim >= t.appel.fin && (t.appel.servi || (t.stats.appelsIgnores += 1), t.appel = null)), t.file.length) {
 		let i = t.file;
 		t.file = [];
-		let a = kn(e, n);
-		for (let t of i) if (!(e.sim - (t.t ?? e.sim) > r.patience + .15)) {
-			if (!a) {
-				q(e, t.action, !1, "indisponible");
+		let a = cr(e, n);
+		for (let o of i) if (!(e.sim - (o.t ?? e.sim) > r.patience + .15)) {
+			if (o.action === "pousser") {
+				let r = t.pack, i = Tn(e, o.tr ?? o.t);
+				i && r?.type === "ruck" && !r.engage && a && (r.engage = !0, ko(e, n, {
+					action: "grattage",
+					t: e.sim
+				})), K(e, "pousser", i);
 				continue;
 			}
-			Za(e, n, t);
+			if (o.action === "quitter") {
+				K(e, "quitter", !!o.sortie && En(e, o.sortie));
+				continue;
+			}
+			if (!a) {
+				K(e, o.action, !1, "indisponible");
+				continue;
+			}
+			ko(e, n, o);
 		}
 	}
-	Qn(e, K);
+	jr(e, G);
 }
-function Za(e, t, n) {
-	let r = e.direct, i = r.vue, a = V, o = (e) => {
-		t.endurance = Math.max(0, t.endurance - e);
+function ko(e, t, n) {
+	let r = e.direct, i = r.vue, a = B, o = (e) => {
+		t.deuxReserves ? (oe(t, e * .4), t.sprint = Math.max(0, t.sprint - e * 2.2)) : t.endurance = Math.max(0, t.endurance - e);
 	};
 	switch (n.action) {
-		case "passe": return Qa(e, t, n, !1);
-		case "drop": return e.porteur !== t || e.phase !== "jeuCourant" || e.vol || t.corps ? q(e, "drop", !1, "pasDeBallon") : i.possible.drop ? (e.lancement = null, e.combinaisonEnCours = void 0, to(e, t, n), r.recharges.drop = a.rechargeDrop, q(e, "drop", !0)) : q(e, "drop", !1, (r.recharges.drop ?? 0) > 0 ? "recharge" : "horsPortee");
+		case "passe": return Ao(e, t, n, !1);
+		case "drop": return e.porteur !== t || e.phase !== "jeuCourant" || e.vol || t.corps ? K(e, "drop", !1, "pasDeBallon") : i.possible.drop ? (e.lancement = null, e.combinaisonEnCours = void 0, Po(e, t, n), r.recharges.drop = a.rechargeDrop, K(e, "drop", !0)) : K(e, "drop", !1, (r.recharges.drop ?? 0) > 0 ? "recharge" : "horsPortee");
 		case "coupDePied": {
-			if (e.porteur !== t || e.phase !== "jeuCourant" || e.vol || t.corps) return q(e, "coupDePied", !1, "pasDeBallon");
-			let r = Hn(e, t, n);
-			return e.lancement = null, ro(e, t, r), q(e, "coupDePied", !0);
+			if (e.porteur !== t || e.phase !== "jeuCourant" || e.vol || t.corps) return K(e, "coupDePied", !1, "pasDeBallon");
+			let r = xr(e, t, n);
+			return e.lancement = null, Io(e, t, r), K(e, "coupDePied", !0);
 		}
 		case "raffut": return i.possible.raffut ? (r.arme = {
 			action: "raffut",
@@ -46635,18 +47020,18 @@ function Za(e, t, n) {
 		}, e.intention = {
 			type: "raffut",
 			restant: a.dureeGeste
-		}, r.recharges.raffut = a.rechargeRaffut, o(a.coutRaffut), L(e, t, "handoff", 1, "torse"), q(e, "raffut", !0)) : q(e, "raffut", !1, r.recharges.raffut ? "recharge" : "pasDeBallon");
+		}, r.recharges.raffut = a.rechargeRaffut, o(a.coutRaffut), L(e, t, "handoff", 1, "torse"), K(e, "raffut", !0)) : K(e, "raffut", !1, r.recharges.raffut ? "recharge" : "pasDeBallon");
 		case "crochet": {
-			if (!i.possible.crochet) return q(e, "crochet", !1, r.recharges.crochet ? "recharge" : "pasDeBallon");
+			if (!i.possible.crochet) return K(e, "crochet", !1, r.recharges.crochet ? "recharge" : "pasDeBallon");
 			let s = n.vers && Math.hypot(n.vers.x, n.vers.y) > .1 ? n.vers : null;
 			if (!s) {
-				let n = t.vitesse.x, r = t.vitesse.y, i = Math.hypot(n, r), a = i > .5 ? n / i : A(t.cote), o = i > .5 ? r / i : 0, c = {
+				let n = t.vitesse.x, r = t.vitesse.y, i = Math.hypot(n, r), a = i > .5 ? n / i : j(t.cote), o = i > .5 ? r / i : 0, c = {
 					x: -o,
 					y: a
 				}, l = {
 					x: o,
 					y: -a
-				}, u = (n) => Gt(e, j(t.cote), {
+				}, u = (n) => rn(e, M(t.cote), {
 					x: t.pos.x + a * 4 + n.x * 4,
 					y: t.pos.y + o * 4 + n.y * 4
 				});
@@ -46669,27 +47054,28 @@ function Za(e, t, n) {
 				restant: a.dureeGeste
 			}, r.recharges.crochet = a.rechargeCrochet, o(a.coutCrochet);
 			let d = t.numero + Math.floor(e.t) & 1 ? -1 : 1;
-			return L(e, t, "dodge", 1, `${Ai(t, u, e.ouvert, d)}:${u}`), q(e, "crochet", !0);
+			return L(e, t, "dodge", 1, `${sa(t, u, e.ouvert, d)}:${u}`), K(e, "crochet", !0);
 		}
 		case "plaquage": {
-			let n = Kn(e, t);
-			return !n || !i.possible.plaquage ? q(e, "plaquage", !1, n ? "recharge" : "tropLoin") : (r.arme = {
+			if (or(e)) return jo(e, t, o);
+			let n = Tr(e, t);
+			return !n || !i.possible.plaquage ? K(e, "plaquage", !1, n ? "recharge" : "tropLoin") : (r.arme = {
 				action: "plaquage",
 				depuis: e.sim,
 				jusqua: e.sim + a.dureePlaquage
 			}, e.intention = {
 				type: "plaquage",
 				restant: a.dureePlaquage
-			}, r.recharges.plaquage = a.rechargePlaquage, o(a.coutPlaquage), q(e, "plaquage", !0));
+			}, r.recharges.plaquage = a.rechargePlaquage, o(a.coutPlaquage), K(e, "plaquage", !0));
 		}
-		case "grattage": return !i.possible.grattage || !e.ruck ? q(e, "grattage", !1, "tropLoin") : (eo(e, t, "defense"), e.intention = {
+		case "grattage": return !i.possible.grattage || !e.ruck ? K(e, "grattage", !1, "tropLoin") : (No(e, t, "defense"), e.intention = {
 			type: "grattage",
 			restant: Math.min(9, Math.max(2, e.minuteur + 1.6))
-		}, r.recharges.grattage = a.rechargeGrattage, o(a.coutGrattage), L(e, t, "jackal", 2.2), q(e, "grattage", !0));
-		case "engager": return !i.possible.engager || !e.ruck ? q(e, "engager", !1, "tropLoin") : (eo(e, t, "attaque"), e.ruck.vitesseAttaque += 2.2 + k((t.puissance - 60) / 30, 0, 1.4), t.stats.rucksNettoyes += 1, q(e, "engager", !0));
+		}, r.recharges.grattage = a.rechargeGrattage, o(a.coutGrattage), L(e, t, "jackal", 2.2), K(e, "grattage", !0));
+		case "engager": return !i.possible.engager || !e.ruck ? K(e, "engager", !1, "tropLoin") : (No(e, t, "attaque"), e.ruck.vitesseAttaque += 2.2 + A((t.puissance - 60) / 30, 0, 1.4), t.stats.rucksNettoyes += 1, K(e, "engager", !0));
 		case "appel": {
-			if (!i.possible.appel) return q(e, "appel", !1, r.recharges.appel ? "recharge" : "indisponible");
-			let n = e.porteur && e.porteur.cote === t.cote ? e.porteur : null, o = Un(e, t, n);
+			if (!i.possible.appel) return K(e, "appel", !1, r.recharges.appel ? "recharge" : "indisponible");
+			let n = e.porteur && e.porteur.cote === t.cote ? e.porteur : null, o = Sr(e, t, n);
 			r.appel = {
 				depuis: e.sim,
 				fin: e.sim + a.dureeAppel,
@@ -46697,50 +47083,50 @@ function Za(e, t, n) {
 				force: o.force
 			}, r.stats.appels += 1, r.recharges.appel = a.rechargeAppel;
 			let s = n?.pos ?? e.ballon;
-			return L(e, t, "call_ball", 1.4, (t.pos.y - s.y) * A(t.cote) > 0 ? "g" : "d"), r.stats.appels % 3 == 1 && J(e, "jeu", t.cote, I("appelBallon", { nom: t.nom }), 0, !0), q(e, "appel", !0);
+			return L(e, t, "call_ball", 1.4, (t.pos.y - s.y) * j(t.cote) > 0 ? "g" : "d"), r.stats.appels % 3 == 1 && q(e, "jeu", t.cote, I("appelBallon", { nom: t.nom }), 0, !0), K(e, "appel", !0);
 		}
 		case "feinte": {
-			if (!i.possible.feinte) return q(e, "feinte", !1, r.recharges.feinte ? "recharge" : "indisponible");
-			let o = A(t.cote), s = n.vers ?? {
+			if (!i.possible.feinte) return K(e, "feinte", !1, r.recharges.feinte ? "recharge" : "indisponible");
+			let o = j(t.cote), s = n.vers ?? {
 				x: 0,
 				y: e.ouvert
-			}, c = H(e, j(t.cote)).filter((n) => Ut(e, n) && (n.pos.x - t.pos.x) * o > -.5 && O(n.pos, t.pos) < 42.25).sort((e, n) => O(e.pos, t.pos) - O(n.pos, t.pos))[0];
+			}, c = V(e, M(t.cote)).filter((n) => tn(e, n) && (n.pos.x - t.pos.x) * o > -.5 && k(n.pos, t.pos) < 42.25).sort((e, n) => k(e.pos, t.pos) - k(n.pos, t.pos))[0];
 			if (r.recharges.feinte = a.rechargeFeinte, L(e, t, "dummy_pass", .7, s.y >= 0 ? "plus" : "moins"), c) {
-				let n = !Ht(e), r = n ? G.feinteReussieReel : G.feinteReussie, i = n ? G.defenseurFixeReel : G.defenseurFixe;
-				e.rng() < k(r + (t.passe + t.vision - 2 * c.vision) / 260 + .1, .12, .85) ? (c.battu = Math.max(c.battu, i), (e.retards ??= {})[c.id] = e.sim + i, t.stats.franchissements += 1, J(e, "jeu", t.cote, `${t.nom} feinte la passe : ${c.nom} part sur le mauvais pied.`, 0, !0)) : J(e, "jeu", t.cote, `${t.nom} feinte la passe, ${c.nom} ne s’y laisse pas prendre.`, 0, !0);
+				let n = !en(e), r = n ? W.feinteReussieReel : W.feinteReussie, i = n ? W.defenseurFixeReel : W.defenseurFixe;
+				e.rng() < A(r + (t.passe + t.vision - 2 * c.vision) / 260 + .1, .12, .85) ? (c.battu = Math.max(c.battu, i), (e.retards ??= {})[c.id] = e.sim + i, t.stats.franchissements += 1, q(e, "jeu", t.cote, `${t.nom} feinte la passe : ${c.nom} part sur le mauvais pied.`, 0, !0)) : q(e, "jeu", t.cote, `${t.nom} feinte la passe, ${c.nom} ne s’y laisse pas prendre.`, 0, !0);
 			}
-			return q(e, "feinte", !0);
+			return K(e, "feinte", !0);
 		}
 	}
 	return !1;
 }
-function Qa(e, t, n, r) {
-	let i = e.direct, a = V;
-	if (e.porteur !== t || e.phase !== "jeuCourant" || e.vol || t.corps) return q(e, "passe", !1, "pasDeBallon");
+function Ao(e, t, n, r) {
+	let i = e.direct, a = B;
+	if (e.porteur !== t || e.phase !== "jeuCourant" || e.vol || t.corps) return K(e, "passe", !1, "pasDeBallon");
 	let o = n.vers ?? {
 		x: 0,
 		y: e.ouvert
-	}, s = !!n.longue, c = Rn(e, t, o, s);
-	if (!c) return q(e, "passe", !1, "personne");
+	}, s = !!n.longue, c = _r(e, t, o, s);
+	if (!c) return K(e, "passe", !1, "personne");
 	if (!r && !s && i.vue.contactImminent && !i.arme) return i.arme = {
 		action: "offload",
 		depuis: e.sim,
 		jusqua: e.sim + .45,
 		vers: o
-	}, q(e, "passe", !0);
-	let l = D(t.pos, c.pos);
+	}, K(e, "passe", !0);
+	let l = O(t.pos, c.pos);
 	if (e.lancement = null, e.duel = null, s) {
 		let n = a.risqueSautee + Math.max(0, l - 14) * .008 + Math.max(0, 60 - t.passe) * .001;
 		if (e.rng() < n * (1.25 - t.vision / 220)) {
 			t.stats.passes += 1, t.stats.passesRatees += 1;
-			let n = A(t.cote), r = {
+			let n = j(t.cote), r = {
 				de: {
 					x: t.pos.x,
 					y: t.pos.y
 				},
 				vers: {
-					x: Z(t.pos.x + (c.pos.x - t.pos.x) * .7 - n * .6),
-					y: k(t.pos.y + (c.pos.y - t.pos.y) * .7, 1, 69)
+					x: X(t.pos.x + (c.pos.x - t.pos.x) * .7 - n * .6),
+					y: A(t.pos.y + (c.pos.y - t.pos.y) * .7, 1, 69)
 				},
 				duree: .5,
 				ecoule: .5,
@@ -46750,48 +47136,64 @@ function Qa(e, t, n, r) {
 				auteur: t,
 				receveur: null
 			};
-			return e.porteur = null, e.ballon = { ...r.vers }, J(e, "jeu", t.cote, I("duelPasseKo", {
+			return e.porteur = null, e.ballon = { ...r.vers }, q(e, "jeu", t.cote, I("duelPasseKo", {
 				nom: t.nom,
 				cible: c.nom
-			}), 0, !0), Do(e, r, "touche"), q(e, "passe", !1, "tropLongue");
+			}), 0, !0), as(e, r, "touche"), K(e, "passe", !1, "tropLongue");
 		}
 	}
-	let u = Jo(e, t, c, $r(e, t)), d = e.vol;
-	return u && d?.receveur && d.receveur.cote !== t.cote ? i.stats.passesInterceptees += 1 : u && (i.stats.passesReussies += 1), q(e, "passe", u, u ? void 0 : "faute");
+	let u = Es(e, t, c, Di(e, t)), d = e.vol;
+	return u && d?.receveur && d.receveur.cote !== t.cote ? i.stats.passesInterceptees += 1 : u && (i.stats.passesReussies += 1), K(e, "passe", u, u ? void 0 : "faute");
 }
-function $a(e, t) {
-	let n = e.porteur;
-	if (!n || n.cote === t.cote || e.phase !== "jeuCourant" || n.corps) return;
-	let r = n.pos.x - t.pos.x, i = n.pos.y - t.pos.y, a = Math.hypot(r, i) || 1;
-	R(t, {
-		x: r / a * 2.4,
-		y: i / a * 2.4
-	}, 1.7), L(e, t, "tackle_low", 2.3, "manque"), t.battu = Math.max(t.battu, 2.2), t.stats.plaquagesManques += 1, e.direct.stats.plaquagesDansLeVide += 1, e.intention?.type === "plaquage" && (e.intention = null), J(e, "plaquage", t.cote, I("plaquageRateJoueur", {
+function jo(e, t, n) {
+	let r = e.direct, i = B, a = e.porteur;
+	if (!a || a.cote === t.cote || e.phase !== "jeuCourant" || a.corps || t.corps) return K(e, "plaquage", !1, "tropLoin");
+	if ((r.recharges.plaquage ?? 0) > 0) return K(e, "plaquage", !1, "recharge");
+	if (O(t.pos, a.pos) > i.porteeLancer) return K(e, "plaquage", !1, "tropLoin");
+	let o = r.commande, s = Math.hypot(o.mx, o.my), c = Math.hypot(t.vitesse.x, t.vitesse.y), l = s > .3 ? Math.atan2(o.my, o.mx) : c > 1.5 ? Math.atan2(t.vitesse.y, t.vitesse.x) : Math.atan2(a.pos.y - t.pos.y, a.pos.x - t.pos.x);
+	return r.arme = {
+		action: "plaquage",
+		depuis: e.sim,
+		jusqua: e.sim + i.dureeLancer,
+		cap: l
+	}, e.intention = {
+		type: "plaquage",
+		restant: i.dureeLancer
+	}, L(e, t, "plongeon", i.dureeLancer), r.recharges.plaquage = i.rechargePlaquage + .5, n(i.coutPlaquage), K(e, "plaquage", !0);
+}
+function Mo(e, t, n) {
+	let r = e.porteur;
+	if (!r || r.cote === t.cote || e.phase !== "jeuCourant" || r.corps) return;
+	let i = n, a = i === void 0 ? r.pos.x - t.pos.x : Math.cos(i), o = i === void 0 ? r.pos.y - t.pos.y : Math.sin(i), s = Math.hypot(a, o) || 1;
+	Zt(t, {
+		x: a / s * 2.4,
+		y: o / s * 2.4
+	}, 1.7), L(e, t, "tackle_low", 2.3, "manque"), t.battu = Math.max(t.battu, 2.2), t.stats.plaquagesManques += 1, e.direct.stats.plaquagesDansLeVide += 1, e.intention?.type === "plaquage" && (e.intention = null), q(e, "plaquage", t.cote, I("plaquageRateJoueur", {
 		nom: t.nom,
-		cible: n.nom
+		cible: r.nom
 	}), 0, !0);
 }
-function eo(e, t, n) {
+function No(e, t, n) {
 	if (!e.ruck) return;
-	e.ruck.organisation || li(e);
+	e.ruck.organisation || Li(e);
 	let r = e.ruck.organisation, i = n === "attaque" ? r.attaque : r.defense, a = n === "attaque" ? 3 : 2;
 	if (!i.includes(t.id)) {
 		if (i.length >= a) {
-			let t = i.map((t) => e.pions.find((e) => e.id === t)).filter((e) => !!e).sort((t, n) => O(n.pos, e.ballon) - O(t.pos, e.ballon))[0];
+			let t = i.map((t) => e.pions.find((e) => e.id === t)).filter((e) => !!e).sort((t, n) => k(n.pos, e.ballon) - k(t.pos, e.ballon))[0];
 			t && (i.splice(i.indexOf(t.id), 1), t.role === "ruck" && (t.role = "ligne"), e.placement && delete e.placement[t.id]);
 		}
 		i.push(t.id);
 	}
 	t.role = "ruck", e.direct.tenuJusqua = e.sim + Math.max(1.4, e.minuteur + .7);
 }
-function to(e, t, n) {
+function Po(e, t, n) {
 	t.stats.coupsDePied += 1, t.stats.butsTentes += 1, e.dernierPasseur = null;
-	let r = dc(e, t), { devant: i, droite: a } = qi(t.pos, t.cote), s = Math.abs(t.pos.y - 35), c = 0, l = k(Yi(t.pos, t.cote, r) + .1, .3, 1), u = .6;
+	let r = al(e, t), { devant: i, droite: a } = wa(t.pos, t.cote), s = Math.abs(t.pos.y - 35), c = 0, l = A(Ea(t.pos, t.cote, r) + .1, .3, 1), u = .6;
 	if (n.visee) {
-		let e = Math.hypot(n.visee.x, n.visee.y) || 1, r = n.visee.x / e, a = n.visee.y / e, o = r * A(t.cote);
-		o > .2 && (c = k(t.pos.y + i / o * a - 35, -6, 6)), l = k(n.visee.puissance, .3, 1), u = k(.5 + (n.visee.vif ?? .4) * .5, .3, .95);
+		let e = Math.hypot(n.visee.x, n.visee.y) || 1, r = n.visee.x / e, a = n.visee.y / e, o = r * j(t.cote);
+		o > .2 && (c = A(t.pos.y + i / o * a - 35, -6, 6)), l = A(n.visee.puissance, .3, 1), u = A(.5 + (n.visee.vif ?? .4) * .5, .3, .95);
 	}
-	let d = $r(e, t), f = k(fc(a + 11, s, t.pied) - .1 - Math.max(0, 7 - d) * .02 - (100 - t.endurance) * .001, .05, .9), p = Qi(t.pos, t.cote, {
+	let d = Di(e, t), f = A(ol(a + 11, s, t.pied) - .1 - Math.max(0, 7 - d) * .02 - (100 - t.endurance) * .001, .05, .9), p = ka(t.pos, t.cote, {
 		ecart: c,
 		puissance: l,
 		effet: 0,
@@ -46804,64 +47206,64 @@ function to(e, t, n) {
 		humain: !0
 	};
 	let m = e.responsabilites;
-	m && (m.stats.drops += 1, p.reussi && (m.stats.dropsReussis += 1)), J(e, "pied", t.cote, o("rv.fil.dropTente", { nom: t.nom }), 0, !0), X(e, t, p.vers, "drop", p.duree, .5, void 0, !1, {
+	m && (m.stats.drops += 1, p.reussi && (m.stats.dropsReussis += 1)), q(e, "pied", t.cote, o("rv.fil.dropTente", { nom: t.nom }), 0, !0), Y(e, t, p.vers, "drop", p.duree, .5, void 0, !1, {
 		derive: p.derive,
 		...p.ricochet ? { ricochet: p.ricochet } : {}
 	});
 }
-function no(e, t) {
-	let n = A(t.cote), r = null, i = Infinity;
-	for (let a of H(e, j(t.cote))) {
+function Fo(e, t) {
+	let n = j(t.cote), r = null, i = Infinity;
+	for (let a of V(e, M(t.cote))) {
 		if (a.sanction > 0 || a.corps || a.battu > 0 || (a.pos.x - t.pos.x) * n < -.3) continue;
-		let e = D(a.pos, t.pos), o = t.pos.x - a.pos.x, s = t.pos.y - a.pos.y, c = Math.max(.1, Math.hypot(o, s));
+		let e = O(a.pos, t.pos), o = t.pos.x - a.pos.x, s = t.pos.y - a.pos.y, c = Math.max(.1, Math.hypot(o, s));
 		e <= 1 + .25 * Math.max(0, (a.vitesse.x * o + a.vitesse.y * s) / c) && e < i && (i = e, r = a);
 	}
 	return r;
 }
-function ro(e, t, n) {
+function Io(e, t, n) {
 	t.stats.coupsDePied += 1, e.dernierPasseur = null;
 	let r = {
 		x: t.pos.x,
 		y: t.pos.y
-	}, i = ol(e, t), a = k((t.pied - 40) / 50, 0, 1), o = .86 + .14 * t.endurance / 100, s = i < 2 ? .2 : i < 3.5 ? .1 : i < 6 ? .04 : 0, c = (e.rng() + e.rng()) / 2, l = k((.58 + .4 * a) * o + (c - .5) * .46 - s, .22, 1), u = n.intention !== "parDessus" && i < 1.7 && e.rng() < .11 + (.55 - l) * .1, d = t.nom;
+	}, i = $l(e, t), a = A((t.pied - 40) / 50, 0, 1), o = .86 + .14 * t.endurance / 100, s = i < 2 ? .2 : i < 3.5 ? .1 : i < 6 ? .04 : 0, c = (e.rng() + e.rng()) / 2, l = A((.58 + .4 * a) * o + (c - .5) * .46 - s, .22, 1), u = n.intention !== "parDessus" && i < 1.7 && e.rng() < .11 + (.55 - l) * .1, d = t.nom;
 	if (u) {
-		let n = A(t.cote);
-		return J(e, "pied", t.cote, `Le coup de pied de ${d} est contré !`, 0, !0), X(e, t, {
-			x: k(t.pos.x + n * (2 + e.rng() * 3), 12, 110),
-			y: k(t.pos.y + (e.rng() * 6 - 3), 2, 68)
+		let n = j(t.cote);
+		return q(e, "pied", t.cote, `Le coup de pied de ${d} est contré !`, 0, !0), Y(e, t, {
+			x: A(t.pos.x + n * (2 + e.rng() * 3), 12, 110),
+			y: A(t.pos.y + (e.rng() * 6 - 3), 2, 68)
 		}, "rasant", .55, .1);
 	}
-	let { arrivee: f, intention: p } = n, m = D(r, f), h = .64 + .38 * l;
+	let { arrivee: f, intention: p } = n, m = O(r, f), h = .64 + .38 * l;
 	if (l < .9) {
 		let t = m * Math.min(1, h), n = (e.rng() - .5) * (1 - l) * .5 * m, i = (f.x - r.x) / Math.max(.1, m), a = (f.y - r.y) / Math.max(.1, m), o = p === "degagement" || p === "cinquanteVingtDeux";
 		o && t < m * .93 ? (f = {
-			x: k(r.x + i * t, 8, 114),
-			y: k(r.y + a * t + n, 3, 67)
+			x: A(r.x + i * t, 8, 114),
+			y: A(r.y + a * t + n, 3, 67)
 		}, p = "occupation") : o || (f = {
-			x: k(r.x + i * t - a * n, 8, 114),
-			y: k(r.y + a * t + i * n, 2, 68)
+			x: A(r.x + i * t - a * n, 8, 114),
+			y: A(r.y + a * t + i * n, 2, 68)
 		});
 	}
-	let g = p === "degagement" ? ht : p === "cinquanteVingtDeux" ? vt : p === "chandelle" ? _t : p === "rasant" ? bt : p === "transversale" ? xt : gt;
-	J(e, "pied", t.cote, p === "parDessus" ? `Petit coup de pied par-dessus de ${d} : il se lance derrière le rideau.` : F(e.rng, g, { nom: d }), 0, !0), X(e, t, f, p, n.duree, n.hauteur);
+	let g = p === "degagement" ? Et : p === "cinquanteVingtDeux" ? kt : p === "chandelle" ? Ot : p === "rasant" ? jt : p === "transversale" ? Mt : Dt;
+	q(e, "pied", t.cote, p === "parDessus" ? `Petit coup de pied par-dessus de ${d} : il se lance derrière le rideau.` : F(e.rng, g, { nom: d }), 0, !0), Y(e, t, f, p, n.duree, n.hauteur);
 }
-function io(e) {
+function Lo(e) {
 	let t = e.bagarre;
 	if (!t) {
 		e.phase = "jeuCourant";
 		return;
 	}
 	if (!t.ordre) {
-		t.attente += K, t.attente > 90 && zr(e, "reculer");
+		t.attente += G, t.attente > 90 && pi(e, "reculer");
 		return;
 	}
-	let n = Br(e);
+	let n = mi(e);
 	if (e.bagarre = null, e.intention = null, n.fauteVue === !1) {
-		Ic(e, n.lieu);
+		$(e, n.lieu);
 		return;
 	}
-	let r = e.responsabilites ? ln(e, n.pour, n.lieu) : void 0;
-	Q(e, "penalite", n.pour, n.lieu), e.penalite = {
+	let r = e.responsabilites ? Vn(e, n.pour, n.lieu) : void 0;
+	Z(e, "penalite", n.pour, n.lieu), e.penalite = {
 		pour: n.pour,
 		lieu: {
 			x: n.lieu.x,
@@ -46871,10 +47273,10 @@ function io(e) {
 		...r ? { defense: r } : {}
 	};
 }
-function J(e, t, n, r, i = 0, a = !1) {
-	Ze(e, t, n, r, i, a);
+function q(e, t, n, r, i = 0, a = !1) {
+	ct(e, t, n, r, i, a);
 }
-function ao(e, t, n = 20) {
+function Ro(e, t, n = 20) {
 	if (e.placement = t, e.placementJoue) {
 		for (let n of e.pions) {
 			let e = t[n.id];
@@ -46891,13 +47293,13 @@ function ao(e, t, n = 20) {
 	for (let i of e.pions) {
 		if (!i.surLeTerrain || i.sanction > 0) continue;
 		let e = t[i.id];
-		e && (i.cible = e, (r || D(i.pos, e) > n) && (delete i.corps, i.pos = {
+		e && (i.cible = e, (r || O(i.pos, e) > n) && (delete i.corps, i.pos = {
 			x: e.x,
 			y: e.y
-		}, N(i)));
+		}, P(i)));
 	}
 }
-function oo(e) {
+function zo(e) {
 	let t = e.conquete;
 	if (!t || t.type !== "touche" || !t.ramassage || t.ramassage === "tenu" || !t.ballonAuSol) return;
 	let n = e.pions.find((e) => e.id === t.lanceurId && e.surLeTerrain && e.sanction <= 0);
@@ -46910,18 +47312,18 @@ function oo(e) {
 		n.cible = {
 			x: t.ballonAuSol.x,
 			y: t.ballonAuSol.y + r * .45
-		}, !n.corps && D(n.pos, n.cible) < .5 && (t.ramassage = "ramasse", t.ramassageDepuis = e.sim, N(n), L(e, n, "pickup", 1.15));
+		}, !n.corps && O(n.pos, n.cible) < .5 && (t.ramassage = "ramasse", t.ramassageDepuis = e.sim, P(n), L(e, n, "pickup", 1.15));
 		return;
 	}
 	n.cible = { ...n.pos }, e.sim - (t.ramassageDepuis ?? e.sim) >= 1.1 && (t.ramassage = "tenu");
 }
-var so = 24;
-function co(e) {
+var Bo = 24;
+function Vo(e) {
 	let t = e.attentePlacement;
 	if (!e.placementJoue || !t) return !1;
 	if (t.phase !== e.phase) return e.attentePlacement = null, !1;
 	if (t.pret || e.phase !== "melee" && e.phase !== "touche" && e.phase !== "renvoi22") return !1;
-	if (e.sim - t.depuis > so) return t.pret = !0, e.conquete?.ramassage && (e.conquete.ramassage = "tenu"), !1;
+	if (e.sim - t.depuis > Bo) return t.pret = !0, e.conquete?.ramassage && (e.conquete.ramassage = "tenu"), !1;
 	if (e.phase === "touche" && e.conquete?.ramassage && e.conquete.ramassage !== "tenu") return !0;
 	for (let t of e.pions) {
 		if (!t.surLeTerrain || t.sanction > 0) continue;
@@ -46930,26 +47332,26 @@ function co(e) {
 		let r = e.phase === "renvoi22" ? e.placement?.[t.id] : t.cible;
 		if (!r) continue;
 		let i = e.phase === "renvoi22" ? 2 : t.role === "melee" ? .8 : t.role === "alignement" ? 1.3 : 1.8;
-		if (t.corps || D(t.pos, r) > i) return !0;
+		if (t.corps || O(t.pos, r) > i) return !0;
 	}
 	return t.pret = !0, !1;
 }
-function Y(e, t) {
+function J(e, t) {
 	return t === "A" ? e.clubA : e.clubB;
 }
-function lo(e, t) {
+function Ho(e, t) {
 	return t === "A" ? e.planA : e.planB;
 }
-function uo(e, t) {
+function Uo(e, t) {
 	return t === "A" ? e.scoreA - e.scoreB : e.scoreB - e.scoreA;
 }
-function fo(e, t) {
-	let n = lo(e, t);
+function Wo(e, t) {
+	let n = Ho(e, t);
 	if (n.total <= 0) return -.5;
-	let r = (n.total * Math.min(1, e.t / (2 * Ta) * 1.03) - n.marques) / Math.max(8, n.total);
-	return e.minute >= 60 && (r *= 2), k(r, -.6, 1);
+	let r = (n.total * Math.min(1, e.t / (2 * no) * 1.03) - n.marques) / Math.max(8, n.total);
+	return e.minute >= 60 && (r *= 2), A(r, -.6, 1);
 }
-function po(e, t = !0, n = 3) {
+function Go(e, t = !0, n = 3) {
 	if (![
 		"jeuCourant",
 		"ballonEnLAir",
@@ -46977,10 +47379,10 @@ function po(e, t = !0, n = 3) {
 				"alignement"
 			].includes(u.role) && u.role === n.role ? .62 : l ? .78 : f ? 1.18 : .94, m = n.pos.x - u.pos.x, h = n.pos.y - u.pos.y, g = m * m + h * h;
 			if (e === 0 && t && f && g >= p * p) {
-				let e = m - (n.vitesse.x - u.vitesse.x) * K, t = h - (n.vitesse.y - u.vitesse.y) * K, r = m - e, i = h - t, a = r * r + i * i;
+				let e = m - (n.vitesse.x - u.vitesse.x) * G, t = h - (n.vitesse.y - u.vitesse.y) * G, r = m - e, i = h - t, a = r * r + i * i;
 				if (a > .25) {
-					let o = k(-(e * r + t * i) / a, 0, 1), s = e + r * o, c = t + i * o;
-					o > 0 && o < 1 && s * s + c * c < p * p && (u.pos.x -= u.vitesse.x * K * (1 - o), u.pos.y -= u.vitesse.y * K * (1 - o), n.pos.x -= n.vitesse.x * K * (1 - o), n.pos.y -= n.vitesse.y * K * (1 - o), m = n.pos.x - u.pos.x, h = n.pos.y - u.pos.y, g = m * m + h * h);
+					let o = A(-(e * r + t * i) / a, 0, 1), s = e + r * o, c = t + i * o;
+					o > 0 && o < 1 && s * s + c * c < p * p && (u.pos.x -= u.vitesse.x * G * (1 - o), u.pos.y -= u.vitesse.y * G * (1 - o), n.pos.x -= n.vitesse.x * G * (1 - o), n.pos.y -= n.vitesse.y * G * (1 - o), m = n.pos.x - u.pos.x, h = n.pos.y - u.pos.y, g = m * m + h * h);
 				}
 			}
 			if (g >= p * p) continue;
@@ -47013,47 +47415,47 @@ function po(e, t = !0, n = 3) {
 		});
 	}
 }
-function mo(e, t) {
+function Ko(e, t) {
 	let n = e.pos.x - t.pos.x, r = e.pos.y - t.pos.y, i = Math.max(.01, Math.hypot(n, r));
 	if (i <= 1.02) return;
 	let a = i - 1.02;
 	t.pos.x += n / i * a * .78, t.pos.y += r / i * a * .78, e.pos.x -= n / i * a * .22, e.pos.y -= r / i * a * .22;
 }
-function ho(e, t, n = !1) {
-	let r = e.pos.x - t.pos.x, i = e.pos.y - t.pos.y, a = Math.max(.01, Math.hypot(r, i)), o = Math.max(.01, Math.hypot(e.vitesse.x, e.vitesse.y)), s = n ? .2 : .47, c = r / a * (1 - s) + e.vitesse.x / o * s, l = i / a * (1 - s) + e.vitesse.y / o * s, u = Math.max(.01, Math.hypot(c, l)), d = k((n ? 3.1 : 1.7) + (t.puissance - e.puissance) / 24 + ((t.poidsKg ?? 95) - (e.poidsKg ?? 95)) / 45 + Math.hypot(t.vitesse.x - e.vitesse.x, t.vitesse.y - e.vitesse.y) * .35, .8, n ? 7.2 : 6), f = {
+function qo(e, t, n = !1) {
+	let r = e.pos.x - t.pos.x, i = e.pos.y - t.pos.y, a = Math.max(.01, Math.hypot(r, i)), o = Math.max(.01, Math.hypot(e.vitesse.x, e.vitesse.y)), s = n ? .2 : .47, c = r / a * (1 - s) + e.vitesse.x / o * s, l = i / a * (1 - s) + e.vitesse.y / o * s, u = Math.max(.01, Math.hypot(c, l)), d = A((n ? 3.1 : 1.7) + (t.puissance - e.puissance) / 24 + ((t.poidsKg ?? 95) - (e.poidsKg ?? 95)) / 45 + Math.hypot(t.vitesse.x - e.vitesse.x, t.vitesse.y - e.vitesse.y) * .35, .8, n ? 7.2 : 6), f = {
 		x: c / u * d,
 		y: l / u * d
 	};
-	R(e, f, n ? 2.4 : 2.1), R(t, {
+	Zt(e, f, n ? 2.4 : 2.1), Zt(t, {
 		x: f.x * .7,
 		y: f.y * .7
 	}, n ? 1.8 : 1.6);
 }
-function go(e, t) {
+function Jo(e, t) {
 	for (let t of e.pions) t.surLeTerrain && delete t.corps;
 	e.possession = t, e.porteur = null, e.vol = null, e.lancement = null, e.conquete = null, e.phasesDepuisArret = 0, e.ballon = {
 		x: 61,
 		y: 35
-	}, e.phase = "coupEnvoi", e.minuteur = ka(e, "coupEnvoi"), e.ouvert = e.rng() < .5 ? 1 : -1, e.cibleRenvoi || _o(e, t), ao(e, Le(e.pions, 61, t, e.cibleRenvoi, e.responsabilites ? xn(e, t, "engagement")?.id : void 0), 18);
+	}, e.phase = "coupEnvoi", e.minuteur = oo(e, "coupEnvoi"), e.ouvert = e.rng() < .5 ? 1 : -1, e.cibleRenvoi || Yo(e, t), Ro(e, Je(e.pions, 61, t, e.cibleRenvoi, e.responsabilites ? $n(e, t, "engagement")?.id : void 0), 18);
 }
-function _o(e, t) {
+function Yo(e, t) {
 	e.cibleRenvoi = {
-		x: 61 + A(t) * (27 + e.rng() * 11),
-		y: k(35 + (e.rng() < .5 ? 1 : -1) * (14 + e.rng() * 10), 8, 62)
+		x: 61 + j(t) * (27 + e.rng() * 11),
+		y: A(35 + (e.rng() < .5 ? 1 : -1) * (14 + e.rng() * 10), 8, 62)
 	};
 }
-function vo(e) {
+function Xo(e) {
 	if (e.minuteur > 0) return;
 	if (e.placement) {
 		let t = e.attenteCoupEnvoi ?? 0;
-		if (t < (e.cadenceDetaillee ? 110 : 4) && e.pions.some((t) => t.surLeTerrain && t.sanction <= 0 && e.placement?.[t.id] && D(t.pos, e.placement[t.id]) > 2)) {
+		if (t < (e.cadenceDetaillee ? 110 : 4) && e.pions.some((t) => t.surLeTerrain && t.sanction <= 0 && e.placement?.[t.id] && O(t.pos, e.placement[t.id]) > 2)) {
 			e.attenteCoupEnvoi = t + 1, e.minuteur = .25;
 			return;
 		}
 		delete e.attenteCoupEnvoi;
 	}
-	let t = e.possession, n = H(e, t), r = (e.responsabilites ? xn(e, t, "engagement") : void 0) ?? n.find((e) => e.buteur) ?? ir(n, 10) ?? n[0];
-	if (!r) return Qc(e);
+	let t = e.possession, n = V(e, t), r = (e.responsabilites ? $n(e, t, "engagement") : void 0) ?? n.find((e) => e.buteur) ?? Mr(n, 10) ?? n[0];
+	if (!r) return Gl(e);
 	e.cadenceDetaillee || (r.pos = {
 		x: 61,
 		y: 35
@@ -47062,13 +47464,13 @@ function vo(e) {
 		y: 0
 	});
 	let i = e.cibleRenvoi ?? {
-		x: 61 + A(t) * 30,
+		x: 61 + j(t) * 30,
 		y: 35
 	}, a = 3, o = 11 + r.pied * .025;
-	if (e.responsabilites && e.cadenceDetaillee && r.moi && Cn(e, "engagement", t)) {
+	if (e.responsabilites && e.cadenceDetaillee && r.moi && tr(e, "engagement", t)) {
 		let n = e.responsabilites;
 		if (n.engagement) {
-			let s = +(e.minute >= 65 && Math.abs(e.scoreA - e.scoreB) <= 7), c = ea(t, n.engagement, r, s, e.rng(), e.rng(), e.rng(), e.rng());
+			let s = +(e.minute >= 65 && Math.abs(e.scoreA - e.scoreB) <= 7), c = ja(t, n.engagement, r, s, e.rng(), e.rng(), e.rng(), e.rng());
 			i = c.arrivee, a = c.duree, o = .4, n.stats.engagements += 1, c.enJeu && (n.stats.engagementsReussis += 1), e.cibleRenvoi = { ...i };
 		} else {
 			if (n.attente?.type !== "engagement" && (n.attente = {
@@ -47076,7 +47478,7 @@ function vo(e) {
 				depuis: e.sim,
 				delai: 20,
 				valeur: 0,
-				portee: $i(r.puissance, r.pied, r.endurance)
+				portee: Aa(r.puissance, r.pied, r.endurance)
 			}), e.sim - n.attente.depuis < n.attente.delai) return;
 			n.stats.chronosDepasses += 1;
 		}
@@ -47085,54 +47487,54 @@ function vo(e) {
 	r.stats.coupsDePied += 1;
 	let s = e.placement;
 	e.placement = {};
-	for (let n of H(e, j(t))) {
+	for (let n of V(e, M(t))) {
 		let t = s?.[n.id];
 		t && (e.placement[n.id] = { ...t });
 	}
-	X(e, r, i, "renvoi", a, o, {
+	Y(e, r, i, "renvoi", a, o, {
 		x: 61,
 		y: 35
-	}), J(e, "pied", t, I("coupEnvoiJoueur", { nom: r.nom }), 0, r.moi);
+	}), q(e, "pied", t, I("coupEnvoiJoueur", { nom: r.nom }), 0, r.moi);
 }
-function yo(e) {
+function Zo(e) {
 	if (e.minuteur > 0) return;
-	let t = e.possession, n = A(t), r = H(e, t), i = r.find((e) => e.buteur) ?? [...r].sort((e, t) => t.pied - e.pied)[0] ?? r[0];
-	if (!i) return Qc(e);
+	let t = e.possession, n = j(t), r = V(e, t), i = r.find((e) => e.buteur) ?? [...r].sort((e, t) => t.pied - e.pied)[0] ?? r[0];
+	if (!i) return Gl(e);
 	let a = e.ligneRenvoi !== void 0, o = e.ligneRenvoi ?? (t === "A" ? 33 : 89);
 	delete e.ligneRenvoi;
 	let s = {
 		x: o + n * (28 + i.pied / 4 + e.rng() * 10),
-		y: k(35 + (e.rng() * 30 - 15), 6, 64)
+		y: A(35 + (e.rng() * 30 - 15), 6, 64)
 	};
-	i.stats.coupsDePied += 1, e.placement = null, X(e, i, s, "renvoi", 2.8, 10 + i.pied * .02, {
+	i.stats.coupsDePied += 1, e.placement = null, Y(e, i, s, "renvoi", 2.8, 10 + i.pied * .02, {
 		x: o,
 		y: 35
-	}), J(e, "pied", t, I(a ? "renvoiEnButJoueur" : "renvoi22Joueur", { nom: i.nom }), 0, i.moi);
+	}), q(e, "pied", t, I(a ? "renvoiEnButJoueur" : "renvoi22Joueur", { nom: i.nom }), 0, i.moi);
 }
-function bo(e, t, n, r = e.ballon, i) {
+function Qo(e, t, n, r = e.ballon, i) {
 	let a = {
 		x: t === "A" ? 33 : 89,
 		y: 35
 	};
-	if (!z(e) || n === "tir") return delete e.ligneRenvoi, Q(e, "renvoi22", t, a);
-	if (n === "engagement") return delete e.ligneRenvoi, Q(e, "melee", t, {
-		x: k(i?.x ?? 61, 16, 106),
+	if (!R(e) || n === "tir") return delete e.ligneRenvoi, Z(e, "renvoi22", t, a);
+	if (n === "engagement") return delete e.ligneRenvoi, Z(e, "melee", t, {
+		x: A(i?.x ?? 61, 16, 106),
 		y: 35
 	});
 	if (n === "defense") {
 		delete e.ligneRenvoi;
 		let n = t === "A" ? 16 : 106;
-		return Q(e, "melee", j(t), {
+		return Z(e, "melee", M(t), {
 			x: n,
-			y: k(r.y, 6, 64)
+			y: A(r.y, 6, 64)
 		});
 	}
-	return e.ligneRenvoi = t === "A" ? 11 : 111, Q(e, "renvoi22", t, {
+	return e.ligneRenvoi = t === "A" ? 11 : 111, Z(e, "renvoi22", t, {
 		x: e.ligneRenvoi,
 		y: 35
 	});
 }
-function xo(e, t) {
+function $o(e, t) {
 	let n = (e.volsRecents ?? []).filter((t) => e.t - t.debut <= 8).slice(-23);
 	n.push({
 		de: { ...t.de },
@@ -47146,10 +47548,10 @@ function xo(e, t) {
 		debut: e.t
 	}), e.volsRecents = n;
 }
-function So(e, t) {
-	t.type === "pied" && t.intention !== "rasant" && (t.duree = Math.max(t.duree, Math.sqrt(8 * t.hauteur / Pi)), t.hauteur = .19 + Pi * t.duree * t.duree / 8), t.type === "passe" && (L(e, t.auteur, t.intention === "offload" ? "offload" : t.vers.y < t.de.y ? "pass_left" : "pass", Math.max(.65, t.duree), t.variante), t.receveur && L(e, t.receveur, "catch", Math.max(.65, t.duree))), e.vol = t, xo(e, t);
+function es(e, t) {
+	t.type === "pied" && t.intention !== "rasant" && (t.duree = Math.max(t.duree, Math.sqrt(8 * t.hauteur / da)), t.hauteur = .19 + da * t.duree * t.duree / 8), t.type === "passe" && (L(e, t.auteur, t.intention === "offload" ? "offload" : t.vers.y < t.de.y ? "pass_left" : "pass", Math.max(.65, t.duree), t.variante), t.receveur && L(e, t.receveur, "catch", Math.max(.65, t.duree))), e.vol = t, $o(e, t);
 }
-function X(e, t, n, r, i, a, o, s = !1, c) {
+function Y(e, t, n, r, i, a, o, s = !1, c) {
 	if (!s) {
 		o ??= { ...t.pos }, e.piedPrepare = {
 			auteurId: t.id,
@@ -47172,17 +47574,17 @@ function X(e, t, n, r, i, a, o, s = !1, c) {
 		y: t.pos.y
 	};
 	e.chenilleTenue && (delete e.chenilleTenue, e.ruck = null, e.placement = null);
-	let u = A(t.cote);
-	for (let n of H(e, t.cote)) n.horsJeu = n !== t && (n.pos.x - l.x) * u > .5;
-	for (let n of H(e, j(t.cote))) n.horsJeu = !1;
-	if (!c && z(e) && (e.ventForce ?? 0) > .5) {
-		let a = oa(ia(e), i, r), o = oa(ra(e, e.t), i, r), s = k((t.pied - 30) / 65, .2, .9);
+	let u = j(t.cote);
+	for (let n of V(e, t.cote)) n.horsJeu = n !== t && (n.pos.x - l.x) * u > .5;
+	for (let n of V(e, M(t.cote))) n.horsJeu = !1;
+	if (!c && R(e) && (e.ventForce ?? 0) > .5) {
+		let a = La(Fa(e), i, r), o = La(Pa(e, e.t), i, r), s = A((t.pied - 30) / 65, .2, .9);
 		n = {
-			x: k(n.x + o.x - a.x * s, .5, 121.5),
+			x: A(n.x + o.x - a.x * s, .5, 121.5),
 			y: n.y + o.y - a.y * s
 		}, c = { derive: o };
 	}
-	So(e, {
+	es(e, {
 		de: l,
 		vers: n,
 		duree: i,
@@ -47195,81 +47597,81 @@ function X(e, t, n, r, i, a, o, s = !1, c) {
 		...c
 	}), t.stats.metresAuPied += Math.abs(n.x - l.x), e.porteur = null, e.phase = "ballonEnLAir", e.minuteur = i + .5, e.derniereTouche = t;
 }
-function Co(e, t) {
-	let n = A(t.cote), r = H(e, t.cote).filter((e) => !e.horsJeu && e.sanction <= 0);
-	for (let i of H(e, t.cote)) i.horsJeu && r.some((e) => (e.pos.x - i.pos.x) * n >= 0) && (i.horsJeu = !1);
+function ts(e, t) {
+	let n = j(t.cote), r = V(e, t.cote).filter((e) => !e.horsJeu && e.sanction <= 0);
+	for (let i of V(e, t.cote)) i.horsJeu && r.some((e) => (e.pos.x - i.pos.x) * n >= 0) && (i.horsJeu = !1);
 }
-function wo(e) {
+function ns(e) {
 	for (let t of e.pions) t.horsJeu = !1;
 }
-function To(e, t) {
+function rs(e, t) {
 	let n = t.y <= 0 ? 0 : 70, r = t.y - e.y;
-	if (Math.abs(r) < 1e-6 || _e(e)) return {
+	if (Math.abs(r) < 1e-6 || De(e)) return {
 		x: t.x,
 		y: n
 	};
-	let i = k((n - e.y) / r, 0, 1);
+	let i = A((n - e.y) / r, 0, 1);
 	return {
 		x: e.x + (t.x - e.x) * i,
 		y: n
 	};
 }
-function Eo(e) {
+function is(e) {
 	let t = e.vol;
-	if (!t) return Ic(e, e.ballon);
-	if (t.auteur && t.auteur.surLeTerrain && Co(e, t.auteur), t.ecoule < t.duree) return;
+	if (!t) return $(e, e.ballon);
+	if (t.auteur && t.auteur.surLeTerrain && ts(e, t.auteur), t.ecoule < t.duree) return;
 	e.vol = null, t.intention === "renvoi" && (e.placement = null);
 	let n = t.auteur.cote, r = e.ballon;
 	if (t.intention === "drop") {
 		let i = e.dropEnCours?.auteurId === t.auteur.id && e.dropEnCours.reussi;
 		if (delete e.dropEnCours, i) {
-			let r = lo(e, n);
-			return r.penalites = Math.max(0, r.penalites - 1), t.auteur.stats.butsReussis += 1, t.auteur.stats.pointsAuPied = (t.auteur.stats.pointsAuPied ?? 0) + 3, Fc(e, n, 3), J(e, "but", n, F(e.rng, st, { nom: t.auteur.nom }), 3, t.auteur.moi), e.sirene && !e.finSurSortieOuEnAvant ? Qc(e) : go(e, j(n));
+			let r = Ho(e, n);
+			return r.penalites = Math.max(0, r.penalites - 1), t.auteur.stats.butsReussis += 1, t.auteur.stats.pointsAuPied = (t.auteur.stats.pointsAuPied ?? 0) + 3, kl(e, n, 3), q(e, "but", n, F(e.rng, vt, { nom: t.auteur.nom }), 3, t.auteur.moi), e.sirene && !e.finSurSortieOuEnAvant ? Gl(e) : Jo(e, M(n));
 		}
-		if (J(e, "butRate", n, I("dropRate", { nom: t.auteur.nom }), 0, t.auteur.moi), z(e) && !ge(r, n)) t.intention = r.x === t.de.x || t.duree < .6 ? "rasant" : "chandelle";
-		else return Q(e, "renvoi22", j(n), {
-			x: j(n) === "A" ? 33 : 89,
+		if (q(e, "butRate", n, I("dropRate", { nom: t.auteur.nom }), 0, t.auteur.moi), R(e) && !Ee(r, n)) t.intention = r.x === t.de.x || t.duree < .6 ? "rasant" : "chandelle";
+		else return Z(e, "renvoi22", M(n), {
+			x: M(n) === "A" ? 33 : 89,
 			y: 35
 		});
 	}
-	if (_e(r)) {
-		let i = To(t.de, r);
-		if (t.intention === "penaltouche") return J(e, "touche", n, I("toucheASuivre", { club: Y(e, n) })), Q(e, "touche", n, i);
-		let a = he(t.de, n) || Math.abs(t.de.x - 61) < .5, o = pe(i, n) && !ge(i, n);
-		if (t.intention === "cinquanteVingtDeux" && a && o) return J(e, "pied", n, F(e.rng, vt, { nom: t.auteur.nom }), 0, t.auteur.moi), t.auteur.stats.cinquanteVingtDeux += 1, Q(e, "touche", n, i);
-		t.intention === "cinquanteVingtDeux" && J(e, "pied", n, F(e.rng, yt, { nom: t.auteur.nom }), 0, t.auteur.moi);
-		let s = !me(t.de, n), c = s ? {
+	if (De(r)) {
+		let i = rs(t.de, r);
+		if (t.intention === "penaltouche") return q(e, "touche", n, I("toucheASuivre", { club: J(e, n) })), Z(e, "touche", n, i);
+		let a = Te(t.de, n) || Math.abs(t.de.x - 61) < .5, o = Ce(i, n) && !Ee(i, n);
+		if (t.intention === "cinquanteVingtDeux" && a && o) return q(e, "pied", n, F(e.rng, kt, { nom: t.auteur.nom }), 0, t.auteur.moi), t.auteur.stats.cinquanteVingtDeux += 1, Z(e, "touche", n, i);
+		t.intention === "cinquanteVingtDeux" && q(e, "pied", n, F(e.rng, At, { nom: t.auteur.nom }), 0, t.auteur.moi);
+		let s = !we(t.de, n), c = s ? {
 			x: t.de.x,
 			y: i.y
 		} : i;
-		return s && J(e, "touche", j(n), I("toucheDirecte", { nom: t.auteur.nom }), 0, t.auteur.moi), Q(e, "touche", j(n), c, !1, !0);
+		return s && q(e, "touche", M(n), I("toucheDirecte", { nom: t.auteur.nom }), 0, t.auteur.moi), Z(e, "touche", M(n), c, !1, !0);
 	}
 	if (r.x <= 1 || r.x >= 121) {
 		let i = r.x <= 11 ? "A" : "B";
-		return (t.intention === "cinquanteVingtDeux" || t.intention === "occupation") && J(e, "pied", n, I("ballonEnBut")), bo(e, i, t.intention === "renvoi" ? "engagement" : n === i ? "defense" : "attaque", r, t.de);
+		return (t.intention === "cinquanteVingtDeux" || t.intention === "occupation") && q(e, "pied", n, I("ballonEnBut")), Qo(e, i, t.intention === "renvoi" ? "engagement" : n === i ? "defense" : "attaque", r, t.de);
 	}
-	let i = e.pions.filter((e) => e.surLeTerrain && e.sanction <= 0 && O(e.pos, r) < 400), a = i.filter((e) => e.cote === n), o = i.filter((e) => e.cote !== n), s = (e) => {
+	let i = e.pions.filter((e) => e.surLeTerrain && e.sanction <= 0 && k(e.pos, r) < 400), a = i.filter((e) => e.cote === n), o = i.filter((e) => e.cote !== n), s = (e) => {
 		let t = null, n = -Infinity;
 		for (let i of e) {
-			let e = i.detente * .5 + i.vision * .3 - D(i.pos, r) * 3.2;
+			let e = i.detente * .5 + i.vision * .3 - O(i.pos, r) * 3.2;
 			e > n && (n = e, t = i);
 		}
 		return t;
-	}, c = s(a.filter((e) => !e.horsJeu)), l = s(o), u = c ? O(c.pos, r) : Infinity, d = a.find((e) => e.horsJeu && O(e.pos, r) < Math.min(u, 100));
-	if (d) return wo(e), $(e, j(n), {
+	}, c = s(a.filter((e) => !e.horsJeu)), l = s(o), u = c ? k(c.pos, r) : Infinity, d = a.find((e) => e.horsJeu && k(e.pos, r) < Math.min(u, 100));
+	if (d) return ns(e), Q(e, M(n), {
 		x: r.x,
 		y: r.y
 	}, "hors-jeu", d);
-	let f = t.intention === "chandelle" || t.intention === "rasant" || t.intention === "transversale" || t.intention === "renvoi" || t.intention === "parDessus", p = f ? .42 : .12, m = t.hauteur > .7 ? 3.5 : t.intention === "rasant" ? 2.2 : 2.8, h = c && D(c.pos, r) <= m ? c : null, g = l && D(l.pos, r) <= m ? l : null, _ = null;
-	if (_ = h && (!g || e.rng() < p || D(h.pos, r) < D(g.pos, r) - .8) ? h : g ?? h, !_) return Do(e, t);
-	if (_.cote === n && f && J(e, "pied", n, I("ballonAerien", { nom: _.nom }), 0, _.moi), t.hauteur > .7 && e.rng() < .07) return e.ballon = {
+	let f = t.intention === "chandelle" || t.intention === "rasant" || t.intention === "transversale" || t.intention === "renvoi" || t.intention === "parDessus", p = f ? .42 : .12, m = t.hauteur > .7 ? 3.5 : t.intention === "rasant" ? 2.2 : 2.8, h = c && O(c.pos, r) <= m ? c : null, g = l && O(l.pos, r) <= m ? l : null, _ = null;
+	if (_ = h && (!g || e.rng() < p || O(h.pos, r) < O(g.pos, r) - .8) ? h : g ?? h, !_) return as(e, t);
+	if (_.cote === n && f && q(e, "pied", n, I("ballonAerien", { nom: _.nom }), 0, _.moi), t.hauteur > .7 && e.rng() < .07) return e.ballon = {
 		x: _.pos.x,
 		y: _.pos.y
-	}, Bo(e, _);
-	e.possession = _.cote, Ic(e, _.pos, _, void 0, void 0, void 0, _.cote === n ? void 0 : "reception");
+	}, vs(e, _);
+	e.possession = _.cote, $(e, _.pos, _, void 0, void 0, void 0, _.cote === n ? void 0 : "reception");
 }
-function Do(e, t, n = t.type === "pied" ? t.intention : "touche") {
-	wo(e);
+function as(e, t, n = t.type === "pied" ? t.intention : "touche") {
+	ns(e);
 	let r = t.vers.x - t.de.x, i = t.vers.y - t.de.y, a = Math.max(.01, Math.hypot(r, i)), o = t.hauteur > .72, s = t.intention === "rasant", c = s ? 10.5 : o ? 3.8 : 7.2;
 	e.porteur = null, e.vol = null, e.ballonLibre = null, e.ruck = null, e.aplatissage = null, e.phase = "ballonLibre", e.minuteur = 10, e.ballonLibre = {
 		vitesse: {
@@ -47290,12 +47692,12 @@ function Do(e, t, n = t.type === "pied" ? t.intention : "touche") {
 		auteur: t.auteur,
 		age: 0,
 		rebonds: 0
-	}, J(e, "pied", null, s ? "Le ballon fuse au ras du sol : la course à la récupération est lancée." : o ? "Le ballon retombe sans receveur et prend un rebond imprévisible." : "Le ballon rebondit puis roule dans l’espace.");
+	}, q(e, "pied", null, s ? "Le ballon fuse au ras du sol : la course à la récupération est lancée." : o ? "Le ballon retombe sans receveur et prend un rebond imprévisible." : "Le ballon rebondit puis roule dans l’espace.");
 }
-function Oo(e, t) {
+function os(e, t) {
 	let n = e.ballonLibre;
-	if (!n) return Ic(e, e.ballon);
-	n.age += t, n.auteur && n.auteur.surLeTerrain && n.auteur.sanction <= 0 && Co(e, n.auteur), n.age > 4.5 && wo(e), e.ballon.x += n.vitesse.x * t, e.ballon.y += n.vitesse.y * t, n.orientation = (n.orientation ?? Math.atan2(n.vitesse.y, n.vitesse.x)) + (n.vitesseRotation ?? 0) * t;
+	if (!n) return $(e, e.ballon);
+	n.age += t, n.auteur && n.auteur.surLeTerrain && n.auteur.sanction <= 0 && ts(e, n.auteur), n.age > 4.5 && ns(e), e.ballon.x += n.vitesse.x * t, e.ballon.y += n.vitesse.y * t, n.orientation = (n.orientation ?? Math.atan2(n.vitesse.y, n.vitesse.x)) + (n.vitesseRotation ?? 0) * t;
 	let r = n.hauteur > 0 || n.vitesseVerticale > 0;
 	if (r && (n.hauteur += n.vitesseVerticale * t, n.vitesseVerticale -= 9.81 * t), r && n.hauteur <= 0 && n.vitesseVerticale < 0) {
 		n.hauteur = 0;
@@ -47315,100 +47717,100 @@ function Oo(e, t) {
 		};
 		e.ballonLibre = null;
 		let r = n.auteurCote;
-		return z(e) && n.depuis && n.intention !== "touche" && n.rebonds >= 1 && he(n.depuis, r) && pe(t, r) && !ge(t, r) ? (n.auteur && (n.auteur.stats.cinquanteVingtDeux += 1, J(e, "pied", r, F(e.rng, vt, { nom: n.auteur.nom }), 0, n.auteur.moi)), Q(e, "touche", r, t)) : Q(e, "touche", j(n.auteurCote), t, !1, n.intention !== "touche");
+		return R(e) && n.depuis && n.intention !== "touche" && n.rebonds >= 1 && Te(n.depuis, r) && Ce(t, r) && !Ee(t, r) ? (n.auteur && (n.auteur.stats.cinquanteVingtDeux += 1, q(e, "pied", r, F(e.rng, kt, { nom: n.auteur.nom }), 0, n.auteur.moi)), Z(e, "touche", r, t)) : Z(e, "touche", M(n.auteurCote), t, !1, n.intention !== "touche");
 	}
 	if (e.ballon.x <= 0 || e.ballon.x >= 122) {
 		let t = e.ballon.x <= 11 ? "A" : "B", r = n.auteurCote;
-		return e.ballonLibre = null, bo(e, t, r === t ? "defense" : "attaque");
+		return e.ballonLibre = null, Qo(e, t, r === t ? "defense" : "attaque");
 	}
 	if (e.minuteur <= 0 || n.age >= 8) {
-		e.ballonLibre = null, wo(e);
-		let t = e.pions.filter((e) => e.surLeTerrain && e.sanction <= 0).sort((t, n) => O(t.pos, e.ballon) - O(n.pos, e.ballon))[0];
-		return t && D(t.pos, e.ballon) < 5 ? (e.possession = t.cote, J(e, "pied", t.cote, `Le ballon vivant est récupéré par ${t.nom}.`, 0, t.moi), Ic(e, t.pos, t)) : Q(e, "melee", j(n.auteurCote), e.ballon);
+		e.ballonLibre = null, ns(e);
+		let t = e.pions.filter((e) => e.surLeTerrain && e.sanction <= 0).sort((t, n) => k(t.pos, e.ballon) - k(n.pos, e.ballon))[0];
+		return t && O(t.pos, e.ballon) < 5 ? (e.possession = t.cote, q(e, "pied", t.cote, `Le ballon vivant est récupéré par ${t.nom}.`, 0, t.moi), $(e, t.pos, t)) : Z(e, "melee", M(n.auteurCote), e.ballon);
 	}
-	let a = e.pions.filter((e) => e.surLeTerrain && e.sanction <= 0 && !e.horsJeu).sort((t, n) => O(t.pos, e.ballon) - O(n.pos, e.ballon));
+	let a = e.pions.filter((e) => e.surLeTerrain && e.sanction <= 0 && !e.horsJeu).sort((t, n) => k(t.pos, e.ballon) - k(n.pos, e.ballon));
 	for (let t of a.slice(0, 6)) t.role = "chasseur", t.effort = 1.1, t.cible = {
-		x: k(e.ballon.x + n.vitesse.x * .16, .5, 121.5),
-		y: k(e.ballon.y + n.vitesse.y * .16, .5, 69.5)
+		x: A(e.ballon.x + n.vitesse.x * .16, .5, 121.5),
+		y: A(e.ballon.y + n.vitesse.y * .16, .5, 69.5)
 	};
 	let o = a[0], s = Math.hypot(n.vitesse.x, n.vitesse.y) < .25 && n.hauteur <= .15, c = n.hauteur > 1.5 ? 1.2 : n.hauteur > .45 ? 1.8 : s ? 3.2 : 2.4;
-	if (!o || D(o.pos, e.ballon) > c) return;
+	if (!o || O(o.pos, e.ballon) > c) return;
 	let l = n.hauteur * 7 + Math.hypot(n.vitesse.x, n.vitesse.y) * .55, u = o.vision * .45 + o.detente * .35 + o.passe * .2;
-	if (n.age < .2 || e.rng() < k((l + 10 - u) / 180, .01, .12)) {
-		let t = A(o.cote);
+	if (n.age < .2 || e.rng() < A((l + 10 - u) / 180, .01, .12)) {
+		let t = j(o.cote);
 		n.vitesse.x += t * 1.5, n.vitesse.y += (e.rng() - .5) * 1.8, n.vitesseVerticale = Math.max(n.vitesseVerticale, 1.2), n.hauteur = Math.max(n.hauteur, .12), o.battu = Math.max(o.battu, .25);
 		return;
 	}
-	if (e.ballonLibre = null, e.possession = o.cote, wo(e), z(e) && n.hauteur < .5 && L(e, o, Math.hypot(o.vitesse.x, o.vitesse.y) > 2.2 ? "scoop" : "pickup", .9), e.ballon.x <= 11 && o.cote === "A" || e.ballon.x >= 111 && o.cote === "B") return bo(e, o.cote, n.auteurCote === o.cote ? "defense" : "attaque");
-	J(e, "pied", o.cote, `Le ballon vivant est récupéré par ${o.nom}.`, 0, o.moi), Ic(e, o.pos, o, void 0, void 0, void 0, n.intention !== "touche" && o.cote !== n.auteurCote ? "reception" : void 0);
+	if (e.ballonLibre = null, e.possession = o.cote, ns(e), R(e) && n.hauteur < .5 && L(e, o, Math.hypot(o.vitesse.x, o.vitesse.y) > 2.2 ? "scoop" : "pickup", .9), e.ballon.x <= 11 && o.cote === "A" || e.ballon.x >= 111 && o.cote === "B") return Qo(e, o.cote, n.auteurCote === o.cote ? "defense" : "attaque");
+	q(e, "pied", o.cote, `Le ballon vivant est récupéré par ${o.nom}.`, 0, o.moi), $(e, o.pos, o, void 0, void 0, void 0, n.intention !== "touche" && o.cote !== n.auteurCote ? "reception" : void 0);
 }
-function ko(e, t) {
+function ss(e, t) {
 	if (e.vol && e.vol.type === "passe") {
 		if (e.vol.ecoule < e.vol.duree) return;
-		let t = e.vol, n = e.vol.receveur, r = e.vol.intention === "offload", i = D(e.vol.de, e.vol.vers), a = { ...e.vol.vers };
-		if (e.vol = null, !n || !n.surLeTerrain || n.sanction > 0) return Ms(e, e.ballon);
-		if (D(n.pos, a) > (e.cadenceDetaillee ? 2.3 : 1.8)) return e.ballon = a, Do(e, t, "touche");
-		if (e.cadenceDetaillee ? n.vitesse.x * A(n.cote) < 0 && (n.vitesse.x = 0) : (n.pos = a, n.cible = { ...a }, N(n)), n.cote !== t.auteur.cote) return e.possession = n.cote, e.phasesDepuisArret = 0, e.dernierTurnover = {
+		let t = e.vol, n = e.vol.receveur, r = e.vol.intention === "offload", i = O(e.vol.de, e.vol.vers), a = { ...e.vol.vers };
+		if (e.vol = null, !n || !n.surLeTerrain || n.sanction > 0) return uc(e, e.ballon);
+		if (O(n.pos, a) > (e.cadenceDetaillee ? 2.3 : 1.8)) return e.ballon = a, as(e, t, "touche");
+		if (e.cadenceDetaillee ? n.vitesse.x * j(n.cote) < 0 && (n.vitesse.x = 0) : (n.pos = a, n.cible = { ...a }, P(n)), n.cote !== t.auteur.cote) return e.possession = n.cote, e.phasesDepuisArret = 0, e.dernierTurnover = {
 			pion: n,
 			t: e.t
-		}, ni(e, n.cote, ei.turnover), e.ballon = { ...n.pos }, Ic(e, n.pos, n);
-		if (Uo(e, n, i, r)) return e.ballon = e.cadenceDetaillee ? { ...n.pos } : a, Bo(e, n);
-		Wo(e, n, r ? .5 : .35);
+		}, Ai(e, n.cote, Oi.turnover), e.ballon = { ...n.pos }, $(e, n.pos, n);
+		if (xs(e, n, i, r)) return e.ballon = e.cadenceDetaillee ? { ...n.pos } : a, vs(e, n);
+		Ss(e, n, r ? .5 : .35);
 		return;
 	}
 	let n = e.porteur;
-	if (!n) return Ms(e, e.ballon);
-	let r = A(n.cote);
-	if (e.cellule?.pousse && e.cellule.porteurId === n.id) return _s(e, n);
-	let i = e.echappee?.pion === n, a = kn(e, n), o = a || (e.controleArcadeCamps?.includes(n.cote) ?? !1);
+	if (!n) return uc(e, e.ballon);
+	let r = j(n.cote);
+	if (e.cellule?.pousse && e.cellule.porteurId === n.id) return Ys(e, n);
+	let i = e.echappee?.pion === n, a = cr(e, n), o = a || (e.controleArcadeCamps?.includes(n.cote) ?? !1);
 	o || (n.cible = i ? {
 		x: n.cote === "A" ? 113 : 9,
-		y: k(n.pos.y, 3, 67)
-	} : Je(e) ?? Ao(e, n) ?? cs(e, n) ?? Po(e, n));
+		y: A(n.pos.y, 3, 67)
+	} : at(e) ?? cs(e, n) ?? Bs(e, n) ?? fs(e, n));
 	let s = n.pos.x;
-	a ? In(n, t, Wa(e, n), Ka(e)) : o || ke(n, t), hs(e), po(e);
+	a ? hr(n, t, So(e, n), wo(e)) : o || ze(n, t), qs(e), Go(e);
 	let c = (t) => Math.max(0, (t - e.ligneAvantage) * r), l = c(n.pos.x) - c(s);
 	l > 0 && (n.stats.metres += l, e.metresGagnesPhase = Math.max(e.metresGagnesPhase, c(n.pos.x))), e.ballon = {
 		x: n.pos.x,
 		y: n.pos.y
 	};
 	let u = 99, d = null, f = Infinity, p = 0;
-	for (let t of H(e, j(n.cote))) {
+	for (let t of V(e, M(n.cote))) {
 		if (t.sanction > 0) continue;
 		let i = (t.pos.x - n.pos.x) * r;
 		if (i < -.5 && p++, t.battu <= 0) {
-			let r = D(t.pos, n.pos);
-			r <= qa(e, t) && r < f && (d = t, f = r), r < u && i > -.2 && (u = r);
+			let r = O(t.pos, n.pos);
+			r <= To(e, t) && r < f && (d = t, f = r), r < u && i > -.2 && (u = r);
 		}
 	}
-	if (e.gardeRuck > 0 && O(n.pos, e.origine) < 6.25 && (d = null), ge(n.pos, n.cote)) return d && n.battu <= 0 ? ks(e, n, d) : Dc(e, n);
-	if (_e(n.pos)) return J(e, "touche", j(n.cote), I("pousseTouche", { nom: n.nom }), 0, n.moi), Q(e, "touche", j(n.cote), n.pos);
-	let m = M(n.pos, n.cote) < 3.5 && u > 2.1;
+	if (e.gardeRuck > 0 && k(n.pos, e.origine) < 6.25 && (d = null), Ee(n.pos, n.cote)) return d && n.battu <= 0 ? sc(e, n, d) : xl(e, n);
+	if (De(n.pos)) return q(e, "touche", M(n.cote), I("pousseTouche", { nom: n.nom }), 0, n.moi), Z(e, "touche", M(n.cote), n.pos);
+	let m = N(n.pos, n.cote) < 3.5 && u > 2.1;
 	if (m && (n.cible = {
 		x: n.cote === "A" ? 112.2 : 9.8,
-		y: k(n.pos.y, 2, 68)
-	}), !e.perceeSignalee && p >= 13 && u > 11 && e.metresGagnesPhase > 16 && n.battu <= 0 && (e.perceeSignalee = !0, e.compteurs.percees += 1, n.stats.franchissements += 1, J(e, "franchissement", n.cote, F(e.rng, dt, { nom: n.nom }), 0, n.moi)), !m && n.moi && e.controle && e.intention) {
+		y: A(n.pos.y, 2, 68)
+	}), !e.perceeSignalee && p >= 13 && u > 11 && e.metresGagnesPhase > 16 && n.battu <= 0 && (e.perceeSignalee = !0, e.compteurs.percees += 1, n.stats.franchissements += 1, q(e, "franchissement", n.cote, F(e.rng, St, { nom: n.nom }), 0, n.moi)), !m && n.moi && e.controle && e.intention) {
 		let t = e.intention.type === "passeGauche" ? -1 : +(e.intention.type === "passeDroite");
 		if (e.intention.type === "passe" || t !== 0) {
-			let r = t === 0 ? Jr(e, n) : Yr(e, n, t) ?? Jr(e, n);
+			let r = t === 0 ? Si(e, n) : Ci(e, n, t) ?? Si(e, n);
 			if (r) {
-				Zr(e), Jo(e, n, r, u);
+				Ti(e), Es(e, n, r, u);
 				return;
 			}
 		}
-		if (e.intention.type === "pied") return Zr(e), Jc(e, n, Kc(e, n));
+		if (e.intention.type === "pied") return Ti(e), Vl(e, n, zl(e, n));
 	}
-	if (o) return d && n.battu <= 0 ? ks(e, n, d) : void 0;
-	if (Go(e, n, u)) {
-		d && n.battu <= 0 && e.porteur === n && e.phase === "jeuCourant" && ks(e, n, d);
+	if (o) return d && n.battu <= 0 ? sc(e, n, d) : void 0;
+	if (Cs(e, n, u)) {
+		d && n.battu <= 0 && e.porteur === n && e.phase === "jeuCourant" && sc(e, n, d);
 		return;
 	}
 	if (e.direct?.actif && !m) {
-		let t = jn(e);
+		let t = ur(e);
 		if (t && t !== n) {
-			let r = Gn(e, n, t);
+			let r = wr(e, n, t);
 			if (r > 0 && e.rng() < r) {
-				e.lancement = null, e.duel = null, Jo(e, n, t, u) && J(e, "jeu", n.cote, I("duelPasseOk", {
+				e.lancement = null, e.duel = null, Es(e, n, t, u) && q(e, "jeu", n.cote, I("duelPasseOk", {
 					nom: n.nom,
 					cible: t.nom
 				}), 0, !0);
@@ -47417,28 +47819,28 @@ function ko(e, t) {
 		}
 	}
 	let h = e.lancement;
-	if (h?.relecture && !h.relu && h.index >= 1 && z(e) && !i && !m && (n.numero === 10 || n.numero === 12 || n.numero === 15)) {
+	if (h?.relecture && !h.relu && h.index >= 1 && R(e) && !i && !m && (n.numero === 10 || n.numero === 12 || n.numero === 15)) {
 		h.relu = !0;
-		let t = ga(e, n, u);
-		if (t?.type === "pied") return Jc(e, n, t.intention);
-		t?.type === "saute" ? (h.chaine = t.chaine, h.index = 0, h.tempo = "vite", J(e, "jeu", n.cote, `${n.nom} voit son premier soutien pris : il saute un joueur.`, 0, n.moi)) : t?.type === "porter" && (h.chaine = [n], h.index = 0, h.jeu = "intervalle", J(e, "jeu", n.cote, `${n.nom} voit l’intervalle et le prend lui-même.`, 0, n.moi));
+		let t = qa(e, n, u);
+		if (t?.type === "pied") return Vl(e, n, t.intention);
+		t?.type === "saute" ? (h.chaine = t.chaine, h.index = 0, h.tempo = "vite", q(e, "jeu", n.cote, `${n.nom} voit son premier soutien pris : il saute un joueur.`, 0, n.moi)) : t?.type === "porter" && (h.chaine = [n], h.index = 0, h.jeu = "intervalle", q(e, "jeu", n.cote, `${n.nom} voit l’intervalle et le prend lui-même.`, 0, n.moi));
 	}
 	let g = e.lancement;
-	e.direct?.actif && g && Ga(e, n, g);
-	let _ = g && g.index + 1 < g.chaine.length ? g.chaine[g.index + 1] : null, v = $r(e, n), y = Qr(e, n), b = _ ? D(n.pos, _.pos) : 99, x = _ ? (_.pos.x - n.pos.x) * r <= .4 : !1, ee = v > 7 && p >= 9 || y >= 8.5 && v > 6, S = O(n.pos, e.origine) > 49;
-	!i && S && (p >= 9 && v > 7.5 || y >= 8.5 && v > 7) && cl(e, n);
-	let C = z(e) && e.gardeRuck > 0 && !!g && g.index === 0 && g.chaine[0] === n && g.chaine.length > 1 && g.type !== "pickAndGo" && O(n.pos, e.origine) < 12.25, w = e.gardeRuck > 0 && (n.numero === 9 || n.numero === 10 || n.role === "demi") || C, T = w ? 20 : n.avant ? 12 : z(e) ? 23 : 18, te = g?.tempo === "vite" && !n.avant, E = w ? 99 : te ? 9.5 : n.avant ? 3.2 : 3.6, ne = _ ? (n.pos.x - _.pos.x) * r : 0, re = _ && e.cadenceDetaillee ? bs(b, n) : 0, ie = _ ? Math.max(0, _.vitesse.x * r) * re + .5 * _.acceleration * .85 * re * re : 0, ae = !!e.cadenceDetaillee && w && e.gardeRuck > .15 && !!_ && ne - ie > 1.8 || !!e.cadenceDetaillee && !!_ && ls(e, n, _) && u > 2.4, oe = !1;
-	if (Xt(e) && !w && !m && !i && !o) {
-		let t = Mo(e, n, u, _);
+	e.direct?.actif && g && Co(e, n, g);
+	let _ = g && g.index + 1 < g.chaine.length ? g.chaine[g.index + 1] : null, v = Di(e, n), y = Ei(e, n), b = _ ? O(n.pos, _.pos) : 99, x = _ ? (_.pos.x - n.pos.x) * r <= .4 : !1, ee = v > 7 && p >= 9 || y >= 8.5 && v > 6, S = k(n.pos, e.origine) > 49;
+	!i && S && (p >= 9 && v > 7.5 || y >= 8.5 && v > 7) && tu(e, n);
+	let C = R(e) && e.gardeRuck > 0 && !!g && g.index === 0 && g.chaine[0] === n && g.chaine.length > 1 && g.type !== "pickAndGo" && k(n.pos, e.origine) < 12.25, w = e.gardeRuck > 0 && (n.numero === 9 || n.numero === 10 || n.role === "demi") || C, T = w ? 20 : n.avant ? 12 : R(e) ? 23 : 18, E = g?.tempo === "vite" && !n.avant, D = w ? 99 : E ? 9.5 : n.avant ? 3.2 : 3.6, te = _ ? (n.pos.x - _.pos.x) * r : 0, ne = _ && e.cadenceDetaillee ? Qs(b, n) : 0, re = _ ? Math.max(0, _.vitesse.x * r) * ne + .5 * _.acceleration * .85 * ne * ne : 0, ie = !!e.cadenceDetaillee && w && e.gardeRuck > .15 && !!_ && te - re > 1.8 || !!e.cadenceDetaillee && !!_ && Vs(e, n, _) && u > 2.4, ae = !1;
+	if (kn(e) && !w && !m && !i && !o) {
+		let t = us(e, n, u, _);
 		if (t === "passe") return;
-		oe = t === "garde";
+		ae = t === "garde";
 	} else e.duel &&= null;
-	if (!oe && !m && !i && (w || !ee) && _ && _.surLeTerrain && x && !ae && b <= T && u <= E) {
-		Jo(e, n, _, u);
+	if (!ae && !m && !i && (w || !ee) && _ && _.surLeTerrain && x && !ie && b <= T && u <= D) {
+		Es(e, n, _, u);
 		return;
 	}
-	if (i && !m && u > 1.7 && z(e)) {
-		let t = Lo(e, n, v);
+	if (i && !m && u > 1.7 && R(e)) {
+		let t = hs(e, n, v);
 		if (t) {
 			e.lancement = {
 				type: "large",
@@ -47447,41 +47849,41 @@ function ko(e, t) {
 				jeu: "soutien",
 				libelle: "soutien de la percée"
 			};
-			let i = H(e, j(n.cote)).filter((t) => Ut(e, t) && (t.pos.x - n.pos.x) * r > -.5 && O(t.pos, n.pos) < 25).sort((e, t) => O(e.pos, n.pos) - O(t.pos, n.pos))[0];
-			Jo(e, n, t, u) && (i && (i.battu = Math.max(i.battu, .9), (e.retards ??= {})[i.id] = e.sim + .9), J(e, "jeu", n.cote, `${n.nom} fixe le dernier défenseur et sert ${t.nom} à son épaule.`, 0, n.moi || t.moi));
+			let i = V(e, M(n.cote)).filter((t) => tn(e, t) && (t.pos.x - n.pos.x) * r > -.5 && k(t.pos, n.pos) < 25).sort((e, t) => k(e.pos, n.pos) - k(t.pos, n.pos))[0];
+			Es(e, n, t, u) && (i && (i.battu = Math.max(i.battu, .9), (e.retards ??= {})[i.id] = e.sim + .9), q(e, "jeu", n.cote, `${n.nom} fixe le dernier défenseur et sert ${t.nom} à son épaule.`, 0, n.moi || t.moi));
 			return;
 		}
 	}
-	if (z(e) && g?.type === "pied" && g.botteur === n && !m && (u > 1.7 || e.gardeRuck > 0)) return Jc(e, n, g.intention ?? "occupation");
-	if (d && n.battu <= 0) return ks(e, n, d);
-	e.prochaineDecision -= t, !(e.prochaineDecision > 0) && (e.prochaineDecision = .25, !i && !m && Ko(e, n, u));
+	if (R(e) && g?.type === "pied" && g.botteur === n && !m && (u > 1.7 || e.gardeRuck > 0)) return Vl(e, n, g.intention ?? "occupation");
+	if (d && n.battu <= 0) return sc(e, n, d);
+	e.prochaineDecision -= t, !(e.prochaineDecision > 0) && (e.prochaineDecision = .25, !i && !m && ws(e, n, u));
 }
-function Ao(e, t) {
+function cs(e, t) {
 	let n = e.regard;
-	return !Xt(e) || !n || n.id !== t.id || !n.cible || e.sim - (n.cibleA ?? -9) > .35 ? null : n.cible;
+	return !kn(e) || !n || n.id !== t.id || !n.cible || e.sim - (n.cibleA ?? -9) > .35 ? null : n.cible;
 }
-function jo(e, t, n) {
-	let r = k((t.vision - 40) / 50, 0, 1), i = Math.min(n.pos.y, 70 - n.pos.y) < 9, a = r > .5 ? .1 : .03, o = .28 + (i ? .2 : 0) + r * .1, s = k(.3 - r * .24, .06, .3), c = e.rng();
+function ls(e, t, n) {
+	let r = A((t.vision - 40) / 50, 0, 1), i = Math.min(n.pos.y, 70 - n.pos.y) < 9, a = r > .5 ? .1 : .03, o = .28 + (i ? .2 : 0) + r * .1, s = A(.3 - r * .24, .06, .3), c = e.rng();
 	return c < a ? "couper" : c < a + o ? "glisser" : c < a + o + s ? "hesiter" : "monter";
 }
-function Mo(e, t, n, r) {
-	let i = A(t.cote), a = !Ht(e), o = {
-		...G,
-		intervalleMin: a ? G.intervalleMinReel : G.intervalleMin,
-		margeDuPlan: a ? G.margeDuPlanReel : G.margeDuPlan,
-		defenseurFixe: a ? G.defenseurFixeReel : G.defenseurFixe,
-		feinteReussie: a ? G.feinteReussieReel : G.feinteReussie
+function us(e, t, n, r) {
+	let i = j(t.cote), a = !en(e), o = {
+		...W,
+		intervalleMin: a ? W.intervalleMinReel : W.intervalleMin,
+		margeDuPlan: a ? W.margeDuPlanReel : W.margeDuPlan,
+		defenseurFixe: a ? W.defenseurFixeReel : W.defenseurFixe,
+		feinteReussie: a ? W.feinteReussieReel : W.feinteReussie
 	};
 	e.regard?.id !== t.id && (e.regard = {
 		id: t.id,
 		depuis: e.sim,
 		alea: e.rng()
 	});
-	let s = e.regard, c = nn(t);
+	let s = e.regard, c = Fn(t);
 	if (e.sim - s.depuis < (1 - c) * o.tempsDeLecture) return e.duel?.porteurId !== t.id && (e.duel = null), null;
 	let l = (t) => {
 		s.cible = t, s.cibleA = e.sim;
-	}, u = rn(e, t), d = u ? 1 + u.soutiens.length - u.defenseurs.length : 0;
+	}, u = In(e, t), d = u ? 1 + u.soutiens.length - u.defenseurs.length : 0;
 	if (u && c + s.alea * .35 > (d >= 2 ? .18 : .4)) {
 		let r = u.defenseurs[0], a = u.soutiens[0], d = e.duel;
 		!d || d.porteurId !== t.id || d.defenseurId !== r.id ? (d = e.duel = {
@@ -47489,25 +47891,25 @@ function Mo(e, t, n, r) {
 			soutienIds: u.soutiens.map((e) => e.id),
 			defenseurId: r.id,
 			cote: u.cote,
-			choix: jo(e, r, a),
+			choix: ls(e, r, a),
 			depuis: e.sim
 		}, d.choix === "hesiter" && (d.rechoisiA = e.sim + .4 + e.rng() * .45)) : d.soutienIds = u.soutiens.map((e) => e.id), d.choix === "hesiter" && e.sim >= (d.rechoisiA ?? 0) && (d.choix = e.rng() < .5 ? "monter" : "glisser");
-		let f = D(t.pos, r.pos), p = (r.pos.x - t.pos.x) / Math.max(.1, f), m = (r.pos.y - t.pos.y) / Math.max(.1, f), h = Math.max(0, (t.vitesse.x - r.vitesse.x) * p + (t.vitesse.y - r.vitesse.y) * m), g = k(o.passeAuDernierMoment + h * .3, 2.3, 4.6), _ = an(e, t, a), v = Math.abs(a.pos.y - t.pos.y), y = _ === r || (r.pos.y - t.pos.y) * u.cote > .6 * v, b = c + s.alea * .3 > o.lectureDeLaFeinte;
+		let f = O(t.pos, r.pos), p = (r.pos.x - t.pos.x) / Math.max(.1, f), m = (r.pos.y - t.pos.y) / Math.max(.1, f), h = Math.max(0, (t.vitesse.x - r.vitesse.x) * p + (t.vitesse.y - r.vitesse.y) * m), g = A(o.passeAuDernierMoment + h * .3, 2.3, 4.6), _ = Ln(e, t, a), v = Math.abs(a.pos.y - t.pos.y), y = _ === r || (r.pos.y - t.pos.y) * u.cote > .6 * v, b = c + s.alea * .3 > o.lectureDeLaFeinte;
 		if (y && b && f <= g + 1.8) {
 			if (s.feinteA === void 0) {
 				s.feinteA = e.sim, e.cadenceDetaillee && L(e, t, "dummy_pass", .7, u.cote > 0 ? "plus" : "moins");
-				let n = e.rng() < k(o.feinteReussie + (t.passe + t.vision - 2 * r.vision) / 260 + (d.choix === "couper" ? .18 : 0), .12, .85);
+				let n = e.rng() < A(o.feinteReussie + (t.passe + t.vision - 2 * r.vision) / 260 + (d.choix === "couper" ? .18 : 0), .12, .85);
 				n && (r.battu = Math.max(r.battu, o.defenseurFixe), (e.retards ??= {})[r.id] = e.sim + o.defenseurFixe, t.stats.franchissements += 1), e.lancement = {
 					type: "large",
 					chaine: [t],
 					index: 0,
 					jeu: "feinte",
 					libelle: "feinte de passe"
-				}, J(e, "jeu", t.cote, n ? `Feinte de passe de ${t.nom} ! ${r.nom} est parti sur ${a.nom}, la porte est ouverte.` : `${t.nom} feinte la passe et garde, ${r.nom} ne s’y laisse pas prendre.`, 0, t.moi || r.moi);
+				}, q(e, "jeu", t.cote, n ? `Feinte de passe de ${t.nom} ! ${r.nom} est parti sur ${a.nom}, la porte est ouverte.` : `${t.nom} feinte la passe et garde, ${r.nom} ne s’y laisse pas prendre.`, 0, t.moi || r.moi);
 			}
 			return l({
-				x: Z(t.pos.x + i * 14),
-				y: k(t.pos.y - u.cote * 1.8, 2.5, 67.5)
+				x: X(t.pos.x + i * 14),
+				y: A(t.pos.y - u.cote * 1.8, 2.5, 67.5)
 			}), "garde";
 		}
 		let x = (a.pos.x - t.pos.x) * i <= .4;
@@ -47518,29 +47920,29 @@ function Mo(e, t, n, r) {
 			jeu: "surnombre",
 			libelle: `${1 + u.soutiens.length} contre ${u.defenseurs.length}`,
 			tempo: u.defenseurs.length > 1 ? "vite" : void 0
-		}, Jo(e, t, a, n)) ? (d.choix !== "glisser" && (r.battu = Math.max(r.battu, o.defenseurFixe), (e.retards ??= {})[r.id] = e.sim + o.defenseurFixe), J(e, "jeu", t.cote, `${t.nom} fixe ${r.nom} et donne au dernier moment : ${a.nom} est lancé dans l’espace.`, 0, t.moi || a.moi), e.duel = null, "passe") : (l({
-			x: Z(t.pos.x + i * 12),
-			y: k(r.pos.y - u.cote * .6, 2.5, 67.5)
+		}, Es(e, t, a, n)) ? (d.choix !== "glisser" && (r.battu = Math.max(r.battu, o.defenseurFixe), (e.retards ??= {})[r.id] = e.sim + o.defenseurFixe), q(e, "jeu", t.cote, `${t.nom} fixe ${r.nom} et donne au dernier moment : ${a.nom} est lancé dans l’espace.`, 0, t.moi || a.moi), e.duel = null, "passe") : (l({
+			x: X(t.pos.x + i * 12),
+			y: A(r.pos.y - u.cote * .6, 2.5, 67.5)
 		}), "garde");
 	}
 	e.duel &&= null;
-	let f = tn(e, t), p = f.intervalle;
+	let f = Pn(e, t), p = f.intervalle;
 	if (!p) return null;
 	let m = o.intervalleMin + (1 - c) * 3.2 + (t.avant ? .9 : t.numero >= 11 ? -.5 : 0);
 	if (p.largeur < m || f.rayons.axe.libre < 2.5 && Math.abs(p.y - t.pos.y) < 1.2) return null;
 	let h = Math.min(p.largeur, 9) + (t.vitesseMax - 8) * 1.1 + Math.max((t.evitement - 60) / 16, (t.puissance - 70) / 22) - p.couverture * 1.4 - p.profondeur * .1 + (s.alea - .5) * 2.6 * (1.15 - c), g = -Infinity;
-	return r && B(r) && (r.pos.x - t.pos.x) * i <= .4 && (g = Math.min(12, Gt(e, j(t.cote), r.pos)) * .75 + (t.passe - 60) / 14 + (e.lancement?.tempo === "vite" ? 1.6 : 0) - (an(e, t, r) ? 3 : 0)), h <= g + o.margeDuPlan || h < 3.2 ? null : (s.intervalle || (s.intervalle = !0, e.lancement && e.lancement.index + 1 < e.lancement.chaine.length && (e.lancement = {
+	return r && z(r) && (r.pos.x - t.pos.x) * i <= .4 && (g = Math.min(12, rn(e, M(t.cote), r.pos)) * .75 + (t.passe - 60) / 14 + (e.lancement?.tempo === "vite" ? 1.6 : 0) - (Ln(e, t, r) ? 3 : 0)), h <= g + o.margeDuPlan || h < 3.2 ? null : (s.intervalle || (s.intervalle = !0, e.lancement && e.lancement.index + 1 < e.lancement.chaine.length && (e.lancement = {
 		...e.lancement,
 		chaine: [t],
 		index: 0,
 		jeu: "intervalle",
 		libelle: "intervalle pris à la main"
-	}, J(e, "jeu", t.cote, `${t.nom} voit l’intervalle s’ouvrir devant lui et garde le ballon !`, 0, t.moi))), l({
-		x: Z(t.pos.x + i * 14),
-		y: k(p.y, 2.5, 67.5)
+	}, q(e, "jeu", t.cote, `${t.nom} voit l’intervalle s’ouvrir devant lui et garde le ballon !`, 0, t.moi))), l({
+		x: X(t.pos.x + i * 14),
+		y: A(p.y, 2.5, 67.5)
 	}), "garde");
 }
-function No(e) {
+function ds(e) {
 	let t = e.duel;
 	if (!t) return;
 	let n = e.porteur;
@@ -47548,54 +47950,54 @@ function No(e) {
 		e.vol || (e.duel = null);
 		return;
 	}
-	let r = A(n.cote);
+	let r = j(n.cote);
 	t.soutienIds.forEach((i, a) => {
 		let o = e.pions.find((e) => e.id === i);
-		if (!o || !B(o)) return;
-		let s = Math.max(Math.abs(o.pos.y - n.pos.y), 6.5 + a * 6), c = k(n.pos.y + t.cote * s + n.vitesse.y * .4, 2.5, 67.5);
+		if (!o || !z(o)) return;
+		let s = Math.max(Math.abs(o.pos.y - n.pos.y), 6.5 + a * 6), c = A(n.pos.y + t.cote * s + n.vitesse.y * .4, 2.5, 67.5);
 		o.role = "ligne", o.cible = {
-			x: Z(n.pos.x - r * (1.7 + a * 1.3) + n.vitesse.x * .55),
+			x: X(n.pos.x - r * (1.7 + a * 1.3) + n.vitesse.x * .55),
 			y: c
 		}, o.effort = Math.max(o.effort, 1.05);
 	});
 	let i = e.pions.find((e) => e.id === t.defenseurId), a = e.pions.find((e) => e.id === t.soutienIds[0]);
-	if (!i || !a || !Ut(e, i)) return;
+	if (!i || !a || !tn(e, i)) return;
 	let o = a.pos.y - n.pos.y;
 	t.choix === "monter" ? (i.cible = {
 		x: n.pos.x + n.vitesse.x * .25,
 		y: n.pos.y + n.vitesse.y * .25
 	}, i.effort = Math.max(i.effort, 1.04)) : t.choix === "glisser" ? i.cible = {
-		x: Z(n.pos.x + r * 2.4),
-		y: k(n.pos.y + o * .62, 1.5, 68.5)
+		x: X(n.pos.x + r * 2.4),
+		y: A(n.pos.y + o * .62, 1.5, 68.5)
 	} : t.choix === "hesiter" ? (i.cible = {
-		x: Z(i.pos.x + r * 1.2),
-		y: k(n.pos.y + o * .35, 1.5, 68.5)
+		x: X(i.pos.x + r * 1.2),
+		y: A(n.pos.y + o * .35, 1.5, 68.5)
 	}, i.effort = Math.min(i.effort, .6)) : (i.cible = {
-		x: Z((n.pos.x + a.pos.x) / 2 + r * .6),
-		y: k(n.pos.y + o * .5, 1.5, 68.5)
+		x: X((n.pos.x + a.pos.x) / 2 + r * .6),
+		y: A(n.pos.y + o * .5, 1.5, 68.5)
 	}, i.effort = Math.max(i.effort, 1.08));
 }
-function Po(e, t) {
-	let n = A(t.cote), r = e.ouvert, i = H(e, j(t.cote)), a = null, o = Infinity;
+function fs(e, t) {
+	let n = j(t.cote), r = e.ouvert, i = V(e, M(t.cote)), a = null, o = Infinity;
 	for (let e of i) {
 		if (e.battu > 0 || e.sanction > 0 || (e.pos.x - t.pos.x) * n < -1.5) continue;
-		let r = O(e.pos, t.pos);
+		let r = k(e.pos, t.pos);
 		r < o && (o = r, a = e);
 	}
-	let s = a ? Math.sqrt(o) : 99, c = M(t.pos, t.cote);
+	let s = a ? Math.sqrt(o) : 99, c = N(t.pos, t.cote);
 	if (!a || s > 13) {
-		let e = c < 22 ? k((22 - c) / 22, 0, 1) * .55 : 0;
+		let e = c < 22 ? A((22 - c) / 22, 0, 1) * .55 : 0;
 		return {
 			x: t.pos.x + n * 22,
-			y: k(ue(t.pos.y, 35, e), 2.5, 67.5)
+			y: A(be(t.pos.y, 35, e), 2.5, 67.5)
 		};
 	}
 	if (e.lancement && e.lancement.index + 1 < e.lancement.chaine.length) return {
 		x: t.pos.x + n * 14,
-		y: k(a.pos.y + r * .6, 2.5, 67.5)
+		y: A(a.pos.y + r * .6, 2.5, 67.5)
 	};
-	if (z(e) && !t.avant) {
-		let r = Fo(e, t, i);
+	if (R(e) && !t.avant) {
+		let r = ps(e, t, i);
 		if (r !== null) return {
 			x: t.pos.x + n * 14,
 			y: r
@@ -47605,7 +48007,7 @@ function Po(e, t) {
 		let e = null, r = Infinity;
 		for (let o of i) {
 			if (o === a || o.battu > 0 || o.sanction > 0 || o.corps || (o.pos.x - t.pos.x) * n < -1.5) continue;
-			let i = O(o.pos, a.pos);
+			let i = k(o.pos, a.pos);
 			i < r && (r = i, e = o);
 		}
 		let o = t.vision >= 52;
@@ -47613,29 +48015,29 @@ function Po(e, t) {
 			let i = Math.abs(e.pos.y - a.pos.y);
 			if (i > 3.2 && i < 9) return {
 				x: t.pos.x + n * 12,
-				y: k((a.pos.y + e.pos.y) / 2, 2.5, 67.5)
+				y: A((a.pos.y + e.pos.y) / 2, 2.5, 67.5)
 			};
 			let o = e.puissance + (e.poidsKg ?? 95) * .25 < a.puissance + (a.poidsKg ?? 95) * .25 && Math.sqrt(r) < 4 ? e : a, s = Math.sign((o === a ? e.pos.y : a.pos.y) - o.pos.y) || 1;
 			return {
 				x: t.pos.x + n * 12,
-				y: k(o.pos.y - s * .55, 2.5, 67.5)
+				y: A(o.pos.y - s * .55, 2.5, 67.5)
 			};
 		}
 		return {
 			x: t.pos.x + n * 12,
-			y: k(a.pos.y + (t.pos.y < a.pos.y ? -.5 : .5), 2.5, 67.5)
+			y: A(a.pos.y + (t.pos.y < a.pos.y ? -.5 : .5), 2.5, 67.5)
 		};
 	}
 	return {
 		x: t.pos.x + n * 15,
-		y: k(a.pos.y + r * 5.5, 2.5, 67.5)
+		y: A(a.pos.y + r * 5.5, 2.5, 67.5)
 	};
 }
-function Fo(e, t, n) {
-	let r = A(t.cote), i = [];
+function ps(e, t, n) {
+	let r = j(t.cote), i = [];
 	for (let a of n) {
 		let n = (a.pos.x - t.pos.x) * r;
-		n > -1 && n < 16 && Ut(e, a) && i.push(a.pos.y);
+		n > -1 && n < 16 && tn(e, a) && i.push(a.pos.y);
 	}
 	if (!i.length) return null;
 	i.sort((e, t) => e - t);
@@ -47654,20 +48056,20 @@ function Fo(e, t, n) {
 	}
 	return o;
 }
-function Io(e) {
+function ms(e) {
 	let t = e.porteur;
 	if (e.phase !== "jeuCourant" || !t || !(e.echappee?.pion === t || e.perceeSignalee)) {
 		e.soutiensPercee = void 0;
 		return;
 	}
-	let n = A(t.cote), r = (t) => e.pions.find((e) => e.id === t), i = (e.soutiensPercee ?? []).filter((e) => {
+	let n = j(t.cote), r = (t) => e.pions.find((e) => e.id === t), i = (e.soutiensPercee ?? []).filter((e) => {
 		let n = r(e);
-		return !!n && n !== t && n.cote === t.cote && B(n) && O(n.pos, t.pos) < 576;
-	}), a = Ht(e) ? 3 : G.soutiensReel;
+		return !!n && n !== t && n.cote === t.cote && z(n) && k(n.pos, t.pos) < 576;
+	}), a = en(e) ? 3 : W.soutiensReel;
 	if (i.length < a) {
-		let o = H(e, t.cote).filter((e) => e !== t && B(e) && !i.includes(e.id) && (e.pos.x - t.pos.x) * n < 3).map((e) => ({
+		let o = V(e, t.cote).filter((e) => e !== t && z(e) && !i.includes(e.id) && (e.pos.x - t.pos.x) * n < 3).map((e) => ({
 			q: e,
-			c: D(e.pos, t.pos) - tr(e).suitLaPercee - (e.vitesseMax - 8) * 3
+			c: O(e.pos, t.pos) - pn(e).suitLaPercee - (e.vitesseMax - 8) * 3
 		})).sort((e, t) => e.c - t.c).slice(0, a - i.length).map((e) => e.q.id);
 		i = [...i, ...o];
 		let s = r(o[0] ?? "");
@@ -47680,127 +48082,127 @@ function Io(e) {
 		if (!a) return;
 		let s = i === 0 ? o = a.pos.y >= t.pos.y ? 1 : -1 : i === 1 ? -o : 0;
 		a.role = "ligne", a.cible = {
-			x: Z(t.pos.x - n * (i === 2 ? 5 : 2.4) + t.vitesse.x * .6),
-			y: k(t.pos.y + s * 5.5 + t.vitesse.y * .6, 2, 68)
+			x: X(t.pos.x - n * (i === 2 ? 5 : 2.4) + t.vitesse.x * .6),
+			y: A(t.pos.y + s * 5.5 + t.vitesse.y * .6, 2, 68)
 		}, a.effort = 1.14;
 	});
 }
-function Lo(e, t, n) {
-	if (n > G.fixation || !e.soutiensPercee?.length) return null;
-	let r = A(t.cote), i = null, a = 2.5;
+function hs(e, t, n) {
+	if (n > W.fixation || !e.soutiensPercee?.length) return null;
+	let r = j(t.cote), i = null, a = 2.5;
 	for (let o of e.soutiensPercee) {
 		let s = e.pions.find((e) => e.id === o);
-		if (!s || !B(s)) continue;
+		if (!s || !z(s)) continue;
 		let c = (t.pos.x - s.pos.x) * r, l = Math.abs(s.pos.y - t.pos.y);
 		if (c < .3 || c > 7 || l < 2.5 || l > 12) continue;
-		let u = $r(e, s) - n;
+		let u = Di(e, s) - n;
 		u > a && (a = u, i = s);
 	}
 	return i;
 }
-var Ro = 4.5;
-function zo(e, t, n, r) {
+var gs = 4.5;
+function _s(e, t, n, r) {
 	e.sifflet = {
 		cle: t,
-		club: Y(e, n),
+		club: J(e, n),
 		fautif: r?.nom ?? "",
 		maFaute: !!r?.moi,
-		restant: Ro
+		restant: gs
 	};
 }
-function Bo(e, t) {
-	L(e, t, "foul_knockon", 1.9), t.stats.passesRatees += 1, e.compteurs.enAvants += 1, J(e, "faute", t.cote, F(e.rng, pt, {
+function vs(e, t) {
+	L(e, t, "foul_knockon", 1.9), t.stats.passesRatees += 1, e.compteurs.enAvants += 1, q(e, "faute", t.cote, F(e.rng, wt, {
 		nom: t.nom,
-		club: Y(e, j(t.cote))
-	}), 0, t.moi), zo(e, "ml.sifflet.enAvant", j(t.cote), t), ni(e, t.cote, ei.enAvant), Q(e, "melee", j(t.cote), t.pos, !0);
+		club: J(e, M(t.cote))
+	}), 0, t.moi), _s(e, "ml.sifflet.enAvant", M(t.cote), t), Ai(e, t.cote, Oi.enAvant), Z(e, "melee", M(t.cote), t.pos, !0);
 }
-function Vo(e, t) {
-	L(e, t, "foul_forwardpass", 1.2), --t.stats.passes, t.stats.passesRatees += 1, e.compteurs.enAvants += 1, J(e, "faute", t.cote, F(e.rng, mt, {
+function ys(e, t) {
+	L(e, t, "foul_forwardpass", 1.2), --t.stats.passes, t.stats.passesRatees += 1, e.compteurs.enAvants += 1, q(e, "faute", t.cote, F(e.rng, Tt, {
 		nom: t.nom,
-		club: Y(e, j(t.cote))
-	}), 0, t.moi), zo(e, "ml.sifflet.passeAvant", j(t.cote), t), Q(e, "melee", j(t.cote), t.pos, !0);
+		club: J(e, M(t.cote))
+	}), 0, t.moi), _s(e, "ml.sifflet.passeAvant", M(t.cote), t), Z(e, "melee", M(t.cote), t.pos, !0);
 }
-function Ho(e, t) {
+function bs(e, t) {
 	let n = e.cohesion?.[t];
-	return n === void 0 ? 1 : k(1 + (50 - n) / 100 * .6, .7, 1.3);
+	return n === void 0 ? 1 : A(1 + (50 - n) / 100 * .6, .7, 1.3);
 }
-function Uo(e, t, n, r) {
+function xs(e, t, n, r) {
 	let i = 99;
-	for (let n of H(e, j(t.cote))) n.sanction > 0 || n.battu > 0 || (i = Math.min(i, D(n.pos, t.pos)));
-	let a = .6 + t.passe / 220, o = Math.max(0, (55 - t.endurance) / 150), s = ((r ? .03 : .01) + o * .032 + Math.max(0, 4 - i) * .007 + Math.max(0, n - 9) / 500) * Ho(e, t.cote);
+	for (let n of V(e, M(t.cote))) n.sanction > 0 || n.battu > 0 || (i = Math.min(i, O(n.pos, t.pos)));
+	let a = .6 + t.passe / 220, o = Math.max(0, (55 - t.endurance) / 150), s = ((r ? .03 : .01) + o * .032 + Math.max(0, 4 - i) * .007 + Math.max(0, n - 9) / 500) * bs(e, t.cote);
 	return e.rng() < Math.max(0, s / a);
 }
-function Wo(e, t, n) {
+function Ss(e, t, n) {
 	e.porteur = t, e.possession = t.cote, e.ballon = {
 		x: t.pos.x,
 		y: t.pos.y
 	}, t.stats.courses += 1, e.lancement?.type === "pickAndGo" && t.avant && (t.stats.pickAndGo += 1), e.prochaineDecision = n, e.vol = null;
 }
-function Go(e, t, n) {
+function Cs(e, t, n) {
 	let r = e.combinaisonEnCours;
 	if (!r) return !1;
 	if (r.cote !== t.cote || e.sim - r.debut > 45) return e.combinaisonEnCours = void 0, e.lancement = null, !1;
-	qe(e);
+	it(e);
 	let i = r.etapes[r.index], a = i?.actions.find((e) => e.action.type !== "leurre")?.action ?? i?.actions[0]?.action;
 	if (!a) return e.combinaisonEnCours = void 0, e.lancement = null, !1;
 	let o = () => {
 		r.index++, r.depuis = e.sim;
 	};
 	if (a.type === "leurre") return r.courses[a.numero] = a.destination, o(), !0;
-	if (a.type === "course") return (D(t.pos, Ge(r, a.destination)) < 1.5 || e.sim - r.depuis > 4) && o(), !0;
-	if (a.type === "pied") return n > 1.6 && e.sim - r.depuis >= .25 && (e.combinaisonEnCours = void 0, Jc(e, t, a.intention)), !0;
-	let s = Ve(e, r.cote, a.destinataire);
-	return !s || s === t || e.sim - r.depuis > 4 ? (e.combinaisonEnCours = void 0, e.lancement = null, !1) : ((s.pos.x - t.pos.x) * A(t.cote) <= .4 && D(t.pos, s.pos) <= 28 && e.sim - r.depuis >= .3 && (o(), Jo(e, t, s, n)), !0);
+	if (a.type === "course") return (O(t.pos, nt(r, a.destination)) < 1.5 || e.sim - r.depuis > 4) && o(), !0;
+	if (a.type === "pied") return n > 1.6 && e.sim - r.depuis >= .25 && (e.combinaisonEnCours = void 0, Vl(e, t, a.intention)), !0;
+	let s = Qe(e, r.cote, a.destinataire);
+	return !s || s === t || e.sim - r.depuis > 4 ? (e.combinaisonEnCours = void 0, e.lancement = null, !1) : ((s.pos.x - t.pos.x) * j(t.cote) <= .4 && O(t.pos, s.pos) <= 28 && e.sim - r.depuis >= .3 && (o(), Es(e, t, s, n)), !0);
 }
-function Ko(e, t, n) {
+function ws(e, t, n) {
 	let r = e.lancement, i = r && r.index + 1 < r.chaine.length;
-	if (e.sirene && uo(e, t.cote) > 0 && n > 1.8) return Jc(e, t, "degagement");
-	if (r && r.type === "pied" && r.botteur === t && n > 2.4) return Jc(e, t, r.intention ?? "occupation");
+	if (e.sirene && Uo(e, t.cote) > 0 && n > 1.8) return Vl(e, t, "degagement");
+	if (r && r.type === "pied" && r.botteur === t && n > 2.4) return Vl(e, t, r.intention ?? "occupation");
 	if (!i) {
-		if (z(e)) return qo(e, t, n);
-		if (t.numero === 10 && M(t.pos, t.cote) < 32 && Math.abs(t.pos.y - 35) < 14 && t.pied > 55 && n > 4.5 && e.rng() < (e.minute >= 65 ? .04 : .015)) return Jc(e, t, "drop");
-		if (!t.avant && M(t.pos, t.cote) < 26 && n < 6 && t.pied > 55 && e.rng() < .032) return Jc(e, t, "rasant");
+		if (R(e)) return Ts(e, t, n);
+		if (t.numero === 10 && N(t.pos, t.cote) < 32 && Math.abs(t.pos.y - 35) < 14 && t.pied > 55 && n > 4.5 && e.rng() < (e.minute >= 65 ? .04 : .015)) return Vl(e, t, "drop");
+		if (!t.avant && N(t.pos, t.cote) < 26 && n < 6 && t.pied > 55 && e.rng() < .032) return Vl(e, t, "rasant");
 	}
 }
-function qo(e, t, n) {
+function Ts(e, t, n) {
 	if (t.avant || t.pied < 55) return;
-	let r = Jt(e, t.cote, t.pos), i = M(t.pos, t.cote);
-	if (t.numero === 10 && i < 34 && Math.abs(t.pos.y - 35) < 15 && n > 4.5 && (r.posture === "troisPoints" || r.restantes <= 25 && Math.abs(r.diff) <= 3 && e.rng() < .03)) return Jc(e, t, "drop");
+	let r = sn(e, t.cote, t.pos), i = N(t.pos, t.cote);
+	if (t.numero === 10 && i < 34 && Math.abs(t.pos.y - 35) < 15 && n > 4.5 && (r.posture === "troisPoints" || r.restantes <= 25 && Math.abs(r.diff) <= 3 && e.rng() < .03)) return Vl(e, t, "drop");
 	if (r.posture === "gestion" || i > 45 || n < 2.6 || n > 7.5) return;
-	let a = A(t.cote), o = H(e, t.cote).some((e) => e !== t && B(e) && (e.pos.x - t.pos.x) * a <= .5 && O(e.pos, t.pos) < 49), s = Gt(e, j(t.cote), {
-		x: Z(t.pos.x + a * 14),
+	let a = j(t.cote), o = V(e, t.cote).some((e) => e !== t && z(e) && (e.pos.x - t.pos.x) * a <= .5 && k(e.pos, t.pos) < 49), s = rn(e, M(t.cote), {
+		x: X(t.pos.x + a * 14),
 		y: t.pos.y
 	});
-	if (!o && s >= 9 && e.rng() < .16 * (t.pied / 70) * (r.posture === "urgence" ? .5 : 1)) return Jc(e, t, "rasant");
+	if (!o && s >= 9 && e.rng() < .16 * (t.pied / 70) * (r.posture === "urgence" ? .5 : 1)) return Vl(e, t, "rasant");
 }
-function Jo(e, t, n, r) {
-	let i = A(t.cote), a = {
+function Es(e, t, n, r) {
+	let i = j(t.cote), a = {
 		x: n.pos.x,
 		y: n.pos.y
-	}, o = D(t.pos, a);
+	}, o = O(t.pos, a);
 	t.stats.passes += 1;
-	let s = Ho(e, t.cote), c = (a.x - t.pos.x) * i;
+	let s = bs(e, t.cote), c = (a.x - t.pos.x) * i;
 	if (c > .4) {
-		if (c > 1.8) return Vo(e, t), !1;
+		if (c > 1.8) return ys(e, t), !1;
 		let n = Math.min(.22, Math.max(0, c - 1.4) * .038) * (1.3 - t.vision / 200) * s;
-		if (e.rng() < n) return Vo(e, t), !1;
+		if (e.rng() < n) return ys(e, t), !1;
 		a.x = t.pos.x - i * .4;
 	}
 	let l = (.01 + Math.max(0, 3 - r) * .007 + o / 1800) * s;
-	if (e.rng() < l * (1.35 - t.passe / 220)) return --t.stats.passes, Bo(e, t), !1;
-	if (e.dernierPasseur = t, e.lancement && !e.lancement.fixe && (e.cadenceDetaillee && e.lancement.structure || z(e) && e.lancement.leurres) && us(e, e.lancement, t, n)) return !1;
-	let u = H(e, j(t.cote)), d = 0;
-	for (let e of u) e.battu > 0 || e.role === "chasseur" && O(e.pos, t.pos) < 2.3 * 2.3 && (e.battu = .25, d++);
+	if (e.rng() < l * (1.35 - t.passe / 220)) return --t.stats.passes, vs(e, t), !1;
+	if (e.dernierPasseur = t, e.lancement && !e.lancement.fixe && (e.cadenceDetaillee && e.lancement.structure || R(e) && e.lancement.leurres) && Hs(e, e.lancement, t, n)) return !1;
+	let u = V(e, M(t.cote)), d = 0;
+	for (let e of u) e.battu > 0 || e.role === "chasseur" && k(e.pos, t.pos) < 2.3 * 2.3 && (e.battu = .25, d++);
 	let f = 99;
 	for (let e of u) {
 		if (e.battu > 0 || e.sanction > 0 || (e.pos.x - n.pos.x) * i < -.5) continue;
-		let t = D(n.pos, e.pos);
+		let t = O(n.pos, e.pos);
 		t < f && (f = t);
 	}
 	if (e.lancement && (e.lancement.index += 1), e.gardeRuck = 0, e.porteur = null, e.cadenceDetaillee) {
-		let { vers: i, duree: s } = ys(t, n, a, (e) => bs(e, t));
-		So(e, {
-			variante: vs(e, t, o, r, i),
+		let { vers: i, duree: s } = Zs(t, n, a, (e) => Qs(e, t));
+		es(e, {
+			variante: Xs(e, t, o, r, i),
 			de: {
 				x: t.pos.x,
 				y: t.pos.y
@@ -47808,19 +48210,19 @@ function Jo(e, t, n, r) {
 			vers: i,
 			duree: s,
 			ecoule: 0,
-			hauteur: k(Pi * s * s / 8 * .6, .08, 1.1),
+			hauteur: A(da * s * s / 8 * .6, .08, 1.1),
 			type: "passe",
 			intention: "passe",
 			auteur: t,
 			receveur: n
 		});
-	} else So(e, {
+	} else es(e, {
 		de: {
 			x: t.pos.x,
 			y: t.pos.y
 		},
 		vers: a,
-		duree: k(.08 + o / (12 + t.passe * .32), .18, .95),
+		duree: A(.08 + o / (12 + t.passe * .32), .18, .95),
 		ecoule: 0,
 		hauteur: Math.min(.28, .08 + o * .008),
 		type: "passe",
@@ -47828,17 +48230,17 @@ function Jo(e, t, n, r) {
 		auteur: t,
 		receveur: n
 	});
-	if (z(e) && e.vol && Yo(e, t, e.vol)) return !1;
-	if (f > 13 && d > 0) for (let e of u) e.numero !== 15 && O(e.pos, n.pos) < 180 && (e.battu = Math.max(e.battu, 1.5));
-	else e.lancement && e.lancement.type !== "ras" && e.lancement.index === e.lancement.chaine.length - 1 && !n.avant && n.numero >= 11 && e.rng() < .45 && J(e, "jeu", t.cote, F(e.rng, Nt, { nom: n.nom }), 0, n.moi);
+	if (R(e) && e.vol && Ds(e, t, e.vol)) return !1;
+	if (f > 13 && d > 0) for (let e of u) e.numero !== 15 && k(e.pos, n.pos) < 180 && (e.battu = Math.max(e.battu, 1.5));
+	else e.lancement && e.lancement.type !== "ras" && e.lancement.index === e.lancement.chaine.length - 1 && !n.avant && n.numero >= 11 && e.rng() < .45 && q(e, "jeu", t.cote, F(e.rng, Wt, { nom: n.nom }), 0, n.moi);
 	return !0;
 }
-function Yo(e, t, n) {
+function Ds(e, t, n) {
 	let r = n.vers.x - n.de.x, i = n.vers.y - n.de.y, a = Math.hypot(r, i);
 	if (a < 8 || n.intention !== "passe") return !1;
 	let o = null, s = 0, c = 1.7;
-	for (let l of H(e, j(t.cote))) {
-		if (!Ut(e, l)) continue;
+	for (let l of V(e, M(t.cote))) {
+		if (!tn(e, l)) continue;
 		let t = ((l.pos.x - n.de.x) * r + (l.pos.y - n.de.y) * i) / (a * a);
 		if (t < .4 || t > .92) continue;
 		let u = Math.hypot(l.pos.x - n.de.x - t * r, l.pos.y - n.de.y - t * i);
@@ -47850,10 +48252,10 @@ function Yo(e, t, n) {
 	let u = {
 		x: n.de.x + r * s,
 		y: n.de.y + i * s
-	}, d = e.rng(), f = k(.2 + (o.vision - 60) / 400, .1, .34);
-	return d < f ? (n.receveur = o, n.vers = u, n.duree *= s, L(e, o, "intercept", .9), J(e, "franchissement", o.cote, `INTERCEPTION ! ${o.nom} a lu la passe de ${t.nom}.`, 0, o.moi || t.moi), !1) : d < f + .3 ? (L(e, o, "foul_knockon", 1.4), J(e, "faute", t.cote, `${o.nom} tend le bras sur la passe de ${t.nom} sans pouvoir la saisir.`, 0, o.moi), $(e, t.cote, u, "en-avant volontaire", o), !0) : (o.battu = Math.max(o.battu, 1.3), (e.retards ??= {})[o.id] = e.sim + 1.3, o.cible = u, !1);
+	}, d = e.rng(), f = A(.2 + (o.vision - 60) / 400, .1, .34);
+	return d < f ? (n.receveur = o, n.vers = u, n.duree *= s, L(e, o, "intercept", .9), q(e, "franchissement", o.cote, `INTERCEPTION ! ${o.nom} a lu la passe de ${t.nom}.`, 0, o.moi || t.moi), !1) : d < f + .3 ? (L(e, o, "foul_knockon", 1.4), q(e, "faute", t.cote, `${o.nom} tend le bras sur la passe de ${t.nom} sans pouvoir la saisir.`, 0, o.moi), Q(e, t.cote, u, "en-avant volontaire", o), !0) : (o.battu = Math.max(o.battu, 1.3), (e.retards ??= {})[o.id] = e.sim + 1.3, o.cible = u, !1);
 }
-var Xo = [
+var Os = [
 	"equilibre",
 	"avants",
 	"large",
@@ -47861,17 +48263,17 @@ var Xo = [
 	"pied",
 	"leurres"
 ];
-function Zo(e) {
+function ks(e) {
 	let t = 2166136261;
 	for (let n = 0; n < e.length; n++) t = Math.imul(t ^ e.charCodeAt(n), 16777619);
-	return Xo[(t >>> 0) % Xo.length];
+	return Os[(t >>> 0) % Os.length];
 }
-function Qo(e) {
+function As(e) {
 	return e === "avants" ? { attaque: "avants" } : e === "large" || e === "leurres" ? { attaque: "large" } : e === "pied" ? { attaque: "occupation" } : void 0;
 }
-function $o(e) {
-	let t = ve(e.ballon), n = 70 - ye(e.ballon), r = e.serieCote, i = t;
-	return r && r.n >= 3 && (r.cote !== t || n > 14) && e.rng() < .6 ? i = r.cote === 1 ? -1 : 1 : n > 19 && e.rng() < .2 && (i = t === 1 ? -1 : 1), r && i !== r.cote && r.n >= 3 && J(e, "jeu", e.possession, `${Y(e, e.possession)} renverse le jeu : tout le monde se replace de l’autre côté du ruck.`), e.serieCote = r && r.cote === i ? {
+function js(e) {
+	let t = Oe(e.ballon), n = 70 - ke(e.ballon), r = e.serieCote, i = t;
+	return r && r.n >= 3 && (r.cote !== t || n > 14) && e.rng() < .6 ? i = r.cote === 1 ? -1 : 1 : n > 19 && e.rng() < .2 && (i = t === 1 ? -1 : 1), r && i !== r.cote && r.n >= 3 && q(e, "jeu", e.possession, `${J(e, e.possession)} renverse le jeu : tout le monde se replace de l’autre côté du ruck.`), e.serieCote = r && r.cote === i ? {
 		cote: i,
 		n: r.n + 1
 	} : {
@@ -47879,13 +48281,13 @@ function $o(e) {
 		n: 1
 	}, i;
 }
-var es = {
+var Ms = {
 	lateral: 4.8,
 	attente: 5.2,
 	lance: .9,
 	epaule: 1.2,
 	soutien: .9
-}, ts = {
+}, Ns = {
 	courte: {
 		lateral: 3.2,
 		attente: 3.8
@@ -47899,11 +48301,11 @@ var es = {
 		attente: 7.2
 	}
 };
-function ns(e, t, n) {
-	let r = e.ruck?.organisation, i = A(t), a = {
-		x: e.ballon.x - i * es.attente,
-		y: k(e.ballon.y + e.ouvert * es.lateral, 2.5, 67.5)
-	}, o = /* @__PURE__ */ new Set([...r?.attaque ?? [], n]), s = H(e, t).filter((t) => t.avant && t.sanction <= 0 && !t.corps && !o.has(t.id) && !(t.moi && e.direct?.actif)).sort((e, t) => O(e.pos, a) - O(t.pos, a)).slice(0, 4);
+function Ps(e, t, n) {
+	let r = e.ruck?.organisation, i = j(t), a = {
+		x: e.ballon.x - i * Ms.attente,
+		y: A(e.ballon.y + e.ouvert * Ms.lateral, 2.5, 67.5)
+	}, o = /* @__PURE__ */ new Set([...r?.attaque ?? [], n]), s = V(e, t).filter((t) => t.avant && t.sanction <= 0 && !t.corps && !o.has(t.id) && !(t.moi && e.direct?.actif)).sort((e, t) => k(e.pos, a) - k(t.pos, a)).slice(0, 4);
 	if (s.length < 3) {
 		e.blocPrepare = null;
 		return;
@@ -47916,12 +48318,12 @@ function ns(e, t, n) {
 			l[0].id,
 			l[1].id
 		]
-	}, z(e)) {
-		let n = e.styles?.[t] ?? "equilibre", r = M(e.ballon, t) < 15, i = e.rng(), a = r ? .6 : n === "avants" ? .45 : .25, o = r ? .05 : n === "large" || n === "leurres" ? .35 : .2;
+	}, R(e)) {
+		let n = e.styles?.[t] ?? "equilibre", r = N(e.ballon, t) < 15, i = e.rng(), a = r ? .6 : n === "avants" ? .45 : .25, o = r ? .05 : n === "large" || n === "leurres" ? .35 : .2;
 		e.blocPrepare.profondeur = i < a ? "courte" : i > 1 - o ? "profonde" : "standard";
 	}
 }
-function rs(e) {
+function Fs(e) {
 	let t = e.blocPrepare;
 	if (!t) return;
 	let n = e.phase === "ruck" && e.possession === t.cote, r = e.lancement, i = e.phase === "jeuCourant" && e.possession === t.cote && !!r && r.index === 0 && !e.vol && (r.chaine.slice(1).some((e) => t.ids.includes(e.id)) || r.structure === "ecran");
@@ -47930,24 +48332,24 @@ function rs(e) {
 		return;
 	}
 	if (i && r.structure === "ecran") return;
-	let a = A(t.cote), o = n ? e.ballon : e.origine, s = z(e), c = s ? ts[t.profondeur ?? "standard"] : es, l = .1 + (c.attente - .2) / 5.4, u = s ? i || n && e.minuteur < l : i && e.gardeRuck < .85 || n && e.minuteur < .6;
+	let a = j(t.cote), o = n ? e.ballon : e.origine, s = R(e), c = s ? Ns[t.profondeur ?? "standard"] : Ms, l = .1 + (c.attente - .2) / 5.4, u = s ? i || n && e.minuteur < l : i && e.gardeRuck < .85 || n && e.minuteur < .6;
 	t.ids.forEach((t, n) => {
 		let r = e.pions.find((e) => e.id === t);
 		if (!r || !r.surLeTerrain || r.sanction > 0 || r.corps || r.role === "ruck" || r === e.porteur) return;
 		let l = n === 0 ? 0 : n === 1 ? -1 : 1;
 		r.role = "podRas";
-		let d = u ? s ? i ? 3 : -.2 : -es.lance : -c.attente;
+		let d = u ? s ? i ? 3 : -.2 : -Ms.lance : -c.attente;
 		r.cible = {
-			x: Z(o.x + a * (d - (n === 0 ? 0 : es.soutien))),
-			y: k(o.y + e.ouvert * c.lateral + l * es.epaule, 2, 68)
+			x: X(o.x + a * (d - (n === 0 ? 0 : Ms.soutien))),
+			y: A(o.y + e.ouvert * c.lateral + l * Ms.epaule, 2, 68)
 		}, r.effort = u ? s ? n === 0 ? 1.08 : 1.04 : .96 : .9;
 	});
 }
-function is(e, t, n, r, i, a, o, s, c) {
-	if (!r || !i || !a || i === r || r.avant || M(e.ballon, t) < 12) return null;
+function Is(e, t, n, r, i, a, o, s, c) {
+	if (!r || !i || !a || i === r || r.avant || N(e.ballon, t) < 12) return null;
 	let l = e.styles?.[t] ?? "equilibre", u = l === "leurres" ? 1.7 : l === "large" ? 1.15 : l === "avants" ? .65 : l === "pied" ? .75 : 1, d = e.rng(), f = (e) => !!e && e.surLeTerrain && e.sanction <= 0 && !e.corps && e.role !== "ruck";
 	if (!f(i) || !f(a)) return null;
-	let p = e.blocPrepare?.cote === t ? e.blocPrepare.ids.map((e) => n.find((t) => t.id === e)).filter((e) => f(e)) : [], m = p.length === 3 ? p : n.filter((t) => t.avant && f(t) && (t.pos.y - e.ballon.y) * e.ouvert > -3 && O(t.pos, e.ballon) < 576).sort((t, n) => O(t.pos, e.ballon) - O(n.pos, e.ballon)).slice(0, 3), h = [
+	let p = e.blocPrepare?.cote === t ? e.blocPrepare.ids.map((e) => n.find((t) => t.id === e)).filter((e) => f(e)) : [], m = p.length === 3 ? p : n.filter((t) => t.avant && f(t) && (t.pos.y - e.ballon.y) * e.ouvert > -3 && k(t.pos, e.ballon) < 576).sort((t, n) => k(t.pos, e.ballon) - k(n.pos, e.ballon)).slice(0, 3), h = [
 		r,
 		i,
 		a,
@@ -47986,21 +48388,21 @@ function is(e, t, n, r, i, a, o, s, c) {
 		].filter((e) => !!e)
 	} : null;
 }
-function as(e, t, n) {
+function Ls(e, t, n) {
 	let r = t.chaine[1], i = t.chaine[2];
 	if (!r) return;
-	let a = t.structure === "ecran" ? `Le bloc d’avants de ${Y(e, n)} se lance au ras : ${r.nom} attend le ballon derrière eux.` : t.structure === "croisee" && i ? `${r.nom} et ${i.nom} préparent une croisée.` : t.structure === "redoublee" ? `${r.nom} annonce la redoublée.` : "";
-	a && e.rng() < .7 && J(e, "jeu", n, a, 0, r.moi);
+	let a = t.structure === "ecran" ? `Le bloc d’avants de ${J(e, n)} se lance au ras : ${r.nom} attend le ballon derrière eux.` : t.structure === "croisee" && i ? `${r.nom} et ${i.nom} préparent une croisée.` : t.structure === "redoublee" ? `${r.nom} annonce la redoublée.` : "";
+	a && e.rng() < .7 && q(e, "jeu", n, a, 0, r.moi);
 }
-function os(e) {
-	rs(e), ss(e);
+function Rs(e) {
+	Fs(e), zs(e);
 	let t = e.lancement;
-	if (!t || e.phase !== "jeuCourant" || !(t.structure || t.leurres && z(e))) return;
-	let n = e.possession, r = A(n), i = e.porteur ?? (e.vol?.type === "passe" ? e.vol.receveur : null);
+	if (!t || e.phase !== "jeuCourant" || !(t.structure || t.leurres && R(e))) return;
+	let n = e.possession, r = j(n), i = e.porteur ?? (e.vol?.type === "passe" ? e.vol.receveur : null);
 	if (!i || i.cote !== n) return;
 	if (!t.structure && t.leurres && t.index <= 2) {
 		for (let n of t.leurres) !n.surLeTerrain || n.sanction > 0 || n.corps || n === e.porteur || (n.role = "ligne", n.cible = {
-			x: Z(e.ligneAvantage + r * 7),
+			x: X(e.ligneAvantage + r * 7),
 			y: n.pos.y
 		}, n.effort = t.index >= 1 ? 1.12 : .85);
 		return;
@@ -48009,8 +48411,8 @@ function os(e) {
 		let n = t.index >= 1 || e.gardeRuck < .9;
 		t.leurres.forEach((t, i) => {
 			!t.surLeTerrain || t.sanction > 0 || t.corps || t === e.porteur || (t.role = "podRas", t.cible = {
-				x: Z(e.ligneAvantage + r * (n ? 6.5 : -1)),
-				y: k(t.pos.y + (i - 1) * .02, 2, 68)
+				x: X(e.ligneAvantage + r * (n ? 6.5 : -1)),
+				y: A(t.pos.y + (i - 1) * .02, 2, 68)
 			}, t.effort = n ? 1.1 : .8);
 		});
 		return;
@@ -48019,72 +48421,72 @@ function os(e) {
 	let a = t.chaine[1], o = t.chaine[2];
 	if (t.structure === "croisee" && t.index === 1 && a && o && !o.corps) {
 		o.role = "ligne", o.cible = {
-			x: Z(a.pos.x - r * 1.3 + a.vitesse.x * .35),
-			y: k(a.pos.y - e.ouvert * 2.6 + a.vitesse.y * .35, 2, 68)
+			x: X(a.pos.x - r * 1.3 + a.vitesse.x * .35),
+			y: A(a.pos.y - e.ouvert * 2.6 + a.vitesse.y * .35, 2, 68)
 		}, o.effort = 1.12;
 		return;
 	}
 	t.structure === "redoublee" && t.index === 2 && e.porteur === o && a && !a.corps && (a.role = "ligne", a.cible = {
-		x: Z(o.pos.x - r * 2.1),
-		y: k(o.pos.y + e.ouvert * 3.4, 2, 68)
+		x: X(o.pos.x - r * 2.1),
+		y: A(o.pos.y + e.ouvert * 3.4, 2, 68)
 	}, a.effort = 1.15);
 }
-function ss(e) {
+function zs(e) {
 	let t = e.lancement, n = e.porteur;
 	if (e.phase !== "jeuCourant" || !t || !n || n.cote !== e.possession || e.echappee || t.structure === "croisee" && t.index === 1 || t.structure === "redoublee" && t.index === 2) return;
-	let r = A(n.cote), i = Math.max(0, n.vitesse.x * r);
+	let r = j(n.cote), i = Math.max(0, n.vitesse.x * r);
 	for (let a = 1; a <= 2; a++) {
 		let o = t.chaine[t.index + a];
 		if (!o || o === n || !o.surLeTerrain || o.sanction > 0 || o.corps || e.blocPrepare?.ids.includes(o.id) || t.leurres?.includes(o)) continue;
-		let s = (n.pos.x - o.pos.x) * r, c = bs(D(n.pos, o.pos), n), l = Math.max(0, o.vitesse.x * r) * c * .9 + 1, u = a === 1 ? s > l ? 1 : -l : -l - 1.8;
+		let s = (n.pos.x - o.pos.x) * r, c = Qs(O(n.pos, o.pos), n), l = Math.max(0, o.vitesse.x * r) * c * .9 + 1, u = a === 1 ? s > l ? 1 : -l : -l - 1.8;
 		o.cible = {
-			x: Z(n.pos.x + r * (i * .5 + u)),
+			x: X(n.pos.x + r * (i * .5 + u)),
 			y: o.cible.y
 		}, o.effort = a === 1 ? 1 : .85;
 	}
 }
-function cs(e, t) {
+function Bs(e, t) {
 	let n = e.lancement;
 	if (!e.cadenceDetaillee || !n) return null;
-	let r = A(t.cote);
+	let r = j(t.cote);
 	return n.couloir !== void 0 && n.index === 0 && t === n.chaine[0] && Math.abs(t.pos.x - e.origine.x) < 6 ? {
-		x: Z(t.pos.x + r * 7),
-		y: k(e.origine.y + n.couloir, 2.5, 67.5)
+		x: X(t.pos.x + r * 7),
+		y: A(e.origine.y + n.couloir, 2.5, 67.5)
 	} : n.structure ? n.structure === "croisee" && n.index === 1 && t === n.chaine[1] ? {
-		x: Z(t.pos.x + r * 8),
-		y: k(t.pos.y + e.ouvert * 7, 2.5, 67.5)
+		x: X(t.pos.x + r * 8),
+		y: A(t.pos.y + e.ouvert * 7, 2.5, 67.5)
 	} : n.structure === "redoublee" && n.index === 2 && t === n.chaine[2] ? {
-		x: Z(t.pos.x + r * 10),
+		x: X(t.pos.x + r * 10),
 		y: t.pos.y
 	} : null : null;
 }
-function ls(e, t, n) {
+function Vs(e, t, n) {
 	let r = e.lancement;
-	return n.vitesse.x * A(t.cote) < -2.6 ? !0 : r && r.index === 0 && e.blocPrepare?.ids[0] === n.id && e.gardeRuck > .12 ? (t.pos.x - n.pos.x) * A(t.cote) > 1.1 : r?.structure ? r.structure === "ecran" && r.index === 0 && r.leurres?.[0] && e.gardeRuck > .12 ? (t.pos.x - r.leurres[0].pos.x) * A(t.cote) > .9 : r.structure === "croisee" && r.index === 1 && t === r.chaine[1] ? (n.pos.y - t.pos.y) * e.ouvert > -.8 : r.structure === "redoublee" && r.index === 2 && t === r.chaine[2] && (n.pos.y - t.pos.y) * e.ouvert < 1.6 : !1;
+	return n.vitesse.x * j(t.cote) < -2.6 ? !0 : r && r.index === 0 && e.blocPrepare?.ids[0] === n.id && e.gardeRuck > .12 ? (t.pos.x - n.pos.x) * j(t.cote) > 1.1 : r?.structure ? r.structure === "ecran" && r.index === 0 && r.leurres?.[0] && e.gardeRuck > .12 ? (t.pos.x - r.leurres[0].pos.x) * j(t.cote) > .9 : r.structure === "croisee" && r.index === 1 && t === r.chaine[1] ? (n.pos.y - t.pos.y) * e.ouvert > -.8 : r.structure === "redoublee" && r.index === 2 && t === r.chaine[2] && (n.pos.y - t.pos.y) * e.ouvert < 1.6 : !1;
 }
-function us(e, t, n, r) {
-	let i = n.cote, a = H(e, j(i)).filter((e) => e.sanction <= 0 && !e.corps && e.battu <= 0), o = z(e), s = !1, c = (t, r, c) => {
+function Hs(e, t, n, r) {
+	let i = n.cote, a = V(e, M(i)).filter((e) => e.sanction <= 0 && !e.corps && e.battu <= 0), o = R(e), s = !1, c = (t, r, c) => {
 		if (s) return !1;
-		let l = a.filter((e) => O(e.pos, t.pos) < r * r).sort((e, n) => O(e.pos, t.pos) - O(n.pos, t.pos))[0];
+		let l = a.filter((e) => k(e.pos, t.pos) < r * r).sort((e, n) => k(e.pos, t.pos) - k(n.pos, t.pos))[0];
 		if (!l) return !1;
-		let u = k(c + (t.vitesseMax * 7 + t.puissance * .25 - l.vision) / 170, .25, .85);
-		return e.rng() >= u ? !1 : (l.battu = Math.max(l.battu, .65 + e.rng() * .45), l.cible = { ...t.pos }, o && ((e.retards ??= {})[l.id] = e.sim + l.battu, t !== n && O(l.pos, t.pos) < 2.2 * 2.2 && e.rng() < .07 * wa(e) * (1.35 - l.discipline / 110) && (L(e, l, "foul_late", 1.3), L(e, t, "reaction_hit", 1.4), s = !0, $(e, i, { ...t.pos }, "plaquage sans ballon", l))), !s);
+		let u = A(c + (t.vitesseMax * 7 + t.puissance * .25 - l.vision) / 170, .25, .85);
+		return e.rng() >= u ? !1 : (l.battu = Math.max(l.battu, .65 + e.rng() * .45), l.cible = { ...t.pos }, o && ((e.retards ??= {})[l.id] = e.sim + l.battu, t !== n && k(l.pos, t.pos) < 2.2 * 2.2 && e.rng() < .07 * to(e) * (1.35 - l.discipline / 110) && (L(e, l, "foul_late", 1.3), L(e, t, "reaction_hit", 1.4), s = !0, Q(e, i, { ...t.pos }, "plaquage sans ballon", l))), !s);
 	};
 	if (t.structure === "ecran" && t.index === 0 && t.leurres) {
 		t.fixe = !0;
-		let n = o ? t.leurres.find((e) => e.surLeTerrain && !e.corps && a.some((t) => O(t.pos, e.pos) < 1.6 * 1.6)) : void 0;
-		if (n && e.rng() < .045 * wa(e) * (1.35 - n.discipline / 110)) return $(e, j(i), { ...n.pos }, "obstruction du leurre", n), !0;
-		t.leurres.filter((e) => e.surLeTerrain && !e.corps && c(e, 8, .6)).length >= 2 && !s && J(e, "jeu", i, `La défense mord sur le bloc d’avants : le ballon est passé derrière, pour ${r.nom}.`, 0, r.moi);
-	} else t.structure === "croisee" && t.index === 1 ? (t.fixe = !0, c(n, 7, .66) && J(e, "jeu", i, `Croisée ! ${r.nom} rentre dans le dos de ${n.nom}, la défense est à contre-pied.`, 0, r.moi)) : t.structure === "redoublee" && t.index === 2 ? (t.fixe = !0, c(n, 6, .6) && J(e, "jeu", i, `Redoublée : ${r.nom} ressort à l’extérieur et retrouve le ballon lancé.`, 0, r.moi)) : o && !t.structure && t.leurres && t.index >= 1 && (t.fixe = !0, t.leurres.filter((e) => e !== r && e.surLeTerrain && !e.corps && c(e, 6, .5)).length && !s && J(e, "jeu", i, `${t.leurres[0].nom} emmène son défenseur : le ballon passe dans son dos pour ${r.nom}.`, 0, r.moi));
+		let n = o ? t.leurres.find((e) => e.surLeTerrain && !e.corps && a.some((t) => k(t.pos, e.pos) < 1.6 * 1.6)) : void 0;
+		if (n && e.rng() < .045 * to(e) * (1.35 - n.discipline / 110)) return Q(e, M(i), { ...n.pos }, "obstruction du leurre", n), !0;
+		t.leurres.filter((e) => e.surLeTerrain && !e.corps && c(e, 8, .6)).length >= 2 && !s && q(e, "jeu", i, `La défense mord sur le bloc d’avants : le ballon est passé derrière, pour ${r.nom}.`, 0, r.moi);
+	} else t.structure === "croisee" && t.index === 1 ? (t.fixe = !0, c(n, 7, .66) && q(e, "jeu", i, `Croisée ! ${r.nom} rentre dans le dos de ${n.nom}, la défense est à contre-pied.`, 0, r.moi)) : t.structure === "redoublee" && t.index === 2 ? (t.fixe = !0, c(n, 6, .6) && q(e, "jeu", i, `Redoublée : ${r.nom} ressort à l’extérieur et retrouve le ballon lancé.`, 0, r.moi)) : o && !t.structure && t.leurres && t.index >= 1 && (t.fixe = !0, t.leurres.filter((e) => e !== r && e.surLeTerrain && !e.corps && c(e, 6, .5)).length && !s && q(e, "jeu", i, `${t.leurres[0].nom} emmène son défenseur : le ballon passe dans son dos pour ${r.nom}.`, 0, r.moi));
 	return s;
 }
-var ds = 2.6, fs = {
+var Us = 2.6, Ws = {
 	recul: .5,
 	ecart: .62,
 	portee: 8,
 	accroche: 2.2
 };
-function ps(e) {
+function Gs(e) {
 	let t = e.cellule;
 	if (t?.pousse && e.phase === "jeuCourant" && e.porteur?.id === t.porteurId) return;
 	if (e.phase !== "jeuCourant") {
@@ -48102,9 +48504,9 @@ function ps(e) {
 	}
 	let a = r;
 	a.cote;
-	let o = new Set((e.lancement?.chaine ?? []).slice((e.lancement?.index ?? 0) + 1)), s = (t) => t.surLeTerrain && t.sanction <= 0 && !t.corps && t.avant && t !== a && t !== n && t.role !== "ruck" && !o.has(t) && !(t.moi && e.direct?.actif), c = t?.porteurId === a.id ? t.soutiens.map((t) => e.pions.find((e) => e.id === t)).filter((e) => !!e && s(e) && O(e.pos, a.pos) < 144) : [];
+	let o = new Set((e.lancement?.chaine ?? []).slice((e.lancement?.index ?? 0) + 1)), s = (t) => t.surLeTerrain && t.sanction <= 0 && !t.corps && t.avant && t !== a && t !== n && t.role !== "ruck" && !o.has(t) && !(t.moi && e.direct?.actif), c = t?.porteurId === a.id ? t.soutiens.map((t) => e.pions.find((e) => e.id === t)).filter((e) => !!e && s(e) && k(e.pos, a.pos) < 144) : [];
 	if (c.length < 2) {
-		let t = c, n = H(e, a.cote).filter((e) => s(e) && !t.includes(e) && O(e.pos, a.pos) < fs.portee ** 2).sort((e, t) => O(e.pos, a.pos) - O(t.pos, a.pos));
+		let t = c, n = V(e, a.cote).filter((e) => s(e) && !t.includes(e) && k(e.pos, a.pos) < Ws.portee ** 2).sort((e, t) => k(e.pos, a.pos) - k(t.pos, a.pos));
 		c = [...t, ...n].slice(0, 2);
 	}
 	if (!c.length) {
@@ -48114,14 +48516,14 @@ function ps(e) {
 	c.sort((e, t) => e.pos.y - t.pos.y);
 	let l = [];
 	c.forEach((e, t) => {
-		let n = c.length === 1 ? e.pos.y < a.pos.y ? -1 : 1 : t === 0 ? -1 : 1, r = ms(a, n, i);
-		if (e.role = "podRas", !i && D(e.pos, r) < fs.accroche) {
+		let n = c.length === 1 ? e.pos.y < a.pos.y ? -1 : 1 : t === 0 ? -1 : 1, r = Ks(a, n, i);
+		if (e.role = "podRas", !i && O(e.pos, r) < Ws.accroche) {
 			l.push(e.id);
 			return;
 		}
 		e.cible = {
-			x: Z(r.x + a.vitesse.x * .5),
-			y: k(r.y + a.vitesse.y * .5, 1, 69)
+			x: X(r.x + a.vitesse.x * .5),
+			y: A(r.y + a.vitesse.y * .5, 1, 69)
 		}, e.effort = 1.12;
 	});
 	let u = t?.porteurId === a.id;
@@ -48135,17 +48537,17 @@ function ps(e) {
 		approche: i
 	}, !i && l.length && (a.effort = Math.min(a.effort, .92));
 }
-function Z(e) {
-	return k(e, .5, 121.5);
+function X(e) {
+	return A(e, .5, 121.5);
 }
-function ms(e, t, n) {
-	let r = A(e.cote);
+function Ks(e, t, n) {
+	let r = j(e.cote);
 	return {
-		x: Z(e.pos.x - r * (n ? .9 : fs.recul)),
-		y: k(e.pos.y + t * (n ? 1 : fs.ecart), 1, 69)
+		x: X(e.pos.x - r * (n ? .9 : Ws.recul)),
+		y: A(e.pos.y + t * (n ? 1 : Ws.ecart), 1, 69)
 	};
 }
-function hs(e) {
+function qs(e) {
 	let t = e.cellule;
 	if (!t || !t.accroches?.length) return;
 	let n = e.pions.find((e) => e.id === t.porteurId);
@@ -48153,103 +48555,103 @@ function hs(e) {
 	let r = 0, i = t.soutiens.map((t) => e.pions.find((e) => e.id === t)).filter((e) => !!e);
 	i.forEach((e, a) => {
 		if (!t.accroches.includes(e.id)) return;
-		let o = i.length === 1 ? e.pos.y < n.pos.y ? -1 : 1 : a === 0 ? -1 : 1, s = ms(n, o, !1), c = D(e.pos, s), l = De(e) * 1.15 * K, u = c > l ? l / c : 1, d = e.pos.x + (s.x - e.pos.x) * u, f = e.pos.y + (s.y - e.pos.y) * u;
+		let o = i.length === 1 ? e.pos.y < n.pos.y ? -1 : 1 : a === 0 ? -1 : 1, s = Ks(n, o, !1), c = O(e.pos, s), l = Le(e) * 1.15 * G, u = c > l ? l / c : 1, d = e.pos.x + (s.x - e.pos.x) * u, f = e.pos.y + (s.y - e.pos.y) * u;
 		e.vitesse = {
-			x: (d - e.pos.x) / K,
-			y: (f - e.pos.y) / K
+			x: (d - e.pos.x) / G,
+			y: (f - e.pos.y) / G
 		}, e.stats.distanceParcourue += Math.hypot(d - e.pos.x, f - e.pos.y), e.pos.x = d, e.pos.y = f, e.cible = {
 			x: s.x,
 			y: s.y
-		}, D(e.pos, s) < .45 && r++;
+		}, O(e.pos, s) < .45 && r++;
 	}), t.lie = r >= 2;
 }
-function gs(e, t, n) {
+function Js(e, t, n) {
 	let r = e.cellule;
 	if (!e.cadenceDetaillee || !r || r.porteurId !== t.id || !r.lie || r.pousseFaite || r.pousse) return !1;
-	let i = r.soutiens.map((t) => e.pions.find((e) => e.id === t)).filter((e) => !!e), a = k(1.5 + (t.puissance * .5 + Us(i, (e) => e.puissance) * .5 - n.puissance) / 45, .9, 2.4), o = .9 + e.rng() * .5;
+	let i = r.soutiens.map((t) => e.pions.find((e) => e.id === t)).filter((e) => !!e), a = A(1.5 + (t.puissance * .5 + jc(i, (e) => e.puissance) * .5 - n.puissance) / 45, .9, 2.4), o = .9 + e.rng() * .5;
 	return r.pousse = {
 		defenseurId: n.id,
 		jusqua: e.sim + o,
 		vitesse: a,
 		debut: e.sim
-	}, N(n), H(e, n.cote).filter((e) => e !== n && e.sanction <= 0 && !e.corps && e.battu <= 0 && O(e.pos, t.pos) < 20.25).sort((e, n) => O(e.pos, t.pos) - O(n.pos, t.pos)).slice(0, 2).forEach((e) => {
+	}, P(n), V(e, n.cote).filter((e) => e !== n && e.sanction <= 0 && !e.corps && e.battu <= 0 && k(e.pos, t.pos) < 20.25).sort((e, n) => k(e.pos, t.pos) - k(n.pos, t.pos)).slice(0, 2).forEach((e) => {
 		e.battu = Math.max(e.battu, o + .6), e.cible = { ...t.pos };
 	}), !0;
 }
-function _s(e, t) {
-	let n = e.cellule, r = n.pousse, i = A(t.cote), a = e.pions.find((e) => e.id === r.defenseurId), o = (r) => {
-		if (n.pousse = void 0, n.pousseFaite = !0, r && r.surLeTerrain && r.sanction <= 0) return ks(e, t, r, !0);
+function Ys(e, t) {
+	let n = e.cellule, r = n.pousse, i = j(t.cote), a = e.pions.find((e) => e.id === r.defenseurId), o = (r) => {
+		if (n.pousse = void 0, n.pousseFaite = !0, r && r.surLeTerrain && r.sanction <= 0) return sc(e, t, r, !0);
 	};
 	if (!a || !a.surLeTerrain || a.sanction > 0) return o(void 0);
-	let s = H(e, a.cote).filter((e) => e !== a && e.sanction <= 0 && !e.corps && O(e.pos, t.pos) < 2.25).length, c = r.vitesse * .6 ** s, l = t.pos.x;
+	let s = V(e, a.cote).filter((e) => e !== a && e.sanction <= 0 && !e.corps && k(e.pos, t.pos) < 2.25).length, c = r.vitesse * .6 ** s, l = t.pos.x;
 	t.vitesse = {
 		x: i * c,
 		y: 0
-	}, t.pos.x = k(t.pos.x + i * c * K, -1.5, 123.5), a.pos = {
+	}, t.pos.x = A(t.pos.x + i * c * G, -1.5, 123.5), a.pos = {
 		x: t.pos.x + i * .8,
-		y: t.pos.y + k(a.pos.y - t.pos.y, -.3, .3)
+		y: t.pos.y + A(a.pos.y - t.pos.y, -.3, .3)
 	}, a.vitesse = {
 		x: i * c,
 		y: 0
-	}, a.cible = { ...a.pos }, hs(e);
+	}, a.cible = { ...a.pos }, qs(e);
 	let u = (t) => Math.max(0, (t - e.ligneAvantage) * i), d = u(t.pos.x) - u(l);
 	if (d > 0 && (t.stats.metres += d, e.metresGagnesPhase = Math.max(e.metresGagnesPhase, u(t.pos.x))), e.ballon = {
 		x: t.pos.x,
 		y: t.pos.y
-	}, ge(t.pos, t.cote)) return n.pousse = void 0, n.pousseFaite = !0, Dc(e, t);
+	}, Ee(t.pos, t.cote)) return n.pousse = void 0, n.pousseFaite = !0, xl(e, t);
 	if (e.sim >= r.jusqua || s >= 2) return o(a);
 }
-function vs(e, t, n, r, i) {
-	let a = A(t.cote), o = Math.hypot(t.vitesse.x, t.vitesse.y), s = H(e, j(t.cote)).filter((e) => e.sanction <= 0 && !e.corps && e.battu <= 0 && (e.pos.x - t.pos.x) * a > -.4 && O(e.pos, t.pos) < 1.55 * 1.55).sort((e, n) => O(e.pos, t.pos) - O(n.pos, t.pos))[0];
+function Xs(e, t, n, r, i) {
+	let a = j(t.cote), o = Math.hypot(t.vitesse.x, t.vitesse.y), s = V(e, M(t.cote)).filter((e) => e.sanction <= 0 && !e.corps && e.battu <= 0 && (e.pos.x - t.pos.x) * a > -.4 && k(e.pos, t.pos) < 1.55 * 1.55).sort((e, n) => k(e.pos, t.pos) - k(n.pos, t.pos))[0];
 	if (s && o > 1.5) {
 		L(e, s, "tackle_low", 1.2, "apres-passe");
 		let n = t.pos.x - s.pos.x, r = t.pos.y - s.pos.y, i = Math.max(.01, Math.hypot(n, r));
-		return R(t, {
+		return Zt(t, {
 			x: n / i * 1.6 + t.vitesse.x * .3,
 			y: r / i * 1.6 + t.vitesse.y * .3
-		}, 1.5), s.battu = Math.max(s.battu, 1.2), N(s), e.rng() < .3 && J(e, "jeu", t.cote, `${t.nom} fixe ${s.nom} et donne au contact.`, 0, t.moi), "contact";
+		}, 1.5), s.battu = Math.max(s.battu, 1.2), P(s), e.rng() < .3 && q(e, "jeu", t.cote, `${t.nom} fixe ${s.nom} et donne au contact.`, 0, t.moi), "contact";
 	}
-	if (n < 6.5 && r < 2.6 && o > 3.2 && t.passe >= 66 && t.numero !== 9 && e.rng() < (t.avant ? .05 : .16)) return e.rng() < .1 && (i.x -= a * .9, i.y += (e.rng() < .5 ? -1 : 1) * 1.4), e.rng() < .5 && J(e, "jeu", t.cote, `Chistera de ${t.nom} !`, 0, t.moi), "chistera";
+	if (n < 6.5 && r < 2.6 && o > 3.2 && t.passe >= 66 && t.numero !== 9 && e.rng() < (t.avant ? .05 : .16)) return e.rng() < .1 && (i.x -= a * .9, i.y += (e.rng() < .5 ? -1 : 1) * 1.4), e.rng() < .5 && q(e, "jeu", t.cote, `Chistera de ${t.nom} !`, 0, t.moi), "chistera";
 }
-function ys(e, t, n, r) {
-	let i = A(t.cote), a = Math.max(0, (e.pos.x - n.x) * i - .5), o = t.vitesse.x * i, s = Math.max(1, t.acceleration * .85), c = De(t) * 1.05, l = o < 0 ? -o / s : 0, u = r(D(e.pos, n)), d = n;
+function Zs(e, t, n, r) {
+	let i = j(t.cote), a = Math.max(0, (e.pos.x - n.x) * i - .5), o = t.vitesse.x * i, s = Math.max(1, t.acceleration * .85), c = Le(t) * 1.05, l = o < 0 ? -o / s : 0, u = r(O(e.pos, n)), d = n;
 	for (let f = 0; f < 3; f++) {
-		let f = o < 0 && u > l ? -o * o / (2 * s) + .5 * s * (u - l) ** 2 : o * u + .5 * s * u * u, p = Math.min(a, f), m = k(t.vitesse.y * u * .9, -6.5, 6.5), h = Math.hypot(p, m), g = c * u;
+		let f = o < 0 && u > l ? -o * o / (2 * s) + .5 * s * (u - l) ** 2 : o * u + .5 * s * u * u, p = Math.min(a, f), m = A(t.vitesse.y * u * .9, -6.5, 6.5), h = Math.hypot(p, m), g = c * u;
 		h > g && (p *= g / h, m *= g / h), d = {
-			x: Z(n.x + i * p),
-			y: k(n.y + m, 1, 69)
-		}, u = r(D(e.pos, d));
+			x: X(n.x + i * p),
+			y: A(n.y + m, 1, 69)
+		}, u = r(O(e.pos, d));
 	}
 	return {
 		vers: d,
 		duree: u
 	};
 }
-function bs(e, t) {
-	return k(.14 + e / (k(8.2 + e * .52, 9, 18) * (.92 + t.passe / 1e3)), .34, 1.25);
+function Qs(e, t) {
+	return A(.14 + e / (A(8.2 + e * .52, 9, 18) * (.92 + t.passe / 1e3)), .34, 1.25);
 }
-function xs(e, t) {
-	let n = A(t.cote);
-	return H(e, t.cote).some((e) => e !== t && !e.corps && e.sanction <= 0 && (e.pos.x - t.pos.x) * n <= .8 && O(e.pos, t.pos) < 49 && e.vitesse.x * n > 2);
+function $s(e, t) {
+	let n = j(t.cote);
+	return V(e, t.cote).some((e) => e !== t && !e.corps && e.sanction <= 0 && (e.pos.x - t.pos.x) * n <= .8 && k(e.pos, t.pos) < 49 && e.vitesse.x * n > 2);
 }
-function Ss(e, t) {
-	return H(e, j(t.cote)).filter((e) => e.sanction <= 0 && !e.corps && O(e.pos, t.pos) < 5.76).length;
+function ec(e, t) {
+	return V(e, M(t.cote)).filter((e) => e.sanction <= 0 && !e.corps && k(e.pos, t.pos) < 5.76).length;
 }
-function Cs(e, t, n, r, i) {
-	let a = A(t.cote), o = H(e, t.cote).filter((e) => e !== t && (e.pos.x - t.pos.x) * a <= .8 && O(e.pos, t.pos) < 90);
+function tc(e, t, n, r, i) {
+	let a = j(t.cote), o = V(e, t.cote).filter((e) => e !== t && (e.pos.x - t.pos.x) * a <= .8 && k(e.pos, t.pos) < 90);
 	if (!o.length) return !1;
-	let s = i ? o.filter((e) => (e.pos.x - t.pos.x) * i.x + (e.pos.y - t.pos.y) * i.y > .8) : [], c = (s.length ? s : o).sort((e, n) => O(t.pos, e.pos) - O(t.pos, n.pos))[0], l = !1;
-	if (n && r && (ho(t, r), e.rng() < Mi(t, n, Ss(e, t)))) {
+	let s = i ? o.filter((e) => (e.pos.x - t.pos.x) * i.x + (e.pos.y - t.pos.y) * i.y > .8) : [], c = (s.length ? s : o).sort((e, n) => k(t.pos, e.pos) - k(t.pos, n.pos))[0], l = !1;
+	if (n && r && (qo(t, r), e.rng() < la(t, n, ec(e, t)))) {
 		let n = e.rng();
-		if (L(e, t, "offload", .9, "rate"), n < .4) return J(e, "plaquage", r.cote, `${t.nom} veut faire vivre le ballon après contact : il part en avant.`, 0, t.moi), Bo(e, t), !0;
-		if (n < .72) return J(e, "plaquage", r.cote, `Offload manqué de ${t.nom} : le ballon lui échappe et roule au sol.`, 0, t.moi), e.lancement = null, e.ballon = {
+		if (L(e, t, "offload", .9, "rate"), n < .4) return q(e, "plaquage", r.cote, `${t.nom} veut faire vivre le ballon après contact : il part en avant.`, 0, t.moi), vs(e, t), !0;
+		if (n < .72) return q(e, "plaquage", r.cote, `Offload manqué de ${t.nom} : le ballon lui échappe et roule au sol.`, 0, t.moi), e.lancement = null, e.ballon = {
 			x: t.pos.x,
 			y: t.pos.y
-		}, Do(e, {
+		}, as(e, {
 			de: { ...e.ballon },
 			vers: {
 				x: e.ballon.x - a * (.8 + e.rng() * 1.6),
-				y: k(e.ballon.y + (e.rng() - .5) * 3, 1, 69)
+				y: A(e.ballon.y + (e.rng() - .5) * 3, 1, 69)
 			},
 			duree: .35,
 			ecoule: .35,
@@ -48261,24 +48663,24 @@ function Cs(e, t, n, r, i) {
 		}, "touche"), !0;
 		l = !0;
 	}
-	J(e, "jeu", t.cote, I("offload", {
+	q(e, "jeu", t.cote, I("offload", {
 		porteur: t.nom,
 		receveur: c.nom
 	}), 0, t.moi || c.moi), t.stats.passes += 1, t.stats.offloads += 1, e.dernierPasseur = t, e.lancement && (e.lancement.chaine = [], e.lancement.index = 0), e.porteur = null;
-	let u = e.cadenceDetaillee ? ys(t, c, {
+	let u = e.cadenceDetaillee ? Zs(t, c, {
 		x: c.pos.x,
 		y: c.pos.y
-	}, (e) => k(.16 + e / 8.5, .3, .7)) : {
+	}, (e) => A(.16 + e / 8.5, .3, .7)) : {
 		vers: {
 			x: c.pos.x,
 			y: c.pos.y
 		},
 		duree: .28
 	};
-	l && (u.vers.x = Z(u.vers.x - a * (.8 + e.rng() * .8)), u.vers.y = k(u.vers.y + (e.rng() < .5 ? -1 : 1) * (1.2 + e.rng()), 1, 69));
+	l && (u.vers.x = X(u.vers.x - a * (.8 + e.rng() * .8)), u.vers.y = A(u.vers.y + (e.rng() < .5 ? -1 : 1) * (1.2 + e.rng()), 1, 69));
 	let d = t.numero + c.numero + Math.floor(e.t) & 1 ? -1 : 1;
-	return So(e, {
-		variante: n ? l ? "rate" : Ni(n, (c.pos.x - t.pos.x) * a < -1.5, d) : void 0,
+	return es(e, {
+		variante: n ? l ? "rate" : ua(n, (c.pos.x - t.pos.x) * a < -1.5, d) : void 0,
 		de: {
 			x: t.pos.x,
 			y: t.pos.y
@@ -48293,140 +48695,140 @@ function Cs(e, t, n, r, i) {
 		receveur: c
 	}), !0;
 }
-function ws(e, t, n, r, i, a = 1) {
-	let o = .72 + n.endurance / 360, s = n.plaquage * o * (i ? 1.16 : 1), c = .76 + t.endurance / 420, l = (t.evitement * .55 + t.puissance * .45) * c, u = M(t.pos, t.cote), d = u < 6 ? .09 : u < 12 ? .05 : 0, f = ai(e, n.cote), p = e.defenseArcadeCote === n.cote ? .055 : 0, m = k(.93 + (s - l) / 380 + f + d + p - Es(t, r) * a - Ts(e, t, n), .45, .99);
-	return e.resserrement ? 1 - (1 - m) * (1 - .6 * k(e.resserrement, 0, 1.5)) : m;
+function nc(e, t, n, r, i, a = 1) {
+	let o = .72 + n.endurance / 360, s = n.plaquage * o * (i ? 1.16 : 1), c = .76 + t.endurance / 420, l = (t.evitement * .55 + t.puissance * .45) * c, u = N(t.pos, t.cote), d = u < 6 ? .09 : u < 12 ? .05 : 0, f = Ni(e, n.cote), p = e.defenseArcadeCote === n.cote ? .055 : 0, m = ln(e) && r === "raffut" ? .05 * A((t.puissance - n.puissance) / 22 + ((t.poidsKg ?? 95) - (n.poidsKg ?? 95)) / 35 + (Math.hypot(t.vitesse.x, t.vitesse.y) - 4) / 5, -.6, 1.3) * (.7 + .3 * t.endurance / 100) : 0, h = A(.93 + (s - l) / 380 + f + d + p - ic(t, r) * a - rc(e, t, n) - m, .45, .99);
+	return e.resserrement ? 1 - (1 - h) * (1 - .6 * A(e.resserrement, 0, 1.5)) : h;
 }
-function Ts(e, t, n) {
-	if (!z(e)) return 0;
-	let r = A(t.cote), i = G, a = 0, o = t.vitesse.x * r;
-	o > 5.2 && (a += Math.min(i.lance, (o - 5.2) * .034)), o > 4 && -n.vitesse.x * r < .5 && (a += i.subit), o > 5.5 && Math.abs(n.pos.y - t.pos.y) > .9 && (n.pos.x - t.pos.x) * r < .6 && (a += i.travers), !t.avant && n.numero <= 5 && Qr(e, t) >= 5 && (a += Math.min(i.duelVitesse, Math.max(0, t.vitesseMax - n.vitesseMax) * .05)), (e.retards?.[n.id] ?? 0) > e.sim && (a += i.enRetard);
-	for (let r of e.pions) if (!(r === n || r.cote !== n.cote || !Ut(e, r)) && O(r.pos, t.pos) < 3.61) {
+function rc(e, t, n) {
+	if (!R(e)) return 0;
+	let r = j(t.cote), i = W, a = 0, o = t.vitesse.x * r;
+	o > 5.2 && (a += Math.min(i.lance, (o - 5.2) * .034)), o > 4 && -n.vitesse.x * r < .5 && (a += i.subit), o > 5.5 && Math.abs(n.pos.y - t.pos.y) > .9 && (n.pos.x - t.pos.x) * r < .6 && (a += i.travers), !t.avant && n.numero <= 5 && Ei(e, t) >= 5 && (a += Math.min(i.duelVitesse, Math.max(0, t.vitesseMax - n.vitesseMax) * .05)), (e.retards?.[n.id] ?? 0) > e.sim && (a += i.enRetard);
+	for (let r of e.pions) if (!(r === n || r.cote !== n.cote || !tn(e, r)) && k(r.pos, t.pos) < 3.61) {
 		a -= i.aDeux;
 		break;
 	}
-	return a * (Ht(e) ? i.condense : i.avantageReel);
+	return a * (en(e) ? i.condense : i.avantageReel);
 }
-function Es(e, t) {
-	let n = (e, t) => k((e - t) * .006, 0, .26);
+function ic(e, t) {
+	let n = (e, t) => A((e - t) * .006, 0, .26);
 	switch (t) {
 		case "crochet": return n(e.evitement, 43);
 		case "raffut": return n(e.puissance, 58);
-		case "sprint": return k((e.vitesseMax - 7.6) * .11, 0, .2);
+		case "sprint": return A((e.vitesseMax - 7.6) * .11, 0, .2);
 		default: return 0;
 	}
 }
-function Ds(e, t, n) {
-	let r = Qr(e, t), i = Math.abs(n.pos.y - t.pos.y) < .9;
-	if (Xt(e)) {
+function ac(e, t, n) {
+	let r = Ei(e, t), i = Math.abs(n.pos.y - t.pos.y) < .9;
+	if (kn(e)) {
 		let e = t.pos.y < 3 || t.pos.y > 67, a = (t.evitement - n.plaquage * .55 - n.vitesseMax * 3) / 10 + (r > 2.5 ? 1 : -1.5) - (e ? 2 : 0), o = (t.puissance - n.puissance) / 8 + (i ? .8 : 0) + ((t.poidsKg ?? 95) - (n.poidsKg ?? 95)) / 14, s = (t.vitesseMax - n.vitesseMax) * 2.2 + (i ? -2 : .6) + (r > 4 ? .8 : -1), c = Math.max(a, o, s);
 		return c < .8 ? null : c === a ? "crochet" : c === o ? "raffut" : "sprint";
 	}
 	let a = t.puissance - t.evitement;
 	return i && t.puissance >= 70 && a >= 7 ? "raffut" : t.evitement >= 66 && r > 2 && t.pos.y > 3 && t.pos.y < 67 ? "crochet" : !i && r > 4 && t.vitesseMax > n.vitesseMax ? "sprint" : t.puissance > n.puissance + 5 ? "raffut" : null;
 }
-function Os(e, t, n, r) {
+function oc(e, t, n, r) {
 	let i = t.numero + n.numero + Math.floor(e.t) & 1 ? -1 : 1, a = t.pos.y < 4 ? 1 : t.pos.y > 66 ? -1 : i;
 	if (r === "raffut") {
-		let r = Oi(t, n);
+		let r = aa(t, n);
 		L(e, t, r === "percussion" ? "bump" : "handoff", 1.1, r);
-	} else r === "crochet" ? L(e, t, "dodge", 1.1, `${Ai(t, a, e.ouvert, i)}:${a}`) : r && L(e, t, "sprint_ball", 1.1);
+	} else r === "crochet" ? L(e, t, "dodge", 1.1, `${sa(t, a, e.ouvert, i)}:${a}`) : r && L(e, t, "sprint_ball", 1.1);
 	if (r === "crochet") {
 		let e = a;
-		return t.cible.y = k(t.pos.y + e * 2.6, 1, 69), t.vitesse.y += e * 1.5, e;
+		return t.cible.y = A(t.pos.y + e * 2.6, 1, 69), t.vitesse.y += e * 1.5, e;
 	}
-	return r === "sprint" && (t.effort = 1, t.vitesse.x += A(t.cote) * 1.1), i;
+	return r === "sprint" && (t.effort = 1, t.vitesse.x += j(t.cote) * 1.1), i;
 }
-function ks(e, t, n, r) {
-	if (O(t.pos, n.pos) > qa(e, n) ** 2) {
+function sc(e, t, n, r) {
+	if (k(t.pos, n.pos) > To(e, n) ** 2) {
 		n.cible = { ...t.pos };
 		return;
 	}
-	let i = e.cadenceDetaillee ? Ei(t, n, t.numero + n.numero + Math.floor(e.t) & 1 ? -1 : 1) : null;
-	mo(t, n), e.ballon = { ...t.pos };
-	let a = Ir(e, n);
+	let i = e.cadenceDetaillee ? ra(t, n, t.numero + n.numero + Math.floor(e.t) & 1 ? -1 : 1) : null;
+	Ko(t, n), e.ballon = { ...t.pos };
+	let a = ui(e, n);
 	if (a) {
-		L(e, n, a.cathedrale ? "foul_tip" : a.haut ? "foul_high" : "foul_late", a.cathedrale ? 2 : 1.3), L(e, t, a.cathedrale ? "reaction_tip" : a.haut ? "reaction_high" : "reaction_hit", a.cathedrale ? 2 : 1.4), a.cathedrale && R(t, {
-			x: A(n.cote) * 3.4,
+		L(e, n, a.cathedrale ? "foul_tip" : a.haut ? "foul_high" : "foul_late", a.cathedrale ? 2 : 1.3), L(e, t, a.cathedrale ? "reaction_tip" : a.haut ? "reaction_high" : "reaction_hit", a.cathedrale ? 2 : 1.4), a.cathedrale && Zt(t, {
+			x: j(n.cote) * 3.4,
 			y: 0
-		}, 2.3), e.compteurs.irregularites += 1, n.stats.plaquagesManques += 1, t.battu = .6, e.rng() < zt(e, t.pos) && $(e, t.cote, {
+		}, 2.3), e.compteurs.irregularites += 1, n.stats.plaquagesManques += 1, t.battu = .6, e.rng() < Xt(e, t.pos) && Q(e, t.cote, {
 			x: t.pos.x,
 			y: t.pos.y
-		}, a.motif, n, a.cathedrale ? e.rng() < .35 ? "rouge" : "jaune" : a.haut && e.rng() < .22 ? "jaune" : void 0), Lr(e, n, t, a);
+		}, a.motif, n, a.cathedrale ? e.rng() < .35 ? "rouge" : "jaune" : a.haut && e.rng() < .22 ? "jaune" : void 0), di(e, n, t, a);
 		return;
 	}
-	let o = t.moi && e.controle && e.intention ? e.intention.type : null, s = o || kn(e, t) ? null : Ds(e, t, n), c = o ?? s, l = Os(e, t, n, c), u = n.moi && Xr(e, "plaquage"), d = Ja(e, t), f = ws(e, t, n, c, u, o ? t.moi ? Ya(e) : 1 : .3);
+	let o = t.moi && e.controle && e.intention ? e.intention.type : null, s = o || cr(e, t) ? null : ac(e, t, n), c = o ?? s, l = oc(e, t, n, c), u = n.moi && wi(e, "plaquage"), d = Eo(e, t), f = nc(e, t, n, c, u, o ? t.moi ? Do(e) : 1 : .3);
 	if (e.direct?.actif && (u || o || d) && (e.direct.arme = null), r === void 0 ? e.rng() >= f : !r) {
-		if (n.stats.plaquagesManques += 1, t.stats.franchissements += 1, L(e, n, "tackle_low", e.cadenceDetaillee ? 2.3 : 1.05, "manque"), n.battu = u ? 3 : 2, t.battu = .4, e.cadenceDetaillee) As(e, t, n, c, l);
+		if (n.stats.plaquagesManques += 1, t.stats.franchissements += 1, L(e, n, "tackle_low", e.cadenceDetaillee ? 2.3 : 1.05, "manque"), n.battu = u ? 3 : 2, t.battu = .4, e.cadenceDetaillee) cc(e, t, n, c, l);
 		else if (c === "raffut") {
-			let r = k(2.8 + (t.puissance - n.puissance) / 20 + ((t.poidsKg ?? 95) - (n.poidsKg ?? 95)) / 50, 2, 5.8);
-			r > 3.6 || t.puissance - n.puissance > 6 || e.rng() < .42 ? (L(e, n, "fall_back", 1.8), R(n, {
-				x: A(t.cote) * (r + 1.2),
+			let r = A(2.8 + (t.puissance - n.puissance) / 20 + ((t.poidsKg ?? 95) - (n.poidsKg ?? 95)) / 50, 2, 5.8);
+			r > 3.6 || t.puissance - n.puissance > 6 || e.rng() < .42 ? (L(e, n, "fall_back", 1.8), Zt(n, {
+				x: j(t.cote) * (r + 1.2),
 				y: l * .6
 			}, 2.2), e.grosImpact = {
 				lieu: { ...n.pos },
 				type: "raffut",
 				restant: 2.2
-			}, J(e, "franchissement", t.cote, `GROS IMPACT ! ${t.nom} envoie ${n.nom} sur les fesses d’un raffut destructeur !`, 0, t.moi || n.moi)) : (R(n, {
-				x: A(t.cote) * r,
+			}, q(e, "franchissement", t.cote, `GROS IMPACT ! ${t.nom} envoie ${n.nom} sur les fesses d’un raffut destructeur !`, 0, t.moi || n.moi)) : (Zt(n, {
+				x: j(t.cote) * r,
 				y: l * 1.2
-			}, 1.85), L(e, n, "reaction_hit", 1.2)), L(e, t, "bump", 1.1), n.vitesse.x += A(t.cote) * 2.8, n.vitesse.y += l * .8, n.cible.y = k(n.pos.y + l * 1.6, 0, 70);
+			}, 1.85), L(e, n, "reaction_hit", 1.2)), L(e, t, "bump", 1.1), n.vitesse.x += j(t.cote) * 2.8, n.vitesse.y += l * .8, n.cible.y = A(n.pos.y + l * 1.6, 0, 70);
 		} else c === "crochet" && (n.vitesse.y -= l * 1.7);
 		if (!e.cadenceDetaillee && !n.corps) {
 			let e = t.vitesse;
-			R(n, {
-				x: e.x * .55 + A(t.cote) * .8,
+			Zt(n, {
+				x: e.x * .55 + j(t.cote) * .8,
 				y: e.y * .55 - l * 1.3
 			}, 1.15);
 		}
-		t.moi && (e.perceeJoueur = !0), $r(e, t) >= 7.5 && Qr(e, t) >= 7 ? cl(e, t) : ni(e, t.cote, ei.percee * .5), c === "crochet" || c === "raffut" ? (o && Zr(e), J(e, "franchissement", t.cote, I(c === "crochet" ? "crochetReussi" : "raffutReussi", {
+		t.moi && (e.perceeJoueur = !0), Di(e, t) >= 7.5 && Ei(e, t) >= 7 ? tu(e, t) : Ai(e, t.cote, Oi.percee * .5), c === "crochet" || c === "raffut" ? (o && Ti(e), q(e, "franchissement", t.cote, I(c === "crochet" ? "crochetReussi" : "raffutReussi", {
 			nom: t.nom,
 			cible: n.nom
-		}), 0, !!o)) : u ? (Zr(e), J(e, "plaquage", t.cote, I("plaquageRateJoueur", {
+		}), 0, !!o)) : u ? (Ti(e), q(e, "plaquage", t.cote, I("plaquageRateJoueur", {
 			nom: n.nom,
 			cible: t.nom
-		}), 0, !0)) : e.rng() < .22 && J(e, "plaquage", t.cote, I("cassePlaquage", {
+		}), 0, !0)) : e.rng() < .22 && q(e, "plaquage", t.cote, I("cassePlaquage", {
 			porteur: t.nom,
 			defenseur: n.nom
 		}), 0, t.moi || n.moi);
 		return;
 	}
-	if (z(e) && (t.pos.x - fe(t.cote)) * A(t.cote) < -.4) {
-		n.stats.plaquages += 1, ho(t, n), L(e, t, "fall_back", 1.4), L(e, n, "tackle_drive", 1.35);
+	if (R(e) && (t.pos.x - Se(t.cote)) * j(t.cote) < -.4) {
+		n.stats.plaquages += 1, qo(t, n), L(e, t, "fall_back", 1.4), L(e, n, "tackle_drive", 1.35);
 		let r = t.cote;
-		return e.derniereTouche && e.derniereTouche.cote !== r && e.phasesDepuisArret === 0 ? (J(e, "plaquage", n.cote, `${t.nom} est repris dans son en-but par ${n.nom} : renvoi pour ${Y(e, r)}.`, 0, t.moi || n.moi), bo(e, r, "attaque")) : (J(e, "plaquage", n.cote, `${t.nom} est plaqué dans son propre en-but : mêlée à cinq mètres pour ${Y(e, n.cote)}.`, 0, t.moi || n.moi), Q(e, "melee", n.cote, {
-			x: fe(r) + A(r) * 5,
+		return e.derniereTouche && e.derniereTouche.cote !== r && e.phasesDepuisArret === 0 ? (q(e, "plaquage", n.cote, `${t.nom} est repris dans son en-but par ${n.nom} : renvoi pour ${J(e, r)}.`, 0, t.moi || n.moi), Qo(e, r, "attaque")) : (q(e, "plaquage", n.cote, `${t.nom} est plaqué dans son propre en-but : mêlée à cinq mètres pour ${J(e, n.cote)}.`, 0, t.moi || n.moi), Z(e, "melee", n.cote, {
+			x: Se(r) + j(r) * 5,
 			y: t.pos.y
 		}));
 	}
-	if (!(r === void 0 && gs(e, t, n))) {
-		n.stats.plaquages += 1, u && (Zr(e), J(e, "plaquage", n.cote, I("plaquageLance", {
+	if (!(r === void 0 && Js(e, t, n))) {
+		n.stats.plaquages += 1, u && (Ti(e), q(e, "plaquage", n.cote, I("plaquageLance", {
 			nom: n.nom,
 			cible: t.nom
-		}), 0, !0), Tr(e, 4));
-		for (let r of H(e, n.cote)) if (!(r === n || r.battu > 0) && O(r.pos, t.pos) < 5.3) {
+		}), 0, !0), $r(e, 4));
+		for (let r of V(e, n.cote)) if (!(r === n || r.battu > 0) && k(r.pos, t.pos) < 5.3) {
 			r.stats.plaquages += 1;
 			break;
 		}
-		if (e.rng() < .08 && J(e, "plaquage", n.cote, F(e.rng, ut, {
+		if (e.rng() < .08 && q(e, "plaquage", n.cote, F(e.rng, xt, {
 			nom: n.nom,
 			cible: t.nom
-		}), 0, n.moi || t.moi), e.rng() < .02 * (1.6 - n.discipline / 130) * (u ? 2.2 : 1) && (u && Tr(e, 8), L(e, n, "foul_high", 1.3), L(e, t, "reaction_high", 1.4), e.rng() < zt(e, t.pos, n.id))) return $(e, t.cote, t.pos, "plaquage haut", n);
-		if (i && z(e) && i.fermeture > 8 && e.rng() < G.contactDangereux * wa(e) * (i.fermeture / 9) * (1.5 - n.discipline / 100) * (1.5 - n.endurance / 200)) return L(e, n, "foul_high", 1.3), L(e, t, "reaction_high", 1.6), Tr(e, 10), e.compteurs.irregularites += 1, $(e, t.cote, { ...t.pos }, "plaquage dangereux à la tête", n);
-		if (o === "crochet" && (Zr(e), J(e, "plaquage", n.cote, I("crochetRate", {
+		}), 0, n.moi || t.moi), e.rng() < .02 * (1.6 - n.discipline / 130) * (u ? 2.2 : 1) && (u && $r(e, 8), L(e, n, "foul_high", 1.3), L(e, t, "reaction_high", 1.4), e.rng() < Xt(e, t.pos, n.id))) return Q(e, t.cote, t.pos, "plaquage haut", n);
+		if (i && R(e) && i.fermeture > 8 && e.rng() < W.contactDangereux * to(e) * (i.fermeture / 9) * (1.5 - n.discipline / 100) * (1.5 - n.endurance / 200)) return L(e, n, "foul_high", 1.3), L(e, t, "reaction_high", 1.6), $r(e, 10), e.compteurs.irregularites += 1, Q(e, t.cote, { ...t.pos }, "plaquage dangereux à la tête", n);
+		if (o === "crochet" && (Ti(e), q(e, "plaquage", n.cote, I("crochetRate", {
 			nom: t.nom,
 			cible: n.nom
-		}), 0, !0), e.rng() < .13)) return Bo(e, t);
+		}), 0, !0), e.rng() < .13)) return vs(e, t);
 		if (i) {
-			if ((d || e.rng() < ji(t, i, xs(e, t), Ss(e, t), c === "raffut")) && Cs(e, t, i, n, d?.vers)) return;
-		} else if (e.rng() < .055 + t.vision / 1600 + (o === "raffut" ? .22 : 0) && Cs(e, t)) return;
-		if (t.endurance < 30 && e.rng() < k((30 - t.endurance) / 250, .02, .08)) return J(e, "plaquage", n.cote, `Sous le choc et la fatigue, ${t.nom} commet un en-avant au contact !`, 0, t.moi || n.moi), Bo(e, t);
-		if (i) return js(e, t, n, i, u);
-		n.plaquage + n.puissance - (t.evitement + t.puissance) > 6 || u && e.rng() < .45 || e.rng() < .2 ? (L(e, t, "fall_back", 1.8), L(e, n, "tackle_drive", 1.6), ho(t, n, !0), e.grosImpact = {
+			if ((d || e.rng() < ca(t, i, $s(e, t), ec(e, t), c === "raffut")) && tc(e, t, i, n, d?.vers)) return;
+		} else if (e.rng() < .055 + t.vision / 1600 + (o === "raffut" ? .22 : 0) && tc(e, t)) return;
+		if (t.endurance < 30 && e.rng() < A((30 - t.endurance) / 250, .02, .08)) return q(e, "plaquage", n.cote, `Sous le choc et la fatigue, ${t.nom} commet un en-avant au contact !`, 0, t.moi || n.moi), vs(e, t);
+		if (i) return lc(e, t, n, i, u);
+		n.plaquage + n.puissance - (t.evitement + t.puissance) > 6 || u && e.rng() < .45 || e.rng() < .2 ? (L(e, t, "fall_back", 1.8), L(e, n, "tackle_drive", 1.6), qo(t, n, !0), e.grosImpact = {
 			lieu: { ...t.pos },
 			type: "tampon",
 			restant: 2.2
-		}, Tr(e, 8), J(e, "plaquage", n.cote, `ÉNORME TAMPON de ${n.nom} ! ${t.nom} est séché net et envoyé sur les fesses !`, 0, n.moi || t.moi)) : (ho(t, n), L(e, t, Math.abs(t.corps?.direction ?? 0) < Math.PI / 2 ? "fall_forward" : "fall_back", 1.4), L(e, n, (t.corps?.intensite ?? 0) > .75 ? "tackle_drive" : "tackle_low", 1.35)), Ms(e, {
+		}, $r(e, 8), q(e, "plaquage", n.cote, `ÉNORME TAMPON de ${n.nom} ! ${t.nom} est séché net et envoyé sur les fesses !`, 0, n.moi || t.moi)) : (qo(t, n), L(e, t, Math.abs(t.corps?.direction ?? 0) < Math.PI / 2 ? "fall_forward" : "fall_back", 1.4), L(e, n, (t.corps?.intensite ?? 0) > .75 ? "tackle_drive" : "tackle_low", 1.35)), uc(e, {
 			x: t.pos.x,
 			y: t.pos.y
 		}, {
@@ -48435,28 +48837,28 @@ function ks(e, t, n, r) {
 		});
 	}
 }
-function As(e, t, n, r, i) {
-	let a = A(t.cote), o = () => R(n, {
+function cc(e, t, n, r, i) {
+	let a = j(t.cote), o = () => Zt(n, {
 		x: t.vitesse.x * .55 + a * .8,
 		y: t.vitesse.y * .55 - i * 1.3
 	}, 2.3);
 	if (r === "raffut") {
-		let r = Oi(t, n), o = Di(t, n), s = k(2.8 + (t.puissance - n.puissance) / 20 + ((t.poidsKg ?? 95) - (n.poidsKg ?? 95)) / 50, 2, 5.8);
-		o === "tombe" ? (L(e, n, "fall_back", 2.4, r === "percussion" ? "assis" : "raffute"), R(n, {
-			x: a * (s + 1.2),
+		let r = ln(e), o = aa(t, n, r), s = ia(t, n, r), c = A(2.8 + (t.puissance - n.puissance) / 20 + ((t.poidsKg ?? 95) - (n.poidsKg ?? 95)) / 50, 2, 5.8);
+		s === "tombe" ? (L(e, n, "fall_back", 2.4, o === "percussion" ? "assis" : "raffute"), Zt(n, {
+			x: a * (c + 1.2),
 			y: i * .6
 		}, 2.4), e.grosImpact = {
 			lieu: { ...n.pos },
 			type: "raffut",
 			restant: 2.2
-		}, J(e, "franchissement", t.cote, r === "percussion" ? `${t.nom} baisse l’épaule et met ${n.nom} sur les fesses !` : `GROS IMPACT ! ${t.nom} envoie ${n.nom} sur les fesses d’un raffut destructeur !`, 0, t.moi || n.moi)) : o === "equilibre" ? (L(e, n, "reaction_hit", 1.8, "equilibre"), R(n, {
-			x: a * s * .8,
+		}, q(e, "franchissement", t.cote, o === "percussion" ? `${t.nom} baisse l’épaule et met ${n.nom} sur les fesses !` : `GROS IMPACT ! ${t.nom} envoie ${n.nom} sur les fesses d’un raffut destructeur !`, 0, t.moi || n.moi)) : s === "equilibre" ? (L(e, n, "reaction_hit", 1.8, "equilibre"), Zt(n, {
+			x: a * c * .8,
 			y: i * 1.2
-		}, 1.8)) : (L(e, n, "reaction_hit", 1, "repousse"), n.battu = Math.max(1, Math.min(n.battu, 1.2))), n.vitesse.x += a * 2.8, n.vitesse.y += i * .8, n.cible.y = k(n.pos.y + i * 1.6, 0, 70);
+		}, 1.8)) : (L(e, n, "reaction_hit", 1, "repousse"), n.battu = Math.max(1, Math.min(n.battu, 1.2))), n.vitesse.x += a * 2.8, n.vitesse.y += i * .8, n.cible.y = A(n.pos.y + i * 1.6, 0, 70);
 		return;
 	}
 	if (r === "crochet") {
-		if (n.vitesse.y -= i * 1.7, ki(t, n) === "contrepied") {
+		if (n.vitesse.y -= i * 1.7, oa(t, n) === "contrepied") {
 			o();
 			return;
 		}
@@ -48465,8 +48867,8 @@ function As(e, t, n, r, i) {
 	}
 	r !== "sprint" && L(e, t, "bump", .9, "casse"), o();
 }
-function js(e, t, n, r, i) {
-	let a = A(t.cote), o = r.type !== "dominant" && i && e.rng() < .45 ? {
+function lc(e, t, n, r, i) {
+	let a = j(t.cote), o = r.type !== "dominant" && i && e.rng() < .45 ? {
 		...r,
 		type: "dominant",
 		recul: Math.max(.8, r.recul)
@@ -48477,29 +48879,29 @@ function js(e, t, n, r, i) {
 		x: a,
 		y: 0
 	};
-	if (o.type === "dominant") L(e, t, "fall_back", 1.8, "dominant"), L(e, n, "tackle_drive", 1.6, "dominant"), ho(t, n, !0), e.grosImpact = {
+	if (o.type === "dominant") L(e, t, "fall_back", 1.8, "dominant"), L(e, n, "tackle_drive", 1.6, "dominant"), qo(t, n, !0), e.grosImpact = {
 		lieu: { ...t.pos },
 		type: "tampon",
 		restant: 2.2
-	}, Tr(e, 8), J(e, "plaquage", n.cote, `ÉNORME TAMPON de ${n.nom} ! ${t.nom} est stoppé net et repoussé de ${o.recul.toFixed(0)} m.`, 0, n.moi || t.moi);
+	}, $r(e, 8), q(e, "plaquage", n.cote, `ÉNORME TAMPON de ${n.nom} ! ${t.nom} est stoppé net et repoussé de ${o.recul.toFixed(0)} m.`, 0, n.moi || t.moi);
 	else if (o.type === "accroche") {
 		let r = 2.2 - o.recul;
-		R(t, {
+		Zt(t, {
 			x: c.x * r,
 			y: c.y * r
-		}, 2.1), R(n, {
+		}, 2.1), Zt(n, {
 			x: c.x * r * .85,
 			y: c.y * r * .85
 		}, 1.7), L(e, t, "fall_forward", 1.5, "accroche"), L(e, n, "tackle_low", 1.4, "accroche"), t.stats.metres += -o.recul;
-	} else o.type === "debout" ? (R(t, {
+	} else o.type === "debout" ? (Zt(t, {
 		x: -c.x * .5,
 		y: -c.y * .5
-	}, 2.3), R(n, {
+	}, 2.3), Zt(n, {
 		x: -c.x * .35,
 		y: -c.y * .35
-	}, 1.7), L(e, t, "fall_back", 1.9, "debout"), L(e, n, "tackle_drive", 1.8, "debout")) : (ho(t, n), L(e, t, Math.abs(t.corps?.direction ?? 0) < Math.PI / 2 ? "fall_forward" : "fall_back", 1.4, o.type), L(e, n, o.type === "jambes" || o.type === "poursuite" ? "tackle_low" : "tackle_drive", 1.35, o.type));
-	Ms(e, {
-		x: Z(t.pos.x - a * o.recul),
+	}, 1.7), L(e, t, "fall_back", 1.9, "debout"), L(e, n, "tackle_drive", 1.8, "debout")) : (qo(t, n), L(e, t, Math.abs(t.corps?.direction ?? 0) < Math.PI / 2 ? "fall_forward" : "fall_back", 1.4, o.type), L(e, n, o.type === "jambes" || o.type === "poursuite" ? "tackle_low" : "tackle_drive", 1.35, o.type));
+	uc(e, {
+		x: X(t.pos.x - a * o.recul),
 		y: t.pos.y
 	}, {
 		porteur: t,
@@ -48509,12 +48911,12 @@ function js(e, t, n, r, i) {
 		angle: o.angle
 	});
 }
-function Ms(e, t, n) {
+function uc(e, t, n) {
 	e.combinaisonEnCours = void 0, e.combinaisonPreparee = void 0, e.dernierPasseur = null, e.ballon = {
-		x: k(t.x, 11.5, 110.5),
-		y: k(t.y, 1.2, 68.8)
+		x: A(t.x, 11.5, 110.5),
+		y: A(t.y, 1.2, 68.8)
 	}, e.porteur = null, e.vol = null, e.ballonLibre = null, e.phase = "ruck", e.phasesDepuisArret += 1, e.compteurs.rucks += 1, e.perceeSignalee = !1;
-	let r = e.possession, i = j(r), a = (t) => (t.plaquage * .34 + t.puissance * .3 + t.vision * .2 + t.discipline * .16 + (t.numero === 6 || t.numero === 7 || t.numero === 2 ? 7 : 0)) * (.72 + t.endurance / 360) - D(t.pos, e.ballon) * 4.2, o = (t) => H(e, t).filter((e) => e.avant && e !== n?.porteur).map(a).sort((e, t) => t - e).slice(0, 3).reduce((e, t, n, r) => e + t / Math.max(1, r.length), 0), s = o(r) + (e.cohesion?.[r] ?? 50) * .12, c = o(i) + (e.cohesion?.[i] ?? 50) * .12 + (n?.defenseur ? 4 : 0);
+	let r = e.possession, i = M(r), a = (t) => (t.plaquage * .34 + t.puissance * .3 + t.vision * .2 + t.discipline * .16 + (t.numero === 6 || t.numero === 7 || t.numero === 2 ? 7 : 0)) * (.72 + t.endurance / 360) - O(t.pos, e.ballon) * 4.2, o = (t) => V(e, t).filter((e) => e.avant && e !== n?.porteur).map(a).sort((e, t) => t - e).slice(0, 3).reduce((e, t, n, r) => e + t / Math.max(1, r.length), 0), s = o(r) + (e.cohesion?.[r] ?? 50) * .12, c = o(i) + (e.cohesion?.[i] ?? 50) * .12 + (n?.defenseur ? 4 : 0);
 	e.ruck = {
 		porteurId: n?.porteur.id,
 		plaqueurId: n?.defenseur.id,
@@ -48525,53 +48927,124 @@ function Ms(e, t, n) {
 	};
 	let l = 0;
 	if (e.cadenceDetaillee) {
-		let t = (e.ballon.x - e.ligneAvantage) * A(r), n = e.avantage ?? 0;
+		let t = (e.ballon.x - e.ligneAvantage) * j(r), n = e.avantage ?? 0;
 		l = t >= 1.5 ? Math.min(3, Math.max(0, n) + 1) : t <= -1 ? Math.max(-3, Math.min(0, n) - 1) : 0, e.avantage = l;
 	}
-	let u = z(e) ? H(e, r).filter((t) => t !== n?.porteur && B(t) && O(t.pos, e.ballon) < 20.25).length : -1, d = u < 0 ? 0 : u >= 2 ? G.soutienDeux : u === 1 ? G.soutienUn : G.soutienAucun, f = d > 0 && !Ht(e) ? d * G.soutienReel : d, p = c + (e.rng() - .5) * 12 > s - 3 + l * 2.2 + f;
-	if (e.ballonLent = p, e.minuteur = ((p ? 4 : 2.25) + e.rng() * (p ? 1.5 : .9)) * (1 - .07 * l), z(e) && !p) {
+	let u = R(e) ? V(e, r).filter((t) => t !== n?.porteur && z(t) && k(t.pos, e.ballon) < 20.25).length : -1, d = u < 0 ? 0 : u >= 2 ? W.soutienDeux : u === 1 ? W.soutienUn : W.soutienAucun, f = d > 0 && !en(e) ? d * W.soutienReel : d, p = c + (e.rng() - .5) * 12 > s - 3 + l * 2.2 + f;
+	if (e.ballonLent = p, e.minuteur = ((p ? 4 : 2.25) + e.rng() * (p ? 1.5 : .9)) * (1 - .07 * l), R(e) && !p) {
 		let t = u;
 		(l >= 1 || t >= 2) && e.rng() < .3 + .15 * l + .1 * Math.min(3, t) && (e.minuteur *= .6, e.ruck.eclair = !0);
 	}
-	if (e.placement = Ie(e.pions, e.ballon, e.possession), n) {
-		N(n.porteur), N(n.defenseur), n.porteur.role = "ruck", n.defenseur.role = "ruck";
-		let t = A(n.porteur.cote);
+	if (e.placement = qe(e.pions, e.ballon, e.possession), n) {
+		P(n.porteur), P(n.defenseur), n.porteur.role = "ruck", n.defenseur.role = "ruck";
+		let t = j(n.porteur.cote);
 		e.placement[n.porteur.id] = {
 			x: e.ballon.x - t * .25,
-			y: k(e.ballon.y - .35, 1.2, 68.8)
+			y: A(e.ballon.y - .35, 1.2, 68.8)
 		}, e.placement[n.defenseur.id] = {
 			x: e.ballon.x + t * .45,
-			y: k(e.ballon.y + .35, 1.2, 68.8)
+			y: A(e.ballon.y + .35, 1.2, 68.8)
 		};
 	}
-	let m = A(e.possession);
-	if (e.horsJeu = t.x + m * 1.3, e.ligneDef = e.horsJeu, li(e), e.cadenceDetaillee && (e.ouvert = $o(e), e.coteDecidePour = r, ns(e, r, n?.porteur.id)), e.cadenceDetaillee && e.ruck.organisation) {
+	let m = j(e.possession);
+	if (e.horsJeu = t.x + m * 1.3, e.ligneDef = e.horsJeu, Li(e), e.cadenceDetaillee && (e.ouvert = js(e), e.coteDecidePour = r, Ps(e, r, n?.porteur.id)), e.cadenceDetaillee && e.ruck.organisation) {
 		let t = e.ruck.organisation;
 		for (let n of [...t.attaque, ...t.defense]) {
 			let t = e.pions.find((e) => e.id === n);
 			if (!t) continue;
-			let r = D(t.pos, e.ballon), i = Math.hypot(t.vitesse.x, t.vitesse.y), a = 1.2 + r * 1.6;
+			let r = O(t.pos, e.ballon), i = Math.hypot(t.vitesse.x, t.vitesse.y), a = 1.2 + r * 1.6;
 			r < 2.4 && i > a && (t.vitesse.x *= a / i, t.vitesse.y *= a / i);
 		}
 	}
 }
-function Ns(e) {
-	let t = e.ruck?.organisation, n = He(e, "ruck");
+function dc(e, t, n, r, i, a, o, s) {
+	let c = e.ruck, l = M(c.attaque), u = {
+		x: e.ballon.x,
+		y: e.ballon.y
+	}, d = t === "gratte" ? [n] : r, f = A(Math.max(...d.map((e) => O(e.pos, u))) / 6.2 + .25, .5, 1.8), p = t === "contre" ? 1.5 : 0, m = t === "gratte" ? f + .57 + 1.07 + 1 : f + p + .5;
+	c.duel = {
+		type: t,
+		acteurId: n.id,
+		contreursIds: r.map((e) => e.id),
+		debut: e.sim,
+		contact: e.sim + f,
+		poussee: p,
+		fin: e.sim + m,
+		issue: i,
+		avancee: a,
+		origine: u,
+		fautifId: o?.id,
+		motif: s
+	}, e.minuteur = m + .05, c.eclair = !1;
+	for (let e of d) oe(e, t === "gratte" ? E.coutGrattage : E.coutContreRuck), e.sprint = Math.max(0, e.sprint - 8);
+	t === "gratte" ? q(e, "ruck", l, `${n.nom} arrive sur le ballon, se couche dessus et lutte pour le garder.`, 0, n.moi) : (q(e, "ruck", l, `Contre-ruck : ${J(e, l)} arrive lancé sur le regroupement et cherche à reculer les soutiens.`), e.indicationJeu = {
+		cle: "contreRuck",
+		cote: l,
+		t: e.sim
+	});
+}
+function fc(e) {
+	let t = e.ruck, n = t.duel, r = t.attaque, i = M(r), a = e.pions.find((e) => e.id === n.acteurId), o = () => {
+		for (let t of e.pions) t.role === "ruck" && t.surLeTerrain && t.sanction <= 0 && (t.battu = Math.max(t.battu, .6), t.role = "ligne");
+	};
+	switch (n.issue) {
+		case "turnover":
+			n.type === "gratte" ? (a.stats.grattages += 1, q(e, "ruck", i, F(e.rng, Ct, { nom: a.nom }), 0, a.moi)) : q(e, "ruck", i, `Contre-ruck puissant : ${J(e, i)} passe au-dessus du ballon.`), lr(e), e.possession = i, e.phasesDepuisArret = 0, e.dernierTurnover = {
+				pion: a,
+				t: e.t
+			}, e.indicationJeu = {
+				cle: n.type === "gratte" ? "grattage" : "turnover",
+				cote: i,
+				t: e.sim
+			}, Ai(e, i, Oi.turnover);
+			break;
+		case "attaqueConserve":
+			e.ballonLent = !0, q(e, "ruck", r, `Le contre-ruck de ${J(e, i)} est repoussé : ${J(e, r)} garde le ballon, mais il est ralenti.`);
+			break;
+		case "instable": {
+			q(e, "ruck", null, "Le ballon jaillit du regroupement : il est libre, la course est lancée.");
+			let t = { ...e.ballon }, n = j(r);
+			return o(), e.ruck = null, e.placement = null, as(e, {
+				de: t,
+				vers: {
+					x: t.x - n * (1.4 + e.rng() * 1.2),
+					y: A(t.y + (e.rng() - .5) * 3, 1.2, 68.8)
+				},
+				duree: .3,
+				ecoule: .3,
+				hauteur: .1,
+				type: "passe",
+				intention: "passe",
+				auteur: a,
+				receveur: null
+			});
+		}
+		case "penalite": {
+			let t = n.fautifId ? e.pions.find((e) => e.id === n.fautifId) : void 0;
+			return o(), e.ruck = null, Q(e, t && t.cote === r ? i : r, e.ballon, n.motif ?? "entrée par le côté au ruck", t);
+		}
+	}
+	let s = t.organisation;
+	return mc(e, s ? s.attaque.map((t) => e.pions.find((e) => e.id === t)).filter((e) => !!e) : []);
+}
+function pc(e) {
+	if (ln(e) && e.ruck?.duel && e.minuteur <= 0) return fc(e);
+	let t = e.ruck?.organisation, n = $e(e, "ruck");
 	n && t && delete t.chenille;
 	let r = t?.chenille;
 	if (r) {
 		let n = e.pions.find((e) => e.id === r.neufId && e.surLeTerrain && e.sanction <= 0 && !e.corps), i = r.pretDepuis !== void 0 && e.sim - r.pretDepuis >= 1.5;
 		if (n && i) {
-			let t = z(e);
+			let t = R(e);
 			t || (e.ruck = null, e.placement = null);
-			let r = H(e, j(n.cote)).filter((e) => e.sanction <= 0).sort((e, t) => O(e.pos, n.pos) - O(t.pos, n.pos))[0];
+			let r = V(e, M(n.cote)).filter((e) => e.sanction <= 0).sort((e, t) => k(e.pos, n.pos) - k(t.pos, n.pos))[0];
 			if (r && e.rng() < 1 / 12) {
 				e.ruck = null, e.placement = null, L(e, r, "charge_down", 1.4), L(e, n, "kick", .8), r.effort = 1.15, r.cible = { ...n.pos }, n.stats.coupsDePied += 1;
-				let t = A(r.cote), i = {
-					x: k(n.pos.x + t * (3 + e.rng() * 4), 2, 120),
-					y: k(n.pos.y + (e.rng() - .5) * 5, 2, 68)
+				let t = j(r.cote), i = {
+					x: A(n.pos.x + t * (3 + e.rng() * 4), 2, 120),
+					y: A(n.pos.y + (e.rng() - .5) * 5, 2, 68)
 				};
-				J(e, "franchissement", r.cote, `💥 CONTRE SUR LA CHENILLE ! ${r.nom} monte en flèche et contre la boîte de ${n.nom} ! Ballon libre !`, 0, r.moi || n.moi), So(e, {
+				q(e, "franchissement", r.cote, `💥 CONTRE SUR LA CHENILLE ! ${r.nom} monte en flèche et contre la boîte de ${n.nom} ! Ballon libre !`, 0, r.moi || n.moi), es(e, {
 					de: { ...n.pos },
 					vers: i,
 					duree: .7,
@@ -48584,7 +49057,7 @@ function Ns(e) {
 				}), e.porteur = null, e.phase = "ballonEnLAir", e.minuteur = .9, e.derniereTouche = r;
 				return;
 			}
-			t && (e.chenilleTenue = !0), Jc(e, n, me(n.pos, n.cote) ? "degagement" : "chandelle"), t && !e.piedPrepare && (delete e.chenilleTenue, e.phase !== "ruck" && (e.ruck = null, e.placement = null));
+			t && (e.chenilleTenue = !0), Vl(e, n, we(n.pos, n.cote) ? "degagement" : "chandelle"), t && !e.piedPrepare && (delete e.chenilleTenue, e.phase !== "ruck" && (e.ruck = null, e.placement = null));
 			return;
 		}
 		if (n && e.sim - r.debut < 10) {
@@ -48593,72 +49066,85 @@ function Ns(e) {
 		}
 		delete t.chenille;
 	}
-	if (!n && t && !t.chenilleEssayee && !r && e.minuteur <= 0 && e.ballonLent && (e.ballon.x - 61) * A(e.possession) < -5) {
-		let t = fi(e);
-		if (t && t.numero === 9 && mi(e, t)) return;
+	if (!n && t && !t.chenilleEssayee && !r && e.minuteur <= 0 && e.ballonLent && (e.ballon.x - 61) * j(e.possession) < -5) {
+		let t = Bi(e);
+		if (t && t.numero === 9 && Hi(e, t)) return;
 	}
 	if (e.minuteur > 0) {
-		if (t && !t.annonce && e.minuteur < 1.1 && z(e) && e.cadenceDetaillee) {
+		if (t && !t.annonce && e.minuteur < 1.1 && R(e) && e.cadenceDetaillee) {
 			let n = e.pions.find((e) => e.id === t.relayeurId);
-			n && n.numero === 9 && !n.corps && D(n.pos, e.ballon) < 3.2 && (t.annonce = !0, L(e, n, "direct_play", .9, e.ouvert > 0 ? "d" : "g"));
+			n && n.numero === 9 && !n.corps && O(n.pos, e.ballon) < 3.2 && (t.annonce = !0, L(e, n, "direct_play", .9, e.ouvert > 0 ? "d" : "g"));
 		}
 		return;
 	}
 	if (e.cadenceDetaillee && t) {
-		let n = fi(e), r = t.attenteSortie ?? 0;
-		if (n && D(n.pos, e.ballon) > ds && D(n.pos, e.ballon) < 7 && r < 1.2) {
-			t.attenteSortie = r + K;
+		let n = Bi(e), r = t.attenteSortie ?? 0;
+		if (n && O(n.pos, e.ballon) > Us && O(n.pos, e.ballon) < 7 && r < 1.2) {
+			t.attenteSortie = r + G;
 			return;
 		}
-		if (z(e) && r < 2.6 && !e.pions.some((t) => t.surLeTerrain && t.sanction <= 0 && !t.corps && t.cote === e.possession && t.id !== e.ruck?.porteurId && D(t.pos, e.ballon) < ds)) {
-			t.secoursId ??= H(e, e.possession).filter((t) => t.sanction <= 0 && !t.corps && t.id !== e.ruck?.porteurId).sort((t, n) => O(t.pos, e.ballon) - O(n.pos, e.ballon))[0]?.id, t.attenteSortie = r + K;
+		if (R(e) && r < 2.6 && !e.pions.some((t) => t.surLeTerrain && t.sanction <= 0 && !t.corps && t.cote === e.possession && t.id !== e.ruck?.porteurId && O(t.pos, e.ballon) < Us)) {
+			t.secoursId ??= V(e, e.possession).filter((t) => t.sanction <= 0 && !t.corps && t.id !== e.ruck?.porteurId).sort((t, n) => k(t.pos, e.ballon) - k(n.pos, e.ballon))[0]?.id, t.attenteSortie = r + G;
 			return;
 		}
 	}
-	let i = e.possession, a = j(i), o = e.ruck, s = (t) => (t.plaquage * .38 + t.puissance * .28 + t.vision * .19 + t.discipline * .15 + (t.numero === 7 ? 9 : t.numero === 6 || t.numero === 2 ? 6 : 0)) * (.7 + t.endurance / 335) - D(t.pos, e.ballon) * 5, c = H(e, a).filter((t) => t.avant && O(t.pos, e.ballon) < 72).sort((e, t) => s(t) - s(e)), l = H(e, i).filter((t) => t.avant && t.id !== o?.porteurId && O(t.pos, e.ballon) < 72).sort((e, t) => s(t) - s(e)), u = c[0], d = l.slice(0, 3), f = (o?.vitesseDefense ?? 45) * .42 + (u ? s(u) : 0) * .58 - ((o?.vitesseAttaque ?? 45) * .45 + d.reduce((e, t) => e + s(t), 0) / Math.max(1, d.length) * .55) + (e.ballonLent ? 6 : -4), p = Math.abs(e.ballon.x - fe(a));
+	let i = e.possession, a = M(i), o = e.ruck, s = (t) => (t.plaquage * .38 + t.puissance * .28 + t.vision * .19 + t.discipline * .15 + (t.numero === 7 ? 9 : t.numero === 6 || t.numero === 2 ? 6 : 0)) * (.7 + t.endurance / 335) - O(t.pos, e.ballon) * 5, c = V(e, a).filter((t) => t.avant && k(t.pos, e.ballon) < 72).sort((e, t) => s(t) - s(e)), l = V(e, i).filter((t) => t.avant && t.id !== o?.porteurId && k(t.pos, e.ballon) < 72).sort((e, t) => s(t) - s(e)), u = c[0], d = l.slice(0, 3), f = (o?.vitesseDefense ?? 45) * .42 + (u ? s(u) : 0) * .58 - ((o?.vitesseAttaque ?? 45) * .45 + d.reduce((e, t) => e + s(t), 0) / Math.max(1, d.length) * .55) + (e.ballonLent ? 6 : -4), p = Math.abs(e.ballon.x - Se(a));
 	p < 8 ? f += 6.5 : p < 15 && (f += 3);
-	let m = e.pions.find((e) => e.moi), h = Xr(e, "grattage") && !!m && m.cote === a && m.surLeTerrain && m.sanction <= 0 && O(m.pos, e.ballon) < 64;
-	h && m && (Zr(e), u = m, f += 12, J(e, "ruck", a, I("grattagePlonge", { nom: m.nom }), 0, !0));
-	let g = f + (e.rng() - .5) * 26, _ = d.filter((t) => !t.corps && O(t.pos, e.ballon) < 5.76).length, v = z(e) ? (_ >= 2 ? G.protectionDeux : _ === 1 ? G.protectionUn : G.protectionAucun) * (Ht(e) ? 1 : G.protectionReel) : 1, y = u?.discipline ?? 50, b = !u || D(u.pos, e.ballon) > 3.4;
-	if (u && e.rng() < k(.018 + (62 - y) / 900 + (b ? .055 : 0), .012, .11)) return e.ruck = null, $(e, i, e.ballon, b ? "défenseur qui plonge au ruck" : "entrée par le côté au ruck", u);
-	if (u && !b && g > 13 && e.rng() < k(.1 + g / 180, .1, .27) * v) return e.ruck = null, $(e, a, e.ballon, "ballon gardé au sol");
-	if (z(e)) {
-		let t = wa(e), n = Ca(e, a, e.ballon), r = (e) => 1.35 - (e?.discipline ?? 55) / 110, s = A(i), c = o?.plaqueurId ? e.pions.find((e) => e.id === o.plaqueurId && e.surLeTerrain && e.sanction <= 0) : void 0;
-		if (c && e.rng() < .011 * t * (.5 + 1.6 * n) * (e.ballonLent ? .6 : 1.3) * r(c)) return e.ruck = null, $(e, i, e.ballon, "plaqueur qui ne se relève pas", c);
-		if (u && e.rng() < .008 * t * (.4 + 1.8 * n) * r(u)) return e.ruck = null, $(e, i, e.ballon, "mains dans le ruck", u);
-		let l = H(e, a).filter((t) => t.role !== "ruck" && t.sanction <= 0 && !t.corps && (t.pos.x - e.horsJeu) * s < -.4 && O(t.pos, e.ballon) < 196).sort((t, n) => O(t.pos, e.ballon) - O(n.pos, e.ballon))[0];
-		if (l && e.rng() < .03 * t * (.5 + 1.2 * n) * (e.ballonLent ? .6 : 1.4) * r(l)) return e.ruck = null, $(e, i, { ...l.pos }, "hors-jeu au ruck", l);
-		let f = d[0];
-		if (f && e.rng() < .007 * t * (e.ballonLent ? 1.5 : .7) * r(f)) return e.ruck = null, $(e, a, e.ballon, "soutien qui plonge au ruck", f);
+	let m = e.pions.find((e) => e.moi), h = !1, g = wi(e, "grattage") && !!m && m.cote === a && m.surLeTerrain && m.sanction <= 0 && k(m.pos, e.ballon) < 64;
+	if (g && m) {
+		Ti(e), u = m;
+		let t = e.direct?.pack?.type === "ruck" ? e.direct.pack.temps[0]?.q : void 0;
+		f += !ln(e) || t === void 0 || t === 1 ? 12 : t === 2 ? 20 : 2, ln(e) && t === 0 && (h = !0), q(e, "ruck", a, I("grattagePlonge", { nom: m.nom }), 0, !0);
 	}
-	let x = k(.065 + g / 170 + (h ? .06 : 0), .015, .34) * v;
-	if (u && !b && e.rng() < x) u.stats.grattages += 1, L(e, u, "jackal", 2.2), J(e, "ruck", a, F(e.rng, ft, { nom: u.nom }), 0, u.moi), An(e), e.possession = a, e.phasesDepuisArret = 0, e.dernierTurnover = {
-		pion: u,
-		t: e.t
-	}, ni(e, a, ei.turnover);
-	else if (g > 9 && c.length >= 2 && e.rng() < .15 * v) {
+	let _ = f + (e.rng() - .5) * 26, v = d.filter((t) => !t.corps && k(t.pos, e.ballon) < 5.76).length, y = R(e) ? (v >= 2 ? W.protectionDeux : v === 1 ? W.protectionUn : W.protectionAucun) * (en(e) ? 1 : W.protectionReel) : 1, b = u?.discipline ?? 50, x = !u || O(u.pos, e.ballon) > 3.4 || h;
+	if (u && e.rng() < A(.018 + (62 - b) / 900 + (x ? .055 : 0), .012, .11)) return e.ruck = null, Q(e, i, e.ballon, x ? "défenseur qui plonge au ruck" : "entrée par le côté au ruck", u);
+	if (u && !x && _ > 13 && e.rng() < A(.1 + _ / 180, .1, .27) * y) return e.ruck = null, Q(e, a, e.ballon, "ballon gardé au sol");
+	if (R(e)) {
+		let t = to(e), n = eo(e, a, e.ballon), r = (e) => 1.35 - (e?.discipline ?? 55) / 110, s = j(i), c = o?.plaqueurId ? e.pions.find((e) => e.id === o.plaqueurId && e.surLeTerrain && e.sanction <= 0) : void 0;
+		if (c && e.rng() < .011 * t * (.5 + 1.6 * n) * (e.ballonLent ? .6 : 1.3) * r(c)) return e.ruck = null, Q(e, i, e.ballon, "plaqueur qui ne se relève pas", c);
+		if (u && e.rng() < .008 * t * (.4 + 1.8 * n) * r(u)) return e.ruck = null, Q(e, i, e.ballon, "mains dans le ruck", u);
+		let l = V(e, a).filter((t) => t.role !== "ruck" && t.sanction <= 0 && !t.corps && (t.pos.x - e.horsJeu) * s < -.4 && k(t.pos, e.ballon) < 196).sort((t, n) => k(t.pos, e.ballon) - k(n.pos, e.ballon))[0];
+		if (l && e.rng() < .03 * t * (.5 + 1.2 * n) * (e.ballonLent ? .6 : 1.4) * r(l)) return e.ruck = null, Q(e, i, { ...l.pos }, "hors-jeu au ruck", l);
+		let f = d[0];
+		if (f && e.rng() < .007 * t * (e.ballonLent ? 1.5 : .7) * r(f)) return e.ruck = null, Q(e, a, e.ballon, "soutien qui plonge au ruck", f);
+	}
+	let ee = A(.065 + _ / 170 + (g ? .06 : 0), .015, .34) * y;
+	if (u && !x && e.rng() < ee) {
+		if (ln(e)) return dc(e, "gratte", u, [], "turnover", 0);
+		u.stats.grattages += 1, L(e, u, "jackal", 2.2), q(e, "ruck", a, F(e.rng, Ct, { nom: u.nom }), 0, u.moi), lr(e), e.possession = a, e.phasesDepuisArret = 0, e.dernierTurnover = {
+			pion: u,
+			t: e.t
+		}, Ai(e, a, Oi.turnover);
+	} else if (_ > 9 && c.length >= 2 && e.rng() < .15 * y) {
+		if (ln(e)) return dc(e, "contre", c[0], c.slice(0, 3), "turnover", 1.8 + e.rng() * 1.4);
 		let t = c[0];
-		An(e), e.possession = a, e.phasesDepuisArret = 0, e.dernierTurnover = {
+		lr(e), e.possession = a, e.phasesDepuisArret = 0, e.dernierTurnover = {
 			pion: t,
 			t: e.t
-		}, J(e, "ruck", a, `Contre-ruck puissant : ${Y(e, a)} passe au-dessus du ballon.`), ni(e, a, ei.turnover);
-	} else g < -9 ? (e.ballonLent = !1, J(e, "ruck", i, `Sortie rapide pour ${Y(e, i)} : les soutiens ont nettoyé juste à temps.`)) : g > 2 && (e.ballonLent = !0, J(e, "ruck", i, `Ballon ralenti, la défense de ${Y(e, a)} a le temps de se replacer.`));
-	for (let t of d) O(t.pos, e.ballon) < 16 && (t.stats.rucksNettoyes += 1);
+		}, q(e, "ruck", a, `Contre-ruck puissant : ${J(e, a)} passe au-dessus du ballon.`), Ai(e, a, Oi.turnover);
+	} else if (ln(e) && _ > 2 && c.length >= 2 && e.rng() < un.contreRuckVisible * y) {
+		let t = e.rng(), n = c.slice(0, Math.min(3, c.length));
+		return t < .6 ? dc(e, "contre", n[0], n, "attaqueConserve", -(.4 + e.rng() * .9)) : t < .84 ? dc(e, "contre", n[0], n, "instable", .3 + e.rng() * .6) : t < .93 ? dc(e, "contre", n[0], n, "penalite", .5 + e.rng() * .5, n[0], "entrée par le côté au ruck") : dc(e, "contre", n[0], n, "penalite", .3, d[0], "soutien qui plonge au ruck");
+	} else _ < -9 ? (e.ballonLent = !1, q(e, "ruck", i, `Sortie rapide pour ${J(e, i)} : les soutiens ont nettoyé juste à temps.`)) : _ > 2 && (e.ballonLent = !0, q(e, "ruck", i, `Ballon ralenti, la défense de ${J(e, a)} a le temps de se replacer.`));
+	return mc(e, d);
+}
+function mc(e, t) {
+	for (let n of t) k(n.pos, e.ballon) < 16 && (n.stats.rucksNettoyes += 1);
 	e.gardeRuck = (e.ballonLent ? .45 : .6) + (e.cadenceDetaillee ? .45 + .12 * (e.avantage ?? 0) : 0);
-	let ee = e.ruck?.porteurId, S = fi(e);
-	e.cadenceDetaillee && (!S || D(S.pos, e.ballon) > ds) && (S = pi(e) ?? S), z(e) && Ps(e, j(e.possession));
+	let n = e.ruck?.porteurId, r = Bi(e);
+	e.cadenceDetaillee && (!r || O(r.pos, e.ballon) > Us) && (r = Vi(e) ?? r), R(e) && hc(e, M(e.possession));
 	for (let t of e.pions) t.role === "ruck" && t.surLeTerrain && t.sanction <= 0 && (t.battu = Math.max(t.battu, .9), t.role = "ligne");
-	S && S.numero !== 9 && H(e, S.cote).some((e) => e.numero === 9) && J(e, "ruck", S.cote, `Demi de mêlée pris dans le jeu : ${S.nom} assure le relais derrière le ruck.`, 0, S.moi), e.ruck = null, e.placement = null;
-	let C = S;
-	if (z(e) && e.cadenceDetaillee && e.dernierTurnover?.t === e.t && e.dernierTurnover.pion.cote === e.possession) {
-		let t = e.dernierTurnover.pion, n = (t) => t.surLeTerrain && t.sanction <= 0 && !t.corps && D(t.pos, e.ballon) < 3.2;
-		if (n(t)) C = t;
-		else if (!H(e, e.possession).some(n)) {
+	r && r.numero !== 9 && V(e, r.cote).some((e) => e.numero === 9) && q(e, "ruck", r.cote, `Demi de mêlée pris dans le jeu : ${r.nom} assure le relais derrière le ruck.`, 0, r.moi), e.ruck = null, e.placement = null;
+	let i = r;
+	if (R(e) && e.cadenceDetaillee && e.dernierTurnover?.t === e.t && e.dernierTurnover.pion.cote === e.possession) {
+		let t = e.dernierTurnover.pion, n = (t) => t.surLeTerrain && t.sanction <= 0 && !t.corps && O(t.pos, e.ballon) < 3.2;
+		if (n(t)) i = t;
+		else if (!V(e, e.possession).some(n)) {
 			let n = { ...e.ballon };
-			return Do(e, {
+			return as(e, {
 				de: n,
 				vers: {
-					x: n.x - A(e.possession) * 1.2,
+					x: n.x - j(e.possession) * 1.2,
 					y: n.y
 				},
 				duree: .3,
@@ -48671,78 +49157,105 @@ function Ns(e) {
 			});
 		}
 	}
-	Ic(e, e.ballon, void 0, 3, ee, C);
+	$(e, e.ballon, void 0, 3, n, i);
 }
-function Ps(e, t) {
-	let n = G, r = !e.ballonLent, i = A(j(t)), a = ((r ? n.retardRapide : n.retardLent) * (e.ruck?.eclair ? 1.35 : 1) + e.rng() * (r ? .8 : .2)) * (Ht(e) ? 1 : n.retardReel), o = /* @__PURE__ */ new Set([e.ruck?.plaqueurId, ...e.ruck?.organisation?.defense ?? []]), s = {};
-	for (let n of H(e, t)) n.sanction > 0 || (n.role === "ruck" || o.has(n.id) ? (s[n.id] = e.sim + a, n.battu = Math.max(n.battu, a * .8)) : (n.pos.x - e.horsJeu) * i < -.6 && O(n.pos, e.ballon) < 144 && (s[n.id] = e.sim + a * .6, n.battu = Math.max(n.battu, a * .4)));
+function hc(e, t) {
+	let n = W, r = !e.ballonLent, i = j(M(t)), a = ((r ? n.retardRapide : n.retardLent) * (e.ruck?.eclair ? 1.35 : 1) + e.rng() * (r ? .8 : .2)) * (en(e) ? 1 : n.retardReel), o = /* @__PURE__ */ new Set([e.ruck?.plaqueurId, ...e.ruck?.organisation?.defense ?? []]), s = {};
+	for (let n of V(e, t)) n.sanction > 0 || (n.role === "ruck" || o.has(n.id) ? (s[n.id] = e.sim + a, n.battu = Math.max(n.battu, a * .8)) : (n.pos.x - e.horsJeu) * i < -.6 && k(n.pos, e.ballon) < 144 && (s[n.id] = e.sim + a * .6, n.battu = Math.max(n.battu, a * .4)));
 	e.retards = s;
 }
-function Fs(e, t, n) {
+function gc(e, t, n) {
 	if (e.monteeSeul = null, e.systeme !== "blitz" || e.phasesDepuisArret < 1) return;
-	let r = A(t), i = null, a = Infinity;
-	for (let o of H(e, j(t))) {
-		if (!Ut(e, o)) continue;
+	let r = j(t), i = null, a = Infinity;
+	for (let o of V(e, M(t))) {
+		if (!tn(e, o)) continue;
 		let t = (o.pos.y - n.y) * e.ouvert, s = (o.pos.x - n.x) * r;
 		if (t < 7 || t > 28 || s < -1 || s > 12) continue;
 		let c = o.vision * .6 + o.discipline * .3 + o.endurance * .1;
 		c < a && (a = c, i = o);
 	}
 	if (!i) return;
-	let o = G.monteeSeul * (1.6 - a / 100) * (Ht(e) ? G.condense : G.avantageReel);
+	let o = W.monteeSeul * (1.6 - a / 100) * (en(e) ? W.condense : W.avantageReel);
 	e.rng() < o && (e.monteeSeul = {
 		id: i.id,
 		jusqua: e.sim + 2.4
 	});
 }
-function Is(e, t) {
-	let n = e.possession, r = A(n), i = H(e, n).filter((e) => e.avant), a = H(e, j(n)).filter((e) => e.avant), o = (e) => e.length ? e.reduce((e, t) => e + t.puissance, 0) / e.length : 50, s = o(i) - o(a), c = k(.75 + s / 45, .1, 1.9);
-	if (e.ballon.x += r * c * t, i.forEach((t, n) => {
+function _c(e, t, n) {
+	let r = t.cote, i = V(e, r).find((t) => t.numero === 9 && t.sanction <= 0 && !t.corps && O(t.pos, e.ballon) < 12);
+	if (n !== "ramasser" && !i) return !1;
+	for (let t of e.pions) t.role === "maul" && (t.role = "ligne", t.battu = Math.max(t.battu, .5));
+	return e.maul = null, e.placement = null, n === "ramasser" ? (q(e, "maul", r, `${t.nom} récupère le ballon au fond du maul et part seul.`, 0, !0), $(e, {
+		x: e.ballon.x,
+		y: e.ballon.y
+	}, t, 3), !0) : (q(e, "maul", r, n === "passer" ? `${t.nom} sert le demi de mêlée au fond du maul.` : `${t.nom} se détache du maul, le demi de mêlée le sert.`, 0, !0), $(e, {
+		x: e.ballon.x,
+		y: e.ballon.y
+	}, void 0, 3, void 0, i), n === "detacher" && e.lancement && i && (e.lancement.chaine = Nl([
+		i,
+		t,
+		...e.lancement.chaine.filter((e) => e !== i && e !== t)
+	]).slice(0, 6)), !0);
+}
+function vc(e, t) {
+	let n = e.possession, r = j(n), i = V(e, n).filter((e) => e.avant), a = V(e, M(n)).filter((e) => e.avant), o = (e) => e.length ? e.reduce((e, t) => e + t.puissance, 0) / e.length : 50, s = o(i) - o(a), c = ln(e) && e.direct?.pack?.type === "maul" ? e.direct.pack : void 0, l = c ? e.pions.find((e) => e.moi) : void 0;
+	if (c && l && (s += (l.cote === n ? 1 : -1) * On(l, c) * 1.4), c && l?.cote === n && c.sortie && _c(e, l, c.sortie)) return;
+	let u = A(.75 + s / 45, .1, 1.9);
+	if (e.ballon.x += r * u * t, ln(e) && e.maul && (e.maul.avance = (e.maul.avance ?? 0) + u * t), i.forEach((t, n) => {
 		t.role = "maul", t.cible = {
 			x: e.ballon.x - r * (.42 + Math.floor(n / 3) * .72),
-			y: k(e.ballon.y + (n % 3 - 1) * .76, 3, 67)
+			y: A(e.ballon.y + (n % 3 - 1) * .76, 3, 67)
 		};
 	}), a.forEach((t, n) => {
 		t.role = "maul", t.cible = {
 			x: e.ballon.x + r * (.42 + Math.floor(n / 3) * .72),
-			y: k(e.ballon.y + (n % 3 - 1) * .76, 3, 67)
+			y: A(e.ballon.y + (n % 3 - 1) * .76, 3, 67)
 		};
-	}), ge(e.ballon, n)) {
-		let t = e.placementJoue ? [...i].sort((t, n) => O(t.pos, e.ballon) - O(n.pos, e.ballon))[0] : i.find((e) => e.numero === 2) ?? i[0];
+	}), Ee(e.ballon, n)) {
+		let t = e.placementJoue ? [...i].sort((t, n) => k(t.pos, e.ballon) - k(n.pos, e.ballon))[0] : i.find((e) => e.numero === 2) ?? i[0];
 		if (t) return t.pos = {
 			x: e.ballon.x,
 			y: e.ballon.y
-		}, Dc(e, t, "maul");
+		}, xl(e, t, "maul");
 	}
 	if (e.minuteur <= 0) {
-		if (e.rng() < (z(e) ? .07 + .22 * Ca(e, j(n), e.ballon) * (s > 0 ? 1 : .5) : .07)) return $(e, n, e.ballon, "maul écroulé");
-		Ms(e, e.ballon);
+		if (e.rng() < (R(e) ? .07 + .22 * eo(e, M(n), e.ballon) * (s > 0 ? 1 : .5) : .07)) return Q(e, n, e.ballon, "maul écroulé");
+		if (ln(e) && (e.maul?.avance ?? 9) < 1.2 && s < -4 && e.rng() < A(.2 - s / 60, .2, .55)) {
+			q(e, "maul", M(n), `Maul arrêté : ${J(e, M(n))} l'a stoppé net, mêlée pour ${J(e, M(n))}.`), e.indicationJeu = {
+				cle: "melee",
+				cote: M(n),
+				t: e.sim
+			};
+			for (let t of e.pions) t.role === "maul" && (t.role = "ligne");
+			return Z(e, "melee", M(n), e.ballon);
+		}
+		uc(e, e.ballon);
 	}
 }
-function Q(e, t, n, r, i = !1, a = !1) {
-	if (e.sirene && (e.finSurSortieOuEnAvant ? t === "touche" || i : t !== "penalite")) return Qc(e);
-	e.possession = n, e.porteur = null, e.vol = null, e.ballonLibre = null, e.ruck = null, e.aplatissage = null, e.lancement = null, e.conquete = null, e.combinaisonPreparee = void 0, e.combinaisonEnCours = void 0, wo(e), e.dernierPasseur = null, e.phasesDepuisArret = 0, e.metresGagnesPhase = 0, e.perceeSignalee = !1, e.ballon = {
-		x: k(r.x, 12, 110),
+function Z(e, t, n, r, i = !1, a = !1) {
+	if (e.sirene && (e.finSurSortieOuEnAvant ? t === "touche" || i : t !== "penalite")) return Gl(e);
+	e.possession = n, e.porteur = null, e.vol = null, e.ballonLibre = null, e.ruck = null, e.aplatissage = null, e.lancement = null, e.conquete = null, e.combinaisonPreparee = void 0, e.combinaisonEnCours = void 0, ns(e), e.dernierPasseur = null, e.phasesDepuisArret = 0, e.metresGagnesPhase = 0, e.perceeSignalee = !1, e.ballon = {
+		x: A(r.x, 12, 110),
 		y: r.y
-	}, e.phase = t, e.minuteur = ka(e, t), e.ouvert = Sr(e);
-	let o = t === "touche" && e.responsabilites ? xn(e, n, "lanceur") : void 0, s = !!o && o.moi && !!e.cadenceDetaillee && Cn(e, "lanceur", n);
-	if (!(t === "touche" && a && z(e) && !s && rc(e, n))) if (t === "touche") {
-		e.ballon.y = e.ballon.y < 35 ? .6 : 69.4, e.ballon.x = k(e.ballon.x, 16, 106);
+	}, e.phase = t, e.minuteur = oo(e, t), e.ouvert = Xr(e);
+	let o = t === "touche" && e.responsabilites ? $n(e, n, "lanceur") : void 0, s = !!o && o.moi && !!e.cadenceDetaillee && tr(e, "lanceur", n);
+	if (!(t === "touche" && a && R(e) && !s && Zc(e, n))) if (t === "touche") {
+		e.ballon.y = e.ballon.y < 35 ? .6 : 69.4, e.ballon.x = A(e.ballon.x, 16, 106);
 		let t = e.rng() < .32 ? 4 : e.rng() < .6 ? 5 : 7;
-		ao(e, Fe(e.pions, e.ballon, n, t, void 0, o?.id), 34);
-		let r = H(e, n).filter((e) => e.role === "alignement").sort((t, n) => Math.abs(t.cible.y - e.ballon.y) - Math.abs(n.cible.y - e.ballon.y)), i = [
+		Ro(e, Ke(e.pions, e.ballon, n, t, void 0, o?.id), 34);
+		let r = V(e, n).filter((e) => e.role === "alignement").sort((t, n) => Math.abs(t.cible.y - e.ballon.y) - Math.abs(n.cible.y - e.ballon.y)), i = [
 			"premierBloc",
 			"milieu",
 			"fond",
 			"leurreDevant"
-		], c = i[Math.abs(Math.round(e.t / K) + Math.round(e.ballon.x)) % i.length], l = c === "premierBloc" ? 0 : c === "fond" ? r.length - 1 : c === "leurreDevant" ? Math.min(r.length - 1, Math.max(1, Math.floor(r.length * .68))) : Math.floor(r.length / 2);
+		], c = i[Math.abs(Math.round(e.t / G) + Math.round(e.ballon.x)) % i.length], l = c === "premierBloc" ? 0 : c === "fond" ? r.length - 1 : c === "leurreDevant" ? Math.min(r.length - 1, Math.max(1, Math.floor(r.length * .68))) : Math.floor(r.length / 2);
 		if (e.conquete = {
 			type: "touche",
 			progression: 0,
 			combinaison: c,
 			cibleId: r[Math.max(0, l)]?.id
-		}, z(e) ? Object.assign(e.conquete, ec(e, n, r)) : e.cadenceDetaillee && Object.assign(e.conquete, ac(e, n, c, r, e.conquete.cibleId)), e.placementJoue) {
-			let t = e.ballon.y < 35 ? -1 : 1, r = t < 0 ? 0 : 70, i = o ?? H(e, n).find((e) => e.numero === 2);
+		}, R(e) ? Object.assign(e.conquete, Jc(e, n, r)) : e.cadenceDetaillee && Object.assign(e.conquete, $c(e, n, c, r, e.conquete.cibleId)), e.placementJoue) {
+			let t = e.ballon.y < 35 ? -1 : 1, r = t < 0 ? 0 : 70, i = o ?? V(e, n).find((e) => e.numero === 2);
 			i && (e.conquete.lanceurId = i.id, e.conquete.ballonAuSol = {
 				x: e.ballon.x,
 				y: r + t * .9
@@ -48751,8 +49264,8 @@ function Q(e, t, n, r, i = !1, a = !1) {
 				y: r + t * .55
 			}));
 		}
-		s && Zs(e, n, !!a), e.compteurs.touches += 1;
-	} else t === "melee" ? (e.ballon.y = k(e.ballon.y, 12, 58), e.ballon.x = k(e.ballon.x, 17, 105), ao(e, Pe(e.pions, e.ballon, n), 22), e.conquete = {
+		s && zc(e, n, !!a), e.compteurs.touches += 1;
+	} else t === "melee" ? (e.ballon.y = A(e.ballon.y, 12, 58), e.ballon.x = A(e.ballon.x, 17, 105), Ro(e, Ge(e.pions, e.ballon, n), 22), e.conquete = {
 		type: "melee",
 		progression: 0,
 		pousseVers: n
@@ -48762,137 +49275,225 @@ function Q(e, t, n, r, i = !1, a = !1) {
 		debut: e.sim,
 		centre: { ...e.ballon },
 		introducteur: n,
-		dureePoussee: Aa.poussee,
+		dureePoussee: so.poussee,
 		avanceFinale: 0,
 		angleFinal: 0
-	}), e.compteurs.melees += 1) : t === "renvoi22" ? (Math.abs(r.x - (n === "A" ? 11 : 111)) > 2 && delete e.ligneRenvoi, ao(e, ze(e.pions, e.ligneRenvoi ?? (n === "A" ? 33 : 89), n))) : e.placement = null;
-	let c = A(n);
-	e.ligneDef = e.ballon.x + c * (t === "touche" ? 10 : t === "melee" ? 5 : 10), e.horsJeu = e.ligneDef, (t === "melee" || t === "touche") && !e.conquete?.rapide && Ue(e, t);
+	}), e.compteurs.melees += 1) : t === "renvoi22" ? (Math.abs(r.x - (n === "A" ? 11 : 111)) > 2 && delete e.ligneRenvoi, Ro(e, Xe(e.pions, e.ligneRenvoi ?? (n === "A" ? 33 : 89), n))) : e.placement = null;
+	let c = j(n);
+	e.ligneDef = e.ballon.x + c * (t === "touche" ? 10 : t === "melee" ? 5 : 10), e.horsJeu = e.ligneDef, (t === "melee" || t === "touche") && !e.conquete?.rapide && et(e, t);
 }
-function Ls(e) {
-	let t = k(e, 0, 1);
+function yc(e) {
+	let t = A(e, 0, 1);
 	return t * t * (3 - 2 * t);
 }
-function Rs(e, t) {
-	let n = t - e.etapeDepuis, r = e.etape === "sortie" ? 1 : e.etape === "poussee" ? Ls(n / Math.max(.1, e.ruptureApres ?? e.dureePoussee)) : 0, i = e.etape === "placement" ? 1.4 : e.etape === "liaison" ? 1.4 - .55 * Ls((n - Aa.liaison * .45) / (Aa.liaison * .5)) : e.etape === "impact" ? .85 * (1 - Ls(n / .55)) : 0;
+function bc(e, t) {
+	let n = t - e.etapeDepuis;
+	if (e.dyn && (e.etape === "poussee" || e.etape === "sortie")) {
+		let r = e.dyn, i = e.etape === "sortie" ? 1 : yc(n / Math.max(.1, e.ruptureApres ?? e.dureePoussee)), a = r.tourne ? r.tourne.sens * .62 * yc((n - r.tourne.depuis) / 1.5) : 0;
+		return {
+			avance: r.a + r.v * A(t - r.t, 0, G),
+			angle: e.angleFinal * i + a,
+			ecart: 0
+		};
+	}
+	let r = e.etape === "sortie" ? 1 : e.etape === "poussee" ? yc(n / Math.max(.1, e.ruptureApres ?? e.dureePoussee)) : 0, i = e.etape === "placement" ? 1.4 : e.etape === "liaison" ? 1.4 - .55 * yc((n - so.liaison * .45) / (so.liaison * .5)) : e.etape === "impact" ? .85 * (1 - yc(n / .55)) : 0;
 	return {
 		avance: e.avanceFinale * r,
 		angle: e.angleFinal * r,
 		ecart: i
 	};
 }
-function zs(e, t) {
-	let n = t.introducteur, r = j(n), i = H(e, n).filter((e) => e.avant), a = H(e, r).filter((e) => e.avant), o = e.bonusConqueteArcade?.type === "melee" ? e.bonusConqueteArcade.scores : void 0, s = ((o?.[n] ?? 0) - (o?.[r] ?? 0)) * 8;
+function xc(e, t) {
+	if (ln(e)) return Sc(e, t);
+	let n = t.introducteur, r = M(n), i = V(e, n).filter((e) => e.avant), a = V(e, r).filter((e) => e.avant), o = e.bonusConqueteArcade?.type === "melee" ? e.bonusConqueteArcade.scores : void 0, s = ((o?.[n] ?? 0) - (o?.[r] ?? 0)) * 8;
 	e.bonusConqueteArcade = null;
-	let c = Ws(e, i, n) - Ws(e, a, r) + s + (e.rng() - .5) * 18, l = c >= 0 ? n : r;
-	t.duel = c, t.perdant = j(l), t.talonneur = n, t.dureePoussee = Aa.poussee, t.avanceFinale = k(c * .2, -2.6, 2.6);
+	let c = Mc(e, i, n) - Mc(e, a, r) + s + (e.rng() - .5) * 18, l = c >= 0 ? n : r;
+	t.duel = c, t.perdant = M(l), t.talonneur = n, t.dureePoussee = so.poussee, t.avanceFinale = A(c * .2, -2.6, 2.6);
 	let u = (e, t) => e.find((e) => e.numero === t)?.puissance ?? 60, d = (u(i, 1) - u(a, 3) - (u(i, 3) - u(a, 1))) / 160;
-	t.angleFinal = k(d, -.14, .14);
-	let f = Us(l === n ? a : i, (e) => e.discipline), p = k((Math.abs(c) - 5) / 105 + (58 - f) / 700, .015, .24);
+	t.angleFinal = A(d, -.14, .14);
+	let f = jc(l === n ? a : i, (e) => e.discipline), p = A((Math.abs(c) - 5) / 105 + (58 - f) / 700, .015, .24);
 	if (Math.abs(c) > 6 && e.rng() < p) {
 		let n = e.rng() >= .5;
 		t.penalite = {
 			pour: l,
 			motif: n ? "mêlée écroulée" : "liaison perdue en mêlée"
-		}, t.issue = n ? "ecroulee" : "relevee", t.ruptureApres = 1.5, t.dureePoussee = 3.5, t.avanceFinale = k(c * .12, -1.4, 1.4);
-	} else Math.abs(c) < 3.2 && e.rng() < .16 ? (t.issue = "tourne", t.angleFinal = (d >= 0 ? 1 : -1) * .62, t.avanceFinale *= .4) : c < -7 && e.rng() < k(.2 + Math.abs(c) / 90, .2, .48) ? (t.contre = !0, t.talonneur = r, t.issue = "recule") : Math.abs(t.avanceFinale) < .45 ? (t.issue = "stable", t.avanceFinale *= .5) : t.issue = t.avanceFinale > 0 ? "avance" : "recule";
+		}, t.issue = n ? "ecroulee" : "relevee", t.ruptureApres = 1.5, t.dureePoussee = 3.5, t.avanceFinale = A(c * .12, -1.4, 1.4);
+	} else Math.abs(c) < 3.2 && e.rng() < .16 ? (t.issue = "tourne", t.angleFinal = (d >= 0 ? 1 : -1) * .62, t.avanceFinale *= .4) : c < -7 && e.rng() < A(.2 + Math.abs(c) / 90, .2, .48) ? (t.contre = !0, t.talonneur = r, t.issue = "recule") : Math.abs(t.avanceFinale) < .45 ? (t.issue = "stable", t.avanceFinale *= .5) : t.issue = t.avanceFinale > 0 ? "avance" : "recule";
 	!t.penalite && !t.contre && !e.combinaisonPreparee && c > 5 && e.rng() < .32 && (t.depart8 = !0), e.conquete && (e.conquete.pousseVers = Math.abs(t.avanceFinale) < .2 ? void 0 : t.avanceFinale > 0 ? n : r);
 }
-function Bs(e) {
-	let t = e.conquete.melee, n = (e.dureeArret ?? ja) - e.minuteur, r = (n) => {
+function Sc(e, t) {
+	let n = t.introducteur, r = M(n), i = V(e, n).filter((e) => e.avant), a = V(e, r).filter((e) => e.avant), o = e.bonusConqueteArcade?.type === "melee" ? e.bonusConqueteArcade.scores : void 0, s = ((o?.[n] ?? 0) - (o?.[r] ?? 0)) * 8;
+	e.bonusConqueteArcade = null;
+	let c = Mc(e, i, n) - Mc(e, a, r) + s + (e.rng() - .5) * 18;
+	t.dyn = {
+		duel0: c,
+		bonus: 0,
+		t: e.sim,
+		a: 0,
+		v: 0
+	}, t.duel = c, t.perdant = M(c >= 0 ? n : r), t.talonneur = n, t.dureePoussee = so.poussee, t.avanceFinale = 0, t.issue = "stable";
+	let l = (e, t) => e.find((e) => e.numero === t)?.puissance ?? 60;
+	t.angleFinal = A((l(i, 1) - l(a, 3) - (l(i, 3) - l(a, 1))) / 160, -.14, .14), e.conquete && (e.conquete.pousseVers = Math.abs(c) < 1 ? void 0 : c > 0 ? n : r);
+}
+function Cc(e, t) {
+	let n = j(t.introducteur);
+	return ((t.introducteur === "A" ? 111 : 11) - e.ballon.x) * n;
+}
+function wc(e, t) {
+	let n = t.dyn, r = un, i = e.sim - t.etapeDepuis;
+	n.bonus = Dc(e);
+	let a = A((n.duel0 + n.bonus) * r.vitessePousseeParPoint, -1.9, 2.2) * (t.penalite ? .15 : 1);
+	n.v += (a - n.v) * (1 - Math.exp(-.15 / r.inertiePoussee)), n.a = A(n.a + n.v * G, -r.recuMax, 40), n.t = e.sim, !n.decidee && i >= t.dureePoussee * r.decision && Tc(e, t), n.garde && i >= t.dureePoussee - .12 && t.dureePoussee < r.poussee && n.v > .2 && Cc(e, t) > 0 && (t.dureePoussee += .6, e.minuteur += .6, e.dureeArret = (e.dureeArret ?? 0) + .6);
+}
+function Tc(e, t) {
+	let n = t.dyn;
+	if (n.decidee) return;
+	n.decidee = !0;
+	let r = un, i = t.introducteur, a = M(i), o = V(e, i).filter((e) => e.avant), s = V(e, a).filter((e) => e.avant), c = e.sim - t.etapeDepuis, l = n.duel0 + n.bonus;
+	t.duel = l;
+	let u = l >= 0 ? i : a, d = e.direct?.pack, f = d?.type === "melee" ? e.pions.find((e) => e.moi) : void 0, p = !1;
+	f && d && d.score < .28 && d.temps.filter((e) => e.q !== void 0).length >= 3 && e.rng() < .3 && (u = M(f.cote), p = !0), t.perdant = M(u), t.talonneur = i;
+	let m = d?.poste === "talonneur" && f?.cote === i ? d.temps[0]?.q : void 0, h = m === 2 ? .3 : m === 0 ? 1.6 : 1, g = jc(u === i ? s : o, (e) => e.discipline), _ = A((Math.abs(l) - 5) / 105 + (58 - g) / 700, .015, .24) * (f && f.cote === u && d && d.score >= .7 ? 1.5 : 1), v = f && f.cote !== u;
+	if (p || (Math.abs(l) > 6 || v && d && d.score >= .7 && l * (f.cote === i ? 1 : -1) > 3) && e.rng() < _) {
+		let n = e.rng() >= .5;
+		t.penalite = {
+			pour: u,
+			motif: n ? "mêlée écroulée" : "liaison perdue en mêlée"
+		}, t.issue = n ? "ecroulee" : "relevee", t.ruptureApres = c + 1.2, t.dureePoussee, t.dureePoussee = c + 2.2;
+		let r = (e.dureeArret ?? co) - e.minuteur;
+		e.minuteur = Math.max(.4, t.dureePoussee - c) + .3, e.dureeArret = r + e.minuteur;
+	} else Math.abs(l) < 3.2 && e.rng() < .16 ? (t.issue = "tourne", n.tourne = {
+		depuis: c,
+		sens: t.angleFinal >= 0 ? 1 : -1
+	}) : l < -7 && e.rng() < A(.2 + Math.abs(l) / 90, .2, .48) * h ? (t.contre = !0, t.talonneur = a, t.issue = "recule") : t.issue = Math.abs(n.v) < .12 ? "stable" : n.v > 0 ? "avance" : "recule";
+	let y = Cc(e, t);
+	!t.penalite && !t.contre && t.talonneur === i && l >= r.essaiSeuil && y > 0 && y <= r.essaiPortee + Math.max(0, n.a) ? (n.garde = !0, t.issue = "avance", q(e, "melee", i, `Le pack de ${J(e, i)} domine à ${Math.round(y)} mètres de la ligne : le 8 garde le ballon aux pieds et la poussée continue.`)) : !t.penalite && !t.contre && !e.combinaisonPreparee && l > 5 && e.rng() < .32 && (t.depart8 = !0), e.conquete && (e.conquete.pousseVers = Math.abs(n.v) < .1 ? void 0 : n.v > 0 ? i : a);
+}
+function Ec(e, t) {
+	let n = t.introducteur, r = V(e, n).filter((e) => e.sanction <= 0 && !e.corps), i = r.find((e) => e.numero === 8) ?? r.filter((e) => e.avant).sort((t, n) => k(t.pos, e.ballon) - k(n.pos, e.ballon))[0];
+	if (!i) return;
+	t.dyn.essai = !0, q(e, "melee", n, `ESSAI DE POUSSÉE ! Le pack de ${J(e, n)} a reculé toute la défense jusqu'à la ligne : ${i.nom} aplatit le ballon.`, 0, i.moi);
+	let a = V(e, M(n));
+	e.conquete = null, e.placement = null;
+	for (let t of e.pions) t.role === "melee" && (t.role = "ligne", P(t));
+	for (let e of a) e.battu = Math.max(e.battu, 2);
+	i.pos = {
+		x: e.ballon.x,
+		y: e.ballon.y
+	}, i.pos.x = n === "A" ? Math.max(i.pos.x, 111.1) : Math.min(i.pos.x, 10.9), xl(e, i, "maul");
+}
+function Dc(e) {
+	let t = e.direct?.pack, n = e.pions.find((e) => e.moi);
+	return !t || t.type !== "melee" || !n ? 0 : (n.cote === e.conquete?.melee?.introducteur ? 1 : -1) * On(n, t);
+}
+function Oc(e) {
+	let t = e.conquete.melee, n = (e.dureeArret ?? co) - e.minuteur, r = (n) => {
 		t.etape = n, t.etapeDepuis = e.sim;
 	}, i = e.sim - t.etapeDepuis;
-	t.etape === "placement" ? n > .2 && r("liaison") : t.etape === "liaison" ? i >= Aa.liaison && r("impact") : t.etape === "impact" ? i >= Aa.impact && r("introduction") : t.etape === "introduction" ? i >= Aa.introduction && (zs(e, t), r("poussee"), e.minuteur = t.dureePoussee + (t.penalite ? .3 : Aa.sortie), e.dureeArret = n + e.minuteur) : t.etape === "poussee" && i >= t.dureePoussee && r("sortie"), t.etape !== "poussee" && t.etape !== "sortie" && (e.minuteur = Math.max(e.minuteur, .6));
-	let a = Rs(t, e.sim), o = A(t.introducteur), s = {
+	t.etape === "placement" ? n > .2 && r("liaison") : t.etape === "liaison" ? i >= so.liaison && r("impact") : t.etape === "impact" ? i >= so.impact && r("introduction") : t.etape === "introduction" ? i >= so.introduction && (xc(e, t), r("poussee"), e.minuteur = t.dureePoussee + (t.penalite ? .3 : so.sortie), e.dureeArret = n + e.minuteur) : t.etape === "poussee" && (t.dyn && wc(e, t), i >= t.dureePoussee && r("sortie")), t.etape !== "poussee" && t.etape !== "sortie" && (e.minuteur = Math.max(e.minuteur, .6));
+	let a = bc(t, e.sim), o = j(t.introducteur), s = {
 		x: t.centre.x + o * a.avance,
 		y: t.centre.y
-	}, c = Math.cos(a.angle), l = Math.sin(a.angle), u = (e, t) => ({
-		x: k(s.x + e * c - t * l, 12, 110),
-		y: k(s.y + e * l + t * c, 2, 68)
-	}), d = t.centre.y < 35 ? 1 : -1, f = t.talonneur ?? t.introducteur, p = t.etape === "sortie" || t.etape === "poussee" && e.sim - t.etapeDepuis > t.dureePoussee * .25;
+	}, c = Math.cos(a.angle), l = Math.sin(a.angle), u = t.dyn?.garde ? 3 : 0, d = (e, t) => ({
+		x: A(s.x + e * c - t * l, 12 - u, 110 + u),
+		y: A(s.y + e * l + t * c, 2, 68)
+	}), f = t.centre.y < 35 ? 1 : -1, p = t.talonneur ?? t.introducteur, m = t.etape === "sortie" || t.etape === "poussee" && e.sim - t.etapeDepuis > t.dureePoussee * .25;
 	for (let n of e.pions) {
 		if (!n.surLeTerrain || n.sanction > 0) continue;
 		let r = e.placement?.[n.id];
 		if (r) {
-			if (n.role === "melee") n.cible = u(r.x - t.centre.x - A(n.cote) * a.ecart, r.y - t.centre.y);
+			if (n.role === "melee") n.cible = d(r.x - t.centre.x - j(n.cote) * a.ecart, r.y - t.centre.y);
 			else if (n.numero === 9) {
-				let e = A(n.cote);
-				if (p && n.cote === f && !t.penalite) {
+				let e = j(n.cote);
+				if (m && n.cote === p && !t.penalite) {
 					let t = n.pos.x - s.x, r = n.pos.y - s.y, i = -(t * c + r * l) * e, a = -t * l + r * c;
-					n.cible = i < 2.3 ? u(-e * 2.95, (a < 0 ? -1 : 1) * Math.max(1.5, Math.min(1.9, Math.abs(a)))) : u(-e * 3.05, -d * .5), n.effort = Math.max(n.effort, .9);
-				} else n.cible = u(r.x - t.centre.x, r.y - t.centre.y);
+					n.cible = i < 2.3 ? d(-e * 2.95, (a < 0 ? -1 : 1) * Math.max(1.5, Math.min(1.9, Math.abs(a)))) : d(-e * 3.05, -f * .5), n.effort = Math.max(n.effort, .9);
+				} else n.cible = d(r.x - t.centre.x, r.y - t.centre.y);
 			}
 		}
 	}
-	let m = A(f), h = t.etape === "sortie" ? 1 : t.etape === "poussee" ? Ls((e.sim - t.etapeDepuis) / Math.max(.1, t.dureePoussee * .85)) : 0;
-	e.ballon = u(-m * 2.3 * h, 0);
+	let h = j(p), g = t.etape === "sortie" ? 1 : t.etape === "poussee" ? yc((e.sim - t.etapeDepuis) / Math.max(.1, t.dureePoussee * .85)) : 0;
+	e.ballon = d(-h * 2.3 * g, 0), t.dyn?.garde && (t.etape === "poussee" || t.etape === "sortie") && !t.penalite && !t.contre && Ee(e.ballon, t.introducteur) && Ec(e, t);
 }
-function Vs(e, t) {
-	t.duel === void 0 && zs(e, t), e.conquete = null;
-	let n = t.introducteur, r = j(n), i = t.duel ?? 0, a = i >= 0 ? n : r, o = H(e, a).filter((e) => e.avant);
-	if (t.penalite) return J(e, "melee", a, F(e.rng, Tt, { club: Y(e, a) })), e.placement = null, $(e, t.penalite.pour, e.ballon, t.penalite.motif);
-	t.issue === "tourne" ? (J(e, "melee", n, "La mêlée tourne, le demi de mêlée doit sortir un ballon difficile."), e.ballonLent = !0) : t.contre ? (e.possession = r, J(e, "melee", r, `Ballon talonné contre l’introduction : ${Y(e, r)} renverse la mêlée.`), ni(e, r, ei.turnover), e.ballonLent = Math.abs(i) < 13) : i > 8 ? (J(e, "melee", n, `Pack dominant : ${Y(e, n)} avance avant de libérer.`), e.ballonLent = !1) : (J(e, "melee", n, F(e.rng, wt, { club: Y(e, n) })), e.ballonLent = i < -2);
-	for (let e of o) e.stats.melees += 1;
+function kc(e, t) {
+	if (t.dyn) {
+		t.dyn.decidee || Tc(e, t), t.avanceFinale = t.dyn.a;
+		for (let t of e.pions) t.role === "melee" && t.surLeTerrain && (oe(t, E.coutPousseeMelee), t.sprint = Math.max(0, t.sprint - 10));
+	}
+	t.duel === void 0 && xc(e, t);
+	let n = t.dyn && e.direct?.pack?.type === "melee" ? e.direct.pack : void 0, r = n ? e.pions.find((e) => e.moi) : void 0;
+	n?.sortie && r && r.cote === t.introducteur && !t.penalite && !t.contre && !t.dyn?.garde && (n.sortie === "ramasser" && r.numero === 8 ? t.depart8 = !0 : n.sortie === "passer" && (t.depart8 = !1)), e.conquete = null;
+	let i = t.introducteur, a = M(i), o = t.duel ?? 0, s = o >= 0 ? i : a, c = V(e, s).filter((e) => e.avant);
+	if (t.penalite) return q(e, "melee", s, F(e.rng, It, { club: J(e, s) })), e.placement = null, Q(e, t.penalite.pour, e.ballon, t.penalite.motif);
+	t.issue === "tourne" ? (q(e, "melee", i, "La mêlée tourne, le demi de mêlée doit sortir un ballon difficile."), e.ballonLent = !0) : t.contre ? (e.possession = a, q(e, "melee", a, `Ballon talonné contre l’introduction : ${J(e, a)} renverse la mêlée.`), Ai(e, a, Oi.turnover), e.ballonLent = Math.abs(o) < 13) : o > 8 ? (q(e, "melee", i, `Pack dominant : ${J(e, i)} avance avant de libérer.`), e.ballonLent = !1) : (q(e, "melee", i, F(e.rng, Ft, { club: J(e, i) })), e.ballonLent = o < -2);
+	for (let e of c) e.stats.melees += 1;
 	e.placement = null, e.gardeRuck = .4;
-	let s = H(e, e.possession).find((e) => e.numero === 8);
-	if (t.depart8 && s && e.possession === n) {
-		let t = H(e, n).find((e) => e.numero === 9 && e.sanction <= 0 && !e.corps), r = !!e.cadenceDetaillee && !!t && e.rng() < .5;
-		if (Ic(e, e.ballon, s, 5), e.porteur !== s) return;
-		let i = -e.ouvert, a = i > 0 ? 70 - e.origine.y : e.origine.y, o = e.rng(), c = o < .4 && a > 9 ? i * 6 : o < .8 ? e.ouvert * 6 : 0;
+	let l = V(e, e.possession).find((e) => e.numero === 8);
+	if (t.depart8 && l && e.possession === i) {
+		let t = V(e, i).find((e) => e.numero === 9 && e.sanction <= 0 && !e.corps), n = !!e.cadenceDetaillee && !!t && e.rng() < .5;
+		if ($(e, e.ballon, l, 5), e.porteur !== l) return;
+		let r = -e.ouvert, a = r > 0 ? 70 - e.origine.y : e.origine.y, o = e.rng(), s = o < .4 && a > 9 ? r * 6 : o < .8 ? e.ouvert * 6 : 0;
 		e.lancement = {
 			type: "pickAndGo",
-			chaine: r ? [s, t] : [s],
+			chaine: n ? [l, t] : [l],
 			index: 0,
-			libelle: r ? "départ du 8, relais du 9" : "départ du 8",
-			couloir: c
-		}, s.stats.pickAndGo += 1;
-		let l = c === 0 ? "dans l’axe" : c * e.ouvert > 0 ? "côté ouvert" : "petit côté";
-		J(e, "melee", n, r ? `${s.nom} se détache de la mêlée, ballon en main, ${l}, ${t.nom} dans sa roue.` : `${s.nom} ramasse au talon et part lui-même, ${l}.`, 0, s.moi);
+			libelle: n ? "départ du 8, relais du 9" : "départ du 8",
+			couloir: s
+		}, l.stats.pickAndGo += 1;
+		let c = s === 0 ? "dans l’axe" : s * e.ouvert > 0 ? "côté ouvert" : "petit côté";
+		q(e, "melee", i, n ? `${l.nom} se détache de la mêlée, ballon en main, ${c}, ${t.nom} dans sa roue.` : `${l.nom} ramasse au talon et part lui-même, ${c}.`, 0, l.moi);
 		return;
 	}
-	Ic(e, e.ballon, void 0, 5);
+	if ($(e, e.ballon, void 0, 5), n?.sortie === "detacher" && r && r.cote === e.possession && e.lancement && !t.penalite) {
+		let t = V(e, e.possession).find((e) => e.numero === 9 && e.sanction <= 0 && !e.corps);
+		t && r !== t && (e.lancement.chaine = Nl([
+			t,
+			r,
+			...e.lancement.chaine.filter((e) => e !== t && e !== r)
+		]).slice(0, 6), e.lancement.index = 0, q(e, "melee", e.possession, `${r.nom} se détache de la mêlée : ${t.nom} le sert dans la foulée.`, 0, !0));
+	}
 }
-function Hs(e) {
+function Ac(e) {
 	if (e.minuteur > 0) return;
-	if (e.conquete?.melee) return Vs(e, e.conquete.melee);
+	if (e.conquete?.melee) return kc(e, e.conquete.melee);
 	e.conquete = null;
-	let t = e.possession, n = H(e, t).filter((e) => e.avant), r = H(e, j(t)).filter((e) => e.avant), i = j(t), a = e.bonusConqueteArcade?.type === "melee" ? e.bonusConqueteArcade.scores : void 0, o = ((a?.[t] ?? 0) - (a?.[i] ?? 0)) * 8;
+	let t = e.possession, n = V(e, t).filter((e) => e.avant), r = V(e, M(t)).filter((e) => e.avant), i = M(t), a = e.bonusConqueteArcade?.type === "melee" ? e.bonusConqueteArcade.scores : void 0, o = ((a?.[t] ?? 0) - (a?.[i] ?? 0)) * 8;
 	e.bonusConqueteArcade = null;
-	let s = Ws(e, n, t) - Ws(e, r, i) + o + (e.rng() - .5) * 18, c = s >= 0 ? t : i, l = c === t ? n : r, u = Us(c === t ? r : n, (e) => e.discipline), d = k((Math.abs(s) - 5) / 105 + (58 - u) / 700, .015, .24);
-	if (Math.abs(s) > 6 && e.rng() < d) return J(e, "melee", c, F(e.rng, Tt, { club: Y(e, c) })), e.placement = null, $(e, c, e.ballon, e.rng() < .5 ? "liaison perdue en mêlée" : "mêlée écroulée");
-	Math.abs(s) < 3.2 && e.rng() < .16 ? (J(e, "melee", t, "La mêlée tourne, le demi de mêlée doit sortir un ballon difficile."), e.ballonLent = !0) : s < -7 && e.rng() < k(.2 + Math.abs(s) / 90, .2, .48) ? (e.possession = i, J(e, "melee", i, `Ballon talonné contre l’introduction : ${Y(e, i)} renverse la mêlée.`), ni(e, i, ei.turnover), e.ballonLent = Math.abs(s) < 13) : s > 8 ? (J(e, "melee", t, `Pack dominant : ${Y(e, t)} avance avant de libérer.`), e.ballonLent = !1) : (J(e, "melee", t, F(e.rng, wt, { club: Y(e, t) })), e.ballonLent = s < -2);
+	let s = Mc(e, n, t) - Mc(e, r, i) + o + (e.rng() - .5) * 18, c = s >= 0 ? t : i, l = c === t ? n : r, u = jc(c === t ? r : n, (e) => e.discipline), d = A((Math.abs(s) - 5) / 105 + (58 - u) / 700, .015, .24);
+	if (Math.abs(s) > 6 && e.rng() < d) return q(e, "melee", c, F(e.rng, It, { club: J(e, c) })), e.placement = null, Q(e, c, e.ballon, e.rng() < .5 ? "liaison perdue en mêlée" : "mêlée écroulée");
+	Math.abs(s) < 3.2 && e.rng() < .16 ? (q(e, "melee", t, "La mêlée tourne, le demi de mêlée doit sortir un ballon difficile."), e.ballonLent = !0) : s < -7 && e.rng() < A(.2 + Math.abs(s) / 90, .2, .48) ? (e.possession = i, q(e, "melee", i, `Ballon talonné contre l’introduction : ${J(e, i)} renverse la mêlée.`), Ai(e, i, Oi.turnover), e.ballonLent = Math.abs(s) < 13) : s > 8 ? (q(e, "melee", t, `Pack dominant : ${J(e, t)} avance avant de libérer.`), e.ballonLent = !1) : (q(e, "melee", t, F(e.rng, Ft, { club: J(e, t) })), e.ballonLent = s < -2);
 	for (let e of l) e.stats.melees += 1;
 	e.placement = null, e.gardeRuck = .4;
-	let f = H(e, e.possession).find((e) => e.numero === 8);
+	let f = V(e, e.possession).find((e) => e.numero === 8);
 	if (!e.combinaisonPreparee && f && e.possession === t && s > 5 && e.rng() < .32) return e.lancement = {
 		type: "pickAndGo",
 		chaine: [f],
 		index: 0,
 		libelle: "départ du 8"
-	}, Wo(e, f, .3);
-	Ic(e, e.ballon, void 0, 5);
+	}, Ss(e, f, .3);
+	$(e, e.ballon, void 0, 5);
 }
-function Us(e, t) {
+function jc(e, t) {
 	return e.length ? e.reduce((e, n) => e + t(n), 0) / e.length : 50;
 }
-function Ws(e, t, n) {
-	let r = Us(t.filter((e) => e.numero <= 3), (e) => (e.puissance * .48 + e.plaquage * .18 + e.discipline * .17 + e.vision * .17) * (.72 + e.endurance / 360)), i = Us(t, (e) => e.puissance * .72 + e.plaquage * .12 + e.endurance * .16);
+function Mc(e, t, n) {
+	let r = jc(t.filter((e) => e.numero <= 3), (e) => (e.puissance * .48 + e.plaquage * .18 + e.discipline * .17 + e.vision * .17) * (.72 + e.endurance / 360)), i = jc(t, (e) => e.puissance * .72 + e.plaquage * .12 + e.endurance * .16);
 	return r * .62 + i * .32 + (e.cohesion?.[n] ?? 50) * .06;
 }
-function Gs(e) {
+function Nc(e) {
 	let t = e.responsabilites, n = t?.attente;
 	if (!t || !n) return;
 	let r = n.type === "penalite" ? "capitaine" : n.type === "tir" ? "buteur" : n.type === "engagement" ? "engagement" : n.type === "touche" ? "lanceur" : null;
-	r && Cn(e, r) || (t.attente = null, t.engagement = null, t.touche = null, t.offreToucheRapide = null, n.type === "tir" && e.tir && (e.tir.humain = !1));
+	r && tr(e, r) || (t.attente = null, t.engagement = null, t.touche = null, t.offreToucheRapide = null, n.type === "tir" && e.tir && (e.tir.humain = !1));
 }
-var Ks = 6;
-function qs(e) {
+var Pc = 6;
+function Fc(e) {
 	return e ? e.sortie === "maul" ? "maul" : e.leurreId ? "leurreMilieu" : e.combinaison === "leurreDevant" ? "leurreAvant" : e.sortie === "peel" ? "sortieRapide" : e.combinaison === "premierBloc" ? "avant" : e.combinaison === "fond" ? "fond" : "milieu" : "milieu";
 }
-function Js(e, t) {
-	let n = e.ballon.y < 35 ? 0 : 70, r = H(e, t).filter((e) => e.role === "alignement").sort((e, t) => Math.abs(e.cible.y - n) - Math.abs(t.cible.y - n)), i = r.length;
+function Ic(e, t) {
+	let n = e.ballon.y < 35 ? 0 : 70, r = V(e, t).filter((e) => e.role === "alignement").sort((e, t) => Math.abs(e.cible.y - n) - Math.abs(t.cible.y - n)), i = r.length;
 	if (i < 3) return null;
-	let a = (e, t) => r.slice(Math.floor(i * e), Math.max(Math.floor(i * e) + 1, Math.ceil(i * t))).sort((e, t) => tr(t).saute * 12 + t.detente - (tr(e).saute * 12 + e.detente))[0] ?? r[0], o = a(0, .4), s = a(.3, .72), c = a(.6, 1);
+	let a = (e, t) => r.slice(Math.floor(i * e), Math.max(Math.floor(i * e) + 1, Math.ceil(i * t))).sort((e, t) => pn(t).saute * 12 + t.detente - (pn(e).saute * 12 + e.detente))[0] ?? r[0], o = a(0, .4), s = a(.3, .72), c = a(.6, 1);
 	return {
 		devant: o,
 		milieu: s,
@@ -48900,8 +49501,8 @@ function Js(e, t) {
 		peeler: i >= 5 ? r.filter((e) => e !== c).sort((e, t) => t.puissance - e.puissance)[2] : void 0
 	};
 }
-function Ys(e, t, n) {
-	let r = Js(e, t);
+function Lc(e, t, n) {
+	let r = Ic(e, t);
 	if (!r) return null;
 	switch (n) {
 		case "avant": return {
@@ -48940,62 +49541,216 @@ function Ys(e, t, n) {
 		} : null;
 	}
 }
-function Xs(e, t) {
-	return hn.filter((n) => Ys(e, t, n));
+function Rc(e, t) {
+	return qn.filter((n) => Lc(e, t, n));
 }
-function Zs(e, t, n) {
+function zc(e, t, n) {
 	let r = e.responsabilites;
 	r.attente = {
 		type: "touche",
 		depuis: e.sim,
 		delai: 22,
-		combinaisons: Xs(e, t),
-		annoncee: qs(e.conquete)
+		combinaisons: Rc(e, t),
+		annoncee: Fc(e.conquete)
 	}, r.touche = {}, r.offreToucheRapide = n ? {
-		jusqua: e.sim + Ks,
+		jusqua: e.sim + Pc,
 		possible: !1
 	} : null;
 }
-function Qs(e) {
+function Bc(e) {
 	let t = e.responsabilites, n = t?.offreToucheRapide;
 	if (!t || !n) return;
 	if (e.phase !== "touche" || e.conquete?.rapide || e.sim > n.jusqua || t.attente?.type !== "touche") {
 		t.offreToucheRapide = null;
 		return;
 	}
-	let r = tc(e, e.possession);
+	let r = Yc(e, e.possession);
 	n.possible = !!r, n.receveurId = r?.receveur.id;
 }
-function $s(e) {
-	if (e.conquete?.rapide) return ic(e);
+function Vc(e) {
+	if (!ln(e) || e.phase !== "touche") return !1;
+	let t = e.responsabilites, n = t?.attente;
+	return !t || !n || n.type !== "touche" || t.touche?.lancer || !e.conquete || e.conquete.rapide || po(e) < un.attenteLancer ? !1 : (n.pret || (n.pret = !0, n.depuis = e.sim), e.sim - n.depuis < n.delai);
+}
+function Hc(e, t) {
+	let n = Math.abs(Uo(e, t)) <= 7 && e.minute >= 65 ? .4 : 0;
+	return A((e.tension ?? 0) / 90 + n, 0, 1);
+}
+function Uc(e, t, n) {
+	if (!n) return;
+	let r = V(e, M(t)).filter((e) => e.sanction <= 0 && !e.corps), i = r.filter((e) => e.role === "alignement");
+	return [...i.length ? i : r.filter((e) => e.avant)].sort((e, t) => Math.abs(e.pos.y - n.y) - Math.abs(t.pos.y - n.y))[0];
+}
+function Wc(e) {
+	let t = e.conquete;
+	!t || t.type !== "touche" || t.rapide || t.issue || po(e) < un.tranchee || Vc(e) || Gc(e);
+}
+function Gc(e) {
+	let t = e.conquete;
+	if (!t || t.type !== "touche" || t.issue) return;
+	let n = e.possession, r = V(e, n), i = r.filter((e) => e.avant), a = e.responsabilites, o = (a ? $n(e, n, "lanceur") : void 0) ?? r.find((e) => e.numero === 2) ?? i[0], s = r.find((e) => e.id === t.cibleId) ?? [...i].sort((e, t) => t.detente - e.detente)[0] ?? r[0];
+	if (!s) return;
+	let c = !!t.horsAlignement, l = e.cadenceDetaillee && !c ? t.combinaison : void 0, u = Hc(e, n), d = a?.touche?.lancer ? Kn(a.touche.choix ?? a.attente?.annoncee ?? "milieu", a.touche.lancer, o, u) : void 0, f = Uc(e, n, c ? t.reception : s.pos), p = c ? [] : i.filter((e) => e !== s && e !== o).sort((e, t) => k(e.pos, s.pos) - k(t.pos, s.pos)).slice(0, 2), m = (e) => .74 + e.endurance / 385, h = (o ? (o.passe * .55 + o.vision * .3 + o.discipline * .15) * m(o) : 45) + (d?.delta ?? 0), g = jc(p, (e) => (e.puissance * .58 + e.detente * .24 + e.vision * .18) * m(e)), _ = e.bonusConqueteArcade?.type === "touche" ? e.bonusConqueteArcade.scores : void 0, v = (_?.[n] ?? 0) * 7, y = (_?.[M(n)] ?? 0) * 7;
+	e.bonusConqueteArcade = null;
+	let b = e.direct?.pack?.type === "touche" ? e.direct.pack : void 0, x = b ? e.pions.find((e) => e.moi) : void 0, ee = b?.temps[0]?.q ?? 1, S = b?.poste === "sauteur" ? 1 : .7, C = b && x ? (ee - 1) * 7.5 * S * (x.cote === n ? 1 : -1) : 0, w = c ? s.passe * .55 + s.vision * .45 : s.detente, T = h * .38 + w * m(s) * (c ? .54 : .34) + g * (c ? 0 : .2) + (e.cohesion?.[n] ?? 50) * .08 + (t.combinaison === "leurreDevant" ? 2.5 : 0) + v + C + (l ? 4 : 0) + (l === "premierBloc" ? 3 : l === "fond" ? -2 : 0), E = f ? (f.detente * .5 + f.vision * .3 + f.puissance * .12 + (e.cohesion?.[f.cote] ?? 50) * .08) * m(f) + y : 45, D = h + (e.cohesion?.[n] ?? 50) * .08, te = e.rng(), ne = A(.048 - (D - 55) / 950, .01, .075) * (d?.pasDroit ?? 1), re = A(.065 - (D - 55) / 800, .018, .105) * (l === "premierBloc" ? .55 : l === "fond" ? 1.6 : 1) * (d?.longueur ?? 1), ie = {
+		type: "gagnee",
+		sauteurId: s.id,
+		contreurId: f?.id,
+		variante: 0,
+		decideeA: e.sim
+	}, ae = e.ballon.y < 35 ? 0 : 70;
+	if (te < ne) ie.type = "pasDroit";
+	else if (te < ne + re) {
+		let t = e.rng() < .5, n = ae === 0 ? -1 : 1;
+		ie.type = t ? "courte" : "longue", ie.point = {
+			x: s.pos.x + (e.rng() - .5) * 1.5,
+			y: A(s.pos.y + (t ? n : -n) * (1.5 + e.rng() * 2), 1, 69)
+		};
+	} else {
+		let t = T - E + (e.rng() - .5) * 22;
+		if (t < -5.5 && f) {
+			ie.type = "perdue";
+			let t = e.rng();
+			ie.variante = t < un.varianteCapte ? 0 : t < un.varianteCapte + un.varianteArrache ? 1 : 2;
+		} else if (t < 2 && f && e.rng() < (l ? .22 : .38)) {
+			ie.type = "devie", ie.variante = e.rng() < .5 ? 0 : 1;
+			let t = j(M(n));
+			ie.point = {
+				x: X(s.pos.x + t * (2.4 + e.rng() * 2.4)),
+				y: A((s.pos.y + f.pos.y) / 2 + (e.rng() - .5) * 2, 1, 69)
+			};
+		}
+	}
+	t.issue = ie;
+}
+function Kc(e) {
+	let t = e.conquete;
+	if (t.horsAlignement && t.reception) {
+		let n = e.pions.find((e) => e.id === t.cibleId);
+		if (n && k(n.pos, t.reception) > .64) {
+			n.cible = { ...t.reception }, e.placement && (e.placement[n.id] = { ...t.reception }), e.minuteur = .15;
+			return;
+		}
+	}
+	t.issue || Gc(e);
+	let n = e.conquete, r = n.issue;
+	if (!r) return Gl(e);
+	let i = e.possession, a = e.responsabilites, o = !1;
+	a?.attente?.type === "touche" && (a.touche?.lancer ? o = !0 : a.stats.chronosDepasses += 1, a.stats.touches += 1, a.attente = null, a.touche = null, a.offreToucheRapide = null);
+	let s = V(e, i), c = (a ? $n(e, i, "lanceur") : void 0) ?? s.find((e) => e.numero === 2) ?? s.find((e) => e.avant), l = e.pions.find((e) => e.id === r.sauteurId) ?? s[0], u = r.contreurId ? e.pions.find((e) => e.id === r.contreurId) : void 0, d = n.combinaison, f = n.sortie, p = n.peelId, m = !!n.horsAlignement;
+	e.conquete = null;
+	let h = (t, n, r, i) => {
+		e.placement = null, e.ballon = { ...t }, as(e, {
+			de: { ...t },
+			vers: { ...n },
+			duree: i,
+			ecoule: i,
+			hauteur: r,
+			type: "pied",
+			intention: "renvoi",
+			auteur: c ?? l,
+			receveur: null
+		}, "touche");
+	};
+	switch (r.type) {
+		case "pasDroit": return q(e, "touche", M(i), `${c?.nom ?? "Le lanceur"} n’est pas droit : mêlée pour ${J(e, M(i))}.`), Z(e, "melee", M(i), e.ballon);
+		case "courte":
+		case "longue": {
+			q(e, "touche", null, r.type === "courte" ? "Lancer trop court : le ballon retombe devant le sauteur." : "Lancer trop long : le ballon dépasse le sauteur annoncé.");
+			let t = r.point ?? {
+				x: l.pos.x,
+				y: l.pos.y
+			};
+			return h(t, {
+				x: t.x + j(i) * 2.5,
+				y: t.y + .4
+			}, .45, .4);
+		}
+		case "devie": {
+			let t = r.point ?? {
+				x: l.pos.x,
+				y: l.pos.y
+			};
+			return q(e, "touche", null, `${u?.nom ?? "Un adversaire"} dévie le lancer du bout des doigts : ballon libre dans le couloir.`), h(u ? {
+				x: (l.pos.x + u.pos.x) / 2,
+				y: (l.pos.y + u.pos.y) / 2
+			} : {
+				x: l.pos.x,
+				y: l.pos.y
+			}, t, .55, .35);
+		}
+		case "perdue": {
+			let t = M(i);
+			if (!u) return q(e, "touche", t, F(e.rng, Pt, {
+				club: J(e, t),
+				nom: ""
+			})), e.possession = t, e.placement = null, $(e, e.ballon);
+			q(e, "touche", t, r.variante === 1 ? `${u.nom} arrache le ballon des mains de ${l.nom} !` : r.variante === 2 ? `${u.nom} monte plus haut et claque le ballon vers son demi de mêlée.` : `${u.nom} monte plus haut et capte le ballon : touche perdue pour ${J(e, i)}.`, 0, u.moi), u.stats.touchesGagnees += 1, e.indicationJeu = {
+				cle: "touchePerdue",
+				cote: t,
+				t: e.sim
+			}, e.possession = t, e.placement = null, e.ballonLent = !1, $(e, {
+				x: u.pos.x,
+				y: u.pos.y
+			}, u, 10);
+			let n = V(e, t).find((e) => e.numero === 9 && e.sanction <= 0 && !e.corps && O(e.pos, u.pos) < 14);
+			r.variante === 2 && n && e.porteur === u && n !== u && (e.lancement && (e.lancement.chaine = Nl([
+				u,
+				n,
+				...e.lancement.chaine.filter((e) => e !== u && e !== n)
+			]).slice(0, 6), e.lancement.index = 0), Es(e, u, n, 9));
+			return;
+		}
+	}
+	let g = e.cadenceDetaillee && !m ? d : void 0;
+	q(e, "touche", i, F(e.rng, Nt, {
+		club: J(e, i),
+		nom: l.nom
+	}), 0, l.moi), l.stats.touchesGagnees += 1, o && a && (a.stats.touchesGagnees += 1), e.placement = null;
+	let _ = N(e.ballon, i) < 25, v = e.cadenceDetaillee ? e.styles?.[i] : void 0, y = v === "avants" ? 1.35 : v === "large" || v === "leurres" ? .7 : 1, b = R(e) && !m ? f === "maul" : null;
+	if (!e.combinaisonPreparee && (b ?? e.rng() < (_ ? .62 : .18) * y)) {
+		e.phase = "maul", e.minuteur = 6 + e.rng() * 3, e.porteur = null, e.ballon = {
+			x: l.pos.x,
+			y: l.pos.y
+		}, e.maul = {
+			receveurId: l.id,
+			debut: e.sim
+		}, q(e, "maul", i, F(e.rng, Lt, { club: J(e, i) }));
+		return;
+	}
+	e.gardeRuck = .5, g === "premierBloc" && (e.ballonLent = !0), $(e, l.pos, l, 10), g && f && f !== "maul" && e.porteur === l && !e.combinaisonEnCours && el(e, l, f, p);
+}
+function qc(e) {
+	if (e.conquete?.rapide) return Qc(e);
 	if (e.minuteur > 0) return;
-	let t = e.possession, n = H(e, t), r = n.filter((e) => e.avant), i = (e.responsabilites ? xn(e, t, "lanceur") : void 0) ?? n.find((e) => e.numero === 2) ?? r[0], a, o = e.responsabilites;
+	if (ln(e) && e.conquete?.type === "touche") return Kc(e);
+	let t = e.possession, n = V(e, t), r = n.filter((e) => e.avant), i = (e.responsabilites ? $n(e, t, "lanceur") : void 0) ?? n.find((e) => e.numero === 2) ?? r[0], a, o = e.responsabilites;
 	if (o?.attente?.type === "touche") {
 		if (o.attente.pret || (o.attente.pret = !0, o.attente.depuis = e.sim), !o.touche?.lancer && e.sim - o.attente.depuis < o.attente.delai) return;
-		o.touche?.lancer ? a = mn(o.touche.choix ?? o.attente.annoncee ?? "milieu", o.touche.lancer) : o.stats.chronosDepasses += 1, o.stats.touches += 1, o.attente = null, o.touche = null, o.offreToucheRapide = null;
+		o.touche?.lancer ? a = Kn(o.touche.choix ?? o.attente.annoncee ?? "milieu", o.touche.lancer) : o.stats.chronosDepasses += 1, o.stats.touches += 1, o.attente = null, o.touche = null, o.offreToucheRapide = null;
 	}
 	let s = e.conquete?.cibleId, c = n.find((e) => e.id === s) ?? [...r].sort((e, t) => t.detente - e.detente)[0] ?? n[0];
-	if (!c) return Qc(e);
+	if (!c) return Gl(e);
 	let l = e.conquete?.horsAlignement, u = e.conquete?.reception;
-	if (l && u && O(c.pos, u) > .64) {
+	if (l && u && k(c.pos, u) > .64) {
 		c.cible = { ...u }, e.placement && (e.placement[c.id] = { ...u }), e.minuteur = .15;
 		return;
 	}
 	let d = e.conquete?.combinaison, f = e.conquete?.sortie, p = e.conquete?.peelId;
 	e.conquete = null;
-	let m = e.cadenceDetaillee && !l ? d : void 0, h = H(e, j(t)), g = [...l ? h : h.filter((e) => e.avant)].sort((e, t) => t.detente * .62 + t.vision * .38 - D(t.pos, c.pos) * 1.8 - (e.detente * .62 + e.vision * .38 - D(e.pos, c.pos) * 1.8))[0] ?? h[0], _ = l ? [] : r.filter((e) => e !== c && e !== i).sort((e, t) => O(e.pos, c.pos) - O(t.pos, c.pos)).slice(0, 2), v = (e) => .74 + e.endurance / 385, y = (i ? (i.passe * .55 + i.vision * .3 + i.discipline * .15) * v(i) : 45) + (a?.delta ?? 0), b = Us(_, (e) => (e.puissance * .58 + e.detente * .24 + e.vision * .18) * v(e)), x = e.bonusConqueteArcade?.type === "touche" ? e.bonusConqueteArcade.scores : void 0, ee = (x?.[t] ?? 0) * 7, S = (x?.[j(t)] ?? 0) * 7;
+	let m = e.cadenceDetaillee && !l ? d : void 0, h = V(e, M(t)), g = [...l ? h : h.filter((e) => e.avant)].sort((e, t) => t.detente * .62 + t.vision * .38 - O(t.pos, c.pos) * 1.8 - (e.detente * .62 + e.vision * .38 - O(e.pos, c.pos) * 1.8))[0] ?? h[0], _ = l ? [] : r.filter((e) => e !== c && e !== i).sort((e, t) => k(e.pos, c.pos) - k(t.pos, c.pos)).slice(0, 2), v = (e) => .74 + e.endurance / 385, y = (i ? (i.passe * .55 + i.vision * .3 + i.discipline * .15) * v(i) : 45) + (a?.delta ?? 0), b = jc(_, (e) => (e.puissance * .58 + e.detente * .24 + e.vision * .18) * v(e)), x = e.bonusConqueteArcade?.type === "touche" ? e.bonusConqueteArcade.scores : void 0, ee = (x?.[t] ?? 0) * 7, S = (x?.[M(t)] ?? 0) * 7;
 	e.bonusConqueteArcade = null;
-	let C = l ? c.passe * .55 + c.vision * .45 : c.detente, w = y * .38 + C * v(c) * (l ? .54 : .34) + b * (l ? 0 : .2) + (e.cohesion?.[t] ?? 50) * .08 + (d === "leurreDevant" ? 2.5 : 0) + ee + (m ? 4 : 0) + (m === "premierBloc" ? 3 : m === "fond" ? -2 : 0), T = g ? (g.detente * .5 + g.vision * .3 + g.puissance * .12 + (e.cohesion?.[g.cote] ?? 50) * .08) * v(g) + S : 45, te = y + (e.cohesion?.[t] ?? 50) * .08, E = e.rng(), ne = k(.048 - (te - 55) / 950, .01, .075) * (a?.pasDroit ?? 1), re = k(.065 - (te - 55) / 800, .018, .105) * (m === "premierBloc" ? .55 : m === "fond" ? 1.6 : 1) * (a?.longueur ?? 1);
-	if (E < ne) return J(e, "touche", j(t), `${i?.nom ?? "Le lanceur"} n’est pas droit : mêlée pour ${Y(e, j(t))}.`), Q(e, "melee", j(t), e.ballon);
-	if (E < ne + re) {
+	let C = l ? c.passe * .55 + c.vision * .45 : c.detente, w = y * .38 + C * v(c) * (l ? .54 : .34) + b * (l ? 0 : .2) + (e.cohesion?.[t] ?? 50) * .08 + (d === "leurreDevant" ? 2.5 : 0) + ee + (m ? 4 : 0) + (m === "premierBloc" ? 3 : m === "fond" ? -2 : 0), T = g ? (g.detente * .5 + g.vision * .3 + g.puissance * .12 + (e.cohesion?.[g.cote] ?? 50) * .08) * v(g) + S : 45, E = y + (e.cohesion?.[t] ?? 50) * .08, D = e.rng(), te = A(.048 - (E - 55) / 950, .01, .075) * (a?.pasDroit ?? 1), ne = A(.065 - (E - 55) / 800, .018, .105) * (m === "premierBloc" ? .55 : m === "fond" ? 1.6 : 1) * (a?.longueur ?? 1);
+	if (D < te) return q(e, "touche", M(t), `${i?.nom ?? "Le lanceur"} n’est pas droit : mêlée pour ${J(e, M(t))}.`), Z(e, "melee", M(t), e.ballon);
+	if (D < te + ne) {
 		let n = e.rng() < .5;
-		return J(e, "touche", null, n ? "Lancer trop court : le ballon ricoche au premier bloc." : "Lancer trop long : le ballon dépasse le sauteur annoncé."), e.placement = null, e.ballon = {
+		return q(e, "touche", null, n ? "Lancer trop court : le ballon ricoche au premier bloc." : "Lancer trop long : le ballon dépasse le sauteur annoncé."), e.placement = null, e.ballon = {
 			x: c.pos.x + (e.rng() - .5) * 1.5,
-			y: k(c.pos.y + (n ? -1 : 1) * (1.5 + e.rng() * 2), 1, 69)
-		}, Do(e, {
+			y: A(c.pos.y + (n ? -1 : 1) * (1.5 + e.rng() * 2), 1, 69)
+		}, as(e, {
 			de: { ...e.ballon },
 			vers: {
-				x: e.ballon.x + A(t) * 2.5,
+				x: e.ballon.x + j(t) * 2.5,
 				y: e.ballon.y + .4
 			},
 			duree: .4,
@@ -49007,18 +49762,18 @@ function $s(e) {
 			receveur: null
 		}, "touche");
 	}
-	let ie = w - T + (e.rng() - .5) * 22;
-	if (ie < -5.5 && g) return J(e, "touche", j(t), F(e.rng, Ct, {
-		club: Y(e, j(t)),
+	let re = w - T + (e.rng() - .5) * 22;
+	if (re < -5.5 && g) return q(e, "touche", M(t), F(e.rng, Pt, {
+		club: J(e, M(t)),
 		nom: g?.nom ?? ""
-	}), 0, g?.moi), e.possession = j(t), e.placement = null, Ic(e, l ? c.pos : e.ballon);
-	if (ie < 2 && g && e.rng() < (m ? .22 : .38)) return J(e, "touche", null, `${g.nom} dévie le lancer : ballon libre dans le couloir.`), e.placement = null, e.ballon = {
+	}), 0, g?.moi), e.possession = M(t), e.placement = null, $(e, l ? c.pos : e.ballon);
+	if (re < 2 && g && e.rng() < (m ? .22 : .38)) return q(e, "touche", null, `${g.nom} dévie le lancer : ballon libre dans le couloir.`), e.placement = null, e.ballon = {
 		x: (c.pos.x + g.pos.x) / 2,
 		y: (c.pos.y + g.pos.y) / 2
-	}, Do(e, {
+	}, as(e, {
 		de: { ...e.ballon },
 		vers: {
-			x: e.ballon.x + A(t) * 3,
+			x: e.ballon.x + j(t) * 3,
 			y: e.ballon.y + (e.rng() - .5) * 2
 		},
 		duree: .35,
@@ -49029,27 +49784,27 @@ function $s(e) {
 		auteur: i ?? c,
 		receveur: null
 	}, "touche");
-	J(e, "touche", t, F(e.rng, St, {
-		club: Y(e, t),
+	q(e, "touche", t, F(e.rng, Nt, {
+		club: J(e, t),
 		nom: c.nom
 	}), 0, c.moi), c.stats.touchesGagnees += 1, a && o && (o.stats.touchesGagnees += 1), e.placement = null;
-	let ae = M(e.ballon, t) < 25, oe = e.cadenceDetaillee ? e.styles?.[t] : void 0, se = oe === "avants" ? 1.35 : oe === "large" || oe === "leurres" ? .7 : 1, ce = z(e) && !l ? f === "maul" : null;
-	if (!e.combinaisonPreparee && (ce ?? e.rng() < (ae ? .62 : .18) * se)) {
+	let ie = N(e.ballon, t) < 25, ae = e.cadenceDetaillee ? e.styles?.[t] : void 0, oe = ae === "avants" ? 1.35 : ae === "large" || ae === "leurres" ? .7 : 1, se = R(e) && !l ? f === "maul" : null;
+	if (!e.combinaisonPreparee && (se ?? e.rng() < (ie ? .62 : .18) * oe)) {
 		e.phase = "maul", e.minuteur = 6 + e.rng() * 3, e.porteur = null, e.ballon = {
 			x: c.pos.x,
 			y: c.pos.y
 		}, e.maul = {
 			receveurId: c.id,
 			debut: e.sim
-		}, J(e, "maul", t, F(e.rng, Et, { club: Y(e, t) }));
+		}, q(e, "maul", t, F(e.rng, Lt, { club: J(e, t) }));
 		return;
 	}
-	e.gardeRuck = .5, m === "premierBloc" && (e.ballonLent = !0), Ic(e, c.pos, c, 10), m && f && f !== "maul" && e.porteur === c && !e.combinaisonEnCours && oc(e, c, f, p);
+	e.gardeRuck = .5, m === "premierBloc" && (e.ballonLent = !0), $(e, c.pos, c, 10), m && f && f !== "maul" && e.porteur === c && !e.combinaisonEnCours && el(e, c, f, p);
 }
-function ec(e, t, n) {
+function Jc(e, t, n) {
 	let r = n.length;
 	if (r < 3) return {};
-	let i = Jt(e, t), a = ca(e, t), o = i.zone, s = o === "ligne" || o === "zoneDeMarque", c = o === "ses22", l = A(t), u = (e, t) => n.slice(Math.floor(r * e), Math.max(Math.floor(r * e) + 1, Math.ceil(r * t))).sort((e, t) => tr(t).saute * 12 + t.detente - (tr(e).saute * 12 + e.detente))[0] ?? n[0], d = u(0, .4), f = u(.3, .72), p = u(.6, 1), m = (e) => n.filter((t) => t !== e).sort((e, t) => t.puissance - e.puissance)[2], h = [
+	let i = sn(e, t), a = za(e, t), o = i.zone, s = o === "ligne" || o === "zoneDeMarque", c = o === "ses22", l = j(t), u = (e, t) => n.slice(Math.floor(r * e), Math.max(Math.floor(r * e) + 1, Math.ceil(r * t))).sort((e, t) => pn(t).saute * 12 + t.detente - (pn(e).saute * 12 + e.detente))[0] ?? n[0], d = u(0, .4), f = u(.3, .72), p = u(.6, 1), m = (e) => n.filter((t) => t !== e).sort((e, t) => t.puissance - e.puissance)[2], h = [
 		{
 			poids: (s ? 3 : o === "campAdverse" ? .9 : .25) * a.avants * (i.posture === "gestion" ? 1.5 : 1),
 			annonce: {
@@ -49131,7 +49886,7 @@ function ec(e, t, n) {
 				peelId: m(p)?.id
 			}
 		}
-	], g = H(e, t).find((e) => e.numero === 2), _ = H(e, t).find((e) => e.numero === 12 && B(e));
+	], g = V(e, t).find((e) => e.numero === 2), _ = V(e, t).find((e) => e.numero === 12 && z(e));
 	if (_ && g && !c && g.passe >= 58) {
 		let t = e.ballon.y < 35 ? 1 : -1;
 		h.push({
@@ -49142,8 +49897,8 @@ function ec(e, t, n) {
 				horsAlignement: !0,
 				leurreId: f.id,
 				reception: {
-					x: Z(e.ballon.x - l * 1.2),
-					y: k(e.ballon.y + t * 17, 6, 64)
+					x: X(e.ballon.x - l * 1.2),
+					y: A(e.ballon.y + t * 17, 6, 64)
 				}
 			},
 			texte: "lancer long par-dessus l’alignement"
@@ -49152,23 +49907,23 @@ function ec(e, t, n) {
 	let v = 0;
 	for (let e of h) v += e.poids;
 	let y = e.rng() * v;
-	for (let n of h) if (y -= n.poids, y <= 0) return n.texte && J(e, "touche", t, `${Y(e, t)} annonce une combinaison : ${n.texte}.`), n.annonce;
+	for (let n of h) if (y -= n.poids, y <= 0) return n.texte && q(e, "touche", t, `${J(e, t)} annonce une combinaison : ${n.texte}.`), n.annonce;
 	return {};
 }
-function tc(e, t) {
-	let n = A(t), r = e.ballon.y < 35 ? 0 : 70, i = r === 0 ? 1 : -1, a = {
-		x: k(e.ballon.x, 16, 106),
+function Yc(e, t) {
+	let n = j(t), r = e.ballon.y < 35 ? 0 : 70, i = r === 0 ? 1 : -1, a = {
+		x: A(e.ballon.x, 16, 106),
 		y: r - i * .45
-	}, o = H(e, t).filter((e) => e.sanction <= 0 && !e.corps), s = [...o].sort((e, t) => O(e.pos, a) - O(t.pos, a))[0];
+	}, o = V(e, t).filter((e) => e.sanction <= 0 && !e.corps), s = [...o].sort((e, t) => k(e.pos, a) - k(t.pos, a))[0];
 	if (!s) return null;
-	let c = D(s.pos, a);
+	let c = O(s.pos, a);
 	if (c > 15) return null;
 	let l = 99;
-	for (let n of H(e, j(t))) n.sanction > 0 || n.corps || (l = Math.min(l, D(n.pos, a)));
+	for (let n of V(e, M(t))) n.sanction > 0 || n.corps || (l = Math.min(l, O(n.pos, a)));
 	if (l < 9 || l < c + 3) return null;
-	let u = o.filter((e) => e !== s && Math.abs(e.pos.y - r) >= 6.5 && (e.pos.x - a.x) * n <= -.3 && O(e.pos, a) < 576).sort((e, t) => O(e.pos, a) - O(t.pos, a))[0];
+	let u = o.filter((e) => e !== s && Math.abs(e.pos.y - r) >= 6.5 && (e.pos.x - a.x) * n <= -.3 && k(e.pos, a) < 576).sort((e, t) => k(e.pos, a) - k(t.pos, a))[0];
 	if (!u) return null;
-	let d = Jt(e, t, a), f = H(e, j(t)).filter((e) => e.sanction <= 0 && !e.corps && O(e.pos, a) < 400).length, p = Gt(e, j(t), u.pos);
+	let d = sn(e, t, a), f = V(e, M(t)).filter((e) => e.sanction <= 0 && !e.corps && k(e.pos, a) < 400).length, p = rn(e, M(t), u.pos);
 	return p < 5 ? null : {
 		point: a,
 		lanceur: s,
@@ -49178,7 +49933,7 @@ function tc(e, t) {
 		champ: p
 	};
 }
-function nc(e, t, n) {
+function Xc(e, t, n) {
 	let { point: r, lanceur: i, receveur: a } = n;
 	e.ballon = { ...r }, e.placement = { [i.id]: { ...r } }, e.conquete = {
 		type: "touche",
@@ -49187,24 +49942,24 @@ function nc(e, t, n) {
 			lanceurId: i.id,
 			receveurId: a.id
 		}
-	}, e.minuteur = 7, e.dureeArret = 7, e.compteurs.touches += 1, J(e, "touche", t, `${i.nom} veut jouer la touche rapidement : ${Y(e, j(t))} n’est pas replacé.`, 0, i.moi);
+	}, e.minuteur = 7, e.dureeArret = 7, e.compteurs.touches += 1, q(e, "touche", t, `${i.nom} veut jouer la touche rapidement : ${J(e, M(t))} n’est pas replacé.`, 0, i.moi);
 }
-function rc(e, t) {
-	let n = tc(e, t);
+function Zc(e, t) {
+	let n = Yc(e, t);
 	if (!n) return !1;
-	let { S: r, revenus: i, champ: a } = n, o = ca(e, t), s = (r.zone === "ses22" ? .3 : .6) * o.mains * (r.posture === "gestion" ? .3 : r.posture === "urgence" ? 1.5 : 1) * (i <= 2 ? 1.4 : i >= 5 ? .4 : 1) * (a >= 10 ? 1.3 : 1) * (r.zone === "zoneDeMarque" || r.zone === "ligne" ? o.avants > o.mains ? .2 : .5 : 1);
-	return e.rng() >= s ? !1 : (nc(e, t, n), !0);
+	let { S: r, revenus: i, champ: a } = n, o = za(e, t), s = (r.zone === "ses22" ? .3 : .6) * o.mains * (r.posture === "gestion" ? .3 : r.posture === "urgence" ? 1.5 : 1) * (i <= 2 ? 1.4 : i >= 5 ? .4 : 1) * (a >= 10 ? 1.3 : 1) * (r.zone === "zoneDeMarque" || r.zone === "ligne" ? o.avants > o.mains ? .2 : .5 : 1);
+	return e.rng() >= s ? !1 : (Xc(e, t, n), !0);
 }
-function ic(e) {
-	let t = e.conquete.rapide, n = e.possession, r = e.pions.find((e) => e.id === t.lanceurId), i = e.pions.find((e) => e.id === t.receveurId), a = e.ballon, o = H(e, j(n)).some((e) => e.sanction <= 0 && !e.corps && O(e.pos, a) < 9);
-	if (!r || !i || !B(r) || !B(i) || o || e.minuteur <= 0) return e.conquete = null, o && J(e, "touche", n, `${Y(e, j(n))} est revenu à temps : la touche se jouera en alignement.`), --e.compteurs.touches, Q(e, "touche", n, {
+function Qc(e) {
+	let t = e.conquete.rapide, n = e.possession, r = e.pions.find((e) => e.id === t.lanceurId), i = e.pions.find((e) => e.id === t.receveurId), a = e.ballon, o = V(e, M(n)).some((e) => e.sanction <= 0 && !e.corps && k(e.pos, a) < 9);
+	if (!r || !i || !z(r) || !z(i) || o || e.minuteur <= 0) return e.conquete = null, o && q(e, "touche", n, `${J(e, M(n))} est revenu à temps : la touche se jouera en alignement.`), --e.compteurs.touches, Z(e, "touche", n, {
 		x: a.x,
 		y: a.y
 	});
-	let s = A(n), c = e.sim - (t.depuis ?? e.sim);
+	let s = j(n), c = e.sim - (t.depuis ?? e.sim);
 	if ((e.placement ??= {})[r.id] = { ...a }, r.cible = { ...a }, !t.etape || t.etape === "aller") {
-		if (r.effort = 1.05, D(r.pos, a) > .8) return;
-		t.etape = "ramasse", t.depuis = e.sim, N(r), L(e, r, "pickup", 1.1);
+		if (r.effort = 1.05, O(r.pos, a) > .8) return;
+		t.etape = "ramasse", t.depuis = e.sim, P(r), L(e, r, "pickup", 1.1);
 		return;
 	}
 	if (t.etape === "ramasse") {
@@ -49213,7 +49968,7 @@ function ic(e) {
 		return;
 	}
 	if (c < .55) return;
-	e.conquete = null, e.placement = null, e.ballonLent = !1, Ic(e, {
+	e.conquete = null, e.placement = null, e.ballonLent = !1, $(e, {
 		x: r.pos.x,
 		y: r.pos.y
 	}, r, 9), e.lancement = {
@@ -49221,7 +49976,7 @@ function ic(e) {
 		chaine: [
 			r,
 			i,
-			...H(e, n).filter((e) => e !== r && e !== i && B(e) && (e.pos.x - i.pos.x) * s <= .5 && O(e.pos, i.pos) < 484).sort((e, t) => O(e.pos, i.pos) - O(t.pos, i.pos)).slice(0, 2)
+			...V(e, n).filter((e) => e !== r && e !== i && z(e) && (e.pos.x - i.pos.x) * s <= .5 && k(e.pos, i.pos) < 484).sort((e, t) => k(e.pos, i.pos) - k(t.pos, i.pos)).slice(0, 2)
 		],
 		index: 0,
 		tempo: "vite",
@@ -49232,13 +49987,13 @@ function ic(e) {
 		y: r.pos.y
 	};
 	let l = a.y < 35 ? 0 : 70;
-	if ((i.pos.x - r.pos.x) * s > .1 || Math.abs(i.pos.y - l) < 5.2) return e.lancement = null, e.porteur = null, --e.compteurs.touches, J(e, "touche", n, `${i.nom} n’est plus derrière la ligne de remise : la touche se jouera en alignement.`), Q(e, "touche", n, {
+	if ((i.pos.x - r.pos.x) * s > .1 || Math.abs(i.pos.y - l) < 5.2) return e.lancement = null, e.porteur = null, --e.compteurs.touches, q(e, "touche", n, `${i.nom} n’est plus derrière la ligne de remise : la touche se jouera en alignement.`), Z(e, "touche", n, {
 		x: a.x,
 		y: l
 	});
-	e.porteur === r && (i.pos.x - r.pos.x) * s <= .3 && O(i.pos, r.pos) < 576 && Jo(e, r, i, 9) && L(e, r, "pass", .9, "remise");
+	e.porteur === r && (i.pos.x - r.pos.x) * s <= .3 && k(i.pos, r.pos) < 576 && Es(e, r, i, 9) && L(e, r, "pass", .9, "remise");
 }
-function ac(e, t, n, r, i) {
+function $c(e, t, n, r, i) {
 	let a = e.styles?.[t] ?? "equilibre", o = e.rng(), s = (n === "fond" ? .4 : n === "premierBloc" ? .12 : .3) * (a === "large" || a === "leurres" ? 1.3 : a === "avants" ? .6 : 1);
 	if (o < s) return { sortie: "deviation" };
 	if (o >= s + (a === "avants" ? .24 : a === "large" ? .08 : .14)) return {};
@@ -49250,35 +50005,35 @@ function ac(e, t, n, r, i) {
 		peelId: u.id
 	} : {};
 }
-function oc(e, t, n, r) {
-	let i = t.cote, a = A(i), o = e.lancement;
+function el(e, t, n, r) {
+	let i = t.cote, a = j(i), o = e.lancement;
 	if (!o) return;
-	let s = H(e, i), c = (e) => !!e && e !== t && e.sanction <= 0 && !e.corps && (e.pos.x - t.pos.x) * a <= .4 && D(e.pos, t.pos) < 14;
+	let s = V(e, i), c = (e) => !!e && e !== t && e.sanction <= 0 && !e.corps && (e.pos.x - t.pos.x) * a <= .4 && O(e.pos, t.pos) < 14;
 	if (n === "mauleSimule") {
 		let n = s.find((e) => e.numero === 9);
 		if (!c(n)) return;
 		let r = 1.1 + e.rng() * .5;
-		for (let n of H(e, j(i))) !n.avant || n.sanction > 0 || n.corps || O(n.pos, t.pos) > 49 || (n.battu = Math.max(n.battu, r), n.cible = { ...t.pos }, (e.retards ??= {})[n.id] = e.sim + r, O(n.pos, t.pos) < 9 && L(e, n, "contact_brace", r));
-		s.filter((e) => e.avant && e !== t && e.numero !== 2 && !e.corps && O(e.pos, t.pos) < 3.2 * 3.2).sort((e, n) => O(e.pos, t.pos) - O(n.pos, t.pos)).slice(0, 3).forEach((n) => {
+		for (let n of V(e, M(i))) !n.avant || n.sanction > 0 || n.corps || k(n.pos, t.pos) > 49 || (n.battu = Math.max(n.battu, r), n.cible = { ...t.pos }, (e.retards ??= {})[n.id] = e.sim + r, k(n.pos, t.pos) < 9 && L(e, n, "contact_brace", r));
+		s.filter((e) => e.avant && e !== t && e.numero !== 2 && !e.corps && k(e.pos, t.pos) < 3.2 * 3.2).sort((e, n) => k(e.pos, t.pos) - k(n.pos, t.pos)).slice(0, 3).forEach((n) => {
 			n.cible = {
 				x: t.pos.x - a * .6,
 				y: n.pos.y + (t.pos.y - n.pos.y) * .6
 			}, L(e, n, "maul_bind", r);
-		}), o.chaine = Bc([
+		}), o.chaine = Nl([
 			t,
 			n,
 			...o.chaine.filter((e) => e !== t && e !== n)
-		]).slice(0, 6), o.index = 0, o.jeu = "mauleSimule", e.ballonLent = !1, J(e, "touche", i, `Maul simulé : le pack de ${Y(e, j(i))} s’engage, le ballon ressort aussitôt pour ${n.nom}.`, 0, n.moi), Jo(e, t, n, 9);
+		]).slice(0, 6), o.index = 0, o.jeu = "mauleSimule", e.ballonLent = !1, q(e, "touche", i, `Maul simulé : le pack de ${J(e, M(i))} s’engage, le ballon ressort aussitôt pour ${n.nom}.`, 0, n.moi), Es(e, t, n, 9);
 		return;
 	}
 	if (n === "deviation") {
 		let n = s.find((e) => e.numero === 9);
 		if (!c(n)) return;
-		o.chaine = Bc([
+		o.chaine = Nl([
 			t,
 			n,
 			...o.chaine.filter((e) => e !== t && e !== n)
-		]).slice(0, 6), o.index = 0, e.ballonLent = !1, J(e, "touche", i, `${t.nom} dévie du bout des doigts pour ${n.nom} : ballon rapide.`, 0, t.moi || n.moi), Jo(e, t, n, 9);
+		]).slice(0, 6), o.index = 0, e.ballonLent = !1, q(e, "touche", i, `${t.nom} dévie du bout des doigts pour ${n.nom} : ballon rapide.`, 0, t.moi || n.moi), Es(e, t, n, 9);
 		return;
 	}
 	let l = s.find((e) => e.id === r);
@@ -49287,58 +50042,58 @@ function oc(e, t, n, r) {
 		chaine: [t, l],
 		index: 0,
 		libelle: "peel en fond d’alignement"
-	}, J(e, "touche", i, `${l.nom} contourne l’alignement : ${t.nom} lui redonne en fond de touche.`, 0, l.moi), Jo(e, t, l, 9));
+	}, q(e, "touche", i, `${l.nom} contourne l’alignement : ${t.nom} lui redonne en fond de touche.`, 0, l.moi), Es(e, t, l, 9));
 }
-function $(e, t, n, r, i, a) {
-	J(e, "penalite", t, F(e.rng, ct, {
-		club: Y(e, t),
+function Q(e, t, n, r, i, a) {
+	q(e, "penalite", t, F(e.rng, yt, {
+		club: J(e, t),
 		motif: r
-	})), zo(e, "ml.sifflet.penalite", t, i), ni(e, j(t), ei.penalite);
+	})), _s(e, "ml.sifflet.penalite", t, i), Ai(e, M(t), Oi.penalite);
 	let o = i ?? (() => {
-		let r = H(e, j(t)).filter((e) => e.sanction <= 0);
-		if (r.length) return r.reduce((e, t) => O(t.pos, n) < O(e.pos, n) ? t : e);
+		let r = V(e, M(t)).filter((e) => e.sanction <= 0);
+		if (r.length) return r.reduce((e, t) => k(t.pos, n) < k(e.pos, n) ? t : e);
 	})();
 	o?.moi && e.direct?.actif && (e.direct.stats.fautes += 1);
-	let s = M(n, t) < 22, c = e.niveau === "amateur" ? 1.7 : 1, l = r.toLowerCase(), u = l.includes("coup de poing") || l.includes("brutalité"), d = l.includes("cathédrale"), f = l.includes("plaquage haut"), p = l.includes("volontaire") || l.includes("antijeu"), m = a || u ? 1 : d ? .8 : f ? .25 : p && s ? .35 * c : 0, h = null, g = !1, _;
-	if (z(e) && o) {
-		let i = xa(e, o.cote, n, r), s = Sa(e, r, i);
+	let s = N(n, t) < 22, c = e.niveau === "amateur" ? 1.7 : 1, l = r.toLowerCase(), u = l.includes("coup de poing") || l.includes("brutalité"), d = l.includes("cathédrale"), f = l.includes("plaquage haut"), p = l.includes("volontaire") || l.includes("antijeu"), m = a || u ? 1 : d ? .8 : f ? .25 : p && s ? .35 * c : 0, h = null, g = !1, _;
+	if (R(e) && o) {
+		let i = Qa(e, o.cote, n, r), s = $a(e, r, i);
 		if (a || (m = s.jaune, h = s.rouge), i.cartonRepete && a !== "rouge") g = !0, m = 1, h !== null && (h = 0);
 		else if (i.avertissement) {
-			J(e, "penalite", t, `L’arbitre appelle le capitaine de ${Y(e, o.cote)} : à la prochaine faute, ce sera un carton.`);
-			let n = H(e, o.cote).filter((e) => e.sanction <= 0 && !e.corps);
+			q(e, "penalite", t, `L’arbitre appelle le capitaine de ${J(e, o.cote)} : à la prochaine faute, ce sera un carton.`);
+			let n = V(e, o.cote).filter((e) => e.sanction <= 0 && !e.corps);
 			_ = n.find((e) => e.capitaine) ?? n.find((e) => e.numero === 8) ?? n.find((e) => e.numero === 2) ?? n[0];
 		}
 	}
 	if (o && !(e.gestes ?? []).some((t) => t.joueurId === o.id && e.sim - t.debut < 1.6 && t.clip.startsWith("foul_"))) {
-		let t = cc.find(([e]) => l.includes(e))?.[1];
+		let t = nl.find(([e]) => l.includes(e))?.[1];
 		t && L(e, o, t, 2.6);
 	}
 	if (e.cadenceDetaillee && o && (u || l.includes("bousculade") || l.includes("coup de pied au sol"))) {
-		let t = (t) => H(e, t).filter((e) => e !== o && e.sanction <= 0 && !e.corps && O(e.pos, n) < 196).sort((e, t) => O(e.pos, n) - O(t.pos, n)).slice(0, 2).map((e) => e.id);
+		let t = (t) => V(e, t).filter((e) => e !== o && e.sanction <= 0 && !e.corps && k(e.pos, n) < 196).sort((e, t) => k(e.pos, n) - k(t.pos, n)).slice(0, 2).map((e) => e.id);
 		e.attroupement = {
 			lieu: {
 				x: n.x,
 				y: n.y
 			},
 			jusqua: e.sim + 5,
-			ids: [...t(o.cote), ...t(j(o.cote))],
+			ids: [...t(o.cote), ...t(M(o.cote))],
 			arrives: []
 		};
 	}
 	if (o && (a || e.rng() < m)) {
 		let t = o, n = t.stats.cartonsJaunes > 0, i = a === "rouge" || n && a !== "jaune" || (h === null ? u && e.rng() < .4 || d && e.rng() < .35 || !a && f && e.rng() < .05 : e.rng() < h);
-		t.surLeTerrain = !1, t.sanction = i ? 99999 : 600, i ? t.stats.cartonsRouges += 1 : t.stats.cartonsJaunes += 1, t.motifCarton = g ? "fautes répétées" : r, t.moi && (i ? e.discipline.rouges += 1 : e.discipline.jaunes += 1, e.discipline.motif = r), i && Tr(e, 14), J(e, "carton", t.cote, i ? I("cartonRouge", {
+		t.surLeTerrain = !1, t.sanction = i ? 99999 : 600, i ? t.stats.cartonsRouges += 1 : t.stats.cartonsJaunes += 1, t.motifCarton = g ? "fautes répétées" : r, t.moi && (i ? e.discipline.rouges += 1 : e.discipline.jaunes += 1, e.discipline.motif = r), i && $r(e, 14), q(e, "carton", t.cote, i ? I("cartonRouge", {
 			nom: t.nom,
 			motif: r,
-			club: Y(e, t.cote)
-		}) : F(e.rng, Ot, {
+			club: J(e, t.cote)
+		}) : F(e.rng, zt, {
 			nom: t.nom,
 			motif: r,
-			club: Y(e, t.cote)
+			club: J(e, t.cote)
 		}), 0, t.moi), e.sifflet && (e.sifflet.cle = i ? "ml.sifflet.cartonRouge" : "ml.sifflet.cartonJaune");
 	}
-	let v = e.responsabilites ? ln(e, t, n) : void 0;
-	Q(e, "penalite", t, n), e.penalite = {
+	let v = e.responsabilites ? Vn(e, t, n) : void 0;
+	Z(e, "penalite", t, n), e.penalite = {
 		pour: t,
 		lieu: {
 			x: n.x,
@@ -49348,18 +50103,18 @@ function $(e, t, n, r, i, a) {
 		...v ? { defense: v } : {}
 	}, _ && e.sifflet && e.phase === "penalite" && (e.sifflet.avertissement = _.id, e.sifflet.restant = Math.max(e.sifflet.restant, 6), e.cadenceDetaillee && (e.minuteur += 3.6, e.dureeArret = (e.dureeArret ?? 0) + 3.6));
 }
-function sc(e) {
+function tl(e) {
 	let t = e.sifflet?.avertissement;
 	if (!t || e.phase !== "penalite" || !e.arbitre) return;
 	let n = e.pions.find((e) => e.id === t);
 	if (!n || !n.surLeTerrain || n.sanction > 0 || n.corps) return;
-	let r = e.arbitre.pos, i = Math.max(.01, D(n.pos, r));
+	let r = e.arbitre.pos, i = Math.max(.01, O(n.pos, r));
 	n.cible = {
-		x: Z(r.x + (n.pos.x - r.x) / i * 1.5),
-		y: k(r.y + (n.pos.y - r.y) / i * 1.5, 1, 69)
+		x: X(r.x + (n.pos.x - r.x) / i * 1.5),
+		y: A(r.y + (n.pos.y - r.y) / i * 1.5, 1, 69)
 	}, n.effort = i > 9 ? .55 : .36;
 }
-var cc = [
+var nl = [
 	["ballon gardé", "foul_holding_ball"],
 	["ne se relève pas", "foul_not_rolling"],
 	["plonge au ruck", "foul_off_feet"],
@@ -49373,7 +50128,7 @@ var cc = [
 	["jeu déloyal", "foul_obstruction"],
 	["obstruction", "foul_obstruction"]
 ];
-function lc(e) {
+function rl(e) {
 	let t = e.attroupement;
 	if (t) {
 		if (e.sim > t.jusqua || e.phase === "jeuCourant") {
@@ -49385,19 +50140,19 @@ function lc(e) {
 			if (!i || !i.surLeTerrain || i.sanction > 0 || i.corps) return;
 			let a = r / t.ids.length * Math.PI * 2 + .6;
 			i.cible = {
-				x: k(t.lieu.x + Math.cos(a) * 1.5, 1, 121),
-				y: k(t.lieu.y + Math.sin(a) * 1.5, 1, 69)
-			}, i.effort = Math.max(i.effort, .85), !t.arrives.includes(n) && D(i.pos, i.cible) < .9 && (t.arrives.push(n), L(e, i, t.arrives.length === 2 ? "foul_punch" : "scuffle_separate", t.arrives.length === 2 ? 1.3 : 2.6, t.arrives.length === 2 ? "bousculade" : void 0));
+				x: A(t.lieu.x + Math.cos(a) * 1.5, 1, 121),
+				y: A(t.lieu.y + Math.sin(a) * 1.5, 1, 69)
+			}, i.effort = Math.max(i.effort, .85), !t.arrives.includes(n) && O(i.pos, i.cible) < .9 && (t.arrives.push(n), L(e, i, t.arrives.length === 2 ? "foul_punch" : "scuffle_separate", t.arrives.length === 2 ? 1.3 : 2.6, t.arrives.length === 2 ? "bousculade" : void 0));
 		});
 	}
 }
-function uc(e, t, n) {
-	if (!z(e) || !(e.ventForce ?? 0)) return 0;
-	let r = ia(e), i = A(t), a = r.x * i;
+function il(e, t, n) {
+	if (!R(e) || !(e.ventForce ?? 0)) return 0;
+	let r = Fa(e), i = j(t), a = r.x * i;
 	return Math.abs(r.y) * .014 + Math.max(0, -a) * .01 * Math.min(1.6, n / 35) - Math.max(0, a) * .004;
 }
-function dc(e, t) {
-	let n = ra(e, e.t), r = A(t.cote), i = 7;
+function al(e, t) {
+	let n = Pa(e, e.t), r = j(t.cote), i = 7;
 	for (let e = 0; e < t.id.length; e++) i = (i * 31 + t.id.charCodeAt(e)) % 9973;
 	return {
 		puissance: t.puissance,
@@ -49407,27 +50162,27 @@ function dc(e, t) {
 		ventDos: n.x * r,
 		ventTravers: n.y,
 		pression: e.minute >= 65 && Math.abs(e.scoreA - e.scoreB) <= 7 ? 1 : e.minute >= 38 && e.minute <= 40 ? .4 : 0,
-		suite: Xt(e)
+		suite: kn(e)
 	};
 }
-function fc(e, t, n) {
-	return k(.97 - Math.max(0, e - 20) / 62 - t / 35 * .22 + (n - 60) / 420, .25, .97);
+function ol(e, t, n) {
+	return A(.97 - Math.max(0, e - 20) / 62 - t / 35 * .22 + (n - 60) / 420, .25, .97);
 }
-function pc(e, t, n, r) {
-	let i = e.minute >= 65 && Math.abs(e.scoreA - e.scoreB) <= 7 ? .06 : 0, a = (e.meteoTir === "pluie" ? .08 : e.meteoTir === "vent" ? .13 : 0) + uc(e, t.cote, n);
-	return k(fc(n, r, t.pied) - (100 - t.endurance) * .0018 - a - i + (t.pied - 60) / 350, .04, .97);
+function sl(e, t, n, r) {
+	let i = e.minute >= 65 && Math.abs(e.scoreA - e.scoreB) <= 7 ? .06 : 0, a = (e.meteoTir === "pluie" ? .08 : e.meteoTir === "vent" ? .13 : 0) + il(e, t.cote, n);
+	return A(ol(n, r, t.pied) - (100 - t.endurance) * .0018 - a - i + (t.pied - 60) / 350, .04, .97);
 }
-function mc(e, t, n) {
-	let r = Math.max(0, M(n, t)), i = Math.abs(n.y - 35), a = xn(e, t, "buteur");
+function cl(e, t, n) {
+	let r = Math.max(0, N(n, t)), i = Math.abs(n.y - 35), a = $n(e, t, "buteur");
 	return {
 		distance: r,
 		angle: i,
-		chance: a ? pc(e, a, r, i) : 0
+		chance: a ? sl(e, a, r, i) : 0
 	};
 }
-function hc(e) {
-	let t = e.responsabilites, n = e.penalite, r = n.pour, i = mc(e, r, n.lieu), a = un(e, Tn(e, r, n.lieu, i));
-	if (Cn(e, "capitaine", r)) {
+function ll(e) {
+	let t = e.responsabilites, n = e.penalite, r = n.pour, i = cl(e, r, n.lieu), a = Hn(e, rr(e, r, n.lieu, i));
+	if (tr(e, "capitaine", r)) {
 		if (t.attente?.type !== "penalite" && (t.attente = {
 			type: "penalite",
 			depuis: e.sim,
@@ -49439,9 +50194,9 @@ function hc(e) {
 		}), e.sim - t.attente.depuis < t.attente.delai) return !1;
 		t.stats.chronosDepasses += 1;
 	}
-	return gc(e, r, a, !1), !0;
+	return ul(e, r, a, !1), !0;
 }
-function gc(e, t, n, r) {
+function ul(e, t, n, r) {
 	let i = e.responsabilites;
 	e.choixPenalite = n.choix, e.attenteDecision = 0, i.attente = null, i.derniere = {
 		cote: t,
@@ -49449,33 +50204,33 @@ function gc(e, t, n, r) {
 		humain: r,
 		t: e.sim
 	};
-	let a = xn(e, t, "capitaine");
-	a && J(e, "jeu", t, o(`rv.fil.capitaine.${n.choix}`, {
+	let a = $n(e, t, "capitaine");
+	a && q(e, "jeu", t, o(`rv.fil.capitaine.${n.choix}`, {
 		nom: a.nom,
 		raison: o(`rv.raison.${n.raison}`)
 	}), 0, a.moi);
 }
-function _c(e, t, n) {
+function dl(e, t, n) {
 	let r = e.direct?.actif ? e.pions.find((e) => e.moi && e.cote === t) : void 0;
-	if (r && r.surLeTerrain && r.sanction <= 0 && !r.corps && D(r.pos, n) < 3.5) return r;
-	let i = H(e, t).filter((e) => e.sanction <= 0 && !e.corps);
-	return i.find((e) => e.numero === 9 && D(e.pos, n) < 14) ?? i.filter((e) => D(e.pos, n) < 10).sort((e, t) => O(e.pos, n) - O(t.pos, n))[0];
+	if (r && r.surLeTerrain && r.sanction <= 0 && !r.corps && O(r.pos, n) < 3.5) return r;
+	let i = V(e, t).filter((e) => e.sanction <= 0 && !e.corps);
+	return i.find((e) => e.numero === 9 && O(e.pos, n) < 14) ?? i.filter((e) => O(e.pos, n) < 10).sort((e, t) => k(e.pos, n) - k(t.pos, n))[0];
 }
-function vc(e) {
-	if (e.minuteur > 0 || e.responsabilites && e.penalite && !e.choixPenalite && !hc(e)) return;
+function fl(e) {
+	if (e.minuteur > 0 || e.responsabilites && e.penalite && !e.choixPenalite && !ll(e)) return;
 	let t = e.penalite;
 	e.penalite = null;
 	let n = e.choixPenalite;
-	if (delete e.choixPenalite, !t) return Ic(e, e.ballon);
-	let r = t.pour, i = H(e, r);
-	if (!i.length) return Qc(e);
-	let a = i.find((e) => e.buteur) ?? [...i].sort((e, t) => t.pied - e.pied)[0], o = Math.max(0, M(t.lieu, r)), s = Math.abs(t.lieu.y - 35), c = 80 - e.minute, l = uo(e, r), u = o < 50 && s < 26, d = l < -7 && c < 10, f = e.tactiques[r]?.penalites ?? "mixte", p = f === "points" ? .95 : f === "touche" ? l < 0 && c < 5 ? .35 : .08 : o < 40 && s < 18 ? .82 : .4, m = n ? n === "points" : u && !d && e.rng() < p, h = null;
-	if (z(e) && !n && f === "mixte") {
-		let n = Jt(e, r, t.lieu), i = pc(e, a, o, s);
-		n.posture === "troisPoints" ? (m = u && i > .3, h = !m) : n.posture === "urgence" ? (m = !1, h = o > 7) : n.posture === "gestion" ? m = u && i > .45 : u && i > .8 && o > 15 ? m = e.rng() < .85 : o < 18 && ca(e, r).avants >= 1 && (m &&= e.rng() < .45, h = m ? null : o > 7);
+	if (delete e.choixPenalite, !t) return $(e, e.ballon);
+	let r = t.pour, i = V(e, r);
+	if (!i.length) return Gl(e);
+	let a = i.find((e) => e.buteur) ?? [...i].sort((e, t) => t.pied - e.pied)[0], o = Math.max(0, N(t.lieu, r)), s = Math.abs(t.lieu.y - 35), c = 80 - e.minute, l = Uo(e, r), u = o < 50 && s < 26, d = l < -7 && c < 10, f = e.tactiques[r]?.penalites ?? "mixte", p = f === "points" ? .95 : f === "touche" ? l < 0 && c < 5 ? .35 : .08 : o < 40 && s < 18 ? .82 : .4, m = n ? n === "points" : u && !d && e.rng() < p, h = null;
+	if (R(e) && !n && f === "mixte") {
+		let n = sn(e, r, t.lieu), i = sl(e, a, o, s);
+		n.posture === "troisPoints" ? (m = u && i > .3, h = !m) : n.posture === "urgence" ? (m = !1, h = o > 7) : n.posture === "gestion" ? m = u && i > .45 : u && i > .8 && o > 15 ? m = e.rng() < .85 : o < 18 && za(e, r).avants >= 1 && (m &&= e.rng() < .45, h = m ? null : o > 7);
 	}
 	if (m) {
-		let n = xi(a);
+		let n = Qi(a);
 		if (e.tir = {
 			buteur: a,
 			distance: o,
@@ -49484,8 +50239,8 @@ function vc(e) {
 			suite: "coupEnvoi",
 			lieu: { ...t.lieu },
 			routine: n,
-			...Cc(e, a) ? { humain: !0 } : {}
-		}, e.phase = "tirAuBut", e.minuteur = ka(e, "tirAuBut"), e.ballon = { ...t.lieu }, e.placement = Re(e.pions, t.lieu, r, a.id), e.cadenceDetaillee) {
+			..._l(e, a) ? { humain: !0 } : {}
+		}, e.phase = "tirAuBut", e.minuteur = oo(e, "tirAuBut"), e.ballon = { ...t.lieu }, e.placement = Ye(e.pions, t.lieu, r, a.id), e.cadenceDetaillee) {
 			e.tir.etape = "approche", e.tir.etapeDepuis = e.sim, e.tir.ballonAuSol = { ...t.lieu }, delete e.placement[a.id];
 			return;
 		}
@@ -49495,41 +50250,41 @@ function vc(e) {
 		}, a.cible = { ...t.lieu };
 		return;
 	}
-	let g = A(r);
+	let g = j(r);
 	if (n === "melee") {
-		Q(e, "melee", r, t.lieu);
+		Z(e, "melee", r, t.lieu);
 		return;
 	}
 	let _ = f === "touche" ? .97 : f === "points" ? .42 : .72;
-	if (n === "touche" || !n && M(t.lieu, r) > 8 && (h ?? e.rng() < _)) {
-		let n = k(28 + a.pied / 3, 20, 48), i = {
-			x: k(t.lieu.x + g * n, 16, 106),
+	if (n === "touche" || !n && N(t.lieu, r) > 8 && (h ?? e.rng() < _)) {
+		let n = A(28 + a.pied / 3, 20, 48), i = {
+			x: A(t.lieu.x + g * n, 16, 106),
 			y: t.lieu.y < 35 ? -1 : 71
 		}, o = !0, s = 2.4;
 		if (e.cadenceDetaillee) {
 			let r = { ...a.pos };
 			a.pos = { ...t.lieu };
-			let c = qc(e, a, n + 6, !0);
+			let c = Bl(e, a, n + 6, !0);
 			a.pos = r, o = c.trouve, s = c.duree, i = {
-				x: k(c.arrivee.x, 16, 106),
+				x: A(c.arrivee.x, 16, 106),
 				y: c.arrivee.y
 			};
 		}
-		a.stats.coupsDePied += 1, e.placement = null, X(e, a, i, o ? "penaltouche" : "occupation", s, .4, t.lieu), J(e, "pied", r, I("penaltouche", {
+		a.stats.coupsDePied += 1, e.placement = null, Y(e, a, i, o ? "penaltouche" : "occupation", s, .4, t.lieu), q(e, "pied", r, I("penaltouche", {
 			nom: a.nom,
-			distance: Math.round(M(i, r))
+			distance: Math.round(N(i, r))
 		}), 0, a.moi);
 		return;
 	}
-	e.placement = null, e.gardeRuck = .7, J(e, "jeu", r, I("penaliteRapide", { club: Y(e, r) })), Ic(e, t.lieu, e.responsabilites ? _c(e, r, t.lieu) : void 0), e.porteur && L(e, e.porteur, "tap", 1.1);
+	e.placement = null, e.gardeRuck = .7, q(e, "jeu", r, I("penaliteRapide", { club: J(e, r) })), $(e, t.lieu, e.responsabilites ? dl(e, r, t.lieu) : void 0), e.porteur && L(e, e.porteur, "tap", 1.1);
 }
-var yc = (e) => ({
+var pl = (e) => ({
 	ventDirection: e.direction,
 	ventForce: e.force,
 	ventGraine: e.graine
 });
-function bc(e, t, n) {
-	if (!Xt(e) || n.x < .5 || n.x > 121.5 || n.y < .5 || n.y > 69.5) return;
+function ml(e, t, n) {
+	if (!kn(e) || n.x < .5 || n.x > 121.5 || n.y < .5 || n.y > 69.5) return;
 	let r = n.x - t.x, i = n.y - t.y, a = Math.hypot(r, i) || 1, o = 1.4 + e.rng() * 4.6, s = (e.rng() - .5) * 3.6;
 	return {
 		duree: .55 + e.rng() * .4,
@@ -49540,21 +50295,21 @@ function bc(e, t, n) {
 		}
 	};
 }
-var xc = (e) => e.ecoule >= e.duree + (e.rebond?.duree ?? 0), Sc = (e) => e.rebond?.vers ?? e.ricochet?.vers ?? e.vers;
-function Cc(e, t) {
-	return !!e.responsabilites && !!e.cadenceDetaillee && t.moi && Cn(e, "buteur", t.cote);
+var hl = (e) => e.ecoule >= e.duree + (e.rebond?.duree ?? 0), gl = (e) => e.rebond?.vers ?? e.ricochet?.vers ?? e.vers;
+function _l(e, t) {
+	return !!e.responsabilites && !!e.cadenceDetaillee && t.moi && tr(e, "buteur", t.cote);
 }
-function wc(e, t, n) {
+function vl(e, t, n) {
 	t.departSim = e.sim;
 	let { buteur: r } = t;
 	L(e, r, t.valeur === 2 ? "conversion" : "penalty", 1.5), e.gestes.at(-1).debut -= .8, r.cote;
 	let i = t.lieu ?? { ...e.ballon };
 	if (t.contre) {
-		let n = A(t.contre.cote), a = {
-			x: k(i.x + n * (2.5 + e.rng() * 3), 1, 121),
-			y: k(i.y + (e.rng() - .5) * 4, 1, 69)
+		let n = j(t.contre.cote), a = {
+			x: A(i.x + n * (2.5 + e.rng() * 3), 1, 121),
+			y: A(i.y + (e.rng() - .5) * 4, 1, 69)
 		};
-		t.reussi = !1, t.volLance = !0, r.stats.coupsDePied += 1, So(e, {
+		t.reussi = !1, t.volLance = !0, r.stats.coupsDePied += 1, es(e, {
 			de: { ...i },
 			vers: a,
 			duree: .8,
@@ -49568,8 +50323,8 @@ function wc(e, t, n) {
 		return;
 	}
 	if (t.humain && t.visee) {
-		let n = dc(e, r), a = k(pc(e, r, t.distance, t.angle) + uc(e, r.cote, t.distance), .04, .97), o = Qi(i, r.cote, t.visee, n, a, e.rng(), e.rng(), e.rng(), e.rng());
-		t.reussi = o.reussi, t.issue = o.issue, t.volLance = !0, r.stats.coupsDePied += 1, So(e, {
+		let n = al(e, r), a = A(sl(e, r, t.distance, t.angle) + il(e, r.cote, t.distance), .04, .97), o = ka(i, r.cote, t.visee, n, a, e.rng(), e.rng(), e.rng(), e.rng());
+		t.reussi = o.reussi, t.issue = o.issue, t.volLance = !0, r.stats.coupsDePied += 1, es(e, {
 			de: { ...i },
 			vers: o.vers,
 			duree: o.duree,
@@ -49582,14 +50337,14 @@ function wc(e, t, n) {
 			derive: o.derive,
 			...o.ricochet ? { ricochet: o.ricochet } : {}
 		});
-		let s = e.vol ? bc(e, i, e.vol.ricochet ? e.vol.ricochet.vers : o.vers) : void 0;
+		let s = e.vol ? ml(e, i, e.vol.ricochet ? e.vol.ricochet.vers : o.vers) : void 0;
 		s && e.vol && (e.vol.rebond = s), e.porteur = null, e.minuteur = o.duree;
 		let c = e.responsabilites;
 		t.valeur === 2 ? (c.stats.transformations += 1, o.reussi && (c.stats.transformationsReussies += 1)) : (c.stats.tirs += 1, o.reussi && (c.stats.tirsReussis += 1));
 		return;
 	}
-	let a = z(e) ? Hi(i, r.cote, n, e.rng(), e.rng(), e.rng(), dc(e, r)) : Vi(i, r.cote, n, e.rng(), e.rng(), e.rng()), { vers: o, duree: s } = a, c = z(e) ? .5 : k(5.8 + Math.hypot(o.x - i.x, o.y - i.y) * .08, 6.8, 9.5);
-	t.reussi = n, t.issue = a.issue, t.volLance = !0, r.stats.coupsDePied += 1, So(e, {
+	let a = R(e) ? ya(i, r.cote, n, e.rng(), e.rng(), e.rng(), al(e, r)) : va(i, r.cote, n, e.rng(), e.rng(), e.rng()), { vers: o, duree: s } = a, c = R(e) ? .5 : A(5.8 + Math.hypot(o.x - i.x, o.y - i.y) * .08, 6.8, 9.5);
+	t.reussi = n, t.issue = a.issue, t.volLance = !0, r.stats.coupsDePied += 1, es(e, {
 		de: { ...i },
 		vers: o,
 		duree: s,
@@ -49602,100 +50357,100 @@ function wc(e, t, n) {
 		..."derive" in a && a.derive ? { derive: a.derive } : {},
 		..."ricochet" in a && a.ricochet ? { ricochet: a.ricochet } : {}
 	});
-	let l = e.vol ? bc(e, i, e.vol.ricochet ? e.vol.ricochet.vers : o) : void 0;
+	let l = e.vol ? ml(e, i, e.vol.ricochet ? e.vol.ricochet.vers : o) : void 0;
 	l && e.vol && (e.vol.rebond = l), e.porteur = null, e.minuteur = s;
 }
-function Tc(e) {
+function yl(e) {
 	if (e.minuteur > 0) return;
 	let t = e.tir;
-	if (!t) return go(e, e.possession);
-	let { buteur: n, distance: r, angle: i } = t, a = n.cote, o = lo(e, a);
+	if (!t) return Jo(e, e.possession);
+	let { buteur: n, distance: r, angle: i } = t, a = n.cote, o = Ho(e, a);
 	if (!t.volLance) {
-		if (t.frappeDepuis === void 0 && D(n.pos, t.lieu ?? e.ballon) > .8) {
+		if (t.frappeDepuis === void 0 && O(n.pos, t.lieu ?? e.ballon) > .8) {
 			n.cible = { ...t.lieu ?? e.ballon }, e.minuteur = .15;
 			return;
 		}
 		if (t.frappeDepuis ??= e.sim, e.sim - t.frappeDepuis < .36) {
-			N(n), e.minuteur = .15;
+			P(n), e.minuteur = .15;
 			return;
 		}
-		n.stats.butsTentes += 1, wc(e, t, t.reussi ?? e.rng() < pc(e, n, r, i));
+		n.stats.butsTentes += 1, vl(e, t, t.reussi ?? e.rng() < sl(e, n, r, i));
 		return;
 	}
 	if (!t.retombe) {
-		if (e.vol && !xc(e.vol)) return;
-		t.retombe = !0, e.vol && (e.ballon = { ...Xt(e) ? Sc(e.vol) : e.vol.vers }), e.vol = null, t.reussi ? (o.penalites = Math.max(0, o.penalites - 1), n.stats.butsReussis += 1, Fc(e, a, 3), n.stats.pointsAuPied = (n.stats.pointsAuPied ?? 0) + 3, J(e, "but", a, F(e.rng, at, {
+		if (e.vol && !hl(e.vol)) return;
+		t.retombe = !0, e.vol && (e.ballon = { ...kn(e) ? gl(e.vol) : e.vol.vers }), e.vol = null, t.reussi ? (o.penalites = Math.max(0, o.penalites - 1), n.stats.butsReussis += 1, kl(e, a, 3), n.stats.pointsAuPied = (n.stats.pointsAuPied ?? 0) + 3, q(e, "but", a, F(e.rng, gt, {
 			nom: n.nom,
 			distance: Math.round(r)
-		}), 3, n.moi)) : J(e, "butRate", a, F(e.rng, ot, {
+		}), 3, n.moi)) : q(e, "butRate", a, F(e.rng, _t, {
 			nom: n.nom,
 			distance: Math.round(r)
 		}), 0, n.moi), e.minuteur = 1.4;
 		return;
 	}
 	let s = !!t.reussi;
-	return e.tir = null, e.placement = null, s ? e.sirene && !e.finSurSortieOuEnAvant ? Qc(e) : go(e, j(a)) : e.sirene && !e.finSurSortieOuEnAvant ? Qc(e) : Q(e, "renvoi22", j(a), {
-		x: j(a) === "A" ? 33 : 89,
+	return e.tir = null, e.placement = null, s ? e.sirene && !e.finSurSortieOuEnAvant ? Gl(e) : Jo(e, M(a)) : e.sirene && !e.finSurSortieOuEnAvant ? Gl(e) : Z(e, "renvoi22", M(a), {
+		x: M(a) === "A" ? 33 : 89,
 		y: 35
 	});
 }
-function Ec(e) {
+function bl(e) {
 	if (e.minuteur > 0) return;
 	let t = e.tir;
-	if (!t) return go(e, j(e.possession));
+	if (!t) return Jo(e, M(e.possession));
 	let n = t.buteur.cote;
 	if (!t.volLance) {
-		if (t.frappeDepuis === void 0 && D(t.buteur.pos, t.lieu ?? e.ballon) > .8) {
+		if (t.frappeDepuis === void 0 && O(t.buteur.pos, t.lieu ?? e.ballon) > .8) {
 			t.buteur.cible = { ...t.lieu ?? e.ballon }, e.minuteur = .15;
 			return;
 		}
 		if (t.frappeDepuis ??= e.sim, e.sim - t.frappeDepuis < .36) {
-			N(t.buteur), e.minuteur = .15;
+			P(t.buteur), e.minuteur = .15;
 			return;
 		}
-		let r = H(e, j(n)).filter((e) => e.sanction <= 0).map((n) => ({
+		let r = V(e, M(n)).filter((e) => e.sanction <= 0).map((n) => ({
 			pion: n,
-			d: D(n.pos, t.lieu ?? e.ballon)
+			d: O(n.pos, t.lieu ?? e.ballon)
 		})).filter(({ d: e }) => e <= 1.8).sort((e, t) => e.d - t.d)[0];
 		if (r) {
 			let n = r.d <= .9 ? .75 : r.d <= 1.4 ? .4 : .15;
-			e.rng() < n && (t.reussi = !1, t.contre = r.pion, L(e, r.pion, "charge_down", 1.4), J(e, "franchissement", r.pion.cote, F(e.rng, it, {
+			e.rng() < n && (t.reussi = !1, t.contre = r.pion, L(e, r.pion, "charge_down", 1.4), q(e, "franchissement", r.pion.cote, F(e.rng, ht, {
 				nom: t.buteur.nom,
 				contreur: r.pion.nom
 			}), 0, r.pion.moi || t.buteur.moi));
 		}
-		wc(e, t, !!t.reussi);
+		vl(e, t, !!t.reussi);
 		return;
 	}
 	if (!t.retombe) {
-		if (e.vol && !xc(e.vol)) return;
-		t.retombe = !0, e.vol && (e.ballon = { ...Xt(e) ? Sc(e.vol) : e.vol.vers }), e.vol = null;
-		let r = lo(e, n);
-		t.reussi ? (r.essaisTransformes = Math.max(0, r.essaisTransformes - 1), t.buteur.stats.butsReussis += 1, Fc(e, n, 2), t.buteur.stats.pointsAuPied = (t.buteur.stats.pointsAuPied ?? 0) + 2, J(e, "but", n, F(e.rng, nt, { nom: t.buteur.nom }), 2, t.buteur.moi)) : (r.essaisSecs = Math.max(0, r.essaisSecs - 1), t.contre ? J(e, "butRate", n, `Transformation contrée par ${t.contre.nom} ! Pas de points pour ${Y(e, n)}.`, 0, t.buteur.moi || t.contre.moi) : J(e, "butRate", n, F(e.rng, rt, { nom: t.buteur.nom }), 0, t.buteur.moi)), e.minuteur = 1.4;
+		if (e.vol && !hl(e.vol)) return;
+		t.retombe = !0, e.vol && (e.ballon = { ...kn(e) ? gl(e.vol) : e.vol.vers }), e.vol = null;
+		let r = Ho(e, n);
+		t.reussi ? (r.essaisTransformes = Math.max(0, r.essaisTransformes - 1), t.buteur.stats.butsReussis += 1, kl(e, n, 2), t.buteur.stats.pointsAuPied = (t.buteur.stats.pointsAuPied ?? 0) + 2, q(e, "but", n, F(e.rng, pt, { nom: t.buteur.nom }), 2, t.buteur.moi)) : (r.essaisSecs = Math.max(0, r.essaisSecs - 1), t.contre ? q(e, "butRate", n, `Transformation contrée par ${t.contre.nom} ! Pas de points pour ${J(e, n)}.`, 0, t.buteur.moi || t.contre.moi) : q(e, "butRate", n, F(e.rng, mt, { nom: t.buteur.nom }), 0, t.buteur.moi)), e.minuteur = 1.4;
 		return;
 	}
-	if (e.tir = null, e.placement = null, e.sirene && !e.finSurSortieOuEnAvant) return Qc(e);
-	go(e, j(n));
+	if (e.tir = null, e.placement = null, e.sirene && !e.finSurSortieOuEnAvant) return Gl(e);
+	Jo(e, M(n));
 }
-function Dc(e, t, n = "jeu") {
+function xl(e, t, n = "jeu") {
 	let r = t.cote;
 	if (!e.aplatissage) {
 		let i = {
 			x: r === "A" ? Math.max(t.pos.x, 111.55) : Math.min(t.pos.x, 10.45),
-			y: k(t.pos.y, 1.5, 68.5)
+			y: A(t.pos.y, 1.5, 68.5)
 		};
 		t.cible = { ...i };
-		let a = H(e, j(r)).find((e) => D(e.pos, t.pos) < 2.1 && e.battu <= 0), o = !!a || Math.hypot(t.vitesse.x, t.vitesse.y) > 4;
+		let a = V(e, M(r)).find((e) => O(e.pos, t.pos) < 2.1 && e.battu <= 0), o = !!a || Math.hypot(t.vitesse.x, t.vitesse.y) > 4;
 		if (L(e, t, o ? "dive_try" : "try", 1.35), o) {
 			let n = t.pos.y < 5 ? 1 : t.pos.y > 65 ? -1 : 0;
-			R(t, {
-				x: A(r) * 2.6,
+			Zt(t, {
+				x: j(r) * 2.6,
 				y: n * 1.4
-			}, 1.35), a && (R(a, {
-				x: A(r) * 2,
+			}, 1.35), a && (Zt(a, {
+				x: j(r) * 2,
 				y: n
 			}, 1.35), L(e, a, "tackle_low", 1.35));
-		} else N(t);
+		} else P(t);
 		e.ballon = { ...t.pos }, e.porteur = t, e.vol = null, e.ballonLibre = null, e.lancement = null, e.aplatissage = {
 			marqueur: t,
 			origine: n,
@@ -49705,23 +50460,23 @@ function Dc(e, t, n = "jeu") {
 	}
 	let i = e.aplatissage;
 	e.aplatissage = null;
-	let a = H(e, j(r)).filter((e) => D(e.pos, t.pos) < 2 && e.battu <= 0);
+	let a = V(e, M(r)).filter((e) => O(e.pos, t.pos) < 2 && e.battu <= 0);
 	if (!e.carriereDixMinutes && a.length > 0) {
-		let n = k(.28 + (a.reduce((e, t) => e + t.plaquage * .55 + t.puissance * .45, 0) / a.length - (t.puissance * .55 + t.evitement * .45) * (.75 + t.endurance / 400)) / 240 + (a.length > 1 ? .15 : 0), .08, .55);
+		let n = A(.28 + (a.reduce((e, t) => e + t.plaquage * .55 + t.puissance * .45, 0) / a.length - (t.puissance * .55 + t.evitement * .45) * (.75 + t.endurance / 400)) / 240 + (a.length > 1 ? .15 : 0), .08, .55);
 		if (e.rng() < n) {
 			let t = a[0];
-			return J(e, "jalon", j(r), `🛑 SAUVETAGE HÉROÏQUE SUR LA LIGNE ! ${t.nom} et la défense se glissent sous le ballon : BALLON TENU EN-BUT !`, 0, !0), ni(e, j(r), ei.turnover), bo(e, j(r), "attaque");
+			return q(e, "jalon", M(r), `🛑 SAUVETAGE HÉROÏQUE SUR LA LIGNE ! ${t.nom} et la défense se glissent sous le ballon : BALLON TENU EN-BUT !`, 0, !0), Ai(e, M(r), Oi.turnover), Qo(e, M(r), "attaque");
 		}
 	}
 	if (i && (e.rng() < .18 || Math.abs(i.lieu.y - 35) > 70 / 2 - 4) && i) {
-		kc(e, i);
+		Cl(e, i);
 		return;
 	}
-	Ac(e, t, n);
+	wl(e, t, n);
 }
-function Oc(e, t, n, r, i) {
+function Sl(e, t, n, r, i) {
 	let a = { ...n.pos };
-	e.ballon = { ...a }, N(t), N(n), e.tmo = {
+	e.ballon = { ...a }, P(t), P(n), e.tmo = {
 		actif: !0,
 		type: "faute_grave",
 		motif: r.includes("coup de") || r.includes("brutalité") ? "coup_de_poing" : r.includes("plaquage haut") ? "plaquage_haut" : r.includes("en avant") ? "en_avant" : "jeu_deloyal",
@@ -49739,11 +50494,11 @@ function Oc(e, t, n, r, i) {
 		},
 		victime: n,
 		carton: i === "carton_rouge" ? "rouge" : "jaune"
-	}, e.phase = "tmo", e.minuteur = ka(e, "tmo"), J(e, "jalon", null, `📺 ARBITRAGE VIDÉO : L'arbitre fait appel au TMO pour un soupçon de ${r} de ${t.nom} !`);
+	}, e.phase = "tmo", e.minuteur = oo(e, "tmo"), q(e, "jalon", null, `📺 ARBITRAGE VIDÉO : L'arbitre fait appel au TMO pour un soupçon de ${r} de ${t.nom} !`);
 }
-function kc(e, t) {
+function Cl(e, t) {
 	let n = t.marqueur, r = { ...t.lieu };
-	e.ballon = { ...r }, N(n);
+	e.ballon = { ...r }, P(n);
 	let i = e.rng(), a = i < .35 ? "aplatissage" : i < .65 ? "en_avant" : i < .85 ? "pied_en_touche" : "jeu_deloyal", o = a === "aplatissage" ? "le contrôle du ballon sur l'aplatissage" : a === "en_avant" ? "un possible en-avant de passe dans la construction" : a === "pied_en_touche" ? "un éventuel pied en touche avant l'en-but" : "un plaquage haut ou obstruction préalable";
 	e.tmo = {
 		actif: !0,
@@ -49762,9 +50517,9 @@ function kc(e, t) {
 			origine: t.origine,
 			lieu: r
 		}
-	}, e.phase = "tmo", e.minuteur = ka(e, "tmo"), J(e, "jalon", null, `📺 TMO DEMANDÉ ! L'arbitre interrompt la validation pour vérifier à la vidéo : ${o}.`);
+	}, e.phase = "tmo", e.minuteur = oo(e, "tmo"), q(e, "jalon", null, `📺 TMO DEMANDÉ ! L'arbitre interrompt la validation pour vérifier à la vidéo : ${o}.`);
 }
-function Ac(e, t, n) {
+function wl(e, t, n) {
 	let r = t.cote;
 	t.stats.essais += 1, e.dernierPasseur && e.dernierPasseur !== t && e.dernierPasseur.cote === r && (e.dernierPasseur.stats.passesDecisives += 1, e.dernierPasseur.moi && e.echos.push({
 		cle: "ml.echo.passeDecisive",
@@ -49776,9 +50531,9 @@ function Ac(e, t, n) {
 		cle: "ml.echo.turnoverEssai",
 		nom: i.pion.nom,
 		cible: t.nom
-	}), e.dernierTurnover = null), ni(e, r, ei.essai), Fc(e, r, 5), r === "A" ? e.essaisA += 1 : e.essaisB += 1;
-	let a = n === "maul" ? "au terme du ballon porté" : F(e.rng, tt, {});
-	J(e, "essai", r, n === "maul" ? F(e.rng, Dt, { nom: t.nom }) : F(e.rng, et, {
+	}), e.dernierTurnover = null), Ai(e, r, Oi.essai), kl(e, r, 5), r === "A" ? e.essaisA += 1 : e.essaisB += 1;
+	let a = n === "maul" ? "au terme du ballon porté" : F(e.rng, ft, {});
+	q(e, "essai", r, n === "maul" ? F(e.rng, Rt, { nom: t.nom }) : F(e.rng, dt, {
 		nom: t.nom,
 		precision: a
 	}), 5, t.moi), e.dernierReplayEssai = {
@@ -49786,16 +50541,16 @@ function Ac(e, t, n) {
 		lieu: { ...t.pos },
 		restant: 4.2
 	};
-	let o = H(e, r), s = o.find((e) => e.buteur) ?? [...o].sort((e, t) => t.pied - e.pied)[0] ?? t, c = Math.abs(t.pos.y - 35), l = fc(22 + c * .55, c, s.pied), u = e.rng() < l;
-	N(t), e.porteur = null, e.vol = null, e.ballonLibre = null, e.ruck = null, e.aplatissage = null;
+	let o = V(e, r), s = o.find((e) => e.buteur) ?? [...o].sort((e, t) => t.pied - e.pied)[0] ?? t, c = Math.abs(t.pos.y - 35), l = ol(22 + c * .55, c, s.pied), u = e.rng() < l;
+	P(t), e.porteur = null, e.vol = null, e.ballonLibre = null, e.ruck = null, e.aplatissage = null;
 	let d = {
-		x: (r === "A" ? 111 : 11) - A(r) * 22,
-		y: k(t.pos.y, 2.5, 67.5)
-	}, f = xi(s);
+		x: (r === "A" ? 111 : 11) - j(r) * 22,
+		y: A(t.pos.y, 2.5, 67.5)
+	}, f = Qi(s);
 	if (e.cadenceDetaillee) {
 		let n = { ...t.pos };
 		e.ballon = { ...n }, s.stats.butsTentes += 1;
-		let i = o.filter((e) => e !== t && e !== s && e.sanction <= 0 && !e.corps).sort((e, t) => O(e.pos, n) - O(t.pos, n)).slice(0, 5).map((e) => e.id);
+		let i = o.filter((e) => e !== t && e !== s && e.sanction <= 0 && !e.corps).sort((e, t) => k(e.pos, n) - k(t.pos, n)).slice(0, 5).map((e) => e.id);
 		e.tir = {
 			buteur: s,
 			distance: 22 + c * .55,
@@ -49805,14 +50560,14 @@ function Ac(e, t, n) {
 			lieu: d,
 			reussi: u,
 			routine: f,
-			...Cc(e, s) ? { humain: !0 } : {},
+			..._l(e, s) ? { humain: !0 } : {},
 			etape: "celebration",
 			etapeDepuis: e.sim,
 			ballonAuSol: n,
 			marqueurId: t.id,
-			celebrationJusqua: e.sim + Ma.celebration,
+			celebrationJusqua: e.sim + lo.celebration,
 			feteurs: i
-		}, e.phase = "transformation", e.minuteur = ka(e, "transformation"), e.possession = r, e.placement = Re(e.pions, d, r, s.id), delete e.placement[s.id];
+		}, e.phase = "transformation", e.minuteur = oo(e, "transformation"), e.possession = r, e.placement = Ye(e.pions, d, r, s.id), delete e.placement[s.id];
 		return;
 	}
 	e.ballon = { ...d }, s.pos = { ...d }, s.vitesse = {
@@ -49827,14 +50582,14 @@ function Ac(e, t, n) {
 		lieu: d,
 		reussi: u,
 		routine: f
-	}, e.phase = "transformation", e.minuteur = ka(e, "transformation"), e.possession = r, e.placement = Re(e.pions, d, r, s.id);
+	}, e.phase = "transformation", e.minuteur = oo(e, "transformation"), e.possession = r, e.placement = Ye(e.pions, d, r, s.id);
 }
-function jc(e) {
+function Tl(e) {
 	let t = e.tir, n = t.buteur, r = t.lieu ?? e.ballon, i = n.cote, a = (n) => {
 		t.etape = n, t.etapeDepuis = e.sim;
 	}, o = e.sim - (t.etapeDepuis ?? e.sim), s = (i === "A" ? 111 : 11) - r.x, c = 35 - r.y, l = Math.max(.01, Math.hypot(s, c)), u = {
 		x: r.x - s / l * .72,
-		y: k(r.y - c / l * .72, 1.5, 68.5)
+		y: A(r.y - c / l * .72, 1.5, 68.5)
 	};
 	e.minuteur = Math.max(e.minuteur, 1);
 	for (let t of e.pions) t.surLeTerrain && t !== n && (t.effort = Math.min(t.effort, .5));
@@ -49843,32 +50598,32 @@ function jc(e) {
 		if (s && e.placement && (e.placement[s.id] = { ...s.pos }), (t.feteurs ?? []).forEach((t, n, r) => {
 			let a = e.pions.find((e) => e.id === t);
 			if (!a || !e.placement) return;
-			let s = n / Math.max(1, r.length) * Math.PI * 1.3 - Math.PI * .65, c = A(i);
+			let s = n / Math.max(1, r.length) * Math.PI * 1.3 - Math.PI * .65, c = j(i);
 			e.placement[t] = {
-				x: k(o.x - c * Math.cos(s) * 1.9, 1, 121),
-				y: k(o.y + Math.sin(s) * 1.9, 1.5, 68.5)
+				x: A(o.x - c * Math.cos(s) * 1.9, 1, 121),
+				y: A(o.y + Math.sin(s) * 1.9, 1.5, 68.5)
 			}, a.effort = .72;
-		}), n.cible = { ...o }, n.effort = D(n.pos, o) > 12 ? .5 : .3, D(n.pos, o) < 3 && (n.cible = { ...n.pos }), e.ballon = { ...o }, e.sim >= (t.celebrationJusqua ?? 0)) {
-			let t = Re(e.pions, r, i, n.id);
+		}), n.cible = { ...o }, n.effort = O(n.pos, o) > 12 ? .5 : .3, O(n.pos, o) < 3 && (n.cible = { ...n.pos }), e.ballon = { ...o }, e.sim >= (t.celebrationJusqua ?? 0)) {
+			let t = Ye(e.pions, r, i, n.id);
 			delete t[n.id], e.placement = t, a("approche");
 		}
 		return;
 	}
 	if (t.etape === "approche") {
 		let i = t.ballonAuSol ?? r;
-		n.cible = { ...i }, n.effort = .6, e.ballon = { ...i }, (D(n.pos, i) < .95 || o > 16) && (N(n), a("ramassage"));
+		n.cible = { ...i }, n.effort = .6, e.ballon = { ...i }, (O(n.pos, i) < .95 || o > 16) && (P(n), a("ramassage"));
 		return;
 	}
 	if (t.etape === "ramassage") {
-		N(n), n.cible = { ...n.pos }, o >= Ma.ramassage && (delete t.ballonAuSol, a("transport"));
+		P(n), n.cible = { ...n.pos }, o >= lo.ramassage && (delete t.ballonAuSol, a("transport"));
 		return;
 	}
 	if (t.etape === "transport") {
-		n.cible = { ...u }, n.effort = .55, e.ballon = { ...n.pos }, (D(n.pos, u) < .45 || o > 18) && (N(n), n.cible = { ...n.pos }, a("pose"));
+		n.cible = { ...u }, n.effort = .55, e.ballon = { ...n.pos }, (O(n.pos, u) < .45 || o > 18) && (P(n), n.cible = { ...n.pos }, a("pose"));
 		return;
 	}
-	if (e.ballon = { ...r }, N(n), n.cible = { ...n.pos }, t.etape === "pose") {
-		o >= (t.humain ? Ma.poseHumain : Ma.pose) && a(t.humain ? "vise" : "pret");
+	if (e.ballon = { ...r }, P(n), n.cible = { ...n.pos }, t.etape === "pose") {
+		o >= (t.humain ? lo.poseHumain : lo.pose) && a(t.humain ? "vise" : "pret");
 		return;
 	}
 	if (t.etape === "vise") {
@@ -49878,7 +50633,7 @@ function jc(e) {
 			return;
 		}
 		if (r.attente?.type !== "tir") {
-			let i = pc(e, n, t.distance, t.angle);
+			let i = sl(e, n, t.distance, t.angle);
 			r.attente = {
 				type: "tir",
 				depuis: e.sim,
@@ -49897,19 +50652,19 @@ function jc(e) {
 		return;
 	}
 	if (t.etape === "pret") {
-		o >= Ma.pret && a("elan");
+		o >= lo.pret && a("elan");
 		return;
 	}
 	if (e.phase === "transformation") {
-		let t = H(e, j(i)).filter((e) => e.sanction <= 0).sort((e, t) => O(e.pos, r) - O(t.pos, r));
+		let t = V(e, M(i)).filter((e) => e.sanction <= 0).sort((e, t) => k(e.pos, r) - k(t.pos, r));
 		for (let n of t.slice(0, 3)) n.role = "chasseur", n.cible = {
 			x: r.x,
 			y: r.y
 		}, n.effort = 1.05, e.placement && delete e.placement[n.id];
 	}
-	o >= (t.humain ? Ma.elanHumain : Ma.elan) && (t.frappeDepuis = e.sim - 1, e.minuteur = 0);
+	o >= (t.humain ? lo.elanHumain : lo.elan) && (t.frappeDepuis = e.sim - 1, e.minuteur = 0);
 }
-function Mc(e) {
+function El(e) {
 	if (e.minuteur > 0) return;
 	let t = e.tmo;
 	if (!t) {
@@ -49917,15 +50672,15 @@ function Mc(e) {
 		return;
 	}
 	if (t.origineEssai) {
-		let n = t.origineEssai, r = n.marqueur.cote, i = j(r);
-		if (e.rng() < .28 && !(e.carriereDixMinutes && t.motif === "aplatissage")) return t.decision = "essai_refuse", e.tmo = null, t.motif === "en_avant" ? (J(e, "jalon", null, `❌ TMO DÉCISION : En-avant confirmé à la vidéo sur la passe ! L’essai de ${n.marqueur.nom} est REFUSÉ.`), Q(e, "melee", i, {
-			x: k(n.lieu.x - A(r) * 5, 16, 106),
-			y: k(n.lieu.y, 5, 65)
-		}, !0)) : t.motif === "pied_en_touche" ? (J(e, "jalon", null, `❌ TMO DÉCISION : Pied en touche sur le plongeon ! L’essai de ${n.marqueur.nom} est REFUSÉ.`), Q(e, "touche", i, {
-			x: k(n.lieu.x - A(r) * 5, 16, 106),
+		let n = t.origineEssai, r = n.marqueur.cote, i = M(r);
+		if (e.rng() < .28 && !(e.carriereDixMinutes && t.motif === "aplatissage")) return t.decision = "essai_refuse", e.tmo = null, t.motif === "en_avant" ? (q(e, "jalon", null, `❌ TMO DÉCISION : En-avant confirmé à la vidéo sur la passe ! L’essai de ${n.marqueur.nom} est REFUSÉ.`), Z(e, "melee", i, {
+			x: A(n.lieu.x - j(r) * 5, 16, 106),
+			y: A(n.lieu.y, 5, 65)
+		}, !0)) : t.motif === "pied_en_touche" ? (q(e, "jalon", null, `❌ TMO DÉCISION : Pied en touche sur le plongeon ! L’essai de ${n.marqueur.nom} est REFUSÉ.`), Z(e, "touche", i, {
+			x: A(n.lieu.x - j(r) * 5, 16, 106),
 			y: n.lieu.y < 35 ? 0 : 70
-		})) : t.motif === "jeu_deloyal" || t.motif === "plaquage_haut" ? (J(e, "jalon", null, "❌ TMO DÉCISION : Faute préalable de l'attaque constatée au ralenti ! L'essai est REFUSÉ."), $(e, i, n.lieu, "jeu déloyal au départ de l'action")) : (J(e, "jalon", null, "❌ TMO DÉCISION : Ballon non aplati et tenu en-but ! L’essai est REFUSÉ."), bo(e, i, "attaque"));
-		t.decision = "essai_accorde", J(e, "jalon", null, "✅ TMO DÉCISION : Aucune irrégularité constatée après visionnage des angles vidéo ! ESSAI ACCORDÉ !"), e.tmo = null, Ac(e, n.marqueur, n.origine);
+		})) : t.motif === "jeu_deloyal" || t.motif === "plaquage_haut" ? (q(e, "jalon", null, "❌ TMO DÉCISION : Faute préalable de l'attaque constatée au ralenti ! L'essai est REFUSÉ."), Q(e, i, n.lieu, "jeu déloyal au départ de l'action")) : (q(e, "jalon", null, "❌ TMO DÉCISION : Ballon non aplati et tenu en-but ! L’essai est REFUSÉ."), Qo(e, i, "attaque"));
+		t.decision = "essai_accorde", q(e, "jalon", null, "✅ TMO DÉCISION : Aucune irrégularité constatée après visionnage des angles vidéo ! ESSAI ACCORDÉ !"), e.tmo = null, wl(e, n.marqueur, n.origine);
 		return;
 	}
 	let n = t.auteur;
@@ -49935,108 +50690,108 @@ function Mc(e) {
 	}
 	let r = t.victime, i = t.motif === "coup_de_poing" ? "coup de poing caractérisé" : t.motif === "plaquage_haut" ? "plaquage haut avec contact à la tête" : "brutalité / jeu déloyal flagrant", a = t.motif === "coup_de_poing" && e.rng() < .4 || t.carton === "rouge" && e.rng() < .4 || t.motif === "plaquage_haut" && e.rng() < .1;
 	if (!(a || t.carton === "jaune" && e.rng() < .8 || e.rng() < .65)) {
-		t.decision = "essai_refuse", J(e, "jalon", null, `📺 TMO DÉCISION : L'arbitre visionne les ralentis : contact non dangereux constaté. Simple pénalité contre ${n.nom}, aucun carton décerné.`);
+		t.decision = "essai_refuse", q(e, "jalon", null, `📺 TMO DÉCISION : L'arbitre visionne les ralentis : contact non dangereux constaté. Simple pénalité contre ${n.nom}, aucun carton décerné.`);
 		let a = t.cible;
-		e.tmo = null, $(e, r ? r.cote : j(n.cote), a, i, n);
+		e.tmo = null, Q(e, r ? r.cote : M(n.cote), a, i, n);
 		return;
 	}
 	let o = a ? "rouge" : "jaune";
-	t.decision = o === "rouge" ? "carton_rouge" : "carton_jaune", J(e, "jalon", null, `📺 TMO DÉCISION : Le ralenti confirme l'agression ! ${o === "rouge" ? "Carton ROUGE direct" : "Carton JAUNE"} pour ${n.nom}.`);
+	t.decision = o === "rouge" ? "carton_rouge" : "carton_jaune", q(e, "jalon", null, `📺 TMO DÉCISION : Le ralenti confirme l'agression ! ${o === "rouge" ? "Carton ROUGE direct" : "Carton JAUNE"} pour ${n.nom}.`);
 	let s = t.cible;
-	e.tmo = null, $(e, r ? r.cote : j(n.cote), s, i, n, o);
+	e.tmo = null, Q(e, r ? r.cote : M(n.cote), s, i, n, o);
 }
-function Nc(e) {
+function Dl(e) {
 	if (e.aplatissage && (e.ballon = { ...e.aplatissage.marqueur.pos }), e.minuteur > 0) return;
 	let t = e.aplatissage;
-	if (!t) return Q(e, "renvoi22", j(e.possession), {
-		x: j(e.possession) === "A" ? 33 : 89,
+	if (!t) return Z(e, "renvoi22", M(e.possession), {
+		x: M(e.possession) === "A" ? 33 : 89,
 		y: 35
 	});
-	Dc(e, t.marqueur, t.origine);
+	xl(e, t.marqueur, t.origine);
 }
-function Pc(e) {
+function Ol(e) {
 	if (!(e.minuteur > 0)) {
-		if (e.placement = null, e.sirene && !e.finSurSortieOuEnAvant) return Qc(e);
-		go(e, e.possession);
+		if (e.placement = null, e.sirene && !e.finSurSortieOuEnAvant) return Gl(e);
+		Jo(e, e.possession);
 	}
 }
-function Fc(e, t, n) {
-	t === "A" ? e.scoreA += n : e.scoreB += n, lo(e, t).marques += n;
+function kl(e, t, n) {
+	t === "A" ? e.scoreA += n : e.scoreB += n, Ho(e, t).marques += n;
 }
-function Ic(e, t, n, r, i, a, o) {
-	e.phase === "ruck" && Ue(e, "ruck"), wo(e);
-	let s = e.possession, c = H(e, s);
-	if (!c.length) return Qc(e);
-	e.cadenceDetaillee && e.coteDecidePour === s || (e.ouvert = Sr(e)), e.coteDecidePour = void 0, e.systeme = yr(e, j(s)), z(e) && Fs(e, s, t), e.phase = "jeuCourant", e.conquete = null, e.ballonLibre = null, e.ruck = null, e.placement = null, e.perceeSignalee = !1, e.cibleRenvoi = null, e.ligneAvantage = t.x, e.origine = {
+function $(e, t, n, r, i, a, o) {
+	e.phase === "ruck" && et(e, "ruck"), ns(e);
+	let s = e.possession, c = V(e, s);
+	if (!c.length) return Gl(e);
+	e.cadenceDetaillee && e.coteDecidePour === s || (e.ouvert = Xr(e)), e.coteDecidePour = void 0, e.systeme = qr(e, M(s)), R(e) && gc(e, s, t), e.phase = "jeuCourant", e.conquete = null, e.ballonLibre = null, e.ruck = null, e.placement = null, e.perceeSignalee = !1, e.cibleRenvoi = null, e.ligneAvantage = t.x, e.origine = {
 		x: t.x,
 		y: t.y
 	}, e.metresGagnesPhase = 0;
-	let l = A(s);
+	let l = j(s);
 	if (r != null) e.ligneDef = t.x + l * r;
 	else {
 		let n = [];
-		for (let r of H(e, j(s))) n.push((r.pos.x - t.x) * l);
+		for (let r of V(e, M(s))) n.push((r.pos.x - t.x) * l);
 		n.sort((e, t) => e - t);
 		let r = n[Math.min(3, n.length - 1)] ?? 10;
-		e.ligneDef = t.x + l * k(r, .6, 32);
+		e.ligneDef = t.x + l * A(r, .6, 32);
 	}
-	if (e.horsJeu = e.ligneDef, e.combinaisonPreparee && Ve(e, s, e.combinaisonPreparee.variante.depart)?.id === i && (e.combinaisonPreparee = void 0), We(e, t, n)) {
+	if (e.horsJeu = e.ligneDef, e.combinaisonPreparee && Qe(e, s, e.combinaisonPreparee.variante.depart)?.id === i && (e.combinaisonPreparee = void 0), tt(e, t, n)) {
 		let t = e.porteur;
-		Wo(e, t, .3), J(e, "jeu", s, `Combinaison : ${e.lancement.libelle}.`);
+		Ss(e, t, .3), q(e, "jeu", s, `Combinaison : ${e.lancement.libelle}.`);
 		return;
 	}
-	let u = (z(e) && o === "reception" && n && !n.avant ? _a(e, n) : null) ?? Vc(e, s, c, n, i, a?.cote === s ? a : void 0);
+	let u = (R(e) && o === "reception" && n && !n.avant ? Ja(e, n) : null) ?? Pl(e, s, c, n, i, a?.cote === s ? a : void 0);
 	if (u.jeu === "ferme" && (e.ouvert = e.ouvert === 1 ? -1 : 1, e.serieCote = {
 		cote: e.ouvert,
 		n: 1
 	}), e.cadenceDetaillee && a && a.cote === s && a.id !== i && !n) {
-		let n = u.chaine[0], r = z(e) ? M(t, s) < 12 ? .75 : .3 : .55;
+		let n = u.chaine[0], r = R(e) ? N(t, s) < 12 ? .75 : .3 : .55;
 		a.avant && u.type !== "pied" && e.rng() < r ? (u = {
 			type: "pickAndGo",
 			chaine: [a],
 			index: 0,
 			libelle: "pick and go"
-		}, J(e, "jeu", s, `${a.nom} ramasse au pied du ruck et repart au ras.`, 0, a.moi)) : n !== a && (!n || D(n.pos, t) > ds) && (u.chaine = [a, ...u.chaine.filter((e) => e !== a)]);
+		}, q(e, "jeu", s, `${a.nom} ramasse au pied du ruck et repart au ras.`, 0, a.moi)) : n !== a && (!n || O(n.pos, t) > Us) && (u.chaine = [a, ...u.chaine.filter((e) => e !== a)]);
 	}
 	let d = u.chaine;
-	if (i && d[0]?.id === i && (d = d.filter((e) => e.id !== i)), z(e) && e.cadenceDetaillee && !n && o !== "reception" && d[0] && D(d[0].pos, t) > 3.2) {
-		let e = c.filter((e) => e.id !== i && e.sanction <= 0 && !e.corps && D(e.pos, t) <= 3.2).sort((e, n) => O(e.pos, t) - O(n.pos, t))[0];
+	if (i && d[0]?.id === i && (d = d.filter((e) => e.id !== i)), R(e) && e.cadenceDetaillee && !n && o !== "reception" && d[0] && O(d[0].pos, t) > 3.2) {
+		let e = c.filter((e) => e.id !== i && e.sanction <= 0 && !e.corps && O(e.pos, t) <= 3.2).sort((e, n) => k(e.pos, t) - k(n.pos, t))[0];
 		e && (u.chaine = [e, ...u.chaine.filter((t) => t !== e)], d = u.chaine);
 	}
 	let f = (n && n.id !== i ? n : null) ?? d[0] ?? c.find((e) => e.id !== i && e.surLeTerrain && e.sanction <= 0) ?? c[0];
-	u.chaine = u.structure === "redoublee" ? [f, ...u.chaine].filter((e, t, n) => e && e !== n[t - 1] && e.surLeTerrain && e.sanction <= 0).slice(0, 6) : zc(Bc([f, ...u.chaine]), 5), u.index = 0, u.structure && as(e, u, s), Lc(e, u, s), e.lancement = u, e.ballon = {
+	u.chaine = u.structure === "redoublee" ? [f, ...u.chaine].filter((e, t, n) => e && e !== n[t - 1] && e.surLeTerrain && e.sanction <= 0).slice(0, 6) : Ml(Nl([f, ...u.chaine]), 5), u.index = 0, u.structure && Ls(e, u, s), Al(e, u, s), e.lancement = u, e.ballon = {
 		x: t.x,
 		y: t.y
-	}, Wo(e, f, .3), e.cadenceDetaillee && a === f && f.vitesse.x * l < 0 && (f.vitesse.x = 0), po(e, !1, 4), e.ballon = { ...f.pos };
+	}, Ss(e, f, .3), e.cadenceDetaillee && a === f && f.vitesse.x * l < 0 && (f.vitesse.x = 0), Go(e, !1, 4), e.ballon = { ...f.pos };
 }
-function Lc(e, t, n) {
-	if (e.direct?.actif) return Rc(e, t, n);
-	if (!Xr(e, "appel")) return;
+function Al(e, t, n) {
+	if (e.direct?.actif) return jl(e, t, n);
+	if (!wi(e, "appel")) return;
 	let r = e.pions.find((e) => e.moi);
-	!r || !r.surLeTerrain || r.sanction > 0 || r.cote !== n || t.chaine.includes(r) || O(r.pos, e.ballon) > 625 || (Zr(e), !(e.rng() < .45) && (t.chaine.splice(Math.min(1, t.chaine.length), 0, r), J(e, "jeu", n, I("appelBallon", { nom: r.nom }), 0, !0)));
+	!r || !r.surLeTerrain || r.sanction > 0 || r.cote !== n || t.chaine.includes(r) || k(r.pos, e.ballon) > 625 || (Ti(e), !(e.rng() < .45) && (t.chaine.splice(Math.min(1, t.chaine.length), 0, r), q(e, "jeu", n, I("appelBallon", { nom: r.nom }), 0, !0)));
 }
-function Rc(e, t, n) {
-	let r = Wn(e), i = jn(e);
-	if (!r || !i || i.cote !== n || t.chaine.includes(i) || O(i.pos, e.ballon) > 625) return;
-	let a = !!e.direct?.assistance?.appelAssure, { force: o } = Un(e, i, null);
-	if (o < V.seuilAppel && !a) return;
-	let s = k(.25 + o * .65 + (a ? .6 : 0), 0, .92);
-	e.rng() > s || (t.chaine.splice(Math.min(1, t.chaine.length), 0, i), J(e, "jeu", n, I("appelBallon", { nom: i.nom }), 0, !0));
+function jl(e, t, n) {
+	let r = Cr(e), i = ur(e);
+	if (!r || !i || i.cote !== n || t.chaine.includes(i) || k(i.pos, e.ballon) > 625) return;
+	let a = !!e.direct?.assistance?.appelAssure, { force: o } = Sr(e, i, null);
+	if (o < B.seuilAppel && !a) return;
+	let s = A(.25 + o * .65 + (a ? .6 : 0), 0, .92);
+	e.rng() > s || (t.chaine.splice(Math.min(1, t.chaine.length), 0, i), q(e, "jeu", n, I("appelBallon", { nom: i.nom }), 0, !0));
 }
-function zc(e, t) {
+function Ml(e, t) {
 	let n = [...e];
 	for (; n.length > t;) n.splice(Math.max(1, Math.floor(n.length / 2) - 1), 1);
 	return n;
 }
-function Bc(e) {
+function Nl(e) {
 	let t = /* @__PURE__ */ new Set(), n = [];
 	for (let r of e) !r || t.has(r) || !r.surLeTerrain || r.sanction > 0 || (t.add(r), n.push(r));
 	return n;
 }
-function Vc(e, t, n, r, i, a) {
-	let o = ir(n, 9), s = (o && o.id !== i && o.role !== "ruck" && (!a || a === o) ? o : void 0) ?? (a && a.id !== i ? a : void 0) ?? ir(n, 10) ?? ir(n, 8) ?? n.find((e) => e.id !== i && e.surLeTerrain && e.sanction <= 0) ?? n[0], c = ir(n, 10), l = (s === c ? ir(n, 12) : c) ?? n[0], u = ir(n, 12), d = ir(n, 13), f = ir(n, 15), p = e.ouvert === 1 ? ir(n, 14) ?? ir(n, 11) : ir(n, 11) ?? ir(n, 14), m = Wc(e, n, i), h = M(e.ballon, t), g = me(e.ballon, t), _ = he(e.ballon, t), v = xr(e), y = e.phasesDepuisArret, b = 80 - e.minute, x = uo(e, t), ee = fo(e, t), S = e.tactiques[t] ?? (e.cadenceDetaillee ? Qo(e.styles?.[t]) : void 0);
-	if (z(e) && !(e.sirene && x > 0)) {
-		let a = Hc(e, t, n, {
+function Pl(e, t, n, r, i, a) {
+	let o = Mr(n, 9), s = (o && o.id !== i && o.role !== "ruck" && (!a || a === o) ? o : void 0) ?? (a && a.id !== i ? a : void 0) ?? Mr(n, 10) ?? Mr(n, 8) ?? n.find((e) => e.id !== i && e.surLeTerrain && e.sanction <= 0) ?? n[0], c = Mr(n, 10), l = (s === c ? Mr(n, 12) : c) ?? n[0], u = Mr(n, 12), d = Mr(n, 13), f = Mr(n, 15), p = e.ouvert === 1 ? Mr(n, 14) ?? Mr(n, 11) : Mr(n, 11) ?? Mr(n, 14), m = Ll(e, n, i), h = N(e.ballon, t), g = we(e.ballon, t), _ = Te(e.ballon, t), v = Yr(e), y = e.phasesDepuisArret, b = 80 - e.minute, x = Uo(e, t), ee = Wo(e, t), S = e.tactiques[t] ?? (e.cadenceDetaillee ? As(e.styles?.[t]) : void 0);
+	if (R(e) && !(e.sirene && x > 0)) {
+		let a = Fl(e, t, n, {
 			distributeur: s,
 			dix: l,
 			douze: u,
@@ -50058,17 +50813,17 @@ function Vc(e, t, n, r, i, a) {
 		l,
 		d,
 		p
-	].filter(Boolean), te = [
+	].filter(Boolean), E = [
 		s,
 		l,
 		u,
 		f,
 		p
-	].filter(Boolean), E = [
+	].filter(Boolean), D = [
 		s,
 		l,
 		u
-	].filter(Boolean), ne = () => {
+	].filter(Boolean), te = () => {
 		let t = e.rng();
 		return t < .26 && d ? {
 			type: "saute",
@@ -50076,7 +50831,7 @@ function Vc(e, t, n, r, i, a) {
 			libelle: "passe sautée vers l’aile"
 		} : t < .52 && f ? {
 			type: "large",
-			chaine: te,
+			chaine: E,
 			libelle: "l’arrière s’intercale"
 		} : {
 			type: "large",
@@ -50097,7 +50852,7 @@ function Vc(e, t, n, r, i, a) {
 	}
 	if (_ && !g) {
 		let r = l ?? s ?? n[0];
-		if (r && r.pied > 65 && y >= 1 && Gc(e, j(t)) && C < .014) return {
+		if (r && r.pied > 65 && y >= 1 && Rl(e, M(t)) && C < .014) return {
 			type: "pied",
 			chaine: [s, r].filter(Boolean),
 			index: 0,
@@ -50118,7 +50873,7 @@ function Vc(e, t, n, r, i, a) {
 	if (h < 22) {
 		let e = S?.attaque === "large" ? .82 : S?.attaque === "avants" ? .28 : .55;
 		if (v >= 1 && C < e) return {
-			...ne(),
+			...te(),
 			index: 0
 		};
 		let t = S?.attaque === "avants" ? .78 : S?.attaque === "large" ? .34 : .55;
@@ -50139,7 +50894,7 @@ function Vc(e, t, n, r, i, a) {
 		};
 	}
 	if (v >= 2 || v >= 1 && y >= 1) return {
-		...ne(),
+		...te(),
 		index: 0
 	};
 	if (e.sirene) {
@@ -50155,7 +50910,7 @@ function Vc(e, t, n, r, i, a) {
 			};
 		}
 		return v >= 1 ? {
-			...ne(),
+			...te(),
 			index: 0
 		} : {
 			type: "pod",
@@ -50174,12 +50929,12 @@ function Vc(e, t, n, r, i, a) {
 		index: 0,
 		libelle: "garder le ballon"
 	};
-	let re = S?.attaque === "large" ? .18 : S?.attaque === "avants" ? -.18 : S?.attaque === "occupation" ? -.05 : 0, ie = C + ee * .3 + re;
+	let ne = S?.attaque === "large" ? .18 : S?.attaque === "avants" ? -.18 : S?.attaque === "occupation" ? -.05 : 0, re = C + ee * .3 + ne;
 	if (e.cadenceDetaillee && !r) {
-		let r = is(e, t, n, s, l, u, d, p, y);
+		let r = Is(e, t, n, s, l, u, d, p, y);
 		if (r) return r;
 	}
-	if (y === 0) return ie < .34 ? {
+	if (y === 0) return re < .34 ? {
 		type: "pod",
 		chaine: [
 			s,
@@ -50188,54 +50943,54 @@ function Vc(e, t, n, r, i, a) {
 		].filter(Boolean),
 		index: 0,
 		libelle: "premier temps"
-	} : ie < .62 ? {
+	} : re < .62 ? {
 		type: "large",
-		chaine: E,
+		chaine: D,
 		index: 0,
 		libelle: "lancement sur la ligne"
 	} : {
-		...ne(),
+		...te(),
 		index: 0
 	};
-	if (ie < .52) {
+	if (re < .52) {
 		let t = e.rng() < .34;
 		return {
 			type: t ? "pickAndGo" : "ras",
-			chaine: Uc(e, t ? [m] : [s, m], n),
+			chaine: Il(e, t ? [m] : [s, m], n),
 			index: 0,
 			libelle: t ? "le ballon repart au ras" : "percussion au ras"
 		};
 	}
-	return ie < .72 ? {
+	return re < .72 ? {
 		type: "pod",
-		chaine: Uc(e, [
+		chaine: Il(e, [
 			s,
 			l,
 			m
 		], n),
 		index: 0,
 		libelle: "bloc d’avants"
-	} : ie < .85 ? {
+	} : re < .85 ? {
 		type: "large",
-		chaine: E,
+		chaine: D,
 		index: 0,
 		libelle: "un temps sur les centres"
-	} : ie > .92 && f && d ? {
-		...ne(),
+	} : re > .92 && f && d ? {
+		...te(),
 		index: 0
-	} : r && r.avant && ie < .8 ? {
+	} : r && r.avant && re < .8 ? {
 		type: "ras",
 		chaine: [r],
 		index: 0,
 		libelle: "percussion"
 	} : {
-		...ne(),
+		...te(),
 		index: 0
 	};
 }
-function Hc(e, t, n, r, i, a) {
-	let o = A(t), s = r.distributeur, c = (e) => !!e && e !== s && e.id !== a && B(e), l = (t) => (e.ballon.x - t.pos.x) * o > -.5, u = e.blocPrepare?.cote === t ? e.blocPrepare.ids.map((e) => n.find((t) => t.id === e)).filter(c) : [], d = u.length === 3 ? u : n.filter((t) => t.avant && c(t) && l(t) && (t.pos.y - e.ballon.y) * e.ouvert > -3 && O(t.pos, e.ballon) < 400).sort((t, n) => O(t.pos, e.ballon) - O(n.pos, e.ballon)).slice(0, 3), f = c(r.percuteur) ? r.percuteur : rr(d), p = n.filter((t) => t.avant && c(t) && l(t) && !d.includes(t) && t !== f && (t.pos.y - e.ballon.y) * e.ouvert > 7 && O(t.pos, e.ballon) < 1156), m = n.filter((t) => t.avant && c(t) && O(t.pos, e.ballon) < 3.2 * 3.2).sort((t, n) => O(t.pos, e.ballon) - O(n.pos, e.ballon))[0], { dix: h, douze: g, treize: _ } = r;
-	return h === s && (h = void 0), h && h === g && (g = _, _ = void 0), ha(e, t, {
+function Fl(e, t, n, r, i, a) {
+	let o = j(t), s = r.distributeur, c = (e) => !!e && e !== s && e.id !== a && z(e), l = (t) => (e.ballon.x - t.pos.x) * o > -.5, u = e.blocPrepare?.cote === t ? e.blocPrepare.ids.map((e) => n.find((t) => t.id === e)).filter(c) : [], d = u.length === 3 ? u : n.filter((t) => t.avant && c(t) && l(t) && (t.pos.y - e.ballon.y) * e.ouvert > -3 && k(t.pos, e.ballon) < 400).sort((t, n) => k(t.pos, e.ballon) - k(n.pos, e.ballon)).slice(0, 3), f = c(r.percuteur) ? r.percuteur : hn(d), p = n.filter((t) => t.avant && c(t) && l(t) && !d.includes(t) && t !== f && (t.pos.y - e.ballon.y) * e.ouvert > 7 && k(t.pos, e.ballon) < 1156), m = n.filter((t) => t.avant && c(t) && k(t.pos, e.ballon) < 3.2 * 3.2).sort((t, n) => k(t.pos, e.ballon) - k(n.pos, e.ballon))[0], { dix: h, douze: g, treize: _ } = r;
+	return h === s && (h = void 0), h && h === g && (g = _, _ = void 0), Ka(e, t, {
 		liste: n,
 		distributeur: s,
 		dix: h,
@@ -50246,42 +51001,42 @@ function Hc(e, t, n, r, i, a) {
 		ailierFerme: n.find((e) => (e.numero === 11 || e.numero === 14) && e !== r.ailierOuvert),
 		percuteur: f,
 		bloc: d.length === 3 ? d : [],
-		percuteurLoin: rr(p),
+		percuteurLoin: hn(p),
 		auRas: m
 	}, i);
 }
-function Uc(e, t, n) {
+function Il(e, t, n) {
 	let r = t.filter(Boolean), i = r[r.length - 1];
 	if (!i || !i.avant || e.rng() > .55) return r;
-	let a = n.filter((e) => e.avant && e !== i && !r.includes(e) && e.role !== "ruck").sort((e, t) => O(e.pos, i.pos) - O(t.pos, i.pos))[0];
+	let a = n.filter((e) => e.avant && e !== i && !r.includes(e) && e.role !== "ruck").sort((e, t) => k(e.pos, i.pos) - k(t.pos, i.pos))[0];
 	return a ? [...r, a] : r;
 }
-function Wc(e, t, n) {
+function Ll(e, t, n) {
 	let r = e.cadenceDetaillee ? e.blocPrepare : null;
 	if (r && t[0]?.cote === r.cote) {
 		let e = t.find((e) => e.id === r.ids[0] && e.id !== n && e.surLeTerrain && e.sanction <= 0 && !e.corps && e.role !== "ruck");
 		if (e) return e;
 	}
 	let i = t.filter((e) => e.avant && e.role !== "ruck" && e.id !== n), a = i.length ? i : t.filter((e) => e.avant && e.id !== n);
-	if (a.length) return [...a].sort((t, n) => O(t.pos, e.ballon) - O(n.pos, e.ballon)).slice(0, 4).sort((e, t) => e.stats.courses - t.stats.courses)[0];
+	if (a.length) return [...a].sort((t, n) => k(t.pos, e.ballon) - k(n.pos, e.ballon)).slice(0, 4).sort((e, t) => e.stats.courses - t.stats.courses)[0];
 }
-function Gc(e, t) {
-	let n = H(e, t).filter((e) => e.numero === 11 || e.numero === 14 || e.numero === 15);
+function Rl(e, t) {
+	let n = V(e, t).filter((e) => e.numero === 11 || e.numero === 14 || e.numero === 15);
 	if (n.length < 2) return !1;
 	let r = 0;
 	for (let t of n) Math.abs(t.pos.x - e.ballon.x) < 22 && r++;
 	return r >= 2;
 }
-function Kc(e, t) {
-	let n = M(t.pos, t.cote);
-	return me(t.pos, t.cote) ? "degagement" : n < 28 ? t.pied > 60 && e.rng() < .35 ? "transversale" : "rasant" : he(t.pos, t.cote) ? t.pied > 62 && Gc(e, j(t.cote)) ? "cinquanteVingtDeux" : "occupation" : t.numero === 9 ? "chandelle" : "occupation";
+function zl(e, t) {
+	let n = N(t.pos, t.cote);
+	return we(t.pos, t.cote) ? "degagement" : n < 28 ? t.pied > 60 && e.rng() < .35 ? "transversale" : "rasant" : Te(t.pos, t.cote) ? t.pied > 62 && Rl(e, M(t.cote)) ? "cinquanteVingtDeux" : "occupation" : t.numero === 9 ? "chandelle" : "occupation";
 }
-function qc(e, t, n, r = !1) {
-	let i = A(t.cote), a = t.pos.y < 35 ? 0 : 70, o = a === 0 ? 1 : -1, s = Math.abs(t.pos.y - a), c = r ? 99 : ol(e, t), l = k((t.pied - 40) / 50, 0, 1), u = .82 + .18 * t.endurance / 100, d = c < 2.2 ? .26 : c < 4 ? .13 : c < 7 ? .05 : 0, f = (e.rng() + e.rng() + e.rng()) / 3, p = k((.38 + .47 * l) * u + (f - .5) * (1.05 - .35 * l) - d + (r ? .14 : 0), 0, 1), m = !r && c < 2.2 && e.rng() < .1 + (.5 - p) * .12, h = (t.numero === 9 && !r ? Math.min(n, 20 + t.pied / 5) : n) * (.32 + .72 * p), g = k(1.3 + h / 24, 1.5, 3.1), _ = .25 + .4 * p;
+function Bl(e, t, n, r = !1) {
+	let i = j(t.cote), a = t.pos.y < 35 ? 0 : 70, o = a === 0 ? 1 : -1, s = Math.abs(t.pos.y - a), c = r ? 99 : $l(e, t), l = A((t.pied - 40) / 50, 0, 1), u = .82 + .18 * t.endurance / 100, d = c < 2.2 ? .26 : c < 4 ? .13 : c < 7 ? .05 : 0, f = (e.rng() + e.rng() + e.rng()) / 3, p = A((.38 + .47 * l) * u + (f - .5) * (1.05 - .35 * l) - d + (r ? .14 : 0), 0, 1), m = !r && c < 2.2 && e.rng() < .1 + (.5 - p) * .12, h = (t.numero === 9 && !r ? Math.min(n, 20 + t.pied / 5) : n) * (.32 + .72 * p), g = A(1.3 + h / 24, 1.5, 3.1), _ = .25 + .4 * p;
 	if (m) return {
 		arrivee: {
-			x: k(t.pos.x + i * (2 + e.rng() * 4), 12, 110),
-			y: k(t.pos.y + (e.rng() * 6 - 3), 2, 68)
+			x: A(t.pos.x + i * (2 + e.rng() * 4), 12, 110),
+			y: A(t.pos.y + (e.rng() * 6 - 3), 2, 68)
 		},
 		trouve: !1,
 		duree: .55,
@@ -50289,13 +51044,13 @@ function qc(e, t, n, r = !1) {
 		contre: !0,
 		longueur: h
 	};
-	let v = k((r ? .05 : .3) - .2 * l + d * .9 + (1 - t.endurance / 100) * .12, r ? .02 : .06, .6), y = e.rng();
+	let v = A((r ? .05 : .3) - .2 * l + d * .9 + (1 - t.endurance / 100) * .12, r ? .02 : .06, .6), y = e.rng();
 	if (y < v * .4) {
 		let n = s * (.3 + .4 * e.rng());
 		return {
 			arrivee: {
-				x: k(t.pos.x + i * h * .85, 13, 109),
-				y: k(a + o * Math.max(5, n), 3, 67)
+				x: A(t.pos.x + i * h * .85, 13, 109),
+				y: A(a + o * Math.max(5, n), 3, 67)
 			},
 			trouve: !1,
 			duree: g,
@@ -50308,8 +51063,8 @@ function qc(e, t, n, r = !1) {
 		let n = Math.max(0, s - 1 - e.rng() * 3), r = Math.sqrt(Math.max(h * h - n * n, (h * .35) ** 2));
 		return {
 			arrivee: {
-				x: k(t.pos.x + i * r, 13, 109),
-				y: k(t.pos.y + (a === 0 ? -1 : 1) * n, 1, 69)
+				x: A(t.pos.x + i * r, 13, 109),
+				y: A(t.pos.y + (a === 0 ? -1 : 1) * n, 1, 69)
 			},
 			trouve: !1,
 			duree: g,
@@ -50321,7 +51076,7 @@ function qc(e, t, n, r = !1) {
 	let b = Math.sqrt(Math.max(h * h - s * s, (h * .25) ** 2));
 	return {
 		arrivee: {
-			x: k(t.pos.x + i * b, 8, 114),
+			x: A(t.pos.x + i * b, 8, 114),
 			y: a === 0 ? -1 : 71
 		},
 		trouve: !0,
@@ -50331,84 +51086,84 @@ function qc(e, t, n, r = !1) {
 		longueur: h
 	};
 }
-function Jc(e, t, n) {
-	let r = A(t.cote);
+function Vl(e, t, n) {
+	let r = j(t.cote);
 	t.stats.coupsDePied += 1, e.dernierPasseur = null;
 	let i = 24 + t.pied / 3.2;
 	switch (n) {
 		case "drop": {
-			let n = lo(e, t.cote);
+			let n = Ho(e, t.cote);
 			t.stats.butsTentes += 1;
-			let i = M(t.pos, t.cote) + 11;
-			if (z(e)) {
-				let a = $r(e, t), o = k(fc(i, Math.abs(t.pos.y - 35), t.pied) - .1 - uc(e, t.cote, i) - Math.max(0, 7 - a) * .035 - (100 - t.endurance) * .001, .05, .9), s = a < 3.4 && e.rng() < (3.4 - a) * .2, c = !s && e.rng() < .05 + Math.max(0, 6 - a) * .02 + (100 - t.pied) / 900, l = !s && !c && !!(e.scoreSurTerrain || n.penalites > 0) && e.rng() < o;
+			let i = N(t.pos, t.cote) + 11;
+			if (R(e)) {
+				let a = Di(e, t), o = A(ol(i, Math.abs(t.pos.y - 35), t.pied) - .1 - il(e, t.cote, i) - Math.max(0, 7 - a) * .035 - (100 - t.endurance) * .001, .05, .9), s = a < 3.4 && e.rng() < (3.4 - a) * .2, c = !s && e.rng() < .05 + Math.max(0, 6 - a) * .02 + (100 - t.pied) / 900, l = !s && !c && !!(e.scoreSurTerrain || n.penalites > 0) && e.rng() < o;
 				if (s || c) {
 					let n = e.rng(), i = s ? {
-						x: k(t.pos.x + r * (1.5 + n * 2.5), 1, 121),
-						y: k(t.pos.y + (e.rng() - .5) * 5, 1, 69)
+						x: A(t.pos.x + r * (1.5 + n * 2.5), 1, 121),
+						y: A(t.pos.y + (e.rng() - .5) * 5, 1, 69)
 					} : {
-						x: k(t.pos.x + r * (9 + n * 9), 1, 121),
-						y: k(t.pos.y + (e.rng() - .5) * 12, 1, 69)
+						x: A(t.pos.x + r * (9 + n * 9), 1, 121),
+						y: A(t.pos.y + (e.rng() - .5) * 12, 1, 69)
 					};
 					return e.dropEnCours = {
 						auteurId: t.id,
 						reussi: !1,
 						issue: s ? "contre" : "malFrappe"
-					}, X(e, t, i, "drop", s ? .45 : 1.1, s ? .3 : .5, void 0, !1, {});
+					}, Y(e, t, i, "drop", s ? .45 : 1.1, s ? .3 : .5, void 0, !1, {});
 				}
-				let u = Hi(t.pos, t.cote, l, e.rng(), e.rng(), e.rng(), dc(e, t));
+				let u = ya(t.pos, t.cote, l, e.rng(), e.rng(), e.rng(), al(e, t));
 				return e.dropEnCours = {
 					auteurId: t.id,
 					reussi: l,
 					issue: u.issue
-				}, X(e, t, u.vers, "drop", u.duree, .5, void 0, !1, {
+				}, Y(e, t, u.vers, "drop", u.duree, .5, void 0, !1, {
 					derive: u.derive,
 					ricochet: u.ricochet
 				});
 			}
-			let a = !!(e.scoreSurTerrain || n.penalites > 0) && e.rng() < fc(i, Math.abs(t.pos.y - 35), t.pied);
+			let a = !!(e.scoreSurTerrain || n.penalites > 0) && e.rng() < ol(i, Math.abs(t.pos.y - 35), t.pied);
 			e.dropEnCours = {
 				auteurId: t.id,
 				reussi: a
 			};
-			let o = a ? .5 : e.rng(), s = Vi(t.pos, t.cote, a, o, o * 7.31 % 1, o * 13.7 % 1);
-			return X(e, t, s.vers, "drop", s.duree, .7);
+			let o = a ? .5 : e.rng(), s = va(t.pos, t.cote, a, o, o * 7.31 % 1, o * 13.7 % 1);
+			return Y(e, t, s.vers, "drop", s.duree, .7);
 		}
 		case "degagement": {
 			if (e.cadenceDetaillee) {
-				let n = qc(e, t, i);
-				return J(e, "pied", t.cote, n.contre ? `Le coup de pied de ${t.nom} est contré !` : F(e.rng, ht, { nom: t.nom }), 0, t.moi), X(e, t, n.arrivee, n.contre ? "rasant" : n.trouve ? "degagement" : "occupation", n.duree, n.hauteur);
+				let n = Bl(e, t, i);
+				return q(e, "pied", t.cote, n.contre ? `Le coup de pied de ${t.nom} est contré !` : F(e.rng, Et, { nom: t.nom }), 0, t.moi), Y(e, t, n.arrivee, n.contre ? "rasant" : n.trouve ? "degagement" : "occupation", n.duree, n.hauteur);
 			}
 			let n = e.rng() < .85 + t.pied / 500, a = n ? {
-				x: k(t.pos.x + r * i, 8, 114),
+				x: A(t.pos.x + r * i, 8, 114),
 				y: t.pos.y < 35 ? -1 : 71
 			} : {
-				x: k(t.pos.x + r * (i + 6), 13, 109),
-				y: k(t.pos.y + (e.rng() * 18 - 9), 4, 66)
+				x: A(t.pos.x + r * (i + 6), 13, 109),
+				y: A(t.pos.y + (e.rng() * 18 - 9), 4, 66)
 			};
-			return J(e, "pied", t.cote, F(e.rng, ht, { nom: t.nom }), 0, t.moi), X(e, t, a, n ? "degagement" : "occupation", 2.6, .5);
+			return q(e, "pied", t.cote, F(e.rng, Et, { nom: t.nom }), 0, t.moi), Y(e, t, a, n ? "degagement" : "occupation", 2.6, .5);
 		}
 		case "cinquanteVingtDeux": {
 			let n = t.cote === "A" ? 97 : 25, a = e.rng() < .3 + t.pied / 320, o = a ? {
 				x: n,
 				y: t.pos.y < 35 ? -1 : 71
 			} : {
-				x: k(t.pos.x + r * (i - 6), 15, 107),
-				y: k(t.pos.y + (e.rng() * 16 - 8), 4, 66)
+				x: A(t.pos.x + r * (i - 6), 15, 107),
+				y: A(t.pos.y + (e.rng() * 16 - 8), 4, 66)
 			};
-			return a || J(e, "pied", t.cote, F(e.rng, yt, { nom: t.nom }), 0, t.moi), X(e, t, o, a ? "cinquanteVingtDeux" : "occupation", 2.8, .6);
+			return a || q(e, "pied", t.cote, F(e.rng, At, { nom: t.nom }), 0, t.moi), Y(e, t, o, a ? "cinquanteVingtDeux" : "occupation", 2.8, .6);
 		}
 		case "chandelle": {
 			let n = {
-				x: k(t.pos.x + r * (19 + e.rng() * 7), 14, 108),
-				y: k(t.pos.y + e.ouvert * (4 + e.rng() * 9), 4, 66)
+				x: A(t.pos.x + r * (19 + e.rng() * 7), 14, 108),
+				y: A(t.pos.y + e.ouvert * (4 + e.rng() * 9), 4, 66)
 			};
-			return J(e, "pied", t.cote, F(e.rng, _t, { nom: t.nom }), 0, t.moi), X(e, t, n, "chandelle", 3.4, 1);
+			return q(e, "pied", t.cote, F(e.rng, Ot, { nom: t.nom }), 0, t.moi), Y(e, t, n, "chandelle", 3.4, 1);
 		}
 		case "rasant": {
-			if (z(e)) {
+			if (R(e)) {
 				let n = 12 + e.rng() * 7, i = {
-					x: Z(t.pos.x + r * n),
+					x: X(t.pos.x + r * n),
 					y: t.pos.y
 				}, a = -1;
 				for (let o of [
@@ -50419,59 +51174,59 @@ function Jc(e, t, n) {
 					-10
 				]) {
 					let s = {
-						x: Z(t.pos.x + r * n),
-						y: k(t.pos.y + o, 4, 66)
-					}, c = Gt(e, j(t.cote), s) - Math.abs(o) * .12;
+						x: X(t.pos.x + r * n),
+						y: A(t.pos.y + o, 4, 66)
+					}, c = rn(e, M(t.cote), s) - Math.abs(o) * .12;
 					c > a && (a = c, i = s);
 				}
-				let o = (1 - k(t.pied, 40, 95) / 100) * 7;
-				return i.y = k(i.y + (e.rng() - .5) * o, 3, 67), J(e, "pied", t.cote, F(e.rng, bt, { nom: t.nom }), 0, t.moi), X(e, t, i, "rasant", .9 + n / 22, .1);
+				let o = (1 - A(t.pied, 40, 95) / 100) * 7;
+				return i.y = A(i.y + (e.rng() - .5) * o, 3, 67), q(e, "pied", t.cote, F(e.rng, jt, { nom: t.nom }), 0, t.moi), Y(e, t, i, "rasant", .9 + n / 22, .1);
 			}
 			let n = {
-				x: k(t.pos.x + r * (13 + e.rng() * 8), 12, 110),
-				y: k(t.pos.y + e.ouvert * (e.rng() * 10 - 2), 3, 67)
+				x: A(t.pos.x + r * (13 + e.rng() * 8), 12, 110),
+				y: A(t.pos.y + e.ouvert * (e.rng() * 10 - 2), 3, 67)
 			};
-			return J(e, "pied", t.cote, F(e.rng, bt, { nom: t.nom }), 0, t.moi), X(e, t, n, "rasant", 1.5, .1);
+			return q(e, "pied", t.cote, F(e.rng, jt, { nom: t.nom }), 0, t.moi), Y(e, t, n, "rasant", 1.5, .1);
 		}
 		case "parDessus": {
 			let n = {
-				x: k(t.pos.x + r * (9 + e.rng() * 5), 12, 110),
-				y: k(t.pos.y + e.ouvert * (.5 + e.rng() * 4), 3, 67)
+				x: A(t.pos.x + r * (9 + e.rng() * 5), 12, 110),
+				y: A(t.pos.y + e.ouvert * (.5 + e.rng() * 4), 3, 67)
 			};
-			return J(e, "pied", t.cote, `Petit coup de pied par-dessus de ${t.nom} : il se lance derrière le rideau.`, 0, t.moi), X(e, t, n, "parDessus", 1.2, .5);
+			return q(e, "pied", t.cote, `Petit coup de pied par-dessus de ${t.nom} : il se lance derrière le rideau.`, 0, t.moi), Y(e, t, n, "parDessus", 1.2, .5);
 		}
 		case "transversale": {
-			if (z(e)) {
-				let n = H(e, t.cote).filter((e) => (e.numero === 11 || e.numero === 14) && B(e) && (e.pos.x - t.pos.x) * r <= .5).sort((e, n) => Math.abs(n.pos.y - t.pos.y) - Math.abs(e.pos.y - t.pos.y))[0];
+			if (R(e)) {
+				let n = V(e, t.cote).filter((e) => (e.numero === 11 || e.numero === 14) && z(e) && (e.pos.x - t.pos.x) * r <= .5).sort((e, n) => Math.abs(n.pos.y - t.pos.y) - Math.abs(e.pos.y - t.pos.y))[0];
 				if (n) {
-					let i = k(1.55 + Math.abs(n.pos.y - t.pos.y) / 30, 1.8, 2.9), a = Math.min(n.vitesseMax * i * .62, 20), o = (1 - k(t.pied, 40, 95) / 100) * 9, s = {
-						x: k(Math.max(t.pos.x * r, n.pos.x * r) * r + r * (a * .7 + (e.rng() - .5) * o), 6, 116),
-						y: k(n.pos.y + (e.rng() - .5) * o, 3.5, 66.5)
+					let i = A(1.55 + Math.abs(n.pos.y - t.pos.y) / 30, 1.8, 2.9), a = Math.min(n.vitesseMax * i * .62, 20), o = (1 - A(t.pied, 40, 95) / 100) * 9, s = {
+						x: A(Math.max(t.pos.x * r, n.pos.x * r) * r + r * (a * .7 + (e.rng() - .5) * o), 6, 116),
+						y: A(n.pos.y + (e.rng() - .5) * o, 3.5, 66.5)
 					};
-					return J(e, "pied", t.cote, F(e.rng, xt, { nom: t.nom }), 0, t.moi), L(e, n, "call_ball", 1.1, n.pos.y > t.pos.y ? "g" : "d"), X(e, t, s, "transversale", i, .9);
+					return q(e, "pied", t.cote, F(e.rng, Mt, { nom: t.nom }), 0, t.moi), L(e, n, "call_ball", 1.1, n.pos.y > t.pos.y ? "g" : "d"), Y(e, t, s, "transversale", i, .9);
 				}
 			}
-			let n = H(e, t.cote).filter((e) => e.numero === 11 || e.numero === 14).sort((e, n) => Math.abs(n.pos.y - t.pos.y) - Math.abs(e.pos.y - t.pos.y))[0], i = {
-				x: k(t.pos.x + r * 20, 15, 107),
-				y: n ? n.pos.y : k(35 + e.ouvert * 26, 5, 65)
+			let n = V(e, t.cote).filter((e) => e.numero === 11 || e.numero === 14).sort((e, n) => Math.abs(n.pos.y - t.pos.y) - Math.abs(e.pos.y - t.pos.y))[0], i = {
+				x: A(t.pos.x + r * 20, 15, 107),
+				y: n ? n.pos.y : A(35 + e.ouvert * 26, 5, 65)
 			};
-			return J(e, "pied", t.cote, F(e.rng, xt, { nom: t.nom }), 0, t.moi), X(e, t, i, "transversale", 2.6, .9);
+			return q(e, "pied", t.cote, F(e.rng, Mt, { nom: t.nom }), 0, t.moi), Y(e, t, i, "transversale", 2.6, .9);
 		}
 		default: {
 			let n = e.rng() < .65;
 			if (n && e.cadenceDetaillee) {
-				let n = qc(e, t, i);
-				return J(e, "pied", t.cote, n.contre ? `Le coup de pied de ${t.nom} est contré !` : F(e.rng, gt, { nom: t.nom }), 0, t.moi), X(e, t, n.arrivee, n.contre ? "rasant" : n.trouve ? "degagement" : "occupation", n.duree, n.hauteur);
+				let n = Bl(e, t, i);
+				return q(e, "pied", t.cote, n.contre ? `Le coup de pied de ${t.nom} est contré !` : F(e.rng, Dt, { nom: t.nom }), 0, t.moi), Y(e, t, n.arrivee, n.contre ? "rasant" : n.trouve ? "degagement" : "occupation", n.duree, n.hauteur);
 			}
 			let a = {
-				x: k(t.pos.x + r * i, 13, 109),
-				y: n ? t.pos.y < 35 ? -1 : 71 : k(t.pos.y + (e.rng() * 22 - 11), 3, 67)
+				x: A(t.pos.x + r * i, 13, 109),
+				y: n ? t.pos.y < 35 ? -1 : 71 : A(t.pos.y + (e.rng() * 22 - 11), 3, 67)
 			};
-			return J(e, "pied", t.cote, F(e.rng, gt, { nom: t.nom }), 0, t.moi), X(e, t, a, n ? "degagement" : "occupation", 3, .8);
+			return q(e, "pied", t.cote, F(e.rng, Dt, { nom: t.nom }), 0, t.moi), Y(e, t, a, n ? "degagement" : "occupation", 3, .8);
 		}
 	}
 }
-var Yc = {
+var Hl = {
 	16: 52,
 	17: 50,
 	18: 50,
@@ -50481,27 +51236,27 @@ var Yc = {
 	22: 66,
 	23: 62
 };
-function Xc(e, t, n, r) {
-	return n.cote !== t || r.cote !== t || n.surLeTerrain || !r.surLeTerrain ? !1 : (r.surLeTerrain = !1, n.surLeTerrain = !0, n.poste = r.poste, n.avant = r.avant, n.numeroMaillot ??= n.numero, n.numero = r.numero, r.remplace = !0, n.role = r.role, n.buteur = r.buteur, n.capitaine = r.capitaine, n.battu = 0, n.horsJeu = !1, e.placement?.[r.id] && (e.placement[n.id] = { ...e.placement[r.id] }, delete e.placement[r.id]), e.conquete?.cibleId === r.id && (e.conquete.cibleId = n.id), e.tir?.buteur === r && (e.tir.buteur = n, e.tir.routine = xi(n)), e.piedPrepare?.auteurId === r.id && (e.piedPrepare.auteurId = n.id), e.lancement && (e.lancement.chaine = e.lancement.chaine.map((e) => e === r ? n : e)), e.porteur === r && (e.porteur = n), L(e, n, "substitution", 1.8), n.pos = {
+function Ul(e, t, n, r) {
+	return n.cote !== t || r.cote !== t || n.surLeTerrain || !r.surLeTerrain ? !1 : (r.surLeTerrain = !1, n.surLeTerrain = !0, n.poste = r.poste, n.avant = r.avant, n.numeroMaillot ??= n.numero, n.numero = r.numero, r.remplace = !0, n.role = r.role, n.buteur = r.buteur, n.capitaine = r.capitaine, n.battu = 0, n.horsJeu = !1, e.placement?.[r.id] && (e.placement[n.id] = { ...e.placement[r.id] }, delete e.placement[r.id]), e.conquete?.cibleId === r.id && (e.conquete.cibleId = n.id), e.tir?.buteur === r && (e.tir.buteur = n, e.tir.routine = Qi(n)), e.piedPrepare?.auteurId === r.id && (e.piedPrepare.auteurId = n.id), e.lancement && (e.lancement.chaine = e.lancement.chaine.map((e) => e === r ? n : e)), e.porteur === r && (e.porteur = n), L(e, n, "substitution", 1.8), n.pos = {
 		x: r.pos.x,
 		y: r.pos.y
-	}, n.cible = { ...r.cible }, N(n), t === "A" ? e.remplacementsA += 1 : e.remplacementsB += 1, J(e, "remplacement", t, F(e.rng, At, {
+	}, n.cible = { ...r.cible }, P(n), t === "A" ? e.remplacementsA += 1 : e.remplacementsB += 1, q(e, "remplacement", t, F(e.rng, Vt, {
 		entrant: n.nom,
 		sortant: r.nom,
-		club: Y(e, t)
+		club: J(e, t)
 	}), 0, n.moi || r.moi), !0);
 }
-function Zc(e) {
-	if (!Ye.has(e.phase)) return;
+function Wl(e) {
+	if (!ot.has(e.phase)) return;
 	let t = (e) => c[e.poste]?.famille;
 	for (let n of ["A", "B"]) {
 		if ((n === "A" ? e.remplacementsA : e.remplacementsB) >= 8) continue;
-		let r = H(e, n), i = e.pions.filter((e) => e.cote === n && !e.surLeTerrain && !e.remplace && e.sanction <= 0 && e.minutes === 0);
+		let r = V(e, n), i = e.pions.filter((e) => e.cote === n && !e.surLeTerrain && !e.remplace && e.sanction <= 0 && e.minutes === 0);
 		if (!i.length) continue;
 		let a = e.remplacementsDemandes[n];
 		if (a) {
 			let t = i.find((e) => e.sourceId === a.entrantId), o = r.find((e) => e.sourceId === a.sortantId && e.numero <= 15);
-			if (delete e.remplacementsDemandes[n], t && o && Xc(e, n, t, o)) continue;
+			if (delete e.remplacementsDemandes[n], t && o && Ul(e, n, t, o)) continue;
 		}
 		let o = (t) => !t.numeroMaillot && (!t.moi || e.minute >= 62), s = (e) => {
 			let n = r.filter((t) => o(t) && t.poste === e.poste), i = r.filter((n) => o(n) && t(n) === t(e)), a = r.filter((t) => o(t) && t.avant === e.avant);
@@ -50511,7 +51266,7 @@ function Zc(e) {
 			return {
 				p: t,
 				cible: s(t),
-				heure: (Yc[t.numero] ?? 60) + i
+				heure: (Hl[t.numero] ?? 60) + i
 			};
 		}).filter((t) => {
 			if (!t.cible) return !1;
@@ -50520,12 +51275,12 @@ function Zc(e) {
 		}).sort((e, t) => e.heure - t.heure || e.p.numero - t.p.numero);
 		if (!c.length) continue;
 		let l = c[0].p, u = c[0].cible;
-		!u || !l || Xc(e, n, l, u);
+		!u || !l || Ul(e, n, l, u);
 	}
 }
-function Qc(e) {
+function Gl(e) {
 	if (delete e.piedPrepare, e.cadenceDetaillee && (e.tir = null), e.periode === 1) {
-		e.periode = 2, e.sirene = !1, e.t = Ta, e.phase = "miTemps", e.minuteur = ka(e, "miTemps"), e.porteur = null, e.vol = null, e.placement = null, J(e, "jalon", null, I("miTempsScore", {
+		e.periode = 2, e.sirene = !1, e.t = no, e.phase = "miTemps", e.minuteur = oo(e, "miTemps"), e.porteur = null, e.vol = null, e.placement = null, q(e, "jalon", null, I("miTempsScore", {
 			clubA: e.clubA,
 			scoreA: e.scoreA,
 			scoreB: e.scoreB,
@@ -50533,78 +51288,78 @@ function Qc(e) {
 		}));
 		return;
 	}
-	e.scoreSurTerrain || el(e), Kr(e), e.phase = "fini", e.fini = !0, e.porteur = null, e.vol = null, e.bagarre = null, e.intention = null, e.reliquat = 0, J(e, "jalon", null, I("coupSiffletFinal", {
+	e.scoreSurTerrain || ql(e), bi(e), e.phase = "fini", e.fini = !0, e.porteur = null, e.vol = null, e.bagarre = null, e.intention = null, e.reliquat = 0, q(e, "jalon", null, I("coupSiffletFinal", {
 		clubA: e.clubA,
 		scoreA: e.scoreA,
 		scoreB: e.scoreB,
 		clubB: e.clubB
 	}));
 }
-function $c(e) {
-	e.minuteur > 0 || (J(e, "jalon", null, I("deuxiemeMiTemps")), z(e) && (e.cotesInverses = !0), go(e, j(e.possession)));
+function Kl(e) {
+	e.minuteur > 0 || (q(e, "jalon", null, I("deuxiemeMiTemps")), R(e) && (e.cotesInverses = !0), Jo(e, M(e.possession)));
 }
-function el(e) {
+function ql(e) {
 	for (let t of ["A", "B"]) {
-		let n = lo(e, t), r = H(e, t), i = r.find((e) => e.buteur) ?? [...r].sort((e, t) => t.pied - e.pied)[0], a = 0;
+		let n = Ho(e, t), r = V(e, t), i = r.find((e) => e.buteur) ?? [...r].sort((e, t) => t.pied - e.pied)[0], a = 0;
 		for (; (n.essaisTransformes > 0 || n.essaisSecs > 0 || n.penalites > 0) && a++ < 12;) if (n.essaisTransformes > 0) {
 			--n.essaisTransformes;
-			let r = tl(e, t);
-			r && (r.stats.essais += 1), i && (i.stats.butsTentes += 1, i.stats.butsReussis += 1), Fc(e, t, 7), i && (i.stats.pointsAuPied = (i.stats.pointsAuPied ?? 0) + 2), t === "A" ? e.essaisA += 1 : e.essaisB += 1, J(e, "essai", t, I("essaiTransformeFin", { nom: r?.nom ?? Y(e, t) }), 7, r?.moi);
+			let r = Jl(e, t);
+			r && (r.stats.essais += 1), i && (i.stats.butsTentes += 1, i.stats.butsReussis += 1), kl(e, t, 7), i && (i.stats.pointsAuPied = (i.stats.pointsAuPied ?? 0) + 2), t === "A" ? e.essaisA += 1 : e.essaisB += 1, q(e, "essai", t, I("essaiTransformeFin", { nom: r?.nom ?? J(e, t) }), 7, r?.moi);
 		} else if (n.essaisSecs > 0) {
 			--n.essaisSecs;
-			let r = tl(e, t);
-			r && (r.stats.essais += 1), i && (i.stats.butsTentes += 1), Fc(e, t, 5), t === "A" ? e.essaisA += 1 : e.essaisB += 1, J(e, "essai", t, I("essaiFin", { nom: r?.nom ?? Y(e, t) }), 5, r?.moi);
-		} else --n.penalites, i && (i.stats.butsTentes += 1, i.stats.butsReussis += 1), Fc(e, t, 3), i && (i.stats.pointsAuPied = (i.stats.pointsAuPied ?? 0) + 3), J(e, "but", t, I("penaliteFin", { nom: i?.nom ?? Y(e, t) }), 3, i?.moi);
+			let r = Jl(e, t);
+			r && (r.stats.essais += 1), i && (i.stats.butsTentes += 1), kl(e, t, 5), t === "A" ? e.essaisA += 1 : e.essaisB += 1, q(e, "essai", t, I("essaiFin", { nom: r?.nom ?? J(e, t) }), 5, r?.moi);
+		} else --n.penalites, i && (i.stats.butsTentes += 1, i.stats.butsReussis += 1), kl(e, t, 3), i && (i.stats.pointsAuPied = (i.stats.pointsAuPied ?? 0) + 3), q(e, "but", t, I("penaliteFin", { nom: i?.nom ?? J(e, t) }), 3, i?.moi);
 	}
 }
-function tl(e, t) {
-	let n = H(e, t);
+function Jl(e, t) {
+	let n = V(e, t);
 	if (!n.length) return;
 	let r = n.filter((e) => !e.avant), i = r.length && e.rng() < .68 ? r : n;
 	return i[Math.floor(e.rng() * i.length)];
 }
-function nl(e, t) {
+function Yl(e, t) {
 	let n = e.tactiques[t];
 	if (!n) return 0;
-	let r = e.tactiques[j(t)], i = (n.rythme === "intense" ? 3 : n.rythme === "gestion" ? -2 : 0) + (e.impactBanc?.[t] ?? 0);
+	let r = e.tactiques[M(t)], i = (n.rythme === "intense" ? 3 : n.rythme === "gestion" ? -2 : 0) + (e.impactBanc?.[t] ?? 0);
 	return i += n.attaque === "large" ? 1 : n.attaque === "occupation" ? -1 : 0, r && (n.attaque === "large" && r.defense === "blitz" && (i += 2), n.attaque === "large" && r.defense === "glissee" && --i, n.attaque === "avants" && r.defense === "repli" && (i += 1), n.attaque === "occupation" && r.defense === "repli" && --i), i;
 }
-function rl(e, t, n) {
-	let r = lo(e, t), i = Math.max(r.marques, u(n)), a = ci(Math.max(0, i - r.marques), e.rng);
+function Xl(e, t, n) {
+	let r = Ho(e, t), i = Math.max(r.marques, u(n)), a = Ii(Math.max(0, i - r.marques), e.rng);
 	r.essaisTransformes = a.essaisTransformes, r.essaisSecs = a.essaisSecs, r.penalites = a.penalites, r.total = r.marques + a.essaisTransformes * 7 + a.essaisSecs * 5 + a.penalites * 3;
 }
-function il(e, t, n, r = !0, i) {
-	let a = nl(e, "A"), o = nl(e, "B");
+function Zl(e, t, n, r = !0, i) {
+	let a = Yl(e, "A"), o = Yl(e, "B");
 	i !== void 0 && (e.impactBanc ??= {}, e.impactBanc[t] = i), e.tactiques[t] = { ...n };
-	let s = nl(e, "A"), c = nl(e, "B"), l = Math.max(0, 1 - e.t / (2 * Ta)), u = Math.round((s - a) * l), d = Math.round((c - o) * l);
-	u && rl(e, "A", e.planA.total + u), d && rl(e, "B", e.planB.total + d), e.ajustementTactiqueA = s, e.ajustementTactiqueB = c, r && J(e, "jeu", t, I("changementDePlan", { club: Y(e, t) }));
+	let s = Yl(e, "A"), c = Yl(e, "B"), l = Math.max(0, 1 - e.t / (2 * no)), u = Math.round((s - a) * l), d = Math.round((c - o) * l);
+	u && Xl(e, "A", e.planA.total + u), d && Xl(e, "B", e.planB.total + d), e.ajustementTactiqueA = s, e.ajustementTactiqueB = c, r && q(e, "jeu", t, I("changementDePlan", { club: J(e, t) }));
 }
-function al(e, t) {
+function Ql(e, t) {
 	if (e.porteur === t) {
 		let n = null, r = 400;
-		for (let i of H(e, j(t.cote))) {
+		for (let i of V(e, M(t.cote))) {
 			if (i.sanction > 0 || i.battu > 0) continue;
-			let e = O(i.pos, t.pos);
+			let e = k(i.pos, t.pos);
 			e < r && (r = e, n = i);
 		}
 		return n;
 	}
 	return e.porteur && e.porteur.cote !== t.cote ? e.porteur : null;
 }
-function ol(e, t) {
-	let n = al(e, t);
-	return n ? Math.sqrt(O(n.pos, t.pos)) : 99;
+function $l(e, t) {
+	let n = Ql(e, t);
+	return n ? Math.sqrt(k(n.pos, t.pos)) : 99;
 }
-var sl = 4.5;
-function cl(e, t) {
+var eu = 4.5;
+function tu(e, t) {
 	e.echappee = {
 		pion: t,
-		restant: sl
-	}, e.lancement = null, t.moi && (e.perceeJoueur = !0), ni(e, t.cote, ei.percee), J(e, "franchissement", t.cote, I("echappee", { nom: t.nom }), 0, t.moi);
+		restant: eu
+	}, e.lancement = null, t.moi && (e.perceeJoueur = !0), Ai(e, t.cote, Oi.percee), q(e, "franchissement", t.cote, I("echappee", { nom: t.nom }), 0, t.moi);
 }
 //#endregion
 //#region src/lib/moteur/passerelle3D.ts
-var ll = {
+var nu = {
 	France: [
 		"Rémi Garnier",
 		"Loïc Lacombe",
@@ -50640,10 +51395,10 @@ var ll = {
 		"Ollie Blake"
 	]
 };
-function ul(e = "rn26-destiny-26", t = !0) {
-	let n = (e) => xe.map((t, n) => ({
+function ru(e = "rn26-destiny-26", t = !0) {
+	let n = (e) => je.map((t, n) => ({
 		id: `${e}-${n}`,
-		nom: (ll[e] ?? [])[n] ?? `${e} ${n + 1}`,
+		nom: (nu[e] ?? [])[n] ?? `${e} ${n + 1}`,
 		poste: t,
 		age: 26,
 		note: 76 + n % 4,
@@ -50652,14 +51407,14 @@ function ul(e = "rn26-destiny-26", t = !0) {
 		regen: !1,
 		jeuAuPied: n === 9 || n === 14 ? 86 : 65
 	}));
-	return Ba("France", "Angleterre", n("France"), n("Angleterre"), 0, 0, e, void 0, {
+	return vo("France", "Angleterre", n("France"), n("Angleterre"), 0, 0, e, void 0, {
 		scoreSurTerrain: !0,
 		tempsReel: !1,
 		niveau: "pro",
 		cadenceDetaillee: t,
 		placementJoue: t,
-		ia: 3
+		ia: 4
 	});
 }
 //#endregion
-export { Ma as RITUEL_TIR, Aa as TEMPS_MELEE, Va as avancer, ul as creerApercuDestiny, fi as designerRelayeur, Rs as geometrieMelee, Ri as passageAuxPoteaux, Lt as porteurPourAffichage, Fi as positionVol, mi as preparerChenille, zi as tirPasseEntreLesPoteaux };
+export { lo as RITUEL_TIR, so as TEMPS_MELEE, yo as avancer, ru as creerApercuDestiny, Bi as designerRelayeur, bc as geometrieMelee, ha as passageAuxPoteaux, Jt as porteurPourAffichage, fa as positionVol, Hi as preparerChenille, ga as tirPasseEntreLesPoteaux };

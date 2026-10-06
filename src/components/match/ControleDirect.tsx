@@ -22,15 +22,15 @@
 // au pouce), mais elles ignorent la souris et ne couvrent que le bas de l'image.
 
 import {
-  useCallback, useEffect, useRef, useSyncExternalStore,
-  type CSSProperties, type MutableRefObject, type PointerEvent as EvPointeur, type ReactNode,
+  useCallback, useEffect, useRef, useState, useSyncExternalStore,
+  type CSSProperties, type MutableRefObject, type PointerEvent as EvPointeur, type ReactNode, type RefObject,
 } from 'react';
 import { Icone, type NomIcone } from '../Icone';
 import { t } from '../../lib/i18n';
 import {
   SEUIL_MAINTIEN, intentionPiedTactile, type FamillePoste, type Intention, type PilotageDirect, type SnapPilotage,
 } from '../../lib/controleDirect/pilotage';
-import { usePreferencesControle, type PreferencesControle } from '../../lib/controleDirect/prefs';
+import { ecrirePreferencesControle, lirePreferencesControle, usePreferencesControle, type PreferencesControle } from '../../lib/controleDirect/prefs';
 import {
   DEFINITIONS_TOUCHES, libelleDeTouche, type ActionClavier, type TouchesDirectes,
 } from '../../lib/controleDirect/touches';
@@ -86,9 +86,10 @@ export function ControleDirect({ pilotage, surReprendre }: { pilotage: PilotageD
   }, [pilotage, prefs.souris]);
 
   // Le sprint verrouillé s'éteint avec le souffle : le moteur ne le tiendrait plus, le bouton ne doit pas mentir.
+  const essouffle = snap.reserve ? snap.reserve.essouffle : snap.endurance <= 2;
   useEffect(() => {
-    if (snap.endurance <= 2 && sprint.current.verrou) { sprint.current.verrou = false; majSprint(pilotage, sprint.current); }
-  }, [snap.endurance, pilotage]);
+    if (essouffle && sprint.current.verrou) { sprint.current.verrou = false; majSprint(pilotage, sprint.current); }
+  }, [essouffle, pilotage]);
 
   // Hors du jeu (banc, carton, fin de match), plus rien de tactile ne reste « tenu ».
   const enJeu = snap.phase === 'actif';
@@ -119,7 +120,7 @@ export function ControleDirect({ pilotage, surReprendre }: { pilotage: PilotageD
       data-modale={(snap.pause && snap.phase === 'actif') || snap.tuto?.carte || snap.resp.tuto ? 'oui' : undefined}
       style={style}
     >
-      {snap.visible && <Souffle valeur={snap.endurance} />}
+      {snap.visible && <Souffle valeur={snap.endurance} sprint={snap.reserve} />}
       {snap.visible && <Situation snap={snap} />}
       {snap.visible && snap.libre && <Toast snap={snap} />}
 
@@ -127,10 +128,15 @@ export function ControleDirect({ pilotage, surReprendre }: { pilotage: PilotageD
       {/* ⚠️ QUAND LE JEU ATTEND UNE RÉPONSE (capitaine, tir, engagement, touche), le joueur ne conduit plus : ni joystick, ni commandes. */}
       <Joystick pilotage={pilotage} prefs={prefs} sprint={sprint} actif={enJeu && !snap.pause && !occupe} />
       <Gestes pilotage={pilotage} actif={enJeu && !snap.pause && snap.libre && !occupe} />
+      {/* La caméra à 360° (Correctif 23) : le haut de l'écran au doigt, la souris partout où rien ne se clique. */}
+      <ZoneCamera pilotage={pilotage} actif={enJeu && !snap.pause && !occupe} sensibilite={prefs.sensibiliteCamera} />
+      <OrbiteSouris pilotage={pilotage} actif={enJeu && !snap.pause && !occupe} sensibilite={prefs.sensibiliteCamera} racine={racine} sansGauche={prefs.souris} />
 
-      {snap.visible && tactile && !snap.pause && !occupe && (
+      {snap.visible && tactile && !snap.pause && !occupe && !snap.pack && (
         <Commandes pilotage={pilotage} snap={snap} sprint={sprint} />
       )}
+      {/* Le geste dans un pack (Correctif 23) : mêlée, maul, saut, lift, grattage — une piste de temps et un gros bouton. */}
+      {snap.visible && enJeu && !snap.pause && !occupe && snap.pack && <Rythme pilotage={pilotage} snap={snap} tactile={tactile} />}
       {/* Les responsabilités : les panneaux de décision, de tir, d'engagement et de touche — et leurs cartes d'explication. */}
       {snap.visible && enJeu && !snap.pause && <Responsabilites pilotage={pilotage} snap={snap} prefs={prefs} />}
       {/* L'étape « déplace-toi » du tutoriel : un anneau pulse là où le pouce doit se poser. */}
@@ -177,11 +183,92 @@ export function ControleDirect({ pilotage, surReprendre }: { pilotage: PilotageD
 // ---------------------------------------------------------------------------
 
 /** L'endurance : une jauge qui se lit du coin de l'œil, et qui vire à l'orange avant qu'on soit à plat. */
-function Souffle({ valeur }: { valeur: number }) {
+function Souffle({ valeur, sprint }: { valeur: number; sprint: SnapPilotage['reserve'] }) {
+  // Deux réserves : l'endurance générale (fine, lente) et la barre de sprint (franche, qui se vide et se recharge).
+  if (sprint) {
+    return (
+      <div className="cd-souffle" data-deux="oui" data-bas={valeur < 30 ? 'oui' : undefined} data-essouffle={sprint.essouffle ? 'oui' : undefined}
+        title={`${t('cd.souffle')} ${valeur} % · ${t('cd.sprint')} ${sprint.valeur} %`} aria-label={`${t('cd.souffle')} ${valeur} %, ${t('cd.sprint')} ${sprint.valeur} %`}>
+        <Icone nom="batterie" taille={14} />
+        <span className="cd-souffle-barres">
+          <span className="cd-souffle-sprint" style={{ ['--cd-max' as string]: `${borner(sprint.max, 0, 100)}%` }}><i style={{ width: `${borner(sprint.valeur, 0, 100)}%` }} /></span>
+          <span className="cd-souffle-fond"><i style={{ width: `${borner(valeur, 0, 100)}%` }} /></span>
+        </span>
+      </div>
+    );
+  }
   return (
     <div className="cd-souffle" data-bas={valeur < 30 ? 'oui' : undefined} title={t('cd.souffle')} aria-label={`${t('cd.souffle')} ${valeur} %`}>
       <Icone nom="batterie" taille={14} />
       <span><i style={{ width: `${borner(valeur, 0, 100)}%` }} /></span>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// LE RYTHME : le geste du joueur dans un pack (Correctif 23)
+// ---------------------------------------------------------------------------
+
+/** Secondes visibles devant le repère : un temps met ce délai à traverser la piste. */
+const HORIZON_RYTHME = 1.7;
+const COULEURS_Q = ['#ff6b57', '#ffd257', '#7ee08f'];
+
+/**
+ * LA PISTE DE TEMPS. Les temps du pack arrivent de la droite vers un repère ; on appuie quand ils le touchent. Un appui juste
+ * pousse le pack, un temps manqué le fait traîner. Un seul bouton pour trois appareils : la barre d'espace, A, ou le doigt.
+ * ⚠️ Le HUD ne juge rien : il dessine ce que le moteur a décidé (`snap.pack`), et fait avancer les temps entre deux clichés.
+ */
+function Rythme({ pilotage, snap, tactile }: { pilotage: PilotageDirect; snap: SnapPilotage; tactile: boolean }) {
+  const p = snap.pack!;
+  const [, tick] = useState(0);
+  // Les temps avancent à chaque image, entre deux clichés du moteur.
+  useEffect(() => {
+    let id = 0;
+    const boucle = () => { tick((n) => (n + 1) % 1e6); id = requestAnimationFrame(boucle); };
+    id = requestAnimationFrame(boucle);
+    return () => cancelAnimationFrame(id);
+  }, []);
+  const ecoule = (performance.now() - p.recuA) / 1000;
+  const touche = p.type === 'touche';
+  const appuyer = () => { pousser(pilotage, { type: 'action' }); pilotage.vibrer(14); };
+  const cle = `${p.type}${touche ? '.' + p.poste : ''}`;
+  const bouton = p.type === 'ruck' ? t('cd.pack.bouton.ruck') : touche ? t(`cd.pack.bouton.${p.poste === 'lifteur' ? 'lifteur' : 'sauteur'}`) : t('cd.pack.bouton');
+  const titre = p.type === 'melee' && p.poste === 'talonneur' ? t('cd.pack.titre.talonne') : t(`cd.pack.titre.${cle}`);
+  const sorties = p.sorties;
+  // L'explication reste jusqu'à ce que le joueur ait joué deux temps de ce geste, puis elle ne revient plus (mémoire de l'appareil).
+  const aideVue = lirePreferencesControle().tutosContext.includes(`pack.${p.type}`);
+  const jouesNb = p.temps.filter((b) => b.q !== null).length;
+  useEffect(() => {
+    if (!aideVue && jouesNb >= 2) ecrirePreferencesControle({ tutosContext: [...lirePreferencesControle().tutosContext, `pack.${p.type}`].slice(-16) });
+  }, [aideVue, jouesNb, p.type]);
+  const dernier = p.derniere && p.derniere.depuis + ecoule < 1.1 ? p.derniere : null;
+  return (
+    <div className="cd-rythme" data-type={p.type} role="group" aria-label={titre}>
+      <div className="cd-rythme-titre"><b>{titre}</b>
+        {!touche && p.type !== 'ruck' && <span className="cd-rythme-synchro" title={t('cd.pack.synchro')}><i style={{ width: `${Math.round(p.score * 100)}%` }} /></span>}
+      </div>
+      {!aideVue && <p className="cd-rythme-aide">{t(`cd.pack.aide.${p.type}`)}</p>}
+      <div className="cd-rythme-piste">
+        <span className="cd-rythme-repere" />
+        {p.temps.map((b, i) => {
+          const dans = b.dans - ecoule;
+          if (dans > HORIZON_RYTHME || dans < -0.5) return null;
+          const x = 14 + (dans / HORIZON_RYTHME) * 86;
+          return <i key={i} className="cd-rythme-temps" data-q={b.q ?? undefined} style={{ left: `${x}%`, ...(b.q !== null ? { background: COULEURS_Q[b.q] } : {}) }} />;
+        })}
+        {dernier && <em key={dernier.depuis + ':' + dernier.q} className="cd-rythme-verdict" style={{ color: COULEURS_Q[dernier.q] }}>{t(`cd.pack.q.${dernier.q}`)}</em>}
+      </div>
+      <div className="cd-rythme-actions">
+        <button type="button" className="cd-rythme-bouton" onPointerDown={(ev) => { ev.preventDefault(); appuyer(); }}>
+          {tactile ? bouton : <>{bouton} <kbd className="cd-touche">{libelleDeTouche(lirePreferencesControle().touches.action[0])}</kbd></>}
+        </button>
+        {sorties.map((s) => (
+          <button key={s} type="button" className="cd-rythme-sortie" data-actif={p.sortie === s ? 'oui' : undefined}
+            onPointerDown={(ev) => { ev.preventDefault(); pousser(pilotage, s === 'ramasser' ? { type: 'raffut' } : { type: 'passe', cote: 1, longue: false }); }}>
+            {t(`cd.pack.sortie.${s}`)}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -193,6 +280,7 @@ function Situation({ snap }: { snap: SnapPilotage }) {
   if (snap.libre && snap.horsJeu) pastilles.push({ cle: 'cd.horsJeu', ton: 'alerte', icone: 'alerte' });
   if (snap.libre && snap.horsPoste && !snap.porte && !snap.horsJeu) pastilles.push({ cle: 'cd.horsPoste', ton: 'alerte', icone: 'viseur' });
   if (snap.libre && snap.appelActif) pastilles.push({ cle: 'cd.appelActif', ton: 'ok', icone: 'appel' });
+  if (snap.indication) pastilles.push({ cle: `cd.ind.${snap.indication.cle}`, ton: snap.indication.pour ? 'ok' : 'alerte' });
   if (!pastilles.length) return null;
   return (
     <div className="cd-situation" role="status">
@@ -321,6 +409,70 @@ function Joystick({ pilotage, prefs, sprint, actif }: {
 // ---------------------------------------------------------------------------
 // LE BALAYAGE — le ballon en main, un coup de pouce à gauche ou à droite donne la passe
 // ---------------------------------------------------------------------------
+
+/** Radians de rotation par pixel parcouru : un glissé de la largeur d'un téléphone fait un demi-tour. */
+const RAD_PAR_PIXEL = 0.0085;
+
+/**
+ * LA ZONE DE CAMÉRA TACTILE (Correctif 23) : le tiers haut de l'écran. Un doigt qui y glisse tourne la caméra autour du joueur — ni passe,
+ * ni course : les balayages de passe vivent plus bas, et le joystick dans le coin. Glisser vers la droite tourne la vue vers la droite.
+ */
+function ZoneCamera({ pilotage, actif, sensibilite }: { pilotage: PilotageDirect; actif: boolean; sensibilite: number }) {
+  const doigt = useRef<{ id: number; x: number } | null>(null);
+  const poser = (ev: EvPointeur<HTMLDivElement>) => {
+    if (ev.pointerType === 'mouse' || doigt.current || !actif) return;
+    try { ev.currentTarget.setPointerCapture(ev.pointerId); } catch { /* pointeur disparu */ }
+    doigt.current = { id: ev.pointerId, x: ev.clientX };
+    pilotage.tactile.actif = performance.now();
+  };
+  const bouger = (ev: EvPointeur<HTMLDivElement>) => {
+    const d = doigt.current;
+    if (!d || ev.pointerId !== d.id) return;
+    pilotage.orbiter((ev.clientX - d.x) * RAD_PAR_PIXEL * sensibilite);
+    d.x = ev.clientX;
+  };
+  const finir = (ev: EvPointeur<HTMLDivElement>) => { if (doigt.current?.id === ev.pointerId) doigt.current = null; };
+  return (
+    <div className="cd-zone-camera" onPointerDown={poser} onPointerMove={bouger} onPointerUp={finir} onPointerCancel={finir} onContextMenu={(ev) => ev.preventDefault()} />
+  );
+}
+
+/**
+ * LA SOURIS TOURNE LA CAMÉRA (Correctif 23) : un glissé, bouton droit (ou gauche quand la souris ne vise pas le pied), partout où il n'y a
+ * pas de bouton. Les clics sur le HUD, la barre de pause ou les cartes ne tournent rien.
+ */
+function OrbiteSouris({ pilotage, actif, sensibilite, racine, sansGauche }: { pilotage: PilotageDirect; actif: boolean; sensibilite: number; racine: RefObject<HTMLDivElement | null>; sansGauche: boolean }) {
+  useEffect(() => {
+    if (!actif) return;
+    let x: number | null = null, id = -1;
+    const bas = (ev: PointerEvent) => {
+      if (ev.pointerType !== 'mouse') return;
+      const cible = ev.target as HTMLElement | null;
+      if (!cible || !racine.current?.parentElement?.contains(cible)) return;
+      if (cible.closest('button, a, input, select, textarea, [role="dialog"], .cd-bouton, .cd-resp, .tuto-bulle')) return;
+      if (ev.button === 0 && sansGauche) return;
+      if (ev.button !== 0 && ev.button !== 2) return;
+      x = ev.clientX; id = ev.pointerId;
+    };
+    const bouge = (ev: PointerEvent) => {
+      if (x === null || ev.pointerId !== id) return;
+      pilotage.orbiter((ev.clientX - x) * RAD_PAR_PIXEL * sensibilite);
+      x = ev.clientX;
+    };
+    const haut = (ev: PointerEvent) => { if (ev.pointerId === id) x = null; };
+    const menu = (ev: MouseEvent) => { if (racine.current?.parentElement?.contains(ev.target as Node)) ev.preventDefault(); };
+    window.addEventListener('pointerdown', bas);
+    window.addEventListener('pointermove', bouge, { passive: true });
+    window.addEventListener('pointerup', haut);
+    window.addEventListener('pointercancel', haut);
+    window.addEventListener('contextmenu', menu);
+    return () => {
+      window.removeEventListener('pointerdown', bas); window.removeEventListener('pointermove', bouge); window.removeEventListener('pointerup', haut);
+      window.removeEventListener('pointercancel', haut); window.removeEventListener('contextmenu', menu);
+    };
+  }, [pilotage, actif, sensibilite, racine, sansGauche]);
+  return null;
+}
 
 function Gestes({ pilotage, actif }: { pilotage: PilotageDirect; actif: boolean }) {
   const zone = useRef<HTMLDivElement>(null);

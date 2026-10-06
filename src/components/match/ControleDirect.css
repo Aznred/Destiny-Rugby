@@ -52,6 +52,9 @@
   .cd-zone-stick, .cd-zone-gestes { pointer-events: auto; }
 }
 .cd-zone-stick { left: 0; bottom: 0; width: 48%; height: 70%; }
+/* La caméra à 360° : le tiers haut, au-dessus des balayages de passe et du joystick. */
+.cd-zone-camera { position: absolute; left: 0; right: 0; top: 0; height: 30%; touch-action: none; pointer-events: none; }
+@media (any-pointer: coarse) { .cd-zone-camera { pointer-events: auto; } }
 .cd-zone-gestes { right: 0; bottom: 0; top: 16%; width: 54%; }
 .cd[data-joy='droite'] .cd-zone-stick { left: auto; right: 0; }
 .cd[data-joy='droite'] .cd-zone-gestes { right: auto; left: 0; }
@@ -320,6 +323,16 @@
   background: linear-gradient(90deg, #35b76d, #9be26c);
   transition: width 0.4s ease, background 0.3s ease;
 }
+/* Deux réserves : une barre de sprint épaisse (le plafond baisse avec la fatigue) sur l'endurance générale, fine et lente. */
+.cd-souffle[data-deux='oui'] { width: min(30%, 220px); }
+.cd-souffle-barres { flex: 1; display: grid; gap: 2px; background: none !important; height: auto !important; overflow: visible !important; }
+.cd-souffle-barres > span { display: block; border-radius: 3px; background: rgba(255, 255, 255, 0.14); overflow: hidden; position: relative; }
+.cd-souffle-sprint { height: 6px; }
+.cd-souffle-sprint::after { content: ''; position: absolute; top: 0; bottom: 0; left: var(--cd-max, 100%); right: 0; background: repeating-linear-gradient(135deg, rgba(0,0,0,.45) 0 2px, transparent 2px 4px); }
+.cd-souffle-sprint > i { background: linear-gradient(90deg, #3aa8d8, #8fe0ff) !important; }
+.cd-souffle-fond { height: 3px; }
+.cd-souffle[data-essouffle='oui'] .cd-souffle-sprint > i { background: linear-gradient(90deg, #ff8a4d, #ff4d4d) !important; }
+.cd-souffle[data-essouffle='oui'] { color: #ffb066; }
 .cd-souffle[data-bas='oui'] { color: #ffb066; }
 .cd-souffle[data-bas='oui'] > span > i { background: linear-gradient(90deg, #ff8a4d, #ff4d4d); }
 
@@ -655,3 +668,103 @@
   pointer-events: none; opacity: calc(0.35 + var(--cd-opa) * 0.4);
 }
 .cd[data-appareil='clavier'] .cd-hint-swipe, .cd[data-appareil='manette'] .cd-hint-swipe { display: none; }
+
+
+/* ── Le rythme : le geste du joueur dans un pack (Correctif 23) ─────────────────────────────────────── */
+.cd-rythme {
+  position: absolute;
+  left: 50%;
+  bottom: calc(max(30px, env(safe-area-inset-bottom) + 22px));
+  transform: translateX(-50%);
+  width: min(86%, 560px);
+  display: grid;
+  gap: 6px;
+  padding: 8px 12px 10px;
+  border-radius: 14px;
+  background: rgba(4, 14, 8, 0.74);
+  border: 1px solid rgba(244, 205, 99, 0.34);
+  backdrop-filter: blur(4px);
+  pointer-events: auto;
+  touch-action: none;
+  z-index: 3;
+}
+.cd-rythme-titre { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: var(--cd-or, #f4cd63); font-size: 13px; letter-spacing: 0.02em; }
+.cd-rythme-synchro { flex: 0 0 38%; height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.14); overflow: hidden; }
+.cd-rythme-synchro > i { display: block; height: 100%; background: linear-gradient(90deg, #ff8a4d, #ffd257 50%, #7ee08f); transition: width 0.25s ease; }
+.cd-rythme-piste {
+  position: relative;
+  height: 34px;
+  border-radius: 17px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.12));
+  overflow: hidden;
+}
+.cd-rythme-repere {
+  position: absolute;
+  left: 14%;
+  top: 3px;
+  bottom: 3px;
+  width: 30px;
+  transform: translateX(-50%);
+  border: 2px solid var(--cd-or, #f4cd63);
+  border-radius: 50%;
+  box-shadow: 0 0 10px rgba(244, 205, 99, 0.55);
+}
+.cd-rythme-temps {
+  position: absolute;
+  top: 50%;
+  width: 20px;
+  height: 20px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.6);
+}
+.cd-rythme-temps[data-q] { opacity: 0.8; box-shadow: none; }
+.cd-rythme-verdict {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-style: normal;
+  font-weight: 800;
+  font-size: 14px;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+  animation: cd-rythme-verdict 1s ease-out forwards;
+}
+@keyframes cd-rythme-verdict { from { opacity: 1; transform: translateY(-50%) scale(1.25); } to { opacity: 0; transform: translateY(-50%) scale(1); } }
+.cd-rythme-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.cd-rythme-bouton {
+  flex: 1 1 160px;
+  min-height: 52px;
+  border-radius: 26px;
+  border: 2px solid var(--cd-or, #f4cd63);
+  background: radial-gradient(circle at 50% 30%, rgba(244, 205, 99, 0.45), rgba(244, 205, 99, 0.16));
+  color: #fff;
+  font-weight: 800;
+  font-size: 17px;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+.cd-rythme-bouton:active { transform: scale(0.97); background: rgba(244, 205, 99, 0.55); }
+.cd-rythme-sortie {
+  flex: 0 1 auto;
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-size: 14px;
+  cursor: pointer;
+}
+.cd-rythme-sortie[data-actif='oui'] { border-color: #7ee08f; background: rgba(126, 224, 143, 0.25); }
+@media (max-height: 420px) {
+  /* Téléphone en paysage : la carte se range à droite, sous le pouce, et laisse la mêlée à l'image. */
+  .cd-rythme { left: auto; right: calc(max(12px, env(safe-area-inset-right)) + 54px); transform: none; bottom: 8px; width: min(44%, 330px); gap: 4px; padding: 6px 10px 8px; }
+  .cd-rythme-piste { height: 26px; }
+  .cd-rythme-bouton { min-height: 44px; flex-basis: 120px; font-size: 15px; }
+  .cd-rythme-sortie { min-height: 38px; padding: 0 10px; font-size: 13px; }
+  .cd-rythme-aide { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .cd-rythme-verdict { animation: none; opacity: 1; } }
+.cd-rythme-aide { margin: 0; font-size: 12px; line-height: 1.35; color: rgba(255, 255, 255, 0.82); }

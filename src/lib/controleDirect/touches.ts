@@ -19,7 +19,7 @@ import { t } from '../i18n';
 export type ActionClavier =
   | 'haut' | 'bas' | 'gauche' | 'droite' | 'sprint'
   | 'passeGauche' | 'passeDroite' | 'coupDePied' | 'raffut' | 'crochet'
-  | 'action' | 'appel' | 'gratter' | 'aide' | 'pause' | 'drop';
+  | 'action' | 'appel' | 'gratter' | 'aide' | 'pause' | 'drop' | 'camGauche' | 'camDroite';
 
 export interface DefinitionTouche {
   id: ActionClavier;
@@ -47,6 +47,8 @@ export const DEFINITIONS_TOUCHES: DefinitionTouche[] = [
   { id: 'gratter', cle: 'cd.touche.gratter', aide: 'cd.touche.gratter.aide', groupe: 'sansBallon' },
   { id: 'aide', cle: 'cd.touche.aide', aide: 'cd.touche.aide.aide', groupe: 'jeu' },
   { id: 'pause', cle: 'cd.touche.pause', aide: 'cd.touche.pause.aide', groupe: 'jeu' },
+  { id: 'camGauche', cle: 'cd.touche.camGauche', aide: 'cd.touche.camGauche.aide', groupe: 'jeu' },
+  { id: 'camDroite', cle: 'cd.touche.camDroite', aide: 'cd.touche.camDroite.aide', groupe: 'jeu' },
 ];
 
 export type TouchesDirectes = Record<ActionClavier, string[]>;
@@ -68,6 +70,8 @@ export const TOUCHES_PAR_DEFAUT: Readonly<TouchesDirectes> = {
   gratter: ['KeyG'],
   aide: ['KeyH'],
   pause: ['KeyP'],
+  camGauche: ['KeyJ'],
+  camDroite: ['KeyL'],
 };
 
 export function copierTouches(t0: Readonly<TouchesDirectes> = TOUCHES_PAR_DEFAUT): TouchesDirectes {

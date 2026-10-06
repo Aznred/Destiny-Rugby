@@ -343,9 +343,12 @@ console.log('— La touche à la main : annoncer, lancer, jouer vite —');
   // Le lancer : il attend le geste.
   const t0 = e.t;
   let garde = 0;
-  while (e.minuteur > 0 && garde++ < 2000) pas(e);
-  pas(e, 20);
-  verifier(e.phase === 'touche' && r.attente?.type === 'touche', 'même la formation finie, le match attend son lancer');
+  // Niveau 4 : le déroulé s'arrête AVANT le saut — on ne voit pas le ballon partir avant que le joueur ait lancé.
+  while (!r.attente?.pret && garde++ < 600) pas(e);
+  pas(e, 120);
+  const avancement = 1 - e.minuteur / (e.dureeArret ?? 1);
+  verifier(avancement < 0.42, `le saut n'est pas parti avant le lancer (avancement ${avancement.toFixed(2)})`);
+  verifier(e.phase === 'touche' && r.attente?.type === 'touche' && !!r.attente.pret, 'même la formation faite, le match attend son lancer');
   verifier(e.t === t0, 'horloge arrêtée');
   verifier(lancerLaTouche(e, { puissance: PUISSANCE_TOUCHE.fond, geste: 1 }), 'il lance');
   garde = 0;

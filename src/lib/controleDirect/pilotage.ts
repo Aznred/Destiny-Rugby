@@ -24,6 +24,7 @@ import {
 import type { Camera3D, ReperesScene, Scene3D } from '../match3D';
 import { INDEX_BOUTON, LecteurManette, MANETTE_ABSENTE, type EtatManette, type TypeManette } from './manette';
 import { actionDeLaTouche, apprendreTouche, type ActionClavier } from './touches';
+import { sortiesPossibles } from '../moteur/pack';
 import { lirePreferencesControle, ecrirePreferencesControle } from './prefs';
 import { tutorielsDesactives } from '../tutoriel/memoire';
 import { ExplicationsContextuelles, TutorielDirect, type SnapContexte, type SnapTuto } from './tutoriel';
@@ -84,6 +85,8 @@ export interface SnapPilotage {
   porte: boolean;
   attaque: boolean;
   endurance: number;
+  /** Les deux réserves (Correctif 23) : la barre de sprint, son plafond du moment, et si l'on est essoufflé. `null` : une seule jauge. */
+  reserve: { valeur: number; max: number; essouffle: boolean } | null;
   famille: FamillePoste;
   possible: VueDirecte['possible'];
   contactImminent: boolean;
@@ -108,6 +111,23 @@ export interface SnapPilotage {
   sprint: boolean;
   /** Ce que le jeu attend de lui (capitaine, tir, engagement, touche) et les bandeaux qui l'accompagnent (Correctif 17). */
   resp: SnapResp;
+  /** Son geste dans un pack (Correctif 23) : mêlée, maul, saut ou lift de touche, grattage. `null` hors de ces moments. */
+  pack: SnapPack | null;
+  /** L'indication discrète du moment (« Ballon gratté », « Touche perdue »…) : ce que la scène vient de montrer, jamais plus. */
+  indication: { cle: string; pour: boolean; n: number } | null;
+}
+
+/** Ce que le HUD dessine du geste dans un pack : les temps à venir (en secondes à partir de `recuA`), la justesse, les sorties permises. */
+export interface SnapPack {
+  type: 'melee' | 'maul' | 'touche' | 'ruck';
+  poste: string;
+  score: number;
+  temps: { dans: number; q: 0 | 1 | 2 | null }[];
+  derniere: { q: 0 | 1 | 2; depuis: number } | null;
+  sorties: ('ramasser' | 'passer' | 'detacher')[];
+  sortie: 'ramasser' | 'passer' | 'detacher' | null;
+  /** Instant (performance.now) où ces durées ont été mesurées : le HUD les fait avancer entre deux clichés. */
+  recuA: number;
 }
 
 const DUREE_ENTREE = 1.45;
@@ -227,7 +247,6 @@ export class PilotageDirect {
   /** Les passes « tap ou maintien » : où en est chaque appui. */
   private passes = new Map<string, { debut: number; long: boolean }>();
   private pied: { source: Appareil; depuis: number } | null = null;
-  private manetteDroite = { x: 0, t: 0 };
   private kickVise: { puissance: number } | null = null;
   private veutDernier = false;
   private sprintActuel = false;
@@ -441,6 +460,13 @@ export class PilotageDirect {
     if (cl.fronts.length && !(ma.connectee && ma.activite)) this.appareil = 'clavier';
 
     // ── La direction sur le terrain : ce que le joueur voit droit devant est « devant » ──
+    // ── La caméra à 360° : doigt (haut de l'écran), souris, touches J/L, stick droit de la manette ──
+    scene.modeCamera = prefs.cameraMode;
+    let orbite = this.orbite; this.orbite = 0;
+    orbite += ((tenu('camDroite') ? 1 : 0) - (tenu('camGauche') ? 1 : 0)) * 1.5 * prefs.sensibiliteCamera * dt;
+    if (ma.connectee && Math.abs(ma.droit.x) > 0.05) orbite += ma.droit.x * 2.3 * prefs.sensibiliteCamera * dt;
+    if (orbite) scene.orbiter(orbite);
+
     const mx = rep.avant.x * sy + rep.droite.x * sx;
     const my = rep.avant.y * sy + rep.droite.y * sx;
     commanderDirect(e, vue.libre ? mx : 0, vue.libre ? my : 0, vue.libre && sprint);
@@ -484,6 +510,10 @@ export class PilotageDirect {
   }
 
   /** Le repère unitaire du « côté » d'écran demandé : −1 gauche, +1 droite, en repère terrain. */
+  /** Rotation de caméra demandée par un geste du HUD (doigt, souris), consommée à l'image suivante. */
+  private orbite = 0;
+  orbiter(rad: number): void { if (Number.isFinite(rad)) this.orbite += rad; }
+
   private vers(rep: ReturnType<Scene3D['reperesCamera']>, cote: number) { return produit(rep.droite, cote); }
 
   private intentionsClavier(sortie: Intention[], t: ReturnType<typeof lirePreferencesControle>['touches'], maintenant: number, sx: number, sy: number): void {
@@ -579,13 +609,7 @@ export class PilotageDirect {
         sortie.push(this.piedDepuis(duree, sx, sy, 'manette'));
       }
     }
-    // Le stick droit : un coup sec à gauche ou à droite est un crochet.
-    const dx = ma.droit.x;
-    if (Math.abs(dx) > 0.78 && Math.abs(this.manetteDroite.x) < 0.4 && maintenant - this.manetteDroite.t > 380) {
-      sortie.push({ type: 'crochet', cote: dx > 0 ? 1 : -1 });
-      this.manetteDroite.t = maintenant;
-    }
-    this.manetteDroite.x = dx;
+    // ⚠️ Le stick droit tourne la caméra (Correctif 23) : le coup sec qui valait crochet est parti, le crochet reste sur LB.
     void moi;
   }
 
@@ -639,6 +663,23 @@ export class PilotageDirect {
       case 'pause': this.rappels.surPause(); return;
       case 'aide': ecrirePreferencesControle({ aidePlacement: !lirePreferencesControle().aidePlacement }); return;
       default: break;
+    }
+    // ⚠️ DANS UN PACK (mêlée, maul, saut, grattage), le pion n'est pas libre — c'est justement là que le joueur joue (Correctif 23).
+    const pack = e.direct!.pack;
+    if (pack) {
+      const sorties = sortiesPossibles(pack);
+      switch (i.type) {
+        case 'action': case 'gratter': demanderDirect(e, { action: 'pousser' }); return;
+        case 'passe': {
+          const s = sorties.includes('passer') ? 'passer' : sorties.includes('detacher') ? 'detacher' : null;
+          if (s) demanderDirect(e, { action: 'quitter', sortie: s });
+          return;
+        }
+        case 'raffut': case 'crochet':
+          if (sorties.includes('ramasser')) demanderDirect(e, { action: 'quitter', sortie: 'ramasser' });
+          return;
+        default: return;
+      }
     }
     if (!vue.libre) return;
     switch (i.type) {
@@ -736,8 +777,9 @@ export class PilotageDirect {
       porte: !!v?.porte,
       attaque: !!v?.attaque,
       endurance: Math.round(moi?.endurance ?? 100),
+      reserve: moi?.deuxReserves ? { valeur: Math.round(moi.sprint), max: Math.round(moi.sprintMax), essouffle: !!moi.essoufle } : null,
       famille: moi ? famillePoste(moi) : 'ailier',
-      possible: v?.possible ?? { passe: false, coupDePied: false, raffut: false, crochet: false, plaquage: false, grattage: false, appel: false, feinte: false, engager: false, drop: false },
+      possible: v?.possible ?? { passe: false, coupDePied: false, raffut: false, crochet: false, plaquage: false, grattage: false, appel: false, feinte: false, engager: false, drop: false, pousser: false, quitter: false },
       contactImminent: !!v?.contactImminent,
       horsJeu: !!v?.horsJeu,
       horsPoste: !!v?.horsPoste,
@@ -753,6 +795,14 @@ export class PilotageDirect {
       arme: v?.arme ?? null,
       sprint: this.sprintActuel,
       resp: this.resp.lire,
+      indication: e?.indicationJeu && e.sim - e.indicationJeu.t < 3 && e.sim >= e.indicationJeu.t
+        ? { cle: e.indicationJeu.cle, pour: !!moi && moi.cote === e.indicationJeu.cote, n: Math.round(e.indicationJeu.t * 100) } : null,
+      pack: e && d?.pack ? {
+        type: d.pack.type, poste: d.pack.poste, score: Math.round(d.pack.score * 100) / 100,
+        temps: d.pack.temps.filter((t) => t.t > e.sim - 1.4 && t.t < e.sim + 2.4).map((t) => ({ dans: Math.round((t.t - e.sim) * 100) / 100, q: t.q ?? null })),
+        derniere: d.pack.derniere ? { q: d.pack.derniere.q, depuis: Math.round((e.sim - d.pack.derniere.t) * 10) / 10 } : null,
+        sorties: sortiesPossibles(d.pack), sortie: d.pack.sortie ?? null, recuA: performance.now(),
+      } : null,
     };
   }
 

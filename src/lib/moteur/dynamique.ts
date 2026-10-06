@@ -44,6 +44,8 @@ export function creerArbitre(): ArbitreMatch {
 /** Le botteur porte visuellement le ballon durant l'armé, même sur un renvoi. */
 export function porteurPourAffichage(e: EtatMatch): string | undefined {
   if (e.porteur) return e.porteur.id;
+  // Un grattage réussi : le défenseur s'est relevé ballon en main, avant que le jeu ne reprenne (Correctif 23).
+  if (e.phase === 'ruck' && e.ruck?.duel?.balle) return e.ruck.duel.balle;
   if (!e.piedPrepare || e.vol) return undefined;
   const p = e.pions.find(q => q.id === e.piedPrepare!.auteurId && q.surLeTerrain && q.sanction <= 0);
   return p && !p.corps && Math.hypot(p.pos.x - e.piedPrepare.depuis.x, p.pos.y - e.piedPrepare.depuis.y) < 1

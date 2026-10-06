@@ -1301,6 +1301,73 @@ en une phrase → faire faire l'action → passer à la suivante**, sur les VRAI
 - ⚠️ **Sources du lecteur hors git** : `analyse-rn26/correctif_20_scene.cjs` et `correctif_20_camera.cjs` (sauvegarde d'avant : `sauvegarde-avant-correctif-20/`), puis `node installer_apercu.mjs`.
 - **Pas fait / à essayer** : un vrai iPhone et la PWA (le bug d'orientation) ; les crampons de la boutique paraissent clairs sur certains modèles (textures allégées) ; pas de tutoriel dédié pour la personnalisation.
 
+### Les conquêtes lisibles, les avants et l'endurance (Correctif 23 — carrière solo, 3D)
+
+Demande : « si la possession change, le joueur doit pouvoir comprendre pourquoi rien qu'en regardant la scène » (jamais
+*possession A → variable → ballon chez le 9 de B*), un vrai gameplay pour les avants (mêlée, maul, touche, grattage), un plaquage
+qu'on peut rater, de grosses percussions, une endurance enfin vivable et une caméra à 360°.
+⚠️ **TOUT EST DERRIÈRE `EtatMatch.ia` ≥ 4** (`IA_MATCH_DE_CARRIERE` = 4, `conqueteLisible(e)` dans `moteur/conquete.ts`). La ligue en ligne reste
+en règles 4 / IA 3 : **ne pas bumper `REGLES_MATCH_EN_LIGNE` sans demande** (elle n'a ni film des nouveaux états, ni étalonnage). Empreinte
+du moteur à l'IA 3 inchangée : `IA_EMPREINTE=3 npx vite-node scripts/empreinteMoteur.ts 6` → `94f2ae2e`.
+
+- **Principe : l'issue est DÉCIDÉE AVANT le geste qui la montre, puis APPLIQUÉE après.** Elle vit dans l'état (`conquete.issue`, `ruck.duel`,
+  `melee.dyn`) ; la scène joue ce que l'état annonce ; la phase n'applique plus que ce que tout le monde a vu.
+- **Endurance (`moteur/endurance.ts`)** : deux réserves par pion (`deuxReserves`). `endurance` = générale, qui descend lentement sur 80 minutes
+  (`usureGenerale` 0,6 de l'ancienne loi, plus les efforts du jeu collectif : `coutLien` au ruck, en mêlée, au maul) ; `sprint` (0-100) se vide
+  UNIQUEMENT en sprintant (6,3 points/s) et se recharge en ralentissant (5,2/s à l'arrêt, moins en courant, moins encore fatigué) ; `sprintMax`
+  = 35 + 0,65 × endurance (≈ 85 à la 60ᵉ). Barre vide : `essoufle` jusqu'à 18. Mesuré (`npm run mesure:endurance -- 12 4 regionale`) : un
+  titulaire de Régionale qui sprinte vers chaque ballon finit à 85 / 74 / 67 / 64 aux 20ᵉ / 40ᵉ / 60ᵉ / 78ᵉ (ancien moteur : 25 à la 20ᵉ, 3 à la
+  40ᵉ). HUD : barre de sprint épaisse (hachurée au-delà du plafond) sur l'endurance fine (`snap.reserve`).
+- **Plaquage dirigé** (`plongeonDirige(e)`, `plongeon()`) : plus de « missile ». Le bouton lance le joueur dans la direction de son stick (à défaut :
+  de sa course, puis vers le porteur) pendant 0,72 s ; contact seulement si le porteur est sur la trajectoire (rayon 1,85 m) ; une aide légère
+  redresse le cap vers le porteur s'il est déjà dans un cône de 0,5 rad (jamais 90°). Possible dès 7,5 m : **trop tôt, on tombe dans le vide**.
+  Geste de scène `plongeon` (`dive_tackle_pre`).
+- **Caméra à 360°** (hors git : `analyse-rn26/correctif_23_camera.cjs`) : `scene.orbiter(dYaw)` + `scene.modeCamera = 'assistee' | 'libre'`. Doigt = le
+  tiers haut de l'écran (`ZoneCamera`), souris = glisser bouton droit (gauche si la souris ne vise pas le pied), clavier J/L (remappables), manette =
+  stick droit (⚠️ le crochet « au coup sec du stick droit » est SUPPRIMÉ : LB le fait). Assistée : après 2,2 s sans geste elle revient doucement derrière
+  la course (jamais quand on bat en retraite) ; dans les deux modes une aide douce tient le ballon dans le champ (passe qui arrive, ballon aérien,
+  partenaire qui porte) sans jamais lutter contre un geste. Réglages : mode et vitesse.
+- **Touche** (`moteur.ts` : `preparerLaTouche` → `trancherLaTouche` → `conclureLaTouche`) : l'issue (`IssueTouche` : gagnée, **perdue** — capté par-dessus,
+  arraché des mains ou tapé vers son 9 —, **déviée**, courte, longue, pas droit) est tranchée à 42 % de la formation, AVANT le saut (0,48). Le sauteur
+  d'en face est celui que la scène fait monter (`contreurId`) ; sur une touche perdue il a vraiment le ballon (`porteur = contreur`), et seulement
+  ensuite le 9 le sert. Le talonneur incarné est lanceur par défaut. Quand c'est le joueur qui lance, le déroulé **s'arrête à 38 %** (`attendLeLancer`) :
+  il annonce, il lance, puis on voit sauter. Trois pastilles « Devant / Milieu / Fond » sur les groupes de sauteurs (`scene.ecran`), un clic ou un
+  toucher annonce. Le lancer dépend du lanceur (`qualiteDuLancer(…, lanceur, pression)` : passe, vision, fatigue, pression, distance) : même visé
+  parfaitement, un lancer au fond peut finir court ou long. Sauteur ou lifteur incarné : un temps au signal (bonus ±7,5 sur le duel).
+- **Ruck** (`lancerLeDuelDuRuck` / `appliquerLeDuelDuRuck`, `regroupements.ts` : `choregraphierLeDuel`) : un grattage ou un contre-ruck est une séquence
+  (`ruck.duel`) : le défenseur arrive, se couche sur le ballon (`jackal_engage` → `jackal_struggle` → `jackal_success_standup`, ballon dans ses mains à
+  la dernière étape via `porteurPourAffichage`), ou les défenseurs chargent (effort 1,2), percutent, et le groupe recule de `avancee` mètres (le ballon
+  avec lui). Issues : turnover, attaque conserve, ballon instable, pénalité. Indication discrète `indicationJeu` (« Ballon gratté », « Touche perdue »…).
+  Grattage du joueur : une fenêtre s'ouvre à portée du ballon (défense) ; son appui est le geste ET le timing (parfait +20, correct +12, raté +2 et
+  pénalité probable).
+- **Mêlée** (`PousseeMelee`, `pousserLaMelee`, `trancherLaMelee`, `essaiDeMelee`) : poussée continue, vitesse = 0,055 m/s par point de rapport de force
+  (`duel0` + geste du joueur), position lue par le moteur ET la scène (`geometrieMelee`). Issue tranchée à 45 % de la poussée. Un pack qui domine à
+  moins de 7 m de la ligne garde le ballon aux pieds du 8 et continue (jusqu'à 9 s) : si le ballon franchit la ligne, **essai de poussée**
+  (`tenterEssai(…, 'maul')`, aucun essai à distance). Le 8 conduit peut ramasser et partir ou servir le 9, un flanker se détacher.
+- **Geste du joueur dans un pack** (`moteur/pack.ts`, `PackHumain`, HUD `Rythme`) : une partition de temps (mêlée 0,85 s, maul 0,72 s, un temps pour
+  le saut, un pour le grattage, un coup de talon pour le talonneur) ; chaque appui reçoit 0/1/2 ; `score` glissant → `apportDuGeste` (± bonus par poste :
+  pilier 13, talonneur 11, 2ᵉ ligne 16, 3ᵉ ligne 9, 8 10, × puissance × souffle). Un temps non joué est raté ; un mauvais geste répété peut faire céder
+  son propre pack. Fenêtres plus larges pour le spécialiste (`largeurDeFenetre`). **Le tap est jugé à l'instant du doigt** (`DemandeDirecte.tr` =
+  `e.sim + reliquat`), pas à celui du pas de simulation suivant.
+- **Maul** : le joueur ajoute ±20 points de puissance au pack (en défense il freine) ; un maul stoppé net par le pack d'en face finit en **mêlée pour la
+  défense** (`indicationJeu.melee`) ; sorties « ramasser et partir » (8), « servir le 9 » (8, 2ᵉ ligne), « se détacher » (3ᵉ ligne).
+- **Percussion** (`duels.ts`) : `issueRaffut(…, grosseFrappe)` et `probaPlaquage` donnent à un porteur nettement plus puissant, plus lourd et lancé davantage de
+  chances de percer et de **mettre le défenseur sur les fesses** ; les centres costauds entrent à l'épaule. Rien d'automatique : la fatigue, le plaquage
+  du défenseur et l'angle pèsent.
+- **Scène** (hors git ; sauvegarde `analyse-rn26/sauvegarde-avant-correctif-23/`) : `correctif_23_camera.cjs`, `correctif_23_touche.cjs`, `correctif_23_ruck.cjs`,
+  `correctif_23_plaquage.cjs`, puis `node scripts/construireMoteur3D.mjs` (rebuild + installation).
+- **Bancs** : `npm run verify:conquete -- 12` (touche tranchée avant le saut et perdue pour de vrai, duels de ruck jamais instantanés, mêlée continue sans saut,
+  essai de poussée provoqué, geste du joueur en mêlée/touche/ruck), `npm run mesure:endurance`. Banc visuel pas à pas :
+  `/scripts/apercuConquete.html` (`__conquete.situation('touche'|'ruck'|'melee'|'maul')`, `.avancer(s)`, `.duel('gratte'|'contre', issue)`,
+  `.issueTouche('perdue', variante)`, `.vue({x, y, dist, haut, angle})` pour cadrer). Les bancs C16 et C17 ont été adaptés : le plaquage lancé va « au
+  contact » (plaqué ou manqué), et le lancer humain attend à 38 % de la formation.
+- ⚠️ **Pièges** : la scène ne reçoit PAS les nouveaux états du direct en ligne (ligue) ; une session de test peut être dérangée par l'utilisateur qui joue dans le
+  même panneau (des appuis « fantômes » dans `pack.appuis` viennent de lui) ; `__matchLive.scene` est une fonction ; la page `apercuControleDirect` garde la
+  caméra en `tv` (mettre `sc.moi` et `sc.camera = 'joueur'`) ; le moteur 2D (`cadenceDetaillee` faux) tranche la touche à la fin, sans animation.
+- **Pas fait / à essayer** : un vrai iPhone, une vraie manette, la PWA ; la ligue en ligne (règle 5 : film des nouveaux états) ; un tutoriel guidé
+  dédié aux avants (seule une aide d'une ligne s'affiche aux deux premiers temps) ; des animations de saut propres au « contre » (le contre réutilise les clips
+  de saut de l'APK) ; la stabilité/angle du pilier est résumée par le risque de faute, pas par un second axe.
+
 ## ⚠️ Équilibrage : ce qui ne se retouche pas sans mesurer
 
 ### Difficulté

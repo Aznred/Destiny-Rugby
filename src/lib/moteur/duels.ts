@@ -108,21 +108,31 @@ export type IssueRaffut = 'repousse' | 'equilibre' | 'tombe';
  * ⚠️ UN PETIT ARRIÈRE N'ASSOIT PAS UN PILIER. L'issue se lit sur la puissance,
  * le poids et la vitesse du porteur à l'impact — plus rien n'est tiré au sort.
  */
-export function issueRaffut(porteur: Pion, defenseur: Pion): IssueRaffut {
+export function issueRaffut(porteur: Pion, defenseur: Pion, grosseFrappe = false): IssueRaffut {
   const ascendant = (porteur.puissance - defenseur.puissance) / 9
     + (poids(porteur) - poids(defenseur)) / 13
     + (allure(porteur) - 4.5) / 2.6;
-  // Asseoir un défenseur demande d'arriver LANCÉ : à petite allure, même un pilier ne fait que le déséquilibrer.
-  return ascendant >= 2.1 && allure(porteur) >= 5.2 ? 'tombe' : ascendant >= 0.7 ? 'equilibre' : 'repousse';
+  if (!grosseFrappe) {
+    // Asseoir un défenseur demande d'arriver LANCÉ : à petite allure, même un pilier ne fait que le déséquilibrer.
+    return ascendant >= 2.1 && allure(porteur) >= 5.2 ? 'tombe' : ascendant >= 0.7 ? 'equilibre' : 'repousse';
+  }
+  // ⚠️ LA GROSSE PERCUSSION (Correctif 23, niveau 4). Un porteur puissant, lancé, face à un défenseur plus léger ou mal placé,
+  // le met réellement par terre — mais rien n'est automatique : puissance, poids, vitesse, souffle, angle de l'épaule et
+  // qualité du défenseur y entrent, et un joueur ordinaire ou à bout de course ne fait que le repousser.
+  const fraicheur = 0.8 + 0.2 * Math.max(0, Math.min(100, porteur.endurance)) / 100;
+  const defense = 0.9 + 0.1 * Math.max(0, Math.min(100, defenseur.plaquage)) / 100;
+  const net = (ascendant * fraicheur) / defense;
+  return net >= 1.6 && allure(porteur) >= 4.6 ? 'tombe' : net >= 0.5 ? 'equilibre' : 'repousse';
 }
 
 /** Comment le porteur cherche le contact : bras tendu, ou épaule en avant, ballon protégé. */
 export type GesteContact = 'epaule' | 'torse' | 'percussion';
 
-export function gesteDeContact(porteur: Pion, defenseur: Pion): GesteContact {
+export function gesteDeContact(porteur: Pion, defenseur: Pion, centrePuissant = false): GesteContact {
   // Un avant, ou un gabarit lourd, baisse le centre de gravité et entre à
   // l'épaule ; un trois-quarts garde son vis-à-vis à distance, bras tendu.
-  if (porteur.avant || poids(porteur) >= 104) return 'percussion';
+  // Niveau 4 : un centre ou un ailier costaud, qui plaque et qui frappe fort, entre lui aussi à l'épaule.
+  if (porteur.avant || poids(porteur) >= 104 || (centrePuissant && porteur.puissance >= 74 && poids(porteur) >= 94)) return 'percussion';
   return poids(defenseur) > poids(porteur) + 6 ? 'epaule' : 'torse';
 }
 

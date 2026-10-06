@@ -1,3 +1,4 @@
+// correctif23-touche
 import * as THREE from '/rn26/vendor/three/build/three.module.js';
 import { GLTFLoader } from '/rn26/vendor/three/examples/jsm/loaders/GLTFLoader.js';
 import { clone } from '/rn26/vendor/three/examples/jsm/utils/SkeletonUtils.js';
@@ -968,7 +969,7 @@ export async function creerScene3D(conteneur,options={}){
         if(k>0){hands(lanceur,handA);t.lerp(handA,k);}
       }
     }else if(e.phase==='touche'){
-      const progress=match.progress(offset),thrower=match.players.find(p=>p.number===2&&p.team===match.team),target=actors.get(e.conquete?.cibleId),lanceur=actors.get(thrower?.id);
+      const progress=match.progress(offset),thrower=(e.conquete?.lanceurId&&match.byId.get(e.conquete.lanceurId))||match.players.find(p=>p.number===2&&p.team===match.team),target=actors.get(e.conquete?.cibleId),lanceur=actors.get(thrower?.id);
       const ram=e.conquete?.ramassage,sol=e.conquete?.ballonAuSol;
       if(ram&&ram!=='tenu'&&sol){
         // Le ballon attend derrière la ligne de touche ; il monte dans les mains
@@ -980,7 +981,24 @@ export async function creerScene3D(conteneur,options={}){
         hands(lanceur,t);key='main:'+thrower.id;heading=lanceur.heading;orientation='main';
         if(progress>=.6&&target){
           target.leftHand.getWorldPosition(handA);target.rightHand.getWorldPosition(handB);handA.add(handB).multiplyScalar(.5);
-          const u=clamp((progress-.6)/.22,0,1);t.lerp(handA,u);t.y+=Math.sin(Math.PI*u)*1.2;key='lancer';orientation=u<1?'vol':'main';st.spin+=simDt*9;
+          const u=clamp((progress-.6)/.22,0,1),issue=e.conquete?.issue;
+          // ⚠️ L'ISSUE EST CONNUE AVANT LE SAUT (Correctif 23) : le ballon va où elle l'annonce. Pris par-dessus, arraché des mains,
+          // dévié, ou retombé court ou long — jamais « apparu » chez le 9 adverse.
+          const preneur=issue?.type==='perdue'&&issue.contreurId?actors.get(issue.contreurId):null;
+          let sol=false;
+          if(issue&&(issue.type==='courte'||issue.type==='longue')&&issue.point){const z=xyz(issue.point);handA.set(z.x,SOL+.12,z.z);sol=u>=1;}
+          else if(preneur&&issue.variante!==1){preneur.leftHand.getWorldPosition(handA);preneur.rightHand.getWorldPosition(handB);handA.add(handB).multiplyScalar(.5);}
+          t.lerp(handA,u);t.y+=Math.sin(Math.PI*u)*1.2;key='lancer';orientation=u<1?'vol':'main';st.spin+=simDt*9;
+          if(preneur&&issue.variante===1&&progress>.84){
+            // Arraché : il l'a d'abord aux mains de notre sauteur, puis le tire à lui.
+            preneur.leftHand.getWorldPosition(handB);preneur.rightHand.getWorldPosition(tmp2);handB.add(tmp2).multiplyScalar(.5);
+            t.lerp(handB,smooth(clamp((progress-.84)/.1,0,1)));
+          }
+          if(issue?.type==='devie'&&issue.point&&progress>.84){
+            const z=xyz(issue.point),w=clamp((progress-.84)/.16,0,1);
+            tmp2.set(z.x,SOL+.25,z.z);t.lerp(tmp2,smooth(w));t.y+=Math.sin(Math.PI*w)*.7;key='devie';orientation='vol';st.spin+=simDt*7;
+          }
+          if(sol){key='sol:touche';orientation='libre';}
         }
       }
     }else if(e.phase==='maul'){
@@ -1068,11 +1086,32 @@ export async function creerScene3D(conteneur,options={}){
     const wBvoulu=.22*clamp((db-8)/22,0,1)+1.3*derriere*clamp((db-3)/12,0,1);
     J.wB+=(wBvoulu-J.wB)*(1-Math.exp(-dt/.7));
     let dx=ax+dvx*wV+bx*J.wB,dz=az+dvz*wV+bz*J.wB;
-    const cap=snap||!J.init?null:Math.hypot(dx,dz)>.25?Math.atan2(dx,dz):null;
-    if(!J.init||snap){J.yaw=Math.atan2(ax+dvx*wV,az+dvz*wV);}
-    else if(cap!==null){
-      const delta=Math.atan2(Math.sin(cap-J.yaw),Math.cos(cap-J.yaw));
-      J.yaw+=clamp(delta*(1-Math.exp(-dt*2.4)),-1.1*dt,1.1*dt);
+    // ⚠️ CAMÉRA À 360° (Correctif 23). Le joueur peut la tourner où il veut (`orbiter`) ; deux comportements :
+    //   libre    — elle reste où il l'a mise ;
+    //   assistée — après `delaiAssistee` secondes sans geste, elle revient doucement DERRIÈRE la direction de course (un retard
+    //              fluide : jamais d'à-coup), sauf quand il bat en retraite face au jeu (on ne lui tourne pas le dos).
+    // Dans les deux cas, une aide au ballon redresse la vue quand une passe arrive sur lui, qu'un ballon aérien approche, ou qu'un
+    // partenaire porte tout près — mais plus lentement en mode libre, et jamais contre un geste en cours.
+    const cap=null;
+    J.age=(J.age??99)+dt;
+    if(options.orbite){J.yaw-=options.orbite;options.orbite=0;J.age=0;}
+    if(!J.init||snap){J.yaw=Math.atan2(ax+dvx*wV,az+dvz*wV);J.age=99;}
+    else{
+      const libre=options.cameraLibre===true;
+      let voulu=null,vmax=.9,raideur=1.7;
+      if(!libre&&J.age>2.2&&sp>1.3&&dvx*ax+dvz*az>-.55){voulu=Math.atan2(dvx,dvz);}
+      // Le ballon que la vue doit garder dans le champ.
+      const vol=match.flights.get(options.moi),enVol=vol&&match.time-vol.start<vol.duree+.2;
+      const hautLoin=ballMesh.position.y>2.2&&db<24;
+      const partenaire=match.carrier&&match.carrier!==options.moi&&(match.byId.get(match.carrier)?.team??-1)===equipe&&db<9;
+      if((enVol||hautLoin||partenaire)&&J.age>.6){
+        const ab=Math.atan2(bx,bz),ecart=Math.atan2(Math.sin(ab-J.yaw),Math.cos(ab-J.yaw));
+        if(Math.abs(ecart)>1.05){voulu=ab;vmax=libre?.22:.5;raideur=1.2;}
+      }
+      if(voulu!==null){
+        const delta=Math.atan2(Math.sin(voulu-J.yaw),Math.cos(voulu-J.yaw));
+        J.yaw+=clamp(delta*(1-Math.exp(-dt*raideur)),-vmax*dt,vmax*dt);
+      }
     }
     const fx=Math.sin(J.yaw),fz=Math.cos(J.yaw);
     // Le joueur est dans l'action : il porte, ou le ballon est tout près. Elle se resserre alors d'un sixième.
@@ -1301,6 +1340,10 @@ export async function creerScene3D(conteneur,options={}){
     set suivreMoi(v){options.suivreMoi=v;},
     /** Facteur de recul de la caméra du joueur (réglage du joueur, 1 par défaut). */
     set reculCamera(v){options.reculCamera=v>0?Math.min(1.5,Math.max(.8,v)):1;},
+    /** Tourne la caméra du joueur : `dYaw` en radians, positif = la vue part vers la droite. À appeler à chaque geste. */
+    orbiter(dYaw){if(Number.isFinite(dYaw))options.orbite=(options.orbite||0)+Math.max(-1.6,Math.min(1.6,dYaw));},
+    /** `'libre'` : la caméra reste où le joueur l'a mise ; `'assistee'` : elle revient derrière sa course après un moment. */
+    set modeCamera(v){options.cameraLibre=v==='libre';},get modeCamera(){return options.cameraLibre?'libre':'assistee';},
     /** Les repères à poser sur la pelouse : `{ suggestion, horsPoste, passes: [{id, fort}], plaquage, visee: { arrivee, puissance } }`, ou `null`. */
     set reperes(v){reperes=v||null;},
     get reperes(){return reperes;},

@@ -431,11 +431,23 @@ function PanneauEngagement({ pilotage, snap, prefs }: { pilotage: PilotageDirect
 
 function PanneauTouche({ pilotage, snap, prefs }: { pilotage: PilotageDirect; snap: SnapPilotage; prefs: PreferencesControle }) {
   const r = snap.resp, d = r.touche, v = r.visee;
-  if (!d) return null;
+  if (!d || d.lance) return null;
   const manette = snap.appareil === 'manette';
   const tous: CombinaisonTouche[] = ['avant', 'milieu', 'fond', 'maul', 'leurreAvant', 'leurreMilieu', 'sortieRapide'];
   const choix = d.choix ?? d.annoncee;
   return (
+    <>
+    {/* Les trois groupes de sauteurs, sur la pelouse : on touche celui où l'on veut envoyer le ballon. */}
+    {d.cibles.map((c) => (
+      <button
+        key={c.choix} type="button" className="rv-cible" data-actif={choix === c.choix ? 'oui' : undefined}
+        style={{ left: c.x, top: c.y }} disabled={!d.combinaisons.includes(c.choix)}
+        onClick={() => pilotage.resp.demander({ t: 'combinaison', choix: c.choix })}
+        aria-label={t(`rv.touche.${c.choix}`)}
+      >
+        {t(`rv.touche.${c.choix}`)}
+      </button>
+    ))}
     <section className="rv-carte rv-touche" role="dialog" aria-label={t('rv.tch.titre')}>
       <Entete icone="lanceur" titre={t(d.pret ? 'rv.tch.lancer' : 'rv.tch.annonce')} sous={d.pret ? undefined : t('rv.tch.attente')} reste={r.reste} delai={r.delai} />
       <div className="rv-combos" role="group" aria-label={t('rv.tch.titre')}>
@@ -476,6 +488,7 @@ function PanneauTouche({ pilotage, snap, prefs }: { pilotage: PilotageDirect; sn
         </div>
       )}
     </section>
+    </>
   );
 }
 

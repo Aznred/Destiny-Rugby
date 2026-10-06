@@ -1819,7 +1819,7 @@ Fait avec 🏉 — thème artisanal, front soigné, sans rendu générique.
 
 La retransmission française utilise F5-TTS sur l'ordinateur via un service local. Lancer `Lancer voix F5.cmd` dans l'atelier `../test voice` ; instructions, limites et licences dans [VOIX_LOCALE.md](VOIX_LOCALE.md). La file et les textes de commentaires existants sont conservés.
 
-## Correctifs 16 à 21 (octobre 2026)
+## Correctifs 16 à 23 (octobre 2026)
 
 ### Correctif 16 — le joueur conduit son pion
 - En carrière solo (match en 3D), le joueur **conduit** son personnage dès qu'il est sur le terrain : banc → caméra télé → remplacement animé → caméra derrière lui → commandes. Les vingt-neuf autres gardent l'IA par poste.
@@ -1863,3 +1863,14 @@ La retransmission française utilise F5-TTS sur l'ordinateur via un service loca
 - **Boutique** (Packs, Crédits, Maillots, Joueur) et **Personnalisation** : on n'équipe que ce qu'on possède ; le reste est « À débloquer », avec son prix.
 - **Maillots d'équipe** : un kit habille toute l'équipe (domicile et extérieur) sur le même modèle 3D de maillot, repeint ; maillots, casques et crampons se voient sur leurs modèles 3D, ou sur le joueur.
 - **Labo** : onglet Boutique pour créer des cosmétiques (prix par monnaie, rareté, dates, publié) et monnaie réglable par pack.
+
+
+### Correctif 23 — conquête lisible, avants, endurance, caméra (06/10/2026)
+
+- **Les changements de possession se voient** : une touche perdue est captée (ou arrachée, ou déviée) par le sauteur adverse ; un grattage se joue
+  (le défenseur arrive, se couche sur le ballon, lutte, se relève) ; un contre-ruck charge et recule le groupe de quelques mètres ; un maul stoppé finit en mêlée.
+- **Les avants jouent** : mêlée et maul au rythme (un temps = un appui), saut et lift au signal, grattage au bon moment ; le talonneur lance en touche et choisit
+  son sauteur au doigt ; un pack qui écrase l'autre près de la ligne marque un essai de poussée.
+- **Plaquage dirigé** (on peut plonger dans le vide), **grosses percussions** des joueurs puissants.
+- **Endurance** : une réserve générale lente + une barre de sprint qui se recharge ; **caméra à 360°** (libre ou assistée).
+- Tout est derrière l'IA de niveau 4 (matchs de carrière) ; la ligue en ligne n'est pas touchée. Banc : `npm run verify:conquete`.

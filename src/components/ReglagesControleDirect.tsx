@@ -184,6 +184,23 @@ export function ReglagesControleDirect() {
         <p className="aide">{t('cd.reg.recul.aide')}</p>
       </div>
       <div className="champ">
+        <label>{t('cd.reg.camera')}</label>
+        <div className="choix-langue rcd-choix">
+          {(['assistee', 'libre'] as const).map((m) => (
+            <button key={m} type="button" className={prefs.cameraMode === m ? 'actif' : ''} aria-pressed={prefs.cameraMode === m}
+              onClick={() => ecrirePreferencesControle({ cameraMode: m })}>
+              {t(m === 'assistee' ? 'cd.reg.camera.assistee' : 'cd.reg.camera.libre')}
+            </button>
+          ))}
+        </div>
+        <p className="aide">{t('cd.reg.camera.aide')}</p>
+      </div>
+      <div className="champ rcd-curseur">
+        <label htmlFor="rcd-camvit">{t('cd.reg.camera.vitesse')} <b>{Math.round(prefs.sensibiliteCamera * 100)} %</b></label>
+        <input id="rcd-camvit" type="range" min={50} max={200} step={10} value={Math.round(prefs.sensibiliteCamera * 100)}
+          onChange={(ev) => ecrirePreferencesControle({ sensibiliteCamera: Number(ev.target.value) / 100 })} />
+      </div>
+      <div className="champ">
         <label>{t('cd.reg.joystick')}</label>
         <div className="choix-langue rcd-choix">
           {(['flottant', 'fixe'] as const).map((j) => (

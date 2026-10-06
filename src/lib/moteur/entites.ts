@@ -10,6 +10,7 @@
 
 import type { Coequipier } from '../effectif.js';
 import { attributsDe } from '../carteJoueur.js';
+import { allureDeCourse, effortPermis, facteurAcceleration, partDeSprintIA, pasEndurance } from './endurance.js';
 import { apparenceJoueurMatch } from './apparenceMatch.js';
 import type { PosteId } from '../../types.js';
 import { AXE, LARGEUR, LONGUEUR, borner, type Cote, type Vec } from './terrain.js';
@@ -104,6 +105,16 @@ export interface Pion {
   acceleration: number; // m/s²
 
   endurance: number;    // 100 → 0
+  /**
+   * LES DEUX RÉSERVES (Correctif 23, IA de niveau 4 — voir `endurance.ts`). `endurance` est alors l'endurance GÉNÉRALE, qui
+   * descend lentement sur quatre-vingts minutes ; `sprint` est la courte réserve du sprint, qui se vide en sprintant et se
+   * recharge en ralentissant, plafonnée à `sprintMax`. Sans `deuxReserves`, le moteur d'origine : une seule jauge.
+   */
+  deuxReserves?: boolean;
+  sprint: number;
+  sprintMax: number;
+  /** Barre vide : plus de sprint avant d'avoir regagné `seuilRelance`. */
+  essoufle?: boolean;
   battu: number;        // secondes pendant lesquelles il est hors du coup
   /**
    * ⚠️ HORS-JEU SUR COUP DE PIED : il était DEVANT le botteur au moment du
@@ -218,6 +229,8 @@ export function creerPion(
     vitesseMax: (VITESSE_POSTE[poste] ?? 8) * (0.61 + borner(vitesseNote, 5, 99) / 190),
     acceleration: (ACCEL_POSTE[poste] ?? 4) * (0.55 + borner(vitesseNote, 5, 99) / 145),
     endurance: 100,
+    sprint: 100,
+    sprintMax: 100,
     battu: 0,
     horsJeu: false,
     surLeTerrain: index < 15,
@@ -242,6 +255,8 @@ export function creerPion(
 }
 
 export function vitesseDisponible(p: Pion): number {
+  // Deux réserves (niveau 4) : la fatigue générale n'écrase pas l'allure normale, seul le sprint s'épuise.
+  if (p.deuxReserves) return p.vitesseMax * allureDeCourse(p);
   // À plat, on court encore, mais 25 % moins vite.
   return p.vitesseMax * (0.58 + 0.42 * (p.endurance / 100));
 }
@@ -256,7 +271,8 @@ export function deplacer(p: Pion, dt: number, vif = false): number {
   const dy = p.cible.y - p.pos.y;
   const d = Math.sqrt(dx * dx + dy * dy);
 
-  const vMax = vitesseDisponible(p) * p.effort;
+  const effort = p.deuxReserves ? effortPermis(p, p.effort) : p.effort;
+  const vMax = vitesseDisponible(p) * effort;
   // On freine à l'approche de la cible : sans ça les pions oscillent autour
   // (et un replacement d'un mètre ne mérite pas un sprint).
   const precision = ['ruck', 'maul', 'melee', 'alignement'].includes(p.role) ? .08 : .7;
@@ -275,7 +291,7 @@ export function deplacer(p: Pion, dt: number, vif = false): number {
   let ax = cibleVx - p.vitesse.x;
   let ay = cibleVy - p.vitesse.y;
   const norme = Math.sqrt(ax * ax + ay * ay);
-  const vivacite = 0.65 + 0.35 * (p.endurance / 100);
+  const vivacite = p.deuxReserves ? facteurAcceleration(p) : 0.65 + 0.35 * (p.endurance / 100);
   let maxDv = p.acceleration * vivacite * dt;
   if (vif && ax * p.vitesse.x + ay * p.vitesse.y < 0) maxDv = Math.max(maxDv, FREIN_REGROUPEMENT * dt);
   if (norme > maxDv && norme > 1e-6) { ax = (ax / norme) * maxDv; ay = (ay / norme) * maxDv; }
@@ -296,6 +312,10 @@ export function deplacer(p: Pion, dt: number, vif = false): number {
   // L'effort coûte de l'endurance, et courir vite coûte beaucoup plus cher que
   // trottiner : l'exposant 1,6 fait la différence entre un ailier qui sprinte
   // et un pilier qui marche.
+  if (p.deuxReserves) {
+    pasEndurance(p, dt, Math.min(1, pas / dt / p.vitesseMax), partDeSprintIA(effort));
+    return pas;
+  }
   if (pas > 0) {
     const intensite = Math.min(1, pas / dt / p.vitesseMax);
     p.endurance = Math.max(0, p.endurance - p.usure * dt * intensite ** 1.6 * 10);

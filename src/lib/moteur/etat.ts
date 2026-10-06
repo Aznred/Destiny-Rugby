@@ -327,7 +327,31 @@ export type VolRecent = Omit<Vol, 'ecoule'> & { debut: number };
  * un pack qui avance, recule, tourne ou s'écroule — soit le résultat réel et
  * non un habillage posé sur un tirage fait après coup.
  */
+/**
+ * LA POUSSÉE D'UNE MÊLÉE, CONTINUE (IA de niveau 4). Plus de `avanceFinale` tranchée d'avance : la mêlée avance — ou recule — à une
+ * vitesse qui suit le rapport de force du moment (`duel0` + ce que le geste du joueur y ajoute), et se mesure en mètres. Un pack qui
+ * domine près de la ligne continue de pousser, ballon aux pieds du 8, jusqu'à l'essai de poussée.
+ */
+export interface PousseeMelee {
+  /** Le rapport de force à l'introduction, bruit compris : positif quand l'introducteur domine. */
+  duel0: number;
+  /** Ce que le geste du joueur ajoute au rapport de force à cet instant. */
+  bonus: number;
+  /** Instant du dernier pas, mètres gagnés par l'introducteur (négatif : il recule) et vitesse à cet instant. */
+  t: number; a: number; v: number;
+  /** L'issue est tranchée (pénalité, écroulement, mêlée qui tourne, ballon renversé, départ du 8). */
+  decidee?: boolean;
+  /** Le pack a franchi la ligne : l'essai de poussée est déclaré. */
+  essai?: boolean;
+  /** Le 8 garde le ballon à ses pieds et le pack poursuit sa poussée vers la ligne. */
+  garde?: boolean;
+  /** La mêlée a tourné : depuis quand (s de poussée) et de quel côté. */
+  tourne?: { depuis: number; sens: number };
+}
+
 export interface MeleeDetaillee {
+  /** Poussée continue (niveau 4) : voir `PousseeMelee`. */
+  dyn?: PousseeMelee;
   etape: 'placement' | 'liaison' | 'impact' | 'introduction' | 'poussee' | 'sortie';
   /** Instant de simulation où l'étape en cours a commencé. */
   etapeDepuis: number;
@@ -358,6 +382,27 @@ export interface MeleeDetaillee {
   penalite?: { pour: Cote; motif: string };
   contre?: boolean;
   depart8?: boolean;
+}
+
+/**
+ * L'ISSUE D'UNE TOUCHE, TRANCHÉE AVANT LE SAUT (IA de niveau 4 — Correctif 23). La scène la lit pour que ce qu'on voit soit ce
+ * qui se passe : l'adversaire capte vraiment, ou dévie, ou le lancer est trop court ; `contreurId` est le sauteur d'en face.
+ *   gagnee  — le sauteur annoncé capte ;
+ *   perdue  — le sauteur adverse capte (variante 0 : par-dessus, 1 : arraché des mains, 2 : tapé vers son 9) ;
+ *   devie   — une main adverse touche le ballon, qui part libre vers `point` ;
+ *   courte / longue — le lancer n'atteint pas, ou dépasse, le sauteur ; le ballon tombe à `point` ;
+ *   pasDroit — lancer de travers : l'arbitre siffle, mêlée pour l'autre camp.
+ */
+export interface IssueTouche {
+  type: 'gagnee' | 'perdue' | 'devie' | 'courte' | 'longue' | 'pasDroit';
+  sauteurId: string;
+  contreurId?: string;
+  /** Pour une touche perdue : 0 capté par-dessus, 1 arraché des mains, 2 tapé vers son 9. Pour une déviation : 0 ou 1. */
+  variante: number;
+  /** Où le ballon retombe (repère terrain), pour un lancer court ou long et pour une déviation. */
+  point?: Vec;
+  /** Instant de la décision. */
+  decideeA: number;
 }
 
 /** Animation et appel annoncés pendant une phase de conquête. */
@@ -400,6 +445,8 @@ export interface ConqueteAnimee {
   lanceurId?: string;
   /** Où repose le ballon sorti, juste derrière la ligne de touche. */
   ballonAuSol?: Vec;
+  /** Ce que le saut va donner, décidé avant lui (niveau 4). */
+  issue?: IssueTouche;
 }
 
 /** Ballon vivant après un rebond : personne ne le possède encore. */
@@ -420,8 +467,41 @@ export interface BallonLibre {
   rebonds: number;
 }
 
+/**
+ * LE DUEL DU RUCK, JOUÉ (IA de niveau 4 — Correctif 23). Grattage ou contre-ruck : la séquence se déroule AVANT que la
+ * possession ne change. La scène la lit (qui plonge, qui charge, de combien le groupe recule) ; `phaseRuck` n'applique l'issue
+ * qu'à la fin de la séquence.
+ *   gratte — `acteurId` arrive sur le ballon, se couche dessus, lutte avec les soutiens, puis se relève ballon en main ;
+ *   contre — `contreursIds` chargent lancés, percutent les soutiens et les repoussent de `avancee` mètres.
+ * Issues : turnover (la défense prend le ballon), attaqueConserve (le contre échoue), instable (le ballon sort libre), penalite.
+ */
+export interface DuelRuck {
+  type: 'gratte' | 'contre';
+  acteurId: string;
+  contreursIds: string[];
+  debut: number;
+  /** Instant du contact : avant, ils courent ; après, ils luttent. */
+  contact: number;
+  /** Durée de la poussée d'un contre-ruck (s). */
+  poussee: number;
+  fin: number;
+  issue: 'turnover' | 'attaqueConserve' | 'instable' | 'penalite';
+  /** Mètres gagnés par ceux qui contrent (positif : le groupe d'attaque recule). Négatif : c'est l'attaque qui avance. */
+  avancee: number;
+  /** Où était le ballon au début : la poussée se mesure depuis là. */
+  origine: Vec;
+  /** Penalite : qui a fauté, et pourquoi. */
+  fautifId?: string;
+  motif?: string;
+  /** Celui qui tient le ballon debout à la fin d'un grattage réussi : la scène le lui met dans les mains. */
+  balle?: string;
+  /** Le joueur humain a minuté son geste (Correctif 23) : de 0 (raté) à 1 (parfait). */
+  timing?: number;
+}
+
 /** Contexte du duel au sol, conservé entre le plaquage et la sortie. */
 export interface RuckEnCours {
+  duel?: DuelRuck;
   organisation?: import('./regroupements').OrganisationRuck;
   porteurId?: string;
   plaqueurId?: string;
@@ -514,6 +594,8 @@ export interface PlanDeScore {
 }
 
 export interface EtatMatch {
+  /** Une indication discrète pour l'écran (Correctif 23) : « BALLON GRATTÉ », « TURNOVER »… Elle ne dit que ce que la scène montre déjà. */
+  indicationJeu?: { cle: 'grattage' | 'turnover' | 'contreRuck' | 'touchePerdue' | 'melee'; cote: Cote; t: number };
   plansCombinaisons?: Partial<Record<Cote, import('../ligue/combinaisons.js').Combinaison[]>>;
   combinaisonPreparee?: import('./combinaisons.js').CombinaisonPreparee;
   combinaisonEnCours?: import('./combinaisons.js').CombinaisonEnCours;
@@ -604,7 +686,7 @@ export interface EtatMatch {
    */
   avantage?: number;
   /** Le ballon porté en cours : qui a capté le lancer, et depuis quand. */
-  maul?: { receveurId: string; debut: number } | null;
+  maul?: { receveurId: string; debut: number; /** Mètres gagnés par le maul depuis son début (Correctif 23). */ avance?: number } | null;
   /**
    * La cellule d'avants de la phase (cadence détaillée) : le porteur — ou
    * l'avant qui va recevoir — et les deux coéquipiers qui se lient à lui.

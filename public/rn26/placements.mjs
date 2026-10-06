@@ -1,3 +1,4 @@
+// correctif23-touche
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 const distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 
@@ -7,7 +8,8 @@ export function lineoutGroups(players,conquest){
   const chosen=players.find(p=>p.id===conquest.cibleId);
   return [0,1].map(team=>{
     const mates=players.filter(p=>p.team===team&&p.source.role==='alignement');
-    const jumper=mates.find(p=>p.id===conquest.cibleId)||mates.sort((a,b)=>Math.abs(a.x-(chosen?.x??0))-Math.abs(b.x-(chosen?.x??0)))[0];
+    // Le sauteur d'en face est celui que le moteur a désigné quand l'issue est connue (Correctif 23).
+    const jumper=mates.find(p=>p.id===conquest.cibleId)||mates.find(p=>p.id===conquest.issue?.contreurId)||mates.sort((a,b)=>Math.abs(a.x-(chosen?.x??0))-Math.abs(b.x-(chosen?.x??0)))[0];
     if(!jumper)return null;
     const lifters=mates.filter(p=>p!==jumper).sort((a,b)=>distance(a,jumper)-distance(b,jumper)).slice(0,2).sort((a,b)=>a.x-b.x);
     return {jumper:jumper.id,lifters:lifters.map(p=>p.id)};

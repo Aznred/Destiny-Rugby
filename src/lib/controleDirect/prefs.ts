@@ -38,6 +38,10 @@ export interface PreferencesControle {
   hudSimple: boolean;
   /** Recul de la caméra derrière le joueur, de 0,85 (plus près) à 1,35 (plus large). */
   reculCamera: number;
+  /** Caméra à 360° (Correctif 23) : `assistee` revient derrière la course après quelques secondes sans geste ; `libre` reste où on la met. */
+  cameraMode: 'assistee' | 'libre';
+  /** Vitesse de rotation de la caméra (doigt, souris, stick), de 0,5 à 2. */
+  sensibiliteCamera: number;
   /** Viser un coup de pied à la souris (facultatif). */
   souris: boolean;
   /** Vibrations du téléphone et de la manette. */
@@ -64,7 +68,7 @@ export interface PreferencesControle {
 
 export const PREFERENCES_PAR_DEFAUT: Readonly<PreferencesControle> = {
   mode: 'direct', aidePlacement: true, tailleHud: 1, opaciteHud: 0.5, joystick: 'flottant', sprintAuBord: true,
-  gaucher: false, positionJoystick: 'gauche', positionActions: 'droite', hudSimple: true, reculCamera: 1, souris: false, vibrations: true, indications: true, tutorielVu: false, tutoSection: 'tout', tutosContext: [], touches: copierTouches(),
+  gaucher: false, positionJoystick: 'gauche', positionActions: 'droite', hudSimple: true, reculCamera: 1, cameraMode: 'assistee', sensibiliteCamera: 1, souris: false, vibrations: true, indications: true, tutorielVu: false, tutoSection: 'tout', tutosContext: [], touches: copierTouches(),
   tirManette: 'direct', aideTir: true, conseilCapitaine: true, tutosResp: [],
 };
 
@@ -90,6 +94,8 @@ function assainir(brut: unknown): PreferencesControle {
     })(),
     hudSimple: b.hudSimple !== false,
     reculCamera: bornerNombre(b.reculCamera, 0.85, 1.35, d.reculCamera),
+    cameraMode: b.cameraMode === 'libre' ? 'libre' : 'assistee',
+    sensibiliteCamera: bornerNombre(b.sensibiliteCamera, 0.5, 2, d.sensibiliteCamera),
     souris: b.souris === true,
     vibrations: b.vibrations !== false,
     indications: b.indications !== false,

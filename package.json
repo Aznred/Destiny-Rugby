@@ -106,7 +106,9 @@
     "verify:laboratoire": "vite-node scripts/verifierLaboratoireLigue.ts",
     "verify:mobile-carriere": "vite-node scripts/verifierCorrectifsMobile.ts",
     "verify:traductions": "vite-node scripts/verifierTraductions.ts",
-    "verify:paiements": "vite-node scripts/verifierPaiementsStripe.ts"
+    "verify:paiements": "vite-node scripts/verifierPaiementsStripe.ts",
+    "mesure:endurance": "vite-node scripts/mesurerEndurance.ts",
+    "verify:conquete": "vite-node scripts/verifierConquete.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

@@ -13,7 +13,7 @@
 
 import type { EtatMatch } from '../moteur/etat';
 import {
-  aideDeTir, choisirCombinaisonTouche, demanderToucheRapide, engagerHumain, lancerLaTouche, tirerHumain, trancherPenalite,
+  aideDeTir, choisirCombinaisonTouche, demanderToucheRapide, engagerHumain, lancerLaTouche, sauteursDeLAlignement, tirerHumain, trancherPenalite,
   type AideDeTir,
 } from '../moteur/moteur';
 import type { ChoixPenalite, CombinaisonTouche, DecisionCapitaine, TypeAttente } from '../moteur/responsabilites';
@@ -85,6 +85,10 @@ export interface SnapResp {
   touche: {
     pret: boolean; choix: CombinaisonTouche | null; annoncee: CombinaisonTouche | null; combinaisons: CombinaisonTouche[];
     rapide: { possible: boolean } | null; lanceur: string;
+    /** Les trois groupes de sauteurs, projetés à l'écran (pixels du cadre) : le HUD y pose ses pastilles. */
+    cibles: { choix: CombinaisonTouche; x: number; y: number }[];
+    /** Le joueur a lancé : le ballon part, le panneau s'efface. */
+    lance: boolean;
   } | null;
   visee: EtatVisee | null;
   /** La zone de visée est ouverte (le HUD place son calque de pointeur). */
@@ -333,8 +337,32 @@ export class PiloteResp {
 
     // ── Ce que la scène dessine sur la pelouse : où le ballon irait, jamais s'il passe ──
     scene.reperes = this.reperes(e, a, moi, ent.droiteY);
+    this.scene = scene;
     this.snap = this.photographier(e, a, ent, aVisee ? this.visee.etat : null);
     return true;
+  }
+
+  /** La scène du moment : le HUD y projette les sauteurs pour les proposer au doigt (Correctif 23). */
+  private scene: Scene3D | null = null;
+
+  /**
+   * LES TROIS CIBLES DU LANCEUR, SUR LA PELOUSE (Correctif 23). Devant, milieu, fond : chaque groupe de sauteurs porte son repère
+   * (un anneau sur la pelouse, une pastille au-dessus de sa tête) et se choisit d'un toucher, d'un clic ou d'une flèche. Ce que
+   * le joueur voit est ce qu'il annonce — plus de liste à lire pour deviner où le ballon ira.
+   */
+  private ciblesDeTouche(e: EtatMatch, moi: Pion): { choix: CombinaisonTouche; x: number; y: number }[] {
+    const s = sauteursDeLAlignement(e, moi.cote);
+    const scene = this.scene;
+    if (!s || !scene) return [];
+    const liste: { choix: CombinaisonTouche; id: string }[] = [
+      { choix: 'avant', id: s.devant.id }, { choix: 'milieu', id: s.milieu.id }, { choix: 'fond', id: s.fond.id },
+    ];
+    const sortie: { choix: CombinaisonTouche; x: number; y: number }[] = [];
+    for (const c of liste) {
+      const p = scene.ecran(c.id, 3.3);
+      if (p) sortie.push({ choix: c.choix, x: Math.round(p.x), y: Math.round(p.y) });
+    }
+    return sortie;
   }
 
   /** Les fronts lus ici ne seront pas relus par le reste du pilote. */
@@ -346,6 +374,14 @@ export class PiloteResp {
     if (a.type === 'tir' && e.tir) {
       const ligne = e.tir.buteur.cote === 'A' ? LIGNE_B : LIGNE_A;
       return { visee: { arrivee: { x: ligne, y: AXE + x * COTE_TIR * sgn }, puissance: p } };
+    }
+    if (a.type === 'touche' && !e.conquete?.rapide) {
+      // Les trois sauteurs entourés ; celui que le joueur a choisi (ou que l'IA annonçait) est le plus marqué.
+      const s = sauteursDeLAlignement(e, moi.cote);
+      if (!s) return null;
+      const choix = e.responsabilites?.touche?.choix ?? a.annoncee ?? 'milieu';
+      const ids: [string, boolean][] = [[s.devant.id, choix === 'avant' || choix === 'maul'], [s.milieu.id, choix === 'milieu' || choix === 'leurreMilieu'], [s.fond.id, choix === 'fond' || choix === 'leurreAvant']];
+      return { passes: ids.map(([id, fort]) => ({ id, fort })) };
     }
     if (a.type === 'engagement') {
       const portee = a.portee ?? porteeEngagement(moi.puissance, moi.pied, moi.endurance);
@@ -386,6 +422,8 @@ export class PiloteResp {
         pret: !!a.pret, choix: r.touche?.choix ?? null, annoncee: a.annoncee ?? null, combinaisons: a.combinaisons ?? [],
         rapide: r.offreToucheRapide ? { possible: r.offreToucheRapide.possible } : null,
         lanceur: moi?.nom ?? '',
+        cibles: moi && !r.touche?.lancer ? this.ciblesDeTouche(e, moi) : [],
+        lance: !!r.touche?.lancer,
       } : null,
       visee: visee ? { ...visee, x: Math.round(visee.x * 100) / 100, p: Math.round(visee.p * 100) / 100, geste: Math.round(visee.geste * 100) / 100, effet: Math.round(visee.effet * 100) / 100 } : null,
       zone: this.zone && !this.tuto,
