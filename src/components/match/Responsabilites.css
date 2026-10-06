@@ -438,3 +438,22 @@
   .rv-carte, .rv-barre-bas, .rv-bandeau, .rv-conseil { animation: none; }
   .rv-retour { animation-duration: 0.01s; opacity: 1; }
 }
+
+/* ── Les trois sauteurs de la touche, sur la pelouse (Correctif 23) ─────────────────────────────────── */
+.rv-cible {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 210, 87, 0.7);
+  background: rgba(8, 22, 14, 0.82);
+  color: #fff;
+  font-weight: 700;
+  font-size: 14px;
+  white-space: nowrap;
+  pointer-events: auto;
+  cursor: pointer;
+  z-index: 1;
+}
+.rv-cible[data-actif='oui'] { border-color: #7ee08f; background: rgba(40, 110, 62, 0.92); box-shadow: 0 0 14px rgba(126, 224, 143, 0.7); transform: translate(-50%, -100%) scale(1.12); }
+.rv-cible:disabled { opacity: 0.4; cursor: default; }

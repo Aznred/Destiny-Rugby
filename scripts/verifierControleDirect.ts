@@ -102,7 +102,11 @@ console.log('— La course : un cap et une allure qu\'on infléchit —');
   const a = creerMatchDEmpreinte(0).pions.find((p) => p.moi)!, b = creerMatchDEmpreinte(0).pions.find((p) => p.moi)!;
   poser(a, 40, AXE); poser(b, 40, AXE);
   for (let i = 0; i < 40; i++) { deplacerHumain(a, DT, { mx: s, my: 0, sprint: true }); deplacerHumain(b, DT, { mx: s, my: 0, sprint: false }); }
-  verifier(100 - a.endurance > (100 - b.endurance) * 1.6, `le sprint vide l'endurance bien plus vite (${(100 - a.endurance).toFixed(1)} contre ${(100 - b.endurance).toFixed(1)} en 6 s)`);
+  // Deux réserves (niveau 4) : c'est la barre de sprint qui se vide en sprintant ; l'endurance générale reste presque intacte.
+  if (a.deuxReserves) {
+    verifier(100 - a.sprint > 25 && b.sprint >= 99, `le sprint vide la barre de sprint (${(100 - a.sprint).toFixed(1)} contre ${(100 - b.sprint).toFixed(1)} en 6 s)`);
+    verifier(a.endurance > 96, `l'endurance générale ne tombe pas en six secondes (${a.endurance.toFixed(1)})`);
+  } else verifier(100 - a.endurance > (100 - b.endurance) * 1.6, `le sprint vide l'endurance bien plus vite (${(100 - a.endurance).toFixed(1)} contre ${(100 - b.endurance).toFixed(1)} en 6 s)`);
   // Lâcher le stick : il s'arrête en moins de deux secondes, sans glisser indéfiniment.
   let n = 0;
   while (Math.hypot(a.vitesse.x, a.vitesse.y) > 0.05 && n < 60) { deplacerHumain(a, DT, { mx: 0, my: 0, sprint: false }); n++; }
@@ -160,7 +164,8 @@ console.log('— Le plaquage : manuel, à portée, et pas tout seul —');
   demanderDirect(e, { action: 'plaquage' });
   let plaque = false;
   for (let i = 0; i < 10 && !plaque; i++) { pas(e); plaque = e.phase === 'ruck' || !!porteur.corps || e.phase === 'penalite'; }
-  verifier(plaque, `un plaquage lancé sur un porteur qui arrive plaque (phase ${e.phase})`);
+  // Le plongeon dirigé (niveau 4) va AU CONTACT, mais le duel reste un duel : plaqué, ou manqué au contact — jamais ignoré.
+  verifier(plaque || h.stats.plaquagesManques >= 1, `un plaquage lancé sur un porteur qui arrive va au contact (phase ${e.phase})`);
   verifier(h.stats.plaquages + h.stats.plaquagesManques >= 1, 'le duel est inscrit à sa feuille');
 }
 {

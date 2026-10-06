@@ -264,14 +264,37 @@ export interface QualiteLancer {
   longueur: number;
 }
 
-/** Ce que vaut le lancer du joueur, d'après la combinaison annoncée, la force dosée et la régularité du geste. */
-export function qualiteDuLancer(choix: CombinaisonTouche, l: LancerTouche): QualiteLancer {
+/**
+ * Ce que vaut le lancer du joueur, d'après la combinaison annoncée, la force dosée et la régularité du geste.
+ *
+ * ⚠️ CORRECTIF 23 : avec `lanceur` (le pion qui lance), la précision dépend AUSSI de lui — qualité de passe et de lecture,
+ * fatigue, pression du moment, et distance du lancer (le fond est plus loin que le premier bloc). Le joueur choisit la cible,
+ * mais même visé parfaitement, un lancer au fond peut finir un peu court ou un peu long : jamais de résultat garanti.
+ * Sans `lanceur`, la loi d'origine (Correctif 17).
+ */
+export function qualiteDuLancer(
+  choix: CombinaisonTouche, l: LancerTouche, lanceur?: Pick<Pion, 'passe' | 'vision' | 'discipline' | 'endurance'>, pression = 0,
+): QualiteLancer {
   const erreur = Math.abs(Math.max(0, Math.min(1, l.puissance)) - PUISSANCE_TOUCHE[choix]);
   const flou = 1 - Math.max(0, Math.min(1, l.geste));
+  if (!lanceur) {
+    return {
+      delta: 14 - erreur * 70 - flou * 20,
+      pasDroit: 1 + 1.5 * flou,
+      longueur: 1 + 5 * Math.max(0, erreur - 0.1),
+    };
+  }
+  const talent = lanceur.passe * 0.55 + lanceur.vision * 0.3 + lanceur.discipline * 0.15;
+  const fatigue = Math.max(0, 1 - lanceur.endurance / 100);
+  // Plus on vise loin, plus le lancer est exigeant : le fond (0,78) pèse près de deux fois le premier bloc (0,34).
+  const distance = 0.8 + PUISSANCE_TOUCHE[choix] * 0.55;
+  // Un bruit propre au joueur et à la situation, jamais tiré : talent faible, fatigue, pression et distance l'élargissent.
+  const bruit = Math.max(0, (68 - talent) / 420) + fatigue * 0.07 + pression * 0.05 + (distance - 1) * 0.04;
+  const e2 = erreur + bruit;
   return {
-    delta: 14 - erreur * 70 - flou * 20,
-    pasDroit: 1 + 1.5 * flou,
-    longueur: 1 + 5 * Math.max(0, erreur - 0.1),
+    delta: 14 - e2 * 70 - flou * 20 + (talent - 60) / 9,
+    pasDroit: (1 + 1.5 * flou) * (1 + pression * 0.25 + fatigue * 0.3),
+    longueur: (1 + 5 * Math.max(0, e2 - 0.1)) * distance,
   };
 }
 

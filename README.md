@@ -1819,7 +1819,7 @@ Fait avec 🏉 — thème artisanal, front soigné, sans rendu générique.
 
 La retransmission française utilise F5-TTS sur l'ordinateur via un service local. Lancer `Lancer voix F5.cmd` dans l'atelier `../test voice` ; instructions, limites et licences dans [VOIX_LOCALE.md](VOIX_LOCALE.md). La file et les textes de commentaires existants sont conservés.
 
-## Correctifs 16 à 21 (octobre 2026)
+## Correctifs 16 à 23 (octobre 2026)
 
 ### Correctif 16 — le joueur conduit son pion
 - En carrière solo (match en 3D), le joueur **conduit** son personnage dès qu'il est sur le terrain : banc → caméra télé → remplacement animé → caméra derrière lui → commandes. Les vingt-neuf autres gardent l'IA par poste.
@@ -1849,7 +1849,7 @@ La retransmission française utilise F5-TTS sur l'ordinateur via un service loca
 - Le tutoriel présente les deux départs en trois étapes ; une fois le joueur choisi, tous les parcours sont ceux de la carrière ordinaire. Bancs : `npm run verify:carriere-existante` (101 contrôles, dont de vrais matchs titulaire et remplaçant et un entraîneur issu de la carrière), `npm run verify:tutoriel`.
 ### Correctif 20 — le joueur, du HUD à l'apparence
 
-- **Barème de classement par compétition** (`src/lib/bareme.ts`) : victoire 4, nul 2, défaite 0, bonus offensif et défensif ajoutés séparément — jamais à la place des 2 points du nul. Chaque compétition déclare son barème (clubs : bonus offensif à 3 essais d'écart ; Six Nations, Coupe du monde et autres tournois : 4 essais marqués). Appliqué au championnat, aux coupes, au Six Nations, aux poules de Coupe du monde, à la ligue en ligne et à la carrière entraîneur. `npm run verify:bareme`.
+- **Barème de classement par compétition** (`src/lib/bareme.ts`) : victoire 4, nul 2, défaite 0, bonus offensif et défensif ajoutés séparément — jamais à la place des 2 points du nul (Correctif 29 : vérifié partout, aucun `draw = 1` ne subsiste). Chaque compétition déclare son barème (clubs : bonus offensif à 3 essais d'écart ; Six Nations, Coupe du monde et autres tournois : 4 essais marqués). Appliqué au championnat, aux coupes, au Six Nations, aux poules de Coupe du monde, à la ligue en ligne et à la carrière entraîneur. `npm run verify:bareme`.
 - **Sortie de match fiabilisée** : une machine à états (entrées coupées, boucle arrêtée, plein écran quitté, orientation stable, dimensions relues, écouteurs recréés, navigation) et un isolement de modales qui se compte (cause probable du gel après un match). Non essayé sur iPhone ni en PWA installée. `npm run verify:modales`.
 - **HUD mobile contextuel** : deux à quatre boutons (Sprint + Réclamer / Plaquer / Gratter sans ballon ; Contact, Pied, Esquive avec), passes par balayage, commandes plus transparentes, positions du joystick et des actions réglables, taille et opacité.
 - **Caméra plus large** derrière le joueur, encore plus sur téléphone, avec un zoom qui glisse selon la situation (réception, percée, défense) et un réglage de recul.
@@ -1863,3 +1863,14 @@ La retransmission française utilise F5-TTS sur l'ordinateur via un service loca
 - **Boutique** (Packs, Crédits, Maillots, Joueur) et **Personnalisation** : on n'équipe que ce qu'on possède ; le reste est « À débloquer », avec son prix.
 - **Maillots d'équipe** : un kit habille toute l'équipe (domicile et extérieur) sur le même modèle 3D de maillot, repeint ; maillots, casques et crampons se voient sur leurs modèles 3D, ou sur le joueur.
 - **Labo** : onglet Boutique pour créer des cosmétiques (prix par monnaie, rareté, dates, publié) et monnaie réglable par pack.
+
+
+### Correctif 23 — conquête lisible, avants, endurance, caméra (06/10/2026)
+
+- **Les changements de possession se voient** : une touche perdue est captée (ou arrachée, ou déviée) par le sauteur adverse ; un grattage se joue
+  (le défenseur arrive, se couche sur le ballon, lutte, se relève) ; un contre-ruck charge et recule le groupe de quelques mètres ; un maul stoppé finit en mêlée.
+- **Les avants jouent** : mêlée et maul au rythme (un temps = un appui), saut et lift au signal, grattage au bon moment ; le talonneur lance en touche et choisit
+  son sauteur au doigt ; un pack qui écrase l'autre près de la ligne marque un essai de poussée.
+- **Plaquage dirigé** (on peut plonger dans le vide), **grosses percussions** des joueurs puissants.
+- **Endurance** : une réserve générale lente + une barre de sprint qui se recharge ; **caméra à 360°** (libre ou assistée).
+- Tout est derrière l'IA de niveau 4 (matchs de carrière) ; la ligue en ligne n'est pas touchée. Banc : `npm run verify:conquete`.

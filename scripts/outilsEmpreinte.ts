@@ -43,7 +43,7 @@ export function creerMatchDEmpreinte(k: number, plus: Partial<OptionsMatch> = {}
       titulaire: k % 2 === 0,
     },
     {
-      niveau: 'pro', scoreSurTerrain: true, controle: true, cadenceDetaillee: true, placementJoue: true, ia: IA_MATCH_DE_CARRIERE,
+      niveau: 'pro', scoreSurTerrain: true, controle: true, cadenceDetaillee: true, placementJoue: true, ia: Number(process.env.IA_EMPREINTE ?? IA_MATCH_DE_CARRIERE),
       ...plus,
     });
   e.carriereDixMinutes = true;

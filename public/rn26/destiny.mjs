@@ -1,3 +1,5 @@
+// correctif23-ruck
+// correctif23-touche
 import { PhysicalPlayers,lineoutGroups,scrumSlots,maulSlots } from './placements.mjs';
 /** Pas fixe du moteur de match, en secondes. */
 export const TICK=.15;
@@ -24,7 +26,7 @@ const SEQUENCES={
 };
 const gestures={pickup:'pick_up_ball',restart:'kick_restart',grubber:'kick_grubber',punt:'kick_running',box_kick:'kick_box',chip:'kick_box',drop:'kick_restart',conversion:'kick_conversion_a_kick',penalty:'kick_conversion_a_kick',tackle_low:'standing_tackle_front_grab',tackle_drive:'standing_tackle_front_grab',fall_forward:'standing_tackled_going_down',fall_back:'standing_tackled_going_down',contact_brace:'ruck_struggle_middle_front',clearout_drive:'ruck_engage_middle',ruck_bind:'ruck_engage_middle',ruck_push:'ruck_struggle_middle_front',try:'try_touchdown',dive_try:'try_dive',foul_knockon:'jumping_catch_fail',reaction_hit:'standing_tackled_going_down',charge_down:'jumping_catch_start_immediate',tap:'pick_up_ball',
   // IA par poste : les avants qui se lient pour un maul simulé, la remise en jeu armée d'une touche rapide.
-  maul_bind:'maul_push_engage',quick_throw:'lout_throw_pull_back'};
+  maul_bind:'maul_push_engage',quick_throw:'lout_throw_pull_back',plongeon:'dive_tackle_pre'};
 // Gestes superposés à la course : seuls le buste et les bras les jouent.
 // « scoop » : le ballon ramassé au sol sans s'arrêter — le buste plonge, les jambes continuent.
 const hauts={handoff:'handoff_left',bump:'drive_with_ball',intercept:'pass_catch_from_left',scoop:'pick_up_ball'};
@@ -234,12 +236,12 @@ export class DestinyMatch {
     // Dans un ruck, le ballon est présenté vers l'arrière puis talonné jusqu'au
     // dernier pied : c'est là que le relayeur vient le prendre.
     let sol=e.ballon;
-    if(e.phase==='ruck'&&e.ruck&&!e.ruck.organisation?.chenille){
+    if(e.phase==='ruck'&&e.ruck&&!e.ruck.organisation?.chenille&&!e.ruck.duel){
       const s=e.possession==='A'?1:-1,k=lisse((e.sim-this.ruckStart-.9)/1.5);
       sol={x:e.ballon.x-s*1.3*k,y:e.ballon.y-.12*k};
     }
     this.ball={...xyz(sol),y:e.ballonLibre?.hauteur??(v?this.outils.positionVol(v).hauteur:e.porteur||e.piedPrepare?1.02:.14)};
-    if(this.conquest!==e.conquete){this.conquest=e.conquete;this.liftGroups=lineoutGroups(this.players,e.conquete);this.leurre=null;}
+    if(this.conquest!==e.conquete||this.contreur!==e.conquete?.issue?.contreurId){this.conquest=e.conquete;this.contreur=e.conquete?.issue?.contreurId;this.liftGroups=lineoutGroups(this.players,e.conquete);this.leurre=null;}
     // Faux saut annoncé ailleurs que devant : celui que l'annonce désigne, porté pour de faux par ses deux voisins.
     if(e.phase==='touche'&&e.conquete?.leurreId&&!this.leurre){
       const pris=new Set(this.liftGroups.flatMap(g=>[g.jumper,...g.lifters])),faux=this.players.find(p=>p.id===e.conquete.leurreId);
@@ -521,7 +523,7 @@ export class DestinyMatch {
       }
     }else if(e.phase==='touche'){
       const c=e.conquete;
-      if(p.number===2&&s.cote===e.possession){
+      if((c?.lanceurId?p.id===c.lanceurId:p.number===2)&&s.cote===e.possession){
         // Le lanceur va chercher le ballon : il court jusqu'à lui les mains libres,
         // se baisse pour le ramasser, puis gagne sa place en le tenant.
         const ram=c?.ramassage;
@@ -612,6 +614,33 @@ export class DestinyMatch {
       const face=p.team===0?Math.PI:0;
       // Où en est le pion du moteur : encore en chemin, ou arrêté à sa place.
       const ecartPlace=s.cible?Math.hypot(s.pos.x-s.cible.x,s.pos.y-s.cible.y):p.arrival,vPion=Math.hypot(s.vitesse.x,s.vitesse.y);
+      // ═══ LE DUEL DU RUCK (Correctif 23) : ce que le moteur a décidé, on le voit se jouer ═══
+      const duel=r?.duel;
+      if(duel&&!s.corps){
+        const t=now-duel.contact,i=Math.max(0,duel.contreursIds.indexOf(p.id));
+        if(duel.type==='gratte'&&duel.acteurId===p.id){
+          // Il arrive en courant, les yeux sur le ballon ; au contact il se couche dessus, lutte, puis se relève avec lui.
+          if(t<0){d.heading=cap(this.ball.x-p.x,this.ball.z-p.z);return done();}
+          const ancre=this.remember('gratte:'+duel.debut,()=>({x:p.x,z:p.z}));
+          jouerSuite(clip,SEQUENCES.jackal,t);
+          d.heading=cap(this.ball.x-ancre.x,this.ball.z-ancre.z);
+          d.anchor={x:ancre.x,z:ancre.z,heading:d.heading,mode:'slot',fondu:.25};
+          return done();
+        }
+        if(duel.type==='contre'&&duel.contreursIds.includes(p.id)){
+          // Ils arrivent lancés (locomotion), percutent, puis poussent : le corps suit le moteur, rien n'est ancré.
+          d.heading=cap(this.ball.x-p.x,this.ball.z-p.z);
+          if(t<0)return done();
+          if(t<.9)clip(ENTREES[i%3],t*1.5);else clip(LUTTES[i%3],(t-.9)*1.5+i*.4,true);
+          d.raise=.25;
+          return done();
+        }
+        if(duel.type==='contre'&&t>=0&&o&&o.attaque.includes(p.id)){
+          // Les soutiens encaissent : ils luttent à pleine cadence et reculent avec le groupe.
+          const j=o.attaque.indexOf(p.id);clip(LUTTES[j%3],t*1.5+j*.3,true);d.heading=face;d.raise=.2;
+          return done();
+        }
+      }
       if(o?.relayeurId===p.id&&!s.corps){
         // Le relayeur — le 9 ou celui qui le remplace — arrive debout, regarde
         // le ballon, puis se baisse pour le prendre quand il sort. ⚠️ Il passe
@@ -649,7 +678,7 @@ export class DestinyMatch {
         }else if(ecartPlace>.95||Math.hypot(xyz(s.cible||s.pos).x-lie.place.x,xyz(s.cible||s.pos).z-lie.place.z)>.95)lie.depuis=undefined;
         if(lie.depuis===undefined){if(speed<.6)d.heading=face;return done();}
         const i=(o.attaque.includes(p.id)?o.attaque:o.defense).indexOf(p.id),t=Math.max(0,now-lie.depuis);
-        if(t<.9)clip(ENTREES[i%3],t);else clip(LUTTES[i%3],t*.5+i*.4,true);
+        if(t<.9)clip(ENTREES[i%3],t);else clip(LUTTES[i%3],t*(r?.duel?1.2:.5)+i*.4,true);
         d.anchor={x:lie.place.x,z:lie.place.z,heading:face,mode:'slot',fondu:.35};d.lie=true;return done();
       }
     }

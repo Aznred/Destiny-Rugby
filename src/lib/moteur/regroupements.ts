@@ -151,10 +151,55 @@ export function preparerChenille(e: EtatMatch, neuf: Pion): boolean {
   return true;
 }
 
+const lisse = (k: number) => { const u = borner(k, 0, 1); return u * u * (3 - 2 * u); };
+
+/** Pendant la poussée d'un contre-ruck, le ballon recule avec le groupe : c'est lui que tout le monde prend pour repère. */
+function ballonDuDuel(e: EtatMatch): void {
+  const d = e.ruck?.duel;
+  if (!d || d.type !== 'contre') return;
+  const s = sens(e.ruck!.attaque);
+  const k = lisse((e.sim - d.contact) / Math.max(0.1, d.poussee));
+  e.ballon = { x: borner(d.origine.x - s * d.avancee * k, LIGNE_A + 0.5, LIGNE_B - 0.5), y: d.origine.y };
+}
+
+/**
+ * LA CHORÉGRAPHIE DU DUEL (Correctif 23). Grattage : le défenseur vient se placer au-dessus du ballon, côté défense, et y reste ;
+ * contre-ruck : les défenseurs arrivent lancés (effort de sprint), se rangent en travers du regroupement et, une fois au contact,
+ * le groupe entier recule — ou avance — de `avancee` mètres (le ballon avec lui, `ballonDuDuel`).
+ */
+function choregraphierLeDuel(e: EtatMatch): void {
+  const d = e.ruck?.duel;
+  if (!d) return;
+  const s = sens(e.possession);
+  const actif = (id: string) => e.pions.find((q) => q.id === id && q.surLeTerrain && q.sanction <= 0 && !q.corps);
+  e.placement ??= {};
+  const poser = (p: Pion, cible: Vec, effort: number) => {
+    p.role = 'ruck';
+    p.cible = { x: borner(cible.x, LIGNE_A + 0.5, LIGNE_B - 0.5), y: borner(cible.y, 1.2, LARGEUR - 1.2) };
+    p.effort = Math.max(p.effort, effort);
+    e.placement![p.id] = { ...p.cible };
+  };
+  const avantContact = e.sim < d.contact;
+  if (d.type === 'gratte') {
+    const g = actif(d.acteurId);
+    if (!g) return;
+    poser(g, { x: e.ballon.x + s * 0.3, y: e.ballon.y }, avantContact ? 1.12 : 1);
+    // Debout, ballon en main : la séquence du grattage est allée jusqu'à son terme.
+    if (e.sim >= d.contact + 0.57 + 1.07 && !d.balle) d.balle = d.acteurId;
+    return;
+  }
+  const contreurs = d.contreursIds.map(actif).filter((p): p is Pion => !!p);
+  contreurs.forEach((p, i) => {
+    const lateral = (i - (contreurs.length - 1) / 2) * 0.62;
+    poser(p, { x: e.ballon.x + s * (0.55 + (i % 2) * 0.3), y: e.ballon.y + lateral }, avantContact ? 1.2 : 1);
+  });
+}
+
 /** Les appuis convergent vers le ruck, les animations attendent l'arrivée. */
 export function placerRegroupement(e: EtatMatch): void {
   if (e.phase !== 'ruck' || !e.ruck) return;
   if (!e.ruck.organisation) organiserRuck(e);
+  ballonDuDuel(e);
   const o = e.ruck.organisation!;
   const s = sens(e.possession);
   const lieu = o.chenille ? o.origine : e.ballon;
@@ -190,6 +235,7 @@ export function placerRegroupement(e: EtatMatch): void {
       : { x: lieu.x - s * (o.chenille ? 3.45 : 1.65), y: lieu.y - .35 });
     relayeur.effort = Math.max(relayeur.effort, .95);
   }
+  choregraphierLeDuel(e);
 }
 
 export function animerRegroupement(e: EtatMatch, dt: number): void {

@@ -19,7 +19,7 @@
  * et l'IA par poste n'y est pas étalonnée (mesuré : 11,6 essais par match).
  * La remettre à 1 suffit à revenir au moteur d'origine.
  */
-export const IA_MATCH_DE_CARRIERE = 3;
+export const IA_MATCH_DE_CARRIERE = 4;
 
 export const REGLAGES_IA = {
   // ── Le duel porteur / plaqueur (`avantageDuPorteur`) ──────────────────────

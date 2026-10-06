@@ -16,6 +16,12 @@ for (const [nom, b] of [['clubs', BAREME_CLUBS], ['tournoi', BAREME_TOURNOI]] as
 ok(pointsDuMatch(BAREME_TOURNOI, 20, 30, 4, 4).points === 1, 'tournoi : 4 essais marqués dans une défaite = bonus offensif');
 ok(pointsDuMatch(BAREME_CLUBS, 20, 30, 4, 4).bonus === 0, 'clubs : 4 essais seuls ne suffisent pas (écart de 3)');
 ok(baremeDeCompetition('sixNations') === BAREME_TOURNOI && baremeDeCompetition('coupeDuMonde') === BAREME_TOURNOI, 'six nations / coupe du monde = tournoi');
+for (const id of ['sixNations', 'rugbyChampionship', 'sixNationsU20', 'mondialU20', 'coupeDuMonde']) {
+  const b = baremeDeCompetition(id);
+  ok(b === BAREME_TOURNOI && b.nul === 2 && b.victoire === 4 && b.defaite === 0, `${id} : 4 / 2 / 0`);
+  const nulTournoi = classer(['A', 'B'], [[{ domicile: 'A', exterieur: 'B', scoreD: 20, scoreE: 20, essaisD: 4, essaisE: 2 }]], b);
+  ok(nulTournoi[0].points === 3 && nulTournoi[1].points === 2, `${id} : nul 20-20, 4 essais d'un côté = 2 + bonus / 2`);
+}
 ok(baremeDeCompetition('top14') === BAREME_CLUBS && baremeDeCompetition() === BAREME_CLUBS, 'clubs par défaut');
 
 const nul: MatchChampionnat = { domicile: 'A', exterieur: 'B', scoreD: 20, scoreE: 20, essaisD: 2, essaisE: 2 };

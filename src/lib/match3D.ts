@@ -115,6 +115,10 @@ export interface Scene3D {
   suivreMoi: boolean | number;
   /** Recul de la caméra derrière le joueur (réglage du joueur, 1 par défaut). */
   reculCamera: number;
+  /** Caméra du joueur à 360° (Correctif 23) : tourne la vue de `dYaw` radians (positif : vers la droite). */
+  orbiter(dYaw: number): void;
+  /** `libre` : la caméra reste où le joueur l'a mise ; `assistee` : elle revient derrière sa course après un moment. */
+  modeCamera: 'libre' | 'assistee';
   readonly ips: number;
   /** Les repères du contrôle direct, redessinés à chaque image ; `null` les éteint. */
   reperes: ReperesScene | null;
