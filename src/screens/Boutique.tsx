@@ -1,403 +1,347 @@
-import { Suspense, lazy, useState, useEffect } from 'react';
-import { acheterOvasStripe, etatPaiementsStripe } from '../lib/carriereEnLigneClient';
+// LA BOUTIQUE (refonte du Correctif 21)
+//
+// Deux monnaies, jamais confondues, et toujours visibles ensemble :
+//   OVAS    — la monnaie de GAMEPLAY (matchs, objectifs, saisons, événements) : elle ne s'achète plus avec de l'argent réel ;
+//   CRÉDITS — la monnaie PREMIUM, la seule qui s'achète (Stripe).
+//
+// Quatre rayons : Packs (la roue d'origine, dans la collection) · Crédits · Maillots · Joueur.
+// ⚠️ LA BOUTIQUE MONTRE CE QUI S'ACHÈTE ; LA PERSONNALISATION CE QUI SE POSSÈDE (`components/Personnalisation.tsx`). Un article possédé
+// porte ici la mention « Possédé » et un renvoi vers la personnalisation — jamais un bouton « Équiper ».
+// ⚠️ UN SOLDE INSUFFISANT N'ACHÈTE RIEN ET NE GRISE RIEN : un clic ouvre la fenêtre qui dit combien il manque (`lib/achatUi.ts`).
+
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
+import { etatPaiementsStripe } from '../lib/carriereEnLigneClient';
 import { motion } from 'framer-motion';
 import { useGame } from '../store/useGame';
 import {
-  SKINS, SKIN_PAR_ID, PACKS, BUNDLES, EQUIPEMENTS, EQUIPEMENT_PAR_ID, CATEGORIES_EQUIPEMENT,
+  BUNDLES, EQUIPEMENTS, EQUIPEMENT_PAR_ID, RUBRIQUES, SKINS, SKIN_PAR_ID, estEnVente, prixArticle, prixSkin, rubriqueDe,
+  type ArticleEquipement, type RubriqueBoutique,
 } from '../data/boutique';
-import {
-  TRAITS_A_DEBLOQUER, descriptionTrait, nomTrait,
-} from '../data/traits';
-import { locale, tn, t, texteTraduit } from '../lib/i18n';
+import { TRAITS_A_DEBLOQUER, descriptionTrait, nomTrait } from '../data/traits';
+import { locale, nombre, t, tn, texteTraduit } from '../lib/i18n';
 import { CartePubRecompensee, BoutonDeblocageParPub } from '../components/Pub';
-import { IconeArticle } from '../components/ModeleObjet';
+import { ApercuJoueur3D } from '../components/ApercuJoueur3D';
+import { MiniatureArticle, PastilleRarete, PrixBoutons } from '../components/CartesCosmetiques';
+import { SoldesMonnaies } from '../components/SoldesMonnaies';
+import { PieceCredits } from '../components/PieceCredits';
 import { PieceOvas } from '../components/PieceOvas';
-
-// ⚠️ `ApercuBallon`, PAS `Hero3D` : depuis que le hero affiche le rugbyman dès
-// qu'une carrière existe, ce cadre montrait le JOUEUR à la place du ballon
-// survolé — cinq articles, la même image. L'aperçu de la boutique ne monte donc
-// que le ballon.
 import { Icone } from '../components/Icone';
-const Apercu3D = lazy(() =>
-  import('../components/Hero3D').then((m) => ({ default: m.ApercuBallon })),
-);
-// ⚠️ Une vignette par article, chargée à la demande comme le grand aperçu : la
-// boutique est déjà un écran paresseux, on ne veut pas que ses cinq petits
-// canvas partent dans le chunk principal.
-const Vignette = lazy(() =>
-  import('../components/VignetteBallon').then((m) => ({ default: m.VignetteBallon })),
-);
-// Même principe pour le vestiaire : un modèle générique, chargé à la demande,
-// qui retombe sur une pastille quand le `.glb` n'a pas encore été modélisé.
-const Objet3D = lazy(() =>
-  import('../components/ModeleObjet').then((m) => ({ default: m.ApercuObjet })),
-);
+import { demanderPaiement, ouvrirRechargeCredits } from '../lib/achatUi';
+import { useBoutiqueLabo } from '../lib/boutiqueLabo';
+import { ouvrirPersonnalisation, prendreCibleBoutique, type OngletPerso } from '../lib/personnalisationUi';
+import { apparencePourApercu, equipementPourScene } from '../lib/apparenceJoueur';
+import { OFFRES_CREDITS, prixOvas, type Devise, type PrixArticle } from '../lib/monnaies';
+import { POSTE_PAR_ID } from '../data/rugby';
+import './Boutique.css';
+
+// ⚠️ `ApercuBallon`, PAS `Hero3D` : le hero affiche le rugbyman dès qu'une carrière existe, et ce cadre montrerait le JOUEUR à la place
+// du ballon survolé. Chaque `<Canvas>` ouvre un contexte WebGL et le navigateur n'en accorde qu'une poignée : un seul grand aperçu est
+// monté à la fois, les vignettes d'articles sont des images rendues hors écran.
+const Apercu3D = lazy(() => import('../components/Hero3D').then((m) => ({ default: m.ApercuBallon })));
+const Vignette = lazy(() => import('../components/VignetteBallon').then((m) => ({ default: m.VignetteBallon })));
+const Objet3D = lazy(() => import('../components/ModeleObjet').then((m) => ({ default: m.ApercuObjet })));
+
+type Rayon = 'credits' | RubriqueBoutique;
+const RAYONS: { id: Rayon | 'packs'; cle: string }[] = [
+  { id: 'packs', cle: 'bo.rub.packs' }, { id: 'credits', cle: 'bo.rub.credits' },
+  ...RUBRIQUES.filter((r) => r.id !== 'ballons'),
+];
+/** Ce qu'on regarde dans le grand aperçu. */
+type Vu = { type: 'ballon' | 'article'; id: string };
 
 export function Boutique() {
+  useBoutiqueLabo();
+  const [rayon, setRayon] = useState<Rayon>('maillots');
+  // Le kit essayé : sur le maillot seul (le modèle 3D du jeu) ou porté par le joueur.
+  const [surJoueur, setSurJoueur] = useState(false);
+  const [flash, setFlash] = useState<string | null>(null);
+  const [vu, setVu] = useState<Vu | null>(null);
   const [paiement, setPaiement] = useState('');
-  const [achatEnCours, setAchatEnCours] = useState(false);
   const [verification, setVerification] = useState(0);
+  const joueur = useGame((s) => s.joueur);
+  const manager = useGame((s) => s.manager);
+  const coins = useGame((s) => s.coins);
+  const inventaire = useGame((s) => s.inventaire);
+  const skinActif = useGame((s) => s.skinActif);
+  const equipements = useGame((s) => s.equipements);
+  const equipementActif = useGame((s) => s.equipementActif);
+  const traitsDebloques = useGame((s) => s.traitsDebloques);
+  const acheterCosmetique = useGame((s) => s.acheterCosmetique);
+  const debloquerTrait = useGame((s) => s.debloquerTrait);
+  const setEcran = useGame((s) => s.setEcran);
+  const maintenant = Date.now();
+
+  const message = (m: string) => { setFlash(m); setTimeout(() => setFlash(null), 2600); };
+
+  // « Voir dans la boutique » depuis la personnalisation : on ouvre le bon rayon, sur le bon article.
+  useEffect(() => {
+    const cible = prendreCibleBoutique();
+    if (!cible) return;
+    setRayon(cible.rubrique as Rayon);
+    if (cible.id) setVu(SKIN_PAR_ID[cible.id] ? { type: 'ballon', id: cible.id } : { type: 'article', id: cible.id });
+  }, []);
+
+  // Le retour du paiement Stripe : seul le webhook signé crédite le compte, le retour navigateur ne crédite rien.
   useEffect(() => {
     const params = new URLSearchParams(location.search);
-    if (params.get('paiement') === 'annule') { setPaiement('Paiement annulé. Aucun achat effectué.'); return; }
+    if (params.get('paiement') === 'annule') { setPaiement(t('bo.paiementAnnule')); return; }
     const session = params.get('session_id');
     if (params.get('paiement') !== 'retour' || !session) return;
     let actif = true; let timer: ReturnType<typeof setTimeout>; let essais = 0;
-    setPaiement('Confirmation du paiement en cours…');
+    setRayon('credits');
+    setPaiement(t('bo.paiementConfirmation'));
     const verifier = async () => {
       try {
         const resultat = await etatPaiementsStripe(session);
         if (!actif) return;
         if (resultat.credite) {
           window.dispatchEvent(new Event('destiny-compte-connecte'));
-          setPaiement('Paiement confirmé. Les Ovas et le contenu du bundle ont été ajoutés à votre compte.');
+          setPaiement(t('bo.paiementOk'));
           history.replaceState(null, '', location.pathname + location.hash);
           return;
         }
         if (++essais < 40) timer = setTimeout(() => void verifier(), 3000);
-        else setPaiement('La confirmation prend plus de temps. Vous pouvez revenir ou vérifier à nouveau.');
-      } catch (e) { if (actif) setPaiement(e instanceof Error ? e.message : 'Vérification indisponible.'); }
+        else setPaiement(t('bo.paiementLong'));
+      } catch (e) { if (actif) setPaiement(e instanceof Error ? e.message : t('mo.paiementIndispo')); }
     };
     void verifier();
     return () => { actif = false; clearTimeout(timer); };
   }, [verification]);
-  const acheter = async (pack: string) => {
-    if (achatEnCours) return;
-    setAchatEnCours(true); setPaiement('Ouverture du paiement sécurisé…');
-    try {
-      const resultat = await acheterOvasStripe(pack, crypto.randomUUID());
-      location.assign(resultat.url);
-    } catch (e) { setPaiement(e instanceof Error ? e.message : 'Paiement indisponible.'); setAchatEnCours(false); }
-  };
-  const coins = useGame((s) => s.coins);
-  const inventaire = useGame((s) => s.inventaire);
-  const skinActif = useGame((s) => s.skinActif);
-  const acheterSkin = useGame((s) => s.acheterSkin);
-  const choisirSkin = useGame((s) => s.choisirSkin);
-  const equipements = useGame((s) => s.equipements);
-  const equipementActif = useGame((s) => s.equipementActif);
-  const acheterEquipement = useGame((s) => s.acheterEquipement);
-  const traitsDebloques = useGame((s) => s.traitsDebloques);
-  const debloquerTrait = useGame((s) => s.debloquerTrait);
-  const basculerEquipement = useGame((s) => s.basculerEquipement);
-  const [apercu, setApercu] = useState(skinActif);
-  // ⚠️ LE GRAND APERÇU EST PARTAGÉ : il montre soit un ballon, soit un article
-  // du vestiaire — jamais les deux, parce qu'il n'y a qu'un contexte WebGL à
-  // dépenser (voir le commentaire du cadre d'aperçu, plus bas).
-  const [apercuType, setApercuType] = useState<'ballon' | 'equipement'>('ballon');
-  const [apercuEquip, setApercuEquip] = useState(EQUIPEMENTS[0].id);
-  const articleVu = EQUIPEMENT_PAR_ID[apercuEquip] ?? EQUIPEMENTS[0];
-  const [flash, setFlash] = useState<string | null>(null);
 
-  const message = (m: string) => {
-    setFlash(m);
-    setTimeout(() => setFlash(null), 2200);
+  const possede = (a: ArticleEquipement) => equipements.includes(a.id);
+
+  /** Un achat de cosmétique : monnaie choisie, solde vérifié, confirmation pour les Crédits, puis la transaction du store. */
+  const acheter = async (id: string, titre: string, prix: PrixArticle, devise: Devise) => {
+    const choisie = await demanderPaiement({ titre, prix, devise });
+    if (!choisie) return;
+    const r = acheterCosmetique(id, choisie);
+    message(r.ok ? t('bo.debloque', { article: texteTraduit(titre) }) : t('bo.pasAssez'));
   };
+  const acheterTrait = async (id: string, prix: number) => {
+    const choisie = await demanderPaiement({ titre: nomTrait(id), prix: prixOvas(prix) });
+    if (!choisie) return;
+    message(debloquerTrait(id) ? t('bo.traitAchete', { trait: nomTrait(id) }) : t('bo.pasAssez'));
+  };
+
+  // Les articles du rayon : en vente ou possédés (un article retiré de la vente reste visible chez qui l'a).
+  const articlesDuRayon = (r: RubriqueBoutique) => EQUIPEMENTS.filter((a) => rubriqueDe(a) === r && (possede(a) || estEnVente(a, maintenant) || a.recompense || a.parPub));
+
+  /** Le rendu d'une carte d'article, quel que soit le rayon. */
+  const carte = (a: ArticleEquipement) => {
+    const prix = prixArticle(a);
+    const mien = possede(a);
+    return (
+      <div key={a.id} className={`carte article article-boutique${vu?.type === 'article' && vu.id === a.id ? ' vu' : ''}${mien ? ' possede' : ''}`}
+        onMouseEnter={() => setVu({ type: 'article', id: a.id })} onFocus={() => setVu({ type: 'article', id: a.id })} onClick={() => setVu({ type: 'article', id: a.id })} tabIndex={0}>
+        <MiniatureArticle a={a} />
+        <div className="article-nom">{texteTraduit(a.nom)}</div>
+        <PastilleRarete rarete={a.rarete} />
+        <div className="article-detail">{texteTraduit(a.detail)}</div>
+        {mien ? (
+          <>
+            <span className="badge-cle ok"><Icone nom="check" taille={13} /> {t('bo.possede')}</span>
+            <button type="button" className="btn fantome petit" onClick={(e) => { e.stopPropagation(); ouvrirPersonnalisation(ongletDe(a)); }}>{t('bo.equiperDansPerso')}</button>
+          </>
+        ) : a.recompense ? (
+          <div className="article-detail etiquette-pub"><Icone nom="verrou" taille={14} /> {texteTraduit(a.recompense)}</div>
+        ) : a.parPub ? (
+          <>
+            <div className="article-detail etiquette-pub"><Icone nom="video" taille={14} /> {t('pub.gratuitPub')}</div>
+            <BoutonDeblocageParPub id={a.id} onDebloque={() => message(t('bo.debloque', { article: texteTraduit(a.nom) }))} />
+          </>
+        ) : (
+          <PrixBoutons prix={prix} onAcheter={(d) => void acheter(a.id, a.nom, prix, d)} />
+        )}
+      </div>
+    );
+  };
+
+  const apparenceBase = useMemo(
+    () => (joueur ? apparencePourApercu(joueur.nom, joueur.poste, joueur.apparence, equipementActif) : apparencePourApercu('Joueur', 'demi_ouverture', undefined, equipementActif)),
+    [joueur, equipementActif],
+  );
+  const articleVu = vu?.type === 'article' ? EQUIPEMENT_PAR_ID[vu.id] : undefined;
+  const avant = (POSTE_PAR_ID[joueur?.poste ?? 'demi_ouverture']?.numero ?? 15) <= 8;
+
+  /** Le grand aperçu : le joueur 3D qui ESSAIE l'article (kit, casque, crampons), le stade, le ballon ou l'objet posé au sol. */
+  const apercu = () => {
+    if (vu?.type === 'ballon') {
+      const s = SKIN_PAR_ID[vu.id];
+      return { vue: <Suspense fallback={<div className="hero-canvas-skel" />}><Apercu3D skinId={vu.id} /></Suspense>, titre: texteTraduit(s?.nom ?? ''), detail: t('bo.apercuAide'), fiche: null as null | ArticleEquipement };
+    }
+    if (!articleVu) return null;
+    const essai = { ...apparenceBase, equipement: equipementPourScene({ ...equipementActif, [articleVu.categorie === 'maillotExt' ? 'maillot' : articleVu.categorie]: articleVu.id }) };
+    let vue;
+    // Maillots, casques et crampons se voient d'abord sur LEUR modèle 3D (exactement celui de la boutique d'avant), puis, au choix, portés par le joueur.
+    if (articleVu.categorie === 'maillot' && surJoueur) vue = <ApercuJoueur3D apparence={apparenceBase} club={joueur?.club ?? manager?.club} kit={articleVu.kit} avant={avant} />;
+    else if ((articleVu.categorie === 'crampons' || articleVu.categorie === 'casque') && surJoueur) vue = <ApercuJoueur3D apparence={essai} club={joueur?.club ?? manager?.club} avant={avant} cadrage={articleVu.categorie === 'casque' ? 'visage' : 'corps'} />;
+    else vue = <Suspense fallback={<div className="hero-canvas-skel" />}><Objet3D url={articleVu.glb} teinte={articleVu.teinte} emoji={articleVu.emoji} /></Suspense>;
+    return { vue, titre: texteTraduit(articleVu.nom), detail: texteTraduit(articleVu.detail), fiche: null as null | ArticleEquipement };
+  };
+  const a = rayon !== 'credits' ? apercu() : null;
 
   return (
-    <motion.section
-      className="boutique"
-      initial={{ opacity: 0, y: 18 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4 }}
-    >
+    <motion.section className="boutique" initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
       <div className="tete-boutique">
         <div>
           <div className="eyebrow">{t('bo.titre')}</div>
           <h1>{t('bo.chapo')}</h1>
         </div>
-        <div className="solde"><PieceOvas taille={20} /> <b>{coins}</b> Ovas</div>
+        <SoldesMonnaies />
       </div>
 
-      {flash && <div className="flash-boutique">{flash}</div>}
+      {flash && <div className="flash-boutique" role="status">{flash}</div>}
+      {paiement && <p role="status" className="bo-paiement">{paiement} {new URLSearchParams(location.search).has('session_id') && <button className="btn fantome petit" onClick={() => setVerification((v) => v + 1)}>{t('bo.reverifier')}</button>}</p>}
 
-      {/* ═══ UN SEUL GRAND APERÇU, POUR LES BALLONS **ET** LE VESTIAIRE ══════
-          ⚠️ CE N'EST PAS UN CHOIX DE MISE EN PAGE, C'EST UNE CONTRAINTE DU
-          NAVIGATEUR. Chaque `<Canvas>` ouvre un contexte WebGL et le navigateur
-          n'en accorde qu'une poignée : la boutique en consomme déjà six (les
-          cinq vignettes de ballons + cet aperçu). Mesuré en jeu, le septième
-          est perdu à la seconde où il s'ouvre — « THREE.WebGLRenderer: Context
-          Lost », cadre vide. Le vestiaire ne monte donc AUCUN canvas de son
-          côté : ses articles sont des pastilles, et pointer l'un d'eux change
-          ce qu'affiche ce cadre-ci. */}
-      <div className="carte apercu-skin">
-        <div className="apercu-canvas">
-          <Suspense fallback={<div className="hero-canvas-skel" />}>
-            {apercuType === 'ballon'
-              ? <Apercu3D skinId={apercu} />
-              : <Objet3D url={articleVu.glb} teinte={articleVu.teinte} emoji={articleVu.emoji} />}
-          </Suspense>
-        </div>
-        <div className="apercu-info">
-          <div className="eyebrow">{t('bo.apercu')}</div>
-          {apercuType === 'ballon' ? (
-            <>
-              <h2>{texteTraduit(SKINS.find((s) => s.id === apercu)?.nom ?? '')}</h2>
-              <p style={{ color: 'var(--craie-dim)' }}>{t('bo.apercuAide')}</p>
-              {inventaire.includes(apercu) ? (
-                skinActif === apercu ? (
-                  <span className="badge-cle ok"><Icone nom="check" taille={13} /> {t('bo.equipe')}</span>
-                ) : (
-                  <button className="btn primaire" onClick={() => { choisirSkin(apercu); message(t('bo.equipeMsg')); }}>
-                    {t('bo.equiper')}
-                  </button>
-                )
-              ) : null}
-            </>
-          ) : (
-            <>
-              <h2>{texteTraduit(articleVu.nom)}</h2>
-              <p style={{ color: 'var(--craie-dim)' }}>{texteTraduit(articleVu.detail)}</p>
-              {equipements.includes(articleVu.id) ? (
-                <button
-                  className={equipementActif[articleVu.categorie] === articleVu.id ? 'btn fantome' : 'btn primaire'}
-                  onClick={() => basculerEquipement(articleVu.id)}
-                >
-                  {equipementActif[articleVu.categorie] === articleVu.id
-                    ? t('bo.porte')
-                    : t('bo.equiper')}
-                </button>
-              ) : articleVu.parPub ? (
-                /* ⚠️ Cet article-là ne s'achète PAS : il se regarde. Voir
-                   `ArticleEquipement.parPub` et `debloquerParPub` (store). */
-                <BoutonDeblocageParPub
-                  id={articleVu.id}
-                  onDebloque={() => message(t('bo.debloque', { article: texteTraduit(articleVu.nom) }))}
-                />
-              ) : (
-                <button
-                  className="btn primaire"
-                  disabled={coins < articleVu.prix}
-                  onClick={() => {
-                    if (acheterEquipement(articleVu.id)) message(t('bo.debloque', { article: texteTraduit(articleVu.nom) }));
-                    else message(t('bo.pasAssez'));
-                  }}
-                >
-                  <PieceOvas taille={17} /> {articleVu.prix}
-                </button>
-              )}
-            </>
-          )}
-        </div>
+      <div className="bo-rayons" role="tablist" aria-label={t('bo.rayons')}>
+        {RAYONS.map((r) => (
+          <button key={r.id} type="button" role="tab" aria-selected={rayon === r.id} className={rayon === r.id ? 'actif' : undefined}
+            // « Packs » ouvre la roue d'origine (collection) : la boutique de packs garde son affichage, avec ses deux monnaies.
+            onClick={() => (r.id === 'packs' ? setEcran('collectionSolo') : setRayon(r.id))} data-tuto={`bo-rayon-${r.id}`}>
+            {r.id === 'credits' && <PieceCredits taille={16} />}{t(r.cle)}
+          </button>
+        ))}
+        <button type="button" className="bo-perso" onClick={() => ouvrirPersonnalisation('joueur')}><Icone nom="reglages" taille={16} /> {t('bo.mesCosmetiques')}</button>
       </div>
 
-      <div className="eyebrow section-titre">{t('bo.ballons')}</div>
-      <div className="grille-boutique">
-        {SKINS.map((s) => {
-          const possede = inventaire.includes(s.id);
-          const equipe = skinActif === s.id;
-          return (
-            <div
-              key={s.id}
-              className={`carte article ${apercuType === 'ballon' && apercu === s.id ? 'vu' : ''}`}
-              onMouseEnter={() => { setApercu(s.id); setApercuType('ballon'); }}
-              onClick={() => { setApercu(s.id); setApercuType('ballon'); }}
-            >
-              {/* Le VRAI ballon, en 3D, qui tourne — plus une pastille de couleur. */}
-              <Suspense fallback={
-                <div className="pastille-couleur" style={{ background: `linear-gradient(135deg, ${s.corps}, ${s.bande})` }} />
-              }>
-                <Vignette skinId={s.id} />
-              </Suspense>
-              <div className="article-nom">{texteTraduit(s.nom)}</div>
-              {equipe ? (
-                <span className="badge-cle ok">{t('bo.equipe')}</span>
-              ) : possede ? (
-                <button className="btn fantome petit" onClick={(e) => { e.stopPropagation(); choisirSkin(s.id); message(t('bo.equipeMsg')); }}>
-                  {t('bo.equiper')}
-                </button>
-              ) : (
-                <button
-                  className="btn primaire petit"
-                  disabled={coins < s.prix}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (acheterSkin(s.id)) message(t('bo.debloque', { article: texteTraduit(s.nom) }));
-                    else message(t('bo.pasAssez'));
-                  }}
-                >
-                  <PieceOvas taille={16} /> {s.prix}
-                </button>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {/* ⚠️ LES BOOSTS ONT ÉTÉ RETIRÉS (demande explicite). Acheter +2 à tous
-          les attributs contredisait frontalement la difficulté du jeu, calibrée
-          au dixième de point dans `lib/progression.ts` : on ne monte pas sa
-          générale à la caisse. La boutique ne vend plus que du cosmétique. */}
-
-      {/* ═══ LE VESTIAIRE ═══════════════════════════════════════════════════
-          Crampons, maillots et accessoires. Purement cosmétique, comme les
-          ballons : ce qu'on porte se voit dans le panneau de carrière, jamais
-          dans les statistiques. Chaque article pointe déjà son `.glb` — ceux
-          qui restent à modéliser affichent leur pastille en attendant, et
-          passeront en 3D le jour où le fichier arrive dans `public/m3d/`. */}
-      <div className="eyebrow section-titre">{t('bo.vestiaire')}</div>
-      <p style={{ color: 'var(--brume)', fontSize: '0.85rem', marginBottom: '0.8rem' }}>
-        {t('bo.vestiaireAide')}
-      </p>
-      {CATEGORIES_EQUIPEMENT.map((cat) => (
-        <div key={cat.id} className="bloc-vestiaire">
-          <div className="vestiaire-titre">{cat.emoji} {t(cat.cle)}</div>
-          <div className="grille-boutique">
-            {EQUIPEMENTS.filter((e) => e.categorie === cat.id).map((e) => {
-              const possede = equipements.includes(e.id);
-              const porte = equipementActif[e.categorie] === e.id;
+      {/* ═══ CRÉDITS ═══════════════════════════════════════════════════════════════════════════════ */}
+      {rayon === 'credits' && (
+        <section>
+          <p className="bo-intro">{t('bo.creditsIntro')}</p>
+          <div className="grille-boutique grille-recharges">
+            {OFFRES_CREDITS.map((p) => (
+              <button key={p.id} type="button" className={`carte article pack recharge-credits${p.populaire ? ' populaire' : ''}`} onClick={() => ouvrirRechargeCredits(p.id)}>
+                {p.populaire && <div className="pack-populaire">{t('bo.populaire')}</div>}
+                <PieceCredits taille={58} variante="boutique" />
+                <div className="pack-nom">{texteTraduit(p.nom)}</div>
+                <div className="pack-ovas">{p.credits.toLocaleString(locale())} {t('mo.credits')}</div>
+                {p.bonus && <div className="pack-bonus">{t('bo.bonus', { v0: p.bonus })}</div>}
+                <span className="btn fantome petit">{p.prix}</span>
+              </button>
+            ))}
+          </div>
+          <h2 className="bo-sous-titre">{t('bo.bundles')}</h2>
+          <p className="bo-intro">{t('bo.bundlesAide')}</p>
+          <div className="grille-boutique grille-bundles">
+            {BUNDLES.map((p) => {
+              const cosmetiques = [...(p.ballons ?? []).map((id) => texteTraduit(SKIN_PAR_ID[id]?.nom ?? id)), ...(p.equipements ?? []).map((id) => texteTraduit(EQUIPEMENT_PAR_ID[id]?.nom ?? id))];
+              const traits = (p.traits ?? []).map((id) => nomTrait(id));
+              const detail = [...cosmetiques, ...traits].join(' · ');
               return (
-                <div
-                  key={e.id}
-                  className={`carte article ${apercuType === 'equipement' && apercuEquip === e.id ? 'vu' : ''}${porte ? ' porte' : ''}`}
-                  /* Survoler une carte ne monte AUCUN canvas : ça change juste
-                     ce qu'affiche le grand aperçu, en haut de l'écran. */
-                  onMouseEnter={() => { setApercuEquip(e.id); setApercuType('equipement'); }}
-                  onFocus={() => { setApercuEquip(e.id); setApercuType('equipement'); }}
-                  onClick={() => { setApercuEquip(e.id); setApercuType('equipement'); }}
-                >
-                  {/* Le VRAI modèle 3D en icône — rendu une fois hors écran,
-                      puis servi en image (voir `lib/vignettes3d.ts`). */}
-                  <IconeArticle url={e.glb} teinte={e.teinte} emoji={e.emoji} />
-                  <div className="article-nom">{texteTraduit(e.nom)}</div>
-                  <div className="article-detail">{texteTraduit(e.detail)}</div>
-                  {/* Un article « par pub » annonce la couleur AVANT le clic :
-                      pas de prix barré, pas de fausse promo — juste ce qu'il
-                      faut faire pour l'avoir. */}
-                  {!possede && e.parPub && (
-                    <div className="article-detail etiquette-pub"><Icone nom="video" taille={14} /> {t('pub.gratuitPub')}</div>
+                <button key={p.id} type="button" className={`carte article pack bundle${p.populaire ? ' populaire' : ''}`} onClick={() => ouvrirRechargeCredits(p.id)}>
+                  {p.populaire && <div className="pack-populaire">{t('bo.populaire')}</div>}
+                  <PieceCredits taille={52} variante="boutique" />
+                  <div className="pack-nom">{texteTraduit(p.nom)}</div>
+                  <div className="pack-ovas">{t('bo.pluscredits', { n: p.credits.toLocaleString(locale()) })}</div>
+                  {(cosmetiques.length > 0 || traits.length > 0) && (
+                    <div className="pack-contenu" title={detail}>
+                      {cosmetiques.length > 0 && <span><Icone nom="cadeau" taille={14} /> {tn('bo.nbCosmetiques', cosmetiques.length, { n: cosmetiques.length })}</span>}
+                      {traits.length > 0 && <span><Icone nom="joueur" taille={14} /> {tn('bo.nbArchetypes', traits.length, { n: traits.length })}</span>}
+                      <small>{detail}</small>
+                    </div>
                   )}
-                  {possede ? (
-                    <button
-                      className={porte ? 'btn fantome petit' : 'btn primaire petit'}
-                      onClick={() => basculerEquipement(e.id)}
-                    >
-                      {porte ? t('bo.porte') : t('bo.equiper')}
-                    </button>
-                  ) : e.parPub ? (
-                    <BoutonDeblocageParPub
-                      id={e.id}
-                      onDebloque={() => message(t('bo.debloque', { article: texteTraduit(e.nom) }))}
-                    />
-                  ) : (
-                    <button
-                      className="btn primaire petit"
-                      disabled={coins < e.prix}
-                      onClick={() => {
-                        if (acheterEquipement(e.id)) message(t('bo.debloque', { article: texteTraduit(e.nom) }));
-                        else message(t('bo.pasAssez'));
-                      }}
-                    >
-                      <PieceOvas taille={16} /> {e.prix}
-                    </button>
-                  )}
-                </div>
+                  <span className="btn fantome petit">{p.prix}</span>
+                </button>
               );
             })}
           </div>
-        </div>
-      ))}
+        </section>
+      )}
 
-      {/* ═══ LES CARACTÈRES ═══════════════════════════════════════════════
-          ⚠️ LA SEULE CHOSE NON COSMÉTIQUE DE LA BOUTIQUE, ET C’EST ASSUMÉ —
-          parce que ça ne vend PAS de la puissance. `MAX_TRAITS` reste à deux :
-          un joueur qui a tout débloqué en porte autant qu’un joueur qui n’a
-          rien acheté, et chaque archétype coûte quelque chose autant qu’il
-          rapporte. `scripts/verifTraits.ts` échoue si un payant pèse plus lourd
-          que le meilleur des gratuits, paires comprises. Ce qu’on achète, c’est
-          une façon de jouer de plus. */}
-      <div className="eyebrow section-titre">{t('bo.caracteres')}</div>
-      <p style={{ color: 'var(--brume)', fontSize: '0.85rem', marginBottom: '0.8rem' }}>
-        {t('bo.caracteresAide')}
-      </p>
-      <div className="grille-caracteres">
-        {TRAITS_A_DEBLOQUER.map((tr) => {
-          const possede = traitsDebloques.includes(tr.id);
-          const prix = tr.prix ?? 0;
-          return (
-            <div key={tr.id} className={`carte caractere${possede ? ' possede' : ''}`}>
-              <div className="caractere-tete">
-                <span className="caractere-emoji">{tr.emoji}</span>
-                <b>{nomTrait(tr.id)}</b>
+      {/* ═══ MAILLOTS · JOUEUR · STADES · ÉVÉNEMENT : une colonne d'aperçu et la grille ═══════════ */}
+      {rayon !== 'credits' && (
+        <div className="bo-deux">
+          <aside className="bo-apercu carte" aria-label={t('bo.apercu')}>
+            <div className="bo-apercu-cadre">
+              {a ? a.vue : <div className="bo-apercu-vide">{t('bo.apercuVide')}</div>}
+            </div>
+            {a && (
+              <div className="bo-apercu-info">
+                <h2>{a.titre}</h2>
+                <p>{a.detail}</p>
               </div>
-              <div className="caractere-desc">{descriptionTrait(tr.id)}</div>
-              {possede ? (
-                <div className="caractere-acquis">{t('bo.traitDebloque')}</div>
-              ) : (
-                <button
-                  className="btn primaire petit"
-                  disabled={coins < prix}
-                  onClick={() => {
-                    if (debloquerTrait(tr.id)) message(t('bo.traitAchete', { trait: nomTrait(tr.id) }));
-                    else message(t('bo.pasAssez'));
-                  }}
-                >
-                  <PieceOvas taille={16} /> {prix}
-                </button>
-              )}
-            </div>
-          );
-        })}
-      </div>
-      {/* ═══ GAGNER DES OVAS SANS PAYER ══════════════════════════════════════
-          ⚠️ FACULTATIF, ET ÇA DOIT LE RESTER. Aucun article n'est réservé à
-          ceux qui regardent des pubs : c'est un raccourci vers la même
-          boutique, plafonné, et qui ne rapporte que des Ovas — donc rien qui
-          touche à la difficulté (voir `lib/pub.ts`). */}
-      <div className="eyebrow section-titre">{t('bo.gagnerOvas')}</div>
-      <div className="grille-boutique">
-        <CartePubRecompensee />
-      </div>
+            )}
+          </aside>
+          <div className="bo-grille-zone">
+            {rayon === 'maillots' && <p className="bo-intro">{t('bo.maillotsAide')}</p>}
+            {(articleVu?.categorie === 'maillot' || articleVu?.categorie === 'casque' || articleVu?.categorie === 'crampons') && (rayon === 'maillots' || rayon === 'joueur') && (
+              <div className="bo-bascule-kit" role="group" aria-label={t('bo.essai')}>
+                <button type="button" aria-pressed={!surJoueur} onClick={() => setSurJoueur(false)}>{t('bo.essaiModele')}</button>
+                <button type="button" aria-pressed={surJoueur} onClick={() => setSurJoueur(true)}>{t('bo.essaiJoueur')}</button>
+              </div>
+            )}
 
-      <div className="eyebrow section-titre">{t('bo.recharges')}</div>
-      {paiement && <p role="status">{paiement} {new URLSearchParams(location.search).has('session_id') && <button className="btn fantome petit" onClick={() => setVerification(v => v + 1)}>{t("ui.72912f6f74e9")}</button>}</p>}
-      <p style={{ color: 'var(--brume)', fontSize: '0.85rem', marginBottom: '0.8rem' }}>{t("ui.707bf51a6afa")}</p>
-      <div className="grille-boutique grille-recharges">
-        {PACKS.map((p) => (
-          <div key={p.id} className={`carte article pack recharge-ovas${p.populaire ? ' populaire' : ''}`}>
-            {p.populaire && <div className="pack-populaire">{t("ui.9a53354ffff4")}</div>}
-            <PieceOvas taille={42} />
-            <div className="pack-nom">{t("ui.12ea799ed506", { v0: texteTraduit(p.nom) })}</div>
-            <div className="pack-ovas">{p.ovas.toLocaleString(locale())} Ovas</div>
-            {p.bonus && <div className="pack-bonus">{t("ui.0fee32c89ee2", { v0: p.bonus })}</div>}
-            <button className="btn fantome petit" disabled={achatEnCours} onClick={() => void acheter(p.id)}>
-              {p.prix}
-            </button>
-          </div>
-        ))}
-      </div>
-
-      <div className="eyebrow section-titre">{t("ui.e27b28415c23")}</div>
-      <p style={{ color: 'var(--brume)', fontSize: '0.85rem', marginBottom: '0.8rem' }}>{t("ui.2acea2053661")}</p>
-      <div className="grille-boutique grille-bundles">
-        {BUNDLES.map((p) => {
-          const cosmetiques = [
-            ...(p.ballons ?? []).map(id => texteTraduit(SKIN_PAR_ID[id]?.nom ?? id)),
-            ...(p.equipements ?? []).map(id => texteTraduit(EQUIPEMENT_PAR_ID[id]?.nom ?? id)),
-          ];
-          const traits = (p.traits ?? []).map(id => nomTrait(id));
-          const detail = [...cosmetiques, ...traits].join(' · ');
-          return (
-            <div key={p.id} className={`carte article pack bundle${p.populaire ? ' populaire' : ''}`}>
-              {p.populaire && <div className="pack-populaire">{t("ui.9a53354ffff4")}</div>}
-              <PieceOvas taille={42} />
-              <div className="pack-nom">{t("ui.25b803cb85f4", { v0: texteTraduit(p.nom) })}</div>
-              <div className="pack-ovas">{p.ovas.toLocaleString(locale())} Ovas</div>
-              {p.bonus && <div className="pack-bonus">{t("ui.0fee32c89ee2", { v0: p.bonus })}</div>}
-              {(cosmetiques.length > 0 || traits.length > 0) && (
-                <div className="pack-contenu" title={detail}>
-                  {cosmetiques.length > 0 && <span><Icone nom="cadeau" taille={14} />{tn("ui.169c6917999f", cosmetiques.length, { v0: cosmetiques.length })}</span>}
-                  {traits.length > 0 && <span><Icone nom="joueur" taille={14} /> {traits.length === TRAITS_A_DEBLOQUER.length ? t("ui.b8e6641b2ac0") : tn("ui.216a85fa1c6e", traits.length, { v0: traits.length })}</span>}
-                  <small>{detail}</small>
+            {rayon === 'joueur' ? (
+              <>
+                {(['crampons', 'casque', 'sac', 'bouclier'] as const).map((cat) => {
+                  const liste = articlesDuRayon('joueur').filter((x) => x.categorie === cat);
+                  return liste.length === 0 ? null : (
+                    <div key={cat} className="bloc-vestiaire">
+                      <div className="vestiaire-titre">{t(`bo.cat.${cat}`)}</div>
+                      <div className="grille-boutique">{liste.map(carte)}</div>
+                    </div>
+                  );
+                })}
+                <div className="bloc-vestiaire">
+                  <div className="vestiaire-titre">{t('bo.ballons')}</div>
+                  <div className="grille-boutique">
+                    {SKINS.map((s) => {
+                      const mien = inventaire.includes(s.id);
+                      const prix = prixSkin(s);
+                      return (
+                        <div key={s.id} className={`carte article article-boutique${vu?.type === 'ballon' && vu.id === s.id ? ' vu' : ''}${mien ? ' possede' : ''}`}
+                          onMouseEnter={() => setVu({ type: 'ballon', id: s.id })} onClick={() => setVu({ type: 'ballon', id: s.id })}>
+                          <Suspense fallback={<div className="pastille-couleur" style={{ background: `linear-gradient(135deg, ${s.corps}, ${s.bande})` }} />}><Vignette skinId={s.id} /></Suspense>
+                          <div className="article-nom">{texteTraduit(s.nom)}</div>
+                          {mien ? (
+                            <>
+                              <span className="badge-cle ok"><Icone nom="check" taille={13} /> {skinActif === s.id ? t('bo.equipe') : t('bo.possede')}</span>
+                              <button type="button" className="btn fantome petit" onClick={(e) => { e.stopPropagation(); ouvrirPersonnalisation('divers'); }}>{t('bo.equiperDansPerso')}</button>
+                            </>
+                          ) : <PrixBoutons prix={prix} onAcheter={(d) => void acheter(s.id, s.nom, prix, d)} />}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-              )}
-              <button className="btn fantome petit" disabled={achatEnCours} onClick={() => void acheter(p.id)}>
-                {p.prix}
-              </button>
-            </div>
-          );
-        })}
-      </div>
+                {/* ═══ LES CARACTÈRES — la seule chose non cosmétique, et ça ne vend pas de la puissance : MAX_TRAITS reste à deux. ═══ */}
+                <div className="bloc-vestiaire">
+                  <div className="vestiaire-titre">{t('bo.caracteres')}</div>
+                  <p className="bo-intro">{t('bo.caracteresAide')}</p>
+                  <div className="grille-caracteres">
+                    {TRAITS_A_DEBLOQUER.map((tr) => {
+                      const mien = traitsDebloques.includes(tr.id);
+                      const prix = tr.prix ?? 0;
+                      return (
+                        <div key={tr.id} className={`carte caractere${mien ? ' possede' : ''}`}>
+                          <div className="caractere-tete"><span className="caractere-emoji">{tr.emoji}</span><b>{nomTrait(tr.id)}</b></div>
+                          <div className="caractere-desc">{descriptionTrait(tr.id)}</div>
+                          {mien ? <div className="caractere-acquis">{t('bo.traitDebloque')}</div>
+                            : <button className="btn prix-ovas petit" onClick={() => void acheterTrait(tr.id, prix)}><PieceOvas taille={16} /> {nombre(prix)}</button>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+                {/* ═══ GAGNER DES OVAS SANS PAYER — facultatif, plafonné, et ça ne rapporte que des Ovas (voir `lib/pub.ts`). ═══ */}
+                <div className="bloc-vestiaire">
+                  <div className="vestiaire-titre">{t('bo.gagnerOvas')}</div>
+                  <div className="grille-boutique"><CartePubRecompensee /></div>
+                </div>
+              </>
+            ) : (
+              <div className="grille-boutique">
+                {articlesDuRayon(rayon as RubriqueBoutique).map(carte)}
+                {articlesDuRayon(rayon as RubriqueBoutique).length === 0 && <p className="bo-intro">{t('bo.rienIci')}</p>}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      <span hidden>{coins}</span>
     </motion.section>
   );
 }
+
+const ongletDe = (a: ArticleEquipement): OngletPerso => (a.categorie === 'maillot' || a.categorie === 'maillotExt' ? 'maillots' : a.categorie === 'sac' || a.categorie === 'bouclier' ? 'divers' : 'joueur');
+

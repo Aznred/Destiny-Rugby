@@ -295,3 +295,11 @@ export function creerEtiquette(renderer){
   };
   return {sprite,ecrire};
 }
+
+/** Un kit dont l'atlas est fourni en image (kits créés dans le Labo) : posé tel quel, sans repeindre. */
+export function tenueDepuisImage(image,maillot,taille=1024){
+  const c=toile(taille),ctx=c.getContext('2d');ctx.drawImage(image,0,0,taille,taille);
+  c.encre=luminance(maillot?.principal||'#0b2a6b')>.56?'#151b22':'#ffffff';
+  c.lisere=c.encre==='#ffffff'?'rgba(10,14,18,.55)':'rgba(255,255,255,.6)';
+  return c;
+}

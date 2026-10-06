@@ -1,28 +1,30 @@
 import Stripe from 'stripe';
 import type { StockageCarriere } from './carriereStockage.js';
 
-export const OFFRES_OVAS = {
-  p1: { nom: 'Essentiel', ovas: 500, centimes: 99 },
-  p2: { nom: 'Réserve', ovas: 3000, centimes: 499 },
-  p3: { nom: 'Coffre', ovas: 7000, centimes: 999 },
-  p4: { nom: 'Club', ovas: 20000, centimes: 2499 },
-  p5: { nom: 'Stade', ovas: 45000, centimes: 4999 },
-  p6: { nom: 'Fortune', ovas: 100000, centimes: 9999 },
+// ⚠️ L'ARGENT RÉEL N'ACHÈTE PLUS D'OVAS (Correctif 21) : il achète des CRÉDITS, la monnaie premium. Les Ovas se gagnent en jouant.
+// Les identifiants (`p1`…`p6`, `b1`…`b4`) restent ceux d'avant : un reçu ou un retour de paiement en cours ne change pas de sens.
+export const OFFRES_CREDITS = {
+  p1: { nom: 'Essentiel', credits: 100, centimes: 99 },
+  p2: { nom: 'Réserve', credits: 600, centimes: 499 },
+  p3: { nom: 'Coffre', credits: 1400, centimes: 999 },
+  p4: { nom: 'Club', credits: 4000, centimes: 2499 },
+  p5: { nom: 'Stade', credits: 9000, centimes: 4999 },
+  p6: { nom: 'Fortune', credits: 20000, centimes: 9999 },
 } as const;
 
 export const OFFRES_BUNDLES = {
-  b1: { nom: 'Vestiaire', ovas: 1000, centimes: 499, inventaire: ['tricolore'], equipements: ['crampons-cuir', 'maillot-bleu'] },
-  b2: { nom: 'Archétypes', ovas: 2500, centimes: 999, traitsDebloques: ['roc', 'cerveau', 'discipline', 'chouchou', 'cadre', 'zen'] },
-  b3: { nom: 'Club', ovas: 5000, centimes: 1999, inventaire: ['ocean', 'or'], equipements: ['maillot-toulousain', 'crampons-dupont', 'casque-or'], traitsDebloques: ['precoce', 'tete_brulee', 'cadre', 'cerveau'] },
+  b1: { nom: 'Vestiaire', credits: 200, centimes: 499, inventaire: ['tricolore'], equipements: ['crampons-cuir', 'maillot-bleu'] },
+  b2: { nom: 'Archétypes', credits: 500, centimes: 999, traitsDebloques: ['roc', 'cerveau', 'discipline', 'chouchou', 'cadre', 'zen'] },
+  b3: { nom: 'Club', credits: 1000, centimes: 1999, inventaire: ['ocean', 'or'], equipements: ['maillot-toulousain', 'crampons-dupont', 'casque-or'], traitsDebloques: ['precoce', 'tete_brulee', 'cadre', 'cerveau'] },
   b4: {
-    nom: 'Légende', ovas: 15000, centimes: 4999,
+    nom: 'Légende', credits: 3000, centimes: 4999,
     inventaire: ['tricolore', 'cuir', 'ocean', 'or'],
     equipements: ['crampons-or', 'crampons-dupont', 'maillot-legende', 'casque-or', 'maillot-toulousain'],
     traitsDebloques: ['roc', 'cerveau', 'discipline', 'chouchou', 'tete_brulee', 'cadre', 'precoce', 'vieux_lion', 'electron', 'muraille', 'zen', 'increvable'],
   },
 } as const;
 
-const OFFRES_STRIPE = { ...OFFRES_OVAS, ...OFFRES_BUNDLES } as const;
+const OFFRES_STRIPE = { ...OFFRES_CREDITS, ...OFFRES_BUNDLES } as const;
 
 type ModeStripe = 'test' | 'live';
 type ConfigurationStripe = { mode: ModeStripe; cle: string; codeFiscal?: string };
@@ -122,16 +124,16 @@ export async function creerPaiement(compte: string, pack: unknown, tentative: un
     // fourni par l'éditeur est obligatoire avant d'activer Managed Payments.
     managed_payments: { enabled: configuration.mode === 'live' },
     client_reference_id: compte,
-    metadata: { compte, pack, ovas: String(offre.ovas), application: 'destiny-rugby' },
+    metadata: { compte, pack, credits: String(offre.credits), application: 'destiny-rugby' },
     line_items: [{ quantity: 1, price_data: { currency: 'eur', unit_amount: offre.centimes,
       product_data: {
-        name: `${pack.startsWith('b') ? 'Bundle' : 'Recharge'} ${offre.nom} — ${offre.ovas} Ovas${configuration.mode === 'test' ? ' (test)' : ''}`,
+        name: `${pack.startsWith('b') ? 'Bundle' : 'Recharge'} ${offre.nom} — ${offre.credits} Crédits${configuration.mode === 'test' ? ' (test)' : ''}`,
         ...(configuration.codeFiscal ? { tax_code: configuration.codeFiscal } : {}),
       } } }],
     success_url: `${origine.origin}/?paiement=retour&session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${origine.origin}/?paiement=annule`,
     integration_identifier: 'destiny_rugby_ovas_qmzptvka',
-  }, { idempotencyKey: `ovas:${compte}:${tentative}` });
+  }, { idempotencyKey: `credits:${compte}:${tentative}` });
   if (!session.url) throw new Error('La page de paiement est indisponible.');
   return { url: session.url };
 }
@@ -148,10 +150,10 @@ export async function traiterEvenementStripe(event: Stripe.Event, stockage: Stoc
   const offre = pack && Object.hasOwn(OFFRES_STRIPE, pack) ? OFFRES_STRIPE[pack as keyof typeof OFFRES_STRIPE] : null;
   if (!offre || !compte || session.client_reference_id !== compte || session.metadata?.application !== 'destiny-rugby'
     || session.amount_total !== offre.centimes || session.currency !== 'eur' || session.mode !== 'payment'
-    || session.metadata?.ovas !== String(offre.ovas)) throw new Error('Paiement ne correspondant pas à une recharge.');
+    || session.metadata?.credits !== String(offre.credits)) throw new Error('Paiement ne correspondant pas à une recharge.');
   if (!stockage.crediterAchat) throw new Error('Stockage des paiements indisponible.');
   await stockage.crediterAchat(session.id, compte, {
-    ovas: offre.ovas,
+    credits: offre.credits,
     inventaire: 'inventaire' in offre ? [...offre.inventaire] : [],
     equipements: 'equipements' in offre ? [...offre.equipements] : [],
     traitsDebloques: 'traitsDebloques' in offre ? [...offre.traitsDebloques] : [],

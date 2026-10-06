@@ -5,6 +5,7 @@ import type { EditionJoueur } from './ligue/atelierCatalogue';
 import type { AjoutJoueur } from './ligue/importsJoueurs';
 import { assemblerCatalogueSpecial, type CatalogueSpecial, type DefinitionCarteSpeciale, type EvenementSpecial } from './ligue/cartesSpeciales';
 import { fournirCatalogueEffectifs } from './catalogueEffectifs';
+import { enregistrerArticlesLabo, type ArticleEquipement } from '../data/boutique';
 
 let revision = -1;
 let courant: readonly SourceCarte[] = catalogueBaseCarriere();
@@ -36,7 +37,7 @@ export function synchroniserCatalogueSolo(): Promise<readonly SourceCarte[]> {
     .then(async reponse => {
       if (!reponse.ok) throw new Error('Catalogue indisponible');
       const donnees = await reponse.json() as { revision?: number; joueurs?: Record<string, EditionJoueur>; ajouts?: Record<string, AjoutJoueur>;
-        speciales?: { definitions?: DefinitionCarteSpeciale[]; evenements?: EvenementSpecial[] } };
+        speciales?: { definitions?: DefinitionCarteSpeciale[]; evenements?: EvenementSpecial[] }; boutique?: Partial<ArticleEquipement>[] };
       dernierChargement = Date.now();
       if (Number.isInteger(donnees.revision) && donnees.joueurs && typeof donnees.joueurs === 'object') {
         revision = donnees.revision!;
@@ -47,6 +48,8 @@ export function synchroniserCatalogueSolo(): Promise<readonly SourceCarte[]> {
         const parId = new Map(mondial.map(s => [s.sourceId, s]));
         speciales = assemblerCatalogueSpecial(definitions, evenements, id => parId.get(id));
         courant = speciales.definitions.length ? [...mondial, ...speciales.definitions.map(d => speciales!.sources.get(d.id)!)] : mondial;
+        // Les cosmétiques du Labo arrivent avec le catalogue : un seul aller-retour, relu au plus une fois par minute.
+        if (Array.isArray(donnees.boutique)) { enregistrerArticlesLabo(donnees.boutique); if (typeof window !== 'undefined') window.dispatchEvent(new Event('destiny-boutique-labo')); }
         if (typeof window !== 'undefined') window.dispatchEvent(new Event('destiny-catalogue-solo-actualise'));
       }
       return courant;

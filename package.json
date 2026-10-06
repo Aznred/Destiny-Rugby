@@ -78,6 +78,7 @@
     "verify:responsabilites": "vite-node scripts/verifierResponsabilites.ts",
     "verify:tutoriel": "vite-node scripts/verifierTutoriel.ts",
     "verify:bareme": "vite-node scripts/verifBareme.ts",
+    "verify:boutique": "vite-node scripts/verifBoutique.ts",
     "verify:modales": "vite-node scripts/verifierModales.ts",
     "mesure:conso-direct": "vite-node scripts/mesurerConsommationDirect.ts",
     "verify:ecriture-direct": "vite-node scripts/verifierEcritureDirect.ts",

@@ -14,8 +14,13 @@ export interface CompteStocke {
   creeLe?: string; vuLe?: string;
 }
 
+/**
+ * Ce qu'un paiement Stripe crédite. ⚠️ Depuis le Correctif 21 l'argent réel achète des CRÉDITS, plus des Ovas. La colonne historique
+ * `achats_stripe.ovas` garde le montant crédité (Ovas avant le Correctif 21, Crédits ensuite) : elle ne sert qu'à l'idempotence
+ * d'une session, et aucune migration n'est nécessaire.
+ */
 export interface RecompensesAchat {
-  ovas: number;
+  credits: number;
   inventaire: string[];
   equipements: string[];
   traitsDebloques: string[];
@@ -354,11 +359,11 @@ export function stockageNeon(url: string): StockageCarriere {
       const equipements = JSON.stringify(recompenses.equipements);
       const traits = JSON.stringify(recompenses.traitsDebloques);
       await sql`with achat as (
-        insert into achats_stripe(session,compte,ovas) values (${session},${compte},${recompenses.ovas})
+        insert into achats_stripe(session,compte,ovas) values (${session},${compte},${recompenses.credits})
         on conflict (session) do nothing returning ovas
       ) update compte_boutique set donnees = donnees || jsonb_build_object(
-        'ovas', (donnees->>'ovas')::bigint + (select ovas from achat),
-        'achatsOvas', coalesce((donnees->>'achatsOvas')::bigint,0) + (select ovas from achat),
+        'credits', coalesce((donnees->>'credits')::bigint,0) + (select ovas from achat),
+        'achatsCredits', coalesce((donnees->>'achatsCredits')::bigint,0) + (select ovas from achat),
         'inventaire', to_jsonb(array(select distinct valeur from jsonb_array_elements_text(coalesce(donnees->'inventaire','[]'::jsonb) || ${inventaire}::jsonb) as elements(valeur))),
         'equipements', to_jsonb(array(select distinct valeur from jsonb_array_elements_text(coalesce(donnees->'equipements','[]'::jsonb) || ${equipements}::jsonb) as elements(valeur))),
         'traitsDebloques', to_jsonb(array(select distinct valeur from jsonb_array_elements_text(coalesce(donnees->'traitsDebloques','[]'::jsonb) || ${traits}::jsonb) as elements(valeur))),
@@ -380,6 +385,8 @@ export function stockageNeon(url: string): StockageCarriere {
             then compte_boutique.donnees->'collectionSolo' else excluded.donnees->'collectionSolo' end,
           'ovas', (excluded.donnees->>'ovas')::bigint + greatest(0, coalesce((compte_boutique.donnees->>'achatsOvas')::bigint,0) - coalesce((excluded.donnees->>'achatsOvas')::bigint,0)),
           'achatsOvas', coalesce((compte_boutique.donnees->>'achatsOvas')::bigint,0),
+          'credits', coalesce((excluded.donnees->>'credits')::bigint,0) + greatest(0, coalesce((compte_boutique.donnees->>'achatsCredits')::bigint,0) - coalesce((excluded.donnees->>'achatsCredits')::bigint,0)),
+          'achatsCredits', coalesce((compte_boutique.donnees->>'achatsCredits')::bigint,0),
           'inventaire', to_jsonb(array(select distinct valeur from jsonb_array_elements_text(coalesce(excluded.donnees->'inventaire','[]'::jsonb) || coalesce(compte_boutique.donnees->'achatsInventaire','[]'::jsonb)) as elements(valeur))),
           'equipements', to_jsonb(array(select distinct valeur from jsonb_array_elements_text(coalesce(excluded.donnees->'equipements','[]'::jsonb) || coalesce(compte_boutique.donnees->'achatsEquipements','[]'::jsonb)) as elements(valeur))),
           'traitsDebloques', to_jsonb(array(select distinct valeur from jsonb_array_elements_text(coalesce(excluded.donnees->'traitsDebloques','[]'::jsonb) || coalesce(compte_boutique.donnees->'achatsTraits','[]'::jsonb)) as elements(valeur))),
@@ -387,8 +394,8 @@ export function stockageNeon(url: string): StockageCarriere {
           'achatsEquipements', coalesce(compte_boutique.donnees->'achatsEquipements','[]'::jsonb),
           'achatsTraits', coalesce(compte_boutique.donnees->'achatsTraits','[]'::jsonb)
         ),modifie_le=excluded.modifie_le returning case
-          when (compte_boutique.donnees - 'achatsInventaire' - 'achatsEquipements' - 'achatsTraits')
-            is distinct from (select donnees - 'achatsInventaire' - 'achatsEquipements' - 'achatsTraits' from entree)
+          when (compte_boutique.donnees - 'achatsInventaire' - 'achatsEquipements' - 'achatsTraits' - 'achatsCredits')
+            is distinct from (select donnees - 'achatsInventaire' - 'achatsEquipements' - 'achatsTraits' - 'achatsCredits' from entree)
           then compte_boutique.donnees else null end as donnees`;
       // Pas de retransfert de la collection vers Vercel quand la base a
       // enregistré exactement ce qu'on lui a fourni. Les conflits restent complets.
@@ -398,8 +405,11 @@ export function stockageNeon(url: string): StockageCarriere {
       // L'UPDATE verrouille la ligne : une ouverture et un échange concurrents
       // ne peuvent pas réintroduire une carte cédée. Seul le delta traverse Neon.
       const lignes = await sql`with entree as (select ${JSON.stringify(modifications)}::jsonb as donnees)
-        update compte_boutique b set donnees = b.donnees || (e.donnees - 'collectionSolo' - 'ovas' - 'achatsOvas')
+        update compte_boutique b set donnees = b.donnees || (e.donnees - 'collectionSolo' - 'ovas' - 'achatsOvas' - 'credits' - 'achatsCredits')
           || jsonb_build_object(
+            'credits', case when e.donnees ? 'credits' then (e.donnees->>'credits')::bigint
+              + greatest(0, coalesce((b.donnees->>'achatsCredits')::bigint,0) - coalesce((e.donnees->>'achatsCredits')::bigint,0))
+              else coalesce((b.donnees->>'credits')::bigint,0) end,
             'ovas', case when e.donnees ? 'ovas' then (e.donnees->>'ovas')::bigint
               + greatest(0, coalesce((b.donnees->>'achatsOvas')::bigint,0) - coalesce((e.donnees->>'achatsOvas')::bigint,0))
               else (b.donnees->>'ovas')::bigint end,
@@ -426,6 +436,7 @@ export function stockageNeon(url: string): StockageCarriere {
         returning case when
           ((e.donnees ? 'collectionSolo') and coalesce((b.donnees->'collectionSolo'->>'revision')::bigint,0) > (e.donnees->'collectionSolo'->>'revision')::bigint)
           or coalesce((b.donnees->>'achatsOvas')::bigint,0) > coalesce((e.donnees->>'achatsOvas')::bigint,0)
+          or coalesce((b.donnees->>'achatsCredits')::bigint,0) > coalesce((e.donnees->>'achatsCredits')::bigint,0)
           then b.donnees else null end as donnees`;
       return lignes.length ? lignes[0].donnees as EtatBoutiqueCompte | null : undefined;
     },

@@ -144,6 +144,7 @@ import { effectifNational } from '../lib/international';
 import { nomNation } from '../lib/nations';
 import { clubParNom } from '../data/clubs';
 import { stadePourClub } from '../lib/stade3D';
+import { kitDeMonEquipe, maillotDepuisKit } from '../lib/personnalisationMatch';
 import { useGame } from '../store/useGame';
 import { Blason, LogoEquipe } from './Blason';
 import { Terrain3D } from './match/Terrain3D';
@@ -1562,10 +1563,19 @@ export function MatchLive({
     return { nom: titre || competition?.nom, logo: competition?.id,
       journee: Number(titre.match(/(?:journée|\bJ)\s*(\d+)/i)?.[1]) || undefined, ...habillage };
   }, [titre, selection, e.clubA, habillage]);
+  // ── Ce que la boutique change (Correctif 21) : le kit de TOUTE l'équipe du joueur ──
+  // Lus UNE fois à l'entrée du match (le store n'est pas relu image par image) : acheter ou équiper en plein match n'y change rien.
+  const equipementBoutique = useGame((s) => s.equipementActif);
+  const monClubBoutique = manager?.club ?? joueur?.club;
+  const monCoteBoutique: 'A' | 'B' | null = monClubBoutique === e.clubA ? 'A' : monClubBoutique === e.clubB ? 'B' : null;
+  const kitMonEquipe = useMemo(
+    () => (monCoteBoutique && !selection ? kitDeMonEquipe(equipementBoutique, monCoteBoutique === 'A') : undefined),
+    [monCoteBoutique, equipementBoutique, selection],
+  );
   const options3D = useMemo<OptionsScene3D>(() => ({
     equipes: [
-      { nom: e.clubA, maillot: tenueDepuisCouleurs(couleurA, couleurA2, e.clubA), blason: ecussonPourToile(clubA?.logo ?? urlLogoEquipe(e.clubA)) },
-      { nom: e.clubB, maillot: tenueDepuisCouleurs(couleurB, couleurB2, e.clubB), blason: ecussonPourToile(clubB?.logo ?? urlLogoEquipe(e.clubB)) },
+      { nom: e.clubA, maillot: monCoteBoutique === 'A' && kitMonEquipe ? maillotDepuisKit(kitMonEquipe) : tenueDepuisCouleurs(couleurA, couleurA2, e.clubA), blason: ecussonPourToile(clubA?.logo ?? urlLogoEquipe(e.clubA)) },
+      { nom: e.clubB, maillot: monCoteBoutique === 'B' && kitMonEquipe ? maillotDepuisKit(kitMonEquipe) : tenueDepuisCouleurs(couleurB, couleurB2, e.clubB), blason: ecussonPourToile(clubB?.logo ?? urlLogoEquipe(e.clubB)) },
     ],
     apparences: apparencesDesJoueurs(e.pions),
     moi: monPion?.id,
@@ -1575,7 +1585,7 @@ export function MatchLive({
     stade: stadePourClub(e.clubA),
     ballon: skinActif,
     textes: { ralenti: t('ml.ralenti') },
-  }), [e, couleurA, couleurA2, couleurB, couleurB2, clubA, clubB, monPion, identiteTV, skinActif]);
+  }), [e, couleurA, couleurA2, couleurB, couleurB2, clubA, clubB, monPion, identiteTV, skinActif, monCoteBoutique, kitMonEquipe]);
   const brancherScene = useCallback((scene: Scene3D | null) => {
     scene3D.current = scene;
     if (!scene) return;

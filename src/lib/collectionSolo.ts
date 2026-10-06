@@ -2,6 +2,7 @@ import type { PackCarriere, RareteCarriere } from './ligue/typesCarriere.js';
 import type { SourceCarte } from './ligue/catalogueCarriere.js';
 import { packEvenementOuvert, preparerTirageSpecial, tirerSpeciale, type CatalogueSpecial } from './ligue/cartesSpeciales.js';
 import { packAvecSkin } from './presentationPacks.js';
+import { OVAS_PAR_CREDIT, prixCredits, prixLesDeux, prixOvas, type PrixArticle } from './monnaies.js';
 
 export interface EtatCollectionSolo {
   /** Nombre d'exemplaires possedes, indexe par l'empreinte stable du joueur. */
@@ -91,6 +92,20 @@ export function prixPackSolo(pack: Pick<PackCarriere, 'id' | 'prix'>): number {
   if (PACKS_SOLO_GRATUITS.has(pack.id)) return 0;
   if (pack.id in PRIX_PACKS_SOLO) return PRIX_PACKS_SOLO[pack.id];
   return Math.max(25, Math.min(350, Math.round(pack.prix * 0.05)));
+}
+
+/**
+ * Le prix d'un pack de la collection solo, PAR MONNAIE (Correctif 21). Les packs gratuits restent gratuits ; un pack d'événement suit les
+ * règles réglées dans le Labo (`monnaie`, `prixCredits`) ; les autres s'achètent au choix en Ovas ou en Crédits.
+ * ⚠️ `pack` est déjà adapté au solo (`packCollectionSolo`) : son `prix` est le prix en Ovas du compte.
+ */
+export function prixPackSoloArticle(pack: Pick<PackCarriere, 'id' | 'prix' | 'monnaie' | 'prixCredits'>): PrixArticle {
+  if (PACKS_SOLO_GRATUITS.has(pack.id) || pack.prix === 0) return prixOvas(0);
+  const mode = pack.monnaie ?? 'OVAS_OR_CREDITS';
+  const credits = pack.prixCredits ?? Math.max(1, Math.round(pack.prix / OVAS_PAR_CREDIT));
+  if (mode === 'OVAS') return prixOvas(pack.prix);
+  if (mode === 'CREDITS') return prixCredits(credits);
+  return prixLesDeux(pack.prix, credits);
 }
 
 /** Volume de cartes par pack en solo : 10 minimum (doublons fréquents), et jusqu'à 20 pour les grands packs. */

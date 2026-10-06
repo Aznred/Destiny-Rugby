@@ -187,5 +187,6 @@ export function chargerCollectionCarriere(ligue: string, filtres: Record<string,
   return requete<PageCollection>(undefined, undefined, signal, `?${params}`);
 }
 
-export const acheterOvasStripe = (pack: string, tentative: string) => requete<{ url: string }>({ action: 'paiementOvas', pack, tentative });
-export const etatPaiementsStripe = (session: string) => requete<{ achatsOvas: number; credite: boolean }>(undefined, undefined, undefined, '?paiementEtat=1&session=' + encodeURIComponent(session));
+/** Achète des CRÉDITS (jamais des Ovas) : renvoie l'adresse de la page de paiement sécurisée de Stripe. */
+export const acheterCreditsStripe = (pack: string, tentative: string) => requete<{ url: string }>({ action: 'paiementOvas', pack, tentative });
+export const etatPaiementsStripe = (session: string) => requete<{ achatsOvas: number; achatsCredits?: number; credite: boolean }>(undefined, undefined, undefined, '?paiementEtat=1&session=' + encodeURIComponent(session));

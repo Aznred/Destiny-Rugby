@@ -694,7 +694,9 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         // jamais un brouillon ni une carte sans image.
         return res.status(200).json(connue === config.revision
           ? { revision: config.revision }
-          : { revision: config.revision, joueurs: config.joueurs, ajouts: config.ajouts ?? {}, speciales: specialesPubliques(config) });
+          : { revision: config.revision, joueurs: config.joueurs, ajouts: config.ajouts ?? {}, speciales: specialesPubliques(config),
+              // Les cosmétiques du Labo : SEULS les publiés quittent le serveur, dans la même réponse (aucune requête de plus).
+              boutique: Object.values(config.boutique ?? {}).filter(a => a.publie) });
       }
       // ⚠️ Les écussons se demandent à part, PAS dans la vue de la ligue :
       // 1 353 entrées, soit 80 Ko qui repartiraient toutes les deux secondes
@@ -915,7 +917,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
       }
       if (url.searchParams.has('paiementEtat')) {
         const boutique = await stockage.boutique(compte.id);
-        return res.status(200).json({ achatsOvas: boutique?.achatsOvas ?? 0, credite: await stockage.achatCredite?.(url.searchParams.get('session') ?? '', compte.id) ?? false });
+        return res.status(200).json({ achatsOvas: boutique?.achatsOvas ?? 0, achatsCredits: boutique?.achatsCredits ?? 0, credite: await stockage.achatCredite?.(url.searchParams.get('session') ?? '', compte.id) ?? false });
       }
       if (action === 'sauvegarderBoutique') {
         if ('modifications' in corps) {
@@ -936,6 +938,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         const enregistree = await stockage.sauvegarderBoutique(compte.id, boutique);
         const visible = (coffre: typeof boutique) => ({
           ovas: coffre.ovas, achatsOvas: coffre.achatsOvas ?? 0, collectionSolo: coffre.collectionSolo,
+          credits: coffre.credits ?? 0, achatsCredits: coffre.achatsCredits ?? 0, cosmetiquesMeta: coffre.cosmetiquesMeta ?? {},
           inventaire: [...coffre.inventaire].sort(), skinActif: coffre.skinActif,
           equipements: [...coffre.equipements].sort(), equipementActif: coffre.equipementActif,
           traitsDebloques: [...coffre.traitsDebloques].sort(),

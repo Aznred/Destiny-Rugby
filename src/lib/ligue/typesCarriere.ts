@@ -79,6 +79,12 @@ export interface PackCarriere {
   /** Le rayon de la boutique où il est présenté. */
   famille?: 'general' | 'poste' | 'monde' | 'age';
   /**
+   * LA MONNAIE DE LA COLLECTION SOLO (Correctif 21) : `OVAS`, `CREDITS` ou `OVAS_OR_CREDITS` (défaut). Les ligues, elles, paient en Ovas du
+   * club et ignorent ces deux champs. `prixCredits` : le prix en Crédits ; absent, il se déduit du prix en Ovas (`OVAS_PAR_CREDIT`).
+   */
+  monnaie?: 'OVAS' | 'CREDITS' | 'OVAS_OR_CREDITS';
+  prixCredits?: number;
+  /**
    * ⚠️ UN PACK D'ÉVÉNEMENT N'EXISTE EN BOUTIQUE QUE PENDANT SA FENÊTRE, si sa
    * famille est active dans le Labo ET si la ligue autorise les cartes
    * spéciales (`packEvenementOuvert`). Recopié par `completerPacks` depuis le

@@ -6,7 +6,7 @@ import { DestinyMatch,xyz,clamp,TICK } from './destiny.mjs';
 import { armChain } from './liaisons.js';
 import { appearance,souhaitDepuisCarte,tirage,prepareBody,groundBody,grip,trackBall,bindLift,findHairMesh,fitToHead,raiseTorso,COIFFURES,BARBES } from './corps.js';
 import { prepareGaits,locomotion } from './allures.js';
-import { creerTenue,numeroter,creerPanneaux,creerAbords,creerPublic,creerEtiquette,creerBallon,nettoyerStade,chargerImage,texture,departagerTenues,nomCourt,luminance,hexa,MAILLOT_DEFAUT } from './habillage.js';
+import { tenueDepuisImage,creerTenue,numeroter,creerPanneaux,creerAbords,creerPublic,creerEtiquette,creerBallon,nettoyerStade,chargerImage,texture,departagerTenues,nomCourt,luminance,hexa,MAILLOT_DEFAUT } from './habillage.js';
 import { creerSons } from './sons.js';
 import { creerTelevision } from './television.js';
 
@@ -325,7 +325,10 @@ export async function creerScene3D(conteneur,options={}){
   const blasons=await Promise.all([0,1].map(i=>chargerImage(options.equipes?.[i]?.blason)));
   await document.fonts?.load?.('40px Anton').catch(()=>{});
   const tailleTenue=leger?512:1024;
+  // Un kit du Labo peut fournir son atlas : il est posé tel quel (les couleurs ne servent alors qu'à l'encre du numéro).
+  const imagesKit=await Promise.all([tenueA,tenueB].map(m=>chargerImage(m.texture)));
   const tenues=[tenueA,tenueB].map((m,i)=>{
+    if(imagesKit[i])return tenueDepuisImage(imagesKit[i],m,1024);
     try{return creerTenue(r.kit,m,blasons[i],1024);}
     // Un écusson servi sans en-tête de partage « salit » la toile : on recommence sans lui.
     catch{return creerTenue(r.kit,m,null,1024);}
@@ -1389,11 +1392,20 @@ export async function creerApercuJoueur(conteneur,options={}){
     modele.updateMatrixWorld(true);
     const bornes=new THREE.Box3().setFromObject(modele,true);modele.position.y=-bornes.min.y;
     if(look.morpho){appliquerMorpho(modele,look.morpho);modele.updateMatrixWorld(true);const apres=new THREE.Box3().setFromObject(modele,true);modele.position.y-=apres.min.y;}
+    // Le kit : le MÊME atlas repeint que sur le terrain (motif, short, chaussettes, numéro dans le dos). Un kit du Labo fournit son atlas.
     const tenue=opt.maillot||{};
+    let kitTex=null;
+    try{
+      await document.fonts?.load?.('40px Anton').catch(()=>{});
+      const m={...MAILLOT_DEFAUT,...tenue},img=tenue.texture?await chargerImage(tenue.texture):null;
+      const base=img?tenueDepuisImage(img,m,1024):creerTenue(r.kit,m,null,1024);
+      kitTex=numeroter(base,opt.numero??9,renderer,1024);
+    }catch(e){console.warn('Kit de l\'aperçu :',e);}
     modele.traverse(o=>{if(!o.isSkinnedMesh)return;o.frustumCulled=false;
       if(/body_|head_/.test(o.name)){o.material=o.material.clone();o.material.map=null;o.material.vertexColors=false;o.material.color.set(look.skin);o.material.roughness=.92;return;}
-      if(/shirt|short|sock|boot/.test(o.name)){o.material=o.material.clone();o.material.map=null;o.material.roughness=.85;
-        o.material.color.set(o.name.includes('shirt')?(tenue.principal||'#15317e'):o.name.includes('sock')?(tenue.chaussettes||tenue.principal||'#15317e'):o.name.includes('short')?(tenue.short||'#16203a'):'#202325');}
+      if(/shirt|short|sock|boot/.test(o.name)){o.material=o.material.clone();o.material.roughness=.85;
+        if(kitTex){o.material.color.set('#fff');o.material.map=kitTex;}
+        else{o.material.map=null;o.material.color.set(o.name.includes('shirt')?(tenue.principal||'#15317e'):o.name.includes('sock')?(tenue.chaussettes||tenue.principal||'#15317e'):o.name.includes('short')?(tenue.short||'#16203a'):'#202325');}}
     });
     groupe.add(modele);groupe.updateMatrixWorld(true);
     habiller(r,modele,kind,look);

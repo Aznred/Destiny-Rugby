@@ -117,8 +117,10 @@ import {
   consequenceDuDerapage, niveauDeFaute,
 } from '../lib/consequences';
 import {
-  SKIN_PAR_ID, EQUIPEMENT_PAR_ID, EQUIPEMENTS_RETIRES, type CategorieEquipement,
+  SKIN_PAR_ID, EQUIPEMENT_PAR_ID, EQUIPEMENTS_RETIRES, estEnVente, prixArticle, prixSkin, type CategorieEquipement,
 } from '../data/boutique';
+import { montantEn, type Devise, type ResultatAchat } from '../lib/monnaies';
+import type { MetaCosmetique } from '../lib/boutiqueCompte';
 import { ETAT_PUBS_VIDE, OVAS_PAR_PUB, etatDuJour, pubDisponible, type EtatPubs } from '../lib/pub';
 import type { Scenario } from '../data/scenarios';
 import { COMPETITIONS, divisionDuClub, competitionDuClub, clubParNom } from '../data/clubs';
@@ -757,6 +759,14 @@ interface GameState {
   journal: EntreeJournal[];
   coins: number;
   achatsOvas: number;
+  /**
+   * LES CRÉDITS (Correctif 21), la monnaie premium. ⚠️ Le client ne fait que les DÉPENSER : seul le serveur en crédite (paiement Stripe
+   * signé), et `achatsCredits` retient ce qui a été payé pour qu'une ancienne sauvegarde locale ne l'efface jamais.
+   */
+  credits: number;
+  achatsCredits: number;
+  /** Quand et comment chaque cosmétique est entré dans l'inventaire (achat, pub, récompense). */
+  cosmetiquesMeta: Record<string, MetaCosmetique>;
   /** Collection de cartes commune au compte local, independante des carrieres. */
   collectionSolo: EtatCollectionSolo;
   inventaire: string[];
@@ -1229,8 +1239,15 @@ interface GameState {
   simulerStatsJournee: (semaineJouee?: number) => Promise<void>;
   // boutique
   acheterSkin: (id: string) => boolean;
-  /** Debite les Ovas du compte et valide un tirage de collection en une operation. */
-  acheterPackCollectionSolo: (prix: number, tirer: (etat: EtatCollectionSolo) => ResultatPackSolo) => ResultatPackSolo | null;
+  /**
+   * L'ACHAT D'UN COSMÉTIQUE, dans la monnaie choisie (Correctif 21) : ballon, crampons, casque, kit, stade. Rend la raison du refus
+   * (solde insuffisant : combien il manque), jamais un échec muet. Il n'achète JAMAIS de monnaie : c'est à l'écran de proposer la recharge.
+   */
+  acheterCosmetique: (id: string, devise: Devise) => ResultatAchat;
+  /** Offre un cosmétique (récompense de saison, succès, événement) : il entre dans l'inventaire sans rien coûter. */
+  octroyerCosmetique: (id: string, source: string) => boolean;
+  /** Débite des Ovas OU des Crédits du compte et valide un tirage de collection en une operation. */
+  acheterPackCollectionSolo: (prix: number, tirer: (etat: EtatCollectionSolo) => ResultatPackSolo, devise?: Devise) => ResultatPackSolo | null;
   choisirSkin: (id: string) => void;
   acheterEquipement: (id: string) => boolean;
   /** Débloque un archétype de caractère contre des Ovas. */
@@ -1245,7 +1262,8 @@ interface GameState {
   publierAuClassement: (force?: boolean) => void;
   /** Débloque un cosmétique « par pub » une fois la pub regardée. */
   debloquerParPub: (id: string) => boolean;
-  basculerEquipement: (id: string) => void;
+  /** Équipe l'article possédé, ou le retire. `emplacement` : un kit se porte à domicile (`maillot`) ou à l'extérieur (`maillotExt`). */
+  basculerEquipement: (id: string, emplacement?: CategorieEquipement) => void;
   setPubConsentement: (choix: 'oui' | 'non') => void;
   setTutoMatchVu: (vu: boolean) => void;
   /** Referme le guide de carrière définitivement. */
@@ -1390,6 +1408,9 @@ export const useGame = create<GameState>()(
       journal: [],
       coins: 0,
       achatsOvas: 0,
+      credits: 0,
+      achatsCredits: 0,
+      cosmetiquesMeta: {},
       collectionSolo: chargerAncienneCollectionSolo(),
       inventaire: ['classique'],
       skinActif: 'classique',
@@ -6955,24 +6976,54 @@ export const useGame = create<GameState>()(
         }));
       },
 
-      acheterSkin: (id) => {
-        const { coins, inventaire } = get();
+      acheterSkin: (id) => get().acheterCosmetique(id, 'ovas').ok,
+
+      acheterCosmetique: (id, devise) => {
+        const s = get();
         const skin = SKIN_PAR_ID[id];
-        if (!skin || inventaire.includes(id) || coins < skin.prix) return false;
-        set({
-          coins: coins - skin.prix,
-          inventaire: [...inventaire, id],
-          skinActif: id,
-        });
+        const article = EQUIPEMENT_PAR_ID[id];
+        if (!skin && !article) return { ok: false, raison: 'inconnu' };
+        if (skin ? s.inventaire.includes(id) : s.equipements.includes(id)) return { ok: false, raison: 'possede' };
+        // ⚠️ UN ARTICLE « PAR PUB » NE S'ACHÈTE PAS, MÊME À 0 OVA, et une récompense non plus : sans cette garde, `solde < 0` étant toujours
+        // faux, n'importe quel clic aurait débloqué l'article — la porte de la pub servait de décoration.
+        if (article && !estEnVente(article)) return { ok: false, raison: 'indisponible' };
+        const prix = skin ? prixSkin(skin) : prixArticle(article!);
+        const montant = montantEn(prix, devise);
+        if (montant === null) return { ok: false, raison: 'devise' };
+        const soldes = { ovas: s.coins, credits: s.credits };
+        if (soldes[devise] < montant) return { ok: false, raison: 'solde', manque: montant - soldes[devise], montant, devise };
+        const meta = { ...s.cosmetiquesMeta, [id]: { date: Date.now(), source: 'boutique' } };
+        set(devise === 'ovas' ? { coins: s.coins - montant } : { credits: s.credits - montant });
+        if (skin) set({ inventaire: [...s.inventaire, id], skinActif: id, cosmetiquesMeta: meta });
+        else set((e) => ({
+          equipements: [...e.equipements, id], cosmetiquesMeta: meta,
+          // L'équipement PERSONNEL s'enfile tout de suite (personne n'achète des crampons pour les laisser dans le sac) ;
+          // un kit d'équipe, qui change l'allure de tout le club, s'équipe d'un geste volontaire.
+          equipementActif: article!.categorie === 'maillot'
+            ? e.equipementActif : { ...e.equipementActif, [article!.categorie]: id },
+        }));
+        return { ok: true, devise, montant };
+      },
+
+      octroyerCosmetique: (id, source) => {
+        const s = get();
+        const skin = SKIN_PAR_ID[id];
+        const article = EQUIPEMENT_PAR_ID[id];
+        if (!skin && !article) return false;
+        if (skin ? s.inventaire.includes(id) : s.equipements.includes(id)) return false;
+        const meta = { ...s.cosmetiquesMeta, [id]: { date: Date.now(), source: source.slice(0, 40) } };
+        if (skin) set({ inventaire: [...s.inventaire, id], cosmetiquesMeta: meta });
+        else set({ equipements: [...s.equipements, id], cosmetiquesMeta: meta });
         return true;
       },
 
-      acheterPackCollectionSolo: (prix, tirer) => {
-        const { coins, collectionSolo } = get();
-        if (!Number.isSafeInteger(prix) || prix < 0 || coins < prix) return null;
+      acheterPackCollectionSolo: (prix, tirer, devise = 'ovas') => {
+        const { coins, credits, collectionSolo } = get();
+        const solde = devise === 'ovas' ? coins : credits;
+        if (!Number.isSafeInteger(prix) || prix < 0 || solde < prix) return null;
         const resultat = tirer(collectionSolo);
         if (!resultat.indices.length) return null;
-        set({ coins: coins - prix, collectionSolo: resultat.etat });
+        set(devise === 'ovas' ? { coins: coins - prix, collectionSolo: resultat.etat } : { credits: credits - prix, collectionSolo: resultat.etat });
         return resultat;
       },
 
@@ -6999,24 +7050,7 @@ export const useGame = create<GameState>()(
         return true;
       },
 
-      acheterEquipement: (id) => {
-        const { coins, equipements } = get();
-        const article = EQUIPEMENT_PAR_ID[id];
-        if (!article || equipements.includes(id) || coins < article.prix) return false;
-        // ⚠️ UN ARTICLE « PAR PUB » NE S'ACHÈTE PAS, MÊME À 0 OVA. Sans cette
-        // ligne, `coins < 0` étant toujours faux, n'importe quel clic sur une
-        // carte l'aurait débloqué gratuitement — la porte de la pub servait
-        // alors de décoration.
-        if (article.parPub) return false;
-        set((s) => ({
-          coins: s.coins - article.prix,
-          equipements: [...s.equipements, id],
-          // On l'enfile tout de suite : personne n'achète des crampons pour les
-          // laisser dans le sac.
-          equipementActif: { ...s.equipementActif, [article.categorie]: id },
-        }));
-        return true;
-      },
+      acheterEquipement: (id) => get().acheterCosmetique(id, 'ovas').ok,
 
       /**
        * Débloque un cosmétique « par pub », APRÈS que la pub a été regardée.
@@ -7036,6 +7070,7 @@ export const useGame = create<GameState>()(
         set((s) => ({
           equipements: [...s.equipements, id],
           equipementActif: { ...s.equipementActif, [article.categorie]: id },
+          cosmetiquesMeta: { ...s.cosmetiquesMeta, [id]: { date: Date.now(), source: 'pub' } },
           pubs: { ...etat, vues: etat.vues + 1, derniere: Date.now() },
         }));
         return true;
@@ -7076,13 +7111,16 @@ export const useGame = create<GameState>()(
       },
 
       /** Équipe l'article, ou le retire s'il est déjà porté. */
-      basculerEquipement: (id) => {
+      basculerEquipement: (id, emplacement) => {
         const article = EQUIPEMENT_PAR_ID[id];
+        // ⚠️ SEUL UN COSMÉTIQUE POSSÉDÉ S'ÉQUIPE : la boutique montre ce qui s'achète, la personnalisation ce qui se possède.
         if (!article || !get().equipements.includes(id)) return;
+        // Un kit se porte à domicile ou à l'extérieur ; tout autre article n'a qu'un emplacement : sa catégorie.
+        const place = article.categorie === 'maillot' && emplacement === 'maillotExt' ? 'maillotExt' : article.categorie;
         set((s) => ({
           equipementActif: {
             ...s.equipementActif,
-            [article.categorie]: s.equipementActif[article.categorie] === id ? undefined : id,
+            [place]: s.equipementActif[place] === id ? undefined : id,
           },
         }));
       },
@@ -7557,6 +7595,9 @@ export const useGame = create<GameState>()(
       },
       partialize: projectionMemoisee((s: GameState) => ({
         achatsOvas: s.achatsOvas,
+        credits: s.credits,
+        achatsCredits: s.achatsCredits,
+        cosmetiquesMeta: s.cosmetiquesMeta,
         joueur: s.joueur,
         // ⚠️ SANS CETTE LIGNE, UNE CARRIÈRE D’ENTRAÎNEUR DISPARAÎT AU
         //    RECHARGEMENT. Attrapé en jouant : un rechargement de page, et le

@@ -1,0 +1,38 @@
+/* La boutique du Correctif 21 : rayons, aperçu collant, cartes à deux prix. */
+.bo-rayons { display: flex; flex-wrap: wrap; gap: 4px; margin: 1rem 0; border-bottom: 1px solid rgba(240, 230, 200, 0.14); align-items: center; }
+.bo-rayons button { min-height: 44px; padding: 0 16px; background: transparent; border: 0; border-bottom: 3px solid transparent; color: var(--craie-dim, #cfd8c8); font: inherit; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
+.bo-rayons button[aria-selected='true'] { color: var(--craie, #f2ecd9); border-bottom-color: var(--or, #d8a94a); }
+.bo-rayons .bo-perso { margin-left: auto; border: 1px solid rgba(240, 230, 200, 0.2); border-radius: 999px; min-height: 40px; }
+.bo-intro { color: var(--brume, #9fb0a3); font-size: 0.88rem; margin: 0 0 0.8rem; max-width: 70ch; line-height: 1.45; }
+.bo-sous-titre { margin: 1.6rem 0 0.4rem; font-size: 1.1rem; }
+.bo-paiement { padding: 0.6rem 0.9rem; border-radius: 10px; background: rgba(90, 140, 255, 0.12); border: 1px solid rgba(100, 150, 255, 0.4); }
+.bo-deux { display: grid; grid-template-columns: minmax(260px, 0.8fr) minmax(0, 2fr); gap: 1.2rem; align-items: start; }
+.bo-apercu { position: sticky; top: 12px; padding: 0.8rem; display: grid; gap: 0.7rem; }
+.bo-apercu-cadre { height: min(430px, 56vh); border-radius: 12px; overflow: hidden; }
+.bo-apercu-cadre .aj3d { height: 100%; }
+.bo-apercu-vide { height: 100%; display: grid; place-items: center; text-align: center; color: var(--craie-dim, #cfd8c8); padding: 1rem; border: 1px dashed rgba(240, 230, 200, 0.25); border-radius: 12px; }
+.bo-apercu-info h2 { margin: 0 0 0.3rem; font-size: 1.15rem; }
+.bo-apercu-info p { margin: 0 0 0.6rem; color: var(--craie-dim, #cfd8c8); font-size: 0.9rem; }
+.article-boutique { display: grid; gap: 6px; align-content: start; justify-items: center; text-align: center; cursor: pointer; }
+.article-boutique.possede { border-color: rgba(120, 220, 140, 0.45); }
+.article-boutique:focus-visible { outline: 2px solid var(--or, #d8a94a); outline-offset: 2px; }
+.miniature { width: 100%; display: grid; place-items: center; min-height: 96px; }
+.miniature-emoji { font-size: 2.2rem; }
+.pastille-rarete { font-size: 0.7rem; letter-spacing: 0.06em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; border: 1px solid currentColor; }
+.rarete-commun { color: #b9c3b8; } .rarete-rare { color: #6fb6ff; } .rarete-epique { color: #c58bff; } .rarete-legendaire { color: #ffcf5a; }
+.prix-boutons { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; justify-content: center; }
+.prix-ou { font-size: 0.72rem; color: var(--craie-dim, #cfd8c8); }
+.btn.prix-ovas, .btn.prix-credits { display: inline-flex; align-items: center; gap: 6px; font-variant-numeric: tabular-nums; min-height: 40px; }
+.btn.prix-ovas { border-color: rgba(232, 178, 58, 0.6); background: rgba(232, 178, 58, 0.12); color: inherit; }
+.btn.prix-credits { border-color: rgba(100, 150, 255, 0.65); background: linear-gradient(160deg, rgba(60, 100, 230, 0.28), rgba(100, 60, 220, 0.2)); color: inherit; }
+.recharge-credits { cursor: pointer; font: inherit; color: inherit; }
+.bo-actions-packs { margin: 1rem 0; }
+@media (max-width: 860px) {
+  .bo-deux { grid-template-columns: 1fr; }
+  .bo-apercu { position: relative; top: 0; }
+  .bo-apercu-cadre { height: 300px; }
+  .bo-rayons .bo-perso { margin-left: 0; }
+}
+.bo-bascule-kit { display: inline-flex; gap: 4px; padding: 4px; border-radius: 999px; background: rgba(6, 16, 12, 0.55); border: 1px solid rgba(240, 230, 200, 0.14); margin: 0 0 0.8rem; }
+.bo-bascule-kit button { min-height: 38px; padding: 0 16px; border: 0; border-radius: 999px; background: transparent; color: var(--craie, #f2ecd9); font: inherit; font-size: 0.85rem; cursor: pointer; }
+.bo-bascule-kit button[aria-pressed='true'] { background: var(--or, #d8a94a); color: #1a1408; }

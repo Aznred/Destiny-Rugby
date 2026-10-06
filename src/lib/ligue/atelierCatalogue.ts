@@ -13,6 +13,14 @@ export interface EditionJoueur {
   poste?: PosteId;
   postesSecondaires?: PosteId[];
 }
+/**
+ * UN COSMÉTIQUE CRÉÉ DANS LE LABO (Correctif 21) : le catalogue de la boutique s'enrichit sans toucher au code. Même forme qu'un article du code
+ * (`ArticleEquipement`), validée côté serveur (`validerArticleLabo`) : prix par monnaie, rareté, fenêtre de vente, publié ON/OFF, kit d'équipe
+ * (couleurs, motif, atlas du maillot) — le maillot reste LE maillot du jeu, repeint.
+ */
+export type ArticleLabo = Pick<import('../../data/boutique.js').ArticleEquipement,
+  'id' | 'nom' | 'categorie' | 'emoji' | 'glb' | 'teinte' | 'prixDef' | 'rarete' | 'kit' | 'detail' | 'dispoDu' | 'dispoAu' | 'publie'>;
+
 export interface CatalogueAdmin {
   revision: number;
   /** Les packs spéciaux ne tournent dans les boutiques que si Kiri l'active. */
@@ -26,6 +34,8 @@ export interface CatalogueAdmin {
    * sans quoi chaque lecture du catalogue rapatrierait des mégaoctets.
    */
   speciales?: ConfigCartesSpeciales;
+  /** Les cosmétiques ajoutés par le Labo à la boutique (clé : identifiant `lab-…`). */
+  boutique?: Record<string, ArticleLabo>;
   /** Joueurs ajoutés par « Imports joueurs », absents des effectifs générés. */
   ajouts?: Record<string, AjoutJoueur>;
   /** Ce que le Labo a tranché pour chaque ligne d'import déjà relue. */

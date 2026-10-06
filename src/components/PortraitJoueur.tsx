@@ -18,11 +18,12 @@ import { useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import { ApercuJoueur3D } from './ApercuJoueur3D';
-import { EditeurApparence } from './EditeurApparence';
+import { kitDeMonEquipe } from '../lib/personnalisationMatch';
+import { ouvrirPersonnalisation } from '../lib/personnalisationUi';
 import { useTenue } from '../lib/tenue';
 import { useGame } from '../store/useGame';
 import { POSTE_PAR_ID } from '../data/rugby';
-import { apparenceDepuisMatch, apparencePourApercu, apparenceValide } from '../lib/apparenceJoueur';
+import { apparencePourApercu } from '../lib/apparenceJoueur';
 import { modeAllege } from '../lib/modeles';
 import { useModalDialog } from '../lib/useModalDialog';
 import { t } from '../lib/i18n';
@@ -77,29 +78,18 @@ export function PortraitJoueur({ repli = 'ballon' }: { repli?: NomIcone }) {
   );
 }
 
-/** Le joueur en entier, seul : on le tourne, et on le personnalise (cheveux, barbe, couleurs, casque, crampons). */
+/** Le joueur en entier, seul : on le tourne, et un bouton ouvre la personnalisation (ce qu'on possède : apparence, kits, stade, ballon). */
 function VueEntiere({ onFermer }: { onFermer: () => void }) {
   const tenue = useTenue();
   const joueur = useGame((st) => st.joueur);
   const equipementActif = useGame((st) => st.equipementActif);
-  const equipements = useGame((st) => st.equipements);
-  const basculerEquipement = useGame((st) => st.basculerEquipement);
-  const personnaliserJoueur = useGame((st) => st.personnaliserJoueur);
   const apparence = useApparenceResolue();
-  const [perso, setPerso] = useState(false);
   const { overlayRef, dialogRef } = useModalDialog(onFermer);
-  // Un joueur né avant l'étape « Apparence » s'ouvre sur ce qu'on voit déjà de lui.
-  const courante = useMemo(
-    () => (joueur ? (joueur.apparence ? apparenceValide(joueur.apparence, joueur.poste) : apparenceDepuisMatch(joueur.nom, joueur.poste)) : null),
-    [joueur],
-  );
-
   return createPortal(
-    // ⚠️ `createPortal(document.body)` obligatoire : le `backdrop-filter` des
-    // `.carte` crée un bloc conteneur qui piège les `position: fixed`.
+    // ⚠️ createPortal(document.body) obligatoire : le backdrop-filter des .carte crée un bloc conteneur qui piège les position: fixed.
     <div className="overlay" ref={overlayRef} onClick={onFermer}>
       <motion.div
-        className={`carte modale modale-joueur${perso ? ' modale-joueur-large' : ''}`}
+        className="carte modale modale-joueur"
         role="dialog"
         aria-modal="true"
         aria-label={tenue.nom}
@@ -108,44 +98,26 @@ function VueEntiere({ onFermer }: { onFermer: () => void }) {
         initial={{ opacity: 0, scale: 0.96 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.22 }}
-        style={perso ? { maxWidth: 'min(1000px, 96vw)', width: '96vw' } : undefined}
       >
         <div className="modale-joueur-tete">
           <div>
-            <div className="eyebrow">{perso ? t('perso.titre') : t('prof.tonJoueur')}</div>
+            <div className="eyebrow">{t('prof.tonJoueur')}</div>
             <h2>{tenue.nom}</h2>
           </div>
           <button type="button" className="btn fantome petit" onClick={onFermer}><Icone nom="croix" taille={17} /></button>
         </div>
-
-        {perso && joueur && courante ? (
-          <>
-            <p className="champ-aide" style={{ marginBottom: '0.8rem' }}>{t('perso.chapo')}</p>
-            <EditeurApparence
-              apparence={courante} poste={joueur.poste} nom={joueur.nom} club={joueur.club} morphoFigee
-              onChange={(a) => personnaliserJoueur({ peau: a.peau, coupe: a.coupe, couleurCheveux: a.couleurCheveux, barbe: a.barbe, couleurBarbe: a.couleurBarbe })}
-              equipementActif={equipementActif} equipements={equipements} onEquiper={basculerEquipement}
+        <div className="modale-joueur-scene">
+          {apparence && joueur && (
+            <ApercuJoueur3D
+              apparence={apparence} club={joueur.club} kit={kitDeMonEquipe(equipementActif, true)} avant={(POSTE_PAR_ID[joueur.poste]?.numero ?? 15) <= 8}
+              repli={<Icone nom="ballon" taille={40} />}
             />
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
-              <button type="button" className="btn primaire" onClick={() => setPerso(false)}>{t('perso.fermer')}</button>
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="modale-joueur-scene">
-              {apparence && joueur && (
-                <ApercuJoueur3D
-                  apparence={apparence} club={joueur.club} avant={(POSTE_PAR_ID[joueur.poste]?.numero ?? 15) <= 8}
-                  repli={<Icone nom="ballon" taille={40} />}
-                />
-              )}
-            </div>
-            <p className="aide">{t('prof.tournerAide')}</p>
-            <div style={{ display: 'flex', justifyContent: 'center', marginTop: '0.6rem' }}>
-              <button type="button" className="btn fantome" onClick={() => setPerso(true)} data-tuto="perso-bouton">{t('perso.bouton')}</button>
-            </div>
-          </>
-        )}
+          )}
+        </div>
+        <p className="aide">{t('prof.tournerAide')}</p>
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '0.6rem' }}>
+          <button type="button" className="btn fantome" onClick={() => { onFermer(); ouvrirPersonnalisation('joueur'); }} data-tuto="perso-bouton">{t('perso.bouton')}</button>
+        </div>
       </motion.div>
     </div>,
     document.body,

@@ -20,6 +20,9 @@
 //
 // ⚠️ Le chiffre exact est MESURÉ, pas estimé :
 //   npx vite-node scripts/verifEconomie.ts
+import { devisesAcceptees, prixCredits, prixLesDeux, prixOvas, prixValide, type PrixArticle } from '../lib/monnaies';
+import { KITS_BOUTIQUE, KITS_EXISTANTS, type KitDef } from './kitsBoutique';
+
 export interface SkinBallon {
   id: string;
   nom: string;
@@ -136,8 +139,14 @@ export const SKIN_PAR_ID: Record<string, SkinBallon> = Object.fromEntries(
 // n'en gardait qu'UN actif — choisir le sac retirait le bouclier. Or ce ne sont
 // pas des pièces portées qui se disputent une place sur le corps : ce sont deux
 // objets POSÉS AU SOL à côté du joueur, et rien n'empêche d'en poser deux.
+// ⚠️ DEUX CATÉGORIES DE PLUS (Correctif 21) : `maillotExt` (le kit EXTÉRIEUR, choisi parmi les mêmes kits possédés que
+// `maillot`, le kit domicile). `maillot` désigne donc maintenant un kit d'ÉQUIPE.
 export type CategorieEquipement =
-  | 'crampons' | 'maillot' | 'casque' | 'bouclier' | 'sac';
+  | 'crampons' | 'maillot' | 'maillotExt' | 'casque' | 'bouclier' | 'sac';
+
+/** Les rayons de la boutique (et de la personnalisation). */
+export type RubriqueBoutique = 'maillots' | 'joueur' | 'ballons';
+export type RareteCosmetique = 'commun' | 'rare' | 'epique' | 'legendaire';
 
 export interface ArticleEquipement {
   id: string;
@@ -171,6 +180,19 @@ export interface ArticleEquipement {
   parPub?: boolean;
   /** Une ligne pour dire ce que c'est — et, pour la 3D, ce qu'il faut modéliser. */
   detail: string;
+  // ── Correctif 21 ────────────────────────────────────────────────────────────────────────────────
+  /** Le prix par monnaie. Absent : `prixArticle` le déduit de `prix` (Ovas) selon la règle du catalogue. */
+  prixDef?: PrixArticle;
+  rarete?: RareteCosmetique;
+  /** Un kit d'équipe (catégorie `maillot`) : couleurs, motif, short, chaussettes — le maillot du jeu repeint, jamais un autre maillage. */
+  kit?: KitDef;
+  dispoDu?: string;
+  dispoAu?: string;
+  /** Jamais en vente : offert par le jeu (titre, succès…). Le texte dit comment l'obtenir. */
+  recompense?: string;
+  /** Créé dans le Labo (catalogue dynamique) : retiré et remis à jour à chaque lecture du catalogue. */
+  origine?: 'labo';
+  publie?: boolean;
 }
 
 export const EQUIPEMENTS: ArticleEquipement[] = [
@@ -221,6 +243,16 @@ export const EQUIPEMENTS: ArticleEquipement[] = [
   { id: 'bouclier', nom: 'Bouclier de plaquage', categorie: 'bouclier', emoji: '🛡️', glb: '/m3d/bouclier-plaquage.glb', teinte: '#1d5c9c', prix: 70, detail: 'Posé à tes pieds sur l’accueil. Le pare-chocs mousse des séances du mardi.' },
 ];
 
+// ═══ KITS ET STADES : ajoutés au vestiaire, avant la construction de l'index ═══════════════════════
+for (const a of EQUIPEMENTS) if (a.categorie === 'maillot' && KITS_EXISTANTS[a.id]) a.kit = KITS_EXISTANTS[a.id];
+for (const k of KITS_BOUTIQUE) {
+  EQUIPEMENTS.push({
+    id: k.id, nom: k.nom, categorie: 'maillot', emoji: k.emoji, glb: '/m3d/maillot.glb', teinte: k.kit.principal,
+    prix: k.prix.ovas ?? 0, prixDef: k.prix, rarete: k.rarete, kit: k.kit, detail: k.detail,
+    ...(k.recompense ? { recompense: k.recompense } : {}),
+  });
+}
+
 /**
  * Les articles retirés de la vente. Ils servent encore à NETTOYER les
  * sauvegardes : un joueur qui portait des chaussettes dorées ne doit pas garder
@@ -241,6 +273,7 @@ export const CATEGORIES_EQUIPEMENT: { id: CategorieEquipement; cle: string; emoj
   { id: 'casque', cle: 'bo.catCasque', emoji: '🪖' },
   { id: 'bouclier', cle: 'bo.catDecor', emoji: '🛡️' },
   { id: 'sac', cle: 'bo.catSac', emoji: '🎒' },
+  { id: 'maillotExt', cle: 'bo.catMaillotExt', emoji: '👕' },
 ];
 
 // ⚠️ LES BOOSTS ONT ÉTÉ SUPPRIMÉS (demande explicite).
@@ -251,13 +284,14 @@ export const CATEGORIES_EQUIPEMENT: { id: CategorieEquipement; cle: string; emoj
 // des ballons — du cosmétique, et rien qui touche à la progression.
 // Ne pas les réintroduire sans relancer `npx vite-node scripts/verifDifficulte.ts`.
 
-// Recharges d'Ovas achetées avec Stripe. Les mêmes identifiants, quantités et
-// montants vivent côté serveur dans `serveur/paiementsStripe.ts` : le serveur
-// reste l'autorité au moment de facturer et de créditer le compte.
-export interface PackOvas {
+// ═══ LES RECHARGES SONT DES RECHARGES DE CRÉDITS (Correctif 21) ═══════════════════════════════════════
+// Plus aucune offre n'achète d'Ovas avec de l'argent réel : l'argent achète des CRÉDITS, la monnaie premium (voir
+// `lib/monnaies.ts`). Les mêmes identifiants, quantités et montants vivent côté serveur dans `serveur/paiementsStripe.ts` :
+// le serveur reste l'autorité au moment de facturer et de créditer le compte.
+export interface PackCredits {
   id: string;
   nom: string;
-  ovas: number;
+  credits: number;
   prix: string;
   bonus?: string;
   populaire?: boolean;
@@ -266,24 +300,82 @@ export interface PackOvas {
   traits?: string[];
 }
 
-export const PACKS: PackOvas[] = [
-  { id: 'p1', nom: 'Essentiel', ovas: 500, prix: '0,99 €' },
-  { id: 'p2', nom: 'Réserve', ovas: 3000, prix: '4,99 €', bonus: '+20 %' },
-  { id: 'p3', nom: 'Coffre', ovas: 7000, prix: '9,99 €', bonus: '+40 %' },
-  { id: 'p4', nom: 'Club', ovas: 20000, prix: '24,99 €', bonus: '+60 %' },
-  { id: 'p5', nom: 'Stade', ovas: 45000, prix: '49,99 €', bonus: '+80 %', populaire: true },
-  { id: 'p6', nom: 'Fortune', ovas: 100000, prix: '99,99 €', bonus: '+100 %' },
-];
+export { OFFRES_CREDITS as PACKS } from '../lib/monnaies';
 
-/** Produits séparés des recharges : leur prix paie un contenu précis. */
-export const BUNDLES: PackOvas[] = [
-  { id: 'b1', nom: 'Vestiaire', ovas: 1000, prix: '4,99 €', ballons: ['tricolore'], equipements: ['crampons-cuir', 'maillot-bleu'] },
-  { id: 'b2', nom: 'Archétypes', ovas: 2500, prix: '9,99 €', traits: ['roc', 'cerveau', 'discipline', 'chouchou', 'cadre', 'zen'] },
-  { id: 'b3', nom: 'Club', ovas: 5000, prix: '19,99 €', populaire: true, ballons: ['ocean', 'or'], equipements: ['maillot-toulousain', 'crampons-dupont', 'casque-or'], traits: ['precoce', 'tete_brulee', 'cadre', 'cerveau'] },
+/** Produits séparés des recharges : leur prix paie un contenu précis, plus un complément de Crédits. */
+export const BUNDLES: PackCredits[] = [
+  { id: 'b1', nom: 'Vestiaire', credits: 200, prix: '4,99 €', ballons: ['tricolore'], equipements: ['crampons-cuir', 'maillot-bleu'] },
+  { id: 'b2', nom: 'Archétypes', credits: 500, prix: '9,99 €', traits: ['roc', 'cerveau', 'discipline', 'chouchou', 'cadre', 'zen'] },
+  { id: 'b3', nom: 'Club', credits: 1000, prix: '19,99 €', populaire: true, ballons: ['ocean', 'or'], equipements: ['maillot-toulousain', 'crampons-dupont', 'casque-or'], traits: ['precoce', 'tete_brulee', 'cadre', 'cerveau'] },
   {
-    id: 'b4', nom: 'Légende', ovas: 15000, prix: '49,99 €',
+    id: 'b4', nom: 'Légende', credits: 3000, prix: '49,99 €',
     ballons: ['tricolore', 'cuir', 'ocean', 'or'],
     equipements: ['crampons-or', 'crampons-dupont', 'maillot-legende', 'casque-or', 'maillot-toulousain'],
     traits: ['roc', 'cerveau', 'discipline', 'chouchou', 'tete_brulee', 'cadre', 'precoce', 'vieux_lion', 'electron', 'muraille', 'zen', 'increvable'],
   },
 ];
+
+// ═══ LES PRIX PAR MONNAIE ═════════════════════════════════════════════════════════════════════════
+// Trois familles, et elles se lisent d'un coup d'œil dans la boutique :
+//   • OVAS SEULEMENT   : l'entrée de gamme, accessible en jouant, sans jamais toucher d'argent réel ;
+//   • LES DEUX         : au choix — des Ovas gagnés, ou des Crédits pour aller plus vite ;
+//   • CRÉDITS SEULEMENT: les pièces premium (or, légendes).
+// Les articles « par pub » restent gratuits (`prix: 0`), et un article `recompense` n'est jamais en vente.
+const OVAS_SEULEMENT = new Set(['crampons-cuir', 'casque', 'maillot-bleu', 'sac', 'bouclier']);
+const CREDITS_SEULEMENT = new Set(['crampons-or', 'casque-or', 'maillot-legende']);
+
+/** Le prix d'un article, par monnaie. */
+export function prixArticle(a: ArticleEquipement): PrixArticle {
+  if (a.prixDef) return a.prixDef;
+  if (a.parPub || a.prix === 0 || OVAS_SEULEMENT.has(a.id)) return prixOvas(a.prix);
+  if (CREDITS_SEULEMENT.has(a.id)) return prixCredits(Math.max(1, Math.round(a.prix / 5)));
+  return prixLesDeux(a.prix);
+}
+
+/** Le prix d'un ballon. */
+export function prixSkin(s: SkinBallon): PrixArticle {
+  if (s.prix === 0 || s.id === 'tricolore') return prixOvas(s.prix);
+  if (s.id === 'or') return prixCredits(Math.max(1, Math.round(s.prix / 5)));
+  return prixLesDeux(s.prix);
+}
+
+/** Un article se vend-il (Ovas ou Crédits) ? Une récompense, un article par pub ou un article dépublié, non. */
+export function estEnVente(a: ArticleEquipement, maintenant = Date.now()): boolean {
+  if (a.recompense || a.parPub || a.publie === false) return false;
+  if (devisesAcceptees(prixArticle(a)).length === 0) return false;
+  if (a.dispoDu && maintenant < Date.parse(a.dispoDu)) return false;
+  if (a.dispoAu && maintenant > Date.parse(a.dispoAu)) return false;
+  return true;
+}
+
+/** Le rayon de la boutique où l'article se range. */
+export function rubriqueDe(a: ArticleEquipement): RubriqueBoutique {
+  if (a.categorie === 'maillot' || a.categorie === 'maillotExt') return 'maillots';
+  return 'joueur';
+}
+
+export const RUBRIQUES: { id: RubriqueBoutique; cle: string }[] = [
+  { id: 'maillots', cle: 'bo.rub.maillots' },
+  { id: 'joueur', cle: 'bo.rub.joueur' },
+  { id: 'ballons', cle: 'bo.rub.ballons' },
+];
+
+/**
+ * LE CATALOGUE DYNAMIQUE : les articles créés dans le Labo. Remplace ceux d'une lecture précédente (même origine) sans
+ * toucher au catalogue du code ; un identifiant déjà pris par le code n'est jamais écrasé.
+ */
+export function enregistrerArticlesLabo(articles: readonly Partial<ArticleEquipement>[]): void {
+  for (let i = EQUIPEMENTS.length - 1; i >= 0; i--) if (EQUIPEMENTS[i].origine === 'labo') { delete EQUIPEMENT_PAR_ID[EQUIPEMENTS[i].id]; EQUIPEMENTS.splice(i, 1); }
+  for (const brut of articles) {
+    if (!brut.id || !brut.nom || !brut.categorie || EQUIPEMENT_PAR_ID[brut.id]) continue;
+    if (!['crampons', 'maillot', 'casque', 'bouclier', 'sac'].includes(brut.categorie)) continue;
+    const prixDef = prixValide(brut.prixDef);
+    if (!prixDef) continue;
+    const a: ArticleEquipement = {
+      id: brut.id, nom: brut.nom, categorie: brut.categorie, emoji: brut.emoji ?? '🎁', glb: brut.glb ?? '', teinte: brut.teinte,
+      prix: prixDef.ovas ?? 0, prixDef, rarete: brut.rarete, kit: brut.kit, detail: brut.detail ?? '',
+      dispoDu: brut.dispoDu, dispoAu: brut.dispoAu, publie: brut.publie !== false, origine: 'labo',
+    };
+    EQUIPEMENTS.push(a); EQUIPEMENT_PAR_ID[a.id] = a;
+  }
+}

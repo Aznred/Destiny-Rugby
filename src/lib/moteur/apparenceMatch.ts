@@ -43,6 +43,8 @@ export interface MaillotMatch {
   short: string;
   chaussettes: string;
   motif: MotifMaillot;
+  /** Atlas du maillot fourni en image (kit du Labo) : posé tel quel, sans repeindre. */
+  texture?: string;
 }
 
 const PROFIL_POSTE: Record<PosteId, [number, number, MorphologieMatch]> = {

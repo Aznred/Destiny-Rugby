@@ -12,16 +12,20 @@ import { appareilLeger, creerApercuJoueur, type ApercuJoueur3D, type OptionsAper
 import { maillotDeSecours } from '../lib/moteur/apparenceMatch';
 import { clubParNom } from '../data/clubs';
 import { t } from '../lib/i18n';
+import { maillotDepuisKit } from '../lib/personnalisationMatch';
+import type { KitDef } from '../data/kitsBoutique';
 import './ApercuJoueur3D.css';
 
 export type CoteApercu = 'face' | 'profil' | 'dos';
 
 export function ApercuJoueur3D({
-  apparence, club, avant = false, cadrage = 'corps', cote, controles = true, repli, className, onPret,
+  apparence, club, kit, avant = false, cadrage = 'corps', cote, controles = true, repli, className, onPret,
 }: {
   /** Apparence résolue du match (peau, cheveux, coupeId, barbeId, morpho, equipement…). */
   apparence: unknown;
   club?: string;
+  /** Un kit de la boutique à faire porter (aperçu avant achat) : il remplace les couleurs du club. */
+  kit?: KitDef;
   avant?: boolean;
   cadrage?: 'corps' | 'visage';
   /** Orientation imposée de l'extérieur ; sans elle, le joueur se tourne au doigt et par les boutons. */
@@ -38,13 +42,14 @@ export function ApercuJoueur3D({
   const dernier = useRef<OptionsApercuJoueur>({});
 
   const maillot = (() => {
+    if (kit) return maillotDepuisKit(kit);
     const c = club ? clubParNom(club) : undefined;
     const secours = maillotDeSecours(c?.c1 ?? '#15317e', club ?? 'joueur');
     return { principal: c?.c1 ?? '#15317e', secondaire: c?.c2 ?? '#f4f4ef', short: secours.short, chaussettes: secours.chaussettes };
   })();
   const options: OptionsApercuJoueur = { apparence: apparence as Record<string, unknown>, maillot, avant, cadrage, leger: appareilLeger() };
   dernier.current = options;
-  const signature = JSON.stringify([apparence, maillot.principal, maillot.secondaire, avant]);
+  const signature = JSON.stringify([apparence, maillot, avant]);
 
   // Montage : une seule scène pour toute la vie du composant.
   useEffect(() => {

@@ -1,6 +1,9 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
+import { ModalesMonnaie } from './components/ModalesMonnaie';
+import { Personnalisation } from './components/Personnalisation';
 import { installerEcouteursApp } from './lib/viewport';
 import { useSynchroApparenceJoueur } from './lib/synchroApparenceJoueur';
+import { useRecompensesCosmetiques } from './lib/recompensesCosmetiques';
 import { AnimatePresence, motion } from 'framer-motion';
 import './App.css';
 import { Analytics } from '@vercel/analytics/react'
@@ -69,6 +72,8 @@ export default function App() {
   useEffect(() => { installerEcouteursApp(); }, []);
   // Le joueur du jeu porte son casque, ses crampons et sa morphologie dans tous les matchs (registre lu par la scène 3D).
   useSynchroApparenceJoueur();
+  // Un titre d'équipe gagné offre le kit « Champion en titre ».
+  useRecompensesCosmetiques();
   useEffect(() => { if (new URLSearchParams(location.search).has('paiement')) useGame.getState().setEcran('boutique'); }, []);
   const animationsMenus = usePreferencesInterface(s => s.animationsMenus);
   useEffect(() => { document.documentElement.classList.toggle('interface-fluide', !animationsMenus); }, [animationsMenus]);
@@ -218,6 +223,9 @@ export default function App() {
         <a href="/contact/">{t("ui.2b5c3d26721a")}</a>
       </footer>
 
+      {/* Les fenêtres d'achat (monnaie à choisir, solde insuffisant, confirmation, recharge de Crédits) : une seule, pour tout l'écran. */}
+      <ModalesMonnaie />
+      <Personnalisation />
       {/* Cérémonie : le trophée gagné s'affiche en 3D, un par un */}
       <AnimatePresence>
         {tropheesEnAttente.length > 0 && (

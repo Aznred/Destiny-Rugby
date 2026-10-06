@@ -2,9 +2,21 @@ import type { CategorieEquipement } from '../data/boutique';
 import { normaliserCollectionSolo, type EtatCollectionSolo } from './collectionSolo.js';
 
 /** Tout ce qui appartient au compte, et non a une carriere particuliere. */
+/** Quand et comment un cosmétique est entré dans l'inventaire du compte. */
+export interface MetaCosmetique { date: number; source: string }
+
 export interface EtatBoutiqueCompte {
   ovas: number;
   achatsOvas?: number;
+  /**
+   * LES CRÉDITS (Correctif 21) : la monnaie premium, la SEULE qui s'achète avec de l'argent réel. Même mécanique que les Ovas :
+   * le client dépense, le serveur seul crédite un achat (`achatsCredits` conserve ce qui a été payé même si une ancienne
+   * sauvegarde locale revient).
+   */
+  credits?: number;
+  achatsCredits?: number;
+  /** Date et source de chaque cosmétique possédé (la liste des identifiants reste `equipements`, `inventaire`). */
+  cosmetiquesMeta?: Record<string, MetaCosmetique>;
   /** Récompenses Stripe conservées même si une ancienne sauvegarde locale revient. */
   achatsInventaire?: string[];
   achatsEquipements?: string[];
@@ -19,12 +31,12 @@ export interface EtatBoutiqueCompte {
 
 /** Les valeurs absolues modifiées ; zéro retire une entrée de la collection. */
 export type ModificationsBoutiqueCompte = Partial<Pick<EtatBoutiqueCompte,
-  'ovas' | 'achatsOvas' | 'inventaire' | 'skinActif' | 'equipements' | 'equipementActif' | 'traitsDebloques'>>
+  'ovas' | 'achatsOvas' | 'credits' | 'achatsCredits' | 'cosmetiquesMeta' | 'inventaire' | 'skinActif' | 'equipements' | 'equipementActif' | 'traitsDebloques'>>
   & { collectionSolo?: EtatCollectionSolo };
 
 export function differencesBoutiqueCompte(avant: EtatBoutiqueCompte, apres: EtatBoutiqueCompte): ModificationsBoutiqueCompte {
-  const modifications: ModificationsBoutiqueCompte = { achatsOvas: apres.achatsOvas ?? 0 };
-  for (const cle of ['ovas', 'inventaire', 'skinActif', 'equipements', 'equipementActif', 'traitsDebloques'] as const) {
+  const modifications: ModificationsBoutiqueCompte = { achatsOvas: apres.achatsOvas ?? 0, achatsCredits: apres.achatsCredits ?? 0 };
+  for (const cle of ['ovas', 'credits', 'cosmetiquesMeta', 'inventaire', 'skinActif', 'equipements', 'equipementActif', 'traitsDebloques'] as const) {
     if (JSON.stringify(avant[cle]) !== JSON.stringify(apres[cle])) Object.assign(modifications, { [cle]: apres[cle] });
   }
   if (avant.collectionSolo !== apres.collectionSolo && JSON.stringify(avant.collectionSolo) !== JSON.stringify(apres.collectionSolo)) {
@@ -50,9 +62,12 @@ export function appliquerModificationsBoutiqueCompte(avant: EtatBoutiqueCompte, 
   };
   const reunir = (a: string[], b?: string[]) => [...new Set([...a, ...(b ?? [])])];
   return {
-    ...avant, ...modifications, achatsOvas: avant.achatsOvas ?? 0,
+    ...avant, ...modifications, achatsOvas: avant.achatsOvas ?? 0, achatsCredits: avant.achatsCredits ?? 0,
     ovas: modifications.ovas === undefined ? avant.ovas
       : modifications.ovas + Math.max(0, (avant.achatsOvas ?? 0) - (modifications.achatsOvas ?? 0)),
+    credits: modifications.credits === undefined ? (avant.credits ?? 0)
+      : modifications.credits + Math.max(0, (avant.achatsCredits ?? 0) - (modifications.achatsCredits ?? 0)),
+    cosmetiquesMeta: { ...(modifications.cosmetiquesMeta ?? {}), ...(avant.cosmetiquesMeta ?? {}) },
     inventaire: reunir(modifications.inventaire ?? avant.inventaire, avant.achatsInventaire),
     equipements: reunir(modifications.equipements ?? avant.equipements, avant.achatsEquipements),
     traitsDebloques: reunir(modifications.traitsDebloques ?? avant.traitsDebloques, avant.achatsTraits),
@@ -64,7 +79,22 @@ export function appliquerModificationsBoutiqueCompte(avant: EtatBoutiqueCompte, 
 }
 
 const IDENTIFIANT = /^[a-zA-Z0-9:_-]{1,100}$/;
-const CATEGORIES = new Set<CategorieEquipement>(['crampons', 'maillot', 'casque', 'bouclier', 'sac']);
+const CATEGORIES = new Set<CategorieEquipement>(['crampons', 'maillot', 'maillotExt', 'casque', 'bouclier', 'sac']);
+
+/** Un dictionnaire d'inventaire daté : identifiants sûrs, date entière, source courte. */
+function metaValide(valeur: unknown): Record<string, MetaCosmetique> | null {
+  if (!valeur || typeof valeur !== 'object' || Array.isArray(valeur)) return null;
+  const entrees = Object.entries(valeur as Record<string, unknown>);
+  if (entrees.length > 1000) return null;
+  const sortie: Record<string, MetaCosmetique> = {};
+  for (const [id, m] of entrees) {
+    if (!IDENTIFIANT.test(id) || !m || typeof m !== 'object') return null;
+    const { date, source } = m as Record<string, unknown>;
+    if (!Number.isSafeInteger(date) || typeof source !== 'string' || !/^[a-zA-Z0-9:_ -]{1,40}$/.test(source)) return null;
+    sortie[id] = { date: Number(date), source };
+  }
+  return sortie;
+}
 
 function liste(valeur: unknown, maximum = 500): string[] | null {
   if (!Array.isArray(valeur) || valeur.length > maximum) return null;
@@ -79,10 +109,11 @@ function liste(valeur: unknown, maximum = 500): string[] | null {
 export function validerModificationsBoutiqueCompte(valeur: unknown): ModificationsBoutiqueCompte | null {
   if (!valeur || typeof valeur !== 'object' || Array.isArray(valeur)) return null;
   const brut = valeur as Record<string, unknown>;
-  const cles = new Set(['ovas', 'achatsOvas', 'inventaire', 'skinActif', 'equipements', 'equipementActif', 'traitsDebloques', 'collectionSolo']);
+  const cles = new Set(['ovas', 'achatsOvas', 'credits', 'achatsCredits', 'cosmetiquesMeta', 'inventaire', 'skinActif', 'equipements', 'equipementActif', 'traitsDebloques', 'collectionSolo']);
   if (Object.keys(brut).some(cle => !cles.has(cle))) return null;
   const resultat: ModificationsBoutiqueCompte = {};
-  for (const cle of ['ovas', 'achatsOvas'] as const) if (cle in brut) {
+  if ('cosmetiquesMeta' in brut) { const m = metaValide(brut.cosmetiquesMeta); if (!m) return null; resultat.cosmetiquesMeta = m; }
+  for (const cle of ['ovas', 'achatsOvas', 'credits', 'achatsCredits'] as const) if (cle in brut) {
     if (!Number.isSafeInteger(brut[cle]) || Number(brut[cle]) < 0 || Number(brut[cle]) > 1_000_000_000) return null;
     resultat[cle] = Number(brut[cle]);
   }
@@ -148,7 +179,13 @@ export function validerEtatBoutiqueCompte(valeur: unknown): EtatBoutiqueCompte |
     if (!CATEGORIES.has(categorie as CategorieEquipement) || typeof id !== 'string' || !equipements.includes(id)) return null;
     equipementActif[categorie as CategorieEquipement] = id;
   }
+  const credits = brut.credits === undefined ? 0 : brut.credits;
+  if (!Number.isSafeInteger(credits) || (credits as number) < 0 || (credits as number) > 1_000_000_000) return null;
+  const meta = brut.cosmetiquesMeta == null ? {} : metaValide(brut.cosmetiquesMeta);
+  if (!meta) return null;
   return {
+    credits: credits as number, cosmetiquesMeta: meta,
+    achatsCredits: Number.isSafeInteger(brut.achatsCredits) && Number(brut.achatsCredits) >= 0 ? Number(brut.achatsCredits) : 0,
     achatsOvas: Number.isSafeInteger(brut.achatsOvas) && Number(brut.achatsOvas) >= 0 ? Number(brut.achatsOvas) : 0,
     achatsInventaire, achatsEquipements, achatsTraits,
     ovas: brut.ovas as number, collectionSolo, inventaire, skinActif: brut.skinActif,

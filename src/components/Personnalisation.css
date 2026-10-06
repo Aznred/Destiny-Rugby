@@ -1,0 +1,35 @@
+.perso-overlay { z-index: 100050; }
+.perso-fenetre { width: min(1040px, 96vw); max-height: 94dvh; display: flex; flex-direction: column; gap: 0.7rem; }
+.perso-tete { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; }
+.perso-tete h2 { margin: 0; }
+.perso-onglets { display: flex; gap: 4px; flex-wrap: wrap; border-bottom: 1px solid rgba(240, 230, 200, 0.14); }
+.perso-onglets button { min-height: 44px; padding: 0 16px; background: transparent; border: 0; border-bottom: 3px solid transparent; color: var(--craie-dim, #cfd8c8); font: inherit; cursor: pointer; }
+.perso-onglets button.actif { color: var(--craie, #f2ecd9); border-bottom-color: var(--or, #d8a94a); }
+.perso-corps { overflow: auto; min-height: 0; padding-bottom: 0.5rem; }
+.perso-deux { display: grid; grid-template-columns: minmax(240px, 0.9fr) minmax(0, 1.3fr); gap: 1.2rem; align-items: start; }
+.perso-apercu { position: sticky; top: 0; height: min(460px, 60vh); }
+.perso-apercu .aj3d { height: 100%; }
+.perso-liste { display: grid; gap: 0.5rem; align-content: start; }
+.perso-liste h3 { margin: 0.6rem 0 0.2rem; font-size: 0.85rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--craie-dim, #cfd8c8); }
+.perso-ligne { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 0.8rem; padding: 0.5rem 0.7rem; border-radius: 12px; border: 1px solid rgba(240, 230, 200, 0.12); background: rgba(240, 230, 200, 0.04); cursor: pointer; }
+.perso-ligne:first-child:not(:has(.miniature)) { grid-template-columns: 1fr auto; }
+.perso-ligne.vu { border-color: rgba(240, 230, 200, 0.4); }
+.perso-ligne.porte { border-color: var(--or, #d8a94a); background: rgba(216, 169, 74, 0.1); }
+.perso-ligne-nom { display: grid; gap: 2px; min-width: 0; }
+.perso-ligne-nom small { color: var(--craie-dim, #cfd8c8); }
+.perso-ligne-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.perso-ligne .miniature, .perso-carte .miniature { width: 56px; height: 64px; display: grid; place-items: center; overflow: hidden; border-radius: 8px; }
+.perso-ligne .miniature img, .perso-carte .miniature img { width: 100%; height: 100%; object-fit: cover; }
+.perso-grille { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.7rem; }
+.perso-carte { position: relative; display: grid; justify-items: center; gap: 6px; text-align: center; padding: 0.8rem 0.6rem; border-radius: 12px; border: 1px solid rgba(240, 230, 200, 0.14); background: rgba(240, 230, 200, 0.04); color: inherit; font: inherit; }
+button.perso-carte { cursor: pointer; }
+.perso-carte.porte { border-color: var(--or, #d8a94a); background: rgba(216, 169, 74, 0.1); }
+.perso-carte.verrouille { opacity: 0.88; }
+.perso-cadenas { position: absolute; top: 8px; right: 8px; opacity: 0.8; }
+.perso-prix { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; color: var(--craie-dim, #cfd8c8); }
+.perso-vide { display: grid; gap: 0.5rem; justify-items: start; padding: 0.8rem; border-radius: 12px; border: 1px dashed rgba(240, 230, 200, 0.25); }
+.perso-vide p { margin: 0; color: var(--craie-dim, #cfd8c8); }
+@media (max-width: 760px) {
+  .perso-deux { grid-template-columns: 1fr; }
+  .perso-apercu { position: relative; height: 300px; }
+}

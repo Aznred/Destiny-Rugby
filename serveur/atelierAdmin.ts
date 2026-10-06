@@ -6,6 +6,8 @@ import type { StockageAtelier } from './atelierStockage.js';
 import { appliquerOperationSpeciale, validerLigneImport, vueImports } from './atelierSpeciales.js';
 import { POSTES } from '../src/data/rugby.js';
 import type { PosteId } from '../src/types.js';
+import type { ArticleLabo } from '../src/lib/ligue/atelierCatalogue.js';
+import { prixValide } from '../src/lib/monnaies.js';
 
 export const contexteAtelier = new AsyncLocalStorage<CatalogueAdmin>();
 fournirCatalogueAdmin(() => contexteAtelier.getStore() ?? CATALOGUE_ADMIN_VIDE);
@@ -29,6 +31,17 @@ export function validerPhoto(v: unknown): string | undefined {
   try { const url = new URL(v); if(url.protocol === 'https:' && !url.username && !url.password && v.length <= 2048) return v; } catch { /* validation ci-dessous */ }
   return refuser('Utilise une image importée, une URL HTTPS ou un chemin /photos/.');
 }
+/** La monnaie d'un pack de la collection solo (Correctif 21) : OVAS, CREDITS ou OVAS_OR_CREDITS (défaut), et son prix en Crédits. */
+function monnaiePack(p: Record<string, unknown>): Pick<PackCarriere, 'monnaie' | 'prixCredits'> {
+  const sortie: Pick<PackCarriere, 'monnaie' | 'prixCredits'> = {};
+  if (p.monnaie !== undefined && p.monnaie !== '') {
+    if (!['OVAS', 'CREDITS', 'OVAS_OR_CREDITS'].includes(String(p.monnaie))) refuser('Monnaie du pack invalide.');
+    sortie.monnaie = p.monnaie as PackCarriere['monnaie'];
+  }
+  if (p.prixCredits !== undefined && p.prixCredits !== '' && p.prixCredits !== null) sortie.prixCredits = entier(p.prixCredits, 1, 1000000);
+  if (sortie.monnaie === 'CREDITS' && sortie.prixCredits === undefined) refuser('Un pack en Crédits seulement a besoin d’un prix en Crédits.');
+  return sortie;
+}
 export function validerPack(v: unknown): PackCarriere {
   const p = objet(v), id = texte(p.id,80);
   if(!/^[a-z0-9][a-z0-9-]*$/.test(id)) refuser('Identifiant du pack invalide.');
@@ -38,7 +51,7 @@ export function validerPack(v: unknown): PackCarriere {
   if(Math.abs(Object.values(probabilites).reduce((a,b)=>a+b,0)-100) > .001) refuser('Les probabilités doivent totaliser 100 %.');
   const garantie = p.garantie === '' || p.garantie === undefined ? undefined : p.garantie as RareteCarriere;
   if(garantie && !RARETES_CARRIERE.includes(garantie)) refuser('Garantie invalide.');
-  const pack: PackCarriere = { id, nom:texte(p.nom,60), prix:entier(p.prix,1,1000000), cartes:entier(p.cartes,1,12), probabilites, garantie, promesse: p.promesse ? texte(p.promesse,180) : undefined, famille: ['general','poste','monde','age'].includes(String(p.famille)) ? p.famille as PackCarriere['famille'] : 'general' };
+  const pack: PackCarriere = { id, nom:texte(p.nom,60), prix:entier(p.prix,1,1000000), cartes:entier(p.cartes,1,12), probabilites, garantie, promesse: p.promesse ? texte(p.promesse,180) : undefined, famille: ['general','poste','monde','age'].includes(String(p.famille)) ? p.famille as PackCarriere['famille'] : 'general', ...monnaiePack(p) };
   if(p.filtre) {
     const f=objet(p.filtre); pack.filtre={};
     if(f.categorie) { if(!['avant','arriere'].includes(String(f.categorie))) refuser('Catégorie invalide.'); pack.filtre.categorie=f.categorie as 'avant'|'arriere'; }
@@ -60,6 +73,59 @@ export function validerPack(v: unknown): PackCarriere {
   if(garantie && !rayon.some(c=>bandesGaranties(garantie).includes(c.rarete))) refuser('Aucun joueur ne peut satisfaire cette garantie.');
   return pack;
 }
+const COULEUR = /^#[0-9a-fA-F]{6}$/;
+const MOTIFS = ['uni', 'cerceaux', 'rayures', 'epaules', 'bande', 'diagonale'];
+/** Une image de maillot ou d'aperçu : une URL `data:` (PNG, JPEG, WebP) de 250 Ko au plus, une URL HTTPS, ou un chemin du jeu. */
+function validerImageLabo(v: unknown): string | undefined {
+  if (v === undefined || v === '' || v === null) return undefined;
+  if (typeof v !== 'string') refuser('Image invalide.');
+  if (/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+=*$/.test(v)) { if (v.length > 250000) refuser('Image trop volumineuse (250 Ko maximum).'); return v; }
+  if (/^\/(photos|m3d|icons)\/[a-zA-Z0-9_./%-]+$/.test(v) && !v.includes('..')) return v;
+  try { const u = new URL(v); if (u.protocol === 'https:' && !u.username && !u.password && v.length <= 2048) return v; } catch { /* refus ci-dessous */ }
+  return refuser('Utilise une image importée, une URL HTTPS ou un chemin du jeu.');
+}
+function dateLabo(v: unknown): string | undefined {
+  if (v === undefined || v === '' || v === null) return undefined;
+  if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}/.test(v) || Number.isNaN(Date.parse(v))) refuser('Date de disponibilité invalide.');
+  return v;
+}
+/** Valide un cosmétique du Labo. Jamais de prix négatif, de monnaie absente, de modèle 3D hors `/m3d/` ni de maillage de maillot nouveau. */
+export function validerArticleLabo(v: unknown): ArticleLabo {
+  const a = objet(v), id = texte(a.id, 44);
+  if (!/^lab-[a-z0-9][a-z0-9-]{1,38}$/.test(id)) refuser('Les cosmétiques du Labo ont un identifiant en « lab-… ».');
+  const categorie = String(a.categorie);
+  if (!['crampons', 'maillot', 'casque', 'bouclier', 'sac'].includes(categorie)) refuser('Catégorie de cosmétique invalide.');
+  const prixDef = prixValide(a.prixDef);
+  if (!prixDef) refuser('Prix invalide : une monnaie (Ovas, Crédits ou les deux) et des montants entiers.');
+  const rarete = a.rarete === undefined || a.rarete === '' ? undefined : String(a.rarete);
+  if (rarete && !['commun', 'rare', 'epique', 'legendaire'].includes(rarete)) refuser('Rareté invalide.');
+  // ⚠️ UN MAILLOT DE LA BOUTIQUE N'EST JAMAIS UN NOUVEAU MAILLAGE : le modèle est celui du jeu, seules les couleurs, le motif et l'atlas changent.
+  let glb = '/m3d/maillot.glb';
+  if (categorie !== 'maillot') {
+    glb = texte(a.glb, 80);
+    if (!/^\/m3d\/[a-z0-9-]+\.glb$/.test(glb)) refuser('Le modèle 3D doit être un fichier de /m3d/.');
+  }
+  const article: ArticleLabo = {
+    id, nom: texte(a.nom, 60), categorie: categorie as ArticleLabo['categorie'], emoji: typeof a.emoji === 'string' && a.emoji.length <= 8 && a.emoji ? a.emoji : '🎁',
+    glb, prixDef, detail: typeof a.detail === 'string' ? a.detail.slice(0, 200) : '', publie: a.publie === true,
+    ...(rarete ? { rarete: rarete as ArticleLabo['rarete'] } : {}),
+  };
+  if (typeof a.teinte === 'string' && a.teinte) { if (!COULEUR.test(a.teinte)) refuser('Teinte invalide.'); article.teinte = a.teinte; }
+  const du = dateLabo(a.dispoDu), au = dateLabo(a.dispoAu);
+  if (du) article.dispoDu = du;
+  if (au) article.dispoAu = au;
+  if (du && au && Date.parse(du) > Date.parse(au)) refuser('La fin de disponibilité précède son début.');
+  if (categorie === 'maillot') {
+    const k = objet(a.kit);
+    const c = (cle: string) => { const x = k[cle]; if (typeof x !== 'string' || !COULEUR.test(x)) refuser('Couleur de kit invalide (' + cle + ').'); return x; };
+    if (!MOTIFS.includes(String(k.motif))) refuser('Motif de kit invalide.');
+    article.kit = { principal: c('principal'), secondaire: c('secondaire'), accent: c('accent'), short: c('short'), chaussettes: c('chaussettes'), motif: k.motif as NonNullable<ArticleLabo['kit']>['motif'] };
+    const atlas = validerImageLabo(k.jerseyTexture);
+    if (atlas) article.kit.jerseyTexture = atlas;
+    if (!article.teinte) article.teinte = article.kit.principal;
+  }
+  return article;
+}
 export function vueAtelier(q: string) {
   const normaliser=(s:string)=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
   const recherche=normaliser(q.slice(0,100));
@@ -69,6 +135,7 @@ export function vueAtelier(q: string) {
   return {
     revision:catalogueAdmin().revision,
     rotationPacks:catalogueAdmin().rotationPacks === true,
+    boutique:Object.values(catalogueAdmin().boutique ?? {}),
     packs:packsCatalogueAdmin(),
     joueurs:joueurs.slice(0,40),
     total:joueurs.length,
@@ -94,6 +161,14 @@ export async function enregistrerAtelier(stockage: StockageAtelier, corps: Recor
     const id=texte(corps.packId,80);
     if(!id.startsWith('kiri-') || !suivant.packs[id]) refuser('Seuls les packs créés dans l’Atelier peuvent être supprimés.');
     delete suivant.packs[id];
+  } else if(corps.operation === 'article') {
+    const article=validerArticleLabo(corps.article);
+    suivant.boutique={...(suivant.boutique??{}),[article.id]:article};
+    if(Object.keys(suivant.boutique).length>200) refuser('Maximum de 200 cosmétiques personnalisés.');
+  } else if(corps.operation === 'supprimerArticle') {
+    const id=texte(corps.articleId,44);
+    if(!suivant.boutique?.[id]) refuser('Cosmétique introuvable.');
+    delete suivant.boutique[id];
   } else if(corps.operation === 'rotationPacks') {
     if(typeof corps.active !== 'boolean') refuser('Réglage de rotation invalide.');
     suivant.rotationPacks=corps.active;

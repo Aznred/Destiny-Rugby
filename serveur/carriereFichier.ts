@@ -144,8 +144,8 @@ export function stockageFichier(fichier: string): StockageCarriere {
       const boutique = base.boutiques![compte];
       if (!boutique) throw new Error('Boutique introuvable.');
       const reunir = (a: string[] | undefined, b: string[]) => [...new Set([...(a ?? []), ...b])];
-      boutique.ovas += recompenses.ovas;
-      boutique.achatsOvas = (boutique.achatsOvas ?? 0) + recompenses.ovas;
+      boutique.credits = (boutique.credits ?? 0) + recompenses.credits;
+      boutique.achatsCredits = (boutique.achatsCredits ?? 0) + recompenses.credits;
       boutique.inventaire = reunir(boutique.inventaire, recompenses.inventaire);
       boutique.equipements = reunir(boutique.equipements, recompenses.equipements);
       boutique.traitsDebloques = reunir(boutique.traitsDebloques, recompenses.traitsDebloques);
@@ -165,12 +165,14 @@ export function stockageFichier(fichier: string): StockageCarriere {
     async sauvegarderBoutique(compte, boutique) {
       const ancienne = base.boutiques![compte];
       const acquis = ancienne?.achatsOvas ?? 0;
+      const acquisCredits = ancienne?.achatsCredits ?? 0;
       const reunir = (a: string[] | undefined, b: string[] | undefined) => [...new Set([...(a ?? []), ...(b ?? [])])];
       const achatsInventaire = reunir(ancienne?.achatsInventaire, boutique.achatsInventaire);
       const achatsEquipements = reunir(ancienne?.achatsEquipements, boutique.achatsEquipements);
       const achatsTraits = reunir(ancienne?.achatsTraits, boutique.achatsTraits);
       base.boutiques![compte] = {
-        ...copie(boutique), achatsOvas: acquis,
+        ...copie(boutique), achatsOvas: acquis, achatsCredits: acquisCredits,
+        credits: (boutique.credits ?? 0) + Math.max(0, acquisCredits - (boutique.achatsCredits ?? 0)),
         collectionSolo: (ancienne?.collectionSolo?.revision ?? 0) > (boutique.collectionSolo.revision ?? 0)
           ? copie(ancienne!.collectionSolo) : copie(boutique.collectionSolo),
         ovas: boutique.ovas + Math.max(0, acquis - (boutique.achatsOvas ?? 0)),
@@ -189,7 +191,8 @@ export function stockageFichier(fichier: string): StockageCarriere {
       if (!validerEtatBoutiqueCompte(apres)) return undefined;
       base.boutiques![compte] = copie(apres); sauver();
       return ((modifications.collectionSolo && (avant.collectionSolo.revision ?? 0) > (modifications.collectionSolo.revision ?? 0))
-        || (avant.achatsOvas ?? 0) > (modifications.achatsOvas ?? 0)) ? copie(apres) : null;
+        || (avant.achatsOvas ?? 0) > (modifications.achatsOvas ?? 0)
+        || (avant.achatsCredits ?? 0) > (modifications.achatsCredits ?? 0)) ? copie(apres) : null;
     },
     async limiter(cle, maximum, fenetre, maintenant) {
       const debut = Math.floor(maintenant / fenetre) * fenetre;

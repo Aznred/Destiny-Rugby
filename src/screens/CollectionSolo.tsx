@@ -8,7 +8,11 @@ import { carteDepuisSource, PACKS_CARRIERE } from '../lib/ligue/catalogueCarrier
 import type { SourceCarte } from '../lib/ligue/catalogueCarriere';
 import { catalogueSpecialSolo, synchroniserCatalogueSolo, useCatalogueSolo } from '../lib/catalogueSoloCommun';
 import type { PackCarriere, RareteCarriere } from '../lib/ligue/typesCarriere';
-import { cleCarteSolo, IDS_PACKS_SOLO_GRATUITS, ouvrirPackSolo, packsCollectionSolo, packsEvenementSolo } from '../lib/collectionSolo';
+import { cleCarteSolo, IDS_PACKS_SOLO_GRATUITS, ouvrirPackSolo, packsCollectionSolo, packsEvenementSolo, prixPackSoloArticle } from '../lib/collectionSolo';
+import { SoldesMonnaies } from '../components/SoldesMonnaies';
+import { demanderPaiement } from '../lib/achatUi';
+import { montantEn, type Devise } from '../lib/monnaies';
+import { nomPackCarriere } from '../lib/presentationPacks';
 import { carteSpecialePackable, carteSpecialeVisibleCollection, chanceSpecialeParCarte, nomFamilleSpeciale } from '../lib/ligue/cartesSpeciales';
 import { Citrouille, EmblemeIcon } from '../components/EmblemesSpeciaux';
 import { nombre, t } from '../lib/i18n';
@@ -25,6 +29,7 @@ const normaliser = (texte: string) => texte.normalize('NFD').replace(/[\u0300-\u
 export function CollectionSolo() {
   const setEcran = useGame(s => s.setEcran);
   const coins = useGame(s => s.coins);
+  const credits = useGame(s => s.credits);
   const etat = useGame(s => s.collectionSolo);
   const acheterPack = useGame(s => s.acheterPackCollectionSolo);
   const joueur = useGame(s => s.joueur);
@@ -76,6 +81,8 @@ export function CollectionSolo() {
   const [packsPrives, setPacksPrives] = useState<PackCarriere[]>([]);
   const [occupe, setOccupe] = useState(false);
   const verrouOuverture = useRef(false);
+  /** La monnaie que le joueur vient de choisir dans la fenêtre d'achat (Correctif 21) ; les packs gratuits n'en demandent aucune. */
+  const choixDevise = useRef<Devise>('ovas');
   const controleurOuverture = useRef<AbortController | null>(null);
   useEffect(() => {
     let vivant = true;
@@ -142,13 +149,17 @@ export function CollectionSolo() {
       const pack = packsRoue.find(candidat => candidat.id === id);
       if (!pack) return;
       const catalogueActuel = await synchroniserCatalogueSolo();
-      const prix = pack.prix;
+      const gratuitPack = idsPacksGratuits.has(pack.id);
+      const prixArt = prixPackSoloArticle(pack);
+      const devise: Devise = gratuitPack ? 'ovas' : choixDevise.current;
+      const prix = montantEn(prixArt, devise) ?? pack.prix;
       // Les packs gratuits ordinaires conservent leur tirage sans carte spéciale.
       const avecSpeciales = !idsPacksGratuits.has(pack.id);
       const resultat = acheterPack(prix, precedent => ouvrirPackSolo(pack, catalogueActuel, precedent, undefined,
-        avecSpeciales ? { speciales: catalogueSpecialSolo(), maintenant: Date.now() } : {}));
+        avecSpeciales ? { speciales: catalogueSpecialSolo(), maintenant: Date.now() } : {}), devise);
       if (!resultat) {
-        setBilan(coins < prix ? t('solo.missingOvas', { n: nombre(prix - coins) }) : t('solo.noPlayerInPack'));
+        const solde = devise === 'ovas' ? coins : credits;
+        setBilan(solde < prix ? t(devise === 'ovas' ? 'solo.missingOvas' : 'solo.missingCredits', { n: nombre(prix - solde) }) : t('solo.noPlayerInPack'));
         return;
       }
       const doublons = resultat.indices.length - resultat.nouvelles;
@@ -168,7 +179,7 @@ export function CollectionSolo() {
       <button type="button" className="btn fantome" onClick={() => setEcran('accueil')}><Icone nom="fleche-droite" className="solo-retour" taille={16} /> {t('online.home')}</button>
       <div><div className="eyebrow">{t('solo.account', { name: nomCompte })}</div><h1>{t('solo.title')}</h1><p>{t('solo.description')}</p></div>
       <div className="solo-entete-droite">
-        <div className="solo-solde"><Icone nom="ova" taille={18} /><strong>{nombre(coins)}</strong><span>Ovas</span></div>
+        <SoldesMonnaies />
       </div>
     </header>
 
@@ -223,6 +234,18 @@ export function CollectionSolo() {
         onOuvrir={ouvrirDepuisRoue}
         gratuit={categoriePacks === 'gratuits'}
         chancesSpeciales={chancesSpeciales}
+        avantAchat={categoriePacks === 'gratuits' ? undefined : async (pack) => {
+          // Le joueur CHOISIT sa monnaie quand le pack accepte les deux ; un solde insuffisant ouvre une vraie fenêtre, jamais un message muet.
+          const d = await demanderPaiement({ titre: nomPackCarriere(pack), prix: prixPackSoloArticle(pack) });
+          if (!d) return false;
+          choixDevise.current = d;
+          return true;
+        }}
+        etiquettePrix={categoriePacks === 'gratuits' ? undefined : (pack) => {
+          const p = prixPackSoloArticle(pack);
+          const o = montantEn(p, 'ovas'), c = montantEn(p, 'credits');
+          return [o !== null ? nombre(o) + ' Ovas' : '', c !== null ? nombre(c) + ' ' + t('mo.credits') : ''].filter(Boolean).join(' · ');
+        }}
         paiementAlternatif={categoriePacks === 'gratuits' ? <button type="button" className="btn fantome petit solo-pub-desactivee" disabled title={t('solo.adTitle')}><Icone nom="video" taille={15} /> {t('solo.adDisabled')}</button> : undefined}
       />
     </section>

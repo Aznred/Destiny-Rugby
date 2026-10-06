@@ -21,6 +21,7 @@ function instantane(): EtatBoutiqueCompte {
   const s = useGame.getState();
   return {
     ovas: s.coins, achatsOvas: s.achatsOvas ?? 0, collectionSolo: s.collectionSolo,
+    credits: s.credits, achatsCredits: s.achatsCredits ?? 0, cosmetiquesMeta: s.cosmetiquesMeta,
     inventaire: s.inventaire, skinActif: s.skinActif,
     equipements: s.equipements, equipementActif: s.equipementActif,
     traitsDebloques: s.traitsDebloques,
@@ -59,6 +60,9 @@ export function activerSynchronisationBoutiqueCompte(): () => void {
         const distante = reponse.boutique;
         useGame.setState({
           coins: distante.ovas, achatsOvas: distante.achatsOvas ?? 0, collectionSolo: distante.collectionSolo,
+          credits: distante.credits ?? 0, achatsCredits: distante.achatsCredits ?? 0,
+          // Les dates d'obtention : ce que le serveur connaît, complété par ce que cet appareil a déjà noté.
+          cosmetiquesMeta: { ...locale.cosmetiquesMeta, ...(distante.cosmetiquesMeta ?? {}) },
           inventaire: distante.inventaire, skinActif: distante.skinActif,
           equipements: distante.equipements, equipementActif: distante.equipementActif,
           traitsDebloques: distante.traitsDebloques,
@@ -104,16 +108,18 @@ export function activerSynchronisationBoutiqueCompte(): () => void {
           const distante = reponse.boutique;
           const actuelle = instantane();
           const changements: Partial<ReturnType<typeof useGame.getState>> = {};
-          const champs = { ovas: 'coins', achatsOvas: 'achatsOvas', inventaire: 'inventaire', skinActif: 'skinActif',
+          const champs = { ovas: 'coins', achatsOvas: 'achatsOvas', credits: 'credits', achatsCredits: 'achatsCredits', inventaire: 'inventaire', skinActif: 'skinActif',
             equipements: 'equipements', equipementActif: 'equipementActif', traitsDebloques: 'traitsDebloques' } as const;
           for (const cle of Object.keys(champs) as (keyof typeof champs)[]) {
-            const valeur = cle === 'achatsOvas' ? distante.achatsOvas ?? 0 : distante[cle];
+            const valeur = cle === 'achatsOvas' ? distante.achatsOvas ?? 0 : cle === 'achatsCredits' ? distante.achatsCredits ?? 0 : cle === 'credits' ? distante.credits ?? 0 : distante[cle];
             Object.assign(confirmee, { [cle]: valeur });
             if (JSON.stringify(actuelle[cle]) === JSON.stringify(cible.etat[cle])) Object.assign(changements, { [champs[cle]]: valeur });
           }
           // Ajouter la correction aux gains/dépenses apparus entre-temps,
           // sinon la prochaine écriture annulerait le crédit de l'achat.
           changements.coins = actuelle.ovas + distante.ovas - cible.etat.ovas;
+          // Même correction pour les Crédits : un achat Stripe confirmé entre-temps s'ajoute aux dépenses locales, il ne les écrase pas.
+          changements.credits = (actuelle.credits ?? 0) + (distante.credits ?? 0) - (cible.etat.credits ?? 0);
           for (const cle of ['inventaire', 'equipements', 'traitsDebloques'] as const) {
             const acquisitions = distante[cle].filter(id => !cible.etat[cle].includes(id));
             changements[cle] = [...new Set([...actuelle[cle], ...acquisitions])];
@@ -161,6 +167,8 @@ export function activerSynchronisationBoutiqueCompte(): () => void {
     // Les changements de navigation, de chrono et de carrière n'affectent
     // pas le coffre. Ne pas sérialiser la collection sur chaque mise à jour.
     if (etatStore.coins === precedent.coins && etatStore.achatsOvas === precedent.achatsOvas
+      && etatStore.credits === precedent.credits && etatStore.achatsCredits === precedent.achatsCredits
+      && etatStore.cosmetiquesMeta === precedent.cosmetiquesMeta
       && etatStore.collectionSolo === precedent.collectionSolo && etatStore.inventaire === precedent.inventaire
       && etatStore.skinActif === precedent.skinActif && etatStore.equipements === precedent.equipements
       && etatStore.equipementActif === precedent.equipementActif && etatStore.traitsDebloques === precedent.traitsDebloques) return;

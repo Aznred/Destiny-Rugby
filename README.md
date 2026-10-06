@@ -1819,7 +1819,7 @@ Fait avec 🏉 — thème artisanal, front soigné, sans rendu générique.
 
 La retransmission française utilise F5-TTS sur l'ordinateur via un service local. Lancer `Lancer voix F5.cmd` dans l'atelier `../test voice` ; instructions, limites et licences dans [VOIX_LOCALE.md](VOIX_LOCALE.md). La file et les textes de commentaires existants sont conservés.
 
-## Correctifs 16 à 20 (octobre 2026)
+## Correctifs 16 à 21 (octobre 2026)
 
 ### Correctif 16 — le joueur conduit son pion
 - En carrière solo (match en 3D), le joueur **conduit** son personnage dès qu'il est sur le terrain : banc → caméra télé → remplacement animé → caméra derrière lui → commandes. Les vingt-neuf autres gardent l'IA par poste.
@@ -1856,3 +1856,10 @@ La retransmission française utilise F5-TTS sur l'ordinateur via un service loca
 - **Tutoriel de contrôle en dix étapes** (déplacement, sprint, placement, réclamer, passe, crochet, raffut, pied, plaquage, grattage), rejouable par partie depuis les Réglages, et des explications contextuelles (offload, ruck, passe au pied, placement).
 - **Apparence et équipement** : étape « Apparence » à la création (teint, coupes, couleur, barbe, morphologie bornée, aperçu 3D tournable en direct), « Personnaliser mon joueur » dans le profil, casque et crampons réellement portés par le modèle 3D du match comme de l'aperçu.
 
+### Correctif 21 — boutique, monnaies et maillots d'équipe
+
+- **Ovas et Crédits** : les Ovas se gagnent en jouant et ne s'achètent plus avec de l'argent réel ; les **Crédits** (jeton octogonal bleu) sont la monnaie premium, achetée par Stripe. Chaque article déclare son prix : Ovas seulement, Crédits seulement, ou au choix.
+- **Fenêtres d'achat claires** : choix de la monnaie, « Pas assez d'Ovas » (utiliser des Crédits / obtenir des Ovas), « Crédits insuffisants » (solde, prix, manque, recharge en un clic), confirmation avant toute dépense de Crédits. Aucun achat n'est jamais lancé tout seul. La roue des packs est inchangée, avec les deux prix.
+- **Boutique** (Packs, Crédits, Maillots, Joueur) et **Personnalisation** : on n'équipe que ce qu'on possède ; le reste est « À débloquer », avec son prix.
+- **Maillots d'équipe** : un kit habille toute l'équipe (domicile et extérieur) sur le même modèle 3D de maillot, repeint ; maillots, casques et crampons se voient sur leurs modèles 3D, ou sur le joueur.
+- **Labo** : onglet Boutique pour créer des cosmétiques (prix par monnaie, rareté, dates, publié) et monnaie réglable par pack.
