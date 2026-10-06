@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { actionPrioritaire, creerChoixCommentaireAudio, creerSuiviCommentaires, familleCommentaireAudio, type ActionCommentee, type FamilleCommentaireAudio } from '../../lib/commentateursMatch';
 import { creerRetransmission, type EtatRetransmission, type Replique } from '../../lib/commentaires/retransmission';
 import { creerLecteurVoix, langueDeRetransmission, type LecteurVoix } from '../../lib/commentaires/voix';
+import { CommentatorVoice } from '../../lib/commentaires/CommentatorVoice';
+import type { EtatVoix } from '../../lib/commentaires/voiceProtocol';
 import { langueCourante } from '../../lib/i18n';
 import type { ContexteStatsTV } from '../../lib/statsTV';
 import { Icone } from '../Icone';
@@ -13,7 +15,7 @@ import './CommentateursMatch.css';
  *  - coupés ;
  *  - la RETRANSMISSION : un commentateur et un consultant qui regardent le
  *    match (`lib/commentaires/`), nomment les joueurs et se répondent, dits par
- *    la synthèse vocale de l'appareil — en français, ou en anglais pour les
+ *    le TTS local français, ou la synthèse de l'appareil en anglais pour les
  *    autres langues du jeu. Demande `etat` : l'état du match affiché ;
  *  - les voix d'origine en anglais (clips par famille d'événement), comme avant.
  */
@@ -36,6 +38,7 @@ export function CommentateursMatch({ lignes, seconde, pause = false, etat, conte
   const [erreur, setErreur] = useState('');
   const [cache, setCache] = useState(() => document.hidden);
   const [parole, setParole] = useState<Replique | null>(null);
+  const [etatVoix, setEtatVoix] = useState<EtatVoix>({ statut: 'repos' });
   const suivi = useRef(creerSuiviCommentaires());
   const choisir = useRef(creerChoixCommentaireAudio());
   const audio = useRef<HTMLAudioElement>(null);
@@ -45,6 +48,7 @@ export function CommentateursMatch({ lignes, seconde, pause = false, etat, conte
   const langue = langueDeRetransmission(langueCourante());
   const observer = useRef<ReturnType<typeof creerRetransmission> | null>(null);
   const voix = useRef<LecteurVoix | null>(null);
+  const moteurVocal = useRef<CommentatorVoice | null>(null);
   const horloge = useRef(0);
   const retransmissionPossible = !!etat;
 
@@ -68,6 +72,7 @@ export function CommentateursMatch({ lignes, seconde, pause = false, etat, conte
       lecteur?.removeAttribute('src');
       lecteur?.load();
       voix.current?.detruire(); voix.current = null;
+      moteurVocal.current?.dispose(); moteurVocal.current = null;
     };
   }, []);
 
@@ -116,7 +121,11 @@ export function CommentateursMatch({ lignes, seconde, pause = false, etat, conte
     setMode(voulu);
     if (voulu === 'retransmission') {
       observer.current = creerRetransmission(langue, contexte);
-      voix.current = creerLecteurVoix(langue, setParole);
+      if (langue === 'fr') moteurVocal.current ??= new CommentatorVoice();
+      voix.current = creerLecteurVoix(langue, setParole, {
+        moteur: moteurVocal.current ?? undefined,
+        surEtat: (etat) => { setEtatVoix(etat); if (etat.statut === 'erreur') setErreur(etat.erreur ?? 'La voix est indisponible.'); },
+      });
       // Une première phrase sur le clic : c'est elle qui autorise la voix sur téléphone.
       voix.current.dire({ voix: 'commentateur', categorie: 'accueil', priorite: 3, t: performance.now() / 1000,
         texte: langue === 'fr' ? 'Bonjour à tous, et bienvenue pour suivre cette rencontre !' : 'Hello everyone, and welcome to this match!' }, performance.now() / 1000);
@@ -127,9 +136,10 @@ export function CommentateursMatch({ lignes, seconde, pause = false, etat, conte
     }
   };
   const libelle = erreur ? 'Voix indisponible'
+    : mode === 'retransmission' && langue === 'fr' && etatVoix.statut === 'chargement' ? `Préparation de la voix${etatVoix.progression ? ` · ${etatVoix.progression} %` : ''}`
     : mode === 'retransmission' ? `Commentateurs · ${langue.toUpperCase()}` : mode === 'origine' ? 'Voix d’origine · EN' : 'Commentateurs';
   const titre = erreur || (mode === 'coupe' ? 'Activer les commentateurs'
-    : mode === 'retransmission' ? 'Commentateur et consultant (voix de synthèse) — appuyer pour les voix d’origine'
+    : mode === 'retransmission' ? 'Commentateur et consultant — appuyer pour les voix d’origine'
       : 'Voix d’origine en anglais — appuyer pour couper');
   return <>
     <audio ref={audio} preload="none" hidden aria-hidden="true" />

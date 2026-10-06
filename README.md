@@ -1799,7 +1799,7 @@ Fait avec 🏉 — thème artisanal, front soigné, sans rendu générique.
 
 - **Le porteur regarde devant lui** (IA de niveau 3 ; ligue : règles 4) : intervalles, deux contre un avec fixation et passe au dernier moment, feinte de passe, défenseur qui choisit, trois contre deux, gestes selon les qualités du joueur.
 - **Tirs au but** : le ballon continue sa course après les poteaux et rebondit ; le point de chute varie de 2 à 34 mètres.
-- **Commentateurs** : un commentateur et un consultant qui nomment les joueurs et connaissent leurs statistiques (français et anglais, voix de synthèse de l'appareil).
+- **Commentateurs** : un commentateur et un consultant qui nomment les joueurs et connaissent leurs statistiques (français avec F5-TTS local, anglais avec la synthèse de l'appareil).
 - **Téléphone** : carrière joueur qui tient sur un écran, sortie de match en plein écran sans plantage, scène allégée et pelouse de secours pour iOS.
 
 ## Cartes spéciales — ICONS et Halloween (octobre 2026)
@@ -1814,6 +1814,10 @@ Fait avec 🏉 — thème artisanal, front soigné, sans rendu générique.
 - **Labo** (Atelier Kiri) : onglet « Cartes spéciales » (liste, statuts, filtres, édition GEN/COL/poste/nation/club/dates/poids, image importée ou remplacée avec aperçu, publication carte par carte ou en masse, import en masse, boutons « Activer ICONS » / « Activer Halloween », prix et probabilités du pack Halloween) et onglet « Imports joueurs » (lot MLR · Championship · NPC et listes collées, appariement prénom + nom + date de naissance, sinon + club, entrées douteuses validées à la main).
 - **Base** : définitions et événements dans `carriere_catalogue_admin` (même révision que l'Atelier, propagée à toutes les ligues), images dans `carriere_cartes_speciales_images` (`serveur/schema-cartes-speciales.sql`, création automatique).
 - Banc : `npm run verify:cartes-speciales` (292 contrôles : graine, raretés mesurées, pack Halloween solo, fin d'événement, collections, marché, collectif, feuille, Labo par l'API, catalogue public, imports).
+
+## Voix française locale
+
+La retransmission française utilise F5-TTS sur l'ordinateur via un service local. Lancer `Lancer voix F5.cmd` dans l'atelier `../test voice` ; instructions, limites et licences dans [VOIX_LOCALE.md](VOIX_LOCALE.md). La file et les textes de commentaires existants sont conservés.
 
 ## Correctifs 16, 17 et 18 (octobre 2026)
 

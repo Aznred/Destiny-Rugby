@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="fr">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Destiny Rugby · Essai de la voix locale</title>
+<style>body{background:#101c19;color:#f0ebdd;font:17px system-ui;margin:0;padding:24px}main{max-width:760px;margin:auto}h1{font-size:28px}button,textarea{font:inherit;box-sizing:border-box;border:1px solid #9a8650;border-radius:8px;padding:12px;background:#233b30;color:inherit}button{cursor:pointer;margin:4px 0}textarea{width:100%;min-height:120px}#etat{min-height:50px;color:#e3c97b}pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:360px;overflow:auto;background:#0a1310;padding:14px;font-size:14px}a{color:#e3c97b}</style>
+<main>
+<h1>Essai de la voix avec F5-TTS local</h1>
+<p>Lance « Lancer voix F5.cmd » dans le dossier test voice, puis prépare la voix ici. F5-TTS utilise l’extrait de référence préparé à partir de ton enregistrement et reste chargé entre les commentaires.</p>
+<p>Le son est généré sur cet ordinateur. Compare la ressemblance et la prononciation avec l’enregistrement avant de retenir la voix pour le jeu.</p>
+<p id="etat" role="status">La voix est au repos.</p>
+<button id="preparer">Préparer la voix</button>
+<label for="texte"><p>Commentaire à lire</p></label>
+<textarea id="texte">Dupont accélère et trouve l’intervalle !</textarea>
+<p><button id="lire">Lire le commentaire</button> <button id="file">Tester trois commentaires</button> <button id="stop">Arrêter</button></p>
+<p>Le test de trois commentaires utilise la file déjà présente dans le jeu.</p>
+<pre id="journal" aria-live="polite"></pre>
+<p><a href="/">Retour au jeu</a></p>
+</main>
+<script type="module">
+import { CommentatorVoice } from '/src/lib/commentaires/CommentatorVoice.ts';
+import { creerLecteurVoix } from '/src/lib/commentaires/voix.ts';
+const moteur = new CommentatorVoice();
+const journal = document.querySelector('#journal');
+const ecrire = texte => { journal.textContent += texte + '\n'; };
+moteur.subscribe(etat => {
+  document.querySelector('#etat').textContent = etat.statut === 'pret' ? `Voix prête · F5-TTS · ${etat.moteur}`
+    : etat.statut === 'chargement' ? `Chargement de la voix · ${etat.progression ?? 0} %`
+    : etat.statut === 'erreur' ? `Erreur : ${etat.erreur}` : 'La voix est au repos.';
+});
+let lecteur = null;
+document.querySelector('#preparer').onclick = () => {
+  const debut = performance.now();
+  void moteur.initialize().then(() => ecrire(`Initialisation : ${Math.round(performance.now() - debut)} ms`)).catch(e => ecrire(e.message));
+};
+document.querySelector('#lire').onclick = () => {
+  lecteur?.couper();
+  const debut = performance.now();
+  void moteur.speak(document.querySelector('#texte').value, { surDebut: () => ecrire(`Lecture commencée · génération ${Math.round(performance.now() - debut)} ms`) })
+    .then(() => ecrire('Lecture terminée.')).catch(e => ecrire(`Erreur : ${e.message}`));
+};
+document.querySelector('#file').onclick = () => {
+  lecteur?.detruire(); moteur.stop();
+  lecteur = creerLecteurVoix('fr', r => ecrire(r ? `En lecture : ${r.texte}` : 'File terminée.'), { moteur });
+  const t = performance.now() / 1000;
+  ['Ramos récupère le ballon et accélère !', 'Dupont trouve l’intervalle !', 'Essai magnifique après cette percée !'].forEach((texte, i) => {
+    lecteur.dire({ texte, voix: i === 1 ? 'consultant' : 'commentateur', categorie: 'accueil', priorite: 4, t }, t);
+  });
+};
+document.querySelector('#stop').onclick = () => { lecteur?.couper(); moteur.stop(); ecrire('Arrêt demandé ; le modèle reste chargé.'); };
+window.addEventListener('pagehide', () => { lecteur?.detruire(); moteur.dispose(); });
+</script>
+</html>

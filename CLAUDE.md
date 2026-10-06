@@ -1025,11 +1025,13 @@ voix d'origine en anglais (les clips d'avant, inchangés).
 - `phrases.ts` : 73 catégories, 408 phrases en français et 268 en anglais (six à huit par voix dans les grandes catégories — pas encore « plusieurs dizaines »). **L'humour de la cabine** : deux catégories à déclencheur — `plaquageCaramel` (plaquage dominant, six fois sur dix) et `fessesParTerre` (le geste « assis » du défenseur qui perd son duel) — et des variantes « Blague » (`xxxBlague`) tirées une fois sur cinq (`PART_DES_BLAGUES`), jamais sur un carton rouge ni une blessure,
   tirées de sacs qui se vident avant de se remplir. Les autres langues du jeu
   entendent l'anglais.
-- `voix.ts` : synthèse vocale de l'appareil (`speechSynthesis`), deux voix
-  différentes quand la langue en a deux, sinon deux hauteurs. ⚠️ C'est une
-  INTERFACE (`LecteurVoix`) : des voix de studio ou un service en ligne se
-  brancheront là. La qualité dépend aujourd'hui de l'appareil ; le sous-titre
-  reste quand il n'y a pas de voix.
+- `voix.ts` conserve la file, les priorités et l'interface `LecteurVoix`.
+  Français : `CommentatorVoice.ts` utilise le service F5 local de
+  `../test voice/serveur_voix_f5.py` via un Worker. La référence autorisée,
+  sa transcription et le modèle français restent en mémoire dans ce service.
+  CUDA si disponible, sinon CPU ; cette version demande Python sur l'ordinateur.
+  Anglais : `speechSynthesis` existant. Voir `VOIX_LOCALE.md` et
+  `npm run verify:voix`. Aucun entraînement ou événement de match dans le lecteur.
 
 #### Téléphone : sortie de match, iOS, mémoire
 
@@ -1423,9 +1425,9 @@ npm run verify:photos             # portraits des cartes : liens morts, silhouet
 npm run verify:assets             # tout chemin /m3d /logos /photos écrit en dur existe vraiment
 npm run verify:triche             # 40 tentatives de triche, toutes refusées
 npm run verify:cartes-speciales   # ICONS, Halloween, Labo, imports (292 contrôles, ~2 min)
+npm run verify:tutoriel           # le tutoriel guidé : textes, ancres, placement des bulles, mémoire (30 600 contrôles)
 
 npx vite-node scripts/verif.ts    # banc général : divisions, effectifs, 8 saisons
-npm run verify:tutoriel           # le tutoriel guidé : textes, ancres, placement des bulles, mémoire (30 600 contrôles)
 ```
 
 Le rugby que produit le moteur (essais, pénalités, cartons, mêlées, touches,
