@@ -81,6 +81,8 @@
     "verify:correctif25": "vite-node scripts/verifierCorrectif25.ts && vite-node scripts/verifierSuiviUsage.ts && vite-node scripts/verifierUsage.ts && vite-node scripts/verifierDeltaVue.ts",
     "verify:delta-vue": "vite-node scripts/verifierDeltaVue.ts",
     "audit:joueurs": "vite-node scripts/auditDonneesJoueurs.ts",
+    "verify:reprises-match": "vite-node scripts/verifierReprisesMatch.ts",
+    "verify:vue-legere": "vite-node scripts/verifierVueLegere.ts",
     "verify:marche-commun": "vite-node scripts/verifierMarcheCommun.ts",
     "verify:chronologie": "vite-node scripts/verifierChronologieDirect.ts",
     "mesure:empreinte": "vite-node scripts/empreinteMoteur.ts",

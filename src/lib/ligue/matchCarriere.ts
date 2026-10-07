@@ -607,6 +607,11 @@ export interface VueMatchEnLigne {
   remplacementsFaits: number;
   surLeTerrain: { carteId: string; nom: string; numero: number; poste: PosteId }[];
   surLeBanc: { carteId: string; nom: string; numero: number; poste: PosteId }[];
+  /**
+   * Vue allégée d'un match TERMINÉ, dans la vue de la ligue : score, chrono et statistiques d'équipe seulement.
+   * Le fil, les temps forts et la feuille (56 Ko par match) se demandent à l'ouverture du match.
+   */
+  resume?: true;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -865,7 +870,7 @@ function ranger(cle: string, entree: EntreeCacheMoteur): void {
 
 /** Mesure légère utilisée par le banc de charge, jamais envoyée aux joueurs. */
 export function diagnosticCacheMatchEnLigne() {
-  return { matchs: CACHE.size, octetsEstimes: cacheOctets, maximumMatchs: CACHE_MAX, maximumOctets: CACHE_OCTETS_MAX, rejouesAFroid, retards };
+  return { matchs: CACHE.size, octetsEstimes: cacheOctets, maximumMatchs: CACHE_MAX, maximumOctets: CACHE_OCTETS_MAX, rejouesAFroid, retards, reprises };
 }
 /** Compteurs du banc : rejoues depuis le coup d'envoi, et ordres arrivés derrière le moteur. */
 let rejouesAFroid = 0;
@@ -964,7 +969,7 @@ function monter(etat: EtatMatchEnLigne): EntreeCacheMoteur {
     equipes.domicile.feuille, equipes.exterieur.feuille,
     etat.cibles.domicile, etat.cibles.exterieur, etat.cle, undefined,
     {
-      rng: graine(`match#${etat.cle}`),
+      rng: rngReprenable(`match#${etat.cle}`),
       // ⚠️ LE CŒUR DU DIRECT. Les déplacements restent à vitesse naturelle et
       // chaque arrêt utilise sa durée directe, courte mais lisible.
       tempsReel: true,
@@ -1147,6 +1152,90 @@ function derouler(etat: EtatMatchEnLigne, but: But, options: OptionsDeroule = {}
   entree.annexe.froid = false;
   ranger(cle, entree);
   return entree.moteur;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 5 bis. LES POINTS DE REPRISE — un serveur froid ne repart plus du coup d'envoi
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * La même suite que `graine()` (`aleatoire.ts`), dont on peut reprendre le fil : son état n'avance que d'une
+ * constante par tirage, le NOMBRE de tirages suffit donc à la retrouver. `graine()` garde le sien dans une
+ * fermeture, qu'on ne peut ni lire ni copier.
+ */
+type RngReprenable = (() => number) & { tirages: number };
+export function rngReprenable(s: string, tirages = 0): RngReprenable {
+  let h = 1779033703 ^ s.length;
+  for (let i = 0; i < s.length; i++) {
+    h = Math.imul(h ^ s.charCodeAt(i), 3432918353);
+    h = (h << 13) | (h >>> 19);
+  }
+  let a = ((h >>> 0) + Math.imul(tirages | 0, 0x6d2b79f5)) | 0;
+  const rng = (() => {
+    rng.tirages++;
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  }) as RngReprenable;
+  rng.tirages = tirages;
+  return rng;
+}
+
+/**
+ * Le moteur d'un match en cours, tel qu'une AUTRE instance peut le reprendre : l'état entier moins ses deux
+ * fonctions (le tirage, retrouvé par son compte ; la caméra, reposée à la reprise).
+ *
+ * ⚠️ C'EST UNE OPTIMISATION, COMME LE CACHE. Un point absent, illisible, d'un autre match ou qui n'est pas la suite
+ * du journal est refusé, et le match est rejoué du coup d'envoi comme avant. Rejouer reste la définition du match.
+ * ⚠️ `moteur` PARTAGE SES OBJETS AVEC LE MOTEUR VIVANT : il se sérialise tout de suite, il ne se garde pas.
+ */
+export interface PointDeReprise {
+  cle: string; debut: number; regles: number;
+  sim: number; tirages: number;
+  moteur: Record<string, unknown>;
+  annexe: Record<string, unknown>;
+}
+let reprises = 0;
+
+export function pointDeReprise(etat: EtatMatchEnLigne): PointDeReprise | null {
+  const garde = CACHE.get(cleCache(etat));
+  if (!garde || garde.annexe.froid || garde.moteur.fini || etat.termine) return null;
+  const tirages = (garde.moteur.rng as Partial<RngReprenable>).tirages;
+  if (typeof tirages !== 'number') return null;
+  const { rng: _rng, apresPas: _camera, ...moteur } = garde.moteur;
+  return { cle: etat.cle, debut: etat.debut, regles: etat.regles ?? 1, sim: garde.moteur.sim, tirages,
+    moteur: moteur as Record<string, unknown>, annexe: garde.annexe as unknown as Record<string, unknown> };
+}
+
+/** La seconde simulée du moteur gardé pour ce match ; `undefined` : cette instance n'en a pas. */
+export function simMoteurGarde(etat: EtatMatchEnLigne): number | undefined {
+  return CACHE.get(cleCache(etat))?.moteur.sim;
+}
+
+/**
+ * Installe un point de reprise à la place d'une rejoue. `point` doit venir d'une désérialisation : ses objets
+ * deviennent ceux du moteur. Rend faux, sans rien toucher, s'il ne peut pas être la suite de ce match.
+ */
+export function reprendreMoteur(etat: EtatMatchEnLigne, point: PointDeReprise): boolean {
+  if (etat.termine || !etat.equipes || !point || typeof point !== 'object') return false;
+  if (point.cle !== etat.cle || point.debut !== etat.debut || point.regles !== (etat.regles ?? 1)) return false;
+  const moteur = point.moteur as unknown as EtatMatch;
+  const annexe = point.annexe as unknown as Annexe;
+  if (!moteur || !annexe || moteur.sim !== point.sim || moteur.fini || !Array.isArray(moteur.pions)) return false;
+  if (!Number.isSafeInteger(point.tirages) || point.tirages < 0 || !Number.isSafeInteger(annexe.appliques)) return false;
+  // Le journal d'aujourd'hui doit prolonger celui que ce moteur a déjà appliqué.
+  if (annexe.appliques < 0 || annexe.appliques > etat.journal.length) return false;
+  if (annexe.appliques > 0 && signature(etat.journal[annexe.appliques - 1]) !== annexe.signature) return false;
+  const cle = cleCache(etat);
+  const garde = CACHE.get(cle);
+  if (garde && garde.moteur.sim >= moteur.sim) return false;
+  moteur.rng = rngReprenable(`match#${etat.cle}`, point.tirages);
+  filmer(moteur);
+  ranger(cle, { moteur, annexe: { ...annexe, froid: false }, octets: 0 });
+  reprises++;
+  return true;
 }
 
 /** Le moteur gardé pour ce match, sans le faire avancer. */
@@ -1761,6 +1850,15 @@ function mesOrdres(etat: EtatMatchEnLigne, monCote: CoteEnLigne): LigneFil[] {
     lignes.push(ligne);
   }
   return lignes;
+}
+
+/** Ce que la liste des rencontres affiche d'un match terminé : voir `VueMatchEnLigne.resume`. */
+export function resumeMatchEnLigne(etat: EtatMatchEnLigne): VueMatchEnLigne {
+  return {
+    id: etat.id, instance: etat.debut, minute: Math.floor(etat.horloge), horloge: r2(etat.horloge), termine: etat.termine,
+    score: etat.score, essais: etat.essais, penalites: etat.penalites, fil: [], stats: etat.stats,
+    remplacementsFaits: 0, surLeTerrain: [], surLeBanc: [], resume: true,
+  };
 }
 
 export function vueMatchEnLigne(

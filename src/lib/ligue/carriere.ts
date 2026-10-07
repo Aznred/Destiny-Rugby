@@ -11,7 +11,7 @@ import { affichesToutesRondes } from './calendrier.js';
 import { horairesChampionnat } from './horaires.js';
 import { graine as hasard, tirerPondere } from './aleatoire.js';
 import { packsCatalogueAdmin, bandesGaranties, carteDepuisSource, catalogueMondialCarriere, coequipierDepuisCarte, dotationBronzeCarriere, emblemeValide, logoCompetitionValide, nomTrophee, PACKS_CARRIERE, RARETES_CARRIERE, rayonDePack, tirerDuRayon, tropheeValide, vivierRestant } from './catalogueCarriere.js';
-import { actualiserCahierMatchEnLigne, avancerMatchEnLigne, commanderMatchEnLigne, conclureMatchEnLigne, creerMatchEnLigne, DUREE_REELLE, forceFeuille, MARGE_AUTORITE, STRATEGIE_EN_LIGNE_DEFAUT, strategieValide, vueMatchEnLigne } from './matchCarriere.js';
+import { actualiserCahierMatchEnLigne, avancerMatchEnLigne, commanderMatchEnLigne, conclureMatchEnLigne, creerMatchEnLigne, DUREE_REELLE, forceFeuille, MARGE_AUTORITE, STRATEGIE_EN_LIGNE_DEFAUT, strategieValide, resumeMatchEnLigne, vueMatchEnLigne } from './matchCarriere.js';
 import type { RepereChrono } from './filmDirect.js';
 import type { CarteCarriere, ClubCarriere, CommandeCarriere, CompetitionCarriere, CreationCarriere, EtatCarriereEnLigne, LigneClassementCarriere, ObjectifCarriere, PackCarriere, RencontreCarriere, TransactionCarriere, VueCarriereEnLigne } from './typesCarriere.js';
 import { LOT_VENTE_RAPIDE_MAX, valeurVenteRapide } from './venteRapideCarriere.js';
@@ -1985,7 +1985,11 @@ export function operationMarcheCarriere(etat: EtatCarriereEnLigne, op: Operation
   }
 }
 
-function construireVueCarriere(etat: EtatCarriereEnLigne, club?: ClubCarriere): VueCarriereEnLigne {
+/**
+ * `leger` : l'écran sait demander le détail d'un match terminé à son ouverture ; la vue n'en porte que le résumé.
+ * Un écran d'avant ne le demande pas et reçoit tout, comme avant.
+ */
+function construireVueCarriere(etat: EtatCarriereEnLigne, club?: ClubCarriere, leger = false): VueCarriereEnLigne {
   const { graine: _secret, clubs: _clubs, cartes: _cartes, rencontres: _rencontres, objectifs: _objectifs, transactions: _transactions, echanges: _echanges, ...publics } = etat;
   return copier({ ...publics, packsActifs: packsActifsLigue(etat), monClubId: club?.id ?? '', observateur: club ? undefined : true,
     competitions: etat.competitions.map(c => c.format === 'poules' && c.poules
@@ -1993,7 +1997,7 @@ function construireVueCarriere(etat: EtatCarriereEnLigne, club?: ClubCarriere): 
       : c),
     clubs: etat.clubs.map(c => { const { compteId: _compte, composition, strategie, compositionsSauvegardees, packsGratuits, packsGratuitsProgrammes: _programmes, dernierLotPacksGratuits, buteurManuel: _buteurManuel, ...reste } = c; return c.id === club?.id ? { ...reste, composition, strategie, compositionsSauvegardees, packsGratuits, dernierLotPacksGratuits } : reste; }),
     cartes: etat.cartes.filter(c => c.proprietaire !== null),
-    rencontres: etat.rencontres.map(r => { const { match, ...reste } = r; return match ? { ...reste, match: vueMatchEnLigne(match, club?.id ?? '') } : reste; }),
+    rencontres: etat.rencontres.map(r => { const { match, ...reste } = r; return match ? { ...reste, match: leger && match.termine ? resumeMatchEnLigne(match) : vueMatchEnLigne(match, club?.id ?? '') } : reste; }),
     objectifs: club ? etat.objectifs.filter(o => o.clubId === club.id) : [],
     transactions: club ? etat.transactions.filter(t => t.clubId === club.id) : [],
     echanges: club ? etat.echanges.filter(e => e.de === club.id || e.vers === club.id).map(e => ({ ...e, blocage: e.etat === 'propose' ? blocageFeuilleEchange(etat, e) : undefined })) : [],
@@ -2002,13 +2006,13 @@ function construireVueCarriere(etat: EtatCarriereEnLigne, club?: ClubCarriere): 
     vivierDisponible: vivierRestant(new Set(etat.cartes.map(c => c.sourceId))) });
 }
 
-export function vueCarriere(etat: EtatCarriereEnLigne, compteId: string): VueCarriereEnLigne {
-  return construireVueCarriere(etat, monClub(etat, compteId));
+export function vueCarriere(etat: EtatCarriereEnLigne, compteId: string, leger = false): VueCarriereEnLigne {
+  return construireVueCarriere(etat, monClub(etat, compteId), leger);
 }
 
 /** Vue publique d'administration : aucune composition, stratégie ou économie privée. */
-export function vueCarriereObservateur(etat: EtatCarriereEnLigne): VueCarriereEnLigne {
-  return construireVueCarriere(etat);
+export function vueCarriereObservateur(etat: EtatCarriereEnLigne, leger = false): VueCarriereEnLigne {
+  return construireVueCarriere(etat, undefined, leger);
 }
 
 /** Vue minimale d'un direct : quelques dizaines de Ko au lieu de toute la ligue. */

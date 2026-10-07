@@ -1535,6 +1535,31 @@ l'enchérisseur dépassé), annulation, expiration, cartes spéciales si la divi
 l'écran annonce sa version (`v`, `delta: true`) et reçoit ce qui a changé. Ouvrir un pack dans une ligue de seize clubs : **394 Ko → 8,5 Ko**
 (compressé 39,9 → 1,7). Écran d'avant, version décalée, requête rejouée : la vue entière, comme avant.
 
+**4 bis. Ouvrir une ligue pendant ses matchs (points de reprise et vue légère).** Signalé en jeu : la ligue publique « longue à
+s'ouvrir », et « serveur de carrière indisponible ». Mesuré le 7 octobre 2026 sur les vrais états : une instance FROIDE rejouait chaque
+match en cours depuis le coup d'envoi avant de répondre — division 1, trois matchs, **45 s** pour une limite de 60 ; et la vue pesait
+**1,7 Mo**, dont 1,2 de fil et de feuille des vingt dernières rencontres.
+- **Points de reprise** (`serveur/reprisesMatch.ts`, table `carriere_reprises`, `pointDeReprise` / `reprendreMoteur` dans
+  `matchCarriere.ts`). Toutes les cinq minutes de JEU, l'instance qui fait avancer un match dépose son moteur (v8 + gzip, ~20 Ko) ; une
+  instance froide le reprend dans `lireLigue` et ne joue que la suite. Mesuré au banc : ouvrir à froid à la 67ᵉ minute, 1,4 s au lieu
+  de 16,6. ⚠️ **CE N'EST PAS UNE SAUVEGARDE DU MATCH** : rejouer depuis la graine reste sa définition. Un point absent, illisible, d'un
+  autre coup d'envoi, d'un autre DÉPLOIEMENT (`CODE_REPRISES` = le commit Vercel : la mémoire brute du moteur ne se relit que par le code
+  qui l'a écrite) ou qui ne prolonge pas le journal est refusé, et le match est rejoué comme avant. Sans la table, pareil.
+- ⚠️ **LE TIRAGE D'UN MATCH DE LIGUE EST `rngReprenable`**, la même suite que `graine()` de `aleatoire.ts`, mais dont l'état se retrouve
+  par son NOMBRE de tirages (une fermeture ne se copie pas). L'état du moteur ne doit contenir AUCUNE autre fonction que `rng` et
+  `apresPas` : une troisième ferait échouer la sérialisation (le point n'est alors pas déposé, le match est rejoué).
+- Une instance ne redépose pas ce qu'une autre vient d'écrire (`simsReprises`, quelques octets) ; les points s'effacent à la sirène et,
+  par le cron, après un jour.
+- **Vue légère** (`leger=1` sur la lecture, `leger: true` sur une commande ; `VueMatchEnLigne.resume`, `resumeMatchEnLigne`) : un match
+  TERMINÉ arrive en résumé (score, chrono, statistiques d'équipe) ; l'écran demande son détail à l'ouverture par `&direct=<match>`
+  (`detailDemande` dans `CarriereEnLigne.tsx`) et `fusionnerVueLigue` le garde d'un sondage à l'autre. Division 1 : **1 730 → 401 Ko**
+  (181 → 48 compressés). Un match en cours n'est jamais résumé ; un écran d'avant ne demande rien et reçoit tout.
+- Bancs : `npm run verify:reprises-match` (133 contrôles : la vue d'une instance qui reprend est identique, octet pour octet, à celle
+  d'une instance qui rejoue tout — à la 12ᵉ, 27ᵉ, 33ᵉ, 54ᵉ et 67ᵉ minute, avec consignes et décisions ; points invalides refusés),
+  `npm run verify:vue-legere` (106 contrôles). La table est posée sur la base du site et ses quatre requêtes y ont
+  été essayées (7 octobre 2026). ⚠️ Pas essayé dans un navigateur (panneau caché), ni en production avant déploiement ; ⚠️ le journal des
+  transactions d'une ligue n'est toujours jamais élagué (7 606 lignes, 4,7 Mo dans la plus ancienne).
+
 **5. Les données joueurs** (`npm run audit:joueurs`, rapport `serveur/AUDIT-JOUEURS.md`). ⚠️ `actualiserCartesCatalogue` réécrit les cartes déjà
 distribuées à chaque ouverture de ligue : un import se propage donc partout. Trouvé : 36 292 licenciés passés d'un poste tiré de leur rang à leur
 vrai numéro FFR (import du 1ᵉʳ octobre) ; 18 professionnels qui héritaient du poste d'un homonyme amateur (`profilJoueurFfr` cherchait le NOM SEUL
@@ -1885,6 +1910,8 @@ npm run verify:chronologie        # le direct d'une ligue : plusieurs instances,
 npm run verify:marche-commun      # marché commun des divisions publiques : achat atomique, coupures, Ovas et cartes conservés (154 contrôles)
 npm run verify:tenues             # deux tenues qu'on ne confond pas, tableau lisible, écusson lu à sa surface (51 302 couples de clubs)
 npm run verify:delta-vue          # réponse compacte d'une commande : la vue tenue par deltas est celle du serveur (55 contrôles)
+npm run verify:reprises-match     # points de reprise : une instance froide reprend exactement le match qu'elle aurait rejoué (133 contrôles, ~4 min)
+npm run verify:vue-legere         # vue légère : détail d'un match terminé à la demande, gardé d'un sondage à l'autre (106 contrôles, ~2 min)
 npm run audit:joueurs             # audit des données joueurs, lecture seule : photographie, comparaison, ligues, base (voir serveur/AUDIT-JOUEURS.md)
 npm run verify:usage              # statistiques d'utilisation : relevés bornés, sommes, rétention, lecture réservée à Kiri (65 contrôles)
 npm run verify:tournoi-final      # tournoi final des divisions à poules jouable, clés du tableau, départage (97 contrôles, ~55 s)

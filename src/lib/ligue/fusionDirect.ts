@@ -89,6 +89,14 @@ export function fusionnerDeltaDirect(
  */
 export const presencesAcquittees = new Map<string, number>();
 
+/**
+ * Le détail d'un match terminé (fil, feuille, temps forts) n'arrive qu'à son ouverture : la vue de la ligue n'en
+ * porte que le résumé. Une vue plus récente ne doit pas reprendre à l'écran le détail qu'il a déjà chargé.
+ */
+const gardeSonDetail = (avant: RencontreVue | undefined, apres: RencontreVue): boolean =>
+  Boolean(avant?.match && apres.match?.resume && !avant.match.resume && avant.match.termine
+    && avant.match.id === apres.match.id && avant.match.instance === apres.match.instance);
+
 export function fusionnerVueLigue(
   courante: VueCarriereEnLigne | null,
   suivante: VueCarriereEnLigne,
@@ -100,6 +108,7 @@ export function fusionnerVueLigue(
     ...suivante,
     rencontres: suivante.rencontres.map(r => {
       const avant = anciennes.get(r.id);
+      if (gardeSonDetail(avant, r)) return { ...r, match: avant!.match };
       const comparable = suivante.version === courante.version || Boolean(avant && memeInstance(avant, r));
       return avant && comparable && rencontreDirectRegresse(avant, r) ? avant : r;
     }),

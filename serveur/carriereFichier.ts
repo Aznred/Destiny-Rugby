@@ -57,6 +57,7 @@ export function stockageFichier(fichier: string): StockageCarriere {
   const echeances: Record<string, number> = {};
   const reveilsMatch: Record<string, number | null> = {};
   const presences = new Map<string, { match: string; compte: string; vu: number }>();
+  const reprises = new Map<string, { match: string; debut: number; sim: number; code: string; donnees: string }>();
   const cleRecu = (l: string, c: string, r: string) => JSON.stringify([l, c, r]);
   return {
     echangesSolo: {
@@ -358,6 +359,21 @@ export function stockageFichier(fichier: string): StockageCarriere {
     async marquerPresence(ligue, match, compte, maintenant) {
       presences.set(JSON.stringify([ligue, match, compte]), { match, compte, vu: maintenant });
       return true;
+    },
+    async lireReprises(ligue, code) {
+      return [...reprises.entries()].flatMap(([cle, r]) => (JSON.parse(cle)[0] === ligue && r.code === code ? [{ ...r }] : []));
+    },
+    async simsReprises(ligue, code) {
+      return [...reprises.entries()].flatMap(([cle, r]) => (JSON.parse(cle)[0] === ligue && r.code === code ? [{ match: r.match, debut: r.debut, sim: r.sim }] : []));
+    },
+    async ecrireReprise(ligue, match, debut, sim, code, donnees) {
+      const cle = JSON.stringify([ligue, match]);
+      const avant = reprises.get(cle);
+      if (!avant || avant.debut !== debut || avant.code !== code || avant.sim < sim) reprises.set(cle, { match, debut, sim, code, donnees });
+      return true;
+    },
+    async nettoyerReprises(ligue, gardes) {
+      for (const cle of [...reprises.keys()]) { const [l, m] = JSON.parse(cle); if (l === ligue && !gardes.includes(m)) reprises.delete(cle); }
     },
     async presencesActives(ligue, depuis) {
       return [...presences.entries()].flatMap(([cle, p]) => {

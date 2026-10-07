@@ -9,6 +9,7 @@ import { configurationPush, envoyerPush, idPush, notifierMatchs, validerAbonneme
 import { agirCarriere, avancerCarriere as actualiserCarriere, avancerCarrierePourDirect, creerCarriere, creerDivisionPublique, creerLaboratoireCarriere, memeEtatDurable, vueCarriere, vueCarriereObservateur, vueRencontreCarriere, vueRencontreCarriereObservateur } from '../src/lib/ligue/carriere.js';
 import { planifierDivisionsPubliques } from './divisionsPubliques.js';
 import { creerMarcheCommun } from './marcheCommun.js';
+import { creerReprises } from './reprisesMatch.js';
 import { differenceVue } from '../src/lib/ligue/deltaVue.js';
 import { assemblerStatistiques, jourUTC, validerEnvoi, type PeriodeUsage } from '../src/lib/usage/agregats.js';
 import { echeanceLigue } from '../src/lib/ligue/echeanceCarriere.js';
@@ -278,6 +279,8 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
   const PAS_PRESENCE_DURABLE_MS = 30_000;
   /** `false` : la table des présences manque, l'ancien battement reste nécessaire. */
   let tablePresences: boolean | undefined;
+  /** Les points de reprise des matchs en cours : voir `reprisesMatch.ts`. Inertes sans leur table. */
+  const reprisesMatch = creerReprises(stockage);
   const oublierLigue = (id: string) => {
     octetsLigues -= poidsLigues.get(id) ?? 0;
     poidsLigues.delete(id); liguesChaudes.delete(id); sondagesDirects.delete(id);
@@ -417,6 +420,12 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
     refus: (statut, message) => new ErreurHttp(statut, message),
   });
   async function lireLigue(id: string, connue?: { version: number; comptes: string[]; echeance: number | null }) {
+    const ligne = await lireLigueBrute(id, connue);
+    // Tout ce qui lit une ligue peut avoir à faire avancer ses matchs : une instance froide reprend ici leur moteur.
+    if (ligne) await reprisesMatch.charger(id, ligne.etat).catch(() => 0);
+    return ligne;
+  }
+  async function lireLigueBrute(id: string, connue?: { version: number; comptes: string[]; echeance: number | null }) {
     const cache = liguesChaudes.get(id);
     if (!cache) {
       const ligne = await stockage.ligue(id);
@@ -550,6 +559,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         // qu'il refuse par principe de revenir en arrière.
         const avance = { ...suivant, version: ligne.etat.version };
         const stable = memoriserLigue(id, { ...ligne, etat: avance, echeance }).etat;
+        await reprisesMatch.deposer(id, stable).catch(() => 0);
         // Un sondage du direct n'est qu'une lecture : le notifier ici lançait
         // une programmation de file et une recherche d'alertes à chaque GET.
         // Seul le réveil durable entretient la chaîne et diffuse les alertes.
@@ -560,6 +570,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
       if (await stockage.comparerEtEcrire(maj, ligne.version, verifierRecu ? { compte, requete } : undefined)) {
         sondagesDirects.delete(id);
         memoriserLigue(id, { ...maj, version: ligne.version + 1, echeance: echeanceLigue(durable, maintenant) });
+        await reprisesMatch.deposer(id, durable).catch(() => 0);
         await notifier(durable);
         return durable;
       }
@@ -1375,7 +1386,9 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         if (accesObservateurKiri && !autorisationKiri) throw new ErreurHttp(404, 'Ligue introuvable.');
         const observateur = Boolean(autorisationKiri && !autorisationKiri.comptes.includes(compte.id));
         const e = await appliquer(id, observateur ? 'horloge' : compte.id, `lecture-${Math.floor(maintenant / 2000)}-catalogue-${catalogueAdmin().revision}`, (e, n, g) => actualiserCarriere(e, n, g), false, false, enteteConnue ?? autorisationKiri);
-        return res.status(200).json(observateur ? vueCarriereObservateur(e) : vueCarriere(e, compte.id));
+        // `leger=1` : l'écran demandera le détail d'un match terminé à son ouverture (`VueMatchEnLigne.resume`).
+        const leger = url.searchParams.get('leger') === '1';
+        return res.status(200).json(observateur ? vueCarriereObservateur(e, leger) : vueCarriere(e, compte.id, leger));
       }
       if (action === 'creer') {
         // ⚠️ COMPTER, C'EST COMPTER. Ce plafond lisait la liste entière — donc,
@@ -1461,11 +1474,13 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
          * entière, comme avant.
          */
         const versionEcran = corps.delta === true && Number.isSafeInteger(corps.v) ? Number(corps.v) : null;
+        // Même allègement que la lecture (`leger=1`) : le delta se calcule entre deux vues de la forme que l'écran tient.
+        const leger = corps.leger === true;
         const repondre = (avant: EtatCarriereEnLigne | undefined, apres: EtatCarriereEnLigne) => {
           if (versionEcran !== null && avant && avant.version === versionEcran && apres.version >= avant.version) {
-            return res.status(200).json({ delta: differenceVue(vueCarriere(avant, compte.id), vueCarriere(apres, compte.id)) });
+            return res.status(200).json({ delta: differenceVue(vueCarriere(avant, compte.id, leger), vueCarriere(apres, compte.id, leger)) });
           }
-          return res.status(200).json(vueCarriere(apres, compte.id));
+          return res.status(200).json(vueCarriere(apres, compte.id, leger));
         };
         // ⚠️ `partagee` NE SE LIT JAMAIS D'UN CLIENT : c'est le serveur qui décide qu'une annonce part sur le marché commun.
         if (commande.type === 'vendre') delete commande.partagee;

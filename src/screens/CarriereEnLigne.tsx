@@ -653,6 +653,20 @@ export function CarriereEnLigne() {
 
 
   const ouvrir = (suivante: VueCarriereEnLigne) => {
+  // Le détail d'un match terminé (fil, feuille, temps forts) ne voyage plus avec la ligue : la vue n'en porte que le
+  // résumé, et on le demande une fois, à l'ouverture du match. La fusion le garde ensuite d'un sondage à l'autre.
+  const detailDemande = useRef('');
+  useEffect(() => {
+    if (!ligueId || !matchId) return;
+    const match = vue?.rencontres.find(r => r.id === matchId)?.match;
+    if (!match?.resume) return;
+    const cle = `${ligueId}:${matchId}:${match.instance ?? ''}`;
+    if (detailDemande.current === cle) return;
+    detailDemande.current = cle;
+    chargerDirectCarriere(ligueId, matchId)
+      .then(delta => setVue(avant => (avant ? fusionnerDeltaDirect(avant, delta) : avant)))
+      .catch(() => { if (detailDemande.current === cle) detailDemande.current = ''; });
+  }, [ligueId, matchId, vue]);
     versionRequete.current++; setVue(suivante); setLigueId(suivante.id); setOnglet(suivante.observateur ? 'calendrier' : 'club'); setMatchId(null); setErreur('');
   };
   // Les clubs se synchronisent déjà par la version de la ligue. Ce contrôle
@@ -1450,7 +1464,7 @@ function Direct({ vue, rencontre: r, agir, occupe, fermer }: { vue: VueCarriereE
     <nav className="cel-onglets secondaires" data-tuto="cel-direct-onglets">{([['fil', t('online.match.log')], ['consignes', t('online.lineup.instructions')], ['banc', t('online.match.bench')], ['stats', t('online.match.stats')]] as const).map(([id, label]) =>
       <button key={id} className={ongletDirect === id ? 'actif' : ''} onClick={() => setOngletDirect(id)}>{label}</button>)}</nav>
 
-    {ongletDirect === 'fil' && <div className="cel-panneau cel-fil-match">{m.fil.length ? [...m.fil].reverse().map((l, i) => <p key={`${l.minute}-${i}`} className={`cel-ligne-fil ${l.type}${l.cote === mien ? ' moi' : ''}`}><b>{l.minute}′</b><span>{l.ordre ? libelleOrdreFil(l.ordre, Boolean(l.auto)) : l.texte}</span>{l.points ? <em>+{l.points}</em> : null}</p>) : <p className="cel-note">{t('online.match.started')}</p>}</div>}
+    {ongletDirect === 'fil' && <div className="cel-panneau cel-fil-match">{m.fil.length ? [...m.fil].reverse().map((l, i) => <p key={`${l.minute}-${i}`} className={`cel-ligne-fil ${l.type}${l.cote === mien ? ' moi' : ''}`}><b>{l.minute}′</b><span>{l.ordre ? libelleOrdreFil(l.ordre, Boolean(l.auto)) : l.texte}</span>{l.points ? <em>+{l.points}</em> : null}</p>) : m.resume ? null : <p className="cel-note">{t('online.match.started')}</p>}</div>}
 
     {ongletDirect === 'consignes' && (m.monCote ? <div className="cel-panneau cel-consignes">
       <p className="cel-note">{t('online.tactics.engineImpactNote')}</p>

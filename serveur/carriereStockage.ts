@@ -139,6 +139,16 @@ export interface StockageCarriere {
   presencesActives(ligue: string, depuis: number): Promise<PresenceMatchStockee[] | null>;
   /** Purge les données temporaires : présences, sessions expirées et compteurs de débit. */
   nettoyerPresences(avant: number): Promise<void>;
+  /**
+   * LES POINTS DE REPRISE des matchs en cours (`reprisesMatch.ts`) : le dernier moteur déposé par match, pour qu'une
+   * instance froide ne rejoue pas depuis le coup d'envoi. `null`/`false` : la table n'est pas posée, on rejoue comme avant.
+   */
+  lireReprises?(ligue: string, code: string): Promise<{ match: string; debut: number; sim: number; donnees: string }[] | null>;
+  /** Où en sont les points déposés, sans leur contenu : une instance ne redépose pas ce qu'une autre vient d'écrire. */
+  simsReprises?(ligue: string, code: string): Promise<{ match: string; debut: number; sim: number }[] | null>;
+  ecrireReprise?(ligue: string, match: string, debut: number, sim: number, code: string, donnees: string): Promise<boolean>;
+  /** Ne garde que les points des matchs cités. */
+  nettoyerReprises?(ligue: string, gardes: string[]): Promise<void>;
   /** Petit état temps réel, séparé des lourdes sauvegardes de carrière. */
   /**
    * LES STATISTIQUES D'UTILISATION (`src/lib/usage/agregats.ts`) : un relevé anonyme par appareil, additionné par jour.
@@ -849,6 +859,40 @@ export function stockageNeon(url: string): StockageCarriere {
         throw erreur;
       }
     },
+    async lireReprises(ligue, code) {
+      try {
+        const r = await sql`select match,debut,sim,donnees from carriere_reprises where ligue=${ligue} and code=${code}`;
+        return r.map(x => ({ match: String(x.match), debut: Number(x.debut), sim: Number(x.sim), donnees: String(x.donnees) }));
+      } catch (erreur) {
+        if ((erreur as { code?: string }).code === '42P01') return null;
+        throw erreur;
+      }
+    },
+    async simsReprises(ligue, code) {
+      try {
+        const r = await sql`select match,debut,sim from carriere_reprises where ligue=${ligue} and code=${code}`;
+        return r.map(x => ({ match: String(x.match), debut: Number(x.debut), sim: Number(x.sim) }));
+      } catch (erreur) {
+        if ((erreur as { code?: string }).code === '42P01') return null;
+        throw erreur;
+      }
+    },
+    async ecrireReprise(ligue, match, debut, sim, code, donnees) {
+      try {
+        // Un point plus ancien du même match et du même code ne remplace jamais un plus récent.
+        await sql`insert into carriere_reprises (ligue,match,debut,sim,code,donnees) values (${ligue},${match},${debut},${sim},${code},${donnees})
+          on conflict (ligue,match) do update set debut=excluded.debut,sim=excluded.sim,code=excluded.code,donnees=excluded.donnees,ecrit_le=now()
+          where carriere_reprises.debut<>excluded.debut or carriere_reprises.code<>excluded.code or carriere_reprises.sim<excluded.sim`;
+        return true;
+      } catch (erreur) {
+        if ((erreur as { code?: string }).code === '42P01') return false;
+        throw erreur;
+      }
+    },
+    async nettoyerReprises(ligue, gardes) {
+      try { await sql`delete from carriere_reprises where ligue=${ligue} and not (match = any(${gardes}::text[]))`; }
+      catch (erreur) { if ((erreur as { code?: string }).code !== '42P01') throw erreur; }
+    },
     async presencesActives(ligue, depuis) {
       try {
         const r = await sql`select match,compte,extract(epoch from vu_le)*1000 as vu from carriere_presences where ligue=${ligue} and vu_le>=to_timestamp(${depuis / 1000})`;
@@ -860,6 +904,9 @@ export function stockageNeon(url: string): StockageCarriere {
     },
     async nettoyerPresences(avant) {
       try { await sql`delete from carriere_presences where vu_le<to_timestamp(${avant / 1000})`; }
+      catch (erreur) { if ((erreur as { code?: string }).code !== '42P01') throw erreur; }
+      // Un point de reprise ne sert que pendant son match : passé un jour, il n'a plus de match.
+      try { await sql`delete from carriere_reprises where ecrit_le<now()-interval '1 day'`; }
       catch (erreur) { if ((erreur as { code?: string }).code !== '42P01') throw erreur; }
       await sql`delete from sessions where expire_le<now()`;
       await sql`delete from carriere_debits where debut<${avant}`;

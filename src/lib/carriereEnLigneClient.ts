@@ -109,7 +109,8 @@ export const chargerAdministrationCarriere = (signal?: AbortSignal) =>
  */
 export const chargerLigueCarriere = (id: string, signal?: AbortSignal, version?: number) =>
   requete<VueCarriereEnLigne>(undefined, undefined, signal,
-    `?ligue=${encodeURIComponent(id)}${version ? `&v=${version}` : ''}`);
+    // `leger=1` : les matchs terminés arrivent en résumé ; leur détail se demande à l'ouverture (`chargerDirectCarriere`).
+    `?ligue=${encodeURIComponent(id)}&leger=1${version ? `&v=${version}` : ''}`);
 /**
  * L'écran annonce le dernier pas de la chronologie qu'il connaît : le serveur
  * ne renvoie alors que la suite, à la place du relevé du terrain.
@@ -191,7 +192,7 @@ export const rejoindreDivisionPublique = (clubNom: string, embleme?: string) =>
  * (`ReponseDelta`, à appliquer avec `appliquerDeltaVue`) au lieu de la ligue entière.
  */
 export const commanderCarriere = (ligue: string, commande: CommandeCarriere, requeteId: string, version?: number) =>
-  requete<VueCarriereEnLigne | ReponseDelta>({ action: 'commande', ligue, commande, requeteId, ...(version ? { v: version, delta: true } : {}) });
+  requete<VueCarriereEnLigne | ReponseDelta>({ action: 'commande', ligue, commande, requeteId, leger: true, ...(version ? { v: version, delta: true } : {}) });
 /** Battement léger : le serveur répond seulement `{ok:true}` et ne renvoie pas la ligue. */
 export const signalerPresenceCarriere = (ligue: string, matchId: string) =>
   requete<{ ok: boolean }>({ action: 'presence', ligue, matchId });

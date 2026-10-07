@@ -39,6 +39,8 @@ export function creerBase(releve: Releve) {
   const ligues = new Map<string, LigneLigue>();
   const recus = new Set<string>();
   const presences = new Map<string, { ligue: string; match: string; compte: string; vu: number }>();
+  /** Les points de reprise des matchs en cours (`serveur/reprisesMatch.ts`). */
+  const reprises = new Map<string, { ligue: string; match: string; debut: number; sim: number; code: string; donnees: string }>();
   /** Ce qui a fait écrire l'état entier : la liste des champs du match qui ont bougé. */
   const causes = new Map<string, number>();
   /** Ce que la table de l'atelier contient : un banc peut y poser une révision plus récente. */
@@ -163,10 +165,23 @@ export function creerBase(releve: Releve) {
         }),
       presencesActives: (ligue: string, depuis: number) => mesurer('presencesActives', 'SELECT', 'carriere_presences', [ligue, depuis], () =>
         [...presences.values()].filter((p) => p.ligue === ligue && p.vu >= depuis).map((p) => ({ match: p.match, compte: p.compte, vu: p.vu }))),
+      lireReprises: (ligue: string, code: string) => mesurer('lireReprises (instance froide)', 'SELECT', 'carriere_reprises', [ligue, code], () =>
+        [...reprises.values()].filter((r) => r.ligue === ligue && r.code === code).map((r) => ({ match: r.match, debut: r.debut, sim: r.sim, donnees: r.donnees }))),
+      simsReprises: (ligue: string, code: string) => mesurer('simsReprises', 'SELECT', 'carriere_reprises', [ligue, code], () =>
+        [...reprises.values()].filter((r) => r.ligue === ligue && r.code === code).map((r) => ({ match: r.match, debut: r.debut, sim: r.sim }))),
+      ecrireReprise: (ligue: string, match: string, debut: number, sim: number, code: string, donnees: string) =>
+        mesurer('ecrireReprise', 'INSERT', 'carriere_reprises', [ligue, match, debut, sim, code, donnees], () => {
+          const avant = reprises.get(`${ligue}|${match}`);
+          if (!avant || avant.debut !== debut || avant.code !== code || avant.sim < sim) reprises.set(`${ligue}|${match}`, { ligue, match, debut, sim, code, donnees });
+          return true;
+        }),
+      nettoyerReprises: (ligue: string, gardes: string[]) => mesurer('nettoyerReprises', 'DELETE', 'carriere_reprises', [ligue, gardes], () => {
+        for (const [cle, r] of reprises) if (r.ligue === ligue && !gardes.includes(r.match)) reprises.delete(cle);
+      }),
       nettoyerPresences: async () => {},
       actives: async () => [],
     } as unknown as StockageCarriere;
   };
-  return { instance, comptes, sessions, ligues, causes, reglages };
+  return { instance, comptes, sessions, ligues, causes, reglages, reprises };
 }
 

@@ -143,5 +143,18 @@ create table if not exists carriere_marches (
   donnees jsonb not null check (jsonb_typeof(donnees) = 'object'),
   modifie_le timestamptz not null default now()
 );
+-- Points de reprise des matchs en cours (`serveur/reprisesMatch.ts`) : le dernier moteur déposé par match, pour
+-- qu'une instance froide ne rejoue pas depuis le coup d'envoi. Une ligne par match en cours, effacée à la sirène.
+-- Sans cette table, les matchs sont rejoués comme avant.
+create table if not exists carriere_reprises (
+  ligue uuid not null references carriere_ligues(id) on delete cascade,
+  match text not null,
+  debut bigint not null,
+  sim double precision not null,
+  code text not null,
+  donnees text not null,
+  ecrit_le timestamptz not null default now(),
+  primary key (ligue, match)
+);
 -- Ne pas purger carriere_commandes pendant la vie d'une ligue : ses reçus
 -- interdisent qu'une ancienne requête rejouée rachète un pack ou un joueur.
