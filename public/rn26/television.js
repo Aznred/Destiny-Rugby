@@ -30,7 +30,8 @@ export function creerTelevision({conteneur,actors,officials,ballMesh,teeMesh,leg
   const temps=new Float64Array(N).fill(-1),ballon=new Float32Array(N*8),tee=new Float32Array(N*4);
   let curseur=-1,dernier=-1e9,nombre=0;
   const EN_TETE=11;
-  const bande=a=>a.bande??={pas:EN_TETE+a.pose.bones.length*4+3,donnees:new Float32Array(N*(EN_TETE+a.pose.bones.length*4+3))};
+  const osDe=a=>a.osComplets||a.pose.bones;
+  const bande=a=>a.bande??={pas:EN_TETE+osDe(a).length*4+3,donnees:new Float32Array(N*(EN_TETE+osDe(a).length*4+3))};
   const tous=()=>[...actors.values(),...officials];
 
   function enregistrer(t){
@@ -42,7 +43,7 @@ export function creerTelevision({conteneur,actors,officials,ballMesh,teeMesh,leg
       const b=bande(a),d=b.donnees;let i=curseur*b.pas;
       d[i]=a.group.visible?1:0;if(!d[i])continue;
       a.group.position.toArray(d,i+1);a.group.quaternion.toArray(d,i+4);a.model.position.toArray(d,i+8);i+=EN_TETE;
-      for(const os of a.pose.bones){os.bone.quaternion.toArray(d,i);i+=4;}
+      for(const os of osDe(a)){os.bone.quaternion.toArray(d,i);i+=4;}
       a.pose.hips.position.toArray(d,i);
     }
     ballMesh.position.toArray(ballon,curseur*8);ballMesh.quaternion.toArray(ballon,curseur*8+3);ballon[curseur*8+7]=ballMesh.visible?1:0;
@@ -77,7 +78,7 @@ export function creerTelevision({conteneur,actors,officials,ballMesh,teeMesh,leg
       a.group.quaternion.fromArray(d,i+4).slerp(q.fromArray(d,j+4),kk);
       a.model.position.fromArray(d,i+8).lerp(v.fromArray(d,j+8),kk);
       i+=EN_TETE;j+=EN_TETE;
-      for(const os of a.pose.bones){THREE.Quaternion.slerpFlat(tampon,0,d,i,d,j,kk);os.bone.quaternion.fromArray(tampon);i+=4;j+=4;}
+      for(const os of osDe(a)){THREE.Quaternion.slerpFlat(tampon,0,d,i,d,j,kk);os.bone.quaternion.fromArray(tampon);i+=4;j+=4;}
       a.pose.hips.position.fromArray(d,i).lerp(v.fromArray(d,j),kk);
       a.group.updateMatrixWorld(true);
     }
@@ -188,6 +189,6 @@ export function creerTelevision({conteneur,actors,officials,ballMesh,teeMesh,leg
     get disponible(){return nombre>CADENCE*2;},
     set surChangement(f){surChangement=f;},
     set textes(t){if(t?.ralenti)libelle.textContent=t.ralenti;},
-    detruire(){clignote?.cancel();calque.remove();},
+    detruire(){clignote?.cancel();calque.remove();for(const a of tous())a.bande=null;nombre=0;surChangement=null;},
   };
 }

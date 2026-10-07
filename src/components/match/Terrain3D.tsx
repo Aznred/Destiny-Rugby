@@ -79,6 +79,10 @@ export function Terrain3D({
       // Ce que l'appareil a tenu sur ce match : le profil du suivant, et un compteur anonyme pour le Labo.
       try { retenirMesure(scene?.mesures?.()); } catch { /* une mesure ne retient jamais le démontage */ }
       rappels.current.surPrete(null);
+      if (import.meta.env.DEV) {
+        const diagnostic = window as unknown as { __scene3D?: Scene3D };
+        if (diagnostic.__scene3D === scene) delete diagnostic.__scene3D;
+      }
       // ⚠️ PAR TRANCHES (Correctif 26) : ce démontage tombe dans l'image du coup de sifflet final.
       void detruireScene(scene);
     };

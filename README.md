@@ -1917,4 +1917,11 @@ La retransmission française utilise F5-TTS sur l'ordinateur via un service loca
   Collection, retrait d'une proposition, cartes promises non proposables deux fois, mise à jour immédiate sans recharger.
 - **Fin de match** : la scène 3D est rendue par tranches, le résultat et les statistiques sont enregistrés par étapes
   après l'affichage de l'écran de fin, et la sauvegarde n'est écrite qu'une fois.
+- **Retour vers la carrière sur iOS** : contexte graphique rendu dès le retrait
+  du terrain, textures de squelettes et images de maillots libérées, ralentis
+  oubliés. Rendu borné à 921 600 pixels sur iPhone/iPad, sans retirer les
+  joueurs ou les tribunes. Les stades utilisés par une autre scène restent
+  disponibles. Validation sur les vrais appareils encore nécessaire :
+  [`sources/SORTIE-MATCH-IOS.md`](sources/SORTIE-MATCH-IOS.md).
 - Bancs : `npm run verify:tournoi-final`, `npm run verify:fin-match`, `npm run verify:propositions-collection`.
+  Restitution 3D : `npm run verify:memoire-3d` et `/scripts/apercuSortie3D.html?ios=1`.

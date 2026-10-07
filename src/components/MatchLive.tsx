@@ -665,6 +665,12 @@ export function MatchLive({
   // Aperçu et essais dans le navigateur (développement seulement, retiré du build) : de quoi lire le moteur et
   // le pilote depuis la console — voir `scripts/apercuControleDirect.tsx`.
   if (import.meta.env.DEV) (globalThis as { __matchLive?: unknown }).__matchLive = { e, pilotage: pilotage.current, scene: () => scene3D.current };
+  useEffect(() => () => {
+    if (import.meta.env.DEV) {
+      const diagnostic = globalThis as { __matchLive?: { e: EtatMatch } };
+      if (diagnostic.__matchLive?.e === e) delete diagnostic.__matchLive;
+    }
+  }, [e]);
   /**
    * La carte de décision ouverte, s'il y en a une. Le match est FIGÉ tant
    * qu'elle est là : c'est tout l'intérêt.

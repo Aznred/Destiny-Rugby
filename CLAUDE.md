@@ -1119,10 +1119,39 @@ voix d'origine en anglais (les clips d'avant, inchangés).
 - **Mode léger de la scène** (`leger`, téléphones et tablettes) : chargement
   l'un après l'autre, textures du stade ramenées à 1 024 px (elles pèsent
   quatre fois moins), matériaux sans éclairage physique, un seul stade gardé
-  en mémoire et rendu à la fin du match, définition 1 sur iOS. La pelouse a un
+  en mémoire et rendu à la fin du match. iOS garde toujours ce budget, y compris
+  l'iPad identifié comme Mac tactile : définition au plus 1 et au plus 921 600
+  pixels par toile, sans anticrénelage. La pelouse a un
   vert rayé de secours si sa texture n'a pas pu être lue. Un contexte WebGL
   repris par le système rend la main à l'hôte (`surPerte`), qui revient au
   terrain vu de haut. ⚠️ RIEN DE CELA N'A PU ÊTRE ESSAYÉ SUR UN iPhone.
+- **Restitution de la mémoire** (`public/rn26/ressources.mjs`) : les ressources
+  en cache sont protégées ; les ressources du match (matériaux, textures,
+  géométries d'ombres/repères, squelettes) sont recensées et rendues une fois.
+  Les images des textures locales sont aussi fermées ou leurs toiles réduites
+  à 1 × 1. Une texture clonée partage son `Source` : on détache ce `Source`
+  avant de le vider. Le cache du stade compte ses scènes utilisatrices : une
+  sortie ne ferme pas les images d'un stade encore affiché ailleurs.
+  Chaque match utilise ses propres objets de géométrie, matériau et texture,
+  pour que leurs écouteurs de destruction ne retiennent pas un ancien
+  renderer dans le cache. Les gros tableaux de sommets et images restent
+  partagés, et les copies sont réutilisées entre les joueurs de la scène.
+  Retouche du vendor : `WebGLRenderer.dispose()` rend aussi la LUT globale
+  `DFG_LUT` (16 × 16), qui gardait les écouteurs des anciens renderers ; ses
+  données CPU restent réutilisables. À conserver/revoir lors d'une mise à jour
+  de `public/rn26/vendor/three/build/three.module.js`.
+- **Transition iOS** : le contexte WebGL est perdu volontairement et la toile
+  retirée dès le début du démontage ; le nettoyage CPU poursuit ses tranches.
+  Scène, joueurs, arbitres et bandes de ralentis sont détachés immédiatement.
+  Le test de disponibilité WebGL ne crée qu'un contexte, aussitôt rendu, pour
+  toute la page. La navigation attend les destructions concurrentes et les
+  références de diagnostic du match sont retirées au démontage.
+- **Bancs de restitution** : `npm run verify:memoire-3d` (58 contrôles de
+  ressources avec trente joueurs sur dix cycles + 19 contrôles de profil iOS,
+  diagnostic WebGL et destruction concurrente), et
+  `/scripts/apercuSortie3D.html?ios=1` (dix scènes WebGL, profil iOS simulé).
+  Ce banc ne mesure pas les FPS et ne reproduit pas WebKit : validation sur
+  iPhone/iPad encore nécessaire. Bilan : `sources/SORTIE-MATCH-IOS.md`.
 - **Carrière joueur** (`Carriere.css`, `ResumeMobile`) : sous 700 px la page
   ne défile plus. Un résumé (note, nom, poste, club, statut, trois jauges,
   prochain match, statistiques), les onglets, puis la vue choisie qui défile en
@@ -1437,13 +1466,14 @@ des effectifs du Correctif 24 ; le moteur, lui, n'a pas bougé).
   (`cle#saison#n°` — pas la clé seule : elle revient d'une carrière à l'autre) ; le store garde ses verrous
   (`resultats[cle]`, `matchRegarde`).
 - **Scène par tranches** : `detruireScene(scene)` (`lib/match3D.ts`, appelée par `Terrain3D`) → `scene.detruireParEtapes()`
-  (lecteur hors git : `../analyse-rn26/correctif_26_scene.cjs`, sauvegarde `sauvegarde-avant-correctif-26/`) : toile
-  masquée et son coupé tout de suite, puis joueurs par six, textures par seize, contexte, stades. `detruire()` reste le
-  filet (lecteur ancien, tranche en échec).
+  (`public/rn26/scene.js`) : contexte rendu, toile retirée et son coupé tout de
+  suite, puis ressources CPU par seize et stade rendu. `ressources.mjs` libère
+  aussi les images des textures, les ombres et les squelettes, en protégeant les
+  modèles partagés. `detruire()` peut terminer un nettoyage déjà commencé.
 - **Les statistiques ne se recalculent pas à la fin** : le moteur les cumule par pion (`p.stats`), `bilan(e)` les lit.
 - **Mesure** : jalons `match_end_detected`, `stats_finalize_start/end`, `db_save_start/end`, `scene_cleanup_start/end`,
   `navigation_start/end` (`performance.mark('fin-match:…')`) ; en développement `__finMatch.durees()`.
-- Banc : `npm run verify:fin-match` (105 contrôles ; dix matchs de suite : finalisation 15-55 ms, une écriture par
+- Banc : `npm run verify:fin-match` (109 contrôles ; dix matchs de suite, une écriture par
   match, tas stable à 240 Mo, aucune minuterie restante). ⚠️ **La mémoire GRAPHIQUE et un vrai téléphone ne sont pas
   mesurés** (pas de WebGL sous Node, panneau navigateur sans GPU) : c'est le premier essai à faire sur iPhone/Android.
 

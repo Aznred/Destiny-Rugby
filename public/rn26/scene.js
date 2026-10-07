@@ -11,6 +11,7 @@ import { prepareGaits,locomotion } from './allures.js';
 import { tenueDepuisImage,creerTenue,numeroter,creerPanneaux,creerAbords,creerPublic,creerEtiquette,creerBallon,nettoyerStade,chargerImage,texture,departagerTenues,nomCourt,luminance,hexa,MAILLOT_DEFAUT } from './habillage.js';
 import { creerSons } from './sons.js';
 import { creerTelevision } from './television.js';
+import { protegerRessources,planLiberation,ressourcesLocales } from './ressources.mjs';
 
 // ---------------------------------------------------------------------------
 // LA SCÈNE DU MATCH EN TROIS DIMENSIONS
@@ -31,7 +32,7 @@ const ballons=new Map();
 /** Le ballon équipé en boutique, allégé pour le match (alleger_equipement.mjs) ; `null` s'il manque. */
 function chargerBallon(nom){
   if(!/^[a-z0-9-]+$/i.test(nom||''))return Promise.resolve(null);
-  if(!ballons.has(nom))ballons.set(nom,new GLTFLoader().loadAsync(RACINE_DECOR+'equipement/ballon-'+nom+'.glb').then(g=>{let m=null;g.scene.traverse(o=>{if(o.isMesh)m=o;});return m;}).catch(()=>null));
+  if(!ballons.has(nom))ballons.set(nom,new GLTFLoader().loadAsync(RACINE_DECOR+'equipement/ballon-'+nom+'.glb').then(g=>{protegerRessources([g.scene]);let m=null;g.scene.traverse(o=>{if(o.isMesh)m=o;});return m;}).catch(()=>null));
   return ballons.get(nom);
 }
 // ── ÉQUIPEMENT : un casque ou des crampons ne se chargent que s'ils sont portés ──
@@ -42,7 +43,7 @@ const POOL_CASQUES=['casque','casque-rouge'],POOL_CRAMPONS=['crampons','crampons
 /** Un modèle allégé de la boutique, par son nom de fichier ; `null` s'il manque. Mis en cache pour la session. */
 export function chargerEquipement(nom){
   if(!/^[a-z0-9-]+$/i.test(nom||''))return Promise.resolve(null);
-  if(!equipements.has(nom))equipements.set(nom,new GLTFLoader().loadAsync(RACINE_DECOR+'equipement/'+nom+'.glb').then(g=>{let m=null;g.scene.traverse(o=>{if(o.isMesh)m=o;});equipementPret.set(nom,m);return m;}).catch(()=>{equipementPret.set(nom,null);return null;}));
+  if(!equipements.has(nom))equipements.set(nom,new GLTFLoader().loadAsync(RACINE_DECOR+'equipement/'+nom+'.glb').then(g=>{protegerRessources([g.scene]);let m=null;g.scene.traverse(o=>{if(o.isMesh)m=o;});equipementPret.set(nom,m);return m;}).catch(()=>{equipementPret.set(nom,null);return null;}));
   return equipements.get(nom);
 }
 /** Charge ce qu'une liste d'apparences porte, plus la réserve des adversaires. */
@@ -151,6 +152,7 @@ function charger(){
       await document.fonts?.load?.('40px Anton').catch(()=>{});
       ball.scene.traverse(o=>{if(o.isMesh&&o.material?.map&&/ball/i.test(o.material.name)&&!/shadow/i.test(o.material.name))o.material.map=peintComme(creerBallon(512),o.material.map);});
     }catch(e){console.warn('Marquage Destiny Rugby :',e);}
+    protegerRessources([forward.scene,back.scene,hair.scene,ball.scene,tee.scene]);
     return {motions,gaits,forward:forward.scene,back:back.scene,hair:hair.scene,ball:ball.scene,tee:tee.scene,kit};
   })();
   return ressources;
@@ -202,10 +204,9 @@ function libererStades(sauf,gardes=1){
   // Les plus anciens d'abord : la Map garde l'ordre d'arrivée, et un stade resservi repasse en dernier (`chargerStade`).
   const autres=[...decors.keys()].filter(c=>c!==sauf),aRendre=new Set(autres.slice(0,Math.max(0,autres.length-(gardes-1))));
   for(const [cle,promesse] of decors){
-    if(!aRendre.has(cle))continue;
+    if(!aRendre.has(cle)||promesse.utilisateurs>0)continue;
     decors.delete(cle);
-    promesse.then(({decor})=>decor.traverse(o=>{if(!o.isMesh)return;o.geometry?.dispose?.();
-      for(const m of Array.isArray(o.material)?o.material:[o.material]){m?.map?.dispose?.();m?.dispose?.();}})).catch(()=>{});
+    promesse.then(({decor,origine})=>planLiberation([decor],Object.values(origine),true).tout()).catch(()=>{});
   }
 }
 /** La pelouse de secours : un vert rayé dessiné sur place, quand la texture du terrain n'a pas pu être lue. */
@@ -255,13 +256,18 @@ function chargerStade(nom,leger=false){
     }catch(e){console.warn('Marquage Destiny Rugby :',e);}
     if(leger)allegerDecor(decor,materiaux,origine);
     figerDecor(decor);
+    protegerRessources([decor],Object.values(origine));
     return {decor,origine,materiaux};
   })().catch(e=>{
     // Un décor absent ou illisible : on retombe sur l'enceinte d'origine, jamais sur un terrain vide.
     decors.delete(cle);if(fichier===STADES.international)throw e;
     console.warn('Stade « '+nom+' » indisponible :',e);return chargerStade('international',leger);
   }));
-  return decors.get(cle);
+  const promesse=decors.get(cle);promesse.utilisateurs=(promesse.utilisateurs||0)+1;
+  return promesse.then(stade=>{
+    let rendu=false;
+    return {...stade,restituer(){if(rendu)return;rendu=true;promesse.utilisateurs--;stade.restituer?.();}};
+  });
 }
 // ── Un squelette par joueur (Correctif 25) ─────────────────────────────────
 // Corps, tête, yeux, maillot, short, chaussettes : chaque pièce du modèle arrive avec SON squelette, et three.js
@@ -288,7 +294,7 @@ function unirSquelettes(model){
       const decales=new Uint16Array(si.count*n);
       for(let i=0;i<si.count;i++){decales[i*n]=si.getX(i)+base;if(n>1)decales[i*n+1]=si.getY(i)+base;if(n>2)decales[i*n+2]=si.getZ(i)+base;if(n>3)decales[i*n+3]=si.getW(i)+base;}
       g.setAttribute('skinIndex',new THREE.BufferAttribute(decales,n));
-      peauxDecalees.set(cle,g);
+      peauxDecalees.set(cle,g);protegerRessources([],[g]);
     }
     m.geometry=g;
   }
@@ -338,7 +344,7 @@ function souderLesPieces(model){
         s0+=n;i0+=nb;
       }
       g.setIndex(new THREE.BufferAttribute(indices,1));g.computeBoundingBox();g.computeBoundingSphere();
-      piecesSoudees.set(cle,g);
+      piecesSoudees.set(cle,g);protegerRessources([],[g]);
     }
     const premiere=pieces[0],soudee=new THREE.SkinnedMesh(g,premiere.material);
     soudee.name='pieces_soudees';soudee.bindMode=premiere.bindMode;soudee.bind(premiere.skeleton,premiere.bindMatrix);
@@ -374,20 +380,34 @@ function repeindre(materiau,canvas,renderer){
  *  - `son` : `false` pour une scène muette (vignettes, aperçus).
  */
 export async function creerScene3D(conteneur,options={}){
-  const leger=!!options.leger;
   // iPhone, iPad (qui se présente comme un Mac tactile) : la mémoire d'un WebView y est la plus courte.
   const ios=typeof navigator!=='undefined'&&(/iP(hone|ad|od)/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1));
+  const leger=ios||!!options.leger;
   // ⚠️ SUR TÉLÉPHONE, UN CHARGEMENT APRÈS L'AUTRE : décoder le stade, les joueurs et
   // les mouvements en même temps fait un pic de mémoire que le match ne redemandera jamais.
   let r,stade;
   if(leger){r=await charger();stade=await chargerStade(options.stade,true);}
-  else [r,stade]=await Promise.all([charger(),chargerStade(options.stade)]);
+  else {
+    const charges=await Promise.allSettled([charger(),chargerStade(options.stade)]);
+    if(charges[1].status==='fulfilled')stade=charges[1].value;
+    if(charges.some(c=>c.status==='rejected')){
+      stade?.restituer();libererStades();
+      throw charges.find(c=>c.status==='rejected').reason;
+    }
+    r=charges[0].value;
+  }
+  let sceneEnCours=null,rendererEnCours=null;
+  const locales=ressourcesLocales();
+  const nettoyagesEchec=[];
+  try{
   const {motions,gaits}=r;
   await chargerEquipementsDe(options.apparences);
   const scene=new THREE.Scene();
+  sceneEnCours=scene;
   scene.background=new THREE.Color('#b6d4e4');scene.fog=new THREE.Fog('#b6d4e4',180,420);
   const camera=new THREE.PerspectiveCamera(48,1,.1,600);
   const renderer=new THREE.WebGLRenderer({antialias:!leger,preserveDrawingBuffer:!!options.capture,powerPreference:leger?'default':'high-performance',failIfMajorPerformanceCaveat:false});
+  rendererEnCours=renderer;
   let definition=Math.min(globalThis.devicePixelRatio||1,ios?1:leger?1.25:1.5);
   renderer.setPixelRatio(definition);
   renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.15;
@@ -401,7 +421,7 @@ export async function creerScene3D(conteneur,options={}){
   // chargé est partagé par toute la session ; repeindre ses matériaux en place
   // faisait qu'une scène détruite (React monte deux fois en développement, et
   // deux matchs peuvent s'enchaîner) rendait à l'autre les panneaux d'origine.
-  const decor=clone(stade.decor);scene.add(decor);
+  const decor=clone(stade.decor);locales.appliquer(decor);scene.add(decor);
   // ⚠️ LA PELOUSE S'AFFICHE TOUJOURS. Une texture que l'appareil n'a pas pu décoder laisse
   // un terrain noir : on la remplace sur-le-champ par un vert rayé dessiné sur place.
   decor.traverse(o=>{if(!o.isMesh)return;
@@ -414,12 +434,13 @@ export async function creerScene3D(conteneur,options={}){
   let contextePerdu=false;
   const surPerteDeContexte=ev=>{ev.preventDefault();if(contextePerdu)return;contextePerdu=true;paused=true;options.surPerte?.();};
   renderer.domElement.addEventListener('webglcontextlost',surPerteDeContexte);
+  nettoyagesEchec.push(()=>toile.removeEventListener('webglcontextlost',surPerteDeContexte));
   // Autour d'un petit stade il n'y a pas de ville modélisée : un sol jusqu'à l'horizon évite le vide sous le ciel.
   const alentours=new THREE.Mesh(new THREE.PlaneGeometry(1600,1600),new THREE.MeshStandardMaterial({color:'#7d9160',roughness:1,metalness:0}));alentours.rotation.x=-Math.PI/2;alentours.position.y=-.12;scene.add(alentours);
   const jetables=[],propres={};
   decor.traverse(o=>{
     if(!o.isMesh||Array.isArray(o.material)||!['banners','banners_noscroll','surround_objects_2021'].includes(o.material.name))return;
-    propres[o.material.name]??=o.material.clone();o.material=propres[o.material.name];
+    propres[o.material.name]??=o.material;o.material=propres[o.material.name];
   });
   jetables.push(...Object.values(propres));
   const [tenueA,tenueB]=(options.tenuesDepartagees?(a,b)=>[a,b]:departagerTenues)({...MAILLOT_DEFAUT,...options.equipes?.[0]?.maillot},{...MAILLOT_DEFAUT,principal:'#f2f4f3',secondaire:'#dfe5e8',accent:'#c8102e',short:'#f2f4f3',chaussettes:'#0b1f44',...options.equipes?.[1]?.maillot});
@@ -429,10 +450,10 @@ export async function creerScene3D(conteneur,options={}){
   // Un kit du Labo peut fournir son atlas : il est posé tel quel (les couleurs ne servent alors qu'à l'encre du numéro).
   const imagesKit=await Promise.all([tenueA,tenueB].map(m=>chargerImage(m.texture)));
   const tenues=[tenueA,tenueB].map((m,i)=>{
-    if(imagesKit[i])return tenueDepuisImage(imagesKit[i],m,1024);
-    try{return creerTenue(r.kit,m,blasons[i],1024);}
+    if(imagesKit[i])return tenueDepuisImage(imagesKit[i],m,tailleTenue);
+    try{return creerTenue(r.kit,m,blasons[i],tailleTenue);}
     // Un écusson servi sans en-tête de partage « salit » la toile : on recommence sans lui.
-    catch{return creerTenue(r.kit,m,null,1024);}
+    catch{return creerTenue(r.kit,m,null,tailleTenue);}
   });
   const teintePad=luminance(tenueA.principal)>.82?tenueA.secondaire:tenueA.principal;
   const peindre=(nom,fabrique)=>{try{const t=repeindre(propres[nom],fabrique(),renderer);if(t)jetables.push(t);}catch(e){console.warn('Habillage du stade ('+nom+') :',e);}};
@@ -472,7 +493,9 @@ export async function creerScene3D(conteneur,options={}){
       cuir.add(neuf);cuir.material=new THREE.MeshBasicMaterial({visible:false});jetables.push(cuir.material);
     }
   }
+  locales.appliquer(ballMesh);
   const teeMesh=clone(r.tee);teeMesh.rotation.x=Math.PI/2;teeMesh.visible=false;scene.add(teeMesh);
+  locales.appliquer(teeMesh);
   teeMesh.updateMatrixWorld(true);const teeBounds=new THREE.Box3().setFromObject(teeMesh);teeMesh.userData.floor=-teeBounds.min.y;teeMesh.userData.top=teeBounds.max.y-teeBounds.min.y;
   const anneau=(interieur,exterieur,teinte,opacite)=>{const m=new THREE.Mesh(new THREE.RingGeometry(interieur,exterieur,40),new THREE.MeshBasicMaterial({color:teinte,side:THREE.DoubleSide,transparent:true,opacity:opacite,depthWrite:false}));m.rotation.x=-Math.PI/2;m.visible=false;scene.add(m);return m;};
   const halo=anneau(.48,.58,'#f5efb9',.7),aura=anneau(.62,.74,'#ffd257',.85);
@@ -518,6 +541,7 @@ export async function creerScene3D(conteneur,options={}){
     prepareBody(actor);
     // Un squelette pour tout le corps, et les pièces qui se dessinent pareil soudées (`squelettes`, `soudure` : false pour mesurer sans).
     if(options.squelettes!==false){unirSquelettes(model);if(options.soudure!==false)souderLesPieces(model);}
+    locales.appliquer(model);
     return actor;
   }
   /** Ce que la carte du joueur sait de son apparence, traduit pour le modèle. */
@@ -563,15 +587,23 @@ export async function creerScene3D(conteneur,options={}){
   // En portrait, le champ s'ouvre : sans cela un téléphone ne verrait qu'une bande du terrain.
   let largeur=1,hauteur=1;
   function cadrer(){
+    if(detruite||contextePerdu)return;
     const l=Math.max(1,conteneur.clientWidth),h=Math.max(1,conteneur.clientHeight);
     if(l===largeur&&h===hauteur)return;largeur=l;hauteur=h;
-    camera.aspect=l/h;camera.fov=(camera.aspect<.8?64:camera.aspect<1.2?56:48)+(leger?4:0);camera.updateProjectionMatrix();renderer.setSize(l,h,false);
+    // La définition 1 ne suffit pas sur une grande tablette : borner aussi
+    // la surface évite de gros tampons GPU lors du passage paysage/portrait.
+    const ratio=Math.min(definition,ios?Math.sqrt(921600/(l*h)):Infinity);
+    renderer.setDrawingBufferSize(l,h,ratio);
+    camera.aspect=l/h;camera.fov=(camera.aspect<.8?64:camera.aspect<1.2?56:48)+(leger?4:0);camera.updateProjectionMatrix();
   }
   const observateur=new ResizeObserver(cadrer);observateur.observe(conteneur);cadrer();
+  nettoyagesEchec.push(()=>observateur.disconnect());
 
   // ── Son et réalisation ────────────────────────────────────────────────────
   const sons=options.son===false?null:creerSons({leger});
+  nettoyagesEchec.push(()=>sons?.detruire());
   const tele=creerTelevision({conteneur,actors,officials,ballMesh,teeMesh,leger,habillage:options.habillage||{},textes:options.textes||{},surVolet:()=>sons?.evenement('volet',{gain:.45})});
+  nettoyagesEchec.push(()=>tele.detruire());
   const reglagesTele={ralentis:options.television?.ralentis!==false};
   tele.surChangement=(actif,motif)=>{if(!actif)snap=true;api.surRalenti?.(actif,motif);};
   // Un appui pendant un ralenti le passe.
@@ -1425,7 +1457,7 @@ export async function creerScene3D(conteneur,options={}){
     if(lente){
       // Un essai de pleine cadence qui échoue : retour immédiat à 30, et le prochain essai attendra deux fois plus.
       if(enEssai){cible=30;enEssai=false;attenteEssai=Math.min(120,attenteEssai*2);essaiLe=horloge+attenteEssai;}
-      else if(definition>PLANCHER){definition=Math.max(PLANCHER,definition-.16);renderer.setPixelRatio(definition);renderer.setSize(largeur,hauteur,false);lentes=0;}
+      else if(definition>PLANCHER){definition=Math.max(PLANCHER,definition-.16);renderer.setDrawingBufferSize(largeur,hauteur,Math.min(definition,ios?Math.sqrt(921600/(largeur*hauteur)):Infinity));lentes=0;}
       else if(cible>30&&++lentes>=2){cible=30;lentes=0;essaiLe=horloge+attenteEssai;}
     }else{
       lentes=0;
@@ -1469,16 +1501,39 @@ export async function creerScene3D(conteneur,options={}){
     const q=contexteGpu.createQuery();if(!q)return null;contexteGpu.beginQuery(extensionGpu.TIME_ELAPSED_EXT,q);return q;
   }
   const projete=new THREE.Vector3();
+  let liberation=null,nettoyage=null,stadeRendu=false;
+  function commencerLiberation(){
+    if(detruite)return;
+    detruite=true;paused=true;arreterGpu();observateur.disconnect();
+    toile.removeEventListener('webglcontextlost',surPerteDeContexte);
+    toile.removeEventListener('pointerdown',passerAuToucher);
+    liberation=planLiberation([scene],jetables);
+    sons?.detruire();tele.detruire();
+    // Le contexte doit disparaître AVANT la sauvegarde, le pivot de l'écran
+    // et le montage du bureau. Le nettoyage CPU se poursuit par tranches.
+    renderer.forceContextLoss?.();renderer.renderLists?.dispose?.();
+    toile.width=1;toile.height=1;toile.remove();
+    actors.clear();officials.length=0;scene.clear();match=null;reperes=null;
+    jetables.length=0;api.surRalenti=null;api.vue=null;
+    for(const c of tenues){c.width=1;c.height=1;}
+  }
+  function finirLiberation(){
+    if(stadeRendu)return;stadeRendu=true;renderer.dispose();locales.oublier();stade.restituer();
+    if(leger)libererStades();
+  }
+  // Une tâche courte plutôt qu'une image : les minuteries et rappels ne
+  // restent pas en attente quand iOS masque l'onglet pendant la transition.
+  const souffler=()=>new Promise(fin=>setTimeout(fin,0));
   const api={
     /** Vue forcée [dx, y, dz, hauteur visée] pour les vérifications ; `null` en jeu. */
     vue:null,
     get match(){return match;},
     get ips(){return ips;},
     /** Le profileur : coût du rendu et écart entre deux images (ms, sur les 240 dernières), compteurs de three.js. */
-    mesures(){const i=renderer.info;return{images:nCouts,rendu:resumerCouts(couts),cpu:resumerCouts(coutsCpu),gpu:nGpu?resumerCouts(coutsGpu,nGpu):undefined,ecart:resumerCouts(ecarts),ips,appels:i.render.calls,triangles:i.render.triangles,geometries:i.memory.geometries,textures:i.memory.textures,definition,largeur,hauteur,leger:!!options.leger,elagues,cadence:cible===Infinity?0:cible,pas,definitionDeDepart,moyenneMatch:tempsTotal>0?imagesTotales/tempsTotal:0,dureeMesuree:tempsTotal};},
+    mesures(){const i=renderer.info;return{images:nCouts,rendu:resumerCouts(couts),cpu:resumerCouts(coutsCpu),gpu:nGpu?resumerCouts(coutsGpu,nGpu):undefined,ecart:resumerCouts(ecarts),ips,appels:i.render.calls,triangles:i.render.triangles,geometries:i.memory.geometries,textures:i.memory.textures,definition:renderer.getPixelRatio(),largeur,hauteur,leger,elagues,cadence:cible===Infinity?0:cible,pas,definitionDeDepart,moyenneMatch:tempsTotal>0?imagesTotales/tempsTotal:0,dureeMesuree:tempsTotal};},
     mesurerGpu(actif){if(!actif){arreterGpu();return;}extensionGpu??=contexteGpu.getExtension('EXT_disjoint_timer_query_webgl2');mesureGpu=!!extensionGpu;},
     get definition(){return definition;},
-    interne:{actors,officials,camera,scene,renderer,motions,THREE,rig,ballState,tenues,tele,unirSquelettes,souderLesPieces},
+    interne:{actors,officials,camera,scene,renderer,motions,THREE,rig,ballState,tenues,tele,unirSquelettes,souderLesPieces,stadesEnCache:()=>decors.size},
     /** Branche un état de match. `direct` : état déjà interpolé (relevés du direct en ligne). */
     brancher(etat,{direct=false}={}){
       match=etat instanceof DestinyMatch?etat:new DestinyMatch({etat,outils:options.outils,direct});
@@ -1567,45 +1622,30 @@ export async function creerScene3D(conteneur,options={}){
      * La même destruction que `detruire`, PAR TRANCHES : l'image disparaît tout de suite, la mémoire graphique est
      * rendue ensuite un peu à chaque image. Rend une promesse tenue quand tout est libéré.
      */
-    async detruireParEtapes(){
-      if(detruite)return;detruite=true;arreterGpu();observateur.disconnect();
-      toile.removeEventListener('webglcontextlost',surPerteDeContexte);
-      toile.removeEventListener('pointerdown',passerAuToucher);sons?.detruire();tele.detruire();
-      toile.style.display='none';
-      // Un onglet caché ne tire plus requestAnimationFrame : la minuterie tient lieu d'image.
-      const souffler=()=>new Promise(fin=>{let fait=false;const finir=()=>{if(!fait){fait=true;fin();}};if(typeof requestAnimationFrame==='function')requestAnimationFrame(finir);setTimeout(finir,40);});
-      await souffler();
-      const acteurs=[...actors.values(),...officials];
-      for(let i=0;i<acteurs.length;i+=6){
-        for(const a of acteurs.slice(i,i+6)){a.kit?.dispose();a.model.traverse(o=>{if(o.isMesh&&o.material?.dispose&&o.material!==undefined){const ms=Array.isArray(o.material)?o.material:[o.material];ms.forEach(m=>m.dispose());}});scene.remove(a.group);if(a.flag)scene.remove(a.flag);if(a.card)scene.remove(a.card);}
-        await souffler();
-      }
-      actors.clear();
-      for(let i=0;i<jetables.length;i+=16){for(const j of jetables.slice(i,i+16))j.dispose?.();await souffler();}
-      etiquette.sprite.material.map.dispose();etiquette.sprite.material.dispose();
-      scene.remove(decor);
-      await souffler();
-      renderer.renderLists?.dispose?.();renderer.dispose();renderer.forceContextLoss?.();toile.remove();
-      await souffler();
-      // Sur téléphone, le stade n'attend pas le match suivant en mémoire.
-      if(leger)libererStades();
+    detruireParEtapes(){
+      if(nettoyage)return nettoyage;
+      commencerLiberation();
+      nettoyage=(async()=>{
+        try{while(liberation?.restant){await souffler();liberation.tranche(16);}}
+        finally{liberation?.tout();finirLiberation();}
+      })();
+      return nettoyage;
     },
     detruire(){
-      if(detruite)return;detruite=true;arreterGpu();observateur.disconnect();
-      toile.removeEventListener('webglcontextlost',surPerteDeContexte);
-      toile.removeEventListener('pointerdown',passerAuToucher);sons?.detruire();tele.detruire();
-      for(const a of [...actors.values(),...officials]){a.kit?.dispose();a.model.traverse(o=>{if(o.isMesh&&o.material?.dispose&&o.material!==undefined){const ms=Array.isArray(o.material)?o.material:[o.material];ms.forEach(m=>m.dispose());}});scene.remove(a.group);if(a.flag)scene.remove(a.flag);if(a.card)scene.remove(a.card);}
-      actors.clear();
-      // Le stade partagé n'a jamais été touché : seules les copies de cette scène sont libérées.
-      for(const j of jetables)j.dispose?.();
-      etiquette.sprite.material.map.dispose();etiquette.sprite.material.dispose();
-      scene.remove(decor);
-      renderer.renderLists?.dispose?.();renderer.dispose();renderer.forceContextLoss?.();toile.remove();
-      // Sur téléphone, le stade n'attend pas le match suivant en mémoire.
-      if(leger)libererStades();
+      commencerLiberation();liberation?.tout();finirLiberation();
     },
   };
   return api;
+  }catch(erreur){
+    // Une création interrompue (WebGL refusé, ressource illisible) doit rendre
+    // le même budget qu'un match terminé avant de laisser l'hôte passer en 2D.
+    for(const nettoyer of nettoyagesEchec)try{nettoyer();}catch{ /* chargement partiel */ }
+    rendererEnCours?.forceContextLoss?.();rendererEnCours?.dispose();
+    if(rendererEnCours){const c=rendererEnCours.domElement;c.width=1;c.height=1;c.remove();}
+    planLiberation([sceneEnCours]).tout();sceneEnCours?.clear();locales.oublier();
+    stade.restituer();if(leger)libererStades();
+    throw erreur;
+  }
 }
 export { DestinyMatch,TICK };
 

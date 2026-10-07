@@ -1,4 +1,5 @@
 import * as THREE from '/rn26/vendor/three/build/three.module.js';
+import { protegerRessources } from './ressources.mjs';
 import { reach,aimBone } from './liaisons.js';
 const point=new THREE.Vector3(),hips=new THREE.Vector3(),spine=new THREE.Vector3();
 const front=new THREE.Vector3(),pole=new THREE.Vector3();
@@ -144,7 +145,7 @@ export function fitBeard(source,headMesh,key,marge=.002){
     }
     peau.material.dispose();
   }
-  p.needsUpdate=true;geometry.computeVertexNormals();geometry.computeBoundingSphere();ajustes.set(cle,geometry);return geometry;
+  p.needsUpdate=true;geometry.computeVertexNormals();geometry.computeBoundingSphere();ajustes.set(cle,geometry);protegerRessources([],[geometry]);return geometry;
 }
 export function fitToHead(source,headMesh,key,marge=.006){
   const cle=key+':'+source.name+':'+marge;
@@ -166,7 +167,7 @@ export function fitToHead(source,headMesh,key,marge=.006){
     if(!crane||r>=crane+marge)continue;
     const k=(crane+marge)/r;p.setXYZ(i,centre.x+dx*k,centre.y+dy*k,centre.z+dz*k);
   }
-  p.needsUpdate=true;geometry.computeVertexNormals();ajustes.set(cle,geometry);return geometry;
+  p.needsUpdate=true;geometry.computeVertexNormals();ajustes.set(cle,geometry);protegerRessources([],[geometry]);return geometry;
 }
 
 // ---------------------------------------------------------------------------

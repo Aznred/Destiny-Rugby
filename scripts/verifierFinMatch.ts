@@ -152,6 +152,7 @@ const sauvegardes = () => ecritures[CLE_SAUVEGARDE] ?? 0;
   };
   const a = fabriquer('tranches');
   const promesse = detruireScene(a as never);
+  egal(detruireScene(a as never), promesse, 'deux demandes de destruction attendent la même libération');
   egal(scenesEnDestruction(), 1, 'une scène en cours de destruction est suivie');
   egal(a.tranches, 0, "rien n'est libéré dans l'instant du démontage");
   await scenesRendues();
@@ -177,13 +178,16 @@ const sauvegardes = () => ecritures[CLE_SAUVEGARDE] ?? 0;
 
   // Le lecteur installé sait se rendre par tranches, et libère la même chose que d'un bloc.
   const source = fs.readFileSync('public/rn26/scene.js', 'utf8');
-  const debut = source.indexOf('async detruireParEtapes(){');
+  const debut = source.indexOf('    detruireParEtapes(){');
   ok(debut > 0, 'le lecteur installé (public/rn26/scene.js) a sa destruction par tranches');
   const corps = source.slice(debut, source.indexOf('    detruire(){', debut));
-  for (const geste of ['sons?.detruire()', 'tele.detruire()', 'a.kit?.dispose()', 'j.dispose?.()', 'renderer.dispose()', 'renderer.forceContextLoss?.()', 'toile.remove()', 'libererStades()', 'observateur.disconnect()'])
+  for (const geste of ['commencerLiberation()', 'liberation.tranche(16)', 'liberation?.tout()', 'finirLiberation()'])
     ok(corps.includes(geste), `la destruction par tranches fait aussi « ${geste} »`);
-  ok((corps.match(/await souffler\(\)/g) ?? []).length >= 5, 'et rend la main au navigateur entre les tranches');
-  ok(/setTimeout\(finir,\d+\)/.test(corps), "sans dépendre de requestAnimationFrame (un onglet caché n'en tire plus)");
+  ok(corps.includes('await souffler()'), 'et rend la main au navigateur entre les tranches');
+  const preparation = source.slice(source.indexOf('  function commencerLiberation(){'), source.indexOf('  const api={', source.indexOf('  function commencerLiberation(){')));
+  for (const geste of ['sons?.detruire()', 'tele.detruire()', 'renderer.dispose()', 'renderer.forceContextLoss?.()', 'toile.remove()', 'observateur.disconnect()', 'officials.length=0', 'scene.clear()', 'stade.restituer()'])
+    ok(preparation.includes(geste), `la libération complète fait aussi « ${geste} »`);
+  ok(/setTimeout\(fin,0\)/.test(preparation), "sans dépendre de requestAnimationFrame (un onglet caché n'en tire plus)");
 }
 
 // ── 4. Dix matchs de suite ─────────────────────────────────────────────────────────────────────────────────────

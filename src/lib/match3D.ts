@@ -186,13 +186,21 @@ export function retenirPreferencesTele(p: Partial<PreferencesTele>): Preferences
 }
 
 /** Le navigateur sait-il dessiner la scène ? Sinon le match garde son terrain en deux dimensions. */
+let disponibiliteWebgl: boolean | undefined;
 export function webglDisponible(): boolean {
   if (typeof document === 'undefined') return false;
+  if (disponibiliteWebgl !== undefined) return disponibiliteWebgl;
+  let toile: HTMLCanvasElement | undefined;
   try {
-    const toile = document.createElement('canvas');
-    return !!(toile.getContext('webgl2') ?? toile.getContext('webgl'));
+    toile = document.createElement('canvas');
+    const contexte = toile.getContext('webgl2', { antialias: false }) ?? toile.getContext('webgl', { antialias: false });
+    disponibiliteWebgl = !!contexte;
+    contexte?.getExtension('WEBGL_lose_context')?.loseContext();
+    return disponibiliteWebgl;
   } catch {
-    return false;
+    return (disponibiliteWebgl = false);
+  } finally {
+    if (toile) { toile.width = 1; toile.height = 1; }
   }
 }
 
@@ -320,26 +328,30 @@ export function ecussonPourToile(logo: string | undefined): string | undefined {
 // La scène se rend maintenant par tranches ; ceux qui ont un travail lourd à faire ensuite (finaliser le match,
 // quitter le plein écran, changer de page) attendent `scenesRendues()`.
 const destructions = new Set<Promise<void>>();
+const scenesDetruites = new WeakMap<Scene3D, Promise<void>>();
 
 /** Détruit une scène par tranches (d'un bloc si le lecteur ne sait pas faire). Ne lève jamais d'erreur. */
 export function detruireScene(scene: Scene3D | null | undefined): Promise<void> {
   if (!scene) return Promise.resolve();
+  const deja = scenesDetruites.get(scene);
+  if (deja) return deja;
   jalon('scene_cleanup_start');
   let promesse: Promise<void>;
   try {
     promesse = scene.detruireParEtapes ? scene.detruireParEtapes() : Promise.resolve(scene.detruire());
-  } catch { promesse = Promise.resolve(); }
+  } catch { try { scene.detruire(); } catch { /* contexte déjà perdu */ } promesse = Promise.resolve(); }
   // Le filet : une tranche qui échoue ne laisse pas un contexte graphique ouvert.
   const suivie: Promise<void> = promesse
     .catch(() => { try { scene.detruire(); } catch { /* déjà rendue */ } })
     .then(() => { destructions.delete(suivie); jalon('scene_cleanup_end'); });
   destructions.add(suivie);
+  scenesDetruites.set(scene, suivie);
   return suivie;
 }
 
 /** Tenue quand plus aucune scène n'est en cours de destruction. */
-export function scenesRendues(): Promise<void> {
-  return Promise.all([...destructions]).then(() => undefined);
+export async function scenesRendues(): Promise<void> {
+  while (destructions.size) await Promise.all([...destructions]);
 }
 
 /** Combien de scènes sont encore en train d'être rendues (banc et diagnostic). */

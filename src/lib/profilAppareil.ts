@@ -67,16 +67,18 @@ export function trancheDeFluidite(ips: number): TrancheFluidite {
 
 /** Le profil de CET appareil, relu à chaque match (il suit la dernière mesure). */
 export function profilAppareil(): DiagnosticAppareil {
-  const leger = appareilTactile();
+  const systeme = plateforme();
+  const leger = systeme === 'ios' || appareilTactile();
   const nav = typeof navigator === 'undefined' ? undefined : (navigator as Navigator & { deviceMemory?: number });
   const memoire = nav?.deviceMemory, coeurs = nav?.hardwareConcurrency;
   const dernier = dernierMatch();
-  const renduLeger = leger && !((memoire ?? 0) >= 6 && (coeurs ?? 0) >= 8);
-  const base = { plateforme: plateforme(), leger: renduLeger, memoire, coeurs, dernierMatch: dernier };
+  const renduLeger = systeme === 'ios' || leger && !((memoire ?? 0) >= 6 && (coeurs ?? 0) >= 8);
+  const base = { plateforme: systeme, leger: renduLeger, memoire, coeurs, dernierMatch: dernier };
   if (dernier && dernier.cadence === 30) return { ...base, profil: 'bas', raison: 'Le dernier match en 3D a fini à 30 images par seconde.' };
   if (dernier) return { ...base, profil: renduLeger ? 'moyen' : 'haut', raison: `Le dernier match en 3D a tenu ${dernier.ips} images par seconde.` };
   if (memoire !== undefined && memoire <= 2) return { ...base, leger: true, profil: 'bas', raison: `${memoire} Go de mémoire annoncés.` };
   if (coeurs !== undefined && coeurs <= 2) return { ...base, leger: true, profil: 'bas', raison: `${coeurs} cœurs annoncés.` };
+  if (systeme === 'ios') return { ...base, profil: 'moyen', raison: 'iPhone ou iPad : textures allégées et mémoire graphique bornée.' };
   if (leger && (memoire ?? 0) >= 6 && (coeurs ?? 0) >= 8) return { ...base, leger: false, profil: 'haut', raison: 'Appareil tactile avec mémoire et processeur suffisants pour le rendu complet.' };
   if (leger && coeurs !== undefined && coeurs <= 4 && (memoire ?? 4) <= 3) return { ...base, profil: 'bas', raison: `Appareil tactile, ${coeurs} cœurs.` };
   if (leger) return { ...base, profil: 'moyen', raison: 'Appareil tactile ou petit écran, pas encore mesuré.' };

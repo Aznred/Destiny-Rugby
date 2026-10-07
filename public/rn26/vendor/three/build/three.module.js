@@ -16571,6 +16571,10 @@ class WebGLRenderer {
 			canvas.removeEventListener( 'webglcontextrestored', onContextRestore, false );
 			canvas.removeEventListener( 'webglcontextcreationerror', onContextCreationError, false );
 
+			// Destiny Rugby : la LUT globale (16 × 16) ne doit pas retenir les
+			// écouteurs des anciens contextes. Ses données restent réutilisables.
+			if ( lut !== null ) lut.dispose();
+
 			background.dispose();
 			renderLists.dispose();
 			renderStates.dispose();
