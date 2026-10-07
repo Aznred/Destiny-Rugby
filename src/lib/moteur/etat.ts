@@ -725,8 +725,24 @@ export interface EtatMatch {
   sim: number;
   reliquat: number;      // reste de pas non consommé, pour un DT toujours exact
   minute: number;
-  periode: 1 | 2;
+  /** 1 et 2 : les deux mi-temps. Au-delà : les périodes de prolongation (`departage`). */
+  periode: number;
   sirene: boolean;
+  /**
+   * ⚠️ ESSAI À TEMPS EXPIRÉ : la transformation est due (Correctif 29). Tant que ce drapeau est levé, ni la mi-temps
+   * ni le match ne peuvent être sifflés — la sirène ne supprime jamais une transformation, qui peut changer le
+   * résultat, un bonus ou la différence de points. Baissé quand le tir est résolu.
+   */
+  transformationDue?: boolean;
+  /**
+   * UN VAINQUEUR EST OBLIGATOIRE (match couperet) : le règlement du départage, figé à la création depuis
+   * `competitionRules.ts`. Absent : le match peut finir sur un nul.
+   */
+  departage?: { periodes: number; duree: number; criteres: ('essais' | 'tirsAuBut')[] };
+  /** La prolongation a été jouée (ou se joue). */
+  prolongation?: boolean;
+  /** Comment le match a été tranché quand il a fallu départager. */
+  issue?: { vainqueur: Cote; critere: 'prolongation' | 'essais' | 'tirsAuBut'; tirs?: [number, number] };
 
   phase: Phase;
   minuteur: number;      // secondes simulées restantes dans la phase en cours
@@ -1103,7 +1119,7 @@ export function ajouterCommentaire(
 ): void {
   e.commentaires.push({
     seconde: Math.min(4800, Math.floor(e.t)),
-    minute: Math.min(80, Math.floor(e.t / 60)), texte, type, cote, points,
+    minute: Math.min(e.prolongation ? 200 : 80, Math.floor(e.t / 60)), texte, type, cote, points,
     scoreA: e.scoreA, scoreB: e.scoreB, moi,
   });
 }

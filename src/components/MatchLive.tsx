@@ -161,7 +161,7 @@ import { couleursDepuisEcusson, departagerLesTenues, enHex } from '../lib/tenues
 import { sortirDuMatch } from '../lib/sortieMatch';
 import { apresLEcran, finaliserMatch, jalon } from '../lib/finMatch';
 import { scenesRendues } from '../lib/match3D';
-import { departager } from '../lib/couperet';
+import { departager, departageDuMatch, inscrireIssueJouee } from '../lib/couperet';
 import { bulleDuMoment, marqueurDepuisEtat, memoireBullesVide, phraseDuMarqueur, ventPourLeTir, type ContexteStatsTV, type PhraseTV } from '../lib/statsTV';
 import { changementsRecents } from '../lib/presentationTV';
 import { urlLogoEquipe } from '../lib/logoEquipe';
@@ -556,6 +556,9 @@ export function MatchLive({
       // impitoyable chez les professionnels (voir `moteur/bagarre.ts`).
       {
         niveau: niveauDuMatch(joueur, selection), controle: true,
+        // ⚠️ MATCH COUPERET : LE NUL N'EXISTE PAS (Correctif 29). Le règlement de la compétition dit ce qui se joue à
+        // égalité à la sirène — prolongations, puis sa procédure. Une journée de championnat ou de poule n'en reçoit pas.
+        ...(selection ? {} : { departage: departageDuMatch(cle) }),
         cadenceDetaillee: cadenceInitiale.current,
         // Le placement se joue : personne n'est installé d'un coup, la phase attend ses joueurs.
         placementJoue: cadenceInitiale.current,
@@ -1421,13 +1424,23 @@ export function MatchLive({
   // Calcul direct (quelques comparaisons) : `e` est le même objet du coup d'envoi à la sirène, une mémoïsation ne le verrait pas changer.
   const prolongation = (() => {
     if (!e.fini || selection) return null;
+    // La prolongation a été JOUÉE : on annonce ce que le terrain a décidé.
+    if (e.issue) {
+      const club = e.issue.vainqueur === 'A' ? e.clubA : e.clubB;
+      const score = `${e.scoreA}-${e.scoreB}`;
+      if (e.issue.critere === 'essais') return { cleTexte: 'ml.departage.essais', club, score, tirs: '' };
+      if (e.issue.critere === 'tirsAuBut') {
+        return { cleTexte: 'ml.departage.tirs', club, score, tirs: `${e.issue.tirs?.[0] ?? 0}-${e.issue.tirs?.[1] ?? 0}` };
+      }
+      return { cleTexte: 'ml.prolongation', club, score, tirs: '' };
+    }
     const cote = manager ? (manager.club === e.clubA ? 'A' : 'B') : monPion?.cote;
     if (!cote) return null;
     const tranche = departager(cle, cote === 'A' ? e.scoreA : e.scoreB, cote === 'A' ? e.scoreB : e.scoreA);
     if (!tranche.prolongation) return null;
     const scoreA = cote === 'A' ? tranche.scorePour : tranche.scoreContre;
     const scoreB = cote === 'A' ? tranche.scoreContre : tranche.scorePour;
-    return { club: scoreA > scoreB ? e.clubA : e.clubB, score: `${scoreA}-${scoreB}` };
+    return { cleTexte: 'ml.prolongation', club: scoreA > scoreB ? e.clubA : e.clubB, score: `${scoreA}-${scoreB}`, tirs: '' };
   })();
 
   // ⚠️ À LA SIRÈNE, LES VRAIES STATS DE TON JOUEUR PARTENT DANS LA SAISON.
@@ -1441,6 +1454,11 @@ export function MatchLive({
     // d'abord ; le résultat, les statistiques et la sanction partent ensuite, une étape par tâche, et la
     // sauvegarde n'est sérialisée qu'UNE fois pour l'ensemble. « Terminer » attend que ce soit fait.
     // Le résultat est VERROUILLÉ ici : ce sont ces valeurs-là qui partent, quoi qu'il arrive à l'état ensuite.
+    // L'issue d'une prolongation jouée est inscrite AVANT que le store n'enregistre le résultat : c'est elle qu'il lit.
+    const vainqueurTirs = e.issue?.tirs ? (e.issue.vainqueur === 'A' ? e.issue.tirs : [e.issue.tirs[1], e.issue.tirs[0]]) as [number, number] : undefined;
+    inscrireIssueJouee(cle, e.issue ? {
+      vainqueur: e.issue.vainqueur === 'A' ? e.clubA : e.clubB, critere: e.issue.critere, ...(vainqueurTirs ? { tirs: vainqueurTirs } : {}),
+    } : null);
     const final = { scoreA: e.scoreA, scoreB: e.scoreB, essaisA: e.essaisA, essaisB: e.essaisB, blessures: blessuresManager.current, minutesJouees: Object.fromEntries(e.pions.map(p => [p.sourceId, p.minutes])) };
     const etapes: (() => void)[] = [() => onTermine?.(final)];
     if (monPion) {
@@ -1825,7 +1843,7 @@ export function MatchLive({
           <div className="ml-colonne">
             {e.fini && stats ? (
               <>
-                {prolongation && <p className="ml-prolongation" role="status"><Icone nom="sifflet" taille={16} /> {t('ml.prolongation', prolongation)}</p>}
+                {prolongation && <p className="ml-prolongation" role="status"><Icone nom="sifflet" taille={16} /> {t(prolongation.cleTexte, prolongation)}</p>}
                 <HommeDuMatch e={e} />
                 <FeuilleMatch e={e} stats={stats} maNote={maNote} />
               </>

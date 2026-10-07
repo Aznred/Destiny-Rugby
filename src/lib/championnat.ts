@@ -22,6 +22,16 @@ export interface MatchChampionnat {
   scoreE: number;
   essaisD: number;
   essaisE: number;
+  /** Match couperet joué jusqu'en prolongation. */
+  prolongation?: boolean;
+  /**
+   * Le vainqueur désigné quand le score est resté à égalité après la prolongation (nombre d'essais, tirs au but) :
+   * `D` le club qui reçoit, `E` le visiteur. Le tableau le lit avant le score.
+   */
+  vainqueurDesigne?: 'D' | 'E';
+  /** Comment l'égalité a été tranchée, et le score de la séance de tirs au but s'il y en a eu une. */
+  departage?: 'essais' | 'tirsAuBut';
+  tirsAuBut?: [number, number];
 }
 
 // Les matchs effectivement coachés remplacent leur résultat théorique dans

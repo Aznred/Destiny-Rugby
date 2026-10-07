@@ -16,6 +16,7 @@ import { championnatEnDirect, graine, resultatJoue, scorePossible, type LigneTab
 import { forceEffectif } from './effectif.js';
 import { semaine } from '../data/calendrier.js';
 import type { Joueur } from '../types.js';
+import { nombreQualifies, rulesFor, zones } from './competitionRules.js';
 
 /**
  * ⚠️ `huitieme` ET `petiteFinale` NE SERVENT QU'À LA COUPE DU MONDE
@@ -38,6 +39,12 @@ export interface MatchFinal {
   perdant: string;
   /** La clé sous laquelle un résultat JOUÉ est relu (tournoi de fin d'année) : c'est elle que l'affiche du week-end doit porter. */
   cle?: string;
+  /** Le score était à égalité à la sirène : il a été tranché après prolongation. */
+  prolongation?: boolean;
+  /** Score de la séance de tirs au but (domicile, extérieur) quand le score est resté à égalité. */
+  tirsAuBut?: [number, number];
+  /** D'où vient le club visiteur quand il a été reversé d'une autre compétition (`qualified_from`). */
+  qualifiedFrom?: Partial<Record<string, import('./competitionRules.js').QualifiedFrom>>;
 }
 
 export interface PhaseFinale {
@@ -47,16 +54,18 @@ export interface PhaseFinale {
   matchs: MatchFinal[];
   champion: string | null;
   finaliste: string | null; // le perdant de la finale — celui qui jouera l'accès
-  dernier: string | null; // relégation directe
-  avantDernier: string | null; // celui qui joue le match d'accès
+  /** Les relégués DIRECTS, le plus mal classé d'abord — leur nombre vient du règlement (`competitionRules.ts`). */
+  relegues: string[];
+  /** Ceux qui jouent un match d'accès pour garder leur place. Vide quand le règlement n'en prévoit pas. */
+  barragistes: string[];
+  dernier: string | null; // le premier relégué direct
+  avantDernier: string | null; // celui qui joue le match d'accès, s'il y en a un
 }
 
 // Combien de clubs disputent la phase finale ? Le format français : 6 dans une
 // poule de 12 et plus, 4 dans une poule de 8 à 11, une finale sèche en dessous.
 export function nbQualifies(taille: number): number {
-  if (taille >= 12) return 6;
-  if (taille >= 8) return 4;
-  return 2;
+  return Math.max(2, nombreQualifies(taille));
 }
 
 // Un match couperet : pas de match nul, et le mieux classé reçoit.
@@ -78,12 +87,23 @@ export function duel(
     : undefined);
   if (reel) {
     let { scoreD, scoreE } = reel;
+    // Égalité tranchée sur le terrain (essais, tirs au but) : le score reste celui du match, le vainqueur est inscrit.
+    if (scoreD === scoreE && reel.vainqueurDesigne) {
+      const recoit = reel.vainqueurDesigne === 'D';
+      return {
+        tour, libelle, domicile, exterieur, scoreD, scoreE, prolongation: true,
+        ...(reel.tirsAuBut ? { tirsAuBut: reel.tirsAuBut } : {}),
+        vainqueur: recoit ? domicile : exterieur,
+        perdant: recoit ? exterieur : domicile,
+      };
+    }
     // Réparation des anciennes égalités enregistrées en match couperet.
-    if (scoreD === scoreE) {
+    const egalite = scoreD === scoreE;
+    if (egalite) {
       if (graine(`departage#${cle}`)() < .5) scoreD += 3; else scoreE += 3;
     }
     return {
-      tour, libelle, domicile, exterieur, scoreD, scoreE,
+      tour, libelle, domicile, exterieur, scoreD, scoreE, ...(egalite || reel.prolongation ? { prolongation: true } : {}),
       vainqueur: scoreD > scoreE ? domicile : exterieur,
       perdant: scoreD > scoreE ? exterieur : domicile,
     };
@@ -103,7 +123,8 @@ export function duel(
   // « 20-4 » en quart de finale de Champions Cup, relevé en jeu.
   let scoreD = scorePossible(18 + ecart * 0.85 + (rng() * 18 - 9));
   let scoreE = scorePossible(18 - ecart * 0.85 + (rng() * 18 - 9));
-  if (scoreD === scoreE) {
+  const prolongation = scoreD === scoreE;
+  if (prolongation) {
     // ⚠️ DÉPARTAGER APRÈS L'ARRONDI, PAS AVANT : rabattre 4 sur 3 peut CRÉER
     // une égalité (4-3 devient 3-3). Trancher en amont laisserait donc des
     // matchs nuls dans un tableau à élimination directe, où quelqu’un doit
@@ -113,7 +134,7 @@ export function duel(
   }
   const vainqueur = scoreD > scoreE ? domicile : exterieur;
   const perdant = scoreD > scoreE ? exterieur : domicile;
-  return { tour, libelle, domicile, exterieur, scoreD, scoreE, vainqueur, perdant };
+  return { tour, libelle, domicile, exterieur, scoreD, scoreE, vainqueur, perdant, ...(prolongation ? { prolongation } : {}) };
 }
 
 // Toute la fin de saison d'une division : classement, bracket, champion.
@@ -131,7 +152,7 @@ export function phaseFinale(
   const taille = classement.length;
   const vide: PhaseFinale = {
     divisionId, classement, qualifies: [], matchs: [],
-    champion: null, finaliste: null, dernier: null, avantDernier: null,
+    champion: null, finaliste: null, relegues: [], barragistes: [], dernier: null, avantDernier: null,
   };
   if (taille < 2) return vide;
 
@@ -180,6 +201,12 @@ export function phaseFinale(
   const finale = duel(fa, fb, saison, cle('finale', fa, fb), 'finale', `FINALE : ${fa} - ${fb}`, 0);
   matchs.push(finale);
 
+  // ⚠️ LE BAS DE TABLEAU SUIT LE RÈGLEMENT DE LA DIVISION, pas une règle commune : en Fédérale les deux derniers
+  // descendent sans jouer ; en Top 14 le dernier descend et l'avant-dernier défend sa place.
+  const z = zones(rulesFor(divisionId), taille);
+  const relegues = classement.slice(taille - z.directRelegation).map((l) => l.club).reverse();
+  const barragistes = z.accessMatch.map((position) => classement[position - 1].club).reverse();
+
   return {
     divisionId,
     classement,
@@ -187,9 +214,20 @@ export function phaseFinale(
     matchs,
     champion: finale.vainqueur,
     finaliste: finale.perdant,
-    dernier: classement[taille - 1]?.club ?? null,
-    avantDernier: taille >= 2 ? classement[taille - 2].club : null,
+    relegues,
+    barragistes,
+    dernier: relegues[0] ?? null,
+    avantDernier: barragistes[0] ?? null,
   };
+}
+
+/**
+ * Les prétendants à la montée d'une division, dans l'ordre : le champion, le finaliste, puis le classement.
+ * Autant montent directement que la division du dessus en relègue ; le suivant joue le match d'accès s'il existe.
+ */
+export function pretendants(phase: PhaseFinale): string[] {
+  return [phase.champion, phase.finaliste, ...phase.classement.map((l) => l.club)]
+    .filter((c, i, liste): c is string => !!c && liste.indexOf(c) === i);
 }
 
 /** L'affiche de phase finale du joueur, uniquement le week-end du tour concerné. */
@@ -210,8 +248,9 @@ export function matchAcces(
   bas: PhaseFinale,
   saison: number,
 ): MatchFinal | null {
-  const tenant = haut.avantDernier;
-  const pretendant = bas.finaliste;
+  // Le tenant est le barragiste du haut ; le prétendant, le premier club du bas qui ne monte pas d'office.
+  const tenant = haut.barragistes[0] ?? null;
+  const pretendant = pretendants(bas)[Math.max(1, haut.relegues.length)] ?? null;
   if (!tenant || !pretendant || tenant === pretendant) return null;
   return duel(
     tenant, pretendant, saison,

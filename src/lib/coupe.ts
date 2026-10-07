@@ -52,12 +52,15 @@ import {
   type LigneTableau, type MatchChampionnat,
 } from './championnat.js';
 import { duel, type MatchFinal } from './phaseFinale.js';
+import { poolStatuses, rulesFor, type QualifiedFrom, type StandingsStatus } from './competitionRules.js';
 
 export interface PouleCoupe {
   nom: string;
   clubs: string[];
   journees: MatchChampionnat[][];
   classement: LigneTableau[];
+  /** Le statut de chaque place (qualifié, reversé en Challenge Cup, éliminé), calculé par le règlement. */
+  statuts: StandingsStatus[];
 }
 
 export interface EtatCoupe {
@@ -86,6 +89,13 @@ export interface EtatCoupe {
   engage: boolean; // le club du joueur dispute cette coupe
   /** Les clubs reversés depuis la Champions Cup (Challenge Cup uniquement). */
   reverses: string[];
+  /**
+   * D'où vient chaque club du tableau (`qualified_from`). Un `CHAMPIONS_CUP_5TH` est moins bien classé que tous les
+   * qualifiés de poule : il joue son huitième à l'extérieur — le terrain n'est jamais tiré au sort.
+   */
+  qualifiedFrom: Record<string, QualifiedFrom>;
+  /** Les cinquièmes de poule que cette coupe reverse ailleurs, et où (Champions Cup, une fois les poules finies). */
+  transferes: { clubs: string[]; vers: string } | null;
 }
 
 /**
@@ -414,6 +424,9 @@ function phaseDePoules(
 ): Qualifies | null {
   const engages = engagesEuropeens(saison)[coupeId] ?? [];
   if (engages.length < 6) return null;
+  // ⚠️ QUI CONTINUE, QUI EST REVERSÉ, QUI SORT : c'est le règlement de la coupe qui le dit (`poolQualification`).
+  const regles = rulesFor(coupeId);
+  const qualification = regles.poolQualification ?? { qualified: [1, 2, 3, 4] };
 
   const groupes = repartir(engages, saison, `${coupeId}#${saison}`);
   const grilles = groupes.map((g, p) => journeesDePoule(g, `${coupeId}#${saison}#${p}`));
@@ -433,6 +446,7 @@ function phaseDePoules(
       clubs,
       journees,
       classement: classer(clubs, journees),
+      statuts: poolStatuses(regles, clubs.length),
     };
   });
 
@@ -443,17 +457,21 @@ function phaseDePoules(
   // les points (puis la différence) qui départagent. C'est ce classement-là qui
   // donne l'avantage du terrain en huitièmes.
   const parRang: { club: string; rang: number; pts: number; diff: number }[] = [];
-  const reverses: string[] = [];
+  const aReverser: typeof parRang = [];
   poules.forEach((poule) => {
     poule.classement.forEach((l, i) => {
-      if (i < 4) parRang.push({ club: l.club, rang: i, pts: l.points, diff: l.pour - l.contre });
-      else if (i === 4) reverses.push(l.club);
+      const ligne = { club: l.club, rang: i, pts: l.points, diff: l.pour - l.contre };
+      if (qualification.qualified.includes(i + 1)) parRang.push(ligne);
+      else if (qualification.transferred?.positions.includes(i + 1)) aReverser.push(ligne);
     });
   });
-  parRang.sort((a, b) => a.rang - b.rang || b.pts - a.pts || b.diff - a.diff);
+  const ordre = (a: typeof parRang[number], b: typeof parRang[number]) => a.rang - b.rang || b.pts - a.pts || b.diff - a.diff;
+  parRang.sort(ordre);
+  // Les reversés sont classés entre eux : le meilleur cinquième affronte le moins bon des quatre premiers du tableau.
+  aReverser.sort(ordre);
 
   void clubJoueur;
-  return { seize: parRang.map((e) => e.club), reverses, poules, total };
+  return { seize: parRang.map((e) => e.club), reverses: aReverser.map((e) => e.club), poules, total };
 }
 
 export function coupeEnDirect(
@@ -473,13 +491,21 @@ export function coupeEnDirect(
   // c'est déterministe et sans état, il n'y a rien à mémoriser.
   let seize = phase.seize;
   let reverses: string[] = [];
-  if (coupeId === 'challengeCup' && seize.length) {
-    const grande = phaseDePoules('championsCup', saison, total, clubJoueur);
+  const qualifiedFrom: Record<string, QualifiedFrom> = Object.fromEntries(seize.map((club) => [club, 'POOL' as const]));
+  // Quelle coupe reverse ses cinquièmes ICI ? Le règlement le dit (`transferred.to`) — pas un nom en dur.
+  const source = COUPES_EUROPE.find((c) => rulesFor(c.id).poolQualification?.transferred?.to === coupeId);
+  if (source && seize.length) {
+    const grande = phaseDePoules(source.id, saison, total, clubJoueur);
     reverses = grande?.reverses ?? [];
-    // Les 12 qualifiés d'office devant, les repêchés derrière : un reversé n'a
-    // pas l'avantage du terrain sur un premier de poule.
+    const origine = rulesFor(source.id).poolQualification!.transferred!.origin;
+    for (const club of reverses) qualifiedFrom[club] = origine;
+    // ⚠️ LES QUALIFIÉS D'OFFICE DEVANT, LES REVERSÉS DERRIÈRE : un cinquième de Champions Cup est tête de série
+    // 13 à 16 et se déplace chez l'un des quatre meilleurs premiers. Le tableau apparie 1-16, 2-15… et le mieux
+    // classé reçoit : l'avantage du terrain découle de l'origine, il n'est jamais tiré.
     seize = [...seize, ...reverses];
   }
+  const transfert = rulesFor(coupeId).poolQualification?.transferred;
+  const transferes = transfert && phase.reverses.length ? { clubs: phase.reverses, vers: transfert.to } : null;
 
   const bracket: MatchFinal[] = [];
   let vainqueur: string | null = null;
@@ -509,7 +535,8 @@ export function coupeEnDirect(
           // Terrain neutre pour la finale, avantage au mieux classé sinon.
           finale ? 0 : undefined,
         );
-        tous.push(m);
+        const origines = Object.fromEntries([d, e].filter((c) => qualifiedFrom[c] && qualifiedFrom[c] !== 'POOL').map((c) => [c, qualifiedFrom[c]]));
+        tous.push(Object.keys(origines).length ? { ...m, qualifiedFrom: origines } : m);
         suivants.push(m.vainqueur);
       }
       tour = suivants;
@@ -543,5 +570,25 @@ export function coupeEnDirect(
     vainqueur,
     engage: (engagesEuropeens(saison)[coupeId] ?? []).some((e) => e.club === clubJoueur),
     reverses,
+    qualifiedFrom,
+    transferes,
   };
+}
+
+/**
+ * Les coupes que ce club DISPUTE à cette date de coupe, reversement compris.
+ *
+ * ⚠️ UN CINQUIÈME DE CHAMPIONS CUP N'EST PAS ÉLIMINÉ (Correctif 29) : une fois les poules finies, il poursuit en
+ * Challenge Cup. `coupesDuClub` ne connaît que les engagés du début de saison ; le calendrier, le tableau et les
+ * deux carrières lisent cette fonction pour ne pas l'oublier.
+ */
+export function coupesDuClubALaDate(club: string, saison: number, datesJouees: number): string[] {
+  const coupes = coupesDuClub(club, saison);
+  for (const id of [...coupes]) {
+    const transfert = rulesFor(id).poolQualification?.transferred;
+    if (!transfert || coupes.includes(transfert.to)) continue;
+    const etat = coupeEnDirect(id, saison, club, datesJouees);
+    if (etat?.transferes?.clubs.includes(club)) coupes.push(transfert.to);
+  }
+  return coupes;
 }

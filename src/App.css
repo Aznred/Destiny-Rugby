@@ -9170,3 +9170,34 @@ select:focus {
   background: color-mix(in srgb, var(--or-500) 12%, transparent);
   font-size: 0.88rem; line-height: 1.35;
 }
+
+/* ═══ ZONES DU CLASSEMENT (Correctif 29) ═══════════════════════════════════════
+   Une couleur par statut calculé par le règlement (lib/competitionRules.ts) — jamais par position. Le tableau complet
+   (TableauClassement), le classement latéral, le tableau final et l'écran de fin de poule lisent les mêmes variables. */
+:root {
+  --zone-QUALIFIED: #3fbf7f;
+  --zone-PROMOTION: #2fd3b0;
+  --zone-PLAYOFF: #5aa7f2;
+  --zone-CHALLENGE_CUP: #b08cf0;
+  --zone-ACCESS_MATCH: #f2a23a;
+  --zone-DIRECT_RELEGATION: #ec5a52;
+  --zone-ELIMINATED: #8f9a94;
+}
+[data-statut='QUALIFIED'] { --zone: var(--zone-QUALIFIED); }
+[data-statut='PROMOTION'] { --zone: var(--zone-PROMOTION); }
+[data-statut='PLAYOFF'] { --zone: var(--zone-PLAYOFF); }
+[data-statut='CHALLENGE_CUP'] { --zone: var(--zone-CHALLENGE_CUP); }
+[data-statut='ACCESS_MATCH'] { --zone: var(--zone-ACCESS_MATCH); }
+[data-statut='DIRECT_RELEGATION'] { --zone: var(--zone-DIRECT_RELEGATION); }
+[data-statut='ELIMINATED'] { --zone: var(--zone-ELIMINATED); }
+.cl-lat-ligne[data-statut] { box-shadow: inset 3px 0 0 var(--zone); }
+.cl-lat-ligne[data-statut] .cl-lat-pos { color: var(--zone); }
+.cl-lat-ligne[data-statut][data-moi] { box-shadow: inset 3px 0 0 var(--zone), inset 5px 0 0 var(--or-500); }
+.arbre-note { display: flex; flex-wrap: wrap; gap: 0.3rem; padding: 0.25rem 0.5rem 0.35rem; font-size: 0.66rem; color: var(--brume); border-top: 1px dashed var(--bordure); }
+.arbre-note .reverse { color: var(--zone-CHALLENGE_CUP); font-weight: 600; }
+.pastille-zone {
+  display: inline-block; font-size: 0.6rem; font-weight: 800; line-height: 1; padding: 0.16rem 0.25rem;
+  border-radius: 4px; color: #0b1410; background: var(--zone); vertical-align: middle;
+}
+.fin-de-poule { border-left: 4px solid var(--zone, var(--bordure-forte)); display: grid; gap: 0.45rem; }
+.fin-de-poule p { margin: 0; overflow-wrap: anywhere; }

@@ -22,7 +22,9 @@ import {
 } from '../lib/championnat';
 import { phaseFinale, type MatchFinal } from '../lib/phaseFinale';
 import { tournoiDeFinDAnnee } from '../lib/tournoi';
-import { coupeEnDirect, coupesDuClub } from '../lib/coupe';
+import { coupeEnDirect, coupesDuClubALaDate } from '../lib/coupe';
+import { rulesFor, standingsStatuses, type StandingsStatus } from '../lib/competitionRules';
+import { TableauClassement } from '../components/TableauClassement';
 import {
   internationalEnDirect, affichesInternationales, competitionsDeLaSaison,
   fenetreInternationale, journeesInternationalesA, classementMondial,
@@ -102,16 +104,16 @@ const ORDRE_TOUR_FINAL: Record<string, number> = {
 function Arbre({ matchs, club }: { matchs: MatchFinal[]; club: string }) {
   const tours = ORDRE_TOURS
     .map((tour) => ({ tour, matchs: matchs.filter((m) => m.tour === tour) }))
-    .filter((t) => t.matchs.length);
+    .filter((g) => g.matchs.length);
   if (!tours.length) return null;
 
   return (
     <div className="arbre">
-      {tours.map((t) => (
-        <div key={t.tour} className="arbre-tour">
-          <div className="arbre-titre">{titreTour(t.tour)}</div>
+      {tours.map((g) => (
+        <div key={g.tour} className="arbre-tour">
+          <div className="arbre-titre">{titreTour(g.tour)}</div>
           <div className="arbre-matchs">
-            {t.matchs.map((m) => (
+            {g.matchs.map((m) => (
               <div
                 key={m.libelle}
                 className={`arbre-match${m.tour === 'finale' ? ' finale' : ''}`}
@@ -125,6 +127,13 @@ function Arbre({ matchs, club }: { matchs: MatchFinal[]; club: string }) {
                   <span>{m.exterieur}</span>
                   <b>{m.scoreE}</b>
                 </div>
+                {/* Un vainqueur est obligatoire : on dit comment il a été désigné, et d'où vient un club reversé. */}
+                {(m.prolongation || m.qualifiedFrom) && (
+                  <div className="arbre-note">
+                    {m.prolongation && <span>{m.tirsAuBut ? t('tb.tab', { tirs: `${m.tirsAuBut[0]}-${m.tirsAuBut[1]}` }) : t('tb.ap')}</span>}
+                    {m.qualifiedFrom?.[m.exterieur] === 'CHAMPIONS_CUP_5TH' && <span className="reverse">{t('tb.reverseDe')}</span>}
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -290,42 +299,26 @@ function ClassementsJoueurs({
   );
 }
 
-function Tableau1({ lignes, club, tete = 6 }: { lignes: LigneTableau[]; club: string; tete?: number }) {
+/**
+ * ⚠️ LES ZONES VIENNENT DU RÈGLEMENT (`statuts`, `lib/competitionRules.ts`), pas d'un nombre de places écrit ici.
+ * `tete` ne sert plus qu'aux tableaux sans règlement (poules de Coupe du monde) : les premiers y sont qualifiés.
+ */
+function Tableau1({ lignes, club, tete = 0, statuts, nations = false }: {
+  lignes: LigneTableau[]; club: string; tete?: number; statuts?: StandingsStatus[]; nations?: boolean;
+}) {
   return (
-    <div className="classement-tableau tableau-live">
-      <div className="classement-entete">
-        <span />
-        <span />
-        <span className="cl-nom">{t('tb.club')}</span>
-        <span title={t('tb.points')}>{t('ui.pointsCourts')}</span>
-        <span title={t('tb.joues')}>J</span>
-        <span title={t('tb.gagnes')}>G</span>
-        <span title={t('tb.nuls')}>N</span>
-        <span title={t('tb.perdus')}>P</span>
-        <span title={t('tb.difference')}>{t('ui.differenceCourte')}</span>
-        <span title={t('tb.bonus')}>B</span>
-      </div>
-      {lignes.map((l) => {
-        const data = clubParNom(l.club);
-        const moi = l.club === club;
-        return (
-          <div key={l.club} className="classement-ligne" data-moi={moi ? 'oui' : undefined}>
-            <span className="cl-pos" data-tete={l.position <= tete ? 'oui' : undefined}>{l.position}</span>
-            {data ? <Blason club={data} taille={22} /> : <span />}
-            <span className="cl-nom">{l.club}{moi && <MoiPastille />}</span>
-            <span className="cl-pts">{l.points}</span>
-            <span>{l.joues}</span>
-            <span>{l.gagnes}</span>
-            <span>{l.nuls}</span>
-            <span>{l.perdus}</span>
-            <span className={l.difference >= 0 ? 'cl-plus' : 'cl-moins'}>
-              {l.difference > 0 ? `+${l.difference}` : l.difference}
-            </span>
-            <span>{l.bonus}</span>
-          </div>
-        );
-      })}
-    </div>
+    <TableauClassement lignes={lignes.map((l, i) => {
+      const data = nations ? undefined : clubParNom(l.club);
+      const moi = l.club === club;
+      return {
+        cle: l.club, position: l.position, nom: nations ? nomNationTraduit(l.club) : l.club,
+        ecusson: nations ? <LogoEquipe nom={l.club} taille={22} /> : data ? <Blason club={data} taille={22} /> : undefined,
+        joues: l.joues, gagnes: l.gagnes, nuls: l.nuls, perdus: l.perdus,
+        pour: l.pour, contre: l.contre, difference: l.difference, bonus: l.bonus, points: l.points,
+        statut: statuts?.[i] ?? (l.position <= tete ? 'QUALIFIED' : 'SAFE'),
+        moi, pastille: moi ? <MoiPastille /> : undefined,
+      };
+    })} />
   );
 }
 
@@ -351,7 +344,11 @@ export function Tableau() {
   const numero = carriere?.semaine ?? 1;
   const semActuelle = semaine(numero);
   const maDivision = carriere?.division ?? '';
-  const mesCoupes = useMemo(() => (carriere?.club ? coupesDuClub(carriere.club, carriere.saison) : []), [carriere]);
+  // ⚠️ REVERSEMENT COMPRIS : un cinquième de Champions Cup voit la Challenge Cup arriver dans SES compétitions.
+  const mesCoupes = useMemo(
+    () => (carriere?.club ? coupesDuClubALaDate(carriere.club, carriere.saison, passees(numero, 'coupe')) : []),
+    [carriere, numero],
+  );
 
   // ⚠️ LES SÉLECTIONS SONT DES COMPÉTITIONS COMME LES AUTRES. Pendant une
   // fenêtre internationale, on n'y voyait ni affiche ni classement : le Tournoi
@@ -786,6 +783,34 @@ export function Tableau() {
             {coupe.vainqueur && <> <Icone nom="trophee" taille={13} /> {t('tb.vainqueur', { club: coupe.vainqueur })}</>}
           </p>
 
+          {/* ═══ FIN DE LA PHASE DE POULES : qui continue, qui est reversé, qui sort — dit en toutes lettres ═══ */}
+          {coupe.journeesJouees >= coupe.totalJournees && (() => {
+            const maPouleCoupe = coupe.poules.find((p) => p.clubs.includes(carriere.club));
+            const rang = maPouleCoupe ? maPouleCoupe.classement.findIndex((l) => l.club === carriere.club) : -1;
+            const statut = rang >= 0 ? maPouleCoupe!.statuts[rang] : null;
+            const recu = coupe.qualifiedFrom[carriere.club] === 'CHAMPIONS_CUP_5TH';
+            if (!statut && !recu && !coupe.transferes && !coupe.reverses.length) return null;
+            return (
+              <div className="carte bloc-competition fin-de-poule" data-statut={recu ? 'CHALLENGE_CUP' : statut ?? undefined}>
+                <div className="comp-tete"><b><Icone nom="sifflet" taille={16} /> {t('tb.finDePoule')}</b></div>
+                {statut === 'QUALIFIED' && <p><b>{t('tb.finDePouleQualifie', { club: carriere.club, rang: rang + 1 })}</b></p>}
+                {statut === 'CHALLENGE_CUP' && <p><b>{t('tb.reverseVers', { club: carriere.club })}</b></p>}
+                {statut === 'ELIMINATED' && <p><b>{t('tb.finDePouleElimine', { club: carriere.club, rang: rang + 1 })}</b></p>}
+                {recu && <p><b>{t('tb.reverseVers', { club: carriere.club })}</b></p>}
+                {coupe.transferes && (
+                  <p className="intro-comp" style={{ margin: 0 }}>
+                    <span className="pastille-zone" data-statut="CHALLENGE_CUP">CC</span> {t('zone.challenge')} : {coupe.transferes.clubs.join(' · ')}
+                  </p>
+                )}
+                {coupe.reverses.length > 0 && (
+                  <p className="intro-comp" style={{ margin: 0 }}>
+                    <span className="pastille-zone" data-statut="CHALLENGE_CUP">CC</span> {t('tb.reverseDe')} : {coupe.reverses.join(' · ')}
+                  </p>
+                )}
+              </div>
+            );
+          })()}
+
           {matchsCoupeVisibles.length > 0 && (
             <div className="carte bloc-competition">
               <div className="comp-tete">
@@ -803,7 +828,7 @@ export function Tableau() {
                   <b>{p.nom}</b>
                   <span className="comp-count">{p.clubs.length} {t('gen.clubs')}</span>
                 </div>
-                <Tableau1 lignes={p.classement} club={carriere.club} tete={2} />
+                <Tableau1 lignes={p.classement} club={carriere.club} statuts={p.statuts} />
                 {p.journees.length > 0 && (
                   <div className="grille-resultats">
                     {p.journees[p.journees.length - 1].map((m) => (
@@ -857,7 +882,7 @@ export function Tableau() {
                       <b>{p.nom}</b>
                       <span className="comp-count">{t('intl.deuxQualifies')}</span>
                     </div>
-                    <Tableau1 lignes={p.classement} club={maNation} tete={2} />
+                    <Tableau1 lignes={p.classement} club={maNation} tete={2} nations />
                   </div>
                 ))}
               </div>
@@ -955,7 +980,8 @@ export function Tableau() {
               <b>{poules.length > 1 ? t('tb.classementPoule', { n: poule + 1 }) : t('tb.classement')}</b>
               <span className="comp-count">{etat.poule.length} {t('gen.clubs')}</span>
             </div>
-            <Tableau1 lignes={etat.classement} club={carriere.club} />
+            <Tableau1 lignes={etat.classement} club={carriere.club}
+              statuts={standingsStatuses(rulesFor(choix), etat.classement.length, poules.length)} />
           </div>
 
           {/* ---------- TOURNOI DE FIN D'ANNÉE ---------- */}

@@ -358,7 +358,7 @@ export interface TerrainDirect {
   ventTV?: VentTV;
   /** Les équipes ont changé de côté (seconde période) : le terrain s'affiche retourné. */
   cotesInverses?: boolean;
-  periode?: 1 | 2;
+  periode?: number;
   simulation?: number;
   gestes?: import('../moteur/dynamique.js').GesteMatch[];
   arbitre?: { x: number; y: number; vx: number; vy: number; regard: number };

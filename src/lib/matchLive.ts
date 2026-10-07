@@ -131,7 +131,7 @@ export function nomPoste(c: Coequipier): string {
 
 import { phaseFinale, type MatchFinal } from './phaseFinale.js';
 import { tournoiDeFinDAnnee } from './tournoi.js';
-import { coupeEnDirect, coupesDuClub, matchDuTourCourant } from './coupe.js';
+import { coupeEnDirect, coupesDuClubALaDate, matchDuTourCourant } from './coupe.js';
 import { semaine as semaineDuCalendrier, CALENDRIER } from '../data/calendrier.js';
 import { divisionAuDessus, divisionEnDessous, nomDivision, resoudrePyramide } from './promotion.js';
 
@@ -269,9 +269,8 @@ export function afficheDuClub(c: CarriereDeClub, bonus = 0): AfficheComplete | n
   if (sem.type === 'coupe') {
     const datesJouees = CALENDRIER
       .slice(0, Math.max(0, c.semaine)).filter((s) => s.type === 'coupe').length;
-    const coupes = coupesDuClub(c.club, c.saison);
-    // Un cinquième de Champions Cup poursuit sa saison en Challenge Cup.
-    if (datesJouees > 4 && coupes.includes('championsCup')) coupes.push('challengeCup');
+    // Un cinquième de Champions Cup poursuit sa saison en Challenge Cup : le règlement le reverse (`coupesDuClubALaDate`).
+    const coupes = coupesDuClubALaDate(c.club, c.saison, datesJouees);
     for (const coupeId of coupes) {
       const etat = coupeEnDirect(coupeId, c.saison, c.club, datesJouees);
       if (etat && datesJouees <= etat.totalJournees) {

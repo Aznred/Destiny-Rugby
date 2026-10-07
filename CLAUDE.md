@@ -1675,6 +1675,66 @@ Toute retouche du lecteur se fait dans `../analyse-rn26/apercu/match/` (par un `
 (les objectifs sont crédités une commande plus tard), `verify:triche` (une coupe aux récompenses démesurées est acceptée), onze contrôles de
 `verify:carriere` (dotation, packs, durée de rejoue).
 
+### Règlements de compétition, prolongations, transformation après la sirène, classement mobile (Correctif 29)
+
+**Le règlement central** (`lib/competitionRules.ts`)
+
+- ⚠️ **UNE ENTRÉE PAR COMPÉTITION, ET PLUS AUCUNE RÈGLE « DU BAS DE TABLEAU ».** `rulesFor(id)` rend le `CompetitionRules`
+  d'une division ou d'une coupe : `standings` (`qualified`, `playoffs`, `promotion`, `directRelegation`,
+  `accessMatchPositions` — comptées DEPUIS LE BAS, pour qu'une division à 12 ou 14 clubs se règle pareil),
+  `poolQualification` (coupes : rangs qualifiés, rangs reversés et vers où), `knockout` (`allowDraw`, `extraTime`,
+  `drawResolution`). Le module est une FEUILLE (aucun import du jeu) : le serveur le lit aussi.
+- **Le même règlement partout** : `zones()` désigne les relégués (`phaseFinale`, `tournoi`), les montées
+  (`promotion.ts`), les statuts du classement (`standingsStatuses`, `poolStatuses`), les divisions publiques
+  (`serveur/divisionsPubliques.ts`, `onlineRules`). Ce qui est rouge à l'écran est ce qui descend.
+- **Fédérale 1, 2, 3** : `directRelegation: 2, accessMatchPositions: []` — les deux derniers de chaque poule descendent
+  sans jouer, autant de clubs montent de l'étage du dessous (champion, finaliste, puis classement : `pretendants`).
+  Top 14, Pro D2, Nationale, Nationale 2, Régionale 1-2 gardent « le dernier descend, l'avant-dernier joue l'accès ».
+  `PhaseFinale.relegues` / `barragistes` remplacent la lecture de `dernier` / `avantDernier` (gardés pour l'affichage).
+- **Champions Cup** : `poolQualification { qualified: [1,2,3,4], transferred: { positions: [5], to: 'challengeCup',
+  origin: 'CHAMPIONS_CUP_5TH' } }`. `EtatCoupe.qualifiedFrom` garde l'origine, `MatchFinal.qualifiedFrom` la porte dans
+  le tableau ; les reversés sont têtes de série 13 à 16, donc à l'extérieur (jamais de tirage). `coupesDuClubALaDate`
+  ajoute la Challenge Cup aux compétitions d'un cinquième (calendrier, écran Résultats, classement latéral, trophée de
+  fin de saison). ⚠️ Le moteur reversait déjà le cinquième ; ce qui manquait, c'est l'affichage (« tête » à 2 places,
+  aucun statut, la Challenge Cup absente de « mes compétitions ») et le trophée.
+
+**Transformation après la sirène** (`moteur.ts`)
+
+- ⚠️ **CAUSE** : le garde-fou « six minutes d'horloge après la sirène » appelait `clorePeriode` quelle que soit la
+  phase. En match de dix minutes l'horloge court huit fois plus vite que l'écran : une longue séquence dans le rouge
+  dépassait ce délai, et l'essai qui la concluait était suivi du coup de sifflet AVANT la transformation.
+- `EtatMatch.transformationDue` (levé par `validerEssai`, baissé quand le tir est résolu) : `clorePeriode` refuse de
+  siffler tant qu'il est levé pendant `aplatissage`, `tmo`, `transformation`, `tirAuBut` ou `penalite`
+  (`coupDePiedDu`). Le garde-fou n'agit plus pendant ces phases (filet absolu : dix-huit minutes).
+- ⚠️ Change la rejoue d'un match de ligue EN COURS uniquement s'il tombait sur ce cas : déployer hors match.
+
+**Prolongations** (`lib/couperet.ts`, `moteur.ts`, `MatchLive`)
+
+- `departageDuMatch(cle)` lit le règlement (`matchRules`) et le passe à `creerMatch` (`OptionsMatch.departage`). À
+  égalité à la fin de la période 2, `clorePeriode` ouvre la période 3 puis 4 (2 × 10 minutes) sur LE MÊME état :
+  fatigue, cartons, remplacements conservés ; `cotesInverses` alterne ; le chrono continue (80:00 → 100:00, libellé
+  « Prolongation » dans `HabillageTV`). Si l'égalité persiste, `trancher` applique la procédure de la compétition
+  (`essais`, puis `tirsAuBut`) et pose `e.issue` — le score ne bouge pas.
+- L'écran inscrit l'issue (`inscrireIssueJouee`) avant l'enregistrement ; `departager` la rend au store. Un score
+  resté à égalité est sauvegardé avec `vainqueurDesigne` (`MatchChampionnat`) / `vainqueur` (`ResultatMatchManager`),
+  que `duel` lit AVANT le score : le vainqueur survit à un rechargement.
+- **Non joué = départage abstrait** : un résultat automatique (avance déléguée, tableau simulé) garde ses trois points
+  tirés de la clé ; `MatchFinal.prolongation` l'annonce (« a.p. ») dans l'arbre.
+- **Pas fait** : la ligue en ligne garde sa prolongation CALCULÉE après coup (`resoudreEgaliteElimination`, jamais de
+  nul) — la jouer dans le direct demande une nouvelle version de règles et un horaire de match variable ; les matchs à
+  élimination de la Coupe du monde (carrière joueur en sélection) gardent leur départage à trois points.
+
+**Classement** (`components/TableauClassement.tsx`, `lib/nomCourt.ts`)
+
+- Un seul tableau pour l'écran Résultats (joueur et entraîneur) et la ligue en ligne. Sous 600 px DE TABLEAU
+  (`ResizeObserver`, pas la largeur d'écran) : `# · équipe · MJ · diff · pts`, nom sur deux lignes (`nomCourt` puis
+  troncature), toucher une ligne déplie V/N/D, bonus, points pour et contre. Aucun défilement horizontal.
+- ⚠️ **L'ÉCRAN NE DÉCIDE JAMAIS D'UNE COULEUR PAR UNE POSITION** : chaque ligne reçoit son `StandingsStatus`. Couleurs
+  `--zone-*` à la fin de `App.css` (rouge relégation, orange accès, vert qualification, bleu barrages, violet
+  Challenge Cup), doublées d'un symbole (`PRESENTATION_STATUT`) et d'une légende. `ClassementLateral` lit les mêmes.
+- Aperçu sans sauvegarde : `/scripts/apercuClassement.html`. Banc : `npm run verify:reglements` (~6 min : 40 matchs
+  détaillés pour la sirène, 36 prolongations).
+
 ## ⚠️ Équilibrage : ce qui ne se retouche pas sans mesurer
 
 ### Difficulté

@@ -18,10 +18,11 @@ import { useMemo } from 'react';
 import { LogoCompet } from './LogoCompet';
 import { useGame, bonusClubDuJoueur } from '../store/useGame';
 import {
-  championnatEnDirect, estAmateur, journeesALaSemaine, nombreJournees,
+  championnatEnDirect, estAmateur, journeesALaSemaine, nombreJournees, poulesDe,
 } from '../lib/championnat';
 import { phaseFinale } from '../lib/phaseFinale';
-import { coupeEnDirect, coupesDuClub } from '../lib/coupe';
+import { coupeEnDirect, coupesDuClubALaDate } from '../lib/coupe';
+import { PRESENTATION_STATUT, rulesFor, standingsStatuses, type StandingsStatus } from '../lib/competitionRules';
 import {
   internationalEnDirect, journeesInternationalesA,
 } from '../lib/international';
@@ -47,6 +48,8 @@ interface Vue {
   emoji?: string;
   sousTitre: string;  // « J7/26 », « Poule B », « 6 Nations »
   classement: LigneTableau[];
+  /** Le statut de chaque place, calculé par le règlement de la compétition (zones de couleur). */
+  statuts?: StandingsStatus[];
   /** true = des équipes nationales, pas des clubs (pas de blason de club). */
   nations: boolean;
   moi: string;        // la ligne à surligner
@@ -99,10 +102,11 @@ export function ClassementLateral({ joueur }: { joueur: Joueur }) {
 
     // ---- SEMAINE DE COUPE D'EUROPE : la poule de MON club ----
     if (!amateur && sem.type === 'coupe') {
-      const mienne = coupesDuClub(joueur.club, joueur.saison)[0];
+      // La dernière de la liste : un cinquième de Champions Cup reversé suit désormais la Challenge Cup.
+      const mienne = coupesDuClubALaDate(joueur.club, joueur.saison, passees(numero, 'coupe')).at(-1);
       if (mienne) {
         const etat = coupeEnDirect(mienne, joueur.saison, joueur.club, passees(numero, 'coupe'));
-        const poule = etat?.poules.find((p) => p.clubs.includes(joueur.club));
+        const poule = etat?.poules.find((p) => p.clubs.includes(joueur.club)) ?? (etat?.qualifiedFrom[joueur.club] ? etat.poules[0] : undefined);
         if (etat && poule) {
           const derniere = poule.journees[poule.journees.length - 1] ?? [];
           const notre = derniere.find((m) => m.domicile === joueur.club || m.exterieur === joueur.club);
@@ -112,6 +116,7 @@ export function ClassementLateral({ joueur }: { joueur: Joueur }) {
             emoji: etat.emoji,
             sousTitre: `${poule.nom} · J${etat.journeesJouees}/${etat.totalJournees}`,
             classement: poule.classement,
+            statuts: poule.statuts,
             nations: false,
             moi: joueur.club,
             pied: notre ?? null,
@@ -140,6 +145,7 @@ export function ClassementLateral({ joueur }: { joueur: Joueur }) {
       emoji: competition?.emoji,
       sousTitre: `J${Math.min(jouees, total)}/${total}`,
       classement: champ.classement,
+      statuts: standingsStatuses(rulesFor(division), champ.classement.length, poulesDe(division).length),
       nations: false,
       moi: joueur.club,
       pied: notre ?? null,
@@ -182,12 +188,16 @@ export function ClassementLateral({ joueur }: { joueur: Joueur }) {
       </div>
 
       <div className="cl-lat-grille">
-        {vue.classement.map((l) => {
+        {vue.classement.map((l, i) => {
           const club = vue.nations ? undefined : clubParNom(l.club);
           const moi = l.club === vue.moi;
+          // La zone vient du règlement (rouge : relégation directe, orange : match d'accès…), jamais d'une position.
+          const statut = vue.statuts?.[i];
+          const zone = statut && statut !== 'SAFE' ? statut : undefined;
           return (
-            <div key={l.club} className="cl-lat-ligne" data-moi={moi ? 'oui' : undefined}>
-              <span className="cl-lat-pos" data-tete={l.position <= 6 ? 'oui' : undefined}>
+            <div key={l.club} className="cl-lat-ligne" data-moi={moi ? 'oui' : undefined} data-statut={zone}
+              title={zone ? t(PRESENTATION_STATUT[zone].cle) : undefined}>
+              <span className="cl-lat-pos" data-tete={statut === 'QUALIFIED' || statut === 'PLAYOFF' ? 'oui' : undefined}>
                 {l.position}
               </span>
               {/* ⚠️ Les sélections n'ont pas de fiche club : leur écusson vient

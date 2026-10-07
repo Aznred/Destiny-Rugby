@@ -268,7 +268,7 @@ export function PanneauMiTemps({ e, couleurs }: { e: EtatMatch; couleurs: Record
   return (
     <div className="tv-mi-temps" role="status">
       <header>
-        <small>{t('ml.tv.miTemps')}</small>
+        <small>{t(e.periode > 2 ? 'tv.prolongation' : 'ml.tv.miTemps')}</small>
         <p>
           <span style={{ ['--club' as string]: couleurs.A }}>{e.clubA}</span>
           <b>{e.scoreA} – {e.scoreB}</b>

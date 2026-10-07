@@ -56,7 +56,7 @@ import { estTitulaire } from '../lib/moteur/titulaire';
 import { definirLangue, langueDuNavigateur, nombre, t, type Langue } from '../lib/i18n';
 import { LANGUE_DE_REPLI } from '../lib/cible';
 import type { LigneReelle } from '../lib/moteur/saison';
-import { coupeEnDirect, coupesDuClub } from '../lib/coupe';
+import { coupeEnDirect, coupesDuClub, coupesDuClubALaDate } from '../lib/coupe';
 import { LIMITES, ficheDepuisJoueur, ficheDepuisManager, scoreDeLaFiche } from '../lib/classementMondial';
 import { cleAleatoire, envoyerAuClassement } from '../lib/classementEnLigne';
 import {
@@ -1337,11 +1337,25 @@ async function personnaliserReponseNegociation(pseudo: string, id: string, conte
  * ⚠️ PAS DE NUL EN MATCH COUPERET : le départage (trois points) est décidé une fois, par la clé, comme pour le manager
  * (`enregistrerResultatManager`) — le tableau final et la suite du tableau ne peuvent pas diverger.
  */
+/** L'issue d'un match couperet de l'entraîneur (prolongation, vainqueur désigné), ramenée au repère domicile/extérieur. */
+function issueDuResultatManager(r: ResultatMatchManager): Partial<MatchChampionnat> {
+  return {
+    ...(r.prolongation ? { prolongation: true } : {}),
+    ...(r.vainqueur ? { vainqueurDesigne: ((r.vainqueur === 'pour') === r.domicile ? 'D' : 'E') as 'D' | 'E' } : {}),
+    ...(r.departage ? { departage: r.departage } : {}),
+    ...(r.tirsAuBut ? { tirsAuBut: (r.domicile ? r.tirsAuBut : [r.tirsAuBut[1], r.tirsAuBut[0]]) as [number, number] } : {}),
+  };
+}
+
 function resultatDeLaRencontre(
   cle: string, equipe: string, adversaire: string, domicile: boolean,
   scorePour: number, scoreContre: number, essaisPour: number, essaisContre: number,
 ): MatchChampionnat {
-  ({ scorePour, scoreContre } = departager(cle, scorePour, scoreContre));
+  const tranche = departager(cle, scorePour, scoreContre);
+  ({ scorePour, scoreContre } = tranche);
+  // Prolongation JOUÉE : si le score est resté à égalité, c'est le vainqueur inscrit (essais, tirs au but) qui compte.
+  const issue = tranche.issue;
+  const gagne = issue ? issue.vainqueur === equipe : null;
   return {
     domicile: domicile ? equipe : adversaire,
     exterieur: domicile ? adversaire : equipe,
@@ -1349,6 +1363,12 @@ function resultatDeLaRencontre(
     scoreE: domicile ? scoreContre : scorePour,
     essaisD: domicile ? essaisPour : essaisContre,
     essaisE: domicile ? essaisContre : essaisPour,
+    ...(tranche.prolongation ? { prolongation: true } : {}),
+    ...(issue && scorePour === scoreContre ? {
+      vainqueurDesigne: (gagne === domicile ? 'D' : 'E') as 'D' | 'E',
+      ...(issue.critere !== 'prolongation' ? { departage: issue.critere } : {}),
+      ...(issue.tirs ? { tirsAuBut: (gagne === domicile ? issue.tirs : [issue.tirs[1], issue.tirs[0]]) as [number, number] } : {}),
+    } : {}),
   };
 }
 
@@ -4624,17 +4644,27 @@ export const useGame = create<GameState>()(
         // Pas de nul en match couperet. Le départage est sauvegardé avec le
         // score, donc identique dans le calendrier, le tableau et le palmarès.
         const tranche = departager(resultat.cle, resultat.scorePour, resultat.scoreContre);
-        if (tranche.prolongation) resultat = { ...resultat, scorePour: tranche.scorePour, scoreContre: tranche.scoreContre };
+        if (tranche.prolongation) {
+          const gagne = tranche.issue ? tranche.issue.vainqueur === resultat.club : null;
+          resultat = {
+            ...resultat, scorePour: tranche.scorePour, scoreContre: tranche.scoreContre, prolongation: true,
+            ...(tranche.issue && tranche.scorePour === tranche.scoreContre ? {
+              vainqueur: gagne ? 'pour' : 'contre',
+              ...(tranche.issue.critere !== 'prolongation' ? { departage: tranche.issue.critere } : {}),
+              ...(tranche.issue.tirs ? { tirsAuBut: (gagne ? tranche.issue.tirs : [tranche.issue.tirs[1], tranche.issue.tirs[0]]) as [number, number] } : {}),
+            } : {}),
+          };
+        }
         const domicile = resultat.domicile ? resultat.club : resultat.adversaire;
         const exterieur = resultat.domicile ? resultat.adversaire : resultat.club;
         const scoreD = resultat.domicile ? resultat.scorePour : resultat.scoreContre;
         const scoreE = resultat.domicile ? resultat.scoreContre : resultat.scorePour;
         const essaisD = resultat.domicile ? resultat.essaisPour : resultat.essaisContre;
         const essaisE = resultat.domicile ? resultat.essaisContre : resultat.essaisPour;
-        enregistrerResultatJoue(resultat.cle, { domicile, exterieur, scoreD, scoreE, essaisD, essaisE });
+        enregistrerResultatJoue(resultat.cle, { domicile, exterieur, scoreD, scoreE, essaisD, essaisE, ...issueDuResultatManager(resultat) });
         oublierResultats();
-        const victoire = resultat.scorePour > resultat.scoreContre;
-        const nul = resultat.scorePour === resultat.scoreContre;
+        const victoire = resultat.vainqueur ? resultat.vainqueur === 'pour' : resultat.scorePour > resultat.scoreContre;
+        const nul = !resultat.vainqueur && resultat.scorePour === resultat.scoreContre;
         // ⚠️ LE TEMPS DE JEU SE COMPTE ICI, ET NULLE PART AILLEURS. C'est le
         // seul endroit du programme où un match du club est certainement JOUÉ :
         // la feuille de match est figée, le score est tombé. Compter à
@@ -7611,6 +7641,7 @@ export const useGame = create<GameState>()(
             scoreE: r.domicile ? r.scoreContre : r.scorePour,
             essaisD: r.domicile ? r.essaisPour : r.essaisContre,
             essaisE: r.domicile ? r.essaisContre : r.essaisPour,
+            ...issueDuResultatManager(r),
           },
         })));
         for (const [cle, match] of Object.entries(etat?.joueur?.international?.resultats ?? {})) enregistrerResultatJoue(cle, match);
@@ -7893,7 +7924,8 @@ function resoudreTrophees(
   // liste des engagés de `COUPES_EUROPE`), pas celles que son classement lui
   // « donnerait ». C'est déjà ce que montrent l'écran Résultats et le classement
   // latéral : le trophée doit sortir de la même source qu'eux.
-  for (const coupeId of coupesDuClub(j.club, saisonEcoulee)) {
+  // Reversement compris (Correctif 29) : un cinquième de Champions Cup peut gagner la Challenge Cup.
+  for (const coupeId of coupesDuClubALaDate(j.club, saisonEcoulee, WEEKENDS_COUPE)) {
     const tropheeCoupe = TROPHEE_PAR_COUPE[coupeId];
     if (!tropheeCoupe) continue;
     const etat = coupeEnDirect(coupeId, saisonEcoulee, j.club, WEEKENDS_COUPE);

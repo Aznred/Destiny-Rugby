@@ -1926,3 +1926,12 @@ La retransmission française utilise F5-TTS sur l'ordinateur via un service loca
   [`sources/SORTIE-MATCH-IOS.md`](sources/SORTIE-MATCH-IOS.md).
 - Bancs : `npm run verify:tournoi-final`, `npm run verify:fin-match`, `npm run verify:propositions-collection`.
   Restitution 3D : `npm run verify:memoire-3d` et `/scripts/apercuSortie3D.html?ios=1`.
+
+## Correctif 29 — règlements de compétition, prolongations, sirène, classement mobile
+
+- Un règlement par compétition (`src/lib/competitionRules.ts`) : qualification, barrages, relégation directe, match d'accès, reversement en Challenge Cup, départage des matchs couperets. La simulation, le classement, le tableau, le calendrier, l'écran et la saison suivante lisent le même.
+- Fédérale 1 à 3 : les deux derniers de chaque poule descendent directement, sans match d'accès. Champions Cup : quatre qualifiés par poule, le cinquième reversé en Challenge Cup, huitième à l'extérieur.
+- Un essai marqué après la sirène est toujours transformé avant la mi-temps ou le coup de sifflet final.
+- Match couperet à égalité : prolongation jouée par le moteur (2 × 10 minutes, fatigue conservée), puis nombre d'essais et tirs au but selon la compétition.
+- Classement : une vraie vue téléphone (position, équipe, MJ, différence, points ; détail en touchant l'équipe), zones colorées et légende calculées par le règlement.
+- Banc : `npm run verify:reglements`. Aperçu : `/scripts/apercuClassement.html`.

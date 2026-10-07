@@ -20,6 +20,7 @@
 import { poulesDe, versionResultatsJoues, type LigneTableau } from './championnat.js';
 import { phaseFinale, duel, type MatchFinal } from './phaseFinale.js';
 import { forceEffectif } from './effectif.js';
+import { rulesFor, zones } from './competitionRules.js';
 
 export interface QualifieTournoi {
   club: string;
@@ -37,7 +38,8 @@ export interface Tournoi {
   matchs: MatchFinal[];
   champion: string | null;
   finaliste: string | null;
-  relegues: string[]; // les derniers de chaque poule
+  /** Les relégués directs de chaque poule (règlement de la division) : tous les derniers d'abord, puis les avant-derniers. */
+  relegues: string[];
 }
 
 const NOM_TOUR: Record<number, string> = {
@@ -89,7 +91,8 @@ function calculerTournoi(
 
   const qualifies: QualifieTournoi[] = [];
   const deuxiemes: QualifieTournoi[] = [];
-  const relegues: string[] = [];
+  const reglement = rulesFor(divisionId);
+  const releguesParRang: string[][] = [];
   const parPoule = poules.length <= 3 ? 2 : 1;
 
   classements.forEach((cl, i) => {
@@ -100,9 +103,11 @@ function calculerTournoi(
     if (parPoule === 1 && cl[1]) {
       deuxiemes.push({ club: cl[1].club, poule: i, rang: 2, points: cl[1].points, difference: cl[1].difference });
     }
-    const dernier = cl[cl.length - 1];
-    if (dernier) relegues.push(dernier.club);
+    // Les relégués directs de la poule, le dernier d'abord. Leur nombre vient du règlement (deux en Fédérale).
+    const n = zones(reglement, cl.length, poules.length).directRelegation;
+    for (let r = 0; r < n; r++) (releguesParRang[r] ??= []).push(cl[cl.length - 1 - r].club);
   });
+  const relegues = releguesParRang.flat();
 
   // 2. On complète à la puissance de deux avec les meilleurs deuxièmes.
   deuxiemes.sort((a, b) => b.points - a.points || b.difference - a.difference);

@@ -6,10 +6,15 @@
 // Pour la division du joueur — et pour ses deux voisines immédiates, celles
 // avec lesquelles elle échange des clubs — on résout :
 //
-//   ⬆️ le CHAMPION de la division du dessous monte ;
-//   ⬇️ le DERNIER de la division descend ;
-//   ⚔️ le MATCH D'ACCÈS : l'avant-dernier reçoit le finaliste malheureux de la
-//      division du dessous, et le vainqueur prend la place.
+//   ⬇️ les RELÉGUÉS DIRECTS de la division descendent — leur nombre est celui du
+//      règlement de la division (`competitionRules.ts`) : un en Top 14, deux en
+//      Fédérale ;
+//   ⬆️ AUTANT de clubs montent de la division du dessous : son champion, puis
+//      son finaliste, puis le classement ;
+//   ⚔️ le MATCH D'ACCÈS, quand le règlement en prévoit un : le barragiste
+//      reçoit le premier club du dessous qui ne monte pas d'office, et le
+//      vainqueur prend la place. ⚠️ En Fédérale il n'y en a PAS : les deux
+//      derniers descendent sans jouer.
 //
 // Le résultat est mémorisé dans le store (`mouvementsClubs`), puis publié à
 // `lib/divisions.ts` : dès la saison suivante, les poules, les classements et
@@ -19,7 +24,8 @@ import { COMPETITIONS } from '../data/clubs.js';
 import { clubsDeDivision } from './divisions.js';
 import { poulesDe } from './championnat.js';
 import { tournoiDeFinDAnnee } from './tournoi.js';
-import { phaseFinale, matchAcces, type PhaseFinale, type MatchFinal } from './phaseFinale.js';
+import { phaseFinale, matchAcces, pretendants, type PhaseFinale, type MatchFinal } from './phaseFinale.js';
+import { rulesFor } from './competitionRules.js';
 
 export interface MouvementClub {
   club: string;
@@ -147,18 +153,22 @@ export function resoudrePyramide(
   // ---- Vers le haut : notre champion monte, notre finaliste joue l'accès ----
   if (haut) {
     const phaseHaut = phaseFinaleDe(haut, saison);
-    if (phase.champion) {
-      bouger(phase.champion, divisionId, haut, 'montee', 'champion');
-      recits.push(`${phase.champion}, champion de ${nomDivision(divisionId)}, accède à la ${nomDivision(haut)}.`);
-    }
-    if (phaseHaut.dernier) {
-      bouger(phaseHaut.dernier, haut, divisionId, 'descente', 'dernier');
-      recits.push(`${phaseHaut.dernier} termine dernier de ${nomDivision(haut)} et descend.`);
+    // Autant de montées directes que la division du dessus relègue de clubs (au moins le champion).
+    const montants = pretendants(phase).slice(0, phaseHaut.relegues.length);
+    montants.forEach((club, i) => {
+      bouger(club, divisionId, haut, 'montee', 'champion');
+      recits.push(i === 0 && club === phase.champion
+        ? `${club}, champion de ${nomDivision(divisionId)}, accède à la ${nomDivision(haut)}.`
+        : `${club} monte directement en ${nomDivision(haut)}.`);
+    });
+    for (const club of phaseHaut.relegues.slice(0, montants.length)) {
+      bouger(club, haut, divisionId, 'descente', 'dernier');
+      recits.push(`${club} est relégué de ${nomDivision(haut)} et descend.`);
     }
     accesVersLeHaut = matchAcces(phaseHaut, phase, saison);
     if (accesVersLeHaut) {
       const m = accesVersLeHaut;
-      const monte = m.vainqueur === phase.finaliste;
+      const monte = m.vainqueur === m.exterieur;
       recits.push(
         `Match d’accès à la ${nomDivision(haut)} : ${m.domicile} ${m.scoreD}-${m.scoreE} ${m.exterieur}. ` +
           (monte
@@ -175,18 +185,21 @@ export function resoudrePyramide(
   // ---- Vers le bas : le dernier descend, l'avant-dernier défend sa place ----
   if (bas) {
     const phaseBas = phaseFinaleDe(bas, saison);
-    if (phase.dernier) {
-      bouger(phase.dernier, divisionId, bas, 'descente', 'dernier');
-      recits.push(`${phase.dernier} termine dernier de ${nomDivision(divisionId)} et descend en ${nomDivision(bas)}.`);
+    const montants = pretendants(phaseBas).slice(0, phase.relegues.length);
+    for (const club of phase.relegues.slice(0, montants.length)) {
+      bouger(club, divisionId, bas, 'descente', 'dernier');
+      recits.push(`${club} est relégué de ${nomDivision(divisionId)} et descend en ${nomDivision(bas)}.`);
     }
-    if (phaseBas.champion) {
-      bouger(phaseBas.champion, bas, divisionId, 'montee', 'champion');
-      recits.push(`${phaseBas.champion}, champion de ${nomDivision(bas)}, monte en ${nomDivision(divisionId)}.`);
-    }
+    montants.forEach((club, i) => {
+      bouger(club, bas, divisionId, 'montee', 'champion');
+      recits.push(i === 0 && club === phaseBas.champion
+        ? `${club}, champion de ${nomDivision(bas)}, monte en ${nomDivision(divisionId)}.`
+        : `${club} monte directement de ${nomDivision(bas)} en ${nomDivision(divisionId)}.`);
+    });
     accesDepuisLeBas = matchAcces(phase, phaseBas, saison);
     if (accesDepuisLeBas) {
       const m = accesDepuisLeBas;
-      const monte = m.vainqueur === phaseBas.finaliste;
+      const monte = m.vainqueur === m.exterieur;
       recits.push(
         `Match d’accès à la ${nomDivision(divisionId)} : ${m.domicile} ${m.scoreD}-${m.scoreE} ${m.exterieur}. ` +
           (monte
@@ -243,8 +256,8 @@ export function resultatDivision(divisionId: string, saison: number): ResultatDi
     const phase = phaseFinaleDe(divisionId, saison);
     res = {
       divisionId,
-      champions: phase.champion ? [phase.champion, ...(phase.finaliste ? [phase.finaliste] : [])] : [],
-      derniers: [phase.dernier, phase.avantDernier].filter((c): c is string => !!c),
+      champions: phase.champion ? pretendants(phase) : [],
+      derniers: [...phase.relegues],
       vainqueurTournoi: null,
     };
   } else {
@@ -258,11 +271,19 @@ export function resultatDivision(divisionId: string, saison: number): ResultatDi
       const vainqueursDePoule = t.poules
         .map((poule) => poule.classement[0]?.club)
         .filter((c): c is string => !!c);
+      // Les deuxièmes de poule suivent, les mieux classés d'abord : une division du dessus qui relègue deux clubs
+      // par poule (Fédérale) a besoin d'autant de montants.
+      const deuxiemes = t.poules
+        .map((poule) => poule.classement[1])
+        .filter((l): l is NonNullable<typeof l> => !!l)
+        .sort((a, b) => b.points - a.points || b.difference - a.difference)
+        .map((l) => l.club);
       const champions = [
         // Le champion de la division d'abord, à condition d'avoir gagné sa poule.
         ...(t.champion && vainqueursDePoule.includes(t.champion) ? [t.champion] : []),
         ...vainqueursDePoule,
         ...(t.champion && !vainqueursDePoule.includes(t.champion) ? [t.champion] : []),
+        ...deuxiemes,
       ].filter((c, i, liste) => liste.indexOf(c) === i);
       res = { divisionId, champions, derniers: t.relegues, vainqueurTournoi: t.champion };
     }
@@ -323,8 +344,10 @@ export function equilibrerMouvements(mouvements: MouvementClub[]): MouvementClub
 // Autant de places que de poules : chaque vainqueur de poule monte, chaque
 // dernier de poule descend. Une division à poule unique n'échange qu'un club
 // (plus le match d'accès, géré par `resoudrePyramide`).
+// ⚠️ MULTIPLIÉ PAR LE NOMBRE DE RELÉGUÉS DIRECTS DU RÈGLEMENT : une Fédérale relègue ses DEUX derniers par poule.
 function placesEchangees(haut: string, bas: string): number {
-  return Math.max(1, Math.min(poulesDe(haut).length, poulesDe(bas).length));
+  const parPoule = Math.max(1, rulesFor(haut).standings.directRelegation);
+  return Math.max(1, Math.min(poulesDe(haut).length, poulesDe(bas).length)) * parPoule;
 }
 
 export interface BilanPyramideComplete {
@@ -387,8 +410,10 @@ export function resoudreToutesDivisions(saison: number): BilanPyramideComplete {
     const haut = pyramide[i];
     const bas = pyramide[i + 1];
     const places = placesEchangees(haut, bas);
-    const montants = resultatDivision(bas, saison).champions.slice(0, places);
-    const descendants = resultatDivision(haut, saison).derniers.slice(0, places);
+    // Jamais un entrant sans sortant : on échange le même nombre de clubs dans les deux sens.
+    const echanges = Math.min(places, resultatDivision(bas, saison).champions.length, resultatDivision(haut, saison).derniers.length);
+    const montants = resultatDivision(bas, saison).champions.slice(0, echanges);
+    const descendants = resultatDivision(haut, saison).derniers.slice(0, echanges);
 
     for (const club of montants) {
       if (bouger(club, bas, haut, 'montee', 'champion')) {

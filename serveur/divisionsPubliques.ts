@@ -4,6 +4,7 @@ import { coequipierDepuisCarte } from '../src/lib/ligue/catalogueCarriere.js';
 import { conclureMatchEnLigne, creerMatchEnLigne } from '../src/lib/ligue/matchCarriere.js';
 import type { CarteCarriere, ClubCarriere } from '../src/lib/ligue/typesCarriere.js';
 import type { LigueStockee } from './carriereStockage.js';
+import { rulesFor, zones } from '../src/lib/competitionRules.js';
 
 export interface HeritierDivision { club: ClubCarriere; cartes: CarteCarriere[] }
 export interface PlanDivision { division: number; heritiers: HeritierDivision[]; barrage?: string }
@@ -35,12 +36,15 @@ export function planifierDivisionsPubliques(ligues: readonly LigueStockee[], cyc
   for (let i = 0; i < plans.length - 1; i++) {
     const haut = plans[i], bas = plans[i + 1];
     if (haut.classement.length < 2 || bas.classement.length < 2) continue;
+    // ⚠️ LE RÈGLEMENT DES DIVISIONS PUBLIQUES (`competitionRules.ts`) dit combien descendent et qui joue le barrage :
+    // c'est le même qui colore le classement à l'écran.
+    const z = zones(rulesFor('divisionPublique'), haut.classement.length);
     const dernier = haut.classement.at(-1)!;
     const champion = bas.classement[0];
     // À deux clubs, l'avant-dernier serait le champion déjà promu depuis la
     // division inférieure ; il n'existe pas de place distincte pour un barrage.
-    if (haut.classement.length >= 3) {
-      const avantDernier = haut.classement.at(-2)!;
+    if (z.accessMatch.length) {
+      const avantDernier = haut.classement[z.accessMatch[0] - 1];
       const finaliste = bas.finaliste && bas.finaliste !== champion ? bas.finaliste : bas.classement[1];
       const hHaut = haut.heritiers.find(h => h.club.id === avantDernier);
       const hBas = bas.heritiers.find(h => h.club.id === finaliste);
@@ -56,7 +60,7 @@ export function planifierDivisionsPubliques(ligues: readonly LigueStockee[], cyc
         if (gagneBas) echanger(haut, avantDernier, bas, finaliste);
       }
     }
-    echanger(haut, dernier, bas, champion);
+    if (z.directRelegation > 0 || haut.classement.length < 4) echanger(haut, dernier, bas, champion);
   }
   return plans.map(({ division, heritiers }) => ({ division, heritiers, barrage: barrages.get(division) }));
 }

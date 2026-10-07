@@ -384,6 +384,8 @@ export interface OptionsMatch {
   /** Un générateur dont le serveur conserve l'état permet les reprises exactes. */
   rng?: () => number;
   scoreSurTerrain?: boolean;
+  /** Match couperet : prolongations puis procédure de la compétition (`competitionRules.ts`). Absent : le nul est permis. */
+  departage?: { periodes: number; minutes: number; criteres: ('essais' | 'tirsAuBut')[] };
   meteoTir?: 'sec' | 'pluie' | 'vent';
   /**
    * ⚠️ LE NIVEAU COMMANDE TOUTE LA DISCIPLINE (cartons, bagarres, sanctions
@@ -599,6 +601,9 @@ export function creerMatch(
     ...((options.ia ?? 1) >= 2 && options.vent !== null ? ventDuMatch(options.vent ?? creerVent(cle)) : {}),
     styles: options.cadenceDetaillee || (options.ia ?? 1) >= 2 ? { A: styleDuClub(clubA), B: styleDuClub(clubB) } : undefined,
     scoreSurTerrain: options.scoreSurTerrain ?? true, meteoTir: options.meteoTir,
+    ...(options.departage && (options.scoreSurTerrain ?? true) ? { departage: {
+      periodes: options.departage.periodes, duree: options.departage.minutes * 60, criteres: options.departage.criteres,
+    } } : {}),
     niveau: options.niveau ?? 'pro',
     controle: options.controle ?? false,
     intention: null,
@@ -707,16 +712,23 @@ function tick(e: EtatMatch): void {
   const dtHorloge = e.responsabilites?.attente ? 0 : dt * (e.dureeReelleArcade ? e.phase === 'miTemps' ? 0 : 4800 / e.dureeReelleArcade
     : e.carriereDixMinutes ? (e.cadenceDetaillee ? facteurArretDetaille(e) : horlogeCondensee(e)) : facteurHorloge(e.phase, e.tempsReel));
   e.t += dtHorloge;
-  e.minute = Math.min(80, Math.floor(e.t / 60));
+  e.minute = Math.min(e.prolongation ? Math.round(finDePeriode(e, 2 + (e.departage?.periodes ?? 0)) / 60) : 80, Math.floor(e.t / 60));
 
   // ── Chronomètre, sirène, mi-temps ────────────────────────────────────────
-  const finPeriode = e.periode * DUREE_PERIODE;
+  const finPeriode = finDePeriode(e);
   if (!e.sirene && e.t >= finPeriode) {
     e.sirene = true;
-    dire(e, 'jalon', null, C.texteMatch(e.periode === 1 ? 'sirenePremiere' : 'sireneFinale'));
+    dire(e, 'jalon', null, C.texteMatch(e.periode === 1 ? 'sirenePremiere' : e.periode > 2 ? 'sireneProlongation' : 'sireneFinale'));
   }
   // Garde-fou : temps additionnel maximum (6 minutes après la sirène).
-  if (e.sirene && !e.finSurSortieOuEnAvant && e.t > finPeriode + 360) return clorePeriode(e);
+  // ⚠️ JAMAIS PENDANT UN ESSAI, SA TRANSFORMATION OU UN TIR (Correctif 29). En match de dix minutes l'horloge court huit
+  // fois plus vite que l'écran : une longue séquence après la sirène dépassait les six minutes, et l'essai qui la
+  // concluait était suivi du coup de sifflet final AVANT la transformation. Le filet absolu reste douze minutes plus loin.
+  if (e.sirene && !e.finSurSortieOuEnAvant && e.t > finPeriode + 360
+    && (!coupDePiedDu(e) || e.t > finPeriode + 1080)) {
+    e.transformationDue = false;
+    return clorePeriode(e);
+  }
 
   // ── Compteurs des joueurs ────────────────────────────────────────────────
   const fatigueCondensee = iaParPoste(e) && condense(e) ? REGLAGES_IA.fatigueCondensee : 0;
@@ -8065,7 +8077,7 @@ function phaseTirAuBut(e: EtatMatch): void {
 function phaseTransformation(e: EtatMatch): void {
   if (e.minuteur > 0) return;
   const tir = e.tir;
-  if (!tir) return preparerCoupEnvoi(e, adverse(e.possession));
+  if (!tir) { e.transformationDue = false; return preparerCoupEnvoi(e, adverse(e.possession)); }
   const cote = tir.buteur.cote;
   if (!tir.volLance) {
     if (tir.frappeDepuis === undefined && distance(tir.buteur.pos, tir.lieu ?? e.ballon) > .8) {
@@ -8132,6 +8144,8 @@ function phaseTransformation(e: EtatMatch): void {
   // Fin de la contemplation du ballon retombé : remise en jeu
   e.tir = null;
   e.placement = null;
+  // Le tir est résolu : la période peut maintenant se terminer.
+  e.transformationDue = false;
   if (e.sirene && !e.finSurSortieOuEnAvant) return clorePeriode(e);
   preparerCoupEnvoi(e, adverse(cote));
 }
@@ -8297,6 +8311,8 @@ function validerEssai(e: EtatMatch, marqueur: Pion, origine: 'jeu' | 'maul'): vo
   }
   pousserElan(e, cote, POUSSEES.essai);
   marquer(e, cote, 5);
+  // La transformation est due, sirène ou pas : `clorePeriode` attend qu'elle soit résolue.
+  e.transformationDue = true;
   if (cote === 'A') e.essaisA += 1; else e.essaisB += 1;
 
   const precision = origine === 'maul'
@@ -9503,7 +9519,50 @@ function gererRemplacements(e: EtatMatch): void {
   }
 }
 
+/** La seconde d'horloge où s'achève la période `periode` (par défaut : celle en cours). */
+function finDePeriode(e: EtatMatch, periode = e.periode): number {
+  return periode <= 2 ? periode * DUREE_PERIODE : 2 * DUREE_PERIODE + (periode - 2) * (e.departage?.duree ?? 600);
+}
+
+/** Un essai est en cours de validation, une transformation ou un tir au but est dû : la période ne se siffle pas. */
+function coupDePiedDu(e: EtatMatch): boolean {
+  return e.phase === 'aplatissage' || e.phase === 'tmo' || e.phase === 'transformation' || e.phase === 'tirAuBut'
+    || e.phase === 'penalite';
+}
+
+/**
+ * LE DÉPARTAGE APRÈS LES PROLONGATIONS : la procédure de la compétition, critère après critère (`competitionRules.ts`).
+ * Le score ne bouge pas — on ne marque pas de points aux tirs au but ; `e.issue` dit qui passe et pourquoi.
+ */
+function trancher(e: EtatMatch): void {
+  for (const critere of e.departage?.criteres ?? []) {
+    if (critere === 'essais' && e.essaisA !== e.essaisB) {
+      const vainqueur: Cote = e.essaisA > e.essaisB ? 'A' : 'B';
+      e.issue = { vainqueur, critere };
+      dire(e, 'jalon', vainqueur, C.texteMatch('departageEssais', { club: nomClub(e, vainqueur), essaisA: e.essaisA, essaisB: e.essaisB }));
+      return;
+    }
+    if (critere === 'tirsAuBut') {
+      // Cinq tireurs par équipe, les meilleurs pieds d'abord, face aux poteaux à trente mètres ; puis la mort subite.
+      const tireurs = (cote: Cote) => surLeTerrain(e, cote).filter((p) => p.sanction <= 0).sort((a, b) => b.pied - a.pied);
+      const [ta, tb] = [tireurs('A'), tireurs('B')];
+      const tente = (liste: Pion[], n: number) => e.rng() < probaTir(30, 6, liste.length ? liste[n % liste.length].pied : 60);
+      let a = 0, b = 0;
+      for (let n = 0; n < 5; n++) { if (tente(ta, n)) a++; if (tente(tb, n)) b++; }
+      for (let n = 5; a === b && n < 25; n++) { if (tente(ta, n)) a++; if (tente(tb, n)) b++; }
+      if (a === b) { if (e.rng() < 0.5) a++; else b++; }
+      const vainqueur: Cote = a > b ? 'A' : 'B';
+      e.issue = { vainqueur, critere, tirs: [a, b] };
+      dire(e, 'jalon', vainqueur, C.texteMatch('tirsAuBut', { clubA: e.clubA, clubB: e.clubB, tirsA: a, tirsB: b, club: nomClub(e, vainqueur) }));
+      return;
+    }
+  }
+}
+
 function clorePeriode(e: EtatMatch): void {
+  // ⚠️ LA TRANSFORMATION D'ABORD (Correctif 29) : un essai marqué temps expiré se transforme avant tout coup de sifflet.
+  if (e.transformationDue && coupDePiedDu(e)) return;
+  e.transformationDue = false;
   delete e.piedPrepare;
   // Un tir interrompu par la fin de la période ne reste pas « en cours » : son
   // buteur gardait le rituel du tee en plein jeu à la reprise (cadence détaillée).
@@ -9523,6 +9582,28 @@ function clorePeriode(e: EtatMatch): void {
     return;
   }
   if (!e.scoreSurTerrain) solderLesPoints(e);
+  // ⚠️ MATCH COUPERET À ÉGALITÉ : ON CONTINUE (Correctif 29). Même état, mêmes joueurs, même fatigue, mêmes cartons et
+  // mêmes remplacements : la prolongation est une période de plus, pas un nouveau match. Une prolongation commencée va
+  // à son terme ; si l'égalité persiste, la procédure de la compétition désigne le vainqueur.
+  const derniere = 2 + (e.departage?.periodes ?? 0);
+  if (e.departage && e.periode < derniere && (e.periode > 2 || e.scoreA === e.scoreB)) {
+    const debut = e.periode === 2;
+    e.t = finDePeriode(e);
+    e.periode += 1;
+    e.sirene = false;
+    e.prolongation = true;
+    e.phase = 'miTemps';
+    e.minuteur = dureeArret(e, 'miTemps');
+    e.porteur = null;
+    e.vol = null;
+    e.placement = null;
+    dire(e, 'jalon', null, C.texteMatch(debut ? 'prolongation' : 'prolongationPause', {
+      clubA: e.clubA, scoreA: e.scoreA, scoreB: e.scoreB, clubB: e.clubB, minutes: Math.round(e.departage.duree / 60),
+    }));
+    return;
+  }
+  if (e.departage && e.scoreA === e.scoreB) trancher(e);
+  else if (e.prolongation) e.issue = { vainqueur: e.scoreA > e.scoreB ? 'A' : 'B', critere: 'prolongation' };
   // ⚠️ LA COMMISSION SE RÉUNIT APRÈS LE COUP DE SIFFLET, pas pendant. C'est ici
   // qu'un carton rouge ou un coup de poing devient une suspension de carrière —
   // `MatchLive` la lit dans le bilan et la fait appliquer par le store.
@@ -9545,11 +9626,11 @@ function clorePeriode(e: EtatMatch): void {
 
 function phaseMiTemps(e: EtatMatch): void {
   if (e.minuteur > 0) return;
-  dire(e, 'jalon', null, C.texteMatch('deuxiemeMiTemps'));
+  dire(e, 'jalon', null, C.texteMatch(e.periode > 2 ? 'prolongationReprise' : 'deuxiemeMiTemps'));
   // ⚠️ ON CHANGE DE CÔTÉ (IA par poste). Le moteur garde son repère ; c'est le stade
   // qui tourne autour de lui : le vent souffle désormais dans l'autre sens, et
   // l'affichage retourne le terrain. Voir `EtatMatch.cotesInverses`.
-  if (iaParPoste(e)) e.cotesInverses = true;
+  if (iaParPoste(e)) e.cotesInverses = e.periode % 2 === 0; // on change à chaque période, prolongation comprise
   // L'équipe qui n'a pas engagé en début de match engage la seconde période.
   preparerCoupEnvoi(e, adverse(e.possession));
 }

@@ -1,0 +1,138 @@
+/* LE CLASSEMENT (Correctif 29) — voir TableauClassement.tsx.
+   Les couleurs de zone sont des variables : une seule définition pour la bande, le symbole, le détail et la légende. */
+.clt {
+  margin-top: 0.8rem;
+  font-size: 0.86rem;
+  min-width: 0;
+  max-width: 100%;
+}
+/* Les couleurs de zone (--zone) sont définies une fois pour toute l'application, à la fin de App.css. */
+
+.clt-table { border-radius: 10px; overflow: hidden; border: 1px solid var(--bordure); }
+.clt-entete, .clt-ligne {
+  display: grid;
+  /* # · équipe · MJ V N D + − · diff · B · pts */
+  grid-template-columns: 4rem minmax(0, 1fr) repeat(6, 2.3rem) 3rem 2rem 2.9rem;
+  align-items: center;
+  column-gap: 0.25rem;
+  padding: 0.42rem 0.7rem 0.42rem 0;
+  width: 100%;
+  font-variant-numeric: tabular-nums;
+}
+.clt[data-forme] .clt-entete, .clt[data-forme] .clt-ligne {
+  grid-template-columns: 4rem minmax(0, 1fr) repeat(6, 2.3rem) 3rem 2rem 6.2rem 2.9rem;
+}
+.clt-entete {
+  font-size: 0.68rem; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--brume); background: rgba(0, 0, 0, 0.28);
+}
+.clt-entete > span, .clt-ligne > span { text-align: right; min-width: 0; }
+.clt-entete > .clt-c-nom, .clt-ligne > .clt-c-nom { text-align: left; }
+.clt-entete > .clt-c-pos { text-align: left; padding-left: 0.85rem; }
+
+.clt-rang { position: relative; border-top: 1px solid rgba(255, 255, 255, 0.05); }
+.clt-rang:nth-child(odd) { background: rgba(0, 0, 0, 0.16); }
+/* La bande de zone : une couleur franche à gauche, un voile très léger sur la ligne. */
+.clt-rang[data-statut]::before {
+  content: ''; position: absolute; inset: 0 auto 0 0; width: 4px; background: var(--zone);
+}
+.clt-rang[data-statut] { background-image: linear-gradient(90deg, color-mix(in srgb, var(--zone) 13%, transparent), transparent 46%); }
+.clt-rang[data-moi] { outline: 1px solid var(--bordure-forte); outline-offset: -1px; background-color: rgba(232, 178, 58, 0.1); }
+.clt-rang[data-moi] .clt-nom-texte { font-weight: 700; color: var(--craie); }
+
+.clt-ligne { color: var(--craie-dim); background: none; border: 0; font: inherit; text-align: inherit; }
+button.clt-ligne { cursor: pointer; }
+button.clt-ligne:hover { background: rgba(255, 255, 255, 0.04); }
+button.clt-ligne:focus-visible { outline: 2px solid var(--or-400); outline-offset: -2px; }
+
+.clt-c-pos { display: flex; align-items: center; gap: 0.3rem; padding-left: 0.85rem; text-align: left !important; }
+.clt-c-pos b { min-width: 1.25rem; font-family: var(--police-forte); color: var(--craie); }
+.clt-zone { display: inline-flex; }
+.clt-zone i {
+  font-style: normal; font-size: 0.6rem; font-weight: 800; line-height: 1; letter-spacing: 0.02em;
+  min-width: 1.15rem; padding: 0.16rem 0.2rem; border-radius: 4px; text-align: center;
+  color: #0b1410; background: var(--zone);
+}
+.clt-lu { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+.clt-c-nom { display: flex; align-items: center; gap: 0.5rem; }
+.clt-c-nom > :first-child { flex: none; }
+.clt-sans-ecusson { width: 22px; }
+.clt-nom { display: flex; align-items: baseline; gap: 0.35rem; min-width: 0; flex: 1; }
+.clt-nom-texte { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.clt-nom small { color: var(--brume); font-size: 0.72rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-shrink: 2; }
+.clt-c-diff.plus { color: var(--succes); }
+.clt-c-diff.moins { color: var(--danger); }
+.clt-ligne > .clt-c-pts { font-family: var(--police-forte); font-size: 0.98rem; color: var(--craie); }
+
+.clt-forme { display: inline-flex; gap: 3px; justify-content: flex-end; }
+.clt-forme i {
+  font-style: normal; font-size: 0.62rem; font-weight: 800; width: 1.05rem; height: 1.05rem; line-height: 1.05rem;
+  border-radius: 3px; text-align: center; color: #0b1410; background: var(--brume);
+}
+.clt-forme i[data-resultat='V'] { background: var(--succes); }
+.clt-forme i[data-resultat='D'] { background: var(--danger); }
+.clt-forme-vide { color: var(--brume); font-style: normal; }
+
+/* ── LA VUE ÉTROITE : # · équipe · MJ · diff · pts · ± ─────────────────────── */
+/* Le tableau prend toute la largeur utile de sa carte : sur un téléphone, chaque pixel va au nom de l'équipe. */
+.clt[data-etroit] { font-size: 0.88rem; margin-inline: -0.5rem; max-width: calc(100% + 1rem); }
+.clt[data-etroit] .clt-entete, .clt[data-etroit] .clt-ligne {
+  grid-template-columns: 2.15rem minmax(0, 1fr) 1.6rem 2.45rem 2.15rem 0.85rem;
+  column-gap: 0.15rem;
+  padding-right: 0.35rem;
+}
+.clt[data-etroit] .clt-ligne { min-height: 2.9rem; padding-block: 0.25rem; }
+/* La position et le symbole de zone l'un sous l'autre : la colonne reste étroite, le symbole reste lisible. */
+.clt[data-etroit] .clt-c-pos { flex-direction: column; justify-content: center; gap: 2px; padding-left: 0.4rem; text-align: center !important; }
+.clt[data-etroit] .clt-c-pos b { min-width: 0; line-height: 1; }
+.clt[data-etroit] .clt-zone i { font-size: 0.54rem; min-width: 1.05rem; padding: 0.12rem 0.16rem; }
+.clt[data-etroit] .clt-zone:empty { display: none; }
+.clt[data-etroit] .clt-entete > .clt-c-pos { padding-left: 0.4rem; text-align: center; }
+.clt[data-etroit] .clt-c-nom { gap: 0.4rem; }
+/* Un nom long passe sur deux lignes avant d'être tronqué : il ne pousse jamais les points hors de l'écran. */
+.clt[data-etroit] .clt-nom { align-items: center; }
+.clt[data-etroit] .clt-nom-texte {
+  white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2;
+  line-height: 1.15; overflow-wrap: anywhere; text-align: left;
+}
+.clt-chevron { color: var(--brume); font-weight: 700; text-align: center !important; }
+.clt-entete > .clt-c-pos, .clt-ligne > .clt-c-pos { min-width: 0; }
+
+.clt-detail {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.45rem 0.7rem;
+  padding: 0.55rem 0.7rem 0.7rem 0.95rem;
+  background: rgba(0, 0, 0, 0.26); border-top: 1px dashed rgba(255, 255, 255, 0.08);
+}
+.clt-detail-nom { flex: 1 1 100%; color: var(--craie); font-size: 0.86rem; overflow-wrap: anywhere; }
+.clt-detail-nom small { color: var(--brume); font-weight: 400; }
+.clt-detail-zone {
+  flex: 1 1 100%; font-size: 0.74rem; font-weight: 700; color: var(--zone);
+}
+.clt-detail dl { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.3rem; margin: 0; flex: 1 1 100%; }
+.clt-detail dl > div { background: rgba(255, 255, 255, 0.05); border-radius: 6px; padding: 0.3rem 0.15rem; text-align: center; min-width: 0; }
+.clt-detail dt { font-size: 0.58rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--brume); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.clt-detail dd { margin: 0.1rem 0 0; font-family: var(--police-forte); color: var(--craie); font-variant-numeric: tabular-nums; }
+.clt-ouvrir {
+  margin-left: auto; padding: 0.4rem 0.7rem; border-radius: 8px; border: 1px solid var(--bordure-forte);
+  background: none; color: var(--or-400); font: inherit; font-size: 0.8rem; cursor: pointer;
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* Très petits téléphones : la différence passe dans le détail, le classement reste entier. */
+@container clt-etroit (max-width: 250px) {
+  .clt[data-etroit] .clt-entete, .clt[data-etroit] .clt-ligne { grid-template-columns: 2.15rem minmax(0, 1fr) 1.6rem 2.15rem 0.85rem; }
+  .clt[data-etroit] .clt-c-diff { display: none; }
+}
+.clt { container: clt-etroit / inline-size; }
+
+/* ── La légende : couleur + symbole + libellé ─────────────────────────────── */
+.clt-legende {
+  list-style: none; display: flex; flex-wrap: wrap; gap: 0.35rem 0.9rem;
+  margin: 0.6rem 0 0; padding: 0; font-size: 0.74rem; color: var(--craie-dim);
+}
+.clt-legende li { display: inline-flex; align-items: center; gap: 0.35rem; }
+.clt-legende i {
+  font-style: normal; font-size: 0.6rem; font-weight: 800; line-height: 1; min-width: 1.15rem;
+  padding: 0.16rem 0.2rem; border-radius: 4px; text-align: center; color: #0b1410; background: var(--zone);
+}

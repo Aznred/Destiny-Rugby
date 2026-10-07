@@ -76,6 +76,8 @@ import { fusionnerDeltaDirect, fusionnerVueLigue, presencesAcquittees } from '..
 import type { ContexteStatsTV } from '../lib/statsTV';
 import { reperesChrono } from '../lib/ligue/filmDirect';
 import { departagerLesTenues } from '../lib/tenuesMatch';
+import { onlineRules, standingsStatuses } from '../lib/competitionRules';
+import { TableauClassement } from '../components/TableauClassement';
 import type { VueMarchePartage } from '../lib/ligue/marchePartage';
 import { appliquerDeltaVue, estReponseDelta } from '../lib/ligue/deltaVue';
 import { photoReelle } from '../lib/avatars';
@@ -651,8 +653,6 @@ export function CarriereEnLigne() {
     };
   }, [ligueId]);
 
-
-  const ouvrir = (suivante: VueCarriereEnLigne) => {
   // Le détail d'un match terminé (fil, feuille, temps forts) ne voyage plus avec la ligue : la vue n'en porte que le
   // résumé, et on le demande une fois, à l'ouverture du match. La fusion le garde ensuite d'un sondage à l'autre.
   const detailDemande = useRef('');
@@ -667,6 +667,8 @@ export function CarriereEnLigne() {
       .then(delta => setVue(avant => (avant ? fusionnerDeltaDirect(avant, delta) : avant)))
       .catch(() => { if (detailDemande.current === cle) detailDemande.current = ''; });
   }, [ligueId, matchId, vue]);
+
+  const ouvrir = (suivante: VueCarriereEnLigne) => {
     versionRequete.current++; setVue(suivante); setLigueId(suivante.id); setOnglet(suivante.observateur ? 'calendrier' : 'club'); setMatchId(null); setErreur('');
   };
   // Les clubs se synchronisent déjà par la version de la ligue. Ce contrôle
@@ -1025,36 +1027,22 @@ function Classement({ vue, onClub }: { vue: VueCarriereEnLigne; onClub?: (clubId
   const joue = vue.classement.some(l => l.joues > 0);
   const nombrePlayoffs = vue.playoffs ? nombreQualifiesPlayoffs(vue.classement.length) : 0;
 
-  return <div className="cel-table-scroll"><table className="cel-table cel-classement">
-    <thead><tr>
-      <th>#</th><th>{t("tb.club")}</th><th>J</th><th>V</th><th>N</th><th>D</th>
-      <th title={t("ui.b8c6033188d6")}>P.</th><th title={t("ui.5bb6f1316bb5")}>C.</th>
-      <th>{t("ui.b48e2553e4e3")}</th><th title={t("tb.bonus")}>{t('ui.bonusCourt')}</th>
-      {joue && <th>{t("attr.forme")}</th>}<th>{t('ui.pointsCourts')}</th>
-    </tr></thead>
-    <tbody>{vue.classement.map((l, i) => {
-      const club = vue.clubs.find(c => c.id === l.clubId);
-      const forme = joue ? formeDuClub(vue, l.clubId) : [];
-      const qualifiePlayoff = i < nombrePlayoffs;
-      return <tr key={l.clubId} className={`${l.clubId === vue.monClubId ? 'moi ' : ''}${qualifiePlayoff ? 'qualifie-playoff' : ''}`}>
-        <td><b>{i + 1}</b>{qualifiePlayoff && <i className="cel-statut-qualif playoff" title={t("ui.569134227271")}>PO</i>}</td>
-        <th>
-          <button className="cel-club-lien" onClick={() => onClub?.(l.clubId)} disabled={!onClub}>
-            {club?.embleme ? <EcussonClub logo={club.embleme} taille={22} /> : <Ecusson nom={l.nom} />}
-            <span>{l.nom}<small>{club?.pseudo}</small></span>
-          </button>
-        </th>
-        <td>{l.joues}</td><td>{l.gagnes}</td><td>{l.nuls}</td><td>{l.perdus}</td>
-        <td>{l.pour}</td><td>{l.contre}</td>
-        <td>{l.difference > 0 ? '+' : ''}{l.difference}</td>
-        <td>{l.bonus}</td>
-        {joue && <td><span className="cel-forme">{forme.length
-          ? forme.map((f, n) => <i key={n} className={f}>{f}</i>)
-          : <em>—</em>}</span></td>}
-        <td><b>{l.points}</b></td>
-      </tr>;
-    })}</tbody>
-  </table>
+  // ⚠️ LE MÊME TABLEAU QUE LES CARRIÈRES (Correctif 29), ET LES MÊMES ZONES : elles viennent du règlement de la ligue
+  // (`onlineRules`), pas d'un rang écrit ici. Sur téléphone, toute la ligue se lit sans défilement horizontal.
+  const statuts = standingsStatuses(onlineRules(vue), vue.classement.length);
+  return <div className="cel-classement-zone">
+    <TableauClassement avecForme={joue} onOuvrir={onClub} libelleOuvrir={t("ui.e117ca5f9abb")}
+      lignes={vue.classement.map((l, i) => {
+        const club = vue.clubs.find(c => c.id === l.clubId);
+        return {
+          cle: l.clubId, position: i + 1, nom: l.nom, sousTitre: club?.pseudo,
+          ecusson: club?.embleme ? <EcussonClub logo={club.embleme} taille={22} /> : <Ecusson nom={l.nom} />,
+          joues: l.joues, gagnes: l.gagnes, nuls: l.nuls, perdus: l.perdus, pour: l.pour, contre: l.contre,
+          difference: l.difference, bonus: l.bonus, points: l.points,
+          statut: statuts[i], moi: l.clubId === vue.monClubId,
+          forme: joue ? formeDuClub(vue, l.clubId) : undefined,
+        };
+      })} />
     {nombrePlayoffs > 0 && <p className="cel-note"><b>PO</b>{t("ui.87f1eacbd7ec", { v0: nombrePlayoffs })}</p>}
     {onClub && <p className="cel-note">{t("ui.e117ca5f9abb")}</p>}
     {logos.size === 0 && null}

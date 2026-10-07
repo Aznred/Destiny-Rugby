@@ -4,6 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "verify:reglements": "vite-node scripts/verifierReglements.ts",
     "verify:voix": "vite-node scripts/verifierVoix.ts",
     "dev": "vite",
     "build": "tsc -b && vite build",
@@ -80,9 +81,9 @@
     "verify:usage": "vite-node scripts/verifierUsage.ts",
     "verify:correctif25": "vite-node scripts/verifierCorrectif25.ts && vite-node scripts/verifierSuiviUsage.ts && vite-node scripts/verifierUsage.ts && vite-node scripts/verifierDeltaVue.ts",
     "verify:delta-vue": "vite-node scripts/verifierDeltaVue.ts",
-    "audit:joueurs": "vite-node scripts/auditDonneesJoueurs.ts",
     "verify:reprises-match": "vite-node scripts/verifierReprisesMatch.ts",
     "verify:vue-legere": "vite-node scripts/verifierVueLegere.ts",
+    "audit:joueurs": "vite-node scripts/auditDonneesJoueurs.ts",
     "verify:marche-commun": "vite-node scripts/verifierMarcheCommun.ts",
     "verify:chronologie": "vite-node scripts/verifierChronologieDirect.ts",
     "mesure:empreinte": "vite-node scripts/empreinteMoteur.ts",

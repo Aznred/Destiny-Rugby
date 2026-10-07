@@ -1023,6 +1023,13 @@ export interface ResultatMatchManager {
   scoreContre: number;
   essaisPour: number;
   essaisContre: number;
+  /** Match couperet allé en prolongation. */
+  prolongation?: boolean;
+  /** Vainqueur désigné quand le score est resté à égalité (essais, tirs au but) — vu du club de l'entraîneur. */
+  vainqueur?: 'pour' | 'contre';
+  departage?: 'essais' | 'tirsAuBut';
+  /** Tirs au but : ceux du club, ceux de l'adversaire. */
+  tirsAuBut?: [number, number];
   blessures?: { joueurId: string; minute: number; activite: string }[];
   minutesJouees?: Record<string, number>;
 }
