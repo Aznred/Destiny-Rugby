@@ -787,11 +787,18 @@ titre('8. CE QUE LE SERVEUR REFUSE');
 
     const melee = structuredClone(compo);
     [melee.titulaires[0], melee.titulaires[13]] = [melee.titulaires[13], melee.titulaires[0]];
-    refuse('mais un ailier ne joue PAS pilier', () =>
-      agirCarriere(e, colin.compteId, { type: 'composition', composition: melee }, T0, 'x'));
+    // ⚠️ CORRECTIF 24 : « autoriser n'importe quel joueur à n'importe quel poste ». La première ligne était la dernière
+    // interdiction (la feuille entière était refusée à la sauvegarde) ; un ailier peut maintenant jouer pilier — et c'est
+    // le terrain qui le fait payer, pas un message d'erreur.
+    let enMelee = false;
+    try { agirCarriere(e, colin.compteId, { type: 'composition', composition: melee }, T0, 'x'); enMelee = true; } catch { /* refusée */ }
+    dire(enMelee, 'et un ailier peut même jouer pilier : la feuille n’est plus refusée');
 
     const effectif = cartesColin.map(coequipierDepuisCarte);
     const rangee = forceFeuille(feuilleGeleeEnLigne(effectif, compo));
+    const improvisee = forceFeuille(feuilleGeleeEnLigne(effectif, melee));
+    dire(improvisee < rangee - 0.5, '⚠️ mais une première ligne improvisée se paie sur le terrain',
+      `${rangee.toFixed(1)} rangée contre ${improvisee.toFixed(1)} avec un ailier au poste de pilier`);
     const empilee = structuredClone(compo);
     const tous = [...empilee.titulaires, ...empilee.remplacants]
       .sort((a, b) => cartesColin.find((c) => c.id === b)!.note - cartesColin.find((c) => c.id === a)!.note);

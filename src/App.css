@@ -8045,6 +8045,8 @@ select:focus {
 .ct-impact-naturel { border-color:rgba(111,208,140,.4); }
 .ct-impact-secondaire { border-color:rgba(232,193,90,.52); background:rgba(96,72,19,.17); }
 .ct-impact-horsPoste { border-color:rgba(227,112,95,.55); background:rgba(104,39,31,.2); }
+/* Contre-emploi ou première ligne improvisée : autorisé, mais on dit ce que ça coûte (Correctif 24). */
+.ct-impact-contre { display:block; margin-top:5px; color:#f3a595; font-weight:600; line-height:1.35; }
 .ct-jauges { margin:0 0 11px; padding:9px 10px 5px; border-radius:9px; background:rgba(255,255,255,.035); }
 .ct-jauges label { display: grid; grid-template-columns: 72px 1fr 38px; align-items: center; gap: 7px; font-size: 11.5px; margin-bottom: 5px; }
 .ct-jauges progress { width: 100%; height: 7px; }
@@ -9148,3 +9150,23 @@ select:focus {
 /* Correctif 20 : l'aperçu 3D du joueur remplace l'ancien modèle dans la vignette du profil et la fenêtre « Ton joueur ». */
 .portrait-joueur .aj3d { min-height: 0; border: 0; border-radius: inherit; background: transparent; pointer-events: none; }
 .modale-joueur-scene .aj3d { min-height: 340px; }
+
+/* ── Fin de match (Correctif 26) : l'état de la finalisation et la prolongation d'un match couperet ── */
+.ml-finalisation {
+  display: inline-flex; align-items: center; gap: 0.45rem;
+  font-size: 0.78rem; letter-spacing: 0.02em; color: var(--craie-dim);
+}
+.ml-finalisation::before {
+  content: ''; width: 0.7rem; height: 0.7rem; border-radius: 50%;
+  border: 2px solid currentColor; border-right-color: transparent;
+  animation: ml-finalisation-tour 0.7s linear infinite;
+}
+@keyframes ml-finalisation-tour { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .ml-finalisation::before { animation: none; } }
+.ml-prolongation {
+  display: flex; align-items: center; gap: 0.5rem; margin: 0 0 0.7rem;
+  padding: 0.55rem 0.8rem; border-radius: var(--rayon-sm);
+  border: 1px solid color-mix(in srgb, var(--or-500) 55%, transparent);
+  background: color-mix(in srgb, var(--or-500) 12%, transparent);
+  font-size: 0.88rem; line-height: 1.35;
+}

@@ -20,6 +20,7 @@ import { apparencePack, modelePackParNom, packAvecSkin } from '../lib/presentati
 import { chargerPacksPrivesSolo, ouvrirPackPriveSolo } from '../lib/carriereEnLigneClient';
 import { appliquerCollectionSoloDistante, attendreBoutiqueSoloEnregistree } from '../lib/synchronisationBoutiqueCompte';
 import './CollectionSolo.css';
+import { fournirCatalogueUsage } from '../lib/usage/collection';
 
 const PAR_PAGE = 40;
 const EchangesCollectionSolo = lazy(() => import('../components/EchangesCollectionSolo').then(module => ({ default: module.EchangesCollectionSolo })));
@@ -35,6 +36,7 @@ export function CollectionSolo() {
   const joueur = useGame(s => s.joueur);
   const manager = useGame(s => s.manager);
   const catalogue = useCatalogueSolo();
+  useEffect(() => { fournirCatalogueUsage(catalogue, cleCarteSolo); }, [catalogue]);
   // Relu à chaque nouveau catalogue : `useCatalogueSolo` change d'identité quand
   // le serveur a servi de nouvelles cartes spéciales.
   const speciales = useMemo(() => (catalogue.length ? catalogueSpecialSolo() : null), [catalogue]);
@@ -197,7 +199,7 @@ export function CollectionSolo() {
     {echangesOuverts && <Suspense fallback={<p>{t("ui.f433895f5136")}</p>}><EchangesCollectionSolo /></Suspense>}
 
     {packsPrives.length > 0 && <section className="solo-rayon" aria-labelledby="solo-packs-prives-titre">
-      <div className="solo-titre-ligne"><div><div className="eyebrow">Réservé au compte Kiri</div><h2 id="solo-packs-prives-titre">ICONS garanties</h2></div><span>Gratuit · 10 cartes · 100 % ICONS</span></div>
+      <div className="solo-titre-ligne"><div><div className="eyebrow">{t('solo.privateAccount')}</div><h2 id="solo-packs-prives-titre">{t('solo.iconGuaranteed')}</h2></div><span>{t('solo.freeIconPack')}</span></div>
       <BoutiquePacks3D packs={packsPrives} solde={coins} occupe={occupe || Boolean(ouverture)} gratuit
         onOuvrir={ouvrirDepuisRoue} chancesSpeciales={() => [{ nom: 'ICON', chance: 100 }]} />
     </section>}

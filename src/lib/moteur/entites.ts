@@ -111,6 +111,12 @@ export interface Pion {
    * recharge en ralentissant, plafonnée à `sprintMax`. Sans `deuxReserves`, le moteur d'origine : une seule jauge.
    */
   deuxReserves?: boolean;
+  /**
+   * Niveau 5 en temps réel (ligue) : ce que la fatigue générale coûte à CE joueur — plancher de son allure de course et
+   * part d'accélération perdue à plat. Absents : les valeurs du match condensé (`REGLAGES_ENDURANCE`).
+   */
+  allurePlancher?: number;
+  accelFatigue?: number;
   sprint: number;
   sprintMax: number;
   /** Barre vide : plus de sprint avant d'avoir regagné `seuilRelance`. */

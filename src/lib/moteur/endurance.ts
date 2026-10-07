@@ -70,7 +70,8 @@ export function sprintMaxDe(endurance: number): number {
 /** Allure de course normale (hors sprint) : la fatigue générale n'écrase jamais un joueur sur place. */
 export function allureDeCourse(p: Pion): number {
   const R = REGLAGES_ENDURANCE;
-  return R.allurePlancher + (1 - R.allurePlancher) * (Math.max(0, Math.min(100, p.endurance)) / 100);
+  const plancher = p.allurePlancher ?? R.allurePlancher;
+  return plancher + (1 - plancher) * (Math.max(0, Math.min(100, p.endurance)) / 100);
 }
 
 /** Peut-il sprinter à cet instant ? */
@@ -81,7 +82,7 @@ export function peutSprinter(p: Pion): boolean {
 /** Facteur d'accélération : un joueur à plat part un peu moins vite, jamais plus de `accelerationFatigue`. */
 export function facteurAcceleration(p: Pion): number {
   const R = REGLAGES_ENDURANCE;
-  return 1 - R.accelerationFatigue * (1 - Math.max(0, Math.min(100, p.endurance)) / 100);
+  return 1 - (p.accelFatigue ?? R.accelerationFatigue) * (1 - Math.max(0, Math.min(100, p.endurance)) / 100);
 }
 
 /**

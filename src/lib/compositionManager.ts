@@ -4,7 +4,7 @@ import type {
 } from '../types.js';
 import type { Coequipier } from './effectif.js';
 import type { RolesEquipe } from './moteur/responsabilites.js';
-import { adequationAuPoste, disponible, facteurDePerformance, type EtatDuJoueur } from './carteJoueur.js';
+import { disponible, rendementAuPoste, type EtatDuJoueur } from './carteJoueur.js';
 
 export const POSTES_XV_MANAGER: PosteId[] = [
   'pilier_gauche', 'talonneur', 'pilier_droit', 'deuxieme_ligne_g', 'deuxieme_ligne_d',
@@ -116,8 +116,7 @@ export function meilleureCompositionManager(
         if (!peutJouerPremiereLigne) return 1e9;
       }
 
-      const adq = adequationAuPoste(j.poste, poste, j.postesSecondaires);
-      const facteur = facteurDePerformance(adq);
+      const facteur = rendementAuPoste(j.poste, poste, j.postesSecondaires);
       const etat = etats?.get(j.id);
       const fatigue = etat?.fatigue ?? 0;
       const forme = etat?.forme ?? 50;
@@ -216,23 +215,25 @@ export function meilleureCompositionManager(
 export function reconcilerCompositionManager(
   effectif: Coequipier[], composition?: Partial<CompositionManager> | null,
   indisponibles: ReadonlySet<string> = new Set(),
+  bancSeulement: ReadonlySet<string> = new Set(),
 ): CompositionManager {
-  const defaut = compositionManagerParDefaut(effectif, indisponibles);
-  if (!composition) return defaut;
+  const defaut = compositionManagerParDefaut(effectif, new Set([...indisponibles, ...bancSeulement]));
+  composition ??= defaut;
   // ⚠️ UN BLESSÉ SORT DE LA FEUILLE, même s'il y était la semaine d'avant :
   //    sinon la composition sauvegardée le réintroduisait à chaque réconciliation.
   const ids = new Set(effectif.filter((x) => !indisponibles.has(x.id)).map((x) => x.id));
   const pris = new Set<string>();
-  const remplir = (source: string[] | undefined, postes: PosteId[], secours: string[]) => postes.map((_, i) => {
+  const remplir = (source: string[] | undefined, postes: PosteId[], secours: string[], titulaire = false) => postes.map((_, i) => {
+    const permis = (id: string) => ids.has(id) && !pris.has(id) && (!titulaire || !bancSeulement.has(id));
     const souhaite = source?.[i];
-    if (souhaite && ids.has(souhaite) && !pris.has(souhaite)) { pris.add(souhaite); return souhaite; }
-    const propose = secours.find((id) => ids.has(id) && !pris.has(id));
+    if (souhaite && permis(souhaite)) { pris.add(souhaite); return souhaite; }
+    const propose = secours.find(permis);
     if (propose) { pris.add(propose); return propose; }
-    const libre = effectif.find((j) => !pris.has(j.id));
+    const libre = effectif.find((j) => permis(j.id));
     if (libre) pris.add(libre.id);
     return libre?.id ?? '';
   }).filter(Boolean);
-  const titulaires = remplir(composition.titulaires, POSTES_XV_MANAGER, defaut.titulaires);
+  const titulaires = remplir(composition.titulaires, POSTES_XV_MANAGER, defaut.titulaires, true);
   const remplacants = remplir(composition.remplacants, POSTES_BANC_MANAGER, defaut.remplacants);
   const feuille = new Set([...titulaires, ...remplacants]);
   // Les autres rôles (Correctif 17) : on garde ceux dont le joueur est toujours sur la feuille, les autres retombent en « automatique ».
@@ -245,9 +246,9 @@ export function reconcilerCompositionManager(
     titulaires,
     remplacants,
     capitaineId: composition.capitaineId && titulaires.includes(composition.capitaineId)
-      ? composition.capitaineId : defaut.capitaineId,
+      ? composition.capitaineId : titulaires.includes(defaut.capitaineId) ? defaut.capitaineId : titulaires[0] ?? '',
     buteurId: composition.buteurId && feuille.has(composition.buteurId)
-      ? composition.buteurId : defaut.buteurId,
+      ? composition.buteurId : feuille.has(defaut.buteurId) ? defaut.buteurId : titulaires[0] ?? remplacants[0] ?? '',
     ...autres,
   };
 }

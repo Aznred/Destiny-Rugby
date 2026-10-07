@@ -18,6 +18,35 @@ import type { EtatMatch } from './etat.js';
 /** Les conquêtes lisibles sont-elles actives dans ce match ? (niveau figé à la création) */
 export function conqueteLisible(e: Pick<EtatMatch, 'ia'>): boolean { return (e.ia ?? 1) >= 4; }
 
+/**
+ * LE JEU VIVANT (Correctifs 24 et 25, niveau d'IA 5). Le ballon ne meurt que lorsqu'il est mort : une pénalité accordée avant
+ * la sirène se joue jusqu'au bout (touche ou mêlée comprises), un tir manqué qui retombe dans le champ ou dans l'en-but reste
+ * en jeu, le regroupement se forme autour du joueur plaqué là où il est tombé, les phases arrêtées partent dès que leurs
+ * joueurs sont prêts, un coup de pied dans le jeu courant part vite — et celui qui l'arme peut être plaqué ou contré.
+ * ⚠️ Niveau figé à la création du match : les rencontres de ligue commencées avant gardent leur moteur.
+ */
+export function jeuVivant(e: Pick<EtatMatch, 'ia'>): boolean { return (e.ia ?? 1) >= 5; }
+
+/** La mêlée quand les packs sont prêts : flexion, liaison, jeu — sans temps mort entre les ordres (secondes). */
+export const MELEE_VIVE = { liaison: 2.1, impact: 0.8, introduction: 1.0, sortie: 0.8 } as const;
+/**
+ * Le rituel du buteur sans attente : le tee et le ballon sont installés PENDANT qu'il arrive, il n'en joue donc que la fin
+ * (`de` : part de la routine déjà faite quand il s'accroupit), puis recule, vise et frappe.
+ */
+export const RITUEL_VIF = { celebration: 4.2, ramassage: 1.0, pose: 4.3, de: 0.55, pret: 0.7 } as const;
+/**
+ * Le délai entre l'armé et la frappe d'un coup de pied dans le jeu courant, par type (secondes). Un coup de pied placé prend
+ * son temps ; un rasant ou un petit par-dessus sous pression, non.
+ */
+export const FRAPPE_VIVE = { rasant: 0.18, chip: 0.24, degagement: 0.32, boite: 0.42, drop: 0.5 } as const;
+/** Avant cet instant de la frappe, un défenseur arrivé au contact plaque le botteur ; après, il ne peut plus que gêner ou contrer. */
+export const MARGE_DE_FRAPPE = 0.16;
+/**
+ * La touche (niveau 5) : tant que sa formation n'a pas atteint cette part (alignements en place, ballon en main, personne ne
+ * saute encore), son temps s'écoule à ce facteur. Le saut, lui, garde sa durée.
+ */
+export const CADENCE_TOUCHE = { jusqua: 0.32, facteur: 2.4 } as const;
+
 export const REGLAGES_CONQUETE = {
   // ── La touche ─────────────────────────────────────────────────────────────
   /** Avancement de la formation (0 → 1) où l'issue est tranchée : juste avant le saut, qui part à 0,48. */

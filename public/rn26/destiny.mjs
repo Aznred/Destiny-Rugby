@@ -1,3 +1,4 @@
+// correctif24-scene
 // correctif23-ruck
 // correctif23-touche
 import { PhysicalPlayers,lineoutGroups,scrumSlots,maulSlots } from './placements.mjs';
@@ -153,8 +154,9 @@ export class DestinyMatch {
         if(!(src?.sanction>0))continue;
         const equipe=src.cote==='A'?0:1,de=this.dernieres.get(id)||xyz(src.pos),rouge=src.sanction>9000;
         // Dix minutes : il attend debout au bord de la touche, devant son banc, et c'est de là qu'il rentrera.
-        const vers=rouge?{x:38.5*inv,z:(equipe===0?-1.6:1.6)*inv}:{x:35.4*inv,z:(equipe===0?-9:9)*inv},d=Math.hypot(de.x-vers.x,de.z-vers.z);
-        this.changements.push({type:'sortie',id,debut:now,attente:4.8,duree:4.8+clamp(d/1.85,2,34),de,vers,equipe,src,allure:1.85,carton:true,rouge});
+        // Correctif 24 : il QUITTE la pelouse. Un jaune va s'asseoir derrière son banc, à six mètres de la touche ; un rouge rentre au tunnel.
+        const vers=rouge?{x:44*inv,z:(equipe===0?-1.6:1.6)*inv}:{x:41.5*inv,z:(equipe===0?-8:8)*inv},d=Math.hypot(de.x-vers.x,de.z-vers.z);
+        this.changements.push({type:'sortie',id,debut:now,attente:4.8,duree:4.8+clamp(d/2.3,2,30),de,vers,equipe,src,allure:2.3,carton:true,rouge});
         // Son corps physique est oublié : à son retour il repart du bord du terrain, pas de l'endroit de la faute.
         this.physics.bodies.delete(id);
         continue;
@@ -176,6 +178,8 @@ export class DestinyMatch {
         const dx=p.x-c.de.x,dz=p.z-c.de.z,d=Math.hypot(dx,dz)||1,v=Math.min(6.2,d/c.duree);
         p.x=c.de.x+dx*k;p.z=c.de.z+dz*k;p.vx=dx/d*v;p.vz=dz/d*v;p.entrant=true;
       }else{
+        // Sorti : il n'est plus sur la scène de jeu (le jaune reviendra de là où il s'est assis).
+        if(c.carton&&k>=1)continue;
         const dx=c.vers.x-c.de.x,dz=c.vers.z-c.de.z,d=Math.hypot(dx,dz)||1;
         // Tant que l'arbitre n'a pas fini, il ne bouge pas.
         const part=now-c.debut>=attente&&k<1,vx=part?dx/d*c.allure:0,vz=part?dz/d*c.allure:0,x=c.de.x+dx*k,z=c.de.z+dz*k;
@@ -307,7 +311,7 @@ export class DestinyMatch {
     return {avance:m.avanceFinale*k,angle:m.angleFinal*k,ecart};
   }
   /** Durée de la liaison : celle du moteur, ou celle du découpage. */
-  dureeLiaison(m){return m.synthese?Math.max(.4,m.durees.liaison):this.outils.TEMPS_MELEE.liaison;}
+  dureeLiaison(m){return m.durees?.liaison!=null?Math.max(.4,m.durees.liaison):this.outils.TEMPS_MELEE.liaison;}
   /**
    * Le tir au but à afficher. Sans rituel détaillé dans le moteur, les étapes
    * (pose, concentration, élan) sont lues sur la progression de la phase.
@@ -428,7 +432,7 @@ export class DestinyMatch {
         clip('kickoff_pickup_ball',depuis*1.15);
         d.anchor={...this.remember('ramassage:'+tir.etapeDepuis,()=>({x:p.x,z:p.z,heading:cap(sol.x-p.x,sol.z-p.z)})),mode:'rel'};
       }else if(tir.etape==='transport'){d.carry='deux';d.heading=speed<.4?face:null;}
-      else if(tir.etape==='pose'){clip('kick_conversion_a_setup',clamp(depuis/(tir.humain?this.outils.RITUEL_TIR.poseHumain:this.outils.RITUEL_TIR.pose),0,1),false,true);d.anchor=tee;}
+      else if(tir.etape==='pose'){const fait=tir.humain?0:(tir.rituel?.de??0);clip('kick_conversion_a_setup',fait+(1-fait)*clamp(depuis/(tir.humain?this.outils.RITUEL_TIR.poseHumain:(tir.rituel?.pose??this.outils.RITUEL_TIR.pose)),0,1),false,true);d.anchor=tee;}
       else if(tir.etape==='pret'||tir.etape==='vise'){clip('kick_conversion_a_ready',depuis,true);d.anchor=tee;}
       else if(tir.etape==='elan'){clip('kick_conversion_a_kick',Math.min(depuis,IMPACT_TIR));d.anchor=tee;}
       return done();

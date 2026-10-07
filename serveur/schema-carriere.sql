@@ -107,5 +107,41 @@ create table if not exists carriere_salons_amicaux (
   modifie_le timestamptz not null default now()
 );
 create index if not exists carriere_salons_amicaux_expire_idx on carriere_salons_amicaux (expire_le);
+-- Les statistiques d'utilisation du Labo (Correctif 25). Un relevé ANONYME par appareil et par jour (identifiant tiré au
+-- hasard dans le navigateur : ni compte, ni pseudo, ni adresse), et des compteurs déjà sommés par jour. Le Labo ne lit
+-- que des agrégats. Sans ces tables, le jeu n'envoie rien d'utile et le Labo dit que les statistiques ne sont pas posées.
+create table if not exists usage_jours (
+  jour date not null,
+  appareil text not null,
+  premier date not null,
+  mode_premier text not null,
+  secondes jsonb not null default '{}'::jsonb check (jsonb_typeof(secondes) = 'object'),
+  sessions integer not null default 0 check (sessions >= 0),
+  jauges jsonb,
+  primary key (jour, appareil)
+);
+create index if not exists usage_jours_appareil_idx on usage_jours (appareil, jour);
+-- Identité indépendante de celle du compte, derniers instantanés uniquement.
+create table if not exists usage_carrieres (
+  appareil text not null, id text not null,
+  debut date not null, dernier date not null, donnees jsonb not null,
+  primary key (appareil, id)
+);
+create index if not exists usage_carrieres_dernier_idx on usage_carrieres (dernier);
+create table if not exists usage_compteurs (
+  jour date not null,
+  cle text not null,
+  n bigint not null default 0,
+  primary key (jour, cle)
+);
+-- Le marché commun des divisions publiques (Correctif 24) : UN document par cycle (« public:<cycle> »), toutes les
+-- annonces des divisions de ce cycle. La colonne revision porte la comparaison-écriture : de deux achats simultanés
+-- du même joueur, un seul trouve la révision qu'il a lue. Sans cette table, chaque division garde son marché.
+create table if not exists carriere_marches (
+  id text primary key,
+  revision integer not null default 1 check (revision >= 1),
+  donnees jsonb not null check (jsonb_typeof(donnees) = 'object'),
+  modifie_le timestamptz not null default now()
+);
 -- Ne pas purger carriere_commandes pendant la vie d'une ligue : ses reçus
 -- interdisent qu'une ancienne requête rejouée rachète un pack ou un joueur.

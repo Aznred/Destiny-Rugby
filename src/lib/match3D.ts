@@ -9,6 +9,7 @@
 // sont servis tels quels depuis `public/` : un joueur qui n'ouvre jamais de
 // match ne télécharge ni le stade ni les mouvements (une quarantaine de Mo).
 
+import { jalon } from './finMatch';
 import { geometrieMelee, TEMPS_MELEE, RITUEL_TIR } from './moteur/moteur';
 import { porteurPourAffichage } from './moteur/dynamique';
 import type { EtatMatch } from './moteur/etat';
@@ -61,6 +62,11 @@ export interface Son3D {
 export interface OptionsScene3D {
   /** Domicile d'abord : c'est son public qui remplit le stade. */
   equipes: [EquipeScene3D, EquipeScene3D];
+  /**
+   * Les deux tenues sont déjà départagées par l'écran (`lib/tenuesMatch.ts`) : la scène les habille telles quelles. Sans
+   * ce drapeau elle refait son propre choix, et le tableau des scores pourrait afficher une autre couleur que le terrain.
+   */
+  tenuesDepartagees?: boolean;
   /** Par identifiant de pion : ce que la carte du joueur sait de son apparence. */
   apparences?: Record<string, Pick<ApparenceMatch, 'peau' | 'cheveux' | 'coiffure' | 'barbe' | 'coupeId' | 'barbeId' | 'couleurBarbe' | 'morpho' | 'equipement'>>;
   /** Le pion du joueur, cerclé sur la pelouse. */
@@ -69,6 +75,10 @@ export interface OptionsScene3D {
   suivreMoi?: boolean | number;
   /** Téléphone ou tablette : textures et définition réduites. */
   leger?: boolean;
+  /** Le profil de l'appareil (`lib/profilAppareil.ts`) : « bas » fait partir la scène à 30 images par seconde régulières. */
+  profil?: 'bas' | 'moyen' | 'haut';
+  /** `false` : la scène ne règle ni sa définition ni sa cadence (bancs de mesure). */
+  cadence?: boolean;
   /** Le navigateur a repris le contexte graphique en cours de match : à l'hôte de revenir au terrain vu de haut. */
   surPerte?: () => void;
   camera?: Camera3D;
@@ -95,6 +105,8 @@ export interface Scene3D {
   /** Position à l'écran, en pixels du cadre, du dessus de la tête d'un joueur. */
   ecran(id: string, hauteurTete?: number): { x: number; y: number } | null;
   detruire(): void;
+  /** La même destruction, par tranches (Correctif 26). Absente d'un lecteur installé avant ce correctif. */
+  detruireParEtapes?(): Promise<void>;
   /** `null` quand le navigateur n'a pas de sortie son. */
   son: Son3D | null;
   television: { ralentis: boolean };
@@ -120,6 +132,10 @@ export interface Scene3D {
   /** `libre` : la caméra reste où le joueur l'a mise ; `assistee` : elle revient derrière sa course après un moment. */
   modeCamera: 'libre' | 'assistee';
   readonly ips: number;
+  /** Le profileur (Correctif 25) : ce que coûte une image. Absent d'un lecteur plus ancien. */
+  mesures?(): import('./profileur').MesuresScene;
+  /** Mesure GPU facultative, uniquement lorsque le profileur est affiché. */
+  mesurerGpu?(actif: boolean): void;
   /** Les repères du contrôle direct, redessinés à chaque image ; `null` les éteint. */
   reperes: ReperesScene | null;
   /** « Droit devant » et « à droite » tels que le joueur les voit, en repère terrain (vecteurs unitaires). */
@@ -297,3 +313,34 @@ export function tenueDepuisCouleurs(principal: string, secondaire: string | unde
 export function ecussonPourToile(logo: string | undefined): string | undefined {
   return logo ? sourceEcusson(logo) : undefined;
 }
+
+// ── RENDRE UNE SCÈNE SANS BLOQUER L'ÉCRAN (Correctif 26) ─────────────────────────────────────────────────────────
+// L'écran de fin de match REMPLACE la scène : React la démonte dans l'image du coup de sifflet. Détruite d'un bloc à
+// ce moment-là (trente joueurs, textures du stade, contexte WebGL, son), c'était LA grosse image de la fin de match.
+// La scène se rend maintenant par tranches ; ceux qui ont un travail lourd à faire ensuite (finaliser le match,
+// quitter le plein écran, changer de page) attendent `scenesRendues()`.
+const destructions = new Set<Promise<void>>();
+
+/** Détruit une scène par tranches (d'un bloc si le lecteur ne sait pas faire). Ne lève jamais d'erreur. */
+export function detruireScene(scene: Scene3D | null | undefined): Promise<void> {
+  if (!scene) return Promise.resolve();
+  jalon('scene_cleanup_start');
+  let promesse: Promise<void>;
+  try {
+    promesse = scene.detruireParEtapes ? scene.detruireParEtapes() : Promise.resolve(scene.detruire());
+  } catch { promesse = Promise.resolve(); }
+  // Le filet : une tranche qui échoue ne laisse pas un contexte graphique ouvert.
+  const suivie: Promise<void> = promesse
+    .catch(() => { try { scene.detruire(); } catch { /* déjà rendue */ } })
+    .then(() => { destructions.delete(suivie); jalon('scene_cleanup_end'); });
+  destructions.add(suivie);
+  return suivie;
+}
+
+/** Tenue quand plus aucune scène n'est en cours de destruction. */
+export function scenesRendues(): Promise<void> {
+  return Promise.all([...destructions]).then(() => undefined);
+}
+
+/** Combien de scènes sont encore en train d'être rendues (banc et diagnostic). */
+export function scenesEnDestruction(): number { return destructions.size; }

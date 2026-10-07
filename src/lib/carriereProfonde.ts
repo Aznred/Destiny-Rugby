@@ -6,8 +6,8 @@
 // les liens, les réputations, les records et les choix politiques qui donnent
 // une couleur différente à deux sauvegardes de trente saisons.
 
-import { clubParNom, competitionDuClub } from '../data/clubs.js';
-import { distanceKm, positionDuClub } from '../data/geographie.js';
+import { competitionDuClub } from '../data/clubs.js';
+import { derbyGeographique } from './donneesClubs.js';
 import { POSTE_PAR_ID } from '../data/rugby.js';
 import type { Manager, PosteId, ResultatMatchManager, TactiqueManager } from '../types.js';
 import { graine } from './championnat.js';
@@ -509,40 +509,7 @@ function profilApresMatch(profil: ProfilTactiqueManager, tactique: TactiqueManag
   };
 }
 
-export function contexteDerby(clubA: string, clubB: string): {
-  derby: boolean;
-  distance: number;
-  type: 'local' | 'departemental' | 'regional' | null;
-  libelle: string;
-  motivation: number;
-  pression: number;
-  medias: number;
-} {
-  // ⚠️ UNE DISTANCE N'EST PAS UN ALÉA. L'ancienne version tirait un nombre
-  // stable à partir des deux noms : Toulouse–Montpellier pouvait ainsi devenir
-  // un « derby à 16 km ». La géographie du centre de formation possède déjà
-  // les coordonnées réelles des villes connues et un repli déterministe pour
-  // les villages ; le match doit lire cette même source de vérité.
-  const distance = distanceKm(positionDuClub(clubA), positionDuClub(clubB));
-  const a = clubParNom(clubA);
-  const b = clubParNom(clubB);
-  const memeDepartement = !!a?.departementNum && a.departementNum === b?.departementNum;
-  const memeLigue = !!a?.ligue && a.ligue === b?.ligue;
-  const type = distance <= 55 ? 'local'
-    : memeDepartement && distance <= 95 ? 'departemental'
-      : memeLigue && distance <= 120 ? 'regional'
-        : null;
-  const intensite = type === 'local' ? 3 : type === 'departemental' ? 2 : type === 'regional' ? 1 : 0;
-  return {
-    derby: type !== null,
-    distance,
-    type,
-    libelle: type === 'local' ? 'Derby local' : type === 'departemental' ? 'Derby départemental' : type === 'regional' ? 'Derby régional' : '',
-    motivation: intensite,
-    pression: intensite * 8,
-    medias: intensite * 10,
-  };
-}
+export const contexteDerby = derbyGeographique;
 
 function ajouterMotif(supporters: SupportersClub, texte: string, delta: number, m: Manager): SupportersClub {
   return { ...supporters, confiance: borne(supporters.confiance + delta), motifs: [{ texte, delta, saison: m.saison, semaine: m.semaine }, ...supporters.motifs].slice(0, 8) };
@@ -631,7 +598,7 @@ function miseAJourRecords(vie: VieClubProfonde, m: Manager, effectif: Coequipier
   ]) { const maj = meilleurRecord(records.club, record); records.club = maj.registre; if (maj.battu && record.valeur > 1) battus.push(record); }
   const derby = contexteDerby(m.club, resultat.adversaire);
   const marketing = moyenne(Object.values(vie.popularites).map((p) => p.marketing));
-  const affluence = Math.round((900 + vie.reputations.locale * 115) * (derby.derby ? 1.3 : 1) * (1 + marketing / 500) * (1 + Math.max(0, marge) / 150));
+  const affluence = Math.round((900 + vie.reputations.locale * 115) * (derby.derby ? 1.12 : 1) * (1 + marketing / 500) * (1 + Math.max(0, marge) / 150));
   const aff = { id: 'affluence', libelle: 'Plus grosse affluence', valeur: affluence, unite: 'spectateurs', saison, adversaire: resultat.adversaire };
   const majAff = meilleurRecord(records.club, aff); records.club = majAff.registre; if (majAff.battu) battus.push(aff);
   const championnat = [
@@ -655,7 +622,7 @@ export function apresResultatProfonde(etatInitial: EtatCarriereProfonde, m: Mana
   const derby = contexteDerby(m.club, resultat.adversaire);
   const offensif = resultat.essaisPour >= 3;
   vie.supporters = ajouterMotif(vie.supporters,
-    derby.derby ? `${victoire ? 'Derby remporté' : 'Derby non remporté'} à ${derby.distance} km.` : victoire ? 'Résultat satisfaisant.' : nul ? 'Match nul sans relief.' : 'Défaite mal vécue.',
+    derby.derby ? `${victoire ? 'Derby remporté' : 'Derby non remporté'} ${derby.distance === null ? '(rivalité historique)' : 'à ' + derby.distance + ' km'}.` : victoire ? 'Résultat satisfaisant.' : nul ? 'Match nul sans relief.' : 'Défaite mal vécue.',
     (victoire ? 3 : nul ? 0 : -3) * (derby.derby ? 1.7 : 1), m);
   if (offensif) vie.supporters = ajouterMotif(vie.supporters, 'Rugby offensif apprécié.', 2, m);
   else if (m.tactique.attaque === 'occupation' && !victoire) vie.supporters = ajouterMotif(vie.supporters, 'Rugby considéré trop prudent.', -2, m);

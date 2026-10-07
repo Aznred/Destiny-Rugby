@@ -30,7 +30,7 @@ import { noter } from '../lib/tutoriel/guide';
 import { POSTES_BANC_MANAGER, POSTES_XV_MANAGER } from '../lib/compositionManager';
 import {
   adequationAuPoste, alertesDeComposition, badgesDe,
-  facteurDePerformance, notesDeLEquipe, statsDeCarte, statutDe, valeurAxe,
+  notesDeLEquipe, rendementAuPoste, statsDeCarte, statutDe, valeurAxe,
   attributsDe, ABREVIATION, axesDe, rareteDe, estPepite, NOM_RARETE,
 } from '../lib/carteJoueur';
 import type {
@@ -346,7 +346,8 @@ function PanneauJoueur({
   const rarete = rareteDe(joueur);
   const adequation = posteSlot
     ? adequationAuPoste(joueur.poste, posteSlot, joueur.postesSecondaires) : 'naturel';
-  const rendement = facteurDePerformance(adequation);
+  // Le rendement réel au poste : un contre-emploi coûte plus qu'un simple hors-poste (`rendementAuPoste`).
+  const rendement = posteSlot ? rendementAuPoste(joueur.poste, posteSlot, joueur.postesSecondaires) : 1;
   const noteEffective = Math.round(joueur.note * rendement);
   const postesSecondaires = [...new Set(joueur.postesSecondaires ?? [])]
     .filter((poste) => poste !== joueur.poste);
@@ -407,6 +408,7 @@ function PanneauJoueur({
               ? t('compo.impact.aucunMalus', { note: joueur.note })
               : t('compo.impact.malus', { pct: Math.round((1 - rendement) * 100), note: joueur.note, effective: noteEffective })}
           </small>
+          {rendement < 0.8 && <small className="ct-impact-contre">{t(rendement <= 0.6 ? 'compo.impact.premiereLigne' : 'compo.impact.contreEmploi')}</small>}
         </section>
       )}
 

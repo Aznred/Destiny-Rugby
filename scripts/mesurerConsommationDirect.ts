@@ -10,7 +10,8 @@
 // secondes, et deux lancements donnent exactement les mêmes chiffres.
 //
 // Les clients sont ceux de l'écran (`CarriereEnLigne.tsx`) :
-//   · un sondage du direct toutes les 2 s, qui annonce sa version et son film ;
+//   · un sondage du direct toutes les 3 s, qui annonce sa version et le dernier pas de sa chronologie
+//     (`--film` : l'écran d'avant le Correctif 24, film v1 sondé toutes les 2 s) ;
 //   · un battement de présence toutes les 25 s pour les deux managers ;
 //   · une réponse à chaque décision de pénalité, quelques secondes après ;
 //   · le réveil durable de la file Vercel, une fois par minute et par ligue,
@@ -26,7 +27,8 @@ import { gzipSync } from 'node:zlib';
 import { creerGestionnaireCarriere, empreinteJeton } from '../serveur/carriereApi';
 import { creerBase, poids, Releve, type Compteur } from './baseQuiCompte';
 import { agirCarriere, creerCarriere } from '../src/lib/ligue/carriere';
-import { diagnosticCacheMatchEnLigne } from '../src/lib/ligue/matchCarriere';
+import { diagnosticCacheMatchEnLigne, espaceMoteursPourBanc } from '../src/lib/ligue/matchCarriere';
+import { LecteurFilm } from '../src/lib/ligue/filmDirect';
 import type { EtatCarriereEnLigne } from '../src/lib/ligue/typesCarriere';
 
 const arg = (nom: string, defaut: number) => {
@@ -40,6 +42,9 @@ const SPECTATEURS = arg('spectateurs', 2);
 const CLUBS = arg('clubs', 2);
 const INSTANCES = arg('instances', 1);
 const ANCIEN = option('ancien');
+/** L'écran d'avant la chronologie : film v1, sondage toutes les deux secondes. */
+const FILM_V1 = option('film') || ANCIEN;
+const SONDAGE_MS = FILM_V1 ? 2_000 : 3_000;
 /** Les règles des matchs mesurés ; 0 = celles du jeu (`REGLES_MATCH_EN_LIGNE`). */
 const REGLES = arg('regles', 0);
 const SORTIE = process.argv.find((a) => a.startsWith('--json='))?.split('=')[1];
@@ -53,7 +58,11 @@ Date.now = () => horloge;
 interface Reponse { statut: number; donnees: any; octets: number; json: string }
 type Gestionnaire = ReturnType<typeof creerGestionnaireCarriere>;
 
+/** Chaque instance a son propre cache de moteurs, comme en production. */
+const espaces = new Map<Gestionnaire, string>();
 async function appeler(api: Gestionnaire, methode: 'GET' | 'POST', url: string, jeton: string, body?: object): Promise<Reponse> {
+  if (!espaces.has(api)) espaces.set(api, `instance-${espaces.size + 1}`);
+  espaceMoteursPourBanc(espaces.get(api)!);
   let statut = 200; let donnees: unknown;
   const res = { status(n: number) { statut = n; return res; }, setHeader() {}, json(x: unknown) { donnees = x; } };
   await api.handler({ method: methode, url, headers: { host: 'localhost', origin: 'http://localhost', 'content-type': 'application/json', cookie: `destiny_carriere=${jeton}` }, body } as never, res as never);
@@ -67,6 +76,8 @@ interface Spectateur {
   termine: boolean; decisionA?: number; decisionVue?: number; choix?: string; presenceAcquittee?: number;
   /** Repères des parties lentes déjà reçues (Correctif 11). */
   reperes?: string;
+  /** Le lecteur de la chronologie (Correctif 24) : c'est lui qui dit quel pas annoncer. */
+  lecteur: LecteurFilm;
 }
 
 interface Mesure {
@@ -76,7 +87,7 @@ interface Mesure {
   octetsDirect: number; octetsDirectMax: number; octetsDirectGzip: number; pasFilm: number; reponsesVides: number;
   sql: Record<string, Compteur>; select: number; update: number; insert: number;
   octetsBaseEnvoyes: number; octetsBaseRecus: number;
-  cpuMs: number; memoireMo: number; cacheMoteursMo: number; causes: Record<string, number>;
+  cpuMs: number; memoireMo: number; cacheMoteursMo: number; causes: Record<string, number>; raccords: number;
   parties: Record<string, number>; gardes: Record<string, number>;
   dureeBancS: number;
 }
@@ -117,7 +128,7 @@ async function mesurer(nombreMatchs: number): Promise<Mesure> {
       const public_ = [...camps, ...autres].slice(0, Math.max(1, SPECTATEURS));
       public_.forEach((m, k) => spectateurs.push({
         jeton: m.jeton, compte: m.compte, ligue: id, match: r.id, manager: k < 2 && camps.includes(m),
-        prochainSondage: 0, prochainePresence: 0, version: 0, film: null, termine: false,
+        prochainSondage: 0, prochainePresence: 0, version: 0, film: null, termine: false, lecteur: new LecteurFilm(),
       }));
     }
   }
@@ -155,7 +166,7 @@ async function mesurer(nombreMatchs: number): Promise<Mesure> {
     sondages: 0, presencesPost: 0, reveils: 0, commandes: 0, decisions: 0, refus: 0, score: 0, essais: 0,
     octetsDirect: 0, octetsDirectMax: 0, octetsDirectGzip: 0, pasFilm: 0, reponsesVides: 0,
     sql: {}, select: 0, update: 0, insert: 0, octetsBaseEnvoyes: 0, octetsBaseRecus: 0,
-    cpuMs: 0, memoireMo: 0, cacheMoteursMo: 0, causes: {}, parties: {}, gardes: {}, dureeBancS: 0,
+    cpuMs: 0, memoireMo: 0, cacheMoteursMo: 0, causes: {}, parties: {}, gardes: {}, dureeBancS: 0, raccords: 0,
   };
   const debutBanc = performance.now();
   const debut = horloge;
@@ -173,6 +184,7 @@ async function mesurer(nombreMatchs: number): Promise<Mesure> {
   for (horloge = debut; horloge < fin; horloge += 100) {
     if (horloge >= prochainReveil) {
       prochainReveil += 60_000;
+      espaceMoteursPourBanc('file');
       for (const l of ligues) { await chrono(() => file.actualiserLigue(l.id)); m.reveils++; }
       memoireMax = Math.max(memoireMax, process.memoryUsage().heapUsed);
     }
@@ -197,9 +209,9 @@ async function mesurer(nombreMatchs: number): Promise<Mesure> {
         m.commandes++;
       }
       if (horloge < s.prochainSondage) continue;
-      s.prochainSondage = horloge + 2_000;
-      const url = `/api/carriere?ligue=${s.ligue}&direct=${encodeURIComponent(s.match)}&v=${s.version}&film=${s.film ?? ''}`
-        + (ANCIEN ? '' : `&r=${s.reperes ?? ''}`);
+      s.prochainSondage = horloge + SONDAGE_MS;
+      const url = `/api/carriere?ligue=${s.ligue}&direct=${encodeURIComponent(s.match)}&v=${s.version}`
+        + (FILM_V1 ? `&film=${s.film ?? ''}` : `&tl=${s.lecteur.repere}`) + (ANCIEN ? '' : `&r=${s.reperes ?? ''}`);
       const r = await chrono(() => appeler(api(tour++), 'GET', url, s.jeton));
       m.sondages++; m.octetsDirect += r.octets; m.octetsDirectMax = Math.max(m.octetsDirectMax, r.octets);
       // Ce qui voyage vraiment : Vercel compresse les réponses JSON.
@@ -212,6 +224,14 @@ async function mesurer(nombreMatchs: number): Promise<Mesure> {
       if (r.donnees.presence) s.presenceAcquittee = horloge;
       for (const cle of r.donnees.gardes ?? []) m.gardes[cle] = (m.gardes[cle] ?? 0) + 1;
       if (match) for (const [cle, valeur] of Object.entries(match)) m.parties[cle] = (m.parties[cle] ?? 0) + poids(valeur);
+      if (match?.chrono) {
+        const avant = s.lecteur.dernier ?? 0;
+        s.lecteur.recevoirChrono(match.chrono);
+        // Le lecteur ne joue pas ici : on le tient à jour d'un coup, comme un écran qui suit.
+        s.lecteur.avancer(60);
+        m.pasFilm += Math.max(0, (s.lecteur.dernier ?? 0) - avant);
+        m.raccords = Math.max(m.raccords, s.lecteur.raccords + s.lecteur.coupes);
+      }
       const film = match?.film;
       if (film) {
         if (film.cle && !(s.film !== null && film.cle.n <= s.film && film.cle.n + film.pas.length >= s.film)) s.film = film.cle.n + film.pas.length;
@@ -253,7 +273,7 @@ function rapport(m: Mesure) {
   console.log(`  PAR MATCH   SELECT ${p(m.select).toFixed(0)}   UPDATE ${p(m.update).toFixed(0)}   INSERT ${p(m.insert).toFixed(0)}   → ${p(m.select + m.update + m.insert).toFixed(0)} requêtes SQL`
     + `   (${(par(m.select + m.update + m.insert, m.matchs * m.minutesJouees)).toFixed(1)} par minute)`);
   console.log(`              base : ${ko(p(m.octetsBaseEnvoyes))} Ko envoyés, ${ko(p(m.octetsBaseRecus))} Ko reçus`);
-  console.log(`              réseau client : ${p(m.sondages).toFixed(0)} sondages, ${ko(p(m.octetsDirect))} Ko (moyenne ${ko(par(m.octetsDirect, m.sondages))} Ko, pic ${ko(m.octetsDirectMax)} Ko ; compressé ${ko(p(m.octetsDirectGzip))} Ko), ${p(m.pasFilm).toFixed(0)} pas de film`);
+  console.log(`              réseau client : ${p(m.sondages).toFixed(0)} sondages, ${ko(p(m.octetsDirect))} Ko (moyenne ${ko(par(m.octetsDirect, m.sondages))} Ko, pic ${ko(m.octetsDirectMax)} Ko ; compressé ${ko(p(m.octetsDirectGzip))} Ko), ${p(m.pasFilm).toFixed(0)} pas de film${FILM_V1 ? ' (film v1)' : `, ${m.raccords} raccord ou reprise`}`);
   console.log(`              présences POST ${p(m.presencesPost).toFixed(0)}, décisions proposées ${p(m.decisions).toFixed(1)}, commandes ${p(m.commandes).toFixed(1)} (${m.refus} refusées), réveils de file ${p(m.reveils).toFixed(0)}`);
   if (m.score) console.log(`              rugby : ${p(m.score).toFixed(1)} points et ${p(m.essais).toFixed(1)} essais par match`);
   console.log(`              calcul serveur ${p(m.cpuMs).toFixed(0)} ms (${par(m.cpuMs, m.sondages + m.presencesPost + m.reveils + m.commandes).toFixed(2)} ms par requête HTTP)`);

@@ -6,9 +6,10 @@ import { graine } from './championnat.js';
 import { nomNation } from './nations.js';
 import { situationSalariale } from './recrutementManager.js';
 import { nombre } from './i18n.js';
+import { coupesDuClub } from './coupe.js';
 
 export type IndicateurObjectif = 'classement' | 'masseSalariale' | 'reserveTransferts'
-  | 'feuillesJeunes' | 'recruesJeunes' | 'locaux' | 'essais' | 'victoires' | 'defensesSolides';
+  | 'parcoursCoupe' | 'feuillesJeunes' | 'recruesJeunes' | 'locaux' | 'essais' | 'victoires' | 'defensesSolides';
 
 /** Les priorités tournent chaque saison, dans les limites du groupe réel. */
 export function objectifsDeSaison(m: Manager, effectif: Coequipier[]): ObjectifDirection[] {
@@ -39,7 +40,11 @@ export function objectifsDeSaison(m: Manager, effectif: Coequipier[]): ObjectifD
   if (locaux / Math.max(1, effectif.length) >= .6) priorites.push(creer('locaux', 'identite', 'Préserver l’ancrage local',
     `Conserver au moins 60 % de joueurs de ${comp?.pays} dans l’effectif senior.`, 60));
   const depart = (Math.floor(graine(`priorites#${m.club}`)() * priorites.length) + (m.saison - 1) * 2) % priorites.length;
-  return [sportif, financier, priorites[depart], priorites[(depart + 1) % priorites.length]];
+  const objectifs = [sportif, financier, priorites[depart], priorites[(depart + 1) % priorites.length]];
+  if (coupesDuClub(m.club, m.saison).length) objectifs.push(creer('parcoursCoupe', 'sportif',
+    m.objectif <= 6 ? 'Atteindre les quarts de Coupe' : 'Sortir des poules en Coupe',
+    'Le parcours se mesure uniquement sur les rencontres réellement disputées en Coupe.', m.objectif <= 6 ? 2 : 1));
+  return objectifs;
 }
 
 /** Même mesure pour Direction et pour le verdict final ; aucune réussite tirée au sort. */
@@ -83,6 +88,16 @@ export function evaluerObjectif(o: ObjectifDirection, m: Manager, effectif: Coeq
       const pays = competitionEffective(m.club, m.division)?.pays;
       valeur = effectif.filter((j) => nomNation(j.nation) === nomNation(pays)).length / Math.max(1, effectif.length) * 100;
       libelle = `${Math.round(valeur)} % de joueurs du pays / ${cible} % requis`;
+      break;
+    }
+    case 'parcoursCoupe': {
+      const tours: Record<string, number> = { barrage: 1, huitieme: 1, quart: 2, demie: 3, finale: 4 };
+      valeur = matchs.reduce((max, r) => {
+        if (!r.cle.startsWith('coupe#')) return max;
+        const tour = r.cle.split('#')[3], niveau = tours[tour] ?? 0;
+        return Math.max(max, niveau + (r.scorePour > r.scoreContre ? 1 : 0));
+      }, 0);
+      libelle = valeur >= cible ? 'Tour visé atteint' : valeur ? 'Qualification en cours' : 'Phase de poules';
       break;
     }
     case 'essais': valeur = matchs.reduce((n, r) => n + r.essaisPour, 0); break;

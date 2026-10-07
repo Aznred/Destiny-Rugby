@@ -77,3 +77,26 @@
 .solo-echanges-actions .btn { flex:1 1 180px; }
 .solo-echanges-carte>button { min-height:36px; }
 @media(max-width:680px){.solo-echanges .rc-scene{height:245px}.solo-echanges .rc footer{padding:10px 8px}.solo-echanges-actions{display:grid;grid-template-columns:minmax(0,1fr)}.solo-echanges-actions .btn{width:100%}}
+
+/* ── Correctif 26 : propositions reçues et envoyées, toujours en tête, quelle que soit la page de la bourse ── */
+.solo-echanges-suivi { display:grid; gap:12px; min-width:0; padding:16px; border:1px solid rgba(238,210,135,.34); border-radius:14px; background:linear-gradient(180deg,rgba(232,196,100,.09),rgba(232,196,100,.02)),#11292f; }
+.solo-echanges-suivi[data-vide] { border-style:dashed; background:rgba(4,22,29,.32); }
+.solo-echanges-suivi>h3, .solo-echanges-liste>h3 { display:flex; align-items:center; gap:10px; margin:0; }
+.solo-echanges-suivi>h3 { color:#f2d17a; }
+.solo-echanges-suivi>h3 small { min-width:1.7em; padding:2px 8px; border-radius:20px; background:#e8c464; color:#10252e; font-size:.78rem; font-weight:800; text-align:center; }
+.solo-echanges-suivi[data-vide]>h3 small { background:#34504d; color:#c9d6cf; }
+.solo-echanges-recue { display:grid; gap:10px; min-width:0; padding:14px; border-radius:12px; border:1px solid rgba(255,255,255,.12); background:#122b34; }
+.solo-echanges-entete { display:flex; align-items:baseline; justify-content:space-between; gap:10px; padding-bottom:8px; border-bottom:1px solid #ffffff24; }
+.solo-echanges-entete b { color:#f1d37f; overflow-wrap:anywhere; }
+.solo-echanges-entete small { color:#b8c1c7; white-space:nowrap; }
+.solo-echanges-fait { display:flex; align-items:center; gap:8px; margin:0; padding:9px 12px; border-radius:10px; border:1px solid rgba(126,214,160,.4); background:rgba(74,160,112,.14); color:#c9f1d6!important; }
+.solo-echanges-pastille { flex:1; min-width:0; padding:6px 10px; border-radius:20px; border:1px solid rgba(238,210,135,.35); background:rgba(232,196,100,.1); color:#f3d584; font-size:.82rem; overflow-wrap:anywhere; }
+.solo-echanges-composer { border-color:rgba(238,210,135,.5); }
+.solo-echanges-composer .solo-echanges-cotes>svg { margin-top:45px; }
+@media(max-width:680px) {
+  .solo-echanges-suivi { padding:12px; }
+  .solo-echanges-recue { padding:11px; }
+  .solo-echanges-entete { flex-direction:column; gap:2px; }
+  .solo-echanges-composer .solo-echanges-cotes>svg { margin:0 auto; }
+  .solo-echanges-recue .solo-echanges-actions>.btn { flex:1; }
+}

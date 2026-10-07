@@ -119,6 +119,16 @@ for (let t = 0; t < 60 * 60_000; t += 2_000) {
   const tenus = fusionne.reperesDirect as string | undefined;
   delete fusionne.reperesDirect;
   const attendu = complet.donnees.rencontre.match as Record<string, unknown>;
+  // Correctif 24 : les statistiques ne repartent que lorsqu'elles ont vraiment bougé. Celles que l'écran
+  // garde peuvent donc avoir quelques mètres ou un point de possession de retard — jamais davantage.
+  if ((allege.donnees.gardes ?? []).includes('stats') && fusionne.stats && attendu.stats) {
+    for (const cote of ['domicile', 'exterieur'] as const) {
+      const tenu = (fusionne.stats as Record<string, Record<string, number>>)[cote], vrai = (attendu.stats as Record<string, Record<string, number>>)[cote];
+      assert.ok(Math.abs(tenu.possession - vrai.possession) <= 4 && Math.abs(tenu.metres - vrai.metres) <= 30 && Math.abs(tenu.plaquages - vrai.plaquages) <= 3
+        && tenu.essais === vrai.essais && tenu.cartons === vrai.cartons, `Statistiques gardées trop anciennes (t=${t}).`);
+    }
+    fusionne.stats = attendu.stats;
+  }
   if (!attendu.termine) {
     assert.deepEqual(JSON.parse(JSON.stringify(fusionne)), JSON.parse(JSON.stringify(attendu)), `La vue fusionnée diffère de la vue complète (t=${t}).`);
     assert.equal(tenus, allege.donnees.reperes, 'Les repères tenus sont ceux de la dernière réponse appliquée.');

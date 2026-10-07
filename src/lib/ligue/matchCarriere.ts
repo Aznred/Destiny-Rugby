@@ -76,11 +76,13 @@ import type { Cote } from '../moteur/terrain.js';
 import { corpsPourAffichage, porteurPourAffichage } from '../moteur/dynamique.js';
 import { scorePossible } from '../championnat.js';
 import { POSTES_BANC_MANAGER, POSTES_XV_MANAGER } from '../compositionManager.js';
-import { adequationAuPoste, facteurDePerformance } from '../carteJoueur.js';
+import { adequationAuPoste, facteurDePerformance, rendementAuPoste } from '../carteJoueur.js';
 import type { CompositionManager, PosteId, TactiqueManager } from '../../types.js';
 import type { Coequipier } from '../effectif.js';
 import { graine } from './aleatoire.js';
-import { cadrerFilm, extraireFilm, filmer, poidsFilm, type FilmDirect } from './filmDirect.js';
+import {
+  cadrerFilm, extraireChrono, extraireFilm, filmer, PAS_FILM, poidsFilm, type ChronoDirect, type FilmDirect, type RepereChrono,
+} from './filmDirect.js';
 import { marqueurDepuisEtat, ventPourLeTir, type MarqueurTV, type VentTV } from '../statsTV.js';
 
 /** Les deux camps, nommés comme la rencontre les nomme. */
@@ -251,11 +253,27 @@ export type CommandeMatchEnLigne =
   | { type: 'presence' }
   | { type: 'strategie'; strategie: StrategieEnLigne }
   | { type: 'remplacement'; sortantId: string; entrantId: string }
-  | { type: 'decision'; choix: ChoixPenaliteEnLigne };
+  | { type: 'decision'; choix: ChoixPenaliteEnLigne }
+  /**
+   * Le banc veille (ou ne veille plus) sur ses pénalités. ⚠️ ÉCRIT PAR LE
+   * SERVEUR, jamais reçu d'un écran : c'est la présence du manager, datée comme
+   * un ordre pour que toutes les instances arrêtent le jeu au même pas.
+   */
+  | { type: 'veille'; actif: boolean };
 
 export interface EvenementMatchEnLigne {
-  /** La minute de jeu à laquelle l'ordre prend effet. Le journal est trié dessus. */
+  /**
+   * La minute de jeu de l'ordre. Elle sert au fil et à l'affichage ; pour une
+   * décision de pénalité, c'est la minute où le jeu s'est arrêté.
+   */
   horloge: number;
+  /**
+   * La seconde SIMULÉE (pas du moteur, attentes comprises) où l'ordre prend
+   * effet : l'heure de sa réception, donc une marge d'autorité devant le
+   * moteur de toutes les instances. Absente sur les ordres d'avant le
+   * Correctif 24, qui s'appliquent à leur minute de jeu.
+   */
+  sim?: number;
   cote: CoteEnLigne;
   commande: CommandeMatchEnLigne;
   /**
@@ -422,6 +440,11 @@ export interface DecisionEnAttente {
   aPortee: boolean;
   /** Date limite réelle (ms). Passée, l'IA tranche et le jeu repart. */
   jusqua: number;
+  /**
+   * Déduite du moteur à chaque lecture, jamais écrite pour elle-même. Sans
+   * cette marque, c'est une décision restée en attente sous l'ancien moteur.
+   */
+  derivee?: 1;
 }
 
 export interface StatsEquipeMatch {
@@ -533,7 +556,8 @@ export interface EtatMatchEnLigne {
  * ⚠️ LA REMETTRE À 1 SUFFIT À REVENIR EN ARRIÈRE pour les prochains matchs :
  * ceux déjà créés gardent les leurs.
  */
-export const REGLES_MATCH_EN_LIGNE = 4;
+// Règles 5 (Correctif 24) : les conquêtes lisibles du solo (touche, ruck, mêlée, maul : IA de niveau 4) et le jeu vivant (niveau 5).
+export const REGLES_MATCH_EN_LIGNE = 5;
 /**
  * Défense resserrée des règles 2 : la cadence détaillée marque davantage, ce
  * réglage ramène le nombre d'essais à celui des matchs de ligue d'avant
@@ -546,7 +570,7 @@ export const RESSERREMENT_REGLES_2 = 1;
  * déjà commencés : la porter par un nouveau niveau, donc une nouvelle règle.
  */
 // Règles 4 : le porteur lit ce qu'il a devant lui (`moteur/ia/vision.ts`, IA de niveau 3).
-export const iaDesRegles = (regles: number | undefined): number | undefined => ((regles ?? 1) >= 4 ? 3 : (regles ?? 1) >= 3 ? 2 : undefined);
+export const iaDesRegles = (regles: number | undefined): number | undefined => ((regles ?? 1) >= 5 ? 5 : (regles ?? 1) >= 4 ? 3 : (regles ?? 1) >= 3 ? 2 : undefined);
 
 /** Ce que le client reçoit : jamais la graine, jamais le plan d'en face. */
 export interface VueMatchEnLigne {
@@ -563,6 +587,8 @@ export interface VueMatchEnLigne {
    * Envoyé À LA PLACE du relevé `terrain` quand l'écran le demande.
    */
   film?: FilmDirect;
+  /** La chronologie (film v2) : pistes, événements datés, somme de contrôle. */
+  chrono?: ChronoDirect;
   minute: number;
   /** La même, au centième : l'écran fait avancer son chrono entre deux relevés. */
   horloge: number;
@@ -589,23 +615,61 @@ export interface VueMatchEnLigne {
 
 /** Une minute de rugby correspond à une minute réelle, hors arrêts de décision. */
 export const MS_PAR_MINUTE = 60_000;
-/** Ce qu'un manager a pour trancher une pénalité avant que l'IA ne le fasse. */
-export const DELAI_DECISION = 20_000;
+/**
+ * Ce qu'un manager a pour trancher une pénalité avant que l'adjoint ne le fasse.
+ * ⚠️ Vingt-six secondes de serveur en font dix-sept à l'écran : l'image arrive
+ * avec le retard de la marge d'autorité, puis celui du tampon de lecture.
+ */
+export const DELAI_DECISION = 26_000;
 /** Au-delà, on considère que le manager a fermé l'onglet. */
 export const DELAI_PRESENCE = 45_000;
 /** Un match lancé puis oublié se termine tout seul au bout de ce délai. */
 export const DUREE_REELLE = 80 * MS_PAR_MINUTE;
 
 /**
- * ⚠️ L'HORLOGE D'UN MATCH NE RECULE JAMAIS. Elle est calculée à partir de
- * `Date.now()` du serveur, et deux instances serverless n'ont pas la
- * milliseconde exacte : sans ce plancher, une requête servie par une machine
- * légèrement en retard ramènerait le chrono de la 44ᵉ à la 43ᵉ, rejouerait un
- * essai déjà annoncé, et le fil se contredirait sous les yeux des deux
- * managers.
+ * ═══ LA MARGE D'AUTORITÉ (Correctif 24) ══════════════════════════════════════
+ *
+ * ⚠️ 1 MATCH = 1 SIMULATION = N SPECTATEURS. Un match n'est pas calculé par UN
+ * serveur : chaque instance serverless rejoue le sien, de la graine et du
+ * journal. Elles ne donnent le même match que si elles connaissent le même
+ * journal AU MOMENT où elles jouent une seconde donnée. Or un ordre écrit par
+ * une instance n'est connu des autres que quelques secondes plus tard (l'en-tête
+ * de la ligue n'est relu que toutes les trois secondes).
+ *
+ * Avant, chaque instance jouait jusqu'à « maintenant ». Un ordre, une décision
+ * de pénalité ou la simple présence d'un manager (connue d'une seule instance)
+ * tombait donc DANS LE PASSÉ des autres : elles avaient déjà joué — et montré —
+ * une autre suite, et devaient tout recalculer. De là les retours en arrière,
+ * les téléportations et les spectateurs qui ne voyaient pas la même action.
+ *
+ * Désormais :
+ *   · le moteur joue jusqu'à « maintenant − MARGE_AUTORITE », jamais au-delà ;
+ *   · un ordre reçu maintenant est daté de « maintenant » : il prend effet
+ *     DEVANT toutes les instances, qui ont la marge entière pour l'apprendre ;
+ *   · ce qui a été joué est donc DÉFINITIF : aucune instance ne recalcule ni ne
+ *     contredit jamais un pas déjà montré.
+ *
+ * La marge couvre la relecture de l'en-tête (3 s), l'écriture en base et l'écart
+ * d'horloge entre deux machines. Elle vaut huit quanta du moteur.
+ */
+export const MARGE_AUTORITE = 4.8;
+
+/** La seconde simulée (attentes de décision comprises) que le serveur a le droit de jouer à cette heure. */
+export function simCible(etat: Pick<EtatMatchEnLigne, 'debut'>, maintenant: number): number {
+  return Math.max(0, (maintenant - etat.debut) / 1000 - MARGE_AUTORITE);
+}
+/** La seconde simulée où prendra effet un ordre reçu à cette heure : devant toutes les instances. */
+export function simOrdre(etat: Pick<EtatMatchEnLigne, 'debut'>, maintenant: number): number {
+  return Math.max(0, (maintenant - etat.debut) / 1000);
+}
+
+/**
+ * La minute de jeu visée à cette heure — une estimation pour l'affichage (elle
+ * ignore les attentes de décision). ⚠️ ELLE NE RECULE JAMAIS : deux instances
+ * n'ont pas la milliseconde exacte.
  */
 export function minuteCible(etat: EtatMatchEnLigne, maintenant: number): number {
-  return Math.max(etat.horloge, Math.min(80, (maintenant - etat.debut - etat.gel) / MS_PAR_MINUTE));
+  return Math.max(etat.horloge, Math.min(80, simCible(etat, maintenant) / 60));
 }
 
 /**
@@ -616,11 +680,6 @@ export function minuteCible(etat: EtatMatchEnLigne, maintenant: number): number 
  * d'une minute, donc à jouer le direct par bonds de soixante secondes.
  */
 const minuteExacte = (e: EtatMatch): number => Math.min(80, e.t / 60);
-
-/** Le gel ne se relâche jamais non plus : il ne fait que s'ajouter. */
-function gelJusqua(etat: EtatMatchEnLigne, instant: number): number {
-  return Math.max(etat.gel, instant - etat.debut - etat.horloge * MS_PAR_MINUTE);
-}
 
 export function presenceActive(etat: EtatMatchEnLigne, cote: CoteEnLigne, maintenant: number): boolean {
   const vu = etat.presence[cote];
@@ -656,8 +715,11 @@ const POSTES_FEUILLE = [...POSTES_XV_MANAGER, ...POSTES_BANC_MANAGER];
  * cette règle est arrivée continuent avec l'ancien barème, sans rupture de
  * déterminisme.
  *
- * Le barème est celui du jeu entier (`facteurDePerformance`) : 100 % à son
- * poste, dans sa famille ou à son poste secondaire, 82 % ailleurs.
+ * Le barème est celui du jeu entier (`rendementAuPoste`, dans `carteJoueur.ts`) :
+ * 100 % à son poste ou à son poste secondaire, 82 % hors poste, 64 % à
+ * contre-emploi (un avant chez les arrières), 60 ou 50 % pour une première
+ * ligne improvisée. ⚠️ PLUS AUCUN PLACEMENT N'EST REFUSÉ (Correctif 24) : même la
+ * première ligne se compose librement, et se paie ici.
  */
 export function feuilleGeleeEnLigne(
   effectif: readonly Coequipier[], composition: CompositionManager,
@@ -667,7 +729,10 @@ export function feuilleGeleeEnLigne(
     const joueur = parId.get(id);
     if (!joueur) return null;
     const poste = POSTES_FEUILLE[i] ?? joueur.poste;
-    const facteur = facteurDePerformance(adequationAuPoste(joueur.poste, poste, joueur.postesSecondaires));
+    // Le XV paie son placement au barème entier (`rendementAuPoste` : un contre-emploi coûte bien plus qu'un simple
+    // hors-poste). Le banc garde le barème d'avant : il n'occupe aucun poste tant qu'il n'est pas entré.
+    const facteur = i < 15 ? rendementAuPoste(joueur.poste, poste, joueur.postesSecondaires)
+      : facteurDePerformance(adequationAuPoste(joueur.poste, poste, joueur.postesSecondaires));
     // Le numéro dans le dos devient celui du poste occupé — c'est déjà ce que
     // faisait `feuilleDepuisComposition`, et le moteur en a besoin pour la
     // mêlée, la touche et les remplacements.
@@ -714,18 +779,50 @@ export function cibleDeScore(
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 5. LA REJOUE
+// 5. LA REJOUE — UNE SEULE LIGNE DE TEMPS PAR MATCH
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
- * ⚠️ LE CACHE EST UNE OPTIMISATION, JAMAIS UNE MÉMOIRE. Sa clé contient tout ce
- * qui détermine le match (graine et nombre d'ordres) : un ordre de plus, et
- * c'est un autre match qui est calculé. Un processus serverless qui démarre à
- * froid le retrouve à l'identique en rejouant — le cache n'est donc jamais une
- * source de vérité, seulement un raccourci.
+ * Ce que le moteur ne porte pas lui-même et que la rejoue doit retenir : où elle
+ * en est du journal, et ce que le journal lui a déjà appris.
+ *
+ * ⚠️ TOUT CE QUI FAIT S'ARRÊTER LE MOTEUR VIENT DU JOURNAL. La présence d'un
+ * manager n'est connue que de l'instance qui reçoit ses sondages : s'arrêter
+ * sur une pénalité « parce qu'il est là » donnait deux matchs différents sur
+ * deux instances. Sa présence entre donc au journal (`veille`), datée comme un
+ * ordre, et toutes les instances s'arrêtent — ou non — au même pas.
  */
-interface EntreeCacheMoteur { moteur: EtatMatch; minute: number; octets: number; ordresAppliques: number }
-const CACHE = new Map<string, EntreeCacheMoteur>();
+interface Annexe {
+  /** Ordres du journal déjà appliqués à ce moteur. */
+  appliques: number;
+  /** Signature du dernier ordre appliqué : un journal qui n'en est plus la suite fait remonter le match. */
+  signature: string;
+  /** Les bancs qui veulent trancher leurs pénalités, d'après le journal. */
+  veille: Record<Cote, boolean>;
+  /** La dernière consigne APPLIQUÉE de chaque banc : c'est elle que lisent les bascules et l'adjoint. */
+  strategies: Record<CoteEnLigne, StrategieEnLigne>;
+  /** Bascules tactiques (60ᵉ, 65ᵉ, 70ᵉ) déjà passées. */
+  bascules: number;
+  /** `e.sim` à la frontière précédente : un ordre qui était déjà dû là est arrivé trop tard. */
+  simAvant: number;
+  /** Seconde simulée du dernier ordre appliqué (les ordres s'appliquent dans l'ordre du journal). */
+  dernierEffet: number;
+  /** Le moteur est en train d'être rejoué depuis le coup d'envoi. */
+  froid: boolean;
+}
+
+/**
+ * ⚠️ LE CACHE EST UNE OPTIMISATION, JAMAIS UNE MÉMOIRE. Un processus serverless
+ * qui démarre à froid retrouve le match à l'identique en le rejouant.
+ *
+ * ⚠️ ET SA CLÉ NE CONTIENT PLUS LE NOMBRE D'ORDRES. Un ordre de plus faisait
+ * recalculer le match entier depuis le coup d'envoi sur toutes les AUTRES
+ * instances — quinze consignes, quinze rejoues de quatre-vingts minutes. Les
+ * ordres sont datés DEVANT le moteur (`MARGE_AUTORITE`) : il les rencontre en
+ * avançant, comme le reste.
+ */
+interface EntreeCacheMoteur { moteur: EtatMatch; annexe: Annexe; octets: number }
+let CACHE = new Map<string, EntreeCacheMoteur>();
 const MOTEUR_VERS_COTE: Record<Cote, CoteEnLigne> = { A: 'domicile', B: 'exterieur' };
 /**
  * 16 entrées obligeaient 384 matchs sur 400 à repartir du coup d'envoi à la
@@ -739,7 +836,8 @@ const CACHE_MAX = 512;
 // d'envoi — mesuré à 300 matchs, 30 ms par requête au lieu de 4,5 et un film troué.
 const CACHE_OCTETS_MAX = 256 * 1024 * 1024;
 let cacheOctets = 0;
-const cleCache = (etat: EtatMatchEnLigne) => `${etat.cle}#${etat.journal.length}`;
+/** Le coup d'envoi fait partie de la clé : le laboratoire relance un match sous le même identifiant. */
+const cleCache = (etat: EtatMatchEnLigne) => `${etat.cle}@${etat.debut}`;
 
 function supprimerCache(cle: string): void {
   cacheOctets -= CACHE.get(cle)?.octets ?? 0;
@@ -753,14 +851,9 @@ function poidsMoteur(moteur: EtatMatch): number {
   return 48 * 1024 + moteur.pions.length * 2_048 + moteur.commentaires.length * 320 + poidsFilm(moteur);
 }
 
-function ranger(cle: string, moteur: EtatMatch, ordresAppliques: number): void {
-  const precedente = CACHE.get(cle);
-  if (precedente) {
-    supprimerCache(cle);
-  }
-  const entree: EntreeCacheMoteur = {
-    moteur, minute: minuteExacte(moteur), octets: poidsMoteur(moteur), ordresAppliques,
-  };
+function ranger(cle: string, entree: EntreeCacheMoteur): void {
+  if (CACHE.has(cle)) supprimerCache(cle);
+  entree.octets = poidsMoteur(entree.moteur);
   CACHE.set(cle, entree);
   cacheOctets += entree.octets;
   while (CACHE.size > CACHE_MAX || cacheOctets > CACHE_OCTETS_MAX) {
@@ -772,18 +865,34 @@ function ranger(cle: string, moteur: EtatMatch, ordresAppliques: number): void {
 
 /** Mesure légère utilisée par le banc de charge, jamais envoyée aux joueurs. */
 export function diagnosticCacheMatchEnLigne() {
-  return { matchs: CACHE.size, octetsEstimes: cacheOctets, maximumMatchs: CACHE_MAX, maximumOctets: CACHE_OCTETS_MAX };
+  return { matchs: CACHE.size, octetsEstimes: cacheOctets, maximumMatchs: CACHE_MAX, maximumOctets: CACHE_OCTETS_MAX, rejouesAFroid, retards };
+}
+/** Compteurs du banc : rejoues depuis le coup d'envoi, et ordres arrivés derrière le moteur. */
+let rejouesAFroid = 0;
+let retards = 0;
+/**
+ * Banc : un processus ne tient qu'UN cache de moteurs, alors qu'en production
+ * chaque instance serverless a le sien. Pour éprouver « plusieurs instances »
+ * dans un seul processus, le banc range chacune dans son espace et bascule de
+ * l'un à l'autre avant chaque requête.
+ */
+const ESPACES = new Map<string, { cache: Map<string, EntreeCacheMoteur>; octets: number }>();
+let espaceCourant = '';
+export function espaceMoteursPourBanc(nom: string): void {
+  if (nom === espaceCourant) return;
+  ESPACES.set(espaceCourant, { cache: CACHE, octets: cacheOctets });
+  const suivant = ESPACES.get(nom) ?? { cache: new Map<string, EntreeCacheMoteur>(), octets: 0 };
+  CACHE = suivant.cache; cacheOctets = suivant.octets; espaceCourant = nom;
 }
 
 /**
  * La pénalité qui MÉRITE qu'on réveille un entraîneur : à son avantage, dans
- * les 50 mètres adverses, et pour un camp dont on a des nouvelles.
+ * les 50 mètres adverses, et pour un banc qui veille.
  *
- * ⚠️ ELLE SERT AUX DEUX BOUTS, ET C'EST OBLIGATOIRE. `pousser` s'arrête
+ * ⚠️ ELLE SERT AUX DEUX BOUTS, ET C'EST OBLIGATOIRE. La rejoue s'arrête
  * dessus ; `avancerMatchEnLigne` en fait une décision. Si les deux critères
  * divergeaient d'un mètre, le moteur s'arrêterait sur une pénalité dont
- * personne ne ferait jamais rien — et le match resterait figé là pour toujours,
- * puisque plus aucun tick ne le sortirait de la phase.
+ * personne ne ferait jamais rien.
  */
 function penaliteADecider(e: EtatMatch, camps: readonly Cote[]): PenaliteEnCours | null {
   if (e.fini || e.phase !== 'penalite' || !e.penalite) return null;
@@ -792,75 +901,35 @@ function penaliteADecider(e: EtatMatch, camps: readonly Cote[]): PenaliteEnCours
   return info && info.distance <= METRES_DECISION ? info : null;
 }
 
-/** Vingt secondes de décision, au pas du moteur. */
-const PAS_ATTENTE_MAX = Math.round(DELAI_DECISION / 150);
-/** Où en est l'attente d'une décision à l'heure qu'il est, en pas du moteur. */
-function pasAttendus(d: DecisionEnAttente, maintenant: number): number {
-  return Math.max(0, Math.min(PAS_ATTENTE_MAX, Math.floor((maintenant - (d.jusqua - DELAI_DECISION)) / 150)));
-}
-/** Joue l'attente jusqu'au pas demandé : elle n'avance que les joueurs, jamais le match. */
-function attendre(e: EtatMatch, pas: number): void {
-  let garde = 0;
-  while ((e.attenteDecision ?? 0) < pas && e.phase === 'penalite' && !e.fini && garde++ <= PAS_ATTENTE_MAX) patienter(e);
-}
+/** Le délai de décision, au pas du moteur. */
+const PAS_ATTENTE_MAX = Math.round(DELAI_DECISION / (PAS_FILM * 1000));
+/** Le moteur avance par quanta de 0,6 s : c'est sur ces frontières que les ordres prennent effet. */
+const QUANTUM = 0.6;
+const SEUILS_BASCULE = [60, 65, 70] as const;
+const signature = (ev: EvenementMatchEnLigne): string =>
+  `${ev.sim ?? ''}:${ev.horloge}:${ev.cote}:${ev.commande.type}:${ev.attente ?? ''}`;
+const campsEnVeille = (a: Annexe): Cote[] => (['A', 'B'] as const).filter((c) => a.veille[c]);
 
-/** Avance le moteur, en s'arrêtant sur une pénalité si un manager doit trancher. */
-function pousser(e: EtatMatch, jusqua: number, arretSur: readonly Cote[]): void {
-  // ⚠️ UN PAS DE 0,6 SECONDE, TOUJOURS LE MÊME, ET POUR DEUX RAISONS.
-  //
-  // La première est la décision du manager : la phase « pénalité » ne dure que
-  // 2,5 secondes à l'écran. Un pas plus large la traverserait sans jamais
-  // pouvoir s'y arrêter, et « je prends les points ou je vais en touche ? »
-  // n'existerait tout simplement pas.
-  //
-  // La seconde est le DÉTERMINISME, et c'est elle qui interdit d'optimiser ici.
-  // Un pas plus large dépasse la minute demandée de plus loin : la rejoue
-  // s'arrêterait à la 30ᵉ 42 au lieu de la 30ᵉ 03, donc à un autre tick, donc
-  // AVANT ou APRÈS un ordre daté de la 30ᵉ. Deux managers dont l'un regarde et
-  // l'autre pas verraient alors deux matchs différents.
-  //
-  // Le coût est mesuré, et il ne vient pas de là : à pas de 8 secondes, un
-  // match complet prend 267 ms au lieu de 285 (le prix est celui des ticks du
-  // moteur, pas celui des appels). Il n'y a donc rien à gagner à élargir.
-  let garde = 0;
-  while (!e.fini && minuteExacte(e) < jusqua && garde++ < 40_000) {
-    if (arretSur.length && penaliteADecider(e, arretSur)) return;
-    avancer(e, 0.6);
-  }
-}
-
-/**
- * Coupe l'avance aux minutes tactiques. Sans ces paliers, les bascules 60/65/70
- * n'étaient recalculées qu'après un clic du manager et restaient décoratives
- * lors des matchs joués en son absence.
- */
-function pousserAvecBascules(e: EtatMatch, etat: EtatMatchEnLigne, jusqua: number, arretSur: readonly Cote[]): void {
-  for (const seuil of [60, 65, 70]) {
-    if (minuteExacte(e) >= seuil || seuil > jusqua) continue;
-    pousser(e, seuil, arretSur);
-    if (minuteExacte(e) + 1e-9 < seuil) return;
-    for (const cote of COTES) {
-      const moteur = MOTEUR[cote];
-      const ecart = moteur === 'A' ? e.scoreA - e.scoreB : e.scoreB - e.scoreA;
-      const strategie = strategieA(etat, cote, seuil);
-      const effective = { ...strategie, mentalite: mentaliteAppliquee(strategie, seuil, ecart) };
-      appliquerTactiqueEquipe(e, moteur, tactiqueDepuisStrategie(effective), true, impactStrategie(effective));
-    }
-  }
-  pousser(e, jusqua, arretSur);
-}
-
-/** La stratégie d'un camp telle qu'elle était à une minute donnée. */
+/** La consigne d'un camp telle que le journal la donnait à une minute donnée. */
 function strategieA(etat: EtatMatchEnLigne, cote: CoteEnLigne, horloge: number): StrategieEnLigne {
   let s = strategieValide(etat.strategies[cote]);
   for (const ev of etat.journal) {
-    if (ev.horloge > horloge) break;
+    if (ev.horloge > horloge) continue;
     if (ev.cote === cote && ev.commande.type === 'strategie') s = strategieValide(ev.commande.strategie);
   }
   return s;
 }
 
-function appliquerAuMoteur(e: EtatMatch, ev: EvenementMatchEnLigne): void {
+/** Le banc veille-t-il, d'après TOUT le journal (ordres à venir compris) ? Et depuis quelle seconde simulée. */
+function veilleAuJournal(journal: readonly EvenementMatchEnLigne[], cote: CoteEnLigne): { actif: boolean; sim: number } {
+  for (let i = journal.length - 1; i >= 0; i--) {
+    const ev = journal[i];
+    if (ev.cote === cote && ev.commande.type === 'veille') return { actif: ev.commande.actif, sim: ev.sim ?? 0 };
+  }
+  return { actif: false, sim: 0 };
+}
+
+function appliquerAuMoteur(e: EtatMatch, a: Annexe, ev: EvenementMatchEnLigne): void {
   const cote = MOTEUR[ev.cote];
   const c = ev.commande;
   if (c.type === 'strategie') {
@@ -873,14 +942,17 @@ function appliquerAuMoteur(e: EtatMatch, ev: EvenementMatchEnLigne): void {
     e.plansCombinaisons[cote] = plans;
     // Un ordre en direct prend effet à la prochaine phase de jeu.
     if (cahierModifie && e.combinaisonPreparee?.cote === cote) e.combinaisonPreparee = undefined;
+    a.strategies[ev.cote] = strategieValide(c.strategie);
   } else if (c.type === 'remplacement') {
     demanderRemplacement(e, cote, c.entrantId, c.sortantId);
   } else if (c.type === 'decision') {
     choisirPenalite(e, cote, c.choix);
+  } else if (c.type === 'veille') {
+    a.veille[cote] = c.actif;
   }
 }
 
-function monter(etat: EtatMatchEnLigne): EtatMatch {
+function monter(etat: EtatMatchEnLigne): EntreeCacheMoteur {
   const equipes = etat.equipes;
   if (!equipes) throw new Error('Ce match est terminé : ses feuilles ont été archivées.');
   const strategieD = strategieA(etat, 'domicile', 0);
@@ -916,91 +988,184 @@ function monter(etat: EtatMatchEnLigne): EtatMatch {
   };
   // La caméra du direct : elle observe, et ne filme que les dernières secondes.
   filmer(e);
-  return e;
+  rejouesAFroid++;
+  return {
+    moteur: e, octets: 0,
+    annexe: {
+      appliques: 0, signature: '', veille: { A: false, B: false },
+      strategies: { domicile: strategieD, exterieur: strategieE },
+      bascules: 0, simAvant: -1, dernierEffet: -1, froid: true,
+    },
+  };
 }
 
-/** Reconstruit l'état du moteur à la minute demandée. */
-function rejouer(etat: EtatMatchEnLigne, jusqua: number, arretSur: readonly CoteEnLigne[]): EtatMatch {
+/** Le moteur gardé pour ce match, s'il est bien la suite de ce journal ; sinon un moteur neuf. */
+function prendre(etat: EtatMatchEnLigne): EntreeCacheMoteur {
   const cle = cleCache(etat);
   const garde = CACHE.get(cle);
-  let e: EtatMatch;
-  let froid: EtatMatch | undefined;
-  let depart = 0;
-  if (garde && garde.minute <= jusqua + 1e-9) {
-    // Le match est déjà calculé jusqu'ici : on repart de là, sans rien rejouer.
-    e = garde.moteur;
-    depart = garde.ordresAppliques;
-    // Un vrai LRU : un match regardé reste chaud, contrairement au FIFO qui
-    // éjectait aussi les directs actifs dès que 16 autres matchs passaient.
-    CACHE.delete(cle);
-    CACHE.set(cle, garde);
-  } else {
-    e = froid = monter(etat);
-  }
-  cadrerFilm(e, jusqua * 60);
-  for (let i = depart; i < etat.journal.length; i++) {
-    const ev = etat.journal[i];
-    if (ev.horloge > jusqua) break;
-    pousserAvecBascules(e, etat, ev.horloge, []);
-    if (ev.commande.type === 'decision') {
-      // Un moteur gardé en mémoire qui aurait attendu PLUS que le journal ne le
-      // dit (deux instances, deux horloges) ne peut pas reculer : on le remonte.
-      if ((e.attenteDecision ?? 0) > (ev.attente ?? 0) && e !== froid) {
-        e = froid = monter(etat);
-        cadrerFilm(e, jusqua * 60);
-        i = -1; depart = 0;
-        continue;
-      }
-      attendre(e, ev.attente ?? 0);
+  if (garde) {
+    const a = garde.annexe;
+    const suite = a.appliques <= etat.journal.length
+      && (a.appliques === 0 || signature(etat.journal[a.appliques - 1]) === a.signature);
+    if (suite) {
+      // Un vrai LRU : un match regardé reste chaud.
+      CACHE.delete(cle); CACHE.set(cle, garde);
+      return garde;
     }
-    appliquerAuMoteur(e, ev);
-    depart = i + 1;
+    supprimerCache(cle);
   }
-  // Une présence ne rend jamais le passé interactif. C'était le défaut qui
-  // faisait « revenir au début » un direct lorsqu'un entraîneur l'ouvrait :
-  // sur une instance froide, la rejoue repartait de 0 avec `arretSur` actif et
-  // s'immobilisait à la toute première pénalité du match, parfois quarante
-  // minutes avant le chrono réellement affiché.
-  //
-  // La table de présence conserve le dernier battement, pas l'instant exact
-  // d'ouverture. La fenêtre de validité constitue donc la borne sûre : une
-  // pénalité antérieure à celle-ci n'a pas pu être proposée par ce passage sur
-  // le direct. On active chaque banc à sa borne, sans jamais reculer le moteur.
-  const seuils = arretSur.map((cote) => {
-    const vu = etat.presence[cote];
-    const minutePresence = vu !== undefined
-      ? Math.max(0, (vu - etat.debut - etat.gel) / MS_PAR_MINUTE)
-      : jusqua;
-    const debutArret = Math.max(etat.horloge, minutePresence);
-    return {
-      cote: MOTEUR[cote],
-      depuis: Math.max(0, Math.min(jusqua, debutArret)),
-    };
-  }).sort((a, b) => a.depuis - b.depuis);
-  const actifs: Cote[] = [];
-  const deja = minuteExacte(e);
-  for (const seuil of seuils) if (seuil.depuis <= deja + 1e-9 && !actifs.includes(seuil.cote)) actifs.push(seuil.cote);
-  for (const seuil of seuils) {
-    if (seuil.depuis <= minuteExacte(e) + 1e-9) continue;
-    pousserAvecBascules(e, etat, Math.min(jusqua, seuil.depuis), actifs);
-    if (minuteExacte(e) + 1e-9 < Math.min(jusqua, seuil.depuis)) break;
-    if (!actifs.includes(seuil.cote)) actifs.push(seuil.cote);
-  }
-  pousserAvecBascules(e, etat, jusqua, actifs);
-  ranger(cle, e, depart);
-  return e;
+  return monter(etat);
+}
+
+/** Secondes simulées d'avance au-delà desquelles un moteur gardé ne peut pas être celui du match demandé. */
+const AVANCE_SUSPECTE = 60;
+/** Jusqu'où dérouler : une seconde simulée (le direct), une minute de jeu (la lecture), ou la sirène. */
+type But = { sim: number } | { minute: number } | { fin: true };
+interface OptionsDeroule {
+  /** Quelqu'un regarde ce match : la caméra tourne. */
+  regarde?: boolean;
+  /** Le journal de `etat` peut recevoir la décision de l'adjoint quand un délai expire. */
+  ecrit?: boolean;
+  /** Banc : appelé une fois le moteur monté, avant le premier pas. */
+  surMoteur?: (e: EtatMatch) => void;
 }
 
 /**
- * Déplace l'entrée de cache d'un état vers son successeur.
- *
- * Sans elle, chaque ordre d'un manager relancerait un match complet depuis la
- * première seconde : quinze changements tactiques dans une rencontre, ce sont
- * quinze rejoues de 80 minutes pour rien.
+ * Déroule le match : applique les ordres dus, joue les attentes, avance d'un
+ * quantum — dans cet ordre, à chaque frontière, sur toutes les instances.
+ * Renvoie `false` si un ordre est arrivé DERRIÈRE ce moteur (il faut le remonter).
  */
-function adopterCache(avant: EtatMatchEnLigne, apres: EtatMatchEnLigne, moteur: EtatMatch): void {
-  supprimerCache(cleCache(avant));
-  ranger(cleCache(apres), moteur, apres.journal.length);
+function deroulerUnMoteur(entree: EntreeCacheMoteur, etat: EtatMatchEnLigne, but: But, options: OptionsDeroule): boolean {
+  const e = entree.moteur, a = entree.annexe;
+  const atteint = (): boolean => e.fini || ('fin' in but ? false
+    : 'sim' in but ? e.sim + 1e-9 >= but.sim : !(minuteExacte(e) < but.minute));
+  let garde = 0;
+  while (garde++ < 80_000) {
+    // ── 1. Les ordres du journal, dans l'ordre du journal ────────────────────
+    const ev = etat.journal[a.appliques];
+    if (ev) {
+      let du = false;
+      if (ev.commande.type === 'decision') {
+        // La décision se prend là où le jeu s'est arrêté, après les pas d'attente inscrits avec elle.
+        if (!(minuteExacte(e) < ev.horloge)) {
+          const fait = e.attenteDecision ?? 0, voulu = ev.attente ?? 0;
+          if (e.phase === 'penalite' && !e.fini && fait !== voulu) {
+            if (fait > voulu) { if (!a.froid) return false; }
+            else {
+              if (atteint()) break;
+              a.simAvant = e.sim;
+              patienter(e);
+              continue;
+            }
+          }
+          du = true;
+        }
+      } else if (ev.sim !== undefined) {
+        du = e.sim + 1e-9 >= ev.sim;
+        // Dû dès la frontière d'avant, et pourtant pas appliqué : il a été écrit derrière ce moteur.
+        if (du && !a.froid && Math.max(ev.sim, a.dernierEffet) <= a.simAvant + 1e-9) return false;
+      } else {
+        // Ordre d'avant la marge d'autorité : daté à la minute de jeu.
+        du = !(minuteExacte(e) < ev.horloge);
+      }
+      if (du) {
+        appliquerAuMoteur(e, a, ev);
+        a.appliques += 1; a.signature = signature(ev); a.dernierEffet = e.sim;
+        continue;
+      }
+    }
+    // ── 2. Les bascules tactiques de fin de match ────────────────────────────
+    while (a.bascules < SEUILS_BASCULE.length && minuteExacte(e) >= SEUILS_BASCULE[a.bascules]) {
+      const seuil = SEUILS_BASCULE[a.bascules++];
+      for (const cote of COTES) {
+        const moteur = MOTEUR[cote];
+        const ecart = moteur === 'A' ? e.scoreA - e.scoreB : e.scoreB - e.scoreA;
+        const strategie = a.strategies[cote];
+        const effective = { ...strategie, mentalite: mentaliteAppliquee(strategie, seuil, ecart) };
+        appliquerTactiqueEquipe(e, moteur, tactiqueDepuisStrategie(effective), true, impactStrategie(effective));
+      }
+    }
+    if (atteint()) break;
+    // ── 3. Une pénalité qui attend son entraîneur ────────────────────────────
+    const camps = campsEnVeille(a);
+    const penalite = camps.length ? penaliteADecider(e, camps) : null;
+    if (penalite) {
+      const fait = e.attenteDecision ?? 0;
+      if (fait >= PAS_ATTENTE_MAX || 'fin' in but) {
+        // Le délai est passé : l'adjoint tranche d'après les consignes — et sa
+        // décision entre au journal comme les autres. Deux instances qui la
+        // prennent en même temps écrivent la MÊME (elle ne dépend que du moteur).
+        if (!options.ecrit) break;
+        const cote = MOTEUR_VERS_COTE[penalite.cote];
+        const ecart = penalite.cote === 'A' ? e.scoreA - e.scoreB : e.scoreB - e.scoreA;
+        const choix = decisionIA(a.strategies[cote], penalite.distance, penalite.aPortee, Math.round(minuteExacte(e)), ecart);
+        etat.journal.splice(a.appliques, 0, {
+          horloge: minuteExacte(e), cote, commande: { type: 'decision', choix }, auto: true, ...(fait ? { attente: fait } : {}),
+        });
+        continue;
+      }
+      // Le chrono est arrêté, pas les joueurs : ils se replacent pendant le choix.
+      if (!('sim' in but)) break;
+      a.simAvant = e.sim;
+      patienter(e);
+      continue;
+    }
+    // ── 4. Un quantum de jeu ─────────────────────────────────────────────────
+    a.simAvant = e.sim;
+    avancer(e, QUANTUM);
+  }
+  return true;
+}
+
+/**
+ * Amène le moteur du match là où on le demande, et le range.
+ *
+ * ⚠️ IL NE RECULE JAMAIS, ET IL N'A PLUS À LE FAIRE. Tout ce qu'il a joué était
+ * définitif. Le seul cas où on le remonte : un ordre daté derrière lui, ce qui
+ * suppose une base restée muette plus longtemps que la marge d'autorité. Le
+ * film le signale alors à l'écran (`rupture`), qui se raccorde en douceur.
+ */
+function derouler(etat: EtatMatchEnLigne, but: But, options: OptionsDeroule = {}): EtatMatch {
+  const cle = cleCache(etat);
+  let entree = prendre(etat);
+  // ⚠️ UN MOTEUR GARDÉ UNE MINUTE DEVANT L'HEURE DEMANDÉE N'EST PAS LA SUITE DE CE MATCH. L'heure d'un direct ne recule pas
+  // (les horloges de deux instances diffèrent d'une seconde, pas de soixante) : c'est donc une AUTRE partie jouée sous la
+  // même clé — un banc qui relance le même match, une base restaurée. Lui faire « continuer » ce moteur montrerait la fin
+  // d'un match qui commence : on le remonte depuis le journal.
+  if ('sim' in but && entree.moteur.sim > but.sim + AVANCE_SUSPECTE) { supprimerCache(cle); entree = monter(etat); }
+  if (entree.annexe.froid) options.surMoteur?.(entree.moteur);
+  const cible = 'sim' in but ? but.sim : 'minute' in but ? but.minute * 60 : Infinity;
+  cadrerFilm(entree.moteur, cible, options.regarde);
+  if (!deroulerUnMoteur(entree, etat, but, options)) {
+    retards++;
+    supprimerCache(cle);
+    entree = monter(etat);
+    options.surMoteur?.(entree.moteur);
+    cadrerFilm(entree.moteur, cible, options.regarde);
+    deroulerUnMoteur(entree, etat, but, options);
+  }
+  entree.annexe.froid = false;
+  ranger(cle, entree);
+  return entree.moteur;
+}
+
+/** Le moteur gardé pour ce match, sans le faire avancer. */
+function moteurGarde(etat: EtatMatchEnLigne): EntreeCacheMoteur | undefined {
+  return CACHE.get(cleCache(etat));
+}
+
+/**
+ * Banc : rejoue le match depuis le coup d'envoi dans un moteur À PART (hors
+ * cache), en observant chaque pas. C'est la référence à laquelle on compare ce
+ * que chaque écran a montré.
+ */
+export function rejouerPourBanc(etat: EtatMatchEnLigne, but: But, surPas: (e: EtatMatch) => void): EtatMatch {
+  const entree = monter(etat);
+  rejouesAFroid--;
+  const camera = entree.moteur.apresPas;
+  entree.moteur.apresPas = (m) => { camera?.(m); surPas(m); };
+  deroulerUnMoteur(entree, { ...etat, journal: [...etat.journal] }, but, {});
+  return entree.moteur;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1285,7 +1450,6 @@ function relever(etat: EtatMatchEnLigne, e: EtatMatch): void {
 
 /** Le coup de sifflet final : on relève tout, puis on archive. */
 function clore(etat: EtatMatchEnLigne, e: EtatMatch): void {
-  const ancienneCle = cleCache(etat);
   relever(etat, e);
   etat.horloge = 80;
   etat.termine = true;
@@ -1293,7 +1457,10 @@ function clore(etat: EtatMatchEnLigne, e: EtatMatch): void {
   delete etat.decision;
   delete etat.equipes;
   etat.journal = [];
-  supprimerCache(ancienneCle);
+  // ⚠️ LE MOTEUR RESTE EN CACHE QUELQUES INSTANTS. Les écrans n'ont pas encore
+  // reçu les derniers pas — la dernière action, le coup de sifflet final : ils
+  // les demandent au sondage suivant (`vueMatchEnLigne`). Le cache l'évincera
+  // de lui-même.
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1328,15 +1495,20 @@ export function creerMatchEnLigne(p: ParametresCreationMatch): EtatMatchEnLigne 
 }
 
 /**
- * Fait avancer un match jusqu'à l'instant présent.
+ * Fait avancer un match jusqu'à l'instant présent — moins la marge d'autorité.
  *
  * ⚠️ C'EST LE SEUL ENDROIT QUI FAIT AVANCER LE TEMPS, et il est appelé à chaque
  * lecture de la ligue — donc par n'importe qui, y compris par l'horloge
  * automatique quand personne ne regarde. C'est ce qui garantit qu'un match
  * lancé puis abandonné se termine quand même, et qu'une ligue ne se bloque
  * jamais sur l'absence d'un manager.
+ *
+ * ⚠️ ET TOUTES LES INSTANCES Y CALCULENT LE MÊME MATCH. Rien de ce qui est joué
+ * ici ne dépend de ce que CETTE instance est seule à savoir : la présence d'un
+ * manager n'arrête le jeu qu'une fois inscrite au journal (`veille`), et le
+ * délai d'une décision se compte en pas du moteur, pas en millisecondes.
  */
-export function avancerMatchEnLigne(etat: EtatMatchEnLigne, maintenant: number): EtatMatchEnLigne {
+export function avancerMatchEnLigne(etat: EtatMatchEnLigne, maintenant: number, regarde = false): EtatMatchEnLigne {
   if (etat.termine) return etat;
   const suivant: EtatMatchEnLigne = {
     ...etat, journal: [...etat.journal], presence: { ...etat.presence },
@@ -1344,52 +1516,64 @@ export function avancerMatchEnLigne(etat: EtatMatchEnLigne, maintenant: number):
   };
   if (!suivant.equipes) { suivant.termine = true; return suivant; }
 
-  // ── 1. Une décision en attente gèle l'horloge, puis expire ────────────────
-  if (suivant.decision) {
-    const limite = suivant.decision.jusqua;
-    if (maintenant < limite) {
-      // Le chrono est gelé, pas les joueurs : ils se replacent pendant le choix.
-      attendre(rejouer(suivant, suivant.decision.horloge, []), pasAttendus(suivant.decision, maintenant));
-      suivant.gel = gelJusqua(etat, maintenant);
-      return suivant;
-    }
-    const d = suivant.decision;
-    const arrete = rejouer(suivant, d.horloge, []);
-    attendre(arrete, PAS_ATTENTE_MAX);
-    const attente = arrete.attenteDecision ?? 0;
-    const ecart = suivant.score[d.cote] - suivant.score[autre(d.cote)];
+  // ── 0. Une décision restée en attente sous l'ancien moteur : l'adjoint tranche ──
+  const ancienne = suivant.decision;
+  delete suivant.decision;
+  if (ancienne && !ancienne.derivee
+    && !suivant.journal.some((ev) => ev.commande.type === 'decision' && ev.horloge === ancienne.horloge)) {
+    const ecart = suivant.score[ancienne.cote] - suivant.score[autre(ancienne.cote)];
     const choix = decisionIA(
-      strategieA(suivant, d.cote, d.horloge), d.distance,
-      d.distance < 52 && d.angle < 30, Math.round(d.horloge), ecart,
+      strategieA(suivant, ancienne.cote, ancienne.horloge), ancienne.distance,
+      ancienne.distance < 52 && ancienne.angle < 30, Math.round(ancienne.horloge), ecart,
     );
-    suivant.journal.push({ horloge: d.horloge, cote: d.cote, commande: { type: 'decision', choix }, auto: true, ...(attente ? { attente } : {}) });
-    suivant.gel = gelJusqua(etat, limite);
-    delete suivant.decision;
+    suivant.journal.push({ horloge: ancienne.horloge, cote: ancienne.cote, commande: { type: 'decision', choix }, auto: true });
   }
 
-  // ── 2. On avance jusqu'à l'heure qu'il est ────────────────────────────────
-  // ⚠️ LES DEUX CAMPS SONT ÉCOUTÉS, PAS SEULEMENT LE PREMIER. La rejoue ne
-  // s'arrêtait que sur les pénalités d'UN seul camp — celui de l'équipe à
-  // domicile dès qu'elle regardait. Le manager visiteur, présent devant son
-  // écran, ne se voyait alors JAMAIS proposer la moindre décision de tout le
-  // match : le moteur traversait ses pénalités sans marquer l'arrêt.
-  const arret = COTES.filter((c) => presenceActive(suivant, c, maintenant));
-  const e = rejouer(suivant, minuteCible(suivant, maintenant), arret);
+  // ── 1. Qui veille ? La présence entre au journal, datée comme un ordre ────
+  // ⚠️ LES DEUX CAMPS SONT ÉCOUTÉS. Un banc qui veille se voit proposer ses
+  // pénalités ; un banc parti (plus de sondage depuis 45 s) ne fait plus
+  // attendre personne. L'un et l'autre prennent effet DEVANT le moteur.
+  const ordre = simOrdre(suivant, maintenant);
+  for (const cote of COTES) {
+    const present = presenceActive(suivant, cote, maintenant);
+    const veille = veilleAuJournal(suivant.journal, cote);
+    if (present === veille.actif || (!present && ordre - veille.sim < 75)) continue;
+    suivant.journal.push({
+      sim: ordre, horloge: Math.min(80, suivant.horloge + MARGE_AUTORITE / 60), cote, commande: { type: 'veille', actif: present },
+    });
+  }
+
+  // ── 2. On avance jusqu'à ce que l'heure permet de montrer ─────────────────
+  const e = derouler(suivant, { sim: simCible(suivant, maintenant) }, { regarde, ecrit: true });
   relever(suivant, e);
 
-  // ── 3. Une pénalité arrêtée devant un manager présent devient une décision ─
-  const penalite = penaliteADecider(e, arret.map((c) => MOTEUR[c]));
-  if (penalite) {
-    suivant.decision = {
-      cote: MOTEUR_VERS_COTE[penalite.cote],
-      distance: penalite.distance, angle: penalite.angle,
-      probabilite: Math.round(penalite.probabilite * 100), buteur: penalite.buteur,
-      aPortee: penalite.aPortee,
-      horloge: suivant.horloge, jusqua: maintenant + DELAI_DECISION,
-    };
+  // ── 3. Une pénalité arrêtée devant un banc qui veille est une décision ────
+  // Elle se DÉDUIT du moteur : elle n'est plus écrite en base, toutes les
+  // instances la voient au même pas. Son échéance est celle du dernier clic
+  // qui garde son effet naturel ; l'adjoint tranche une marge plus tard.
+  const entree = moteurGarde(suivant);
+  if (entree && !e.fini) {
+    const penalite = penaliteADecider(e, campsEnVeille(entree.annexe));
+    const tranchee = suivant.journal[entree.annexe.appliques]?.commande.type === 'decision';
+    if (penalite && !tranchee) {
+      const debutAttente = e.sim - (e.attenteDecision ?? 0) * PAS_FILM;
+      suivant.decision = {
+        cote: MOTEUR_VERS_COTE[penalite.cote],
+        distance: penalite.distance, angle: penalite.angle,
+        probabilite: Math.round(penalite.probabilite * 100), buteur: penalite.buteur,
+        aPortee: penalite.aPortee,
+        horloge: suivant.horloge,
+        jusqua: Math.round(suivant.debut + (debutAttente + PAS_ATTENTE_MAX * PAS_FILM) * 1000),
+        derivee: 1,
+      };
+    }
   }
 
-  if (e.fini || suivant.horloge >= 80) clore(suivant, e);
+  // ⚠️ LA SIRÈNE NE FINIT PLUS LE MATCH, LE BALLON MORT SI. Couper à 80:00 pile
+  // supprimait la dernière action — une pénaltouche accordée avant la sirène ne
+  // se jouait jamais. C'est le moteur qui siffle la fin (au plus tard six
+  // minutes après la sirène).
+  if (e.fini) clore(suivant, e);
   return suivant;
 }
 
@@ -1400,6 +1584,10 @@ export function avancerMatchEnLigne(etat: EtatMatchEnLigne, maintenant: number):
  * points » qui arrive une seconde après la reprise du jeu n'est pas une faute
  * du joueur : l'ordre est ignoré, le match continue. Lever une erreur ferait
  * remonter « action impossible » à l'écran pour un geste parfaitement normal.
+ *
+ * ⚠️ UN ORDRE PREND EFFET UNE MARGE PLUS TARD, JAMAIS TOUT DE SUITE. Il est
+ * daté de l'heure qu'il est, et le moteur de chaque instance joue une marge
+ * derrière : toutes le rencontrent donc au même pas, sans rien avoir à refaire.
  */
 export function commanderMatchEnLigne(
   etat: EtatMatchEnLigne, clubId: string, action: CommandeMatchEnLigne, maintenant: number,
@@ -1413,24 +1601,29 @@ export function commanderMatchEnLigne(
 
   const marque: EtatMatchEnLigne = signalerPresence
     ? { ...etat, presence: { ...etat.presence, [cote]: maintenant } } : etat;
-  if (commande.type === 'presence') return avancerMatchEnLigne(marque, maintenant);
+  const avance = avancerMatchEnLigne(marque, maintenant);
+  if (commande.type === 'presence' || avance.termine || !avance.equipes) return avance;
+  const entree = moteurGarde(avance);
+  if (!entree) return avance;
+  const moteur = entree.moteur;
 
-  // La décision se prend à la minute où le jeu est arrêté, pas à celle qu'il
-  // serait sans l'arrêt : sinon l'ordre serait daté après la reprise.
-  // ⚠️ ET LE CHRONO EST ARRÊTÉ POUR LES DEUX CAMPS. Le gel d'une décision en
-  // attente n'est plus écrit à chaque tick (`gelDerive`, dans `carriere.ts`) :
-  // une instance qui vient de lire la base tient un gel d'avant la décision,
-  // et daterait la consigne de l'autre banc APRÈS la pénalité — le moteur la
-  // jouerait alors sans attendre le choix.
-  const horloge = etat.decision
-    ? etat.decision.horloge
-    : Math.min(80, minuteCible(marque, maintenant));
-
-  if (commande.type === 'decision' && (!etat.decision || etat.decision.cote !== cote)) {
-    return avancerMatchEnLigne(marque, maintenant);
+  if (commande.type === 'decision') {
+    const d = avance.decision;
+    if (!d || d.cote !== cote) return avance;
+    // Les joueurs continuent de se replacer jusqu'à ce que le choix prenne
+    // effet : autant de pas d'attente que la marge en demande, inscrits ici
+    // pour que toutes les rejoues en fassent exactement autant.
+    const fait = moteur.attenteDecision ?? 0;
+    const debutAttente = moteur.sim - fait * PAS_FILM;
+    const attente = Math.max(fait, Math.min(PAS_ATTENTE_MAX, Math.ceil((simOrdre(avance, maintenant) - debutAttente) / PAS_FILM)));
+    const suivant: EtatMatchEnLigne = {
+      ...avance,
+      journal: [...avance.journal, { horloge: d.horloge, cote, commande, ...(attente ? { attente } : {}) }],
+    };
+    delete suivant.decision;
+    return suivant;
   }
 
-  const moteur = rejouer(marque, horloge, []);
   if (commande.type === 'remplacement') {
     // Le moteur refuse un entrant déjà utilisé ou un sortant absent. On le lui
     // demande AVANT d'écrire au journal : un ordre mort y resterait pour
@@ -1438,25 +1631,19 @@ export function commanderMatchEnLigne(
     const cible = MOTEUR[cote];
     const entrant = moteur.pions.find((p) => p.cote === cible && p.sourceId === commande.entrantId && !p.surLeTerrain && p.minutes === 0);
     const sortant = moteur.pions.find((p) => p.cote === cible && p.sourceId === commande.sortantId && p.surLeTerrain && p.numero <= 15);
-    if (!entrant || !sortant) return avancerMatchEnLigne(marque, maintenant);
+    if (!entrant || !sortant) return avance;
+    // Le même remplacement, demandé deux fois avant d'avoir pris effet, n'entre qu'une fois.
+    const deja = avance.journal.slice(entree.annexe.appliques).some((ev) => ev.cote === cote && ev.commande.type === 'remplacement'
+      && (ev.commande.entrantId === commande.entrantId || ev.commande.sortantId === commande.sortantId));
+    if (deja) return avance;
   }
 
-  const evenement: EvenementMatchEnLigne = { horloge, cote, commande };
-  if (commande.type === 'decision' && marque.decision) {
-    attendre(moteur, pasAttendus(marque.decision, maintenant));
-    if (moteur.attenteDecision) evenement.attente = moteur.attenteDecision;
-  }
-  const suivant: EtatMatchEnLigne = { ...marque, journal: [...marque.journal, evenement] };
   // La base reste celle du coup d'envoi. La remplacer ici appliquerait les
   // nouvelles combinaisons dans le passé lors d'une reconstruction à froid.
-  if (commande.type === 'decision' && marque.decision) {
-    // Le gel s'arrête à l'instant du clic : le manager n'a pas volé de temps.
-    suivant.gel = gelJusqua(marque, maintenant);
-    delete suivant.decision;
-  }
-  appliquerAuMoteur(moteur, evenement);
-  adopterCache(marque, suivant, moteur);
-  return avancerMatchEnLigne(suivant, maintenant);
+  const evenement: EvenementMatchEnLigne = {
+    sim: simOrdre(avance, maintenant), horloge: Math.min(80, avance.horloge + MARGE_AUTORITE / 60), cote, commande,
+  };
+  return { ...avance, journal: [...avance.journal, evenement] };
 }
 
 /** Le cahier rejoint les rencontres en cours sans remplacer les autres
@@ -1468,7 +1655,8 @@ export function actualiserCahierMatchEnLigne(
   if (etat.termine || !etat.equipes) return etat;
   const cote = COTES.find(c => etat.equipes![c].clubId === clubId);
   if (!cote) return etat;
-  const actuelle = strategieA(etat, cote, etat.horloge);
+  // La dernière consigne DONNÉE, qu'elle ait déjà pris effet ou non.
+  const actuelle = strategieA(etat, cote, Infinity);
   const demandee = strategieValide({ ...actuelle, ...cahier });
   if (actuelle.modeCombinaisons === demandee.modeCombinaisons
     && JSON.stringify(actuelle.combinaisons) === JSON.stringify(demandee.combinaisons)) return etat;
@@ -1502,9 +1690,11 @@ function normaliserCommande(action: unknown): CommandeMatchEnLigne | null {
  */
 export function conclureMatchEnLigne(etat: EtatMatchEnLigne): EtatMatchEnLigne {
   if (etat.termine) return etat;
-  const suivant: EtatMatchEnLigne = { ...etat, presence: {}, decision: undefined };
+  const suivant: EtatMatchEnLigne = { ...etat, journal: [...etat.journal], presence: {} };
+  delete suivant.decision;
   if (!suivant.equipes) { suivant.termine = true; return suivant; }
-  clore(suivant, rejouer(suivant, 80, []));
+  // Jusqu'au coup de sifflet final du moteur : les pénalités qui attendaient un banc sont tranchées par l'adjoint.
+  clore(suivant, derouler(suivant, { fin: true }, { ecrit: true }));
   return suivant;
 }
 
@@ -1563,7 +1753,7 @@ export function signalAdverse(etat: EtatMatchEnLigne, moi: CoteEnLigne): string 
 function mesOrdres(etat: EtatMatchEnLigne, monCote: CoteEnLigne): LigneFil[] {
   const lignes: LigneFil[] = [];
   for (const ev of etat.journal) {
-    if (ev.cote !== monCote || ev.commande.type === 'presence') continue;
+    if (ev.cote !== monCote || ev.commande.type === 'presence' || ev.commande.type === 'veille') continue;
     const ordre: OrdreFil = ev.commande.type === 'strategie' ? 'consignes'
       : ev.commande.type === 'remplacement' ? 'remplacement' : ev.commande.choix;
     const ligne: LigneFil = { minute: Math.min(80, Math.round(ev.horloge)), texte: '', type: 'ordre', cote: monCote, ordre };
@@ -1577,6 +1767,8 @@ export function vueMatchEnLigne(
   etat: EtatMatchEnLigne, clubId: string, emisLe = Date.now(),
   /** L'écran sait rejouer le film : `depuis` est le dernier pas qu'il connaît. */
   film?: { depuis?: number },
+  /** L'écran lit la chronologie : son dernier pas et sa somme de contrôle. */
+  chrono?: RepereChrono,
 ): VueMatchEnLigne {
   const monCote = etat.equipes ? COTES.find((c) => etat.equipes![c].clubId === clubId) : undefined;
   const vue: VueMatchEnLigne = {
@@ -1586,22 +1778,46 @@ export function vueMatchEnLigne(
     moments: momentsDepuisFil(etat.id, etat.fil), gele: Boolean(etat.decision),
     remplacementsFaits: 0, surLeTerrain: [], surLeBanc: [],
   };
-  if (etat.termine) return vue;
+  if (etat.termine) {
+    // La fin du film : ce que la caméra a vu jusqu'au coup de sifflet final.
+    const garde = chrono ? moteurGarde(etat) : undefined;
+    const fin = garde ? extraireChrono(garde.moteur, chrono, true) : undefined;
+    if (fin && fin !== 'refilmer' && (fin.cle || fin.s.length)) vue.chrono = fin;
+    return vue;
+  }
 
   // ⚠️ UNE SEULE REJOUE POUR TOUT LE MONDE. Le terrain et le banc sortent du
   // MÊME état du moteur : deux appels, c'était deux fois le coût pour la même
   // image — et, sur un démarrage à froid où le cache est vide, deux rejoues
   // complètes du match à chaque sondage.
-  const e = rejouer(etat, etat.horloge, []);
+  // ⚠️ ELLE NE FAIT PAS AVANCER LE MATCH. Le moteur est celui que le dernier
+  // `avancerMatchEnLigne` a laissé ; à froid (vue de la ligue sur une autre
+  // instance), il est rejoué jusqu'à la minute écrite, pas au-delà.
+  let e = derouler(etat, { minute: etat.horloge }, { regarde: Boolean(film || chrono) });
   // ⚠️ LE FILM REMPLACE LE RELEVÉ, IL NE S'Y AJOUTE PAS : envoyer les deux
   // doublerait le transfert pour un écran qui n'en lit qu'un. Sans film à
   // donner (caméra vide), le relevé reste le filet.
-  if (film) vue.film = extraireFilm(e, film.depuis);
-  if (!vue.film) vue.terrain = extraireTerrain(e, emisLe);
+  if (chrono) {
+    let c = extraireChrono(e, chrono);
+    if (c === 'refilmer' && e.sim < 900) {
+      // Ce moteur n'a pas filmé les pas que l'écran attend (au-delà de sa
+      // traîne). En début de match, on le rejoue caméra allumée — il redonne
+      // les mêmes pas, au chiffre près — plutôt que de faire sauter l'écran
+      // par-dessus le trou. Plus tard la rejoue coûterait plusieurs secondes :
+      // l'écran reçoit alors une image complète et s'y raccorde en douceur.
+      const sim = e.sim;
+      supprimerCache(cleCache(etat));
+      e = derouler(etat, { sim }, { regarde: true });
+      c = extraireChrono(e, chrono, true);
+    } else if (c === 'refilmer') c = extraireChrono(e, chrono, true);
+    if (c && c !== 'refilmer') vue.chrono = c;
+  } else if (film) vue.film = extraireFilm(e, film.depuis);
+  if (!vue.film && !vue.chrono) vue.terrain = extraireTerrain(e, emisLe);
   if (!monCote) return vue;
 
   vue.monCote = monCote;
-  vue.maStrategie = strategieA(etat, monCote, etat.horloge);
+  // La dernière consigne DONNÉE : elle prend effet une marge plus tard, mais le manager doit la voir tout de suite.
+  vue.maStrategie = strategieA(etat, monCote, Infinity);
   vue.signalAdverse = signalAdverse(etat, monCote);
   if (etat.decision && etat.decision.cote === monCote) vue.decision = etat.decision;
   // Le tri est stable : à minute égale, le récit du match passe avant mes ordres.

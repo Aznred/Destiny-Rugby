@@ -554,6 +554,7 @@ que l'affichage lise exactement la version du moteur qui joue.
   d'en-but et le changement de côté. Un match en cours au moment
   d'une mise en ligne garde donc son moteur — et son score. Remettre
   `REGLES_MATCH_EN_LIGNE` à 1 suffit à revenir en arrière pour les suivants.
+  **Depuis : règles 4 = lecture locale (IA 3), règles 5 = jeu vivant (IA 5, Correctifs 24-25, celles des matchs créés aujourd'hui).**
   ⚠️ Toute retouche du moteur détaillé change la rejoue des matchs en règles 2
   DÉJÀ COMMENCÉS : la passer sous une règle 3, ou la mettre en ligne quand aucun
   match ne se joue.
@@ -1170,7 +1171,8 @@ Réglages et le repli sans 3D. Séquence : banc → caméra télé → remplacem
   branchement : `pilotage.surImage` AVANT tout retour anticipé de la boucle, cartes tues quand `pilote.voulu`, gel pour la
   pause et la carte d'accueil, tempo ramené à ×1 à l'entrée.
 - ⚠️ **Éteint, le moteur rejoue à l'identique** : `npm run mesure:empreinte -- 6` (empreinte globale `94f2ae2e` au commit
-  `d29eb36` — elle change dès que les effectifs changent : comparer toujours avec le moteur d'origine du MÊME commit).
+  `d29eb36`, `6aca6be7` depuis la correction des effectifs du Correctif 24 — elle change dès que les effectifs changent : comparer
+  toujours avec le moteur d'origine du MÊME commit).
   Banc : `npm run verify:controle-direct` (51 contrôles : course, passes, plaquage, pied, appel 98 %/0 %/0 %, matchs entiers, note).
 - ⚠️ **Les touches sont des CODES PHYSIQUES** (`KeyW`) : ZQSD (AZERTY) et WASD (QWERTY) sont les mêmes touches ; l'affichage lit la
   lettre gravée (`libelleDeTouche`). Défauts : Maj sprint, Q/E passes (A/E sur AZERTY), V pied (pas Ctrl : Ctrl+W ferme l'onglet),
@@ -1306,9 +1308,10 @@ en une phrase → faire faire l'action → passer à la suivante**, sur les VRAI
 Demande : « si la possession change, le joueur doit pouvoir comprendre pourquoi rien qu'en regardant la scène » (jamais
 *possession A → variable → ballon chez le 9 de B*), un vrai gameplay pour les avants (mêlée, maul, touche, grattage), un plaquage
 qu'on peut rater, de grosses percussions, une endurance enfin vivable et une caméra à 360°.
-⚠️ **TOUT EST DERRIÈRE `EtatMatch.ia` ≥ 4** (`IA_MATCH_DE_CARRIERE` = 4, `conqueteLisible(e)` dans `moteur/conquete.ts`). La ligue en ligne reste
-en règles 4 / IA 3 : **ne pas bumper `REGLES_MATCH_EN_LIGNE` sans demande** (elle n'a ni film des nouveaux états, ni étalonnage). Empreinte
-du moteur à l'IA 3 inchangée : `IA_EMPREINTE=3 npx vite-node scripts/empreinteMoteur.ts 6` → `94f2ae2e`.
+⚠️ **TOUT EST DERRIÈRE `EtatMatch.ia` ≥ 4** (`conqueteLisible(e)` dans `moteur/conquete.ts`). Depuis le Correctif 24 la carrière joue au niveau 5
+(`IA_MATCH_DE_CARRIERE`) et la ligue en ligne aussi (règles 5, avec son film et son étalonnage en temps réel — voir la section des Correctifs 24
+et 25). Empreinte du moteur à l'IA 3 : `IA_EMPREINTE=3 npx vite-node scripts/empreinteMoteur.ts 6` → `6aca6be7` (`94f2ae2e` avant la correction
+des effectifs du Correctif 24 ; le moteur, lui, n'a pas bougé).
 
 - **Principe : l'issue est DÉCIDÉE AVANT le geste qui la montre, puis APPLIQUÉE après.** Elle vit dans l'état (`conquete.issue`, `ruck.duel`,
   `melee.dyn`) ; la scène joue ce que l'état annonce ; la phase n'applique plus que ce que tout le monde a vu.
@@ -1367,6 +1370,255 @@ du moteur à l'IA 3 inchangée : `IA_EMPREINTE=3 npx vite-node scripts/empreinte
 - **Pas fait / à essayer** : un vrai iPhone, une vraie manette, la PWA ; la ligue en ligne (règle 5 : film des nouveaux états) ; un tutoriel guidé
   dédié aux avants (seule une aide d'une ligne s'affiche aux deux premiers temps) ; des animations de saut propres au « contre » (le contre réutilise les clips
   de saut de l'APK) ; la stabilité/angle du pilier est résumée par le risque de faute, pas par un second axe.
+
+### Matchs couperets, propositions de cartes et fin de match (Correctif 26)
+
+**Matchs couperets** (`lib/matchLive.ts`, `lib/couperet.ts`, `lib/tournoi.ts`)
+
+- ⚠️ **LE TOURNOI FINAL DES DIVISIONS À POULES N'ÉTAIT PROPOSÉ NULLE PART.** De la Nationale 2 à la Régionale 3 (sept
+  divisions, de 2 à 22 poules), le champion sort d'un tableau sec entre les meilleurs de chaque poule : l'écran Résultats
+  l'affichait, la fin de saison s'en servait, mais ni l'entraîneur ni le joueur ne pouvaient en disputer un match.
+  `affichesDePhaseFinale(c)` rend TOUS les matchs couperets du week-end, dans l'ordre : le tour de sa poule (ou l'accès),
+  puis les tours du tournoi (`TOURS_DU_TOURNOI` : barrages ET quart le premier week-end, demie, finale — le même découpage
+  que le tableau affiché). `afficheDuClub` rend le premier non joué. Un week-end peut donc porter plusieurs matchs.
+- ⚠️ **UN SEUL MOTEUR, UNE SEULE AFFICHE.** Il n'y a pas de simulateur par compétition : toute affiche s'ouvre dans
+  `MatchLive` (mêmes vitesses, même « simuler la fin »), et l'avance déléguée de l'entraîneur leur donne un résultat
+  automatique. La carrière joueur passe par `afficheDuJoueur` — elle fabriquait ses propres clés (« phase#…#semaine »)
+  que le tableau ne relisait pas : barrage gagné sur le terrain, éliminé par le tirage.
+- ⚠️ **LA CLÉ D'UN MATCH DE TOURNOI EST `MatchFinal.cle`** (`tournoi#division#saison#taille#a#b`), celle que `duel` relit :
+  le score joué décide du tour suivant. `tournoiDeFinDAnnee` est mémoïsé (il rejoue toutes les poules de la division :
+  de 40 à 700 ms selon l'étage, recalculé une fois par résultat inscrit) sur ses paramètres et `versionResultatsJoues()`.
+- **Il faut un vainqueur** : `departager(cle, pour, contre)` (`lib/couperet.ts`) est LA définition du nul couperet — trois
+  points de prolongation, tirés de la clé. Le store (joueur et entraîneur) et l'écran de fin la lisent : la feuille annonce
+  « Égalité à la sirène : X l'emporte en prolongation, 20-17 » au lieu d'un 17-17 que le tableau ne retenait pas.
+  ⚠️ Le moteur ne joue PAS de prolongation : c'est un départage, pas vingt minutes de plus.
+- Carrière joueur : un second match couperet le même week-end se compte comme le premier (`autreCouperet` dans
+  `enregistrerMatchVecu`) et la semaine ne tourne que quand `resteUnMatchCeWeekEnd` est faux.
+- Banc : `npm run verify:tournoi-final` (97 contrôles, ~55 s).
+
+**Propositions de cartes** (`components/EchangesCollectionSolo.tsx`, `lib/echangesSolo.ts`, `serveur/carriereApi.ts`)
+
+- ⚠️ **UNE PROPOSITION DOIT SE VOIR DES DEUX CÔTÉS.** Le serveur l'enregistrait, mais celui qui l'envoyait n'en gardait
+  aucune trace à l'écran (il renvoyait, « déjà proposé », la fonction semblait cassée) et celui qui la recevait devait la
+  trouver sous son offre, dans une liste paginée par date. `suivi(compte)` rend, hors pagination, `recues` (mes offres
+  avec propositions) et `envoyees` (les offres où la mienne attend) : sections « Propositions reçues » et « Mes
+  propositions envoyées », en tête. Le destinataire d'une proposition est l'auteur de l'offre.
+- ⚠️ **RIEN NE CHANGE DE MAIN AVANT L'ACCEPTATION.** Une offre séquestre ses cartes à la création ; une proposition n'en
+  déplace aucune. Le même doublon ne se promet pas deux fois : `cartesEngagees` + `doublonsLibres`, vérifiés par le
+  serveur (`verifierDoublonsLibres`) ET par l'écran. À l'acceptation, possession revérifiée et deux mouvements dans la
+  même transaction ; une proposition dont l'auteur n'a plus les cartes est retirée (409) au lieu d'échouer à chaque appui.
+- **Delta, pas rechargement** : chaque action répond `{ boutique, delta: { evenement, offreId, offre, suivi } }`
+  (`tradeCreated`, `tradeProposed`, `tradeAccepted`, `tradeRefused`, `tradeCancelled`, `tradeWithdrawn`) ;
+  `appliquerDeltaEchange` met à jour la page. La lecture annonce la révision de la collection (`&rev=`) : le serveur ne
+  la renvoie que si la sienne est plus récente (échange conclu pendant l'absence).
+- Nouvelle action `retirerPropositionSolo`. ⚠️ **AUCUNE MIGRATION** : `suivi`, `lire` et `retirer` ne lisent que les
+  colonnes existantes de `collection_offres` et sont facultatives dans `StockageCarriere` (un échec rend `suivi: null`,
+  l'écran déduit alors le suivi de la page). ⚠️ Leur SQL Neon n'a pas pu être essayé sur la vraie base.
+- **Pas fait** : choisir un destinataire sans offre publique (il faudrait une colonne `destinataire`, donc une
+  migration), contre-proposition, expiration.
+- Banc : `npm run verify:propositions-collection` (83 contrôles : envoi, réception, refus, retrait, acceptation, double
+  appui, tiers, et le nombre d'exemplaires de chaque carte constant à chaque étape).
+
+**Fin de match** (`lib/finMatch.ts`, `lib/persistanceNavigation.ts`, `lib/match3D.ts`, `MatchLive`)
+
+- ⚠️ **L'ÉCRAN DE FIN REMPLACE LA SCÈNE 3D** (`e.fini && stats ? <FeuilleMatch/> : <Terrain3D/>`) : React la démonte dans
+  l'image du coup de sifflet. Détruite d'un bloc à ce moment-là (trente joueurs, textures du stade, contexte WebGL, son),
+  avec en plus le résultat, les statistiques et la sanction écrits dans le store — c'était LA grosse image.
+- ⚠️ **CHAQUE `set()` DU STORE RÉÉCRIT TOUTE LA SAUVEGARDE** (`persist` : `JSON.stringify` + `localStorage.setItem`,
+  synchrones). `suspendreEcritures()` ne garde que la dernière photo et l'écrit à la reprise ; `ecrituresGroupees(fn)`
+  pour un travail synchrone. Filets : écriture immédiate à `pagehide` / onglet caché, levée seule après 4 s, photo
+  liée à son emplacement de sauvegarde.
+- **Le pipeline** : sirène → résultat verrouillé (`final`, `maFeuille`) → écran de fin dessiné (`apresLEcran`) → scène
+  rendue (`scenesRendues`) → `finaliserMatch(id, étapes)` : résultat, statistiques, sanction, une étape par tâche, une
+  seule écriture de la sauvegarde → « Terminer » se déverrouille (« Finalisation du match… » entre-temps).
+  « Terminer » → `sortirDuMatch` (plein écran, orientation, viewport) → fermeture → une image plus tard,
+  `semaineSuivante()` en écritures groupées (`PanneauJoueur`).
+- ⚠️ **UN MATCH N'EST FINALISÉ QU'UNE FOIS** : `finaliserMatch` tient un registre par identifiant de match OUVERT
+  (`cle#saison#n°` — pas la clé seule : elle revient d'une carrière à l'autre) ; le store garde ses verrous
+  (`resultats[cle]`, `matchRegarde`).
+- **Scène par tranches** : `detruireScene(scene)` (`lib/match3D.ts`, appelée par `Terrain3D`) → `scene.detruireParEtapes()`
+  (lecteur hors git : `../analyse-rn26/correctif_26_scene.cjs`, sauvegarde `sauvegarde-avant-correctif-26/`) : toile
+  masquée et son coupé tout de suite, puis joueurs par six, textures par seize, contexte, stades. `detruire()` reste le
+  filet (lecteur ancien, tranche en échec).
+- **Les statistiques ne se recalculent pas à la fin** : le moteur les cumule par pion (`p.stats`), `bilan(e)` les lit.
+- **Mesure** : jalons `match_end_detected`, `stats_finalize_start/end`, `db_save_start/end`, `scene_cleanup_start/end`,
+  `navigation_start/end` (`performance.mark('fin-match:…')`) ; en développement `__finMatch.durees()`.
+- Banc : `npm run verify:fin-match` (105 contrôles ; dix matchs de suite : finalisation 15-55 ms, une écriture par
+  match, tas stable à 240 Mo, aucune minuterie restante). ⚠️ **La mémoire GRAPHIQUE et un vrai téléphone ne sont pas
+  mesurés** (pas de WebGL sous Node, panneau navigateur sans GPU) : c'est le premier essai à faire sur iPhone/Android.
+
+### Ligue synchronisée, marché commun, données joueurs, jeu vivant (Correctifs 24 et 25)
+
+Principe demandé : « tout ce qui est visuel et interactif est immédiat côté client ; le serveur conserve uniquement l'autorité sur
+les résultats importants », en RÉDUISANT réseau et base. ⚠️ Rien n'a été poussé ; une autre session modifiait la même copie pendant le chantier.
+
+**1. Le direct d'une ligue : une simulation de référence, N spectateurs** (`lib/ligue/matchCarriere.ts`, `filmDirect.ts`).
+
+- ⚠️ **LA MARGE D'AUTORITÉ** (`MARGE_AUTORITE` = 4,8 s). Chaque instance jouait son moteur jusqu'à « maintenant » : un ordre, une décision ou une
+  présence écrits par une autre instance tombaient dans SON passé, et elle rejouait — de là les retours en arrière. Le moteur ne joue plus que
+  jusqu'à `maintenant − marge` (`simCible`) ; un ordre est daté à l'heure réelle (`simOrdre`), donc toujours DEVANT tous les moteurs. Tout ce qui est
+  joué est définitif. La présence d'un entraîneur est un événement du journal (`veille`), la décision en attente se DÉDUIT (`derivee`), et le délai
+  d'une décision se compte en pas de simulation (`PAS_ATTENTE_MAX`) : deux instances prennent la même décision de l'adjoint au même pas.
+- ⚠️ **UN MOTEUR NE RECULE PLUS.** Seuls cas où on le remonte du journal : un ordre daté derrière lui (base muette plus longtemps que la marge —
+  compté dans `retards`), ou un moteur gardé plus de soixante secondes DEVANT l'heure demandée (`AVANCE_SUSPECTE` : une autre partie sous la même clé).
+- **Film v2, la « chronologie »** (`ChronoDirect`) : par segment, des pistes par valeur (échantillons choisis + interpolation d'Hermite écrite avec
+  + − × ÷ seulement, pour que serveur et client tombent d'accord), tolérance adaptative (5 cm près du ballon, 20 cm loin), événements numérotés
+  (`eventId | matchTime | eventType | players | result | seed` : `ligneEvenement`), somme de contrôle annoncée par l'écran (`tl=<pas>.<somme>`).
+  Une divergence se raccorde EN DOUCEUR (`rupture`, fondu sur huit pas, sur un événement repère) — jamais par un saut.
+- **Coût mesuré** (`npm run mesure:conso-direct`, un match de dix minutes, deux instances, deux écrans) : sondages 600 → 400 (3 s au lieu de 2),
+  octets vers les écrans 3 255 → 1 718 Ko (compressés 1 012 → 610, −40 %), requêtes SQL 452 → 341, écritures de l'état 7 → 5. L'image a 9,5 s de
+  retard sur l'horloge du serveur (marge + tampon). Bancs : `npm run verify:chronologie` (plusieurs instances, routage au hasard, latence jusqu'à
+  2,8 s : chaque écran identique à la rejoue de référence, 0 recul), `verify:film-direct`, `verify:ecriture-direct`.
+- ⚠️ **MISE EN LIGNE : quand aucun match ne se joue.** Un match en cours garde ses règles, mais le modèle de temps change pour lui aussi (un à-coup).
+- **Règles 5 = IA 5** (`REGLES_MATCH_EN_LIGNE`, `iaDesRegles`) : la ligue reçoit les conquêtes lisibles du Correctif 23 et le jeu vivant ci-dessous.
+  ⚠️ **LA FATIGUE EN TEMPS RÉEL** : les deux réserves gardent 90 % de son allure à un joueur à plat (réglé pour dix minutes d'écran) ; sur
+  quatre-vingts minutes réelles le jeu ne ralentissait plus jamais — 75 points par match contre 59. `allureReel` 0,58, `accelerationReel` 0,35,
+  `usureReel` 1,5 et `percussionReel` 0,3 (`ia/reglages.ts`, posés sur les pions à la création). Mesuré sur 48 matchs : **57,6 points, 7,3 essais**
+  (production, IA 3 : 59,2 et 7,6), 42 minutes de ballon vivant contre 37,6.
+- **N'importe quel joueur à n'importe quel poste** : `verifierComposition` ne refuse plus rien ; le prix est sportif (`rendementAuPoste` dans
+  `carteJoueur.ts` : 1, 0,82 même catégorie, 0,64 contre-emploi, 0,6 ou 0,5 en première ligne improvisée), affiché dans la composition.
+
+**2. Les tenues et le tableau** (`lib/tenuesMatch.ts`, banc `npm run verify:tenues`). Le visiteur recevait du blanc d'office au tableau ; 450 clubs
+sans couleurs saisies jouaient dans une teinte tirée de leur nom ; l'écusson se lisait à son pixel le plus vif. Désormais : couleurs saisies, sinon
+lues sur l'écusson à sa SURFACE (fond exclu, noir et blanc admis, `analyserEcusson`) ; `departagerLesTenues` (distance perçue CIE Lab, seuil 34) fait
+passer le visiteur en tenue alternative — sa couleur d'origine reste sur les parements — et **le terrain vu de haut, la scène 3D et le tableau lisent
+ce même résultat** (`OptionsScene3D.tenuesDepartagees`). ⚠️ Un kit acheté en boutique ne se repeint jamais : c'est l'autre équipe qui change (`fige`).
+⚠️ La scène peint ses tenues UNE fois : `Terrain3D` attend la lecture des écussons (`pret`, quatre secondes au plus). `siglesTV` : jamais deux sigles
+identiques (« TOU » / « RCT »). Mesuré sur 51 302 couples de clubs : aucun couple confondu, 18,5 % de tenues alternatives.
+
+**3. Le marché commun des divisions publiques** (`lib/ligue/marchePartage.ts`, `serveur/marcheCommun.ts`, `operationMarcheCarriere`).
+Chaque division est une ligue, donc une ligne de base : aucune écriture ne couvre deux ligues. Les annonces de toutes les divisions d'un cycle vivent
+dans UN document (`carriere_marches`, id `public:<cycle>`) écrit par comparaison de version — **c'est lui qui arbitre**. Un achat : réserver les Ovas
+(ligue de l'acheteur) → RÉCLAMER l'annonce dans le document (le point atomique : de deux acheteurs un seul passe, l'autre est remboursé) → solder le
+vendeur → livrer l'acheteur → l'annonce quitte le document. Chaque étape de ligue est rejouable sans effet, et le document note ce qui reste à
+faire : n'importe quelle requête reprend un achat interrompu (`entretenir`, `reprendreLigue`). Enchères entre divisions (réserve, remboursement de
+l'enchérisseur dépassé), annulation, expiration, cartes spéciales si la division de l'acheteur les autorise.
+- ⚠️ **CE NE SONT PAS DES COMMANDES** : aucune opération n'est dans `agirCarriere`, un client ne peut ni se livrer ni se rembourser.
+- ⚠️ **SANS LA TABLE, RIEN NE S'ARME** : `npm run base:appliquer` (schéma dans `serveur/schema-carriere.sql`). Sans elle, chaque division garde son
+  marché ; les ligues privées ne changent jamais. ⚠️ Le SQL Neon n'a pas été essayé sur la vraie base (fichier local et banc seulement).
+- ⚠️ Le marché d'un cycle se ferme avec lui : `creerDivisionPublique` déverrouille les cartes héritées et rend les Ovas réservés.
+- Écran : `useMarchePartage` (15 s, « inchangé » en vingt octets) fond les annonces du document dans la liste de l'onglet Marché.
+- Banc : `npm run verify:marche-commun` (154 contrôles : trois acheteurs simultanés, trois INSTANCES sur la même révision, coupures à chaque étape,
+  aucun Ova ni carte créés ou perdus).
+
+**4. Les réponses compactes** (`lib/ligue/deltaVue.ts`, banc `npm run verify:delta-vue`). Une commande de ligue répondait par la vue ENTIÈRE ;
+l'écran annonce sa version (`v`, `delta: true`) et reçoit ce qui a changé. Ouvrir un pack dans une ligue de seize clubs : **394 Ko → 8,5 Ko**
+(compressé 39,9 → 1,7). Écran d'avant, version décalée, requête rejouée : la vue entière, comme avant.
+
+**5. Les données joueurs** (`npm run audit:joueurs`, rapport `serveur/AUDIT-JOUEURS.md`). ⚠️ `actualiserCartesCatalogue` réécrit les cartes déjà
+distribuées à chaque ouverture de ligue : un import se propage donc partout. Trouvé : 36 292 licenciés passés d'un poste tiré de leur rang à leur
+vrai numéro FFR (import du 1ᵉʳ octobre) ; 18 professionnels qui héritaient du poste d'un homonyme amateur (`profilJoueurFfr` cherchait le NOM SEUL
+quand le club n'était pas une structure FFR — corrigé) ; 80 identifiants passés d'un amateur à un professionnel du même nom (`sourceId` =
+`reel:<nom>`, le mieux noté gagne). Une carte d'amateur ne suit plus un professionnel d'un autre club, et un portrait ne s'efface plus.
+⚠️ **L'empreinte du moteur a bougé avec ces effectifs** : IA 3 `6aca6be7` (au lieu de `94f2ae2e`), IA 4 `ae1c2767`, IA 5 `7630dda3` — vérifié que
+le commit d'origine avec la SEULE correction des effectifs donne les mêmes valeurs aux niveaux 3 et 4 (le moteur n'a pas changé).
+⚠️ Non fait : le registre d'identifiants pour séparer les homonymes (il change des identifiants), et la lecture de la base de production (`--neon`).
+
+**6. Le jeu vivant (IA 5 : carrière 3D et ligue)** — `jeuVivant(e)` dans `moteur/conquete.ts`.
+- **Sirène** : une pénaltouche ou une mêlée de pénalité se joue (`arret(…, dePenalite)`) ; **pénalité manquée** : le ballon reste vivant
+  (`BallonLibre.deTir`), renvoi aux 22 seulement s'il meurt en-but.
+- **Rythme** : mêlée (`MELEE_VIVE`), rituel du buteur en parallèle du replacement (`RITUEL_VIF`), touche (`CADENCE_TOUCHE`), placement retenu 12 s au plus.
+- **Coups de pied** : armé par type (`FRAPPE_VIVE` : rasant 0,18 s … drop 0,50 s), dès le pas de la demande ; ⚠️ **on peut plaquer le botteur jusqu'à la frappe**, aussi en arcade (`plaqueurDuBotteur`), le geste
+  s'interrompt, charge-down selon la distance.
+- **Ruck** : le plaqué n'est plus téléporté (`ancrerLeRuck`, le regroupement se construit autour de lui) ; **grattage** seulement à portée et sur
+  demande (`peutGratter`) ; **maul** : on peut en sortir (`PackHumain.libre`).
+- **HUD** : les temps d'un pack se dessinent à 60 images par seconde et se jugent à l'instant du doigt (`Rythme`), barre de souffle colorée avec
+  son plafond (`Souffle`).
+- **Exclu** : il quitte la pelouse (banc pour un jaune, tunnel pour un rouge) et n'est plus dessiné. **Été** d'un joueur existant : tournée
+  d'été contre trois hôtes différents, puis deux matchs de préparation avec son vrai club (`matchDePreparation`).
+- ⚠️ **Corrigé au passage** : une touche dont le ballon finit au sol plantait le rendu à chaque image (`renderBall`, `correctif_24_ballon_sol.cjs`).
+- Scène, hors git : `analyse-rn26/correctif_24_scene.cjs`, `_scene_tee.cjs`, `_tenues.cjs`, `_ballon_sol.cjs`, puis `node scripts/construireMoteur3D.mjs`.
+
+**7. Le tutoriel de la ligue** (`tutoriel/parcours/ligue.ts`) : `league.portail` fait REJOINDRE la Ligue Publique (présenter, nommer son club,
+écusson, le vrai bouton) ; `league.privees` dit une fois, à l'arrivée, qu'on peut créer ou rejoindre des ligues privées ; l'ancien pas-à-pas de
+création (`league.creation`) ne se lance que si l'on pose le curseur dans « Nom de la ligue ». Essayé dans le navigateur, ordinateur et téléphone.
+
+**8. Les statistiques d'utilisation** (`lib/usage/`, `components/LaboStatistiques.tsx`, banc `npm run verify:usage`, aperçu
+`/scripts/apercuStatistiques.html`). Les modes solo vivent dans le navigateur : `usage/suivi.ts` (lancé depuis `main.tsx`, à part) REGARDE le
+store sans s'y brancher — l'écran affiché donne le mode (`modeDeLEcran`), les changements de la carrière et de la collection donnent les
+compteurs — et envoie un relevé anonyme (identifiant d'appareil tiré au hasard, secondes par mode, compteurs ; jamais un compte) toutes les
+dix minutes de jeu et à la fermeture de l'onglet (`action=usage`, SANS authentification, tout borné par `validerEnvoi`, soixante relevés par
+adresse et par dix minutes, jamais d'erreur visible). Tables `usage_jours`, `usage_compteurs` et `usage_carrieres` (`npm run base:appliquer`) ; le Labo (onglet
+« Statistiques », Kiri seulement) ne lit que des sommes : Global, Collection solo, Carrière joueur (créé contre existant), Carrière
+entraîneur, Hors classement (joueurs les plus incarnés), Rétention à 1, 7 et 30 jours selon le mode joué en premier.
+⚠️ Une carrière ne se compte que si on la VOIT NAÎTRE (aucun match joué) : une sauvegarde rechargée n'en crée pas. Les instantanés anonymes suivent
+le temps par carrière, les saisons, les matchs, les actives et l'abandon estimé (fermeture ou 30 jours sans activité). Le catalogue déjà chargé
+par la Collection donne ses acquisitions, ses rares et son meilleur XV par postes ; un XV incomplet n'a pas de GEN. Le temps des visites courtes,
+les changements de mode et minuit sont couverts par `verifierSuiviUsage.ts`. ⚠️ Le SQL Neon n'a pas été
+essayé sur la vraie base (stockage local et banc seulement).
+
+**9. Le catalogue en ligne se garde d'une visite à l'autre** (`catalogueSoloCommun.ts`, clé `destiny-rugby:catalogue-solo`) : il était versionné,
+mais la révision tenue repartait de −1 à chaque chargement de page. Le préchargement de l'ouverture d'un pack existait déjà (`prechargementPacks.ts`).
+
+**10. Le profileur** (`lib/profileur.ts`, `components/match/Profileur.tsx`, onglet « Profileur » du Labo ; scène :
+`analyse-rn26/correctif_25_profileur.cjs` → `scene.mesures()`). Un réglage de CET appareil (`destiny-rugby:profileur`) : allumé, `Terrain3D` pose
+un cartouche sur tout match en 3D — images par seconde, écart entre deux images et coût du dessin (moyenne, 95ᵉ centile, pire, sur 240 images),
+appels de dessin, triangles, géométries, textures, toile, mémoire, requêtes du match — et chaque match de plus de dix secondes laisse un résumé
+que le Labo aligne (douze séances, une note libre : « avant », « après »), avec filtres mobile/ordinateur/iOS/Android. Le coût CPU de la scène,
+les mesures GPU asynchrones quand l'extension WebGL existe, la latence API et les erreurs réseau complètent ces séances. Éteint, il ne coûte rien. **Première mesure** (ordinateur de
+développement, stade de campagne, 966 × 775) : 58 images par seconde, 17,4 ms entre deux images (95 % sous 27,8), 13,2 ms de dessin,
+361 appels de dessin, 248 746 triangles, 272 textures, 201 Mo — point de départ historique. Le banc actuel `/scripts/apercuPerformances25.html`
+compare les mêmes joueurs, stade, caméra et définition avec puis sans soudure/squelettes communs/élagage/animations économes : 395 → 267 appels,
+12,66 → 10,07 ms CPU scène, 6,43 → 4,42 ms GPU (mesure locale du 7 octobre, pas une garantie pour tous les appareils).
+
+**11. Les barbes et les moustaches** (`corps.js` : `fitBeard`, `REGLAGE_BARBE` ; `analyse-rn26/correctif_25_barbes.cjs` ; banc visuel
+`/scripts/apercuBarbes.html?barbe=11&gros=1&hauteur=330`, les deux têtes de face et de profil). Elles tombaient en collerette autour du cou.
+Mesuré sur les maillages : (1) elles ont été modelées pour une tête dont le nez est 2 cm plus bas et 1 cm moins en avant que celles du jeu
+(la moustache de l'APK est à la hauteur de la BOUCHE des têtes du jeu), et pas du même écart sur les deux têtes ; (2) l'ajustement était
+celui des cheveux — chaque sommet enfoui repoussé depuis le centre du CRÂNE, donc vers le bas pour un sommet de menton. `fitBeard` CALE la
+barbe sur le nez de la tête qui la porte (aucune table par joueur, une troisième tête s'ajusterait seule ; `REGLAGE_BARBE` garde une
+retouche fine par type de tête) puis ramène les sommets enfouis à la peau par lancer de rayon depuis un point situé derrière la bouche.
+Regardé pour la moustache (01), un bouc (03), deux barbes courtes (06, 07) et deux longues (11, 15), sur les deux têtes. Ajustement final demandé :
+recul de 8 mm sur l'arrière et 10 mm sur l'avant, pattes des barbes complètes vers le bord avant des oreilles, cheveux relevés de 1 cm.
+Le relief des lèvres garde une épaisseur de 6 mm pour que la moustache ne traverse pas les facettes du visage.
+
+**12. Première optimisation mesurée : les joueurs hors champ ne sont plus dessinés** (`analyse-rn26/correctif_25_elagage.cjs`, `elaguer`
+dans `scene.js`, `mesures().elagues`). ⚠️ MESURÉ D'ABORD : 331 appels de dessin et 234 729 triangles QUELLE QUE SOIT LA CAMÉRA — rien n'était
+élagué (les maillages animés portent `frustumCulled=false`). Chaque joueur est maintenant testé contre le champ de la caméra par une sphère
+large (2,6 m), caché le temps de l'image, puis rendu visible. Cette première mesure porte sur le dessin ; la passe actuelle évite aussi
+les poses de locomotion hors champ et loin du ballon, et restaure une pose complète au retour dans le champ ou lors d'une coupe.
+Après : 6 à 10 joueurs écartés selon le plan, 299 à 338 appels, 205 000 à 232 000 triangles (−5 à −12 %). ⚠️ CE QUE CE PARAGRAPHE DISAIT ENSUITE ÉTAIT FAUX (« un joueur ne coûte que deux appels, le stade 270 ») : mesuré pièce par pièce, c'est l'inverse —
+un joueur, c'est DIX maillages, 7 100 triangles et six squelettes ; les trente joueurs font ~300 des ~380 appels, le stade une cinquantaine
+(three.js élague déjà ses morceaux un par un). Voir le paragraphe suivant.
+
+**Passe d'optimisation (Correctif 25)** : squelettes communs et pièces compatibles soudées ; calcul des poses évité hors champ, doigts/yeux/mâchoire
+et IK du regard allégés à distance (les indices des fondus restent ceux du squelette complet) ; matrices du stade statiques et cache borné
+à un stade mobile/deux desktop ; équipements chargés selon besoin ; profils bas/moyen/haut et cadence 60/30 adaptative. La broadphase de
+`placements.mjs` utilise une grille de proximité et un rejet exact sur les axes ; 10 800 positions comparées à l'ancien calcul sont identiques.
+Le public du décor est déjà regroupé dans ses meshes : aucune population supprimée. Ne pas souder tout le stade au prix de perdre son élagage.
+Validation matérielle iOS/Android et SQL de production encore nécessaires. Détails : `sources/CORRECTIF-25.md`.
+
+⚠️ **`public/rn26/` EST PRODUIT, IL NE S'ÉDITE PAS.** Ses modules (`scene.js`, `corps.js`, `placements.mjs`, `proximite.mjs`…) sont écrits par
+`node installer_apercu.mjs` (lancé aussi par `node scripts/construireMoteur3D.mjs`) à partir de `../analyse-rn26/apercu/match/`, HORS du dépôt.
+Le 7 octobre, une session a retouché ces fichiers directement dans le jeu (économie d'animation, grille de proximité, barbes, mesure GPU) :
+l'installation suivante aurait tout effacé. Ces retouches ont été reportées dans les sources à l'identique (vérifié : l'installateur
+reproduit les fichiers installés à l'octet près), et l'installateur REFUSE désormais d'écraser un fichier modifié depuis sa dernière
+installation : `node reporter_retouches_installees.cjs` (depuis `../analyse-rn26`) montre ce qui serait reporté, `--ecrire` le reporte.
+Toute retouche du lecteur se fait dans `../analyse-rn26/apercu/match/` (par un `correctif_NN_*.cjs` rejouable), puis s'installe.
+
+**Ce que la scène mesure, et ce que les mesures ont tranché** (`../analyse-rn26/correctif_25_{squelettes,stade,corps,cadence,mesure}.cjs`) :
+- **Le banc** : `/rn26/index.html?stade=moyen&banc=1` puis `rn26.mesurer(8)` (ms par image, dont rendu ; appels et triangles sous les sept
+  caméras) et `rn26.empreinte('wide')` (somme de l'image). `&sans=squelettes,soudure,elagage,cadence` coupe une optimisation.
+  ⚠️ SANS `banc=1` DEUX CHARGEMENTS NE RENDENT PAS LA MÊME IMAGE (une image d'avance ou non selon que le panneau est visible), et les
+  temps d'un chargement à l'autre varient de ±1,5 ms sur cette machine : un avant/après se mesure DANS LA MÊME PAGE
+  (`scene.interne.unirSquelettes` / `souderLesPieces` appliqués à chaud).
+- **Un squelette par joueur, pièces de même dessin soudées** (maillot + short + chaussettes ; corps + tête) : 10 maillages → 7 par joueur,
+  192 squelettes → 33. Stade moyen, même page, mêmes images : télévision 336 → 242 appels, large 388 → 283 ; rendu 5,2 → 3,4 ms,
+  image entière 7,4 → 5,2 ms (−30 %). Image identique (0 à 6 pixels sur 883 000 selon la caméra, arrondis de bord).
+- **Le stade NE SE SOUDE PAS** : essayé par quart (388 → 378 appels, mais +15 % de triangles), par mailles de 40, 24 et 12 m (−5 appels au
+  mieux). Il ne pèse qu'une cinquantaine d'appels à l'image ; seules ses matrices sont figées (`figerDecor`).
+- **Ce qui ne coûte presque rien, donc qu'on n'a pas touché** : repasser sur toutes les matrices de la scène (2 485 nœuds) prend 0,28 ms ;
+  le moteur de match, 2,4 ms par SECONDE simulée. Les modèles des joueurs sont déjà les « LOD2 » de l'APK : pas de second niveau de détail.
+- **Cadence** (`mesures().cadence`, `pas`, `moyenneMatch`) : définition abaissée sous 45 images par seconde, puis 30 régulières (une image
+  sur deux à 60 Hz, sur quatre à 120 Hz), retour à la pleine cadence seulement si une image coûte moins de 7 ms, avec une attente qui double
+  à chaque échec (12 s → 2 min). Essayé avec un appareil simulé ; ⚠️ pas sur un vrai téléphone.
+- **Labo → Statistiques → « Fluidité 3D »** : les compteurs `fluidite.<plateforme>.<tranche>` (un par match en 3D de plus de vingt secondes)
+  par plateforme, avec le filtre Tous / Ordinateur / Mobile / iOS / Android, la part finie à 30 et la part à définition abaissée.
+- ⚠️ `node verifier_destiny.mjs` (banc du lecteur) échoue sur « un joueur en posture de ruck doit être ancré » — aussi avec le
+  `placements.mjs` d'avant la grille de proximité : cela vient du moteur (duels de ruck des Correctifs 23-24), pas de cette passe. À reprendre.
+⚠️ Bancs qui échouent AUSSI sur le commit d'origine : `verify:animations-match` (receveurs de l'engagement, recontrôlé sur HEAD), `verify:laboratoire`
+(les objectifs sont crédités une commande plus tard), `verify:triche` (une coupe aux récompenses démesurées est acceptée), onze contrôles de
+`verify:carriere` (dotation, packs, durée de rejoue).
 
 ## ⚠️ Équilibrage : ce qui ne se retouche pas sans mesurer
 
@@ -1599,6 +1851,15 @@ npm run verify:boutique           # monnaies, prix, achats, inventaire, kits, La
 npm run verify:vitesse-match      # ×1 à ×10, remplacement et simulation : même match quelle que soit la vitesse (132 contrôles, ~75 s)
 npm run verify:resultat-match     # le score joué entre au classement, persisté, rechargé, effacé (18 contrôles)
 npm run verify:carriere-existante # joueur existant : hors classement, carte intacte, monde sans son double (101 contrôles)
+npm run verify:chronologie        # le direct d'une ligue : plusieurs instances, un seul match, aucun recul (Correctif 24)
+npm run verify:marche-commun      # marché commun des divisions publiques : achat atomique, coupures, Ovas et cartes conservés (154 contrôles)
+npm run verify:tenues             # deux tenues qu'on ne confond pas, tableau lisible, écusson lu à sa surface (51 302 couples de clubs)
+npm run verify:delta-vue          # réponse compacte d'une commande : la vue tenue par deltas est celle du serveur (55 contrôles)
+npm run audit:joueurs             # audit des données joueurs, lecture seule : photographie, comparaison, ligues, base (voir serveur/AUDIT-JOUEURS.md)
+npm run verify:usage              # statistiques d'utilisation : relevés bornés, sommes, rétention, lecture réservée à Kiri (65 contrôles)
+npm run verify:tournoi-final      # tournoi final des divisions à poules jouable, clés du tableau, départage (97 contrôles, ~55 s)
+npm run verify:fin-match          # finalisation par étapes, une écriture, scène par tranches, dix matchs de suite (105 contrôles)
+npm run verify:propositions-collection # propositions de cartes : reçues, envoyées, refus, retrait, aucune duplication (83 contrôles)
 
 npx vite-node scripts/verif.ts    # banc général : divisions, effectifs, 8 saisons
 ```

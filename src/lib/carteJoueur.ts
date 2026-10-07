@@ -227,6 +227,31 @@ export function facteurDePerformance(a: Adequation): number {
   return a === 'naturel' || a === 'secondaire' ? 1 : 0.82;
 }
 
+/**
+ * LE RENDEMENT D'UN JOUEUR À UN POSTE — et le CONTRE-EMPLOI (Correctif 24).
+ *
+ * Demande : « Le joueur doit pouvoir mettre n'importe quelle carte à n'importe quel poste et sauvegarder sa composition. En
+ * revanche, il faut conserver une vraie pénalité sportive pour un joueur très mal positionné. Mettre un pilier à l'aile doit
+ * être autorisé, mais il risque évidemment de se faire complètement dépasser. »
+ *
+ * « Hors poste » ne suffisait pas à le dire : un centre à l'aile et un pilier à l'aile rendaient tous deux 82 %. Il y a donc
+ * trois marches sous le poste naturel ou secondaire (100 %) :
+ *   · 82 % — hors poste, mais du même monde (un troisième ligne en deuxième ligne, un centre à l'aile) ;
+ *   · 64 % — CONTRE-EMPLOI : un avant chez les arrières ou l'inverse. Ni les jambes, ni les mains, ni les repères ;
+ *   · 60 % (un autre avant) ou 50 % (un arrière) — PREMIÈRE LIGNE IMPROVISÉE. Rien ne l'interdit plus, et la mêlée le paiera.
+ *
+ * ⚠️ C'EST LA NOTE GELÉE DU MATCH QUI BAISSE, donc tout ce que le moteur en tire : vitesse, plaquage, puissance, placement.
+ */
+export function rendementAuPoste(joueur: PosteId, slot: PosteId, postesSecondaires: readonly PosteId[] = []): number {
+  if (adequationAuPoste(joueur, slot, postesSecondaires) !== 'horsPoste') return 1;
+  const de = POSTES.find((p) => p.id === joueur), vers = POSTES.find((p) => p.id === slot);
+  if (!de || !vers) return 0.82;
+  const premiereLigne = (famille: string) => famille === 'pilier' || famille === 'talonneur';
+  // Un pilier qui passe au talon reste en première ligne : hors poste, sans plus.
+  if (premiereLigne(vers.famille) && !premiereLigne(de.famille)) return de.categorie === vers.categorie ? 0.6 : 0.5;
+  return de.categorie === vers.categorie ? 0.82 : 0.64;
+}
+
 // ---------------------------------------------------------------------------
 // LES BADGES TEMPORAIRES
 // ---------------------------------------------------------------------------

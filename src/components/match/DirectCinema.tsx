@@ -89,7 +89,8 @@ export function DirectCinema({
   const [filmFini, setFilmFini] = useState(false);
   useEffect(() => {
     if (!m.termine) { setFilmFini(false); return; }
-    const attente = setTimeout(() => { setFilmFini(true); setVu(null); rappel.current?.(null); }, 4500);
+    // Le tampon de lecture tient quatre à cinq secondes de film : on lui laisse le temps de les montrer.
+    const attente = setTimeout(() => { setFilmFini(true); setVu(null); rappel.current?.(null); }, 7500);
     return () => clearTimeout(attente);
   }, [m.termine]);
   const affiche = filmFini ? null : vu;
@@ -128,7 +129,7 @@ export function DirectCinema({
     : undefined;
   // La décision n'apparaît qu'une fois la pénalité sifflée À L'ÉCRAN.
   const decision = m.decision && (!affiche || affiche.seconde >= m.decision.horloge * 60 - 1.5) ? m.decision : undefined;
-  const montrerTerrain = Boolean(m.terrain || m.film || (vu && !filmFini));
+  const montrerTerrain = Boolean(m.terrain || m.film || m.chrono || (vu && !filmFini));
 
   const isTmo = Boolean((terrain?.phase === 'tmo' || (terrain?.tmo?.actif && !carton)) && terrain?.tmo);
 
@@ -164,8 +165,8 @@ export function DirectCinema({
           bulle={bulleTenue.current.phrase} vent={terrain?.ventTV ?? null}
           periode={terrain?.periode ?? (secondeCourante >= 2400 ? 2 : 1)} phase={terrain?.phase} termine={m.termine && filmFini}
           equipes={[
-            { nom: domicile, ...couleursEquipeTV(couleurs.domicile), logo: emblemes?.domicile, score: score.domicile, essais: essaisVus.domicile },
-            { nom: exterieur, ...couleursEquipeTV(couleurs.exterieur, true), logo: emblemes?.exterieur, score: score.exterieur, essais: essaisVus.exterieur },
+            { nom: domicile, ...couleursEquipeTV(couleurs.domicile, couleurs.maillots?.domicile.secondaire), logo: emblemes?.domicile, score: score.domicile, essais: essaisVus.domicile },
+            { nom: exterieur, ...couleursEquipeTV(couleurs.exterieur, couleurs.maillots?.exterieur.secondaire), logo: emblemes?.exterieur, score: score.exterieur, essais: essaisVus.exterieur },
           ]}
           exclusions={terrain?.exclusionsTV ?? (m.termine ? dernieresExclusions.current : undefined)} pause={pause}
           joueurs={(terrain?.pions ?? []).map(p => ({ ...p, cote: p.cote === 'domicile' ? 'A' : 'B', photo: portraits ? portraits[p.nom] ?? null : undefined }))}
@@ -175,6 +176,7 @@ export function DirectCinema({
             key={m.id}
             terrain={m.terrain}
             film={m.film}
+            chrono={m.chrono}
             matchId={modeDemo ? undefined : m.id}
             surAffiche={noterAffiche}
             scoreMatch={m.score}

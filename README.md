@@ -1874,3 +1874,47 @@ La retransmission française utilise F5-TTS sur l'ordinateur via un service loca
 - **Plaquage dirigé** (on peut plonger dans le vide), **grosses percussions** des joueurs puissants.
 - **Endurance** : une réserve générale lente + une barre de sprint qui se recharge ; **caméra à 360°** (libre ou assistée).
 - Tout est derrière l'IA de niveau 4 (matchs de carrière) ; la ligue en ligne n'est pas touchée. Banc : `npm run verify:conquete`.
+
+### Correctif 24 — ligue synchronisée, marché commun, données joueurs, rythme des matchs (07/10/2026)
+
+- **Le direct d'une ligue ne revient plus en arrière.** Un match = une simulation de référence, que tous les écrans rejouent avec quelques secondes
+  de retard : le serveur ne joue que ce qui est définitif (marge d'autorité de 4,8 s), l'écran reçoit une chronologie d'événements et de
+  trajectoires et l'anime à 60 images par seconde. Moins de réseau qu'avant : −40 % d'octets, −25 % de requêtes à la base. `npm run verify:chronologie`.
+- **N'importe quel joueur à n'importe quel poste** : la composition ne bloque plus, le contre-emploi se paie sur le terrain et s'affiche.
+- **Les pénaltouches à 40:00 et 80:00 se jouent**, et une **pénalité manquée laisse le ballon vivant**.
+- **Les maillots et le tableau des scores portent les vraies couleurs** : lues sur l'écusson quand le club n'en a pas de saisies, départagées une
+  fois (le visiteur passe en tenue alternative), identiques sur le terrain, en 3D et au tableau. `npm run verify:tenues`.
+- **Marché commun des divisions publiques** : une annonce unique visible de toutes les divisions, achat atomique (de deux acheteurs simultanés un
+  seul est servi), enchères entre divisions. Demande la table `carriere_marches` (`npm run base:appliquer`). `npm run verify:marche-commun`.
+- **Audit des données joueurs** (`npm run audit:joueurs`, rapport dans `serveur/AUDIT-JOUEURS.md`) : dix-huit professionnels retrouvent leur poste,
+  une carte déjà distribuée ne perd plus son portrait ni son identité à un import.
+- **Carrière joueur** : l'exclu quitte la pelouse, un joueur existant fait sa préparation d'été avec son vrai club, temps d'un pack jugés à
+  l'instant du doigt, grattage seulement à portée et sur demande, sortie du maul, plaqué qui ne se téléporte plus, mêlées, pénalités et touches
+  sans temps mort.
+
+### Correctif 25 — visages, souffle, kicks, statistiques et performances
+
+- **Barre de sprint** verte, ambre ou rouge, avec un marqueur de fatigue séparé. Préparation immédiate des kicks : rasant 0,18 s, petit par-dessus 0,24 s, dégagement 0,32 s, box kick 0,42 s, drop 0,50 s. Le botteur reste plaquable jusqu'à la frappe, y compris en arcade ; le drop peut être interrompu ou contré.
+- **Le tutoriel de la ligue fait rejoindre la Ligue Publique** ; les ligues privées sont présentées ensuite, sans rien imposer.
+- **Une commande de ligue ne renvoie plus que ce qui a changé** : ouvrir un pack pèse 8,5 Ko au lieu de 394. `npm run verify:delta-vue`.
+- **Statistiques d'utilisation dans le Labo** (onglet « Statistiques ») : temps par mode, sessions, carrières créées ou avec un joueur existant,
+  joueurs les plus incarnés, collection solo, rétention à 1, 7 et 30 jours. Relevés anonymes par appareil, jamais un compte ; demande les
+  tables `usage_jours`, `usage_compteurs` et `usage_carrieres` (`npm run base:appliquer`). Les instantanés suivent les carrières actives, leur durée de vie, les matchs avant abandon estimé et distinguent créé/existant/entraîneur. Collection : acquisitions, cartes rares possédées, GEN et joueurs du meilleur XV calculé. Les visites courtes et les sessions par mode sont mesurées. `npm run verify:correctif25`.
+- **Le catalogue en ligne se garde d'une visite à l'autre** (plus de retéléchargement à chaque ouverture du jeu).
+- **Profileur** (Labo → Statistiques → Profileur) : un cartouche de mesures sur les matchs en 3D de l'appareil (images par seconde, coût du
+  dessin, CPU de la scène, GPU si disponible, appels de dessin, triangles, mémoire, requêtes, poids, latence et erreurs API) et un tableau des séances filtrable par appareil pour comparer avant/après.
+- **Barbes et moustaches posées sur la mâchoire** : elles tombaient sous le menton ; elles se calent maintenant sur le nez de chaque type de
+  tête, légèrement reculées dans le visage avec les pattes des barbes complètes remontées aux oreilles. Les cheveux sont relevés de 1 cm (aperçu : `/scripts/apercuBarbes.html`).
+- **Optimisations 3D** : pièces compatibles des joueurs soudées, squelettes partagés, joueurs hors champ écartés, animations lointaines allégées, IK du regard limité à l'action, matrices du décor statiques, cache des stades borné, chargement ciblé et profils automatiques à 60/30 FPS. Le public et les équipements restent présents.
+- **Mesure locale avant/après** : 395 → 267 appels de dessin ; CPU scène 12,66 → 10,07 ms ; GPU 6,43 → 4,42 ms. Banc reproductible : `/scripts/apercuPerformances25.html`. Résultats détaillés et limites : [`sources/CORRECTIF-25.md`](sources/CORRECTIF-25.md). La validation sur de vrais appareils iOS/Android et sur la base de production reste à effectuer.
+
+## Correctif 26 — matchs couperets, propositions de cartes, fin de match
+
+- **Tournoi final jouable** : de la Nationale 2 à la Régionale 3, les matchs du tournoi final de la division se jouent
+  et se simulent comme n'importe quel match (même moteur, mêmes vitesses). Le score joué décide du tour suivant ; un nul
+  en match couperet est tranché par une prolongation annoncée sur la feuille de match.
+- **Propositions de cartes** : sections « Propositions reçues » et « Mes propositions envoyées » dans les échanges de la
+  Collection, retrait d'une proposition, cartes promises non proposables deux fois, mise à jour immédiate sans recharger.
+- **Fin de match** : la scène 3D est rendue par tranches, le résultat et les statistiques sont enregistrés par étapes
+  après l'affichage de l'écran de fin, et la sauvegarde n'est écrite qu'une fois.
+- Bancs : `npm run verify:tournoi-final`, `npm run verify:fin-match`, `npm run verify:propositions-collection`.

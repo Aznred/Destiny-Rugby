@@ -1,6 +1,6 @@
 import type { EtatMatch } from './etat.js';
 import type { Pion } from './entites.js';
-import { AXE, MILIEU, LONGUEUR, LARGEUR, borner, sens, type Vec } from './terrain.js';
+import { AXE, MILIEU, LONGUEUR, LARGEUR, LIGNE_A, LIGNE_B, borner, sens, type Vec } from './terrain.js';
 
 export interface GesteMatch {
   id: string; joueurId: string; clip: string; debut: number; duree: number;
@@ -160,7 +160,39 @@ export function avancerCorps(e: EtatMatch, dt: number): void {
     c.direction = Math.atan2(c.points[1]!.y - p.pos.y, c.points[1]!.x - p.pos.x);
   }
   const plaque = e.phase === 'ruck' ? e.pions.find((p) => p.id === e.ruck?.porteurId) : undefined;
-  if (plaque?.corps && plaque.corps.age < 1.35) e.ballon = { ...plaque.pos };
+  if (plaque?.corps && plaque.corps.age < 1.35) {
+    if ((e.ia ?? 1) >= 5) ancrerLeRuck(e, plaque);
+    else e.ballon = { ...plaque.pos };
+  }
+}
+
+/**
+ * LE REGROUPEMENT SE CONSTRUIT AUTOUR DU PLAQUÉ, PAS L'INVERSE (niveau 5).
+ *
+ * Les places du ruck étaient calculées à l'instant du plaquage, autour du point où le moteur PRÉVOYAIT la chute. Le corps,
+ * lui, glisse où le choc l'emmène — un mètre, parfois trois sur un gros tampon. Le ballon le suivait, pas les places : une
+ * fois relevé de sa chute, le plaqué était ramené à pied vers un regroupement formé ailleurs, ou restait couché à côté du
+ * demi de mêlée. Tant qu'il tombe, tout le regroupement se décale donc avec lui, et sa propre place est là où il est.
+ */
+function ancrerLeRuck(e: EtatMatch, plaque: Pion): void {
+  const lieu = { x: borner(plaque.pos.x, LIGNE_A + 0.5, LIGNE_B - 0.5), y: borner(plaque.pos.y, 1.2, LARGEUR - 1.2) };
+  const dx = lieu.x - e.ballon.x, dy = lieu.y - e.ballon.y;
+  e.ballon = lieu;
+  const ruck = e.ruck!;
+  if (e.placement) {
+    if (dx || dy) for (const id in e.placement) {
+      const c = e.placement[id];
+      e.placement[id] = { x: c.x + dx, y: borner(c.y + dy, 1.2, LARGEUR - 1.2) };
+    }
+    // Les deux hommes au sol ne sont rappelés nulle part : ils restent où le contact les a laissés.
+    e.placement[plaque.id] = { x: plaque.pos.x, y: plaque.pos.y };
+    const plaqueur = ruck.plaqueurId ? e.pions.find((p) => p.id === ruck.plaqueurId) : undefined;
+    if (plaqueur?.corps) e.placement[plaqueur.id] = { x: plaqueur.pos.x, y: plaqueur.pos.y };
+  }
+  if (!dx && !dy) return;
+  if (ruck.organisation) { ruck.organisation.origine.x += dx; ruck.organisation.origine.y += dy; }
+  e.horsJeu += dx;
+  e.ligneDef += dx;
 }
 
 /** Les mauvais gestes naissent d'un duel proche, tendu et indiscipliné. */

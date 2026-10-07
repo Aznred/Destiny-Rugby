@@ -1,6 +1,7 @@
 import { CelebrationLigue } from '../components/CelebrationLigue';
 import { AtelierKiri } from '../components/AtelierKiri';
 import { RoueCartes } from '../components/RoueCartes';
+import { noterMatchsLigueUsage } from '../lib/usage/matchsLigue';
 // ═══════════════════════════════════════════════════════════════════════════
 // LA CARRIÈRE EN LIGNE — le troisième mode
 // ═══════════════════════════════════════════════════════════════════════════
@@ -47,7 +48,7 @@ import { DirectCinema } from '../components/match/DirectCinema';
 import { stadePourEffectif } from '../lib/stade3D';
 import { maillotDeSecours, maillotDepuisBlason } from '../lib/moteur/apparenceMatch';
 import {
-  chargerSessionCarriere, chargerLigueCarriere, chargerDirectCarriere, identifierCarriere, identifierGoogleCarriere, configurationCarriere, deconnecterCarriere, supprimerLigueCarriere, INCHANGE,
+  chargerSessionCarriere, chargerLigueCarriere, chargerDirectCarriere, chargerMarchePartage, identifierCarriere, identifierGoogleCarriere, configurationCarriere, deconnecterCarriere, supprimerLigueCarriere, INCHANGE,
   creerLigueCarriere, rejoindreLigueCarriere, rejoindreDivisionPublique, commanderCarriere, signalerPresenceCarriere, chargerEmblemesCarriere, chargerStatistiquesGlobales, chargerAdministrationCarriere, ErreurCarriere,
 } from '../lib/carriereEnLigneClient';
 import type { IdentiteLigue } from '../lib/carriereEnLigneClient';
@@ -73,7 +74,10 @@ import { Citrouille, EmblemeIcon } from '../components/EmblemesSpeciaux';
 import { tn, texteTraduit, locale, nombre, t } from '../lib/i18n';
 import { fusionnerDeltaDirect, fusionnerVueLigue, presencesAcquittees } from '../lib/ligue/fusionDirect';
 import type { ContexteStatsTV } from '../lib/statsTV';
-import { reperesFilm } from '../lib/ligue/filmDirect';
+import { reperesChrono } from '../lib/ligue/filmDirect';
+import { departagerLesTenues } from '../lib/tenuesMatch';
+import type { VueMarchePartage } from '../lib/ligue/marchePartage';
+import { appliquerDeltaVue, estReponseDelta } from '../lib/ligue/deltaVue';
 import { photoReelle } from '../lib/avatars';
 import type { AfficheDirect } from '../components/match/TerrainEnDirect';
 
@@ -500,6 +504,10 @@ export function CarriereEnLigne() {
   const [occupe, setOccupe] = useState(false);
   const [ligueId, setLigueId] = useState<string | null>(() => new URLSearchParams(location.search).get('directLigue'));
   const [vue, setVue] = useState<VueCarriereEnLigne | null>(null);
+  useEffect(() => {
+    if (vue && !vue.observateur && vue.monClubId) noterMatchsLigueUsage(vue.id, vue.monClubId, vue.saison,
+      vue.rencontres.filter(r => r.resultat && (r.domicile === vue.monClubId || r.exterieur === vue.monClubId)).length);
+  }, [vue]);
   const [onglet, setOnglet] = useState<Onglet>('club');
   const [matchId, setMatchId] = useState<string | null>(() => new URLSearchParams(location.search).get('directMatch'));
   // ⚠️ LU PAR LA BOUCLE DE SONDAGE, qui n'est montée qu'une fois : sans cette
@@ -511,6 +519,9 @@ export function CarriereEnLigne() {
   const directOuvert = useRef<string | null>(null);
   directOuvert.current = matchId;
   const versionRequete = useRef(0);
+  /** La vue affichée, lisible depuis une commande en cours : c'est sur elle que s'applique la réponse compacte. */
+  const vueTenue = useRef<VueCarriereEnLigne | null>(null);
+  vueTenue.current = vue;
   const derniereVue = useRef(vue);
   derniereVue.current = vue;
 
@@ -565,7 +576,10 @@ export function CarriereEnLigne() {
       // sans spectateur ne se bloque donc pas, il coûte simplement cinq fois
       // moins cher.
       const suivi = directOuvert.current;
-      if (suivi && vue?.rencontres.some(r => r.id === suivi && r.match && !r.match.termine)) return 2_000;
+      // ⚠️ TROIS SECONDES, PLUS DEUX (Correctif 24). Ce que le serveur envoie est
+      // définitif et l'écran en garde quelques secondes d'avance : sonder moins
+      // souvent ne coûte rien à l'image, et c'est un tiers de requêtes en moins.
+      if (suivi && vue?.rencontres.some(r => r.id === suivi && r.match && !r.match.termine)) return 3_000;
       if (vue?.publique && vue.phase === 'salon') return 15_000;
       if (vue?.rencontres.some(r => r.match && !r.match.termine)) return 20_000;
       const bientot = Date.now() + 5 * 60_000;
@@ -589,11 +603,11 @@ export function CarriereEnLigne() {
         const suivi = directOuvert.current;
         const directActif = suivi && derniereVue.current?.rencontres.some(r => r.id === suivi && r.match && !r.match.termine);
         if (directActif) {
-          // On annonce le dernier pas du film déjà reçu : le serveur n'envoie que la suite.
+          // On annonce le dernier pas de la chronologie déjà reçu, avec sa somme de contrôle : le serveur n'envoie que la suite.
           // Et les repères des parties lentes que l'écran affiche vraiment : fil,
           // temps forts et banc ne repartent que lorsqu'ils ont changé.
           const tenus = derniereVue.current?.rencontres.find(r => r.id === suivi)?.match?.reperesDirect ?? '';
-          const delta = await chargerDirectCarriere(ligueId, suivi, controleur.signal, connue, reperesFilm.get(suivi) ?? null, tenus);
+          const delta = await chargerDirectCarriere(ligueId, suivi, controleur.signal, connue, reperesChrono.get(suivi) ?? '', tenus);
           echecs = 0;
           if (delta.presence) presencesAcquittees.set(suivi, Date.now());
           if (actif && version === versionRequete.current) {
@@ -667,7 +681,12 @@ export function CarriereEnLigne() {
     if (!ligueId || occupe || vue?.observateur) return;
     setOccupe(true); setErreur(''); versionRequete.current++;
     try {
-      const suivante = await commanderCarriere(ligueId, commande, crypto.randomUUID());
+      const reponse = await commanderCarriere(ligueId, commande, crypto.randomUUID(), vueTenue.current?.version);
+      // ⚠️ LE SERVEUR NE REND QUE CE QUI A CHANGÉ (Correctif 25). On l'applique à la vue tenue ; si elle n'est plus celle
+      // dont la commande est partie (un sondage est passé entre-temps), on redemande la ligue entière.
+      const suivante = estReponseDelta(reponse)
+        ? appliquerDeltaVue(vueTenue.current, reponse.delta) ?? await chargerLigueCarriere(ligueId)
+        : reponse;
       // Une commande peut revenir après un rafraîchissement temps réel plus
       // récent. La fusion monotone empêche score, horloge et fil de reculer.
       setVue((avant) => fusionnerVueLigue(avant, suivante)); return suivante;
@@ -691,7 +710,7 @@ export function CarriereEnLigne() {
   const rencontre = vue?.rencontres.find(r => r.id === matchId);
   const navigation = onglets().filter(o => !vue?.observateur || ['calendrier', 'competitions', 'histoire', 'wiki'].includes(o.id));
 
-  return <section className="cel" aria-label={t("online.title")}>
+  return <section className="cel" aria-label={t("online.title")} data-publique={vue?.publique ? '1' : undefined}>
     <div className="cel-fil">
       <button className="btn fantome" onClick={() => vue ? retourLigues() : setEcran('accueil')}><Icone nom="fleche-droite" className="cel-retour" taille={15} />{vue ? t('online.myLeagues') : t('online.home')}</button>
       <span><i className={`cel-presence${erreur ? ' interrompue' : ''}`} /> {t('online.title')}</span>
@@ -819,7 +838,7 @@ function Portail({ session, occupe, ouvrirLigue, onSupprimer, onCreer, onRejoind
   const [emblemePublic, setEmblemePublic] = useState<string | undefined>();
   const [choixPublicOuvert, setChoixPublicOuvert] = useState(false);
   const [aSupprimer, setASupprimer] = useState<SessionCarriere['ligues'][number] | null>(null);
-  return <><header className="cel-titre"><div className="eyebrow">{t('online.portal.welcome', { name: session.compte.pseudo })}</div><h1>{t('online.portal.title')}</h1><p>{t('online.portal.description')}</p></header><div className="cel-portail" data-tuto="cel-portail"><div><h2>{t('online.myLeagues')} <small>{session.ligues.length}</small></h2>{session.ligues.length ? <div className="cel-ligues" data-tuto="cel-ligues-existantes">{session.ligues.map(l => <div className="cel-ligue-ligne" key={l.id}><button className={`cel-ligue${l.laboratoire ? ' cel-ligue-laboratoire' : ''}`} disabled={occupe} onClick={() => { void ouvrirLigue(l.id); }}><Ecusson nom={l.clubNom} logo={l.clubEmbleme} /><span><em className="cel-ligue-nom">{l.logo && <img className="cel-logo-ligue cel-logo-ligue-liste" src={l.logo} alt="" />}{l.nom}{l.laboratoire && <i>{t("ui.a41d6b64660c")}</i>}</em><b>{l.clubNom}</b><small>{t(`online.phase.${l.etat === 'salon' ? 'lobby' : l.etat === 'saison' ? 'season' : 'break'}`)} · {montant(l.ovas)} Ovas</small></span><Icone nom="fleche-droite" /></button>{l.createur && !l.laboratoire && <button type="button" className="cel-supprimer-ligue" disabled={occupe} aria-label={t('online.league.deleteConfirmTitle', { name: l.nom })} title={t('online.league.deleteTitle')} onClick={() => setASupprimer(l)}><Icone nom="corbeille" taille={18} /></button>}</div>)}</div> : <Vide titre={t('online.portal.create')}>{t('online.portal.empty')}</Vide>}</div><form className="cel-panneau" onSubmit={e => { e.preventDefault(); if (mode === 'creer') void onCreer(nom, club, Number(rythme), Number(max), { embleme, logo, tropheeId, playoffs, dotationOvas: Number(dotation), packsActifs, packsGratuitsParJour: Number(packsGratuitsParJour), doublonsAutorises, cartesSpeciales }); else void onRejoindre(code, club, embleme); }}><div className="cel-bascules" data-tuto="cel-bascules"><button type="button" className={mode === 'creer' ? 'actif' : ''} onClick={() => setMode('creer')}>{t('online.portal.create')}</button><button type="button" className={mode === 'rejoindre' ? 'actif' : ''} onClick={() => setMode('rejoindre')}>{t('online.portal.join')}</button></div><h2>{mode === 'creer' ? t('online.portal.create') : t('online.portal.join')}</h2>{mode === 'creer' ? <Champ tuto="cel-nom-ligue" label={t('online.portal.leagueName')}><input required minLength={3} maxLength={50} value={nom} onChange={e => setNom(e.target.value)} /></Champ> : <Champ label={t('online.portal.inviteCode')}><input required autoCapitalize="characters" maxLength={20} value={code} onChange={e => setCode(e.target.value.toUpperCase())} /></Champ>}<Champ tuto="cel-nom-club" label={t('online.portal.clubName')}><input required minLength={3} maxLength={40} value={club} onChange={e => setClub(e.target.value)} /></Champ><div className="cel-champ" data-tuto="cel-embleme"><span>{t('online.portal.badge')}</span><button type="button" className="cel-choix-embleme" onClick={() => setChoixOuvert(true)}><Ecusson nom={club || 'Club'} logo={embleme} /><span>{embleme ? t('online.portal.changeBadge') : t('online.portal.chooseBadge')}</span><Icone nom="fleche-droite" taille={16} /></button></div>{choixOuvert && <ChoixEmbleme valeur={embleme} onChoisir={setEmbleme} onFermer={() => setChoixOuvert(false)} />}{mode === 'creer' && <><div className="cel-deux" data-tuto="cel-rythme-clubs"><Champ label={t('online.portal.matchesPerWeek')}><input type="number" min={1} max={7} required value={rythme} onChange={e => setRythme(e.target.value)} /></Champ><Champ label={t('online.portal.clubCount')}><input type="number" min={2} max={64} required value={max} onChange={e => setMax(e.target.value)} /></Champ></div><Champ tuto="cel-ovas-depart" label={t('online.portal.startingOvas')}><input type="number" min={0} max={100000} required value={dotation} onChange={e => setDotation(e.target.value)} /></Champ><div className="cel-deux" data-tuto="cel-packs-gratuits"><Champ label={t("ui.3043008395df")}><input type="number" min={0} max={20} required value={packsGratuitsParJour} onChange={e => setPacksGratuitsParJour(e.target.value)} /></Champ><label className="cel-bascule"><input type="checkbox" checked={doublonsAutorises} onChange={e => setDoublonsAutorises(e.target.checked)} /><span><b>{t("ui.87da27817e50")}</b>{t("ui.1c2b624b71fd")}</span></label></div><label className="cel-bascule cel-bascule-speciales"><input type="checkbox" checked={cartesSpeciales} onChange={e => setCartesSpeciales(e.target.checked)} /><span><b>{t('special.league.option')}</b>{t('special.league.optionHelp')}</span></label><fieldset className="cel-options-packs" data-tuto="cel-options-packs"><legend>{t("ui.33cc3fe03da2")}</legend><div className="cel-options-packs-grille">{PACKS_CARRIERE.map(pack => <label key={pack.id}><input type="checkbox" checked={packsActifs.includes(pack.id)} onChange={e => setPacksActifs(courants => e.target.checked ? [...courants, pack.id] : courants.filter(id => id !== pack.id))} /><span>{pack.nom}</span></label>)}</div></fieldset><ChoixCompetition logo={logo} tropheeId={tropheeId} onLogo={setLogo} onTrophee={setTropheeId} /><label className="cel-bascule" data-tuto="cel-playoffs"><input type="checkbox" checked={playoffs} onChange={e => setPlayoffs(e.target.checked)} /><span><b>{t('online.competition.knockout')}</b>{t('online.competition.knockoutHelp')}</span></label></>}<p className="cel-note">{t('online.portal.initialSquad')}</p><button className="btn primaire" data-tuto="cel-creer-ligue" disabled={occupe}>{occupe ? t('online.auth.connecting') : mode === 'creer' ? t('online.portal.createPrivate') : t('online.portal.joinLeague')}<Icone nom="fleche-droite" taille={18} /></button></form><aside className="cel-public" data-tuto="cel-public"><div className="eyebrow">{t("ui.9ae63643eb38")}</div><h2>Destiny Rugby</h2><p>{t("ui.3ffa81d00d70")}</p>{!session.ligues.some(l => l.publique) && <><label className="cel-public-club">{t("online.portal.clubName")}<input minLength={3} maxLength={40} value={clubPublic} onChange={e => setClubPublic(e.target.value)} placeholder={t("ui.f548c0358958")} /></label><button type="button" className="cel-choix-embleme cel-public-choix-embleme" onClick={() => setChoixPublicOuvert(true)}><Ecusson nom={clubPublic || 'Club'} logo={emblemePublic} /><span>{emblemePublic ? t("ui.2dfab53895a4") : t("ui.d08bf7a792fa")}</span><Icone nom="fleche-droite" taille={16} /></button>{choixPublicOuvert && <ChoixEmbleme valeur={emblemePublic} onChoisir={setEmblemePublic} onFermer={() => setChoixPublicOuvert(false)} />}</>}<button type="button" className="btn primaire" disabled={occupe || (!session.ligues.some(l => l.publique) && clubPublic.trim().length < 3)} onClick={() => void onRejoindrePublic(clubPublic || session.ligues.find(l => l.publique)?.clubNom || '', emblemePublic)}>{session.ligues.some(l => l.publique) ? t("ui.907799d13804") : t("ui.f4624c09febc")}</button></aside></div>{aSupprimer && <Confirmation titre={t('online.league.deleteConfirmTitle', { name: aSupprimer.nom })} message={t('online.league.deleteConfirmMessage')} libelleOui={t('online.league.deleteDefinitive')} onNon={() => setASupprimer(null)} onOui={() => { const id = aSupprimer.id; setASupprimer(null); void onSupprimer(id); }} />}</>;
+  return <><header className="cel-titre"><div className="eyebrow">{t('online.portal.welcome', { name: session.compte.pseudo })}</div><h1>{t('online.portal.title')}</h1><p>{t('online.portal.description')}</p></header><div className="cel-portail" data-tuto="cel-portail"><div><h2>{t('online.myLeagues')} <small>{session.ligues.length}</small></h2>{session.ligues.length ? <div className="cel-ligues" data-tuto="cel-ligues-existantes">{session.ligues.map(l => <div className="cel-ligue-ligne" key={l.id}><button className={`cel-ligue${l.laboratoire ? ' cel-ligue-laboratoire' : ''}`} disabled={occupe} onClick={() => { void ouvrirLigue(l.id); }}><Ecusson nom={l.clubNom} logo={l.clubEmbleme} /><span><em className="cel-ligue-nom">{l.logo && <img className="cel-logo-ligue cel-logo-ligue-liste" src={l.logo} alt="" />}{l.nom}{l.laboratoire && <i>{t("ui.a41d6b64660c")}</i>}</em><b>{l.clubNom}</b><small>{t(`online.phase.${l.etat === 'salon' ? 'lobby' : l.etat === 'saison' ? 'season' : 'break'}`)} · {montant(l.ovas)} Ovas</small></span><Icone nom="fleche-droite" /></button>{l.createur && !l.laboratoire && <button type="button" className="cel-supprimer-ligue" disabled={occupe} aria-label={t('online.league.deleteConfirmTitle', { name: l.nom })} title={t('online.league.deleteTitle')} onClick={() => setASupprimer(l)}><Icone nom="corbeille" taille={18} /></button>}</div>)}</div> : <Vide titre={t('online.portal.create')}>{t('online.portal.empty')}</Vide>}</div><form className="cel-panneau" onSubmit={e => { e.preventDefault(); if (mode === 'creer') void onCreer(nom, club, Number(rythme), Number(max), { embleme, logo, tropheeId, playoffs, dotationOvas: Number(dotation), packsActifs, packsGratuitsParJour: Number(packsGratuitsParJour), doublonsAutorises, cartesSpeciales }); else void onRejoindre(code, club, embleme); }}><div className="cel-bascules" data-tuto="cel-bascules"><button type="button" className={mode === 'creer' ? 'actif' : ''} onClick={() => setMode('creer')}>{t('online.portal.create')}</button><button type="button" className={mode === 'rejoindre' ? 'actif' : ''} onClick={() => setMode('rejoindre')}>{t('online.portal.join')}</button></div><h2>{mode === 'creer' ? t('online.portal.create') : t('online.portal.join')}</h2>{mode === 'creer' ? <Champ tuto="cel-nom-ligue" label={t('online.portal.leagueName')}><input required minLength={3} maxLength={50} value={nom} onChange={e => setNom(e.target.value)} /></Champ> : <Champ label={t('online.portal.inviteCode')}><input required autoCapitalize="characters" maxLength={20} value={code} onChange={e => setCode(e.target.value.toUpperCase())} /></Champ>}<Champ tuto="cel-nom-club" label={t('online.portal.clubName')}><input required minLength={3} maxLength={40} value={club} onChange={e => setClub(e.target.value)} /></Champ><div className="cel-champ" data-tuto="cel-embleme"><span>{t('online.portal.badge')}</span><button type="button" className="cel-choix-embleme" onClick={() => setChoixOuvert(true)}><Ecusson nom={club || 'Club'} logo={embleme} /><span>{embleme ? t('online.portal.changeBadge') : t('online.portal.chooseBadge')}</span><Icone nom="fleche-droite" taille={16} /></button></div>{choixOuvert && <ChoixEmbleme valeur={embleme} onChoisir={setEmbleme} onFermer={() => setChoixOuvert(false)} />}{mode === 'creer' && <><div className="cel-deux" data-tuto="cel-rythme-clubs"><Champ label={t('online.portal.matchesPerWeek')}><input type="number" min={1} max={7} required value={rythme} onChange={e => setRythme(e.target.value)} /></Champ><Champ label={t('online.portal.clubCount')}><input type="number" min={2} max={64} required value={max} onChange={e => setMax(e.target.value)} /></Champ></div><Champ tuto="cel-ovas-depart" label={t('online.portal.startingOvas')}><input type="number" min={0} max={100000} required value={dotation} onChange={e => setDotation(e.target.value)} /></Champ><div className="cel-deux" data-tuto="cel-packs-gratuits"><Champ label={t("ui.3043008395df")}><input type="number" min={0} max={20} required value={packsGratuitsParJour} onChange={e => setPacksGratuitsParJour(e.target.value)} /></Champ><label className="cel-bascule"><input type="checkbox" checked={doublonsAutorises} onChange={e => setDoublonsAutorises(e.target.checked)} /><span><b>{t("ui.87da27817e50")}</b>{t("ui.1c2b624b71fd")}</span></label></div><label className="cel-bascule cel-bascule-speciales"><input type="checkbox" checked={cartesSpeciales} onChange={e => setCartesSpeciales(e.target.checked)} /><span><b>{t('special.league.option')}</b>{t('special.league.optionHelp')}</span></label><fieldset className="cel-options-packs" data-tuto="cel-options-packs"><legend>{t("ui.33cc3fe03da2")}</legend><div className="cel-options-packs-grille">{PACKS_CARRIERE.map(pack => <label key={pack.id}><input type="checkbox" checked={packsActifs.includes(pack.id)} onChange={e => setPacksActifs(courants => e.target.checked ? [...courants, pack.id] : courants.filter(id => id !== pack.id))} /><span>{pack.nom}</span></label>)}</div></fieldset><ChoixCompetition logo={logo} tropheeId={tropheeId} onLogo={setLogo} onTrophee={setTropheeId} /><label className="cel-bascule" data-tuto="cel-playoffs"><input type="checkbox" checked={playoffs} onChange={e => setPlayoffs(e.target.checked)} /><span><b>{t('online.competition.knockout')}</b>{t('online.competition.knockoutHelp')}</span></label></>}<p className="cel-note">{t('online.portal.initialSquad')}</p><button className="btn primaire" data-tuto="cel-creer-ligue" disabled={occupe}>{occupe ? t('online.auth.connecting') : mode === 'creer' ? t('online.portal.createPrivate') : t('online.portal.joinLeague')}<Icone nom="fleche-droite" taille={18} /></button></form><aside className="cel-public" data-tuto="cel-public"><div className="eyebrow">{t("ui.9ae63643eb38")}</div><h2>Destiny Rugby</h2><p>{t("ui.3ffa81d00d70")}</p>{!session.ligues.some(l => l.publique) && <><label className="cel-public-club" data-tuto="cel-public-club">{t("online.portal.clubName")}<input minLength={3} maxLength={40} value={clubPublic} onChange={e => setClubPublic(e.target.value)} placeholder={t("ui.f548c0358958")} /></label><button type="button" className="cel-choix-embleme cel-public-choix-embleme" data-tuto="cel-public-embleme" onClick={() => setChoixPublicOuvert(true)}><Ecusson nom={clubPublic || 'Club'} logo={emblemePublic} /><span>{emblemePublic ? t("ui.2dfab53895a4") : t("ui.d08bf7a792fa")}</span><Icone nom="fleche-droite" taille={16} /></button>{choixPublicOuvert && <ChoixEmbleme valeur={emblemePublic} onChoisir={setEmblemePublic} onFermer={() => setChoixPublicOuvert(false)} />}</>}<button type="button" className="btn primaire" data-tuto="cel-public-rejoindre" disabled={occupe || (!session.ligues.some(l => l.publique) && clubPublic.trim().length < 3)} onClick={() => void onRejoindrePublic(clubPublic || session.ligues.find(l => l.publique)?.clubNom || '', emblemePublic)}>{session.ligues.some(l => l.publique) ? t("ui.907799d13804") : t("ui.f4624c09febc")}</button></aside></div>{aSupprimer && <Confirmation titre={t('online.league.deleteConfirmTitle', { name: aSupprimer.nom })} message={t('online.league.deleteConfirmMessage')} libelleOui={t('online.league.deleteDefinitive')} onNon={() => setASupprimer(null)} onOui={() => { const id = aSupprimer.id; setASupprimer(null); void onSupprimer(id); }} />}</>;
 }
 
 // ---------------------------------------------------------------------------
@@ -1355,16 +1374,19 @@ function Direct({ vue, rencontre: r, agir, occupe, fermer }: { vue: VueCarriereE
   const couleursSecours = useMemo(() => couleursDirect(r.domicile, r.exterieur), [r.domicile, r.exterieur]);
   const emblemeDomicile = vue.clubs.find(c => c.id === r.domicile)?.embleme;
   const emblemeExterieur = vue.clubs.find(c => c.id === r.exterieur)?.embleme;
-  const [couleurs, setCouleurs] = useState(couleursSecours);
+  const [couleurs, setCouleurs] = useState<CouleursDirect>({ ...couleursSecours, lues: false });
   useEffect(() => {
     let actif = true;
-    setCouleurs(couleursSecours);
+    setCouleurs({ ...couleursSecours, lues: false });
     const baseD = couleursSecours.maillots!.domicile, baseE = couleursSecours.maillots!.exterieur;
     void Promise.all([
       maillotDepuisBlason(emblemeDomicile, baseD, r.domicile),
       maillotDepuisBlason(emblemeExterieur, baseE, r.exterieur),
-    ]).then(([domicile, exterieur]) => {
-      if (actif) setCouleurs({ domicile: domicile.principal, exterieur: exterieur.principal, maillots: { domicile, exterieur } });
+    ]).then(([lueD, lueE]) => {
+      // Les deux écussons lus, on départage : si les maillots se confondent, le visiteur joue en tenue alternative —
+      // et le tableau des scores affiche ce qu'il PORTE (Correctif 24).
+      const { domicile, exterieur } = departagerLesTenues(lueD, lueE);
+      if (actif) setCouleurs({ domicile: domicile.principal, exterieur: exterieur.principal, maillots: { domicile, exterieur }, lues: true });
     });
     return () => { actif = false; };
   }, [couleursSecours, emblemeDomicile, emblemeExterieur, r.domicile, r.exterieur]);
@@ -1382,7 +1404,7 @@ function Direct({ vue, rencontre: r, agir, occupe, fermer }: { vue: VueCarriereE
   const minuteVive = m.termine ? 80
     : Math.min(80, ancre.current.horloge + (gele ? 0 : (Date.now() - ancre.current.recu) / 60_000));
   const resteDecision = m.decision
-    ? Math.max(0, Math.min(20, Math.ceil((m.decision.jusqua - Date.now()) / 1000)))
+    ? Math.max(0, Math.min(26, Math.ceil((m.decision.jusqua - Date.now()) / 1000)))
     : 0;
   const vu = m.termine ? null : affiche;
   const scoreVu = vu?.score ?? m.score;
@@ -1936,7 +1958,45 @@ export function Packs({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Ag
 // LE MARCHÉ — vendre, acheter, enchérir, échanger
 // ═══════════════════════════════════════════════════════════════════════════
 
-function Marche({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; occupe: boolean }) {
+/**
+ * LE MARCHÉ COMMUN DES DIVISIONS PUBLIQUES (Correctif 24). Dans une division publique, les annonces ne vivent plus dans la
+ * ligue mais dans UN document partagé par toutes les divisions du cycle : l'écran le relit toutes les quinze secondes tant
+ * que l'onglet est ouvert (vingt octets quand rien n'a bougé), et tout de suite après chacune de mes actions.
+ * `null` : pas de marché commun ici — l'écran montre les ventes de la ligue, comme avant.
+ */
+function useMarchePartage(vue: VueCarriereEnLigne): VueMarchePartage | null {
+  const [marche, setMarche] = useState<VueMarchePartage | null>(null);
+  const tenu = useRef<VueMarchePartage | null>(null);
+  const publique = Boolean(vue.publique);
+  useEffect(() => {
+    if (!publique) { tenu.current = null; setMarche(null); return; }
+    let actif = true;
+    const controle = new AbortController();
+    const relire = () => {
+      if (document.hidden) return;
+      void chargerMarchePartage(vue.id, tenu.current?.version, controle.signal).then((m) => {
+        if (!actif || (m as unknown) === INCHANGE) return;
+        tenu.current = m as VueMarchePartage | null; setMarche(tenu.current);
+      }).catch(() => {});
+    };
+    relire();
+    const minuteur = window.setInterval(relire, 15_000);
+    return () => { actif = false; controle.abort(); window.clearInterval(minuteur); };
+    // `vue.version` : ma ligue vient de changer (j'ai vendu, acheté, enchéri) — le marché aussi.
+  }, [publique, vue.id, vue.version]);
+  return marche;
+}
+
+function Marche({ vue: vueLigue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; occupe: boolean }) {
+  const partage = useMarchePartage(vueLigue);
+  // ⚠️ UNE SEULE LISTE POUR L'ÉCRAN. Les annonces du marché commun remplacent celles de la ligue qui y sont parties, et les
+  // cartes des autres divisions s'ajoutent à celles de la mienne : tout le reste de l'onglet lit `vue` sans rien savoir.
+  const vue = useMemo<VueCarriereEnLigne>(() => (!partage ? vueLigue : {
+    ...vueLigue,
+    ventes: [...vueLigue.ventes.filter(v => !v.partagee), ...partage.ventes],
+    cartes: [...vueLigue.cartes, ...partage.cartes.filter(c => !vueLigue.cartes.some(x => x.id === c.id))],
+    clubs: [...vueLigue.clubs, ...Object.entries(partage.clubs).map(([id, nom]) => ({ id, nom, pseudo: nom }) as VueCarriereEnLigne['clubs'][number])],
+  }), [vueLigue, partage]);
   const club = vue.clubs.find(c => c.id === vue.monClubId);
   const logos = useLogosDeClub();
   const [sousOnglet, setSousOnglet] = useState<'encours' | 'vendre' | 'echanges'>('encours');
@@ -2026,7 +2086,7 @@ function Marche({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; oc
       <form className="cel-panneau" data-tuto="cel-echange-formulaire" onSubmit={async ev => { ev.preventDefault(); const v = await agir({ type: 'proposerEchange', vers: cible, cartesDonnees: donnees, cartesDemandees: demandees, ovasDonnes: Number(ovasDonnes), ovasDemandes: Number(ovasDemandes) }); if (v) { setDonnees([]); setDemandees([]); } }}>
         <h2>{t('online.market.trade')}</h2>
         <p className="cel-note">{t('online.trade.help')}</p>
-        <Choix label={t('online.trade.withWhom')} valeur={cible} options={[['', t('online.trade.chooseClub')], ...vue.clubs.filter(c => c.id !== vue.monClubId).map(c => [c.id, c.nom] as [string, string])]} onChange={v => { setCible(v); setDemandees([]); }} />
+        <Choix label={t('online.trade.withWhom')} valeur={cible} options={[['', t('online.trade.chooseClub')], ...vueLigue.clubs.filter(c => c.id !== vue.monClubId).map(c => [c.id, c.nom] as [string, string])]} onChange={v => { setCible(v); setDemandees([]); }} />
         {cible && <div>
           <p className="cel-note">{t('online.trade.rulesHelp')}</p>
 

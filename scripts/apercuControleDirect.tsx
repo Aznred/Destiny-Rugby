@@ -55,7 +55,7 @@ const poste = (adresse.get('poste') ?? 'ailier_droit') as PosteId;
 const langue = (LANGUES.find((l) => l.id === adresse.get('langue'))?.id ?? 'fr') as Langue;
 
 useGame.getState().creerJoueur({
-  nom: 'Roméo Aldegheri', poste, nation: 'France', club: 'Meze Rugby Club', division: 'reg3', age: 21,
+  nom: 'Roméo Aldegheri', poste, nation: 'France', club: adresse.get('club') ?? 'Meze Rugby Club', division: (adresse.get('division') ?? 'reg3') as never, age: 21,
   traits: ['professionnel'],
 });
 useGame.getState().setLangue(langue);
@@ -148,7 +148,7 @@ function Apercu() {
   }
   return ouvert ? (
     <MatchLive
-      match={{ domicile: 'Meze Rugby Club', exterieur: 'RC Montmeyrannais', scoreD: 22, scoreE: 17, essaisD: 3, essaisE: 2 }}
+      match={{ domicile: adresse.get('recoit') ?? j.club, exterieur: adresse.get('adv') ?? (adresse.get('recoit') ? j.club : 'RC Montmeyrannais'), scoreD: 22, scoreE: 17, essaisD: 3, essaisE: 2 }}
       saison={j.saison}
       cle={cle}
       titre="Régionale 3 · Aperçu · journée 7"

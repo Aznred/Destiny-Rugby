@@ -90,7 +90,7 @@ import {
   type ChoixPenalite, type CombinaisonTouche, type DecisionCapitaine, type EtatResponsabilites, type LancerTouche,
   type OptionsResponsabilites, type QualiteLancer, type RolesEquipe,
 } from './responsabilites.js';
-import { REGLAGES_CONQUETE, conqueteLisible } from './conquete.js';
+import { CADENCE_TOUCHE, FRAPPE_VIVE, MELEE_VIVE, REGLAGES_CONQUETE, RITUEL_VIF, conqueteLisible, jeuVivant } from './conquete.js';
 import { apportDuGeste, appuyerPack, choisirSortieDuPack, majPack } from './pack.js';
 import { REGLAGES_ENDURANCE, coutEffort, enduranceDeuxReserves, sprintMaxDe } from './endurance.js';
 import { lectureLocale, ligneDePasseCoupee, lireLeSurnombre, niveauDeLecture, regarderDevant } from './ia/vision.js';
@@ -208,6 +208,17 @@ function horlogeCondensee(e: EtatMatch): number {
 function avancementArret(e: EtatMatch): number {
   const total = e.dureeArret ?? 0;
   return total > 0 ? borner(1 - e.minuteur / total, 0, 1) : 1;
+}
+
+/**
+ * À quelle allure s'écoule le temps d'une phase arrêtée (niveau 5). Une touche dont les alignements sont en place et dont le
+ * lanceur tient le ballon n'attend plus : le début de sa formation — seize joueurs qui se regardent — passe plus de deux
+ * fois plus vite. Le saut, le lift et la prise gardent leur durée.
+ */
+function cadenceDeLArret(e: EtatMatch): number {
+  if (!jeuVivant(e)) return 1;
+  if (e.phase === 'touche' && e.conquete && !e.conquete.rapide && avancementArret(e) < CADENCE_TOUCHE.jusqua) return CADENCE_TOUCHE.facteur;
+  return 1;
 }
 
 /**
@@ -623,6 +634,14 @@ export function creerMatch(
   if (options.cohesionA !== undefined || options.cohesionB !== undefined) {
     e.cohesion = { A: options.cohesionA, B: options.cohesionB };
   }
+  // Niveau 5 en temps réel : l'usure se compte pour quatre-vingts vraies minutes (voir `REGLAGES_IA.usureReel`).
+  if (jeuVivant(e) && options.tempsReel) {
+    for (const p of e.pions) {
+      p.usure *= REGLAGES_IA.usureReel;
+      p.allurePlancher = REGLAGES_IA.allureReel;
+      p.accelFatigue = REGLAGES_IA.accelerationReel;
+    }
+  }
   if (options.tactiqueA) appliquerTactiqueEquipe(e, 'A', options.tactiqueA, false);
   if (options.tactiqueB) appliquerTactiqueEquipe(e, 'B', options.tactiqueB, false);
   return e;
@@ -989,9 +1008,8 @@ function tick(e: EtatMatch): void {
   if (e.piedPrepare) {
     const attente = e.piedPrepare;
     const auteur = e.pions.find((p) => p.id === attente.auteurId && p.surLeTerrain && p.sanction <= 0);
-    if (!auteur || auteur.battu > 0) {
-      if (e.placement) delete e.placement[attente.auteurId];
-      delete e.piedPrepare;
+    if (!auteur || auteur.battu > 0 || (attente.avaitBallon && e.porteur !== auteur)) {
+      annulerFrappe(e, attente.auteurId);
       return;
     }
     attente.debut ??= e.sim;
@@ -1011,20 +1029,24 @@ function tick(e: EtatMatch): void {
       delete attente.pretDepuis;
       return;
     }
-    if (attente.pretDepuis === undefined) {
-      attente.pretDepuis = e.sim;
-      jouerGeste(e, auteur, attente.intention === 'renvoi' ? 'restart' : attente.intention === 'rasant' ? 'grubber'
-        : attente.intention === 'drop' ? 'drop' : auteur.numero === 9 ? 'box_kick'
-          : attente.intention === 'chandelle' || attente.intention === 'parDessus' ? 'chip' : 'punt', 1.4);
+    const { frappe, contestable } = armerFrappe(e, auteur, attente);
+    // ═══ CELUI QUI ARME UN COUP DE PIED N'EST PAS INTOUCHABLE (niveau 5) ══════
+    // Tant qu'il tient le ballon, un défenseur arrivé à temps le plaque : le geste est abandonné et le contact se joue
+    // comme n'importe quel autre (il peut être raté). À la frappe, le contact peut encore gêner ou contrer (plus bas).
+    if (contestable && e.phase === 'jeuCourant' && e.sim - attente.pretDepuis! < frappe) {
+      const presse = plaqueurDuBotteur(e, auteur);
+      if (presse) {
+        annulerFrappe(e, auteur.id);
+        dire(e, 'plaquage', presse.cote, `${presse.nom} arrive sur ${auteur.nom} avant qu'il ait pu taper.`, 0, presse.moi || auteur.moi);
+        return resoudrePlaquage(e, auteur, presse);
+      }
     }
-    const frappe = attente.rapideArcade ? .28 : attente.intention === 'drop' ? 1.12 : attente.intention === 'renvoi' ? 1.05
-      : auteur.numero === 9 ? .84 : .7;
     // ⚠️ MÊME FORCÉE, LA FRAPPE ATTEND SON ARMÉ (cadence détaillée). Un botteur
     // gêné qui n'atteignait pas sa marque tapait à l'instant où l'attente
     // expirait : le ballon partait avant que le geste ait commencé, donc sans
     // que le corps se soit tourné — un coup de pied sur vingt-cinq partait dans
     // le dos du botteur (mesuré sur 45 coups de pied).
-    if ((!forceFrappe || e.cadenceDetaillee) && e.sim - attente.pretDepuis < frappe) return;
+    if ((!forceFrappe || e.cadenceDetaillee) && e.sim - attente.pretDepuis! < frappe) return;
     delete e.piedPrepare;
     if (e.placement) {
       delete e.placement[auteur.id];
@@ -1045,11 +1067,54 @@ function tick(e: EtatMatch): void {
         dire(e, 'pied', auteur.cote, traduire('rv.fil.dropContre', { nom: auteur.nom, contreur: contreur.nom }), 0, true);
       }
     }
+    // ═══ LE COUP DE PIED PEUT ÊTRE CONTRÉ OU GÊNÉ (niveau 5) ══════════════════
+    // Un défenseur arrivé sur le botteur à l'instant de la frappe lève les bras ou se jette dans la trajectoire : ballon
+    // contré (il repart en arrière, vivant, avec ses rebonds), ou coup de pied gêné — plus court, de travers.
+    if (contestable && !(attente.intention === 'drop' && e.dropEnCours?.issue === 'contre')) {
+      const contreur = contreurDuDrop(e, auteur);
+      if (contreur) {
+        // Plus il est près, plus il a de chances d'y mettre les mains : à deux mètres, il ne fait que gêner.
+        const ecart = distance(contreur.pos, auteur.pos);
+        const pres = borner(1.3 - ecart / 1.5, 0.12, 1.1);
+        const base = attente.intention === 'rasant' ? 0.16 : attente.intention === 'drop' ? 0.45 : auteur.numero === 9 ? 0.34 : 0.3;
+        const tirage = e.rng();
+        const contre = borner(base * pres * (0.75 + contreur.detente / 200), 0.03, 0.6);
+        if (tirage < contre) {
+          if (e.dropEnCours?.auteurId === auteur.id) {
+            if (e.dropEnCours.humain && e.dropEnCours.reussi && e.responsabilites) e.responsabilites.stats.dropsReussis -= 1;
+            delete e.dropEnCours;
+          }
+          jouerGeste(e, contreur, 'charge_down', 1.4);
+          dire(e, 'pied', contreur.cote, `Contré ! ${contreur.nom} se jette sur le coup de pied de ${auteur.nom} : le ballon est vivant.`, 0, contreur.moi || auteur.moi);
+          const sC = sens(contreur.cote);
+          const de = { x: auteur.pos.x, y: auteur.pos.y };
+          e.ballon = { ...de };
+          return demarrerBallonLibre(e, {
+            de, vers: { x: borner(de.x + sC * (2 + e.rng() * 5), 1, LONGUEUR - 1), y: borner(de.y + (e.rng() - 0.5) * 7, 1, LARGEUR - 1) },
+            duree: 0.4, ecoule: 0.4, hauteur: 0.35, type: 'pied', intention: 'occupation', auteur, receveur: null,
+          }, 'occupation');
+        }
+        if (ecart <= 1.5 && tirage < contre + 0.3) {
+          // Gêné : le ballon part, mais ni où ni comme il le voulait.
+          const k = 0.45 + e.rng() * 0.3;
+          arrivee = {
+            x: borner(auteur.pos.x + (arrivee.x - auteur.pos.x) * k, 1, LONGUEUR - 1),
+            y: borner(auteur.pos.y + (arrivee.y - auteur.pos.y) * k + (e.rng() - 0.5) * 9, -1, LARGEUR + 1),
+          };
+          duree *= 0.8; hauteur *= 0.85; courbe = undefined;
+          if (e.dropEnCours?.auteurId === auteur.id && e.dropEnCours.reussi) {
+            if (e.dropEnCours.humain && e.responsabilites) e.responsabilites.stats.dropsReussis -= 1;
+            e.dropEnCours = { ...e.dropEnCours, reussi: false, issue: 'malFrappe' };
+          }
+          dire(e, 'pied', auteur.cote, `${auteur.nom} tape sous la pression de ${contreur.nom} : le coup de pied part mal.`, 0, contreur.moi || auteur.moi);
+        }
+      }
+    }
     lancerVol(e, auteur, arrivee, attente.intention, duree, hauteur, auteur.pos, true, courbe);
     return;
   }
 
-  if (!retenirLePlacement(e) && !attendLeLancer(e)) e.minuteur -= dt;
+  if (!retenirLePlacement(e) && !attendLeLancer(e)) e.minuteur -= dt * cadenceDeLArret(e);
   switch (e.phase) {
     case 'coupEnvoi': return phaseCoupEnvoi(e);
     case 'renvoi22': return phaseRenvoi22(e);
@@ -1601,6 +1666,22 @@ function dropDirect(e: EtatMatch, p: Pion, dem: DemandeDirecte): void {
  * Le défenseur qui contre un drop : celui qui est sur le botteur à la FRAPPE. Une charge se lit à la distance et à la vitesse
  * de rapprochement : à plus d'un mètre, un défenseur qui court à six mètres par seconde le contre quand même.
  */
+/** Le défenseur debout arrivé au contact du botteur, s'il y en a un (le pion du joueur n'y est que s'il a armé son plaquage). */
+function plaqueurDuBotteur(e: EtatMatch, botteur: Pion): Pion | null {
+  let meilleur: Pion | null = null, plusProche = Infinity;
+  for (const q of surLeTerrain(e, adverse(botteur.cote))) {
+    if (q.sanction > 0 || q.corps || q.battu > 0) continue;
+    const d = distance(q.pos, botteur.pos);
+    // ⚠️ AU CONTACT, PAS « À PORTÉE ». Un coup de pied se décide justement quand le défenseur arrive : avec le rayon de
+    // plaquage ordinaire, un quart des coups de pied de l'IA étaient avortés (mesuré : 13,8 → 10,7 par match). Il faut
+    // être sur le botteur — moins de 70 cm — pour l'empêcher de taper. Le pion du joueur, lui, garde l'allonge de son
+    // plaquage armé : c'est son geste.
+    const rayon = q.moi && e.direct?.actif ? rayonDePlaquage(e, q) : Math.min(rayonDePlaquage(e, q), 0.7);
+    if (d <= rayon && d < plusProche) { plusProche = d; meilleur = q; }
+  }
+  return meilleur;
+}
+
 function contreurDuDrop(e: EtatMatch, botteur: Pion): Pion | null {
   const s = sens(botteur.cote);
   let meilleur: Pion | null = null, plusProche = Infinity;
@@ -1781,7 +1862,8 @@ function retenirLePlacement(e: EtatMatch): boolean {
   if (!e.placementJoue || !a) return false;
   if (a.phase !== e.phase) { e.attentePlacement = null; return false; }
   if (a.pret || !(e.phase === 'melee' || e.phase === 'touche' || e.phase === 'renvoi22')) return false;
-  if (e.sim - a.depuis > ATTENTE_PLACEMENT_MAX) {
+  // Niveau 5 : on n'attend pas vingt-quatre secondes un joueur gêné, trente autres immobiles.
+  if (e.sim - a.depuis > (jeuVivant(e) ? 12 : ATTENTE_PLACEMENT_MAX)) {
     a.pret = true;
     if (e.conquete?.ramassage) e.conquete.ramassage = 'tenu';
     return false;
@@ -2203,6 +2285,33 @@ function poserVol(e: EtatMatch, vol: Vol): void {
   memoriserVol(e, vol);
 }
 
+function annulerFrappe(e: EtatMatch, auteurId: string): void {
+  delete e.piedPrepare;
+  if (e.placement) { delete e.placement[auteurId]; if (!Object.keys(e.placement).length) e.placement = null; }
+  e.gestes = e.gestes?.filter(g => g.joueurId !== auteurId || !['grubber', 'chip', 'punt', 'box_kick', 'drop'].includes(g.clip));
+  if (e.dropEnCours?.auteurId === auteurId) {
+    if (e.dropEnCours.humain && e.dropEnCours.reussi && e.responsabilites) e.responsabilites.stats.dropsReussis = Math.max(0, e.responsabilites.stats.dropsReussis - 1);
+    delete e.dropEnCours;
+  }
+}
+
+/** L'appui commence au même pas que la demande. L'arcade conserve sa rapidité et reste contestable. */
+function armerFrappe(e: EtatMatch, auteur: Pion, attente: NonNullable<EtatMatch['piedPrepare']>) {
+  const frappeDuGeste = attente.rapideArcade ? .28 : attente.intention === 'drop' ? 1.12 : attente.intention === 'renvoi' ? 1.05 : auteur.numero === 9 ? .84 : .7;
+  const contestable = jeuVivant(e) && auteur === e.porteur && attente.intention !== 'renvoi';
+  const frappe = !contestable || attente.rapideArcade ? frappeDuGeste
+    : attente.intention === 'rasant' ? FRAPPE_VIVE.rasant : attente.intention === 'drop' ? FRAPPE_VIVE.drop
+      : auteur.numero === 9 ? FRAPPE_VIVE.boite : attente.intention === 'chandelle' || attente.intention === 'parDessus' ? FRAPPE_VIVE.chip : FRAPPE_VIVE.degagement;
+  if (attente.pretDepuis === undefined) {
+    attente.pretDepuis = e.sim;
+    jouerGeste(e, auteur, attente.intention === 'renvoi' ? 'restart' : attente.intention === 'rasant' ? 'grubber'
+      : attente.intention === 'drop' ? 'drop' : auteur.numero === 9 ? 'box_kick'
+        : attente.intention === 'chandelle' || attente.intention === 'parDessus' ? 'chip' : 'punt', 1.4);
+    if (frappe < frappeDuGeste && e.gestes?.length) e.gestes[e.gestes.length - 1]!.debut -= frappeDuGeste - frappe;
+  }
+  return { frappe, contestable };
+}
+
 function lancerVol(
   e: EtatMatch, auteur: Pion, arrivee: Vec, intention: IntentionPied,
   duree: number, hauteur: number, depuis?: Vec, pret = false,
@@ -2212,9 +2321,10 @@ function lancerVol(
   if (!pret) {
     depuis ??= { ...auteur.pos };
     e.piedPrepare = { auteurId: auteur.id, arrivee: { ...arrivee }, intention, duree, hauteur, depuis: { ...depuis }, debut: e.sim,
-      rapideArcade: !!auteur.moi && !!e.controleArcadeCamps?.includes(auteur.cote), ...(courbe ? { courbe } : {}) };
+      rapideArcade: !!auteur.moi && !!e.controleArcadeCamps?.includes(auteur.cote), avaitBallon: auteur === e.porteur, ...(courbe ? { courbe } : {}) };
     auteur.cible = { ...depuis };
     (e.placement ??= {})[auteur.id] = { ...depuis };
+    if (jeuVivant(e) && auteur === e.porteur && !auteur.corps && distance(auteur.pos, depuis) <= .75) armerFrappe(e, auteur, e.piedPrepare);
     return;
   }
   // ⚠️ UNE COPIE, JAMAIS LA POSITION VIVANTE DU BOTTEUR. `deplacer` modifie
@@ -2361,7 +2471,7 @@ function phaseBallonEnLAir(e: EtatMatch): void {
     const sortie = pointDeSortie(v.de, arrivee);
     if (v.intention === 'penaltouche') {
       dire(e, 'touche', camp, C.texteMatch('toucheASuivre', { club: nomClub(e, camp) }));
-      return arret(e, 'touche', camp, sortie);
+      return arret(e, 'touche', camp, sortie, false, false, true);
     }
     // 1. Le 50/22 : trajectoire indirecte depuis son camp, dans leurs 22.
     const deSonCamp = dansSonCamp(v.de, camp) || Math.abs(v.de.x - MILIEU) < 0.5;
@@ -2582,7 +2692,7 @@ function phaseBallonLibre(e: EtatMatch, dt: number): void {
     const defenseur: Cote = e.ballon.x <= LIGNE_A ? 'A' : 'B';
     const envoyePar = libre.auteurCote;
     e.ballonLibre = null;
-    return reprendreApresEnBut(e, defenseur, envoyePar === defenseur ? 'defense' : 'attaque');
+    return reprendreApresEnBut(e, defenseur, libre.deTir ? 'tir' : envoyePar === defenseur ? 'defense' : 'attaque');
   }
 
   // Si le ballon traîne trop longtemps ou s'il est injouable, on ne fige jamais le match.
@@ -2643,7 +2753,7 @@ function phaseBallonLibre(e: EtatMatch, dt: number): void {
   }
   if ((e.ballon.x <= LIGNE_A && premier.cote === 'A')
     || (e.ballon.x >= LIGNE_B && premier.cote === 'B')) {
-    return reprendreApresEnBut(e, premier.cote, libre.auteurCote === premier.cote ? 'defense' : 'attaque');
+    return reprendreApresEnBut(e, premier.cote, libre.deTir ? 'tir' : libre.auteurCote === premier.cote ? 'defense' : 'attaque');
   }
   dire(e, 'pied', premier.cote, `Le ballon vivant est récupéré par ${premier.nom}.`, 0, premier.moi);
   reprendreJeu(e, premier.pos, premier, undefined, undefined, undefined,
@@ -4628,6 +4738,7 @@ export function probaPlaquage(
   const percussion = conqueteLisible(e) && geste === 'raffut'
     ? 0.05 * borner((porteur.puissance - defenseur.puissance) / 22 + ((porteur.poidsKg ?? 95) - (defenseur.poidsKg ?? 95)) / 35
       + (Math.hypot(porteur.vitesse.x, porteur.vitesse.y) - 4) / 5, -0.6, 1.3) * (0.7 + 0.3 * porteur.endurance / 100)
+      * (jeuVivant(e) && !condense(e) ? REGLAGES_IA.percussionReel : 1)
     : 0;
   const chance = borner(
     0.93 + (force - resistance) / 380 + elan + bonusLigne + bonusBotArcade - bonusDuGeste(porteur, geste) * efficaciteGeste
@@ -5181,6 +5292,15 @@ function formerRuck(
     }
   }
   e.placement = placementRuck(e.pions, e.ballon, e.possession);
+  if (jeuVivant(e) && e.direct?.actif) {
+    // ⚠️ ENTRER AU RUCK EST UN CHOIX (niveau 5). Le pion du joueur n'y est plus envoyé parce qu'il était l'avant le plus
+    // proche : à lui d'y aller (soutenir, gratter) ou de rester dans la ligne.
+    const moi = e.pions.find((p) => p.moi);
+    if (moi && moi !== contact?.porteur && moi !== contact?.defenseur && e.placement[moi.id]) {
+      delete e.placement[moi.id];
+      if (moi.role === 'ruck') moi.role = 'ligne';
+    }
+  }
   if (contact) {
     // Au contact, le ballon ET les deux joueurs s'arrêtent ensemble. Avant,
     // le porteur gardait sa vitesse de course pendant que le ballon restait au
@@ -5198,6 +5318,12 @@ function formerRuck(
       x: e.ballon.x + s * 0.45,
       y: borner(e.ballon.y + 0.35, 1.2, LARGEUR - 1.2),
     };
+    if (jeuVivant(e)) {
+      // Niveau 5 : aucun des deux n'est rappelé vers une place calculée — ils restent où le contact les laisse, et c'est
+      // le regroupement qui vient à eux (`ancrerLeRuck`, dans `dynamique.ts`).
+      e.placement[contact.porteur.id] = { x: contact.porteur.pos.x, y: contact.porteur.pos.y };
+      e.placement[contact.defenseur.id] = { x: contact.defenseur.pos.x, y: contact.defenseur.pos.y };
+    }
   }
   // La ligne de hors-jeu se replace au dernier pied.
   const sa = sens(e.possession);
@@ -5439,8 +5565,10 @@ function phaseRuck(e: EtatMatch): void {
     p.plaquage * 0.38 + p.puissance * 0.28 + p.vision * 0.19 + p.discipline * 0.15
     + (p.numero === 7 ? 9 : p.numero === 6 || p.numero === 2 ? 6 : 0)
   ) * (0.70 + p.endurance / 335) - distance(p.pos, e.ballon) * 5;
+  // Niveau 5 : le pion que le joueur conduit ne gratte ni ne contre-ruck jamais de lui-même.
+  const pilote = jeuVivant(e) && e.direct?.actif;
   const prochesDefense = surLeTerrain(e, defense)
-    .filter((p) => p.avant && distance2(p.pos, e.ballon) < 72)
+    .filter((p) => p.avant && distance2(p.pos, e.ballon) < 72 && !(pilote && p.moi))
     .sort((a, b) => valeurRuck(b) - valeurRuck(a));
   const prochesAttaque = surLeTerrain(e, attaque)
     .filter((p) => p.avant && p.id !== contexte?.porteurId && distance2(p.pos, e.ballon) < 72)
@@ -5468,7 +5596,7 @@ function phaseRuck(e: EtatMatch): void {
   const moi = e.pions.find((p) => p.moi);
   let geste0 = false;
   const jeGratte = intentionEst(e, 'grattage') && !!moi && moi.cote === defense
-    && moi.surLeTerrain && moi.sanction <= 0 && distance2(moi.pos, e.ballon) < 64;
+    && moi.surLeTerrain && moi.sanction <= 0 && distance2(moi.pos, e.ballon) < (jeuVivant(e) ? 3.2 * 3.2 : 64);
   if (jeGratte && moi) {
     consommerIntention(e);
     gratteur = moi;
@@ -5709,7 +5837,9 @@ function sortirDuMaul(e: EtatMatch, moi: Pion, sortie: 'ramasser' | 'passer' | '
   e.placement = null;
   if (sortie === 'ramasser') {
     dire(e, 'maul', cote, `${moi.nom} récupère le ballon au fond du maul et part seul.`, 0, true);
-    reprendreJeu(e, { x: e.ballon.x, y: e.ballon.y }, moi, 3);
+    // Niveau 5 : le jeu repart de là où il se tient, pas du cœur du maul — le ballon ne saute pas vers lui.
+    reprendreJeu(e, jeuVivant(e) ? { x: moi.pos.x, y: moi.pos.y } : { x: e.ballon.x, y: e.ballon.y }, moi, 3);
+    if (jeuVivant(e) && e.direct) e.direct.tenuJusqua = Math.min(e.direct.tenuJusqua, e.sim);
     return true;
   }
   dire(e, 'maul', cote, sortie === 'passer' ? `${moi.nom} sert le demi de mêlée au fond du maul.` : `${moi.nom} se détache du maul, le demi de mêlée le sert.`, 0, true);
@@ -5722,6 +5852,11 @@ function phaseMaul(e: EtatMatch, dt: number): void {
   const cote = e.possession;
   const s = sens(cote);
   const mien = surLeTerrain(e, cote).filter((p) => p.avant);
+  // Niveau 5 : le pion du joueur glisse au fond du maul, là où arrive le ballon — c'est de là qu'il pourra en sortir.
+  if (jeuVivant(e) && e.direct?.actif) {
+    const i = mien.findIndex((p) => p.moi);
+    if (i >= 0 && i < mien.length - 1) mien.push(...mien.splice(i, 1));
+  }
   const adv = surLeTerrain(e, adverse(cote)).filter((p) => p.avant);
   const moy = (l: Pion[]) => (l.length ? l.reduce((a, b) => a + b.puissance, 0) / l.length : 50);
   let poussee = moy(mien) - moy(adv);
@@ -5778,10 +5913,17 @@ function phaseMaul(e: EtatMatch, dt: number): void {
 // PHASES ARRÊTÉES
 // ---------------------------------------------------------------------------
 
-function arret(e: EtatMatch, quoi: Phase, pour: Cote, lieu: Vec, enAvant = false, toucheRapidePossible = false): void {
+function arret(e: EtatMatch, quoi: Phase, pour: Cote, lieu: Vec, enAvant = false, toucheRapidePossible = false,
+  /**
+   * La remise en jeu d'une PÉNALITÉ (pénaltouche trouvée, mêlée choisie). ⚠️ CE N'EST PAS UNE SORTIE DE BALLON ORDINAIRE
+   * (niveau 5) : la pénalité a été accordée, l'équipe a choisi, l'alignement et le lancer se jouent — sirène ou pas.
+   */
+  dePenalite = false,
+): void {
   // Une période se termine sur ballon mort (touche, mêlée/en-avant, renvoi 22),
   // mais JAMAIS sur une pénalité qui doit toujours pouvoir être disputée.
-  if (e.sirene && (e.finSurSortieOuEnAvant ? quoi === 'touche' || enAvant : quoi !== 'penalite')) return clorePeriode(e);
+  if (e.sirene && !(dePenalite && jeuVivant(e))
+    && (e.finSurSortieOuEnAvant ? quoi === 'touche' || enAvant : quoi !== 'penalite')) return clorePeriode(e);
   e.possession = pour;
   e.porteur = null;
   e.vol = null;
@@ -5856,6 +5998,8 @@ function arret(e: EtatMatch, quoi: Phase, pour: Cote, lieu: Vec, enAvant = false
       e.conquete.melee = {
         etape: 'placement', etapeDepuis: e.sim, debut: e.sim, centre: { ...e.ballon },
         introducteur: pour, dureePoussee: TEMPS_MELEE.poussee, avanceFinale: 0, angleFinal: 0,
+        // Niveau 5 : packs prêts, demi au tunnel, arbitre en place — flexion, liaison, jeu, sans pause entre les ordres.
+        ...(jeuVivant(e) ? { durees: { ...MELEE_VIVE } } : {}),
       };
     }
     e.compteurs.melees += 1;
@@ -5912,7 +6056,7 @@ export function geometrieMelee(m: MeleeDetaillee, sim: number): { avance: number
   const k = m.etape === 'sortie' ? 1
     : m.etape === 'poussee' ? lisser(depuis / Math.max(.1, m.ruptureApres ?? m.dureePoussee)) : 0;
   const ecart = m.etape === 'placement' ? 1.4
-    : m.etape === 'liaison' ? 1.4 - .55 * lisser((depuis - TEMPS_MELEE.liaison * .45) / (TEMPS_MELEE.liaison * .5))
+    : m.etape === 'liaison' ? 1.4 - .55 * lisser((depuis - (m.durees?.liaison ?? TEMPS_MELEE.liaison) * .45) / ((m.durees?.liaison ?? TEMPS_MELEE.liaison) * .5))
       : m.etape === 'impact' ? .85 * (1 - lisser(depuis / .55)) : 0;
   return { avance: m.avanceFinale * k, angle: m.angleFinal * k, ecart };
 }
@@ -6139,14 +6283,14 @@ function avancerMeleeDetaillee(e: EtatMatch): void {
     // Tant que l'affichage retient la phase (packs encore en chemin), on attend.
     if (ecoule > 0.2) passer('liaison');
   } else if (m.etape === 'liaison') {
-    if (depuis >= TEMPS_MELEE.liaison) passer('impact');
+    if (depuis >= (m.durees?.liaison ?? TEMPS_MELEE.liaison)) passer('impact');
   } else if (m.etape === 'impact') {
-    if (depuis >= TEMPS_MELEE.impact) passer('introduction');
+    if (depuis >= (m.durees?.impact ?? TEMPS_MELEE.impact)) passer('introduction');
   } else if (m.etape === 'introduction') {
-    if (depuis >= TEMPS_MELEE.introduction) {
+    if (depuis >= (m.durees?.introduction ?? TEMPS_MELEE.introduction)) {
       deciderMeleeDetaillee(e, m);
       passer('poussee');
-      e.minuteur = m.dureePoussee + (m.penalite ? 0.3 : TEMPS_MELEE.sortie);
+      e.minuteur = m.dureePoussee + (m.penalite ? 0.3 : m.durees?.sortie ?? TEMPS_MELEE.sortie);
       e.dureeArret = ecoule + e.minuteur;
     }
   } else if (m.etape === 'poussee') {
@@ -7606,6 +7750,7 @@ function phasePenalite(e: EtatMatch): void {
       suite: 'coupEnvoi', lieu: { ...info.lieu },
       routine,
       ...(tirALaMain(e, buteur) ? { humain: true } : {}),
+      ...(jeuVivant(e) ? { rituel: { ramassage: RITUEL_VIF.ramassage, pose: RITUEL_VIF.pose, de: RITUEL_VIF.de, pret: RITUEL_VIF.pret } } : {}),
     };
     e.phase = 'tirAuBut';
     e.minuteur = dureeArret(e, 'tirAuBut');
@@ -7627,7 +7772,7 @@ function phasePenalite(e: EtatMatch): void {
 
   const s = sens(cote);
   if (choix === 'melee') {
-    arret(e, 'melee', cote, info.lieu);
+    arret(e, 'melee', cote, info.lieu, false, false, true);
     return;
   }
   const chanceTouche = ordrePenalite === 'touche' ? 0.97 : ordrePenalite === 'points' ? 0.42 : 0.72;
@@ -7861,6 +8006,7 @@ function phaseTirAuBut(e: EtatMatch): void {
   if (!tir.retombe) {
     if (e.vol && !volTermine(e.vol)) return;
     tir.retombe = true;
+    const volDuTir = e.vol;
     if (e.vol) e.ballon = { ...(lectureLocale(e) ? arretDuBallon(e.vol) : e.vol.vers) };
     e.vol = null;
     const reussi = !!tir.reussi;
@@ -7876,6 +8022,26 @@ function phaseTirAuBut(e: EtatMatch): void {
       dire(e, 'butRate', cote, C.phrase(e.rng, C.PENALITE_RATEE, {
         nom: buteur.nom, distance: Math.round(d),
       }), 0, buteur.moi);
+      // ═══ MANQUÉ, MAIS PAS MORT (niveau 5) ════════════════════════════════════
+      // Un tir trop court, contré, ou retombé dans l'en-but sans en sortir reste EN JEU : pas de renvoi automatique. On
+      // attend que le ballon soit réellement mort, ou qu'un joueur l'aplatisse, pour donner la reprise qui convient
+      // (`phaseBallonLibre` : renvoi aux 22 s'il meurt ou si un défenseur l'aplatit, essai si un attaquant y arrive le
+      // premier, jeu courant s'il est ramassé dans le champ).
+      const sol = e.ballon;
+      if (jeuVivant(e) && volDuTir && sol.x > 0.6 && sol.x < LONGUEUR - 0.6 && sol.y > 0.6 && sol.y < LARGEUR - 0.6) {
+        e.tir = null;
+        e.placement = null;
+        const dx = sol.x - volDuTir.de.x, dy = sol.y - volDuTir.de.y, n = Math.max(0.01, Math.hypot(dx, dy));
+        demarrerBallonLibre(e, { ...volDuTir, de: { ...volDuTir.de }, vers: { ...sol }, hauteur: 0.1, ecoule: volDuTir.duree }, 'occupation');
+        const libre = e.ballonLibre as NonNullable<EtatMatch['ballonLibre']> | null;
+        if (libre) {
+          // Il a fini sa course : il ne repart pas, il roule encore un peu.
+          libre.vitesse = { x: dx / n * 1.6, y: dy / n * 1.6 };
+          libre.hauteur = 0.05; libre.vitesseVerticale = 0.5;
+          libre.deTir = true;
+        }
+        return;
+      }
     }
     // Pause visuelle : on voit le ballon retombé au sol derrière les poteaux
     e.minuteur = 1.4;
@@ -8183,7 +8349,8 @@ function validerEssai(e: EtatMatch, marqueur: Pion, origine: 'jeu' | 'maul'): vo
       valeur: 2, suite: 'coupEnvoi', lieu, reussi: transforme, routine,
       ...(tirALaMain(e, buteur) ? { humain: true } : {}),
       etape: 'celebration', etapeDepuis: e.sim, ballonAuSol: sol, marqueurId: marqueur.id,
-      celebrationJusqua: e.sim + RITUEL_TIR.celebration, feteurs,
+      celebrationJusqua: e.sim + (jeuVivant(e) ? RITUEL_VIF.celebration : RITUEL_TIR.celebration), feteurs,
+      ...(jeuVivant(e) ? { rituel: { ramassage: RITUEL_VIF.ramassage, pose: RITUEL_VIF.pose, de: RITUEL_VIF.de, pret: RITUEL_VIF.pret } } : {}),
     };
     e.phase = 'transformation';
     e.minuteur = dureeArret(e, 'transformation');
@@ -8267,16 +8434,24 @@ function avancerTirDetaille(e: EtatMatch): void {
   }
   if (tir.etape === 'approche') {
     const sol = tir.ballonAuSol ?? lieu;
-    b.cible = { ...sol };
-    b.effort = .6;
+    // ═══ TOUT SE PRÉPARE PENDANT QU'IL ARRIVE (niveau 5) ══════════════════════
+    // Sur une pénalité, le ballon est déjà à la marque : on n'attend pas le buteur pour amener le tee et l'installer. Il
+    // vient droit à sa place derrière le ballon, au petit trot, et enchaîne — recul, visée, frappe.
+    const surPlace = !!tir.rituel && distance(sol, lieu) < 0.6;
+    b.cible = surPlace ? { ...pose } : { ...sol };
+    b.effort = tir.rituel ? (distance(b.pos, b.cible) > 5 ? .85 : .6) : .6;
     e.ballon = { ...sol };
+    if (surPlace) {
+      if (distance(b.pos, pose) < .5 || depuis > 14) { stopper(b); b.cible = { ...b.pos }; delete tir.ballonAuSol; passer('pose'); }
+      return;
+    }
     if (distance(b.pos, sol) < .95 || depuis > 16) { stopper(b); passer('ramassage'); }
     return;
   }
   if (tir.etape === 'ramassage') {
     stopper(b);
     b.cible = { ...b.pos };
-    if (depuis >= RITUEL_TIR.ramassage) { delete tir.ballonAuSol; passer('transport'); }
+    if (depuis >= (tir.rituel?.ramassage ?? RITUEL_TIR.ramassage)) { delete tir.ballonAuSol; passer('transport'); }
     return;
   }
   if (tir.etape === 'transport') {
@@ -8292,7 +8467,7 @@ function avancerTirDetaille(e: EtatMatch): void {
   b.cible = { ...b.pos };
   if (tir.etape === 'pose') {
     // Le joueur qui tape n'attend pas la routine entière : le ballon est sur le tee, il vise.
-    if (depuis >= (tir.humain ? RITUEL_TIR.poseHumain : RITUEL_TIR.pose)) passer(tir.humain ? 'vise' : 'pret');
+    if (depuis >= (tir.humain ? RITUEL_TIR.poseHumain : tir.rituel?.pose ?? RITUEL_TIR.pose)) passer(tir.humain ? 'vise' : 'pret');
     return;
   }
   if (tir.etape === 'vise') {
@@ -8318,7 +8493,7 @@ function avancerTirDetaille(e: EtatMatch): void {
     return;
   }
   if (tir.etape === 'pret') {
-    if (depuis >= RITUEL_TIR.pret) passer('elan');
+    if (depuis >= (tir.rituel?.pret ?? RITUEL_TIR.pret)) passer('elan');
     return;
   }
   // 🏉 CHARGE DU CONTRE SUR TRANSFORMATION (Règle World Rugby 8.14) : dès que

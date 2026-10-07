@@ -10,7 +10,7 @@ import { terrainSimulationCombinaison } from '../src/lib/ligue/simulationCombina
 import { bornerVueCombinaison, commencerNavigation, poursuivreNavigation } from '../src/lib/ligue/navigationCombinaisons';
 import { joueursEngagesCombinaison } from '../src/lib/ligue/placementsCombinaisons';
 import { rugbyAnimations } from '../src/lib/spritesGenerateur/rugbyAnimations';
-import { actualiserCahierMatchEnLigne, strategieValide, STRATEGIE_EN_LIGNE_DEFAUT, avancerMatchEnLigne, creerMatchEnLigne, vueMatchEnLigne } from '../src/lib/ligue/matchCarriere';
+import { actualiserCahierMatchEnLigne, strategieValide, STRATEGIE_EN_LIGNE_DEFAUT, avancerMatchEnLigne, creerMatchEnLigne, espaceMoteursPourBanc, vueMatchEnLigne } from '../src/lib/ligue/matchCarriere';
 import { agirCarriere, creerLaboratoireCarriere } from '../src/lib/ligue/carriere';
 import { preparerCombinaison, demarrerCombinaison, pointSurTerrain, placerCombinaison } from '../src/lib/moteur/combinaisons';
 import { avancer, creerMatch, installerSituationCombinaison } from '../src/lib/moteur/moteur';
@@ -518,9 +518,14 @@ for (const cote of ['domicile', 'exterieur'] as const) {
   assert.equal(actualiserCahierMatchEnLigne(avecCahier, clubId, { modeCombinaisons: 'configure', combinaisons: plans }, debut + 5 * 60_000), avecCahier, 'Le même cahier ne crée pas un ordre en double');
   const chaud = avancerMatchEnLigne(avecCahier, debut + 20 * 60_000);
   assert.ok(chaud.fil.some(l => l.cote === cote && l.texte.startsWith('Combinaison :')), 'Le camp concerné exécute réellement ses plans après leur activation');
+  // ⚠️ UN MOTEUR NE RECULE PLUS (Correctif 24, marge d'autorité) : relire le début du match, c'est le travail d'une AUTRE
+  // instance, qui le rejoue à froid depuis le journal. Chaque relecture se fait donc dans son propre espace de moteurs.
+  espaceMoteursPourBanc('relecture-' + cote);
   const passe = avancerMatchEnLigne({ ...chaud, horloge: 0 }, debut + 60_000);
   assert.ok(!passe.fil.some(l => l.texte.startsWith('Combinaison :')), 'La sauvegarde n’ajoute pas de combinaison dans le passé');
+  espaceMoteursPourBanc('froid-' + cote);
   const froid = avancerMatchEnLigne(avecCahier, debut + 20 * 60_000);
+  espaceMoteursPourBanc('');
   assert.deepEqual(froid.score, chaud.score);
   assert.deepEqual(froid.fil, chaud.fil, 'La reconstruction à froid respecte la minute d’activation du cahier');
 }

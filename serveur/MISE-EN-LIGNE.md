@@ -125,6 +125,33 @@ l'hôte visé, les tables déjà présentes et le nombre de lignes de `classemen
 le test de la bonne base est donc refait pour toi — puis il demande
 confirmation. À la première erreur il s'arrête en montrant l'instruction fautive.
 
+> **Correctif 24 — une table de plus : `carriere_marches`.** Le marché commun des
+> divisions publiques (une annonce visible de toutes les divisions d'un cycle,
+> achat atomique) tient dans cette table, posée par le même
+> `npm run base:appliquer` (`schema-carriere.sql`, en `create table if not
+> exists`). **Tant qu'elle n'existe pas, rien ne casse** : chaque division garde
+> son marché, comme avant — le serveur le détecte (`42P01`) et revérifie chaque
+> minute. Le code peut donc partir avant la migration ; l'inverse aussi.
+> ⚠️ Cette requête n'a été essayée que sur le stockage local et au banc
+> (`npm run verify:marche-commun`), pas sur la vraie base : à la première mise en
+> vente d'une division publique, vérifier que `select id, revision from
+> carriere_marches` montre une ligne `public:<cycle>`.
+>
+> **Correctif 25 — trois tables : `usage_jours`, `usage_compteurs`, `usage_carrieres`.** Les
+> statistiques d'utilisation du Labo (relevés anonymes par appareil : du temps
+> par mode et des compteurs). Même commande, même règle : sans elles le jeu
+> tourne normalement, les relevés sont ignorés et l'onglet « Statistiques » dit
+> qu'elles ne sont pas posées. Là aussi le SQL n'a tourné qu'au banc
+> (`npm run verify:correctif25`) : après `npm run base:appliquer`, ouvrir le jeu,
+> jouer une carrière puis quitter l'onglet et vérifier les nombres de lignes
+> dans `usage_jours` et `usage_carrieres`. Les anciens jours restent compatibles ;
+> les nouvelles mesures commencent à la mise en ligne, sans inventer l'historique.
+>
+> **Et une précaution de calendrier.** Le direct des ligues change de modèle de
+> temps (le serveur ne joue plus que ce qui est définitif, avec 4,8 s de marge).
+> Un match EN COURS au moment de la mise en ligne garde ses règles mais subit un
+> à-coup : **déployer quand aucun match ne se joue.**
+
 **Les deux solutions de repli**, si tu préfères ne rien lancer en local :
 
 - **La console de Neon** (`console.neon.tech` → ton projet → *SQL Editor*)

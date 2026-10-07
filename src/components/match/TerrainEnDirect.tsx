@@ -53,12 +53,13 @@
 // l'état rejoué exactement comme elle lit un match de carrière.
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { departagerLesTenues } from '../../lib/tenuesMatch';
 import { Icone } from '../Icone';
 import { PelouseMemo } from './Pelouse';
 import { Camera, angleDeVue, type Cadrage, type Vue } from '../../lib/moteur/camera';
 import { LARGEUR, LONGUEUR, borner, type Vec } from '../../lib/moteur/terrain';
 import { extraireTerrain, type CoteEnLigne, type TerrainDirect } from '../../lib/ligue/matchCarriere';
-import { LecteurFilm, PAS_FILM, reperesFilm, type FilmDirect, type PionFilm } from '../../lib/ligue/filmDirect';
+import { LecteurFilm, PAS_FILM, reperesChrono, type ChronoDirect, type FilmDirect, type PionFilm } from '../../lib/ligue/filmDirect';
 import type { EtatMatch } from '../../lib/moteur/etat';
 import { creerScenarioDirect, type ScenarioDirect } from '../../lib/ligue/scenarioDirect';
 import {
@@ -104,6 +105,8 @@ export interface CouleursDirect {
   domicile: string;
   exterieur: string;
   maillots?: Record<CoteEnLigne, MaillotMatch>;
+  /** Faux tant que les écussons sont encore en cours de lecture : la scène 3D attend ces couleurs pour se peindre. */
+  lues?: boolean;
 }
 
 /** Tant qu'aucune image n'est arrivée : une pelouse vide plutôt qu'un écran qui refuse de se monter. */
@@ -131,6 +134,8 @@ interface Props {
   terrain?: TerrainDirect;
   /** Le dernier envoi du film du match : voir `lib/ligue/filmDirect.ts`. */
   film?: FilmDirect;
+  /** Le dernier envoi de la chronologie (film v2) : pistes, événements, somme de contrôle. */
+  chrono?: ChronoDirect;
   /** Identifiant du match : le sondage y retrouve le dernier pas connu du film. */
   matchId?: string;
   /** Appelé quelques fois par seconde avec ce que l'écran montre réellement. */
@@ -211,7 +216,7 @@ function tracerTrajectoires(vol: NonNullable<TerrainDirect['vol']>) {
   return { vol: pointsVol.join(' '), ombre: pointsOmbre.join(' '), anticipe: cheminAnticipe };
 }
 
-function TerrainEnDirect({ terrain = TERRAIN_VIDE, film, matchId, surAffiche, nomDomicile, nomExterieur, couleurs, emblemes, monCote, carton, modeDemo, pause, vitesseDemo, identite, scoreMatch, stade }: Props) {
+function TerrainEnDirect({ terrain = TERRAIN_VIDE, film, chrono, matchId, surAffiche, nomDomicile, nomExterieur, couleurs, emblemes, monCote, carton, modeDemo, pause, vitesseDemo, identite, scoreMatch, stade }: Props) {
   // Le ballon du direct est celui qu'on a équipé en boutique : chacun voit le sien.
   const skinActif = useGame((s) => s.skinActif);
   const scoreCourant = useRef(scoreMatch);
@@ -257,11 +262,11 @@ function TerrainEnDirect({ terrain = TERRAIN_VIDE, film, matchId, surAffiche, no
   useEffect(() => { rappelAffiche.current = surAffiche; }, [surAffiche]);
   useEffect(() => {
     const lec = lecteur.current!;
-    lec.recevoir(film);
+    if (chrono) lec.recevoirChrono(chrono); else lec.recevoir(film);
     // Le sondage annonce ce pas au serveur, qui n'envoie que la suite.
-    if (matchId && lec.dernier !== undefined) reperesFilm.set(matchId, lec.dernier);
-  }, [film, matchId]);
-  useEffect(() => () => { if (matchId) reperesFilm.delete(matchId); }, [matchId]);
+    if (matchId && lec.dernier !== undefined) reperesChrono.set(matchId, lec.repere);
+  }, [film, chrono, matchId]);
+  useEffect(() => () => { if (matchId) reperesChrono.delete(matchId); }, [matchId]);
 
   const tempsSimulationDemo = useRef(0);
   const demoOptions = useRef({ modeDemo, pause, vitesseDemo });
@@ -596,13 +601,19 @@ function TerrainEnDirect({ terrain = TERRAIN_VIDE, film, matchId, surAffiche, no
   // recalculer trente sprites 60 fois par seconde sans perdre une image utile.
   const tempsAnimation = Math.floor((affiche.simulation ?? affiche.instantJeu ?? 0) * 24) / 24;
   const b = ballon.current;
-  const maillots: Record<CoteEnLigne, MaillotMatch> = useMemo(() => couleurs.maillots ?? ({
+  const maillots: Record<CoteEnLigne, MaillotMatch> = useMemo(() => {
+    const bruts = couleurs.maillots ?? ({
     domicile: maillotDeSecours(couleurs.domicile, nomDomicile),
     exterieur: maillotDeSecours(couleurs.exterieur, nomExterieur),
-  }), [couleurs.maillots, couleurs.domicile, couleurs.exterieur, nomDomicile, nomExterieur]);
+    });
+    // Deux maillots qu'on ne confond pas, quel que soit l'écran qui a fourni les couleurs (Correctif 24).
+    const { domicile, exterieur } = departagerLesTenues(bruts.domicile, bruts.exterieur);
+    return { domicile, exterieur };
+  }, [couleurs.maillots, couleurs.domicile, couleurs.exterieur, nomDomicile, nomExterieur]);
   const porteurPosition = affiche.porteurId ? pions.current.get(affiche.porteurId) : undefined;
 
   const options3D = useMemo<OptionsScene3D>(() => ({
+    tenuesDepartagees: true,
     equipes: [
       { nom: nomDomicile, maillot: maillots.domicile, blason: ecussonPourToile(emblemes?.domicile) },
       { nom: nomExterieur, maillot: maillots.exterieur, blason: ecussonPourToile(emblemes?.exterieur) },
@@ -707,7 +718,7 @@ function TerrainEnDirect({ terrain = TERRAIN_VIDE, film, matchId, surAffiche, no
   return (
     <div className="cel-scene" ref={scene}>
       {vue3D ? (
-        <Terrain3D options={options3D} surPrete={brancherScene} surEchec={abandonner3D} />
+        <Terrain3D options={options3D} pret={couleurs.lues !== false} surPrete={brancherScene} surEchec={abandonner3D} />
       ) : (
       <svg
         ref={svg}

@@ -34,11 +34,13 @@ import { TEXTES_CONTROLE_DIRECT } from './textesControleDirect.js';
 import { TEXTES_TUTORIEL_JOUEUR_20 } from './textesTutorielJoueur20.js';
 import { TEXTES_RESPONSABILITES } from './textesResponsabilites.js';
 import { TEXTES_CARRIERE_EXISTANTE } from './textesCarriereExistante.js';
+import { TEXTES_ECHANGES_SOLO } from './textesEchangesSolo.js';
 import { TEXTES_RESPONSABILITES_HUD } from './textesResponsabilitesHUD.js';
 import { TEXTES_TUTORIEL } from './textesTutoriel.js';
 import { TEXTES_APPARENCE } from './textesApparence.js';
 import { TEXTES_BOUTIQUE_21 } from './textesBoutique21.js';
 import { TEXTES_ARTICLES_21 } from './textesArticles21.js';
+import { TEXTES_STAFF } from './textesStaff.js';
 
 // ⚠️ LA TRADUCTION AUTOMATIQUE PASSE EN DERNIER — c'est-à-dire qu'elle est
 // écrasée par tout le reste. `scripts/traduire.ts` remplit les langues
@@ -86,11 +88,13 @@ const ECRIT_A_LA_MAIN: Record<string, Traduction> = {
   ...TEXTES_TUTORIEL_JOUEUR_20,
   ...TEXTES_RESPONSABILITES,
   ...TEXTES_CARRIERE_EXISTANTE,
+  ...TEXTES_ECHANGES_SOLO,
   ...TEXTES_RESPONSABILITES_HUD,
   ...TEXTES_TUTORIEL,
   ...TEXTES_APPARENCE,
   ...TEXTES_BOUTIQUE_21,
   ...TEXTES_ARTICLES_21,
+  ...TEXTES_STAFF,
 
   // --- NAVIGATION ---------------------------------------------------------
   'nav.accueil': { fr: 'Accueil', en: 'Home', es: 'Inicio', it: 'Home', de: 'Start', pt: 'Início', ja: 'ホーム' },

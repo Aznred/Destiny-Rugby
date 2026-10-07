@@ -1,0 +1,80 @@
+/* Le Labo — statistiques d'utilisation. Mêmes matières que le reste de l'Atelier : surface sombre, liseré doré, Archivo. */
+.ls { display: grid; gap: 1rem; }
+.ls-entete { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: .9rem 1.5rem; }
+.ls-entete h3 { margin: 0 0 .2rem; font: 400 1.5rem/1.1 var(--police-titre); letter-spacing: .02em; text-transform: uppercase; color: var(--craie); }
+.ls-entete p { margin: 0; max-width: 46rem; color: var(--brume); font-size: .86rem; }
+
+/* La période : une rangée de pastilles, au-dessus de tout ce qu'elle filtre. */
+.ls-periodes { display: flex; flex-wrap: wrap; gap: .3rem; padding: .3rem; border: 1px solid var(--bordure); border-radius: var(--rayon-pilule); background: color-mix(in srgb, var(--surface) 82%, #000); }
+.ls-periodes button { min-height: 2.5rem; padding: .45rem .95rem; border: 0; border-radius: var(--rayon-pilule); background: transparent; color: var(--brume); font: 700 .76rem/1 var(--police-forte); cursor: pointer; }
+.ls-periodes button:hover { color: var(--craie); }
+.ls-periodes .actif { background: var(--or-400); color: #17130a; }
+/* Un filtre à l'intérieur d'un onglet (la plateforme, pour la fluidité) : même rangée de pastilles, calée à gauche. */
+.ls-filtres { justify-self: start; align-self: start; }
+
+.ls-onglets { display: flex; gap: .35rem; overflow-x: auto; padding-bottom: .15rem; border-bottom: 1px solid var(--bordure); scrollbar-width: thin; }
+.ls-onglets button { flex: 0 0 auto; min-height: 2.75rem; padding: .6rem .95rem; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--brume); font: 700 .8rem/1.2 var(--police-forte); cursor: pointer; }
+.ls-onglets button:hover { color: var(--craie); }
+.ls-onglets .actif { border-bottom-color: var(--or-400); color: var(--or-400); }
+
+.ls-corps { display: grid; gap: 1.1rem; transition: opacity .15s ease; }
+.ls-attente { opacity: .55; }
+.ls-message { margin: 0; padding: .9rem 1rem; border: 1px dashed var(--bordure-forte); border-radius: var(--rayon-sm); color: var(--craie-dim); font-size: .88rem; }
+.ls-message code { padding: .1rem .35rem; border-radius: 5px; background: rgba(0, 0, 0, .35); color: var(--or-400); font-size: .82rem; }
+
+/* Les chiffres seuls : une tuile chacun, le libellé au-dessus, la valeur en grand. */
+.ls-tuiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(11.5rem, 1fr)); gap: .6rem; }
+.ls-tuile { display: grid; align-content: start; gap: .3rem; min-height: 5.6rem; padding: .8rem .9rem; border: 1px solid var(--bordure); border-radius: var(--rayon-sm); background: color-mix(in srgb, var(--surface) 88%, #000); box-shadow: var(--arete); }
+.ls-tuile span { color: var(--brume); font: 600 .74rem/1.25 var(--police-forte); }
+.ls-tuile strong { color: var(--craie); font: 400 1.75rem/1 var(--police-titre); letter-spacing: .01em; font-variant-numeric: tabular-nums; }
+.ls-tuile small { color: var(--brume); font-size: .72rem; line-height: 1.25; }
+
+.ls-bloc { display: grid; grid-template-columns: minmax(0, 1fr); gap: .6rem; padding: .95rem 1rem 1rem; border: 1px solid var(--bordure); border-radius: var(--rayon-sm); background: color-mix(in srgb, var(--surface) 88%, #000); }
+.ls-bloc h4 { margin: 0; color: var(--craie); font: 700 .92rem/1.2 var(--police-forte); }
+.ls-vide, .ls-note { margin: 0; color: var(--brume); font-size: .8rem; line-height: 1.45; }
+.ls-deux { display: grid; grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr)); gap: .8rem; }
+
+/* Des grandeurs à comparer : nom, piste, valeur. Barre fine, une seule teinte, bout arrondi du côté de la donnée. */
+.ls-barres { display: grid; gap: .5rem; margin: 0; padding: 0; list-style: none; }
+.ls-barres li { display: grid; grid-template-columns: minmax(7rem, 15rem) minmax(4rem, 1fr) minmax(5.5rem, auto); align-items: center; gap: .7rem; min-height: 1.9rem; }
+.ls-nom { overflow: hidden; color: var(--craie-dim); font-size: .84rem; text-overflow: ellipsis; white-space: nowrap; }
+.ls-piste { display: block; height: 10px; border-radius: 4px; background: rgba(255, 255, 255, .06); }
+.ls-piste i { display: block; height: 100%; min-width: 3px; border-radius: 0 4px 4px 0; background: var(--or-400); }
+.ls-barres li:hover .ls-piste i { background: color-mix(in srgb, var(--or-400) 78%, #fff); }
+.ls-valeur { display: grid; justify-items: end; color: var(--craie); font: 700 .86rem/1.15 var(--police-forte); font-variant-numeric: tabular-nums; text-align: right; }
+.ls-valeur small { color: var(--brume); font: 500 .7rem/1.2 var(--police); white-space: nowrap; }
+
+.ls-defile { min-width: 0; overflow-x: auto; scrollbar-width: thin; }
+.ls-tableau { width: 100%; border-collapse: collapse; font-size: .84rem; }
+.ls-tableau th, .ls-tableau td { padding: .55rem .6rem; border-bottom: 1px solid rgba(255, 255, 255, .07); text-align: right; font-variant-numeric: tabular-nums; }
+.ls-tableau thead th { color: var(--brume); font: 600 .72rem/1.25 var(--police-forte); vertical-align: bottom; }
+.ls-tableau th:first-child { text-align: left; }
+.ls-tableau tbody th { color: var(--craie); font-weight: 600; }
+.ls-tableau td { color: var(--craie-dim); }
+.ls-tableau tbody tr:last-child th, .ls-tableau tbody tr:last-child td { border-bottom: 0; }
+
+@media (max-width: 700px) {
+  .ls-entete { align-items: start; }
+  .ls-periodes { width: 100%; }
+  .ls-periodes button { flex: 1; padding-inline: .4rem; }
+  .ls-tuiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ls-deux { grid-template-columns: minmax(0, 1fr); }
+  .ls-tuile strong { font-size: 1.45rem; }
+  .ls-barres li { grid-template-columns: minmax(0, 1fr) auto; row-gap: .25rem; }
+  .ls-piste { grid-column: 1 / -1; grid-row: 2; }
+  .ls-tableau { min-width: 34rem; }
+}
+
+/* Le profileur : un interrupteur, et le tableau des séances mesurées. */
+.ls-bascule { display: inline-flex; align-items: center; gap: .6rem; justify-self: start; min-height: 2.75rem; padding: .5rem .9rem .5rem .6rem; border: 1px solid var(--bordure); border-radius: var(--rayon-pilule); background: color-mix(in srgb, var(--surface) 82%, #000); color: var(--craie); font: 700 .8rem/1 var(--police-forte); cursor: pointer; }
+.ls-bascule i { position: relative; width: 34px; height: 19px; border-radius: 99px; background: #69747a; }
+.ls-bascule i::after { content: ''; position: absolute; top: 3px; left: 3px; width: 13px; height: 13px; border-radius: 50%; background: #fff; transition: transform .18s ease; }
+.ls-bascule[aria-pressed='true'] { border-color: var(--bordure-forte); }
+.ls-bascule[aria-pressed='true'] i { background: #4caf6c; }
+.ls-bascule[aria-pressed='true'] i::after { transform: translateX(15px); }
+.ls-seances { min-width: 62rem; }
+.ls-seances tbody th { display: grid; gap: .3rem; min-width: 12rem; }
+.ls-seances input { width: 100%; min-height: 2rem; padding: .25rem .45rem; border: 1px solid var(--bordure); border-radius: 6px; background: rgba(0, 0, 0, .28); color: var(--craie-dim); font: 500 .74rem/1.2 var(--police); }
+.ls-effacer { justify-self: start; min-height: 2.5rem; padding: .4rem .8rem; border: 1px solid var(--bordure); border-radius: var(--rayon-controle); background: transparent; color: var(--brume); font: 700 .74rem/1 var(--police-forte); cursor: pointer; }
+.ls-effacer:hover { color: var(--craie); border-color: var(--bordure-forte); }
+.ls select { min-height: 2.75rem; max-width: 100%; margin-left: .4rem; padding: .4rem .7rem; border: 1px solid var(--bordure); border-radius: var(--rayon-sm); background: var(--surface); color: var(--craie); }

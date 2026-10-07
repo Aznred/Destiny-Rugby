@@ -25,6 +25,7 @@ import {
 import { tirPasseEntreLesPoteaux, type ContexteTir } from '../src/lib/moteur/trajectoire';
 import { activerDirect, demanderDirect, majVueDirecte } from '../src/lib/moteur/direct';
 import { AXE, LARGEUR, LIGNE_A, LIGNE_B, MILIEU, sens } from '../src/lib/moteur/terrain';
+import { FRAPPE_VIVE, MARGE_DE_FRAPPE } from '../src/lib/moteur/conquete';
 import { creerMatchDEmpreinte } from './outilsEmpreinte';
 import { ControleurVisee, REGLAGES_VISEE } from '../src/lib/controleDirect/visee';
 
@@ -441,7 +442,28 @@ console.log('— Le drop à la main : lâcher, rebond, frappe — et le contre �
     verifier((marque === 3) === (e.responsabilites!.stats.dropsReussis === 1), 'le compteur de réussite suit le score');
   }
   {
+    // Correctif 25 : un défenseur AU CONTACT pendant l'armé plaque le botteur — cliquer « drop » ne garantit plus la frappe.
     const { e, adv } = lancer(2, true);
+    const score0 = e.scoreA + e.scoreB;
+    demanderDirect(e, { action: 'drop' });
+    const defenseur = adv[0];
+    const botteur = e.pions.find((p) => p.moi)!;
+    let garde = 0, parti = false;
+    do {
+      poser(defenseur, botteur.pos.x + (botteur.cote === 'A' ? 0.6 : -0.6), botteur.pos.y);
+      pas(e);
+      if (e.vol?.intention === 'drop') parti = true;
+    } while ((e.piedPrepare || garde < 3) && garde++ < 100);
+    verifier(!parti, 'pris avant la frappe : le drop ne part pas');
+    verifier(!e.dropEnCours && !e.piedPrepare, 'le geste est abandonné');
+    garde = 0;
+    while ((e.vol || e.dropEnCours) && garde++ < 300) pas(e);
+    verifier(e.scoreA + e.scoreB === score0, 'un botteur plaqué ne marque pas');
+    verifier(e.responsabilites!.stats.dropsReussis === 0, 'et le drop n\'est pas compté réussi');
+  }
+  {
+    // Le défenseur qui n'arrive qu'À L'INSTANT de la frappe ne plaque plus : il contre.
+    const { e, adv } = lancer(2, false);
     demanderDirect(e, { action: 'drop' });
     pas(e, 2);
     verifier(e.dropEnCours?.humain === true, 'le drop part');
@@ -449,7 +471,10 @@ console.log('— Le drop à la main : lâcher, rebond, frappe — et le contre �
     const botteur = e.pions.find((p) => p.moi)!;
     let garde = 0;
     while (e.piedPrepare && garde++ < 100) {
-      poser(defenseur, botteur.pos.x + (botteur.cote === 'A' ? 0.6 : -0.6), botteur.pos.y);
+      const a = e.piedPrepare;
+      if (a.pretDepuis !== undefined && FRAPPE_VIVE.drop - (e.sim - a.pretDepuis) <= MARGE_DE_FRAPPE) {
+        poser(defenseur, botteur.pos.x + (botteur.cote === 'A' ? 0.6 : -0.6), botteur.pos.y);
+      }
       pas(e);
     }
     verifier(e.dropEnCours?.issue === 'contre' || e.vol?.duree === 0.45, 'un défenseur sur le botteur à la frappe : le drop est contré');

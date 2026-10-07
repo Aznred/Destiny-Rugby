@@ -142,7 +142,7 @@ import { graine, scorePossible, type MatchChampionnat } from '../lib/championnat
 import { effectifDuClub } from '../lib/effectif';
 import { effectifNational } from '../lib/international';
 import { nomNation } from '../lib/nations';
-import { clubParNom } from '../data/clubs';
+import { clubParNom, couleursSaisies } from '../data/clubs';
 import { stadePourClub } from '../lib/stade3D';
 import { kitDeMonEquipe, maillotDepuisKit } from '../lib/personnalisationMatch';
 import { useGame } from '../store/useGame';
@@ -150,7 +150,6 @@ import { Blason, LogoEquipe } from './Blason';
 import { Terrain3D } from './match/Terrain3D';
 import {
   apparencesDesJoueurs, CAMERAS_3D_AVEC_JOUEUR, ecussonPourToile, preferenceMatch3D, preferencesTele, retenirPreferenceMatch3D,
-  tenueDepuisCouleurs,
   type Camera3D, type OptionsScene3D, type Scene3D,
 } from '../lib/match3D';
 import {
@@ -158,8 +157,11 @@ import {
 } from './match/PresentationTV';
 import { HabillageTV } from './match/HabillageTV';
 import { couleursEquipeTV, DUREE_EQUIPE_TV, exclusionsDepuisEtat, logoTV, type IdentiteTV } from '../lib/habillageTV';
-import { deuxImages } from '../lib/pleinEcran';
+import { couleursDepuisEcusson, departagerLesTenues, enHex } from '../lib/tenuesMatch';
 import { sortirDuMatch } from '../lib/sortieMatch';
+import { apresLEcran, finaliserMatch, jalon } from '../lib/finMatch';
+import { scenesRendues } from '../lib/match3D';
+import { departager } from '../lib/couperet';
 import { bulleDuMoment, marqueurDepuisEtat, memoireBullesVide, phraseDuMarqueur, ventPourLeTir, type ContexteStatsTV, type PhraseTV } from '../lib/statsTV';
 import { changementsRecents } from '../lib/presentationTV';
 import { urlLogoEquipe } from '../lib/logoEquipe';
@@ -184,6 +186,24 @@ import { chargerDisposition } from '../lib/controleDirect/touches';
 import { lirePreferencesControle, usePreferencesControle } from '../lib/controleDirect/prefs';
 import { signaler, useGuide } from '../lib/tutoriel/guide';
 import { usePreferencesTutoriel } from '../lib/tutoriel/memoire';
+
+/**
+ * Les couleurs lues sur l'écusson d'un club qui n'en a pas de saisies (Correctif 24). `null` tant qu'elles ne sont pas
+ * lues, ou quand le club a ses vraies couleurs : on ne remplace jamais une couleur saisie par une couleur devinée.
+ */
+function useCouleursEcusson(nom: string, logo: string | undefined): { couleurs: { principal: string; secondaire: string } | null; lu: boolean } {
+  const [lues, setLues] = useState<{ nom: string; c: { principal: string; secondaire: string } | null } | null>(null);
+  const aLire = !couleursSaisies(nom) && !!logo;
+  useEffect(() => {
+    if (!aLire) return;
+    let actif = true;
+    void couleursDepuisEcusson(ecussonPourToile(logo)).then((c) => { if (actif) setLues({ nom, c }); });
+    return () => { actif = false; };
+  }, [nom, logo, aLire]);
+  const miennes = lues && lues.nom === nom ? lues : null;
+  // `lu` : il n'y a plus rien à attendre (couleurs saisies, pas d'écusson, ou lecture terminée — réussie ou non).
+  return { couleurs: miennes?.c ?? null, lu: !aLire || !!miennes };
+}
 
 function couleursDe(nom: string): [string, string] {
   const club = clubParNom(nom);
@@ -350,6 +370,9 @@ function vibrer(ms: number): void {
 }
 
 // ---------------------------------------------------------------------------
+/** Combien de matchs ont été ouverts depuis le chargement de la page : l'identifiant d'une finalisation. */
+let matchsOuverts = 0;
+
 export function MatchLive({
   match, saison, cle, titre, onFermer, onTermine, joueur, selection, manager, habillage,
 }: {
@@ -367,6 +390,7 @@ export function MatchLive({
   onTermine?: (resultat: {
     scoreA: number; scoreB: number; essaisA: number; essaisB: number;
     blessures: { joueurId: string; minute: number; activite: string }[];
+    minutesJouees: Record<string, number>;
   }) => void;
   joueur?: Joueur | null;
   manager?: {
@@ -380,6 +404,7 @@ export function MatchLive({
     penalitesNote?: Record<string, number>;
     /** Risque 0-100 calculé par la carrière pour chaque joueur de la feuille. */
     risquesBlessure?: Record<string, number>;
+    conditions?: Record<string, number>;
   };
 }) {
   const iaActivee = useGame((s) => s.iaActivee);
@@ -402,19 +427,42 @@ export function MatchLive({
   // second appui pendant ce temps ne fait rien.
   const sortieDemandee = useRef(false);
   const [sortie, setSortie] = useState(false);
+  const [quitte, setQuitte] = useState(false);
   const fermerAuParent = useRef(onFermer);
   fermerAuParent.current = onFermer;
   // C'est une MACHINE À ÉTATS (`lib/sortieMatch.ts`) : entrées coupées → boucle arrêtée → plein écran quitté →
   // orientation stable → dimensions relues → écouteurs recréés → entrées rendues → navigation.
+  // ⚠️ UN IDENTIFIANT PAR MATCH OUVERT, pas par rencontre : la même clé revient d'une carrière à l'autre. C'est lui
+  // qui interdit de finaliser deux fois (`finaliserMatch`) ; le store garde en plus ses propres verrous.
+  const idMatch = useRef('');
+  if (!idMatch.current) idMatch.current = `${cle}#${saison}#${++matchsOuverts}`;
+  /** La finalisation en cours à la sirène (résultat, statistiques, sauvegarde) : « Terminer » l'attend. */
+  const finalisation = useRef<Promise<void> | null>(null);
+  const [finalise, setFinalise] = useState(false);
   const quitter = useCallback(() => {
     if (sortieDemandee.current) return;
     sortieDemandee.current = true;
-    setSortie(true);
+    // Le bouton se verrouille tout de suite ; la scène, elle, reste à l'image tant qu'elle n'est pas rendue.
+    setQuitte(true);
     void sortirDuMatch({
       couperEntrees: () => { sortieDemandee.current = true; },
-      // Le moteur ne tourne plus (pause) et la scène se démonte (`sortie`) avant qu'on touche à l'écran.
-      arreterBoucle: async () => { setEnPause(true); setSortie(true); await deuxImages(); },
-      naviguer: () => fermerAuParent.current(),
+      // ⚠️ DANS L'ORDRE, ET JAMAIS DANS LA MÊME IMAGE (Correctif 26) : les données du match d'abord (elles sont
+      // presque toujours déjà écrites), puis la scène 3D rendue PAR TRANCHES — joueurs, textures, tampons, contexte
+      // graphique — et seulement alors on touche à l'écran. Tout détruire d'un coup au moment où l'écran
+      // pivote faisait une seule image de plusieurs centaines de millisecondes sur téléphone.
+      arreterBoucle: async () => {
+        setEnPause(true);
+        await finalisation.current;
+        // Démonter la scène lance sa destruction par tranches (`detruireScene`) ; à la sirène c'est déjà fait.
+        setSortie(true);
+        await apresLEcran();
+        await scenesRendues();
+      },
+      naviguer: () => {
+        jalon('navigation_start', idMatch.current);
+        fermerAuParent.current();
+        void apresLEcran().then(() => jalon('navigation_end', idMatch.current));
+      },
     }).then((fait) => { if (!fait) sortieDemandee.current = true; });
   }, []);
   // ⚠️ ÉCHAP PAUSE LE MATCH QUAND ON LE CONDUIT, ET NE LE FERME QU'AUTREMENT : un seul écouteur, celui de la
@@ -536,6 +584,11 @@ export function MatchLive({
     );
   }
   const e = moteur.current;
+  const conditionAppliquee = useRef(false);
+  if (!conditionAppliquee.current) {
+    conditionAppliquee.current = true;
+    for (const pion of e.pions) { const condition = manager?.conditions?.[pion.sourceId]; if (condition !== undefined) pion.endurance = Math.min(pion.endurance, condition); }
+  }
   // ⚠️ L'AVANT-MATCH SE DÉCIDE À L'OUVERTURE DU MATCH, PAS AU BRANCHEMENT DE LA
   // SCÈNE 3D. Décidé là-bas, il suffisait que le moteur ait joué une demi-seconde
   // pendant le chargement du stade — ou que le match soit vu de haut — pour que
@@ -1284,10 +1337,41 @@ export function MatchLive({
     setEnvoiConsigne(false);
   };
 
-  const [couleurA, couleurA2] = couleursDe(e.clubA);
-  const [couleurB, couleurB2] = couleursDe(e.clubB);
   const clubA = clubParNom(e.clubA);
   const clubB = clubParNom(e.clubB);
+  // ── Ce que la boutique change (Correctif 21) : le kit de TOUTE l'équipe du joueur ──
+  // Lus UNE fois à l'entrée du match (le store n'est pas relu image par image) : acheter ou équiper en plein match n'y change rien.
+  const equipementBoutique = useGame((s) => s.equipementActif);
+  const monClubBoutique = manager?.club ?? joueur?.club;
+  const monCoteBoutique: 'A' | 'B' | null = monClubBoutique === e.clubA ? 'A' : monClubBoutique === e.clubB ? 'B' : null;
+  const kitMonEquipe = useMemo(
+    () => (monCoteBoutique && !selection ? kitDeMonEquipe(equipementBoutique, monCoteBoutique === 'A') : undefined),
+    [monCoteBoutique, equipementBoutique, selection],
+  );
+  // ═══ LES DEUX TENUES, ANALYSÉES AVANT LE MATCH ET DÉPARTAGÉES UNE FOIS (Correctif 24) ═══════════════════════════════
+  // Couleurs saisies du club, sinon celles de son écusson — jamais une teinte tirée de son nom. Puis, si les deux
+  // maillots se confondent, le visiteur passe en tenue alternative. Le terrain vu de haut, la scène 3D et le tableau des
+  // scores lisent tous CE résultat : ils ne peuvent plus se contredire.
+  const lectureA = useCouleursEcusson(e.clubA, clubA?.logo ?? urlLogoEquipe(e.clubA));
+  const lectureB = useCouleursEcusson(e.clubB, clubB?.logo ?? urlLogoEquipe(e.clubB));
+  const ecussonA = lectureA.couleurs, ecussonB = lectureB.couleurs;
+  /** La scène 3D peint ses tenues une fois : elle attend que les deux écussons soient lus. */
+  const tenuesLues = lectureA.lu && lectureB.lu;
+  const tenues = useMemo(() => {
+    const duClub = (nom: string, lues: { principal: string; secondaire: string } | null) => {
+      const [c1, c2] = couleursDe(nom);
+      return { ...maillotDeSecours(enHex(lues?.principal ?? c1), nom), secondaire: enHex(lues?.secondaire ?? c2, '#ffffff') };
+    };
+    // Le kit équipé en boutique habille toute l'équipe du joueur, et c'est LUI qui entre dans le départage.
+    const kit = kitMonEquipe ? maillotDepuisKit(kitMonEquipe) : undefined;
+    return departagerLesTenues(
+      kit && monCoteBoutique === 'A' ? kit : duClub(e.clubA, ecussonA),
+      kit && monCoteBoutique === 'B' ? kit : duClub(e.clubB, ecussonB),
+      kit && monCoteBoutique === 'B' ? 'exterieur' : undefined,
+    );
+  }, [e.clubA, e.clubB, ecussonA, ecussonB, kitMonEquipe, monCoteBoutique]);
+  const couleurA = tenues.domicile.principal, couleurA2 = tenues.domicile.secondaire;
+  const couleurB = tenues.exterieur.principal, couleurB2 = tenues.exterieur.secondaire;
 
   // --- 🎬 CE QUE MON JOUEUR EST EN TRAIN DE FAIRE ---------------------------
   // ⚠️ C'EST LA MOITIÉ « QU'ON VOIE VRAIMENT NOTRE JOUEUR EFFECTUER LE CHOIX »
@@ -1325,6 +1409,21 @@ export function MatchLive({
     return { note: noterMatch(monPion.poste, s), detail: detailNote(monPion.poste, s) };
   }, [e.fini, monPion]);
 
+  // ⚠️ UN MATCH COUPERET A TOUJOURS UN VAINQUEUR (`lib/couperet.ts`). Le moteur joue ses quatre-vingts minutes comme
+  // pour n'importe quel match ; à égalité, la prolongation est tranchée par la même fonction que celle du store —
+  // l'écran de fin annonce donc le score qui entre VRAIMENT dans le tableau (il affichait « 17-17 », le tableau « 20-17 »).
+  // Calcul direct (quelques comparaisons) : `e` est le même objet du coup d'envoi à la sirène, une mémoïsation ne le verrait pas changer.
+  const prolongation = (() => {
+    if (!e.fini || selection) return null;
+    const cote = manager ? (manager.club === e.clubA ? 'A' : 'B') : monPion?.cote;
+    if (!cote) return null;
+    const tranche = departager(cle, cote === 'A' ? e.scoreA : e.scoreB, cote === 'A' ? e.scoreB : e.scoreA);
+    if (!tranche.prolongation) return null;
+    const scoreA = cote === 'A' ? tranche.scorePour : tranche.scoreContre;
+    const scoreB = cote === 'A' ? tranche.scoreContre : tranche.scorePour;
+    return { club: scoreA > scoreB ? e.clubA : e.clubB, score: `${scoreA}-${scoreB}` };
+  })();
+
   // ⚠️ À LA SIRÈNE, LES VRAIES STATS DE TON JOUEUR PARTENT DANS LA SAISON.
   // Elles alimentent le classement des joueurs (écran Résultats) : ce ne sont
   // plus des chiffres estimés, ce sont ceux du match qu'on vient de jouer.
@@ -1332,38 +1431,45 @@ export function MatchLive({
   useEffect(() => {
     if (!e.fini || dejaEnregistre.current) return;
     dejaEnregistre.current = true;
-    onTermine?.({ scoreA: e.scoreA, scoreB: e.scoreB, essaisA: e.essaisA, essaisB: e.essaisB, blessures: blessuresManager.current });
-    if (!monPion) return;
-    // ⚠️ Le RÉSULTAT part avec les statistiques : c'est ce qui permet à la
-    // feuille de match d'être la seule entrée du journal pour ce week-end.
-    const chezMoi = monPion.cote === 'A';
-    enregistrerMatchVecu(
-      statsPourLaNote(monPion, e.direct?.stats),
-      {
-        adversaire: chezMoi ? e.clubB : e.clubA,
-        scorePour: chezMoi ? e.scoreA : e.scoreB,
-        scoreContre: chezMoi ? e.scoreB : e.scoreA,
-        domicile: chezMoi,
-        // ⚠️ LA CLÉ DE LA RENCONTRE : c'est elle qui fait entrer le score RÉEL dans le championnat (sinon le
-        // classement rejoue le score théorique : 10-10 joué, 21-15 affiché).
-        cle, equipe: chezMoi ? e.clubA : e.clubB,
-        essaisPour: chezMoi ? e.essaisA : e.essaisB, essaisContre: chezMoi ? e.essaisB : e.essaisA,
-        // « Top 14 · 22 novembre · journée 7 » → « 22 novembre · journée 7 » :
-        // le nom de la compétition est déjà partout ailleurs dans le journal.
-        libelle: titre.split('·').slice(1).map((m) => m.trim()).filter(Boolean).join(' · ')
-          || t('ml.feuilleMatch'),
-      },
-    );
-    // ⚠️ ET LA DISCIPLINE PART AVEC, JUSTE APRÈS. C'est le seul chemin par
-    // lequel un carton rouge ou un coup de poing devient une suspension.
-    // L'ordre compte — `enregistrerMatchVecu` peut poser une blessure de match,
-    // et la suspension doit passer par-dessus.
-    appliquerSanctionMatch({
-      citation: e.discipline.citation,
-      blessure: e.discipline.blessure,
-      jaunes: e.discipline.jaunes,
-      rouges: e.discipline.rouges,
-    });
+    // ⚠️ RIEN N'EST ÉCRIT DANS L'IMAGE DE LA SIRÈNE (Correctif 26, `lib/finMatch.ts`). L'écran de fin s'affiche
+    // d'abord ; le résultat, les statistiques et la sanction partent ensuite, une étape par tâche, et la
+    // sauvegarde n'est sérialisée qu'UNE fois pour l'ensemble. « Terminer » attend que ce soit fait.
+    // Le résultat est VERROUILLÉ ici : ce sont ces valeurs-là qui partent, quoi qu'il arrive à l'état ensuite.
+    const final = { scoreA: e.scoreA, scoreB: e.scoreB, essaisA: e.essaisA, essaisB: e.essaisB, blessures: blessuresManager.current, minutesJouees: Object.fromEntries(e.pions.map(p => [p.sourceId, p.minutes])) };
+    const etapes: (() => void)[] = [() => onTermine?.(final)];
+    if (monPion) {
+      const maFeuille = statsPourLaNote(monPion, e.direct?.stats);
+      const discipline = { citation: e.discipline.citation, blessure: e.discipline.blessure, jaunes: e.discipline.jaunes, rouges: e.discipline.rouges };
+      etapes.push(() => {
+      // ⚠️ Le RÉSULTAT part avec les statistiques : c'est ce qui permet à la
+      // feuille de match d'être la seule entrée du journal pour ce week-end.
+      const chezMoi = monPion.cote === 'A';
+      enregistrerMatchVecu(
+        maFeuille,
+        {
+          adversaire: chezMoi ? e.clubB : e.clubA,
+          scorePour: chezMoi ? final.scoreA : final.scoreB,
+          scoreContre: chezMoi ? final.scoreB : final.scoreA,
+          domicile: chezMoi,
+          // ⚠️ LA CLÉ DE LA RENCONTRE : c'est elle qui fait entrer le score RÉEL dans le championnat (sinon le
+          // classement rejoue le score théorique : 10-10 joué, 21-15 affiché).
+          cle, equipe: chezMoi ? e.clubA : e.clubB,
+          essaisPour: chezMoi ? final.essaisA : final.essaisB, essaisContre: chezMoi ? final.essaisB : final.essaisA,
+          // « Top 14 · 22 novembre · journée 7 » → « 22 novembre · journée 7 » :
+          // le nom de la compétition est déjà partout ailleurs dans le journal.
+          libelle: titre.split('·').slice(1).map((m) => m.trim()).filter(Boolean).join(' · ')
+            || t('ml.feuilleMatch'),
+        },
+      );
+      });
+      // ⚠️ ET LA DISCIPLINE PART AVEC, JUSTE APRÈS. C'est le seul chemin par
+      // lequel un carton rouge ou un coup de poing devient une suspension.
+      // L'ordre compte — `enregistrerMatchVecu` peut poser une blessure de match,
+      // et la suspension doit passer par-dessus.
+      etapes.push(() => appliquerSanctionMatch(discipline));
+    }
+    // La scène vient d'être démontée par l'écran de fin : on la laisse se rendre AVANT d'écrire quoi que ce soit.
+    finalisation.current = finaliserMatch(idMatch.current, etapes, { avant: scenesRendues }).then(() => setFinalise(true));
   }, [e.fini, e, monPion, enregistrerMatchVecu, appliquerSanctionMatch, onTermine, titre, cle]);
 
   // --- LE RENDU DES PIONS ---------------------------------------------------
@@ -1404,8 +1510,8 @@ export function MatchLive({
   // deux équipes aux couleurs voisines — et à 0,8 px il ne se voyait plus.
   const hauteurSprite = Math.min(5.2, Math.max(3.35, 25 / pxParMetre));
   const tempsAnimation = Math.floor((e.sim + r) * 24) / 24;
-  const maillotA = useMemo(() => ({ ...maillotDeSecours(couleurA, e.clubA), secondaire: couleurA2 }), [couleurA, couleurA2, e.clubA]);
-  const maillotB = useMemo(() => ({ ...maillotDeSecours(couleurB, e.clubB), secondaire: couleurB2 }), [couleurB, couleurB2, e.clubB]);
+  const maillotA = tenues.domicile;
+  const maillotB = tenues.exterieur;
 
   // Le solo expose la même photographie légère que le direct en ligne au
   // générateur de sprites. Le moteur reste inchangé et demeure autoritaire.
@@ -1563,19 +1669,11 @@ export function MatchLive({
     return { nom: titre || competition?.nom, logo: competition?.id,
       journee: Number(titre.match(/(?:journée|\bJ)\s*(\d+)/i)?.[1]) || undefined, ...habillage };
   }, [titre, selection, e.clubA, habillage]);
-  // ── Ce que la boutique change (Correctif 21) : le kit de TOUTE l'équipe du joueur ──
-  // Lus UNE fois à l'entrée du match (le store n'est pas relu image par image) : acheter ou équiper en plein match n'y change rien.
-  const equipementBoutique = useGame((s) => s.equipementActif);
-  const monClubBoutique = manager?.club ?? joueur?.club;
-  const monCoteBoutique: 'A' | 'B' | null = monClubBoutique === e.clubA ? 'A' : monClubBoutique === e.clubB ? 'B' : null;
-  const kitMonEquipe = useMemo(
-    () => (monCoteBoutique && !selection ? kitDeMonEquipe(equipementBoutique, monCoteBoutique === 'A') : undefined),
-    [monCoteBoutique, equipementBoutique, selection],
-  );
   const options3D = useMemo<OptionsScene3D>(() => ({
+    tenuesDepartagees: true,
     equipes: [
-      { nom: e.clubA, maillot: monCoteBoutique === 'A' && kitMonEquipe ? maillotDepuisKit(kitMonEquipe) : tenueDepuisCouleurs(couleurA, couleurA2, e.clubA), blason: ecussonPourToile(clubA?.logo ?? urlLogoEquipe(e.clubA)) },
-      { nom: e.clubB, maillot: monCoteBoutique === 'B' && kitMonEquipe ? maillotDepuisKit(kitMonEquipe) : tenueDepuisCouleurs(couleurB, couleurB2, e.clubB), blason: ecussonPourToile(clubB?.logo ?? urlLogoEquipe(e.clubB)) },
+      { nom: e.clubA, maillot: tenues.domicile, blason: ecussonPourToile(clubA?.logo ?? urlLogoEquipe(e.clubA)) },
+      { nom: e.clubB, maillot: tenues.exterieur, blason: ecussonPourToile(clubB?.logo ?? urlLogoEquipe(e.clubB)) },
     ],
     apparences: apparencesDesJoueurs(e.pions),
     moi: monPion?.id,
@@ -1585,7 +1683,7 @@ export function MatchLive({
     stade: stadePourClub(e.clubA),
     ballon: skinActif,
     textes: { ralenti: t('ml.ralenti') },
-  }), [e, couleurA, couleurA2, couleurB, couleurB2, clubA, clubB, monPion, identiteTV, skinActif, monCoteBoutique, kitMonEquipe]);
+  }), [e, tenues, clubA, clubB, monPion, identiteTV, skinActif]);
   const brancherScene = useCallback((scene: Scene3D | null) => {
     scene3D.current = scene;
     if (!scene) return;
@@ -1670,7 +1768,7 @@ export function MatchLive({
               <Icone nom="repost" taille={16} />
             </button>
           )}
-          <button className="ml-fermer" onClick={fermerOuSortir} disabled={sortie || simulation} title={t('ml.fermerAide')}><Icone nom="croix" taille={18} /></button>
+          <button className="ml-fermer" onClick={fermerOuSortir} disabled={quitte || simulation || (e.fini && !finalise)} title={t('ml.fermerAide')}><Icone nom="croix" taille={18} /></button>
         </header>
         <div className="ml-progression" title={titre}>
           <span style={{ width: `${Math.min(100, (e.t / 4800) * 100)}%` }} />
@@ -1721,6 +1819,7 @@ export function MatchLive({
           <div className="ml-colonne">
             {e.fini && stats ? (
               <>
+                {prolongation && <p className="ml-prolongation" role="status"><Icone nom="sifflet" taille={16} /> {t('ml.prolongation', prolongation)}</p>}
                 <HommeDuMatch e={e} />
                 <FeuilleMatch e={e} stats={stats} maNote={maNote} />
               </>
@@ -1734,6 +1833,7 @@ export function MatchLive({
                 {sortie ? null : vue3D ? (
                   <Terrain3D
                     options={options3D}
+                    pret={tenuesLues}
                     surPrete={brancherScene}
                     surEchec={abandonner3D}
                     enfants={e.bulles.map((b, i) => {
@@ -1876,8 +1976,8 @@ export function MatchLive({
                   })()}
                   bulle={bulleTenue.current.phrase} vent={avantMatch ? null : ventPourLeTir(e)}
                   equipes={[
-                    { nom: e.clubA, ...couleursEquipeTV(couleurA), logo: clubA?.logo ?? urlLogoEquipe(e.clubA), score: e.scoreA, essais: e.essaisA },
-                    { nom: e.clubB, ...couleursEquipeTV(couleurB, true), logo: clubB?.logo ?? urlLogoEquipe(e.clubB), score: e.scoreB, essais: e.essaisB },
+                    { nom: e.clubA, ...couleursEquipeTV(couleurA, couleurA2), logo: clubA?.logo ?? urlLogoEquipe(e.clubA), score: e.scoreA, essais: e.essaisA },
+                    { nom: e.clubB, ...couleursEquipeTV(couleurB, couleurB2), logo: clubB?.logo ?? urlLogoEquipe(e.clubB), score: e.scoreB, essais: e.essaisB },
                   ]}
                   exclusions={exclusionsDepuisEtat(e)} pause={enPause}
                   sifflet={e.sifflet && !decision && !e.bagarre ? { cle: e.sifflet.cle, club: e.sifflet.club, fautif: e.sifflet.fautif, motif: e.penalite?.motif } : null}
@@ -2265,7 +2365,9 @@ export function MatchLive({
               >
                 ⋯
               </button>
-              {e.fini && <button className="btn vert" onClick={quitter} disabled={sortie} aria-busy={sortie}>{t('ml.terminer')}</button>}
+              {/* « Terminer » n'attend que les données du match (quelques images) : jamais une longue sauvegarde. */}
+              {e.fini && !finalise && <span className="ml-finalisation" role="status">{t('ml.finalisation')}</span>}
+              {e.fini && <button className="btn vert" onClick={quitter} disabled={quitte || !finalise} aria-busy={quitte || !finalise}>{t('ml.terminer')}</button>}
             </div>
           </div>
 

@@ -1,3 +1,6 @@
+import { InfirmerieManager } from '../components/InfirmerieManager';
+import { VestiaireManagerSimple } from '../components/VestiaireManagerSimple';
+import { compositionMedicale, autorisationMedicale, bilanMedical, STATUTS_MEDICAUX, centreMedical } from '../lib/infirmerieManager';
 import { CadreCompositionManager } from '../components/CadreCompositionManager';
 import { lazy, Suspense, useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
@@ -56,18 +59,16 @@ import {
 } from '../lib/formationManager';
 import {
   compositionManagerParDefaut, meilleureCompositionManager, noteCompositionManager, POSTES_XV_MANAGER,
-  reconcilerCompositionManager,
 } from '../lib/compositionManager';
 import {
   assurerEtatCarriereAvancee, chargeTotaleEntrainement, disponibiliteJoueur,
-  indisponiblesCarriereAvancee, moisRestantsContrat, moyenneVestiaire, palierContrat,
+  indisponiblesCarriereAvancee, moisRestantsContrat, palierContrat,
   penalitesMedicales, rapportConnaissance, risqueMedicalJoueur,
-  risqueMoyenGroupe, joueurAgent,
+  risqueMoyenGroupe,
 } from '../lib/carriereAvancee';
 import { hallOfFameDe, totaux } from '../lib/histoire';
 import { rivalitesDe, traitsDominants } from '../lib/identiteClub';
 import { effectifNational, jouerTestMatch } from '../lib/international';
-import { nomNation } from '../lib/nations';
 import {
   ajustementsCapitaines, contexteDerby, DOMAINES_DELEGATION, LIBELLES_DELEGATION,
   saisonsChronologie, vieClubProfonde,
@@ -82,7 +83,7 @@ const OvaleManager = lazy(() => import('./Social').then((m) => ({ default: m.Ova
 
 type VueManager = 'bureau' | 'equipe' | 'match' | 'tresorerie' | 'marche' | 'calendrier'
   | 'ovale' | 'formation' | 'recruteurs' | 'entrainement'
-  | 'direction' | 'vestiaire' | 'univers' | 'histoire';
+  | 'direction' | 'infirmerie' | 'vestiaire' | 'univers' | 'histoire';
 
 function humeurDuBoard(confiance: number): { texte: string; ton: string } {
   if (confiance < CONFIANCE_LICENCIEMENT + 12) return { texte: t('mgr.board.sellette'), ton: 'rouge' };
@@ -122,7 +123,7 @@ export function Manager() {
   // Ce que la dernière avance a joué, et pourquoi elle s'est arrêtée. Un saut
   // muet se lit comme un bouton qui n'a rien fait.
   const [avanceFaite, setAvanceFaite] = useState<
-    { semaines: number; arret: 'arrive' | 'decision' | 'match' | 'saison' | 'sansBanc' | 'approche' } | null
+    { semaines: number; arret: 'arrive' | 'decision' | 'match' | 'saison' | 'sansBanc' | 'approche' | 'contrat' } | null
   >(null);
   const contacterClub = useGame((s) => s.contacterClubManager);
   const ouvrirMessages = useGame((s) => s.ouvrirMessagesOvale);
@@ -143,6 +144,8 @@ export function Manager() {
   const enregistrerResultat = useGame((s) => s.enregistrerResultatManager);
   const repondreDiscussion = useGame((s) => s.repondreDiscussionAvancee);
   const deciderMedical = useGame((s) => s.deciderMedicalManager);
+  const ameliorerMedical = useGame(s => s.ameliorerCentreMedicalManager);
+  const repondreDemande = useGame(s => s.repondreDemandeManager);
   const definirChargeEntrainement = useGame((s) => s.definirChargeEntrainementManager);
   const ouvrirRenegociationJoueur = useGame((s) => s.ouvrirRenegociationJoueurManager);
   const observerCible = useGame((s) => s.observerCibleManager);
@@ -294,7 +297,7 @@ export function Manager() {
       ? afficheMemo.match.exterieur
       : afficheMemo.match.domicile;
     return contexteDerby(manager.club, adversaire);
-  }, [afficheMemo, manager?.club]);
+  }, [afficheMemo, manager?.club, catalogue]);
   const penalitesNote = useMemo(() => {
     const medicales = penalitesMedicales(avancee ?? undefined);
     const capitanat = ajustementsCapitaines(avancee?.profonde, effectifBrut);
@@ -346,8 +349,8 @@ export function Manager() {
     return map;
   }, [effectifComplet, manager]);
   const compositionMemo = useMemo(
-    () => reconcilerCompositionManager(effectif, manager?.composition),
-    [effectif, manager?.composition],
+    () => compositionMedicale(effectif, manager?.composition, avancee?.medical),
+    [effectif, manager?.composition, avancee?.medical],
   );
   const detectionJeunes = useMemo(
     () => manager?.club && (vue === 'formation' || vue === 'recruteurs') ? tableauDetectionManager(manager) : null,
@@ -384,7 +387,7 @@ export function Manager() {
     const intensite = manager.tactique.rythme === 'intense' ? 1.25 : manager.tactique.rythme === 'gestion' ? .82 : 1;
     return Object.fromEntries(effectifBrut.map((j) => [j.id, risqueMedicalJoueur(
       avancee.profilsMedicaux[j.id], j, avancee.chargeEntrainement, 'match', intensite,
-    )]));
+    ) * (1 - centreMedical(manager).prevention * .35)]));
   }, [avancee, effectifBrut, manager]);
 
   if (!manager) return null;
@@ -432,9 +435,9 @@ export function Manager() {
   const etatsComposition = new Map<string, EtatDuJoueur>();
   for (const dossier of dossiersMedicaux) {
     etatsComposition.set(dossier.joueurId, {
-      condition: dossier.disponibilite,
-      blesse: dossier.semaines > 0,
-      tempsBlessure: dossier.semaines > 0 ? `${dossier.semaines} sem.` : undefined,
+      condition: dossier.condition, forme: dossier.rythme,
+      blesse: autorisationMedicale(dossier) === 'aucune',
+      tempsBlessure: `${dossier.type} · ${STATUTS_MEDICAUX[bilanMedical(dossier, manager).statut]} · ${bilanMedical(dossier, manager).absence} j`,
     });
   }
   for (const convocation of convocationsActives) {
@@ -643,8 +646,9 @@ export function Manager() {
               <Icone nom="halteres" taille={17} />{t("ui.c5c8664b7a6e")}</button>
             <button data-tuto="mgr-onglet-direction" className={vue === 'direction' ? 'actif' : ''} onClick={() => setVue('direction')}>
               <Icone nom="institution" taille={17} />{t("ui.1a925074120c")}</button>
+            <button data-tuto="mgr-onglet-infirmerie" className={vue === 'infirmerie' ? 'actif' : ''} onClick={() => setVue('infirmerie')}><Icone nom="soin" taille={17} /> {t('staff.med.title')} {dossiersMedicaux.length > 0 && <i>{dossiersMedicaux.length}</i>}</button>
             <button data-tuto="mgr-onglet-vestiaire" className={vue === 'vestiaire' ? 'actif' : ''} onClick={() => setVue('vestiaire')}>
-              <Icone nom="maillot" taille={17} />{t("ui.7d2fafb0e9e7")}{(discussionsOuvertes.length + dossiersMedicaux.filter((d) => d.decision === 'attente').length) > 0 && <i>{discussionsOuvertes.length + dossiersMedicaux.filter((d) => d.decision === 'attente').length}</i>}
+              <Icone nom="maillot" taille={17} />{t("ui.7d2fafb0e9e7")}{discussionsOuvertes.length > 0 && <i>{discussionsOuvertes.length}</i>}
             </button>
             <button data-tuto="mgr-onglet-univers" className={vue === 'univers' ? 'actif' : ''} onClick={() => setVue('univers')}>
               <Icone nom="journal" taille={17} />{t("ch.monde")}</button>
@@ -655,6 +659,7 @@ export function Manager() {
           {vue === 'calendrier' && <CalendrierManager onMatch={() => setVue('match')} />}
           {vue === 'tresorerie' && <TresorerieManager manager={manager} onMarche={() => setVue('marche')} onStructures={() => setVue('formation')} />}
 
+          {manager.conseil?.offre && <section className="carte conseil27-alerte"><b>{t('staff.manager.contractExpired')}</b><p>{t('staff.manager.extensionOffer', { n: manager.conseil.offre.duree })}</p><button className="btn principal" onClick={negocierContrat}>{t('staff.manager.acceptOffer')}</button> <button className="btn fantome" onClick={() => setDemission(true)}>{t('staff.manager.refuseFindClub')}</button></section>}
           {vue === 'bureau' && (
             <div className="manager-bureau">
               <section className="carte manager-club-resume" data-tuto="mgr-club">
@@ -698,7 +703,7 @@ export function Manager() {
                 <p className="manager-avance-bilan" role="status">
                   <Icone nom="chrono" taille={14} />{' '}
                   {t('mgr.avanceFaite', { n: avanceFaite.semaines })}
-                  {' · '}{t(`mgr.avanceArret.${avanceFaite.arret}`)}
+                  {' · '}{avanceFaite.arret === 'contrat' ? 'Contrat arrivé à échéance : répondre au conseil' : t(`mgr.avanceArret.${avanceFaite.arret}`)}
                   <button type="button" className="btn fantome petit" onClick={() => setAvanceFaite(null)}>
                     <Icone nom="croix" taille={13} />
                   </button>
@@ -787,7 +792,7 @@ export function Manager() {
             {manager.historique.length > 0 && (
               <div className="carte bloc-competition manager-historique">
                 <div className="comp-tete"><b><Icone nom="journal" taille={16} /> {t('mgr.parcours')}</b><span className="comp-count">{manager.historique.length}</span></div>
-                <div className="classement-tableau tableau-live histo-manager">{[...manager.historique].reverse().map((h) => <div key={`${h.saison}-${h.club}`} className="classement-ligne"><span className="cl-pos">S{h.saison}</span><span className="cl-nom">{h.club}</span><span>{h.divisionNom}</span><span className={h.tenu ? 'cl-plus' : 'cl-moins'}>{h.rang}ᵉ / {h.objectif}ᵉ</span><span>{h.titres.map((id) => TROPHEES[id]?.nom ?? id).join(', ')}{h.montee && t("ui.a150d3029ccb")}{h.descente && t("ui.ca1aec691065")}{h.licencie && t("ui.42e7fa54fd94")}</span></div>)}</div>
+                <div className="classement-tableau tableau-live histo-manager">{[...manager.historique].reverse().map((h) => <div key={`${h.saison}-${h.club}`} className="classement-ligne"><span className="cl-pos">S{h.saison}</span><span className="cl-nom">{h.club}</span><span>{h.divisionNom}</span><span className={h.tenu ? 'cl-plus' : 'cl-moins'}>{h.rang}ᵉ / {h.objectif}ᵉ</span><span>{h.titres.map((id) => TROPHEES[id]?.nom ?? id).join(', ')}{h.montee && t("ui.a150d3029ccb")}{h.descente && t("ui.ca1aec691065")}{h.licencie && t("ui.42e7fa54fd94")}{h.nonRenouvele && ' · contrat non renouvelé'}</span></div>)}</div>
               </div>
             )}
             </div>
@@ -838,8 +843,11 @@ export function Manager() {
               </section>}
 
               <section className="carte direction-contrat">
-                <div><div className="eyebrow">{t("ui.517064cc36ac")}</div><h3>{t("ui.9bfe4631c917", { v0: manager.contrat?.saisons ?? 0, v1: nombre(manager.contrat?.salaire ?? 0) })}</h3><p>{t("ui.0649952a6a14")}</p></div>
-                <div><button className="btn fantome" onClick={negocierContrat}>{t("ui.91a02bd8cafa")}</button><button className="btn danger" onClick={() => setDemission(true)}>{t("ui.292b1df68a76")}</button></div>
+                <div><div className="eyebrow">{t("ui.517064cc36ac")}</div><h3>{t("ui.9bfe4631c917", { v0: manager.contrat?.saisons ?? 0, v1: nombre(manager.contrat?.salaire ?? 0) })}</h3><p>{manager.conseil?.motif ?? t('staff.manager.contractEvaluation')}</p>
+                  {manager.conseil && <div className="conseil27-detail">{Object.entries(manager.conseil.detail).map(([axe, score]) => <span key={axe}>{axe} : <b>{score}/100</b></span>)}</div>}
+                  {manager.conseil?.avertissement && !manager.conseil.avertissement.termine && <p className="conseil27-alerte">{t('staff.manager.boardWarning', { target: manager.conseil.avertissement.cible, wins: manager.conseil.avertissement.victoires, matches: manager.conseil.avertissement.matchs })}</p>}
+                  {manager.conseil?.offre && <p>{t('staff.manager.clubOffer', { seasons: manager.conseil.offre.duree, salary: nombre(manager.conseil.offre.salaire) })}{manager.conseil.offre.budgetBonus > 0 && ` · ${t('staff.manager.budgetIncrease')}`}</p>}</div>
+                <div><button className="btn fantome" disabled={!manager.conseil?.offre} onClick={negocierContrat}>{manager.conseil?.offre ? t('staff.manager.acceptRenewal') : t('staff.manager.awaitBoard')}</button><button className="btn danger" onClick={() => setDemission(true)}>{t("ui.292b1df68a76")}</button></div>
               </section>
 
               <section className="carte direction-marche-coachs">
@@ -865,43 +873,9 @@ export function Manager() {
             </div>
           )}
 
-          {vue === 'vestiaire' && avancee && (
-            <div className="manager-avance-grille">
-              <section className="carte avance-entete"><div><div className="eyebrow">{t("ui.ca0f17627186")}</div><h2><Icone nom="maillot" taille={20} />{t("ui.f2f5a058a9ed")}</h2><p>{t("ui.58862c612d2a")}</p></div><div className="avance-score"><b>{moyenneVestiaire(avancee)}</b><span>{t("ui.bce2966c0b0d")}</span></div></section>
-
-              {profonde && <section className="carte capitaines-manager">
-                <div className="comp-tete"><div><b><Icone nom="brassard" taille={16} />{t("ui.226777177cb1")}</b><small>{t("ui.cb53dfaf443c")}</small></div></div>
-                <div>{[
-                  ['Capitaine', profonde.capitaines.capitaineId || manager.composition.capitaineId, (id: string) => definirHierarchieCapitaines(id, profonde.capitaines.viceCapitaineId, profonde.capitaines.troisiemeCapitaineId)],
-                  ['Vice-capitaine', profonde.capitaines.viceCapitaineId, (id: string) => definirHierarchieCapitaines(profonde.capitaines.capitaineId || manager.composition.capitaineId, id, profonde.capitaines.troisiemeCapitaineId)],
-                  ['3e capitaine', profonde.capitaines.troisiemeCapitaineId, (id: string) => definirHierarchieCapitaines(profonde.capitaines.capitaineId || manager.composition.capitaineId, profonde.capitaines.viceCapitaineId, id)],
-                ].map(([label, valeur, changer]) => <label key={String(label)}><span>{String(label)}</span><Selecteur
-                  options={[
-                    { valeur: '', label: 'Non désigné' },
-                    ...effectifBrut.map((j) => ({
-                      valeur: j.id,
-                      label: j.nom,
-                      sous: `${j.age} ans · ${nomPoste(j.poste)}`,
-                    })),
-                  ]}
-                  valeur={String(valeur)}
-                  onChange={changer as (id: string) => void}
-                  recherche
-                /></label>)}</div>
-              </section>}
-
-              {!!discussionsOuvertes.length && <section className="discussions-joueurs">
-                {discussionsOuvertes.map((discussion) => <article className="carte discussion-joueur" key={discussion.id}><header><span>{discussion.nom}</span><em>{discussion.type}</em></header><blockquote>{discussion.texte}</blockquote><div><button onClick={() => repondreDiscussion(discussion.id, 'promettre')}>{t("ui.cd11a4937743")}</button><button onClick={() => repondreDiscussion(discussion.id, 'merite')}>{t("ui.44caa996edc4")}</button><button onClick={() => repondreDiscussion(discussion.id, 'aucunePromesse')}>{t("ui.ca86a4618200")}</button><button className="danger" onClick={() => repondreDiscussion(discussion.id, 'ecarter')}>{t("ui.1c3a594c305c")}</button></div></article>)}
-              </section>}
-
-              <section className="carte hierarchie-vestiaire">
-                <div className="comp-tete"><div><b><Icone nom="equipe" taille={16} />{t("ui.7cd6d1756013")}</b><small>{t("ui.369535fe7f3b")}</small></div></div>
-                <div>{Object.values(avancee.vestiaire).sort((a, b) => ['leader', 'influent', 'groupe', 'nouveau'].indexOf(a.rang) - ['leader', 'influent', 'groupe', 'nouveau'].indexOf(b.rang) || b.satisfaction - a.satisfaction).map((profil) => {
-                  const agent = joueurAgent(avancee, profil.joueurId);
-                  return <article key={profil.joueurId}><span className={`rang-vestiaire ${profil.rang}`}>{profil.rang}</span><b>{profil.nom}</b><small>{profil.traits.join(' · ')}</small><i><em style={{ width: `${profil.satisfaction}%` }} /></i><strong>{profil.satisfaction}</strong><span>{profil.soutien ? <><Icone nom="poignee" taille={13} />{t("ml.act.soutien")}</> : <><Icone nom="alerte" taille={13} />{t("ui.6631e845b2e8")}</>}</span><small>{agent ? t("ui.328bb8e63bfa", { v0: agent.nom, v1: agent.relationManager }) : ''}</small></article>;
-                })}</div>
-              </section>
-
+          {vue === 'vestiaire' && avancee && <VestiaireManagerSimple manager={manager} effectif={effectifBrut} avancee={avancee} capitaines={definirHierarchieCapitaines} repondre={repondreDiscussion} demande={repondreDemande} />}
+          {vue === 'infirmerie' && avancee && <InfirmerieManager manager={manager} effectif={effectifBrut} avancee={avancee} decider={deciderMedical} ameliorer={ameliorerMedical} />}
+          {vue === 'marche' && avancee && <details className="carte"><summary>{t('staff.manager.squadContracts')}</summary>
               <section className="carte contrats-effectif-manager">
                 <div className="comp-tete"><div><b><Icone nom="signature" taille={16} />{t("ui.8cf044680897")}</b><small>{t("ui.909420981e2f")}</small></div><span className="comp-count">{Object.values(avancee.contratsJoueurs).filter((c) => c.club === manager.club).length}</span></div>
                 <div>{effectifBrut.map((j) => ({ j, c: avancee.contratsJoueurs[j.id] })).filter(({ c }) => c).sort((a, b) => a.c.fin - b.c.fin || b.c.interetExterieur - a.c.interetExterieur).map(({ j, c }) => {
@@ -927,77 +901,7 @@ export function Manager() {
                 })}</div>
               </section>
 
-              {profonde && <section className="carte relations-joueurs-manager">
-                <div className="comp-tete"><div><b><Icone nom="poignee" taille={16} />{t("ui.aa5a9257ef36")}</b><small>{t("ui.8138d367a04f")}</small></div><span className="comp-count">{profonde.relations.length}</span></div>
-                <div>{profonde.relations.filter((r) => effectifBrut.some((j) => j.id === r.joueurA) && effectifBrut.some((j) => j.id === r.joueurB)).slice(0, 18).map((relation) => { const a = effectifBrut.find((j) => j.id === relation.joueurA); const b = effectifBrut.find((j) => j.id === relation.joueurB); return <article key={relation.id} className={relation.type}><span><b>{a?.nom}</b><i>↔</i><b>{b?.nom}</b></span><em>{relation.type}</em><div><i><em style={{ width: `${relation.intensite}%` }} /></i><strong>{relation.intensite}</strong></div></article>; })}</div>
-              </section>}
-
-              {profonde && <section className="carte integration-joueurs-manager">
-                <div className="comp-tete"><div><b><Icone nom="monde" taille={16} />{t("ui.6bf6318c18cd")}</b><small>{t("ui.e019b087f59b")}</small></div></div>
-                <div className="table-integration-entete"><span>{t("ml.joueur")}</span><span>{t("compoSolo.nation")}</span><span>{t("tb.club")}</span><span>{t("reg.langue")}</span><span>{t("compo.cohesion")}</span><span>{t("ui.9c466199f8ec")}</span></div>
-                {effectifBrut.map((j) => profonde.integrations[j.id]).filter(Boolean).sort((a, b) => a.cohesion - b.cohesion).slice(0, 20).map((integration) => <article key={integration.joueurId}><span><b>{integration.nom}</b><small>{t("ui.682ac8b99ac6", { v0: nomNation(integration.nation), v1: integration.adaptabilite })}</small></span>{[
-                  integration.adaptationPays, integration.adaptationClub, integration.langue, integration.cohesion,
-                ].map((valeur, index) => <div key={index}><i><em style={{ width: `${valeur}%` }} /></i><b>{valeur}</b></div>)}<em>{integration.ambitionRevelee ? integration.ambition.replace(/([A-Z])/g, ' $1').toLowerCase() : t("ui.d2919215537f")}<small>{integration.preferenceAvenir !== 'indecis' ? t("ui.b6c8323d0548", { v0: integration.preferenceAvenir }) : ''}</small></em></article>)}
-              </section>}
-
-              <section className="carte promesses-manager">
-                <div className="comp-tete"><div><b><Icone nom="signature" taille={16} />{t("ui.b89703cc1258")}</b><small>{t("ui.2e2179c41124")}</small></div><span className="comp-count">{avancee.promesses.filter((p) => p.etat === 'active').length}</span></div>
-                {avancee.promesses.slice().reverse().slice(0, 12).map((p) => <article key={p.id} className={p.etat}><span><b>{p.nom}</b><small>{t("ui.40a7118bd0ae", { v0: p.type, v1: p.echeance })}</small></span><progress value={p.progression} max={p.objectif} /><strong>{p.progression}/{p.objectif}</strong><em>{p.etat}</em></article>)}
-                {!avancee.promesses.length && <p className="manager-vide-texte">{t("ui.559d3a51b54f")}</p>}
-              </section>
-
-              <section className="carte infirmerie-manager">
-                <div className="comp-tete"><div><b><Icone nom="soin" taille={16} />{t("ui.e44b5cde8dfe")}</b><small>{t("ui.4dd06f9a927b")}</small></div><span className="comp-count">{dossiersMedicaux.length}</span></div>
-                {dossiersMedicaux.map((d) => {
-                  const phase = d.phase ?? 'diagnostic';
-                  const profil = avancee.profilsMedicaux[d.joueurId];
-                  const diagnosticEnAttente = phase === 'suspicion';
-                  const reprise = phase === 'reprise';
-                  return <article key={d.id} className={`phase-${phase}`}><header><span><b>{d.nom}</b><small>{diagnosticEnAttente ? d.diagnosticInitial : d.type} · {d.zone} · {d.origine}{d.minute ? t("ui.66d46970dc6e", { v0: d.minute }) : ''}</small></span><strong>{phase} · {d.disponibilite}%</strong></header>
-                    <div className="medical-fitness"><span><small>{t("ui.6d68762ee5ae")}</small><b>{d.guerison ?? 0}%</b></span><span><small>{t("compo.condition")}</small><b>{d.condition ?? 0}%</b></span><span><small>{t("online.tactics.rhythm")}</small><b>{d.rythme ?? 0}%</b></span><span><small>{t("ui.690a1603cb9d")}</small><b>{d.risqueRechute ?? d.risqueAggravation}%</b></span></div>
-                    <p>{diagnosticEnAttente ? t("ui.22674c59c531", { v0: d.diagnosticDans ?? 0 }) : t("ui.33d78c250cb6", { v0: d.semaines, v1: d.douleur })}{d.protocoleCommotion && t("ui.31df7c75a49b")}{profil?.historique.length ? t("ui.3d743caf4bfe", { v0: profil.historique.length, v1: profil.commotions }) : ''}</p>
-                    {diagnosticEnAttente ? <em>{t("ui.a242fdd3fa03")}</em> : d.decision === 'attente' ? <div>{reprise ? <><button onClick={() => deciderMedical(d.id, 'reserve')}>{t("ui.ba2d4d66dc9a")}</button><button onClick={() => deciderMedical(d.id, 'reprise20')}>{t("ui.cd04501cb57e")}</button><button onClick={() => deciderMedical(d.id, 'reprise40')}>{t("ui.a5d3a8e3c12d")}</button><button className="danger" onClick={() => deciderMedical(d.id, 'retourDirect')}>{t("ui.bdc8e4541c30")}</button></> : <><button onClick={() => deciderMedical(d.id, 'repos')}>{t("ui.03eefd3aecd7")}</button><button onClick={() => deciderMedical(d.id, 'disponible')}>{t("ui.139e2b374a78")}</button>{!d.protocoleCommotion && <button className="danger" onClick={() => deciderMedical(d.id, 'forcer')}>{t("ui.ff6b62455ff8")}</button>}</>}</div> : <em>{t("ui.20c51fa6227b", { v0: d.decision })}</em>}
-                  </article>;
-                })}
-                {!dossiersMedicaux.length && <p className="manager-vide-texte">{t("ui.0a8b3e25dadc")}</p>}
-              </section>
-
-              {/* ⚠️ LA DISPONIBILITÉ EST UNE PAGE À PART, pas une ligne perdue
-                  dans l'infirmerie. C'est le chiffre qu'on veut voir AVANT de
-                  signer trois ans à un joueur de 32 ans : combien de matchs le
-                  club a joués pendant qu'il était là, combien il en a été
-                  réellement disponible, et ce que ses blessures lui ont coûté
-                  en jours. Tout est compté match par match — jamais estimé. */}
-              <section className="carte disponibilite-manager">
-                <div className="comp-tete"><div><b><Icone nom="resultats" taille={16} />{t("ui.5c0431e908fb")}</b><small>{t("ui.5248691481b1")}</small></div></div>
-                <div className="table-disponibilite-entete"><span>{t("ml.joueur")}</span><span>{t("ui.019555d0a970")}</span><span>{t("ui.f4e4f699637b")}</span><span>{t("ui.2f36b8f61295")}</span><span>{t("ui.eed2c8c4ac67")}</span><span>{t("ui.e968ef99278e")}</span></div>
-                {effectifBrut.map((j) => ({ j, d: disponibiliteJoueur(avancee.profilsMedicaux[j.id], manager.saison), p: avancee.profilsMedicaux[j.id] }))
-                  .filter(({ d }) => d.possibles > 0)
-                  .sort((a, b) => a.d.part - b.d.part).slice(0, 20)
-                  .map(({ j, d, p }) => <article key={j.id} className={d.part < 70 ? 'fragile' : d.part < 88 ? 'moyenne' : ''}>
-                    <span><b>{j.nom}</b><small>{t("ui.7003bc4ae18f", { v0: j.age, v1: nomPoste(j.poste), v2: p?.commotions ? t("ui.ce28314b3bbc", { v0: p.commotions }) : '' })}</small></span>
-                    <strong>{d.possibles}</strong><strong>{d.disponibles}</strong><strong>{d.titularisations}</strong>
-                    <strong>{d.joursBlesse}</strong>
-                    <em><i><b style={{ width: `${d.part}%` }} /></i>{d.part}%</em>
-                    <small className="historique-blessures">{(p?.historique ?? []).slice(-4).reverse()
-                      .map((h) => `${h.type} — ${h.jours ?? '?'} j`).join(' · ') || t("ui.1777740f986f")}</small>
-                  </article>)}
-                {!effectifBrut.some((j) => disponibiliteJoueur(avancee.profilsMedicaux[j.id], manager.saison).possibles > 0)
-                  && <p className="manager-vide-texte">{t("ui.c2d189a955be")}</p>}
-              </section>
-
-              {!!approchesEnCours.length && <section className="carte approches-manager">
-                <div className="comp-tete"><div><b><Icone nom="monde" taille={16} />{t("ui.467ab4ebf340")}</b><small>{t("ui.2efd161f00ef")}</small></div><span className="comp-count">{approchesEnCours.length}</span></div>
-                {approchesEnCours.map((a) => <article key={a.id}>
-                  <span><b>{a.nom}</b><small>{t("ui.e042b12e7b84", { v0: a.club, v1: a.division, v2: a.saisonsRestantes })}</small></span>
-                  <strong>{nombre(a.offre)} €</strong>
-                  <button onClick={() => { setVue('ovale'); ouvrirMessages(); }}>{t("car.repondre")}</button>
-                </article>)}
-              </section>}
-
-              {!!convocationsActives.length && <section className="carte convocations-manager"><div className="comp-tete"><b><Icone nom="drapeau" taille={16} />{t("ui.617e44d7977b")}</b></div>{convocationsActives.map((c) => <p key={c.id}><b>{c.nom}</b> · {c.nation} · {c.competition}</p>)}</section>}
-            </div>
-          )}
+          </details>}
 
           {vue === 'univers' && avancee && (
             <div className="manager-avance-grille univers-manager">
@@ -1143,8 +1047,7 @@ export function Manager() {
                   <div className="eyebrow">{libelleAfficheManager(afficheManager, manager.divisionNom)}</div>
                   {derbyMemo?.derby && (
                     <div className="manager-contexte-derby">
-                      <span><Icone nom="flamme" taille={14} /> {texteTraduit(derbyMemo.libelle)} · {derbyMemo.distance} km</span>
-                      <b>{t("ui.548cbdc6c614", { v0: derbyMemo.motivation })}</b>
+                      <span><Icone nom="flamme" taille={14} /> {texteTraduit(derbyMemo.libelle)} · {derbyMemo.distance === null ? 'Distance à vérifier' : `${derbyMemo.distance} km`}</span>
                       <small>{t("ui.df49bfb2d0ca", { v0: derbyMemo.pression, v1: derbyMemo.medias })}</small>
                     </div>
                   )}
@@ -1803,8 +1706,9 @@ export function Manager() {
               indisponibles,
               penalitesNote,
               risquesBlessure: risquesBlessureMatch,
+              conditions: Object.fromEntries(dossiersMedicaux.map(d => [d.joueurId, d.condition ?? 70])),
             }}
-            onTermine={({ scoreA, scoreB, essaisA, essaisB, blessures }) => {
+            onTermine={({ scoreA, scoreB, essaisA, essaisB, blessures, minutesJouees }) => {
               const domicile = matchOuvert.match.domicile === manager.club;
               enregistrerResultat({
                 cle: matchOuvert.cle, club: manager.club,
@@ -1815,7 +1719,7 @@ export function Manager() {
                 scoreContre: domicile ? scoreB : scoreA,
                 essaisPour: domicile ? essaisA : essaisB,
                 essaisContre: domicile ? essaisB : essaisA,
-                blessures,
+                blessures, minutesJouees,
               });
             }}
             onFermer={() => setMatchOuvert(null)}

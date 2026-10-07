@@ -19,10 +19,10 @@
 import type { EtatMatch } from './etat.js';
 import type { Pion } from './entites.js';
 import type { PackHumain, PosteGeste, RolePack } from './direct.js';
-import { REGLAGES_CONQUETE, conqueteLisible } from './conquete.js';
+import { CADENCE_TOUCHE, REGLAGES_CONQUETE, conqueteLisible } from './conquete.js';
 import { profilDe } from './ia/postes.js';
 import { distance2 } from './terrain.js';
-import { REGLAGES_DIRECT } from './direct.js';
+import { REGLAGES_DIRECT, peutGratter } from './direct.js';
 
 /** Le métier d'un numéro d'avant, ou `null` pour un trois-quarts. */
 export function rolePackDe(numero: number): RolePack | null {
@@ -61,7 +61,9 @@ function tempsDuSaut(e: EtatMatch): number | null {
   const c = e.conquete;
   if (!c || c.type !== 'touche' || c.rapide || c.issue) return null;
   const total = e.dureeArret ?? 6.5;
-  const dans = e.minuteur - total * (1 - 0.35);
+  let dans = e.minuteur - total * (1 - 0.35);
+  // Niveau 5 : le début de la formation passe en accéléré (`CADENCE_TOUCHE`) — le saut arrive d'autant plus tôt.
+  if ((e.ia ?? 1) >= 5) dans -= Math.max(0, e.minuteur - total * (1 - CADENCE_TOUCHE.jusqua)) * (1 - 1 / CADENCE_TOUCHE.facteur);
   return dans > 0.4 ? e.sim + dans : null;
 }
 
@@ -93,8 +95,9 @@ function contexteDe(e: EtatMatch, moi: Pion): Contexte | null {
     return { type: 'maul', cle: `maul:${debut}`, poste, premier: debut + 1.1, periode: REGLAGES_CONQUETE.periodeMaul, continu: true };
   }
   // ── Ruck : la fenêtre du grattage — le défenseur à portée du ballon a un instant pour s'y jeter au bon moment ──
+  // Niveau 5 : la fenêtre ne s'ouvre que si le grattage est réglementairement possible — pas parce qu'un ruck existe quelque part.
   if (e.phase === 'ruck' && e.ruck && !e.ruck.duel && moi.cote !== e.ruck.attaque
-    && distance2(moi.pos, e.ballon) <= (REGLAGES_DIRECT.porteeRuck + 1.5) ** 2 && e.minuteur > 0.5) {
+    && ((e.ia ?? 1) >= 5 ? peutGratter(e, moi) : distance2(moi.pos, e.ballon) <= (REGLAGES_DIRECT.porteeRuck + 1.5) ** 2) && e.minuteur > 0.5) {
     return { type: 'ruck', cle: `ruck:${e.compteurs.rucks}`, poste: 'gratteur', premier: e.sim + 1.0, periode: 99, continu: false };
   }
   // ── Touche : le saut et le lift ────────────────────────────────────────
@@ -146,6 +149,8 @@ export function majPack(e: EtatMatch): void {
   if (!d.pack || d.pack.cle !== ctx.cle) d.pack = nouveauPack(ctx);
   const pk = d.pack;
   pk.poste = ctx.poste;
+  // Niveau 5 : lié depuis plus d'une seconde au maul de SON équipe, il peut en sortir — on n'est plus prisonnier de la structure.
+  pk.libre = (e.ia ?? 1) >= 5 && ctx.type === 'maul' && moi.cote === e.possession && e.sim - (e.maul?.debut ?? e.sim) >= 1.2;
   // Les temps à venir : une partition fixée, ou des pas réguliers posés deux secondes et demie devant le joueur.
   if (ctx.type === 'ruck') {
     // Un seul temps, posé à l'ouverture de la fenêtre.
@@ -204,8 +209,9 @@ export function choisirSortieDuPack(e: EtatMatch, sortie: NonNullable<PackHumain
 }
 
 /** Ce que ce poste peut faire pour quitter le pack. */
-export function sortiesPossibles(pk: Pick<PackHumain, 'type' | 'poste'>): NonNullable<PackHumain['sortie']>[] {
+export function sortiesPossibles(pk: Pick<PackHumain, 'type' | 'poste' | 'libre'>): NonNullable<PackHumain['sortie']>[] {
   if (pk.type !== 'melee' && pk.type !== 'maul') return [];
+  if (pk.type === 'maul' && pk.libre) return ['ramasser', 'passer'];
   if (pk.poste === 'huit') return ['ramasser', 'passer'];
   if (pk.poste === 'troisieme') return ['detacher'];
   if (pk.type === 'maul' && (pk.poste === 'deuxieme' || pk.poste === 'talonneur')) return ['passer'];

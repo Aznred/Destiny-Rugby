@@ -5,7 +5,7 @@ import { Icone } from '../Icone';
 import { nomPoste, POSTES } from '../../data/rugby';
 import { sourceEcusson } from '../../lib/ecussons';
 import {
-  abreviationTV, DUREE_EQUIPE_TV, DUREE_LIGNE_TV, LIGNES_TV, logoTV, PALETTE_TV, PALETTE_TOP14, tempsTV, texteSurCouleur,
+  DUREE_EQUIPE_TV, DUREE_LIGNE_TV, LIGNES_TV, logoTV, PALETTE_TV, PALETTE_TOP14, siglesTV, tempsTV, texteSurCouleur,
   type EquipeTV, type ExclusionTV, type IdentiteTV, type JoueurTV, type PaletteTV,
 } from '../../lib/habillageTV';
 import type { MarqueurTV, PhraseTV, VentTV } from '../../lib/statsTV';
@@ -105,13 +105,14 @@ export function ScoreTV({ identite, equipes, seconde, exclusions = [], phase, te
 }) {
   // Le temps additionnel : au-delà de la 40e en première période, de la 80e en seconde.
   const additionnel = !termine && phase !== 'miTemps' && (periode === 1 ? seconde >= 2400 : seconde >= 4800);
+  const sigles = siglesTV(equipes[0].nom, equipes[1].nom);
   return <div className="btv-score" aria-label={`${equipes[0].nom} ${equipes[0].score}, ${equipes[1].nom} ${equipes[1].score}, ${tempsTV(seconde)}`}>
     <div className="btv-marque"><LogoLigueTV identite={identite} /><time className={additionnel ? 'sirene' : ''}>{tempsTV(seconde)}</time>
       {(phase === 'miTemps' || termine) && <small>{t(termine ? 'tv.fin' : 'tv.miTemps')}</small>}</div>
     {equipes.map((e, i) => <div className="btv-score-camp" key={i}>
       <DessusTV exclusions={exclusions} cote={i === 0 ? 'A' : 'B'} essais={e.essais} />
-      <div className="btv-score-equipe" title={e.nom} style={{ background: e.couleur, color: e.texte ?? texteSurCouleur(e.couleur) }}>
-        <abbr title={e.nom}>{abreviationTV(e.nom)}</abbr><strong>{e.score}</strong>
+      <div className="btv-score-equipe" title={e.nom} style={{ background: e.couleur, color: e.texte ?? texteSurCouleur(e.couleur), ...(e.lisere ? { boxShadow: `inset 0 -4px 0 ${e.lisere}` } : {}) }}>
+        <abbr title={e.nom}>{sigles[i]}</abbr><strong>{e.score}</strong>
       </div>
       <SanctionsTV exclusions={exclusions} seconde={seconde} cote={i === 0 ? 'A' : 'B'} />
     </div>)}

@@ -479,12 +479,14 @@ function grilleTourneeEte(c: CompetitionInternationale, saison: number): [string
   }
   const pris = new Set<string>();
   const affiches: [string, string][] = [];
+  const hotesRetenus: string[] = [], visiteurs: string[] = [];
   for (const visiteur of TOURNEURS_ETE) {
     if (!c.equipes.includes(visiteur)) continue;
     const hote = dispo.find((h) => !pris.has(h));
     if (!hote) break;
     pris.add(hote);
     pris.add(visiteur);
+    hotesRetenus.push(hote); visiteurs.push(visiteur);
     // L’hôte reçoit : c’est le sens même d’une tournée.
     affiches.push([hote, visiteur]);
   }
@@ -496,12 +498,29 @@ function grilleTourneeEte(c: CompetitionInternationale, saison: number): [string
   // points, elle cherche un adversaire à sa portée.
   const reste = c.equipes.filter((n) => !pris.has(n))
     .sort((x, y) => forceNation(y) - forceNation(x));
+  const sens: boolean[] = [];
   for (let i = 0; i + 1 < reste.length; i += 2) {
     // Le receveur alterne : sur une saison, tout le monde voyage.
     const chezLui = rng() < 0.5;
+    sens.push(chezLui);
     affiches.push(chezLui ? [reste[i], reste[i + 1]] : [reste[i + 1], reste[i]]);
   }
-  return Array.from({ length: c.journees }, () => affiches);
+  // ⚠️ UNE TOURNÉE NE REJOUE PLUS TROIS FOIS LA MÊME AFFICHE (Correctif 24). La grille du premier week-end était
+  // recopiée telle quelle sur les suivants : une carrière commencée avec un international français ouvrait sur
+  // « Argentine – France », trois fois de suite — « les matchs d'été semblent toujours utiliser la même équipe ».
+  // Chaque week-end, la tournée change donc d'hôte (les visiteurs glissent d'un cran) et le reste du monde change de
+  // voisin de niveau. La première date reste celle d'avant.
+  return Array.from({ length: c.journees }, (_, k) => {
+    if (k === 0 || !visiteurs.length) return affiches;
+    const tour: [string, string][] = visiteurs.map((v, i) => [hotesRetenus[(i + k) % hotesRetenus.length], v]);
+    // Voisins de niveau, décalés d'un rang une date sur deux : les mêmes n'en décousent pas tout l'été.
+    const depart = k % 2;
+    for (let i = depart; i + 1 < reste.length; i += 2) {
+      const chezLui = sens[(i >> 1) % Math.max(1, sens.length)] !== (k % 2 === 1);
+      tour.push(chezLui ? [reste[i], reste[i + 1]] : [reste[i + 1], reste[i]]);
+    }
+    return tour;
+  });
 }
 
 function grille(c: CompetitionInternationale, saison: number): [string, string][][] {

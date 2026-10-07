@@ -360,6 +360,8 @@ export interface MeleeDetaillee {
   /** Milieu du tunnel à la mise en place. */
   centre: Vec;
   introducteur: Cote;
+  /** Durées des étapes de CETTE mêlée (niveau 5 : sans temps mort). Absentes : celles de `TEMPS_MELEE`. */
+  durees?: { liaison: number; impact: number; introduction: number; sortie: number };
   /** Secondes de poussée avant que le pack dominé ne s'écroule ou ne se relève. */
   ruptureApres?: number;
   /** Durée de la poussée, fixée avec l'issue. */
@@ -465,6 +467,8 @@ export interface BallonLibre {
   auteur?: Pion;
   age: number;
   rebonds: number;
+  /** Le ballon d'un tir au but manqué, resté en jeu (niveau 5) : mort ou aplati dans l'en-but, c'est un renvoi aux 22. */
+  deTir?: boolean;
 }
 
 /**
@@ -709,7 +713,7 @@ export interface EtatMatch {
   gestes?: import('./dynamique.js').GesteMatch[];
   incidentApres?: number;
   fautesVues?: Record<string, boolean>;
-  piedPrepare?: { auteurId: string; arrivee: Vec; intention: IntentionPied; duree: number; hauteur: number; depuis: Vec; pretDepuis?: number; debut?: number; rapideArcade?: boolean;
+  piedPrepare?: { auteurId: string; arrivee: Vec; intention: IntentionPied; duree: number; hauteur: number; depuis: Vec; pretDepuis?: number; debut?: number; rapideArcade?: boolean; avaitBallon?: boolean;
     /** Courbe déjà calculée pour ce coup de pied (drop : dérive du vent, poteau). */
     courbe?: Pick<Vol, 'derive' | 'ricochet'> };
   clubA: string;
@@ -864,6 +868,8 @@ export interface EtatMatch {
     suite: 'renvoi' | 'coupEnvoi';
     /** Point où le ballon est posé. */
     lieu?: Vec;
+    /** Le rituel de CE tir (niveau 5) : durées de la pose et de l'attente, et part de la routine déjà faite à l'arrivée du buteur. */
+    rituel?: { ramassage: number; pose: number; de: number; pret: number };
     /** Résultat décidé une seule fois, avant le vol visible du ballon. */
     reussi?: boolean;
     /** Le rituel est fini et le ballon est actuellement en vol. */

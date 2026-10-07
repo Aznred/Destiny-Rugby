@@ -1,4 +1,5 @@
 import type { PosteId } from '../../types.js';
+import { couleursDepuisEcusson } from '../tenuesMatch.js';
 import { APPARENCES_JOUEURS_MATCH, type CoiffureMatch } from '../../data/apparencesMatch.generated.js';
 import type { SurchargeApparence } from '../apparenceJoueur.js';
 
@@ -121,45 +122,18 @@ export function maillotDeSecours(principal: string, cle: string): MaillotMatch {
   };
 }
 
-const couleurHex = (r: number, g: number, b: number) => `#${[r, g, b].map(v => v.toString(16).padStart(2, '0')).join('')}`;
-const distance = (a: number[], b: number[]) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 
-/** Lit les pixels d'un écusson local et en tire un maillot contrasté. */
+/**
+ * Le maillot d'un club tiré de son écusson. ⚠️ L'analyse vit dans `lib/tenuesMatch.ts` (Correctif 24) : surface occupée,
+ * fond exclu, noir et blanc admis — l'ancienne lecture prenait le premier pixel de la teinte la plus vive.
+ */
 export async function maillotDepuisBlason(url: string | undefined, secours: MaillotMatch, cle: string): Promise<MaillotMatch> {
-  if (!url || typeof document === 'undefined') return secours;
-  return new Promise(resolve => {
-    const image = new Image();
-    image.crossOrigin = 'anonymous';
-    image.onload = () => {
-      try {
-        const canvas = document.createElement('canvas'); canvas.width = 40; canvas.height = 40;
-        const ctx = canvas.getContext('2d', { willReadFrequently: true });
-        if (!ctx) return resolve(secours);
-        ctx.drawImage(image, 0, 0, 40, 40);
-        const pixels = ctx.getImageData(0, 0, 40, 40).data;
-        const groupes = new Map<string, { rgb: number[]; n: number; score: number }>();
-        for (let i = 0; i < pixels.length; i += 4) {
-          if (pixels[i + 3] < 160) continue;
-          const rgb = [pixels[i], pixels[i + 1], pixels[i + 2]];
-          const max = Math.max(...rgb), min = Math.min(...rgb), saturation = max - min;
-          if (max < 35 || (max > 238 && saturation < 18)) continue;
-          const q = rgb.map(v => Math.round(v / 32) * 32);
-          const id = q.join(':'); const actuel = groupes.get(id);
-          if (actuel) { actuel.n++; actuel.score += saturation + 25; }
-          else groupes.set(id, { rgb, n: 1, score: saturation + 25 });
-        }
-        const tries = [...groupes.values()].sort((a, b) => b.score - a.score);
-        if (!tries.length) return resolve(secours);
-        const principal = tries[0].rgb;
-        const second = tries.find(c => c.n > 2 && distance(c.rgb, principal) > 105)?.rgb
-          ?? (luminance(couleurHex(...principal as [number, number, number])) > .5 ? [25, 31, 38] : [245, 241, 226]);
-        const p = couleurHex(...principal as [number, number, number]);
-        const s = couleurHex(...second as [number, number, number]);
-        const h = graineVisuelleMatch(`${cle}:${p}:${s}`);
-        resolve({ principal: p, secondaire: s, accent: luminance(p) > .52 ? '#10161c' : '#ffffff', short: assombrir(p, .48), chaussettes: p, motif: (['uni', 'cerceaux', 'rayures', 'epaules', 'bande', 'diagonale'] as MotifMaillot[])[h % 6] });
-      } catch { resolve(secours); }
-    };
-    image.onerror = () => resolve(secours);
-    image.src = url;
-  });
+  const lues = await couleursDepuisEcusson(url);
+  if (!lues) return secours;
+  const p = lues.principal, s = lues.secondaire;
+  const h = graineVisuelleMatch(`${cle}:${p}:${s}`);
+  return {
+    principal: p, secondaire: s, accent: luminance(p) > .52 ? '#10161c' : '#ffffff', short: assombrir(p, .48), chaussettes: p,
+    motif: (['uni', 'cerceaux', 'rayures', 'epaules', 'bande', 'diagonale'] as MotifMaillot[])[h % 6],
+  };
 }

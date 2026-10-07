@@ -164,6 +164,7 @@ let dictionnaire: Record<string, Traduction> = {};
 let clesParTexte = new Map<string, string>();
 let modelesParTexte: { cle: string; motif: RegExp; variables: string[] }[] = [];
 const cacheTextes = new Map<string, string>();
+const traductionsAnglaisesSignalees = new Set<string>();
 const normaliserTexte = (texte: string) => texte.replace(/[’']/g, "'").replace(/\s+/g, ' ').trim();
 
 export function chargerTextes(textes: Record<string, Traduction>): void {
@@ -229,7 +230,17 @@ export function t(cle: string, vars?: Record<string, string | number | boolean |
     ?? (cle.startsWith('sifflet.') ? dictionnaire[`ml.${cle}`] : undefined)
     ?? (cle.startsWith('ml.sifflet.') ? dictionnaire[cle.replace(/^ml\./, '')] : undefined);
   if (!entree) return cle;
-  let texte = entree[courante] ?? entree.fr;
+  let texte = entree[courante];
+  if (!texte && courante === 'en') {
+    // Never show French copy in an English session. Keep the interface readable
+    // while making the missing key visible to developers in the console.
+    texte = 'Translation unavailable';
+    if (!traductionsAnglaisesSignalees.has(cle)) {
+      traductionsAnglaisesSignalees.add(cle);
+      if (typeof console !== 'undefined') console.error(`[i18n] Missing English translation: ${cle}`);
+    }
+  }
+  texte ??= entree.fr;
   if (vars) {
     for (const [k, v] of Object.entries(vars)) {
       texte = texte.split(`{${k}}`).join(v == null || typeof v === 'boolean' ? '' : String(v));

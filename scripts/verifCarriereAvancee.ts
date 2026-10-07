@@ -60,7 +60,7 @@ const avecBlesse = {
 const repos = deciderMedical(avecBlesse, 'medical-test', 'repos');
 const force = deciderMedical(avecBlesse, 'medical-test', 'forcer');
 verifier('le repos rend réellement indisponible', indisponiblesCarriereAvancee(repos, 1).includes(j.id));
-verifier('forcer augmente fortement le risque', force.medical[0].risqueAggravation >= avecBlesse.medical[0].risqueAggravation + 30);
+verifier('forcer ne contourne pas les soins', force.medical[0].decision === avecBlesse.medical[0].decision && indisponiblesCarriereAvancee(force, 1).includes(j.id));
 
 const resultat = {
   cle: 'test-avance', club: manager.club, saison: 1, semaine: 1, journee: 1, domicile: true,

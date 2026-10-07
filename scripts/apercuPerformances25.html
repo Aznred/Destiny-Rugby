@@ -1,0 +1,6 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Mesure du correctif 25</title>
+<style>body{margin:0;padding:16px;background:#10201a;color:#e9eee6;font:14px system-ui}h1{font-size:22px}#terrain{height:480px;max-width:960px}table{border-collapse:collapse;margin:16px 0}td,th{padding:8px 16px;border-bottom:1px solid #47614d;text-align:right}th:first-child,td:first-child{text-align:left}p{max-width:960px}button{padding:10px;background:#e7b546;border:0;border-radius:6px;font:inherit}</style></head>
+<body><h1>Comparaison 3D du correctif 25</h1><p>Même match, caméra et définition. Les optimisations des joueurs sont désactivées puis activées. 60 images de chauffe, puis 240 images mesurées par passage. Les coûts CPU et GPU concernent la scène ; la mémoire indique le tas JavaScript disponible.</p>
+<button id="lancer">Mesurer avant / après</button><p id="etat" role="status">Prêt.</p><div id="terrain"></div><table><thead><tr><th>Passage</th><th>FPS</th><th>CPU (ms)</th><th>GPU (ms)</th><th>Draw calls</th><th>Triangles</th><th>Mémoire (Mo)</th></tr></thead><tbody id="resultats"></tbody></table>
+<script type="module" src="/scripts/apercuPerformances25.ts"></script></body></html>

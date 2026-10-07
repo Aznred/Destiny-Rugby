@@ -1,4 +1,6 @@
 import { CATALOGUE_ADMIN_VIDE, type CatalogueAdmin } from '../src/lib/ligue/atelierCatalogue.js';
+import { fusionnerEnvoi, matiereDepuisLignes, type CompteurUsage, type LigneUsage } from '../src/lib/usage/agregats.js';
+import { bilanCarrieres, fusionnerCarrieres, type CarriereUsage } from '../src/lib/usage/carrieres.js';
 // Serveur de développement uniquement. Jamais importé par la fonction Vercel.
 // Les écritures sont synchrones et remplacent atomiquement le fichier : aucun
 // await entre la comparaison de version et le commit dans ce processus unique.
@@ -27,6 +29,10 @@ interface BaseLocale {
   boutiques?: Record<string, EtatBoutiqueCompte>;
   offresSolo?: OffreSolo[];
   salonsAmicaux?: SalonAmicalStocke[];
+  /** Les statistiques d'utilisation : relevés par appareil et par jour, compteurs par jour. */
+  usage?: { lignes: LigneUsage[]; compteurs: CompteurUsage[]; carrieres?: CarriereUsage[] };
+  /** Le marché commun des divisions publiques : un document par cycle. */
+  marches?: Record<string, { revision: number; donnees: unknown }>;
 }
 export function stockageFichier(fichier: string): StockageCarriere {
   mkdirSync(dirname(fichier), { recursive: true });
@@ -43,6 +49,9 @@ export function stockageFichier(fichier: string): StockageCarriere {
   base.offresSolo ??= [];
   base.achatsStripe ??= {};
   base.salonsAmicaux ??= [];
+  base.marches ??= {};
+  base.usage ??= { lignes: [], compteurs: [] };
+  base.usage.carrieres ??= [];
   // L'échéance ne vaut que pour ce processus : le serveur de développement
   // redémarre souvent, et une échéance perdue coûte une relecture, rien de plus.
   const echeances: Record<string, number> = {};
@@ -96,6 +105,24 @@ export function stockageFichier(fichier: string): StockageCarriere {
         if (!cible || !boutique) throw new Error('Offre indisponible.');
         boutique.collectionSolo = modifierCollectionSolo(boutique.collectionSolo, cible.offertes, 1);
         cible.statut = 'annulee'; sauver();
+      },
+      async suivi(compte) {
+        const vue = (o: NonNullable<typeof base.offresSolo>[number]) => copie({ ...o,
+          propositions: o.propositions.filter(p => o.compteId === compte || p.compteId === compte) });
+        const ouvertes = base.offresSolo!.filter(o => o.statut === 'ouverte').sort((a, b) => b.creeLe.localeCompare(a.creeLe));
+        return {
+          recues: ouvertes.filter(o => o.compteId === compte && o.propositions.length > 0).map(vue),
+          envoyees: ouvertes.filter(o => o.compteId !== compte && o.propositions.some(p => p.compteId === compte)).map(vue),
+        };
+      },
+      async lire(offre, compte) {
+        const o = base.offresSolo!.find(x => x.id === offre);
+        return o ? copie({ ...o, propositions: o.propositions.filter(p => o.compteId === compte || p.compteId === compte) }) : null;
+      },
+      async retirer(offre, compte) {
+        const cible = base.offresSolo!.find(o => o.id === offre && o.statut === 'ouverte');
+        if (!cible || !cible.propositions.some(p => p.compteId === compte)) throw new Error('Proposition introuvable ou déjà traitée.');
+        cible.propositions = cible.propositions.filter(p => p.compteId !== compte); sauver();
       },
     },
     atelier: {
@@ -200,6 +227,17 @@ export function stockageFichier(fichier: string): StockageCarriere {
       base.debits[cle] = { debut, nombre: ancien?.debut === debut ? ancien.nombre + 1 : 1 };
       // Le quota est un frein opérationnel local ; les données du jeu sont persistées.
       return base.debits[cle].nombre <= maximum;
+    },
+    async enregistrerUsage(envoi) { fusionnerEnvoi(base.usage!.lignes, base.usage!.compteurs, envoi); fusionnerCarrieres(base.usage!.carrieres!, (envoi.carrieres ?? []).map(c => ({ ...c, id: `${envoi.appareil}:${c.id}` }))); sauver(); return true; },
+    async matiereUsage(periode, aujourdhui) { return { ...matiereDepuisLignes(base.usage!.lignes, base.usage!.compteurs, periode, aujourdhui), carrieres: bilanCarrieres(base.usage!.carrieres!, periode, aujourdhui) }; },
+    async lireMarche(id) {
+      const m = base.marches![id];
+      return m ? copie({ id, revision: m.revision, donnees: m.donnees }) : null;
+    },
+    async comparerEtEcrireMarche(id, revision, donnees) {
+      const m = base.marches![id];
+      if (revision === null ? m !== undefined : m?.revision !== revision) return false;
+      base.marches![id] = { revision: (revision ?? 0) + 1, donnees: copie(donnees) }; sauver(); return true;
     },
     async salonAmical(code) {
       const index = base.salonsAmicaux!.findIndex((salon) => salon.code === code);

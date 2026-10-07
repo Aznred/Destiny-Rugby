@@ -120,6 +120,8 @@ export const TEXTES_CONTROLE_DIRECT: Record<string, Traduction> = {
   'cd.pack.sortie.ramasser': tr("Ramasser et partir", "Pick up and go", "Recoger y salir", "Raccogli e parti", "Aufnehmen und los", "Pegar e arrancar", "拾って走る"),
   'cd.pack.sortie.passer': tr("Servir le 9", "Feed the 9", "Servir al 9", "Servi il 9", "9er bedienen", "Servir o 9", "9番へ出す"),
   'cd.pack.sortie.detacher': tr("Se détacher", "Break off", "Despegarse", "Staccarsi", "Sich lösen", "Soltar-se", "離れる"),
+  'cd.pack.sortie.maul': tr("Sortir du maul", "Break from the maul", "Salir del maul", "Uscire dal maul", "Aus dem Maul lösen", "Sair do maul", "モールから出る"),
+  'cd.souffle.plafond': tr("Plafond", "Cap", "Tope", "Tetto", "Limit", "Teto", "上限"),
   'cd.ind.grattage': tr("Ballon gratté", "Ball stolen", "Balón robado", "Pallone rubato", "Ball erobert", "Bola roubada", "ボール奪取"),
   'cd.ind.turnover': tr("Turnover", "Turnover", "Pérdida de balón", "Turnover", "Turnover", "Turnover", "ターンオーバー"),
   'cd.ind.contreRuck': tr("Contre-ruck", "Counter-ruck", "Contra-ruck", "Contro-ruck", "Gegen-Ruck", "Contra-ruck", "カウンターラック"),

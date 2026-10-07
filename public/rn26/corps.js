@@ -91,6 +91,61 @@ const ajustes=new Map();
  * les joueurs paraissent chauves. Chaque sommet est donc repoussé juste
  * au-dessus de la surface de la tête, dans sa direction depuis le centre du crâne.
  */
+/** Le nez de la tête pour laquelle les barbes de l'APK ont été modelées (repère du maillage, visage vers −z). */
+const NEZ_DE_REFERENCE={y:1.672,z:-.066};
+/** Retouche à l'œil par type de tête : décalage vertical, profondeur (négatif = vers l'avant du visage), échelle légère. */
+export const REGLAGE_BARBE={male_back:{dy:0,dz:.008,echelle:1},male_forward:{dy:0,dz:.010,echelle:1.03}};
+const rayonBarbe=new THREE.Raycaster();
+/**
+ * Pose une barbe ou une moustache SUR la mâchoire (Correctif 25). Voir `correctif_25_barbes.cjs` : la barbe est calée
+ * sur le nez de la tête qui la porte, puis ses sommets enfouis sont ramenés à la peau le long d'un rayon parti de
+ * derrière la bouche — jamais du sommet du crâne, qui les envoyait sous le menton.
+ */
+export function fitBeard(source,headMesh,key,marge=.002){
+  const cle='barbe:'+key+':'+source.name+':'+marge+':'+JSON.stringify(REGLAGE_BARBE[key]);
+  if(ajustes.has(cle))return ajustes.get(cle);
+  const tete=headMesh.geometry.attributes.position;
+  let nez=null;
+  for(let i=0;i<tete.count;i++){if(Math.abs(tete.getX(i))>.012)continue;const z=tete.getZ(i);if(!nez||z<nez.z)nez={y:tete.getY(i),z};}
+  const r=REGLAGE_BARBE[key]||{dy:0,dz:0,echelle:1};
+  const dy=(nez?nez.y-NEZ_DE_REFERENCE.y:0)+r.dy,dz=(nez?nez.z-NEZ_DE_REFERENCE.z:0)+r.dz,e=r.echelle||1;
+  // L'échelle se prend autour d'un point situé derrière la lèvre : la barbe s'élargit sans monter ni descendre.
+  const ax=0,ay=NEZ_DE_REFERENCE.y-.03,az=NEZ_DE_REFERENCE.z+.05;
+  const geometry=source.geometry.clone(),p=geometry.attributes.position;
+  for(let i=0;i<p.count;i++)p.setXYZ(i,ax+(p.getX(i)-ax)*e,ay+(p.getY(i)-ay)*e+dy,az+(p.getZ(i)-az)*e+dz);
+  // Les barbes complètes rejoignent le bord avant des oreilles par leurs pattes.
+  // Seule leur extrémité latérale remonte : ni le menton, ni la moustache, ni les boucs ne sont étirés.
+  if(nez&&/^Beard_(0[5-9]|1[0-5])_/.test(source.name)){
+    let largeur=0;for(let i=0;i<tete.count;i++)largeur=Math.max(largeur,Math.abs(tete.getX(i)));
+    let oreilleY=-Infinity,oreilleZ=Infinity;
+    for(let i=0;i<tete.count;i++)if(Math.abs(tete.getX(i))>largeur*.84&&tete.getY(i)>nez.y-.015&&tete.getY(i)<nez.y+.06){
+      oreilleY=Math.max(oreilleY,tete.getY(i));oreilleZ=Math.min(oreilleZ,tete.getZ(i));
+    }
+    let haut=-Infinity,arriere=-Infinity;
+    for(let i=0;i<p.count;i++)if(Math.abs(p.getX(i))>.05&&p.getZ(i)>-.005){haut=Math.max(haut,p.getY(i));arriere=Math.max(arriere,p.getZ(i));}
+    if(Number.isFinite(haut)&&Number.isFinite(oreilleY))for(let i=0;i<p.count;i++){
+      const x=p.getX(i),y=p.getY(i),z=p.getZ(i);
+      const k=THREE.MathUtils.smoothstep(Math.abs(x),.045,.065)*THREE.MathUtils.smoothstep(y,haut-.055,haut-.005)*THREE.MathUtils.smoothstep(z,-.01,.025);
+      p.setXYZ(i,x+Math.sign(x)*k*.004,y+k*Math.max(0,oreilleY-.008-haut),z+k*Math.max(0,oreilleZ-.006-arriere));
+    }
+  }
+  if(nez){
+    // La peau : les triangles de la tête au repos, vus de l'intérieur.
+    const peau=new THREE.Mesh(headMesh.geometry,new THREE.MeshBasicMaterial({side:THREE.DoubleSide}));
+    const centre=new THREE.Vector3(0,nez.y-.055,nez.z+.085),dir=new THREE.Vector3(),pt=new THREE.Vector3();
+    for(let i=0;i<p.count;i++){
+      pt.set(p.getX(i),p.getY(i),p.getZ(i));dir.copy(pt).sub(centre);
+      const d=dir.length();if(d<1e-5)continue;dir.multiplyScalar(1/d);
+      rayonBarbe.set(centre,dir);rayonBarbe.far=.4;
+      const touche=rayonBarbe.intersectObject(peau,false)[0];
+      // Les lèvres ont un relief anguleux : conserver une fine épaisseur évite de couper la moustache en fragments.
+      const epaisseur=pt.y>nez.y-.04&&Math.abs(pt.x)<.05?Math.max(marge,.006):marge;
+      if(touche&&d<touche.distance+epaisseur)p.setXYZ(i,centre.x+dir.x*(touche.distance+epaisseur),centre.y+dir.y*(touche.distance+epaisseur),centre.z+dir.z*(touche.distance+epaisseur));
+    }
+    peau.material.dispose();
+  }
+  p.needsUpdate=true;geometry.computeVertexNormals();geometry.computeBoundingSphere();ajustes.set(cle,geometry);return geometry;
+}
 export function fitToHead(source,headMesh,key,marge=.006){
   const cle=key+':'+source.name+':'+marge;
   if(ajustes.has(cle))return ajustes.get(cle);
@@ -135,7 +190,8 @@ export function groundBody(actor,dt=.016){
   actor.model.position.y=actor.baseY;
   actor.group.updateMatrixWorld(true);
   let low=Infinity;
-  for(const {bone,radius} of actor.contacts){bone.getWorldPosition(point);low=Math.min(low,point.y-radius);}
+  // correctif25-corps : les matrices viennent d'être calculées, on les lit sans remonter treize fois jusqu'à la racine.
+  for(const {bone,radius} of actor.contacts){const y=bone.matrixWorld.elements[13]-radius;if(y<low)low=y;}
   const need=low<0?-low:0;
   // Montée immédiate, redescente progressive : pas de saut d'une image à l'autre.
   actor.lift=need>actor.lift?need:Math.max(need,actor.lift-dt*.6);
@@ -157,7 +213,8 @@ export function trackBall(actor,ball,weight=.28){
   const yaw=THREE.MathUtils.clamp(Math.atan2(-local.x,-local.z),-.65,.65);
   const pitch=THREE.MathUtils.clamp(Math.asin(local.y),-.25,.65);
   neck.quaternion.multiply(regard.setFromEuler(euler.set(pitch*weight,0,yaw*weight)));
-  actor.group.updateMatrixWorld(true);
+  // Seul le cou a tourné : lui et ce qu'il porte, pas tout le corps (toujours appelé après une mise à jour complète).
+  neck.updateWorldMatrix(false,true);
 }
 const axe=new THREE.Vector3(),tour=new THREE.Quaternion(),parentQ=new THREE.Quaternion(),mondeQ=new THREE.Quaternion();
 /**

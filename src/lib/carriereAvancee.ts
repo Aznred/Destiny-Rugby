@@ -38,6 +38,8 @@ import {
 import { salaire } from './offres.js';
 import { forceDuGroupe, ouvrirNegociationManager, salairesEffectif } from './recrutementManager.js';
 import { pseudoStable } from './comptes.js';
+import { centreMedical, niveauMedical, normaliserSoin, dateMedicale, evoluerSoin, choisirReprise, autorisationMedicale, risqueReprise } from './infirmerieManager.js';
+import { accepterProlongation } from './conseilManager.js';
 
 const borne = (n: number) => Math.max(0, Math.min(100, Math.round(n)));
 
@@ -218,6 +220,12 @@ export interface DossierMedical {
   risqueRechute?: number;
   protocoleCommotion?: boolean;
   rechute?: boolean;
+  joursRestants?: number;
+  dureeInitiale?: number;
+  joursEcoules?: number;
+  joursReprise?: number;
+  risqueBase?: number;
+  club?: string;
 }
 
 
@@ -227,7 +235,7 @@ export function blessuresParJoueur(
 ): Map<string, DossierMedical> {
   const par = new Map<string, DossierMedical>();
   for (const d of medical ?? []) {
-    if (d.semaines <= 0) continue;
+    if (d.phase === 'clos' || (d.semaines <= 0 && d.phase !== 'reprise')) continue;
     // Le dossier le plus grave l'emporte si un joueur en cumule deux.
     const avant = par.get(d.joueurId);
     if (!avant || d.semaines > avant.semaines) par.set(d.joueurId, d);
@@ -567,9 +575,10 @@ function evoluerAttachement(
 }
 
 function normaliserDossier(d: DossierMedical): DossierMedical {
-  const zone: ZoneMedicale = d.zone ?? (d.type.toLowerCase().includes('genou') ? 'genou'
-    : d.type.toLowerCase().includes('muscul') ? 'ischio' : 'epaule');
-  return {
+  const nature = d.type.toLowerCase();
+  const zone: ZoneMedicale = d.zone ?? (nature.includes('commotion') ? 'commotion' : nature.includes('genou') ? 'genou'
+    : /muscul|ischio/.test(nature) ? 'ischio' : nature.includes('cheville') ? 'cheville' : /dos|lomb/.test(nature) ? 'dos' : 'epaule');
+  return normaliserSoin({
     ...d, phase: d.phase ?? (d.semaines > 0 ? 'diagnostic' : 'clos'), zone,
     origine: d.origine ?? 'match', diagnosticInitial: d.diagnosticInitial ?? d.type,
     diagnosticDans: d.diagnosticDans ?? 0,
@@ -578,7 +587,7 @@ function normaliserDossier(d: DossierMedical): DossierMedical {
     rythme: d.rythme ?? (d.semaines <= 0 ? 68 : Math.max(15, 100 - d.semaines * 9)),
     risqueRechute: d.risqueRechute ?? d.risqueAggravation,
     protocoleCommotion: d.protocoleCommotion ?? zone === 'commotion', rechute: d.rechute ?? false,
-  };
+  });
 }
 
 function creerAgents(): AgentPersistant[] {
@@ -657,7 +666,7 @@ export function changerClubCarriereAvancee(a: EtatCarriereAvancee | undefined, m
     vestiaire: Object.fromEntries(effectif.map((j) => [j.id, etat.vestiaire[j.id] ?? profilDuJoueur(j, m.composition.capitaineId, m.saison)])),
     discussions: etat.discussions.map((d) => d.etat === 'ouverte' ? { ...d, etat: 'close' as const, reponse: 'aucunePromesse' as const } : d),
     promesses: etat.promesses.map((p) => p.etat === 'active' ? { ...p, etat: 'rompue' as const } : p),
-    medical: etat.medical.map(normaliserDossier).filter((d) => d.phase === 'clos'), convocations: [],
+    medical: etat.medical.map(normaliserDossier), convocations: [],
     // Les clubs ne poursuivent pas une approche auprès d'un entraîneur qui a
     // quitté le banc : c'est au nouveau club de traiter ses propres dossiers.
     approches: [],
@@ -752,7 +761,7 @@ function genererDiscussion(a: EtatCarriereAvancee, m: Manager, effectif: Coequip
   const dejaCetteSaison = new Set(a.discussions.filter((d) => d.id.includes(`-${m.saison}-`)).map((d) => d.joueurId));
   const candidat = effectif
     .map((j) => ({ j, p: a.vestiaire[j.id] }))
-    .filter(({ j, p }) => p && p.satisfaction < 47 && !dejaCetteSaison.has(j.id))
+    .filter(({ j, p }) => p && p.satisfaction < 47 && !dejaCetteSaison.has(j.id) && !indisponiblesCarriereAvancee(a, m.semaine).includes(j.id) && Object.values(m.resultats).filter(r => r.club === m.club && r.saison === m.saison).length >= 5)
     .sort((x, y) => x.p.satisfaction - y.p.satisfaction)[0];
   if (!candidat) return a;
   const { j, p } = candidat;
@@ -829,7 +838,7 @@ export function risqueMedicalJoueur(
   origine: 'match' | 'entrainement', intensite = 1,
 ): number {
   const fragiliteZone = Math.max(...Object.values(profil.zones));
-  const historique = profil.historique.length * 4 + Object.values(profil.sequelles).reduce((n, x) => n + (x ?? 0), 0) * .25;
+  const historique = Math.min(20, profil.historique.slice(-5).length * 3) + Object.values(profil.sequelles).reduce((n, x) => n + (x ?? 0), 0) * .25;
   const age = Math.max(0, j.age - 28) * 2.1;
   const charge = Math.max(0, chargePourJoueur(plan, j)) * 4;
   const contact = origine === 'match' ? 18 * intensite : plan.contacts * 4;
@@ -853,19 +862,20 @@ function creerIncidentMedical(
 ): DossierMedical {
   const zone = zoneIncident(j, activite, rng);
   const ancien = profil.historique.filter((h) => h.zone === zone).length;
-  const score = profil.zones[zone] + profil.fatigue * .45 + ancien * 12 + (j.age >= 31 ? 9 : 0);
+  const score = profil.zones[zone] + profil.fatigue * .45 + Math.min(18, ancien * 6) + (j.age >= 31 ? 9 : 0);
   const grave = rng() * 100 + score * .22 > 86;
   const moyenne = !grave && rng() * 100 + score * .18 > 64;
   const gravite: DossierMedical['gravite'] = grave ? 'grave' : moyenne ? 'moyenne' : 'legere';
   const baseSemaines = zone === 'commotion' ? (grave ? 8 : moyenne ? 4 : 2) : grave ? 12 + Math.floor(rng() * 13) : moyenne ? 5 + Math.floor(rng() * 5) : 2 + Math.floor(rng() * 3);
   const type = TYPES_PAR_ZONE[zone][grave || moyenne ? 1 : 0];
-  const qualite = borne(35 + (m.installations[m.club]?.entrainement ?? 0) * 10 + (m.avancee?.profonde?.directeurSportif.gestionStaff ?? 45) * .25);
+  const qualite = 35 + (niveauMedical(m) - 1) * 14;
   return {
     id: `medical-${m.saison}-${m.semaine}-${j.id}-${origine}`, joueurId: j.id, nom: j.nom,
     type, gravite, disponibilite: 0, douleur: grave ? 90 : moyenne ? 70 : 48,
     risqueAggravation: grave ? 46 : moyenne ? 30 : 17, semaines: baseSemaines,
-    decision: 'attente', penalitePerformance: grave ? 30 : moyenne ? 19 : 10,
-    saison: m.saison, semaine: m.semaine, phase: 'suspicion', zone, origine, activite,
+    decision: 'repos', penalitePerformance: grave ? 30 : moyenne ? 19 : 10,
+    saison: m.saison, semaine: m.semaine, phase: qualite >= 68 ? 'diagnostic' : 'suspicion', zone, origine, activite,
+    club: m.club, joursRestants: baseSemaines * 7, dureeInitiale: baseSemaines * 7, joursEcoules: 0, joursReprise: 0,
     minute: origine === 'match' ? 5 + Math.floor(rng() * 74) : undefined,
     diagnosticInitial: zone === 'commotion' ? 'Suspicion de commotion, sortie immédiate.'
       : `Douleur à la zone ${zone}. Durée encore incertaine.`,
@@ -883,15 +893,16 @@ function traiterMedicalApresMatch(a: EtatCarriereAvancee, m: Manager, effectif: 
   const alignes = new Set([...m.composition.titulaires, ...m.composition.remplacants]);
 
   medical = medical.map((d) => {
-    if (d.phase === 'clos' || !alignes.has(d.joueurId)) return d;
-    if (['traitement', 'disponible', 'forcer', 'retourDirect', 'reprise20', 'reprise40'].includes(d.decision)
-      && rng() < (d.risqueRechute ?? d.risqueAggravation) / 100) {
+    if (d.phase === 'clos' || !alignes.has(d.joueurId) || autorisationMedicale(d) === 'aucune') return d;
+    const minutes = resultat?.minutesJouees ? resultat.minutesJouees[d.joueurId] ?? 0 : (m.composition.titulaires.includes(d.joueurId) ? 80 : 20);
+    if (minutes > 0 && rng() < risqueReprise(d, minutes, niveauMedical(m)) / 100) {
       actualites.push(nouvelleActualite({ saison: m.saison, semaine: m.semaine, categorie: 'blessure', importance: 3, club: m.club, titre: `Rechute de ${d.nom}`, texte: `${d.nom} a rejoué avant d’avoir retrouvé sa condition. L’absence et les séquelles augmentent.` }));
       const profil = profilsMedicaux[d.joueurId];
       if (profil && d.zone) profilsMedicaux[d.joueurId] = { ...profil,
         zones: { ...profil.zones, [d.zone]: borne(profil.zones[d.zone] + 10) },
         sequelles: { ...profil.sequelles, [d.zone]: Math.min(30, (profil.sequelles[d.zone] ?? 0) + 6) } };
-      return { ...d, gravite: 'grave' as const, phase: 'diagnostic' as const, semaines: Math.max(10, d.semaines * 3), disponibilite: 0, douleur: 92, decision: 'repos' as const, risqueAggravation: 52, risqueRechute: 46, penalitePerformance: 32, rechute: true };
+      const jours = Math.max(14, Math.round((d.dureeInitiale ?? 42) * .5));
+      return { ...d, phase: 'diagnostic' as const, semaines: Math.ceil(jours / 7), joursRestants: jours, dureeInitiale: (d.dureeInitiale ?? 42) + jours, joursReprise: 0, guerison: 0, disponibilite: 0, douleur: 75, decision: 'repos' as const, risqueBase: 30, risqueRechute: 30, penalitePerformance: 24, rechute: true };
     }
     return d;
   });
@@ -903,14 +914,15 @@ function traiterMedicalApresMatch(a: EtatCarriereAvancee, m: Manager, effectif: 
   const absents = new Set(indisponiblesCarriereAvancee(a, m.semaine));
   for (const j of effectif) {
     const profil = profilsMedicaux[j.id] ?? profilMedicalInitial(j);
-    const joue = alignes.has(j.id);
+    const minutes = resultat?.minutesJouees ? resultat.minutesJouees[j.id] ?? 0 : (m.composition.titulaires.includes(j.id) ? 80 : m.composition.remplacants.includes(j.id) ? 20 : 0);
+    const joue = minutes > 0;
     const lignes = ligneDisponibilite(profil, m.saison);
     const index = lignes.findIndex((d) => d.saison === m.saison);
     lignes[index] = {
       ...lignes[index],
       possibles: lignes[index].possibles + 1,
       disponibles: lignes[index].disponibles + (absents.has(j.id) ? 0 : 1),
-      titularisations: lignes[index].titularisations + (m.composition.titulaires.includes(j.id) ? 1 : 0),
+      titularisations: lignes[index].titularisations + (joue && m.composition.titulaires.includes(j.id) ? 1 : 0),
     };
     profilsMedicaux[j.id] = { ...profil, disponibilites: lignes,
       fatigue: borne(profil.fatigue + (joue ? (m.composition.titulaires.includes(j.id) ? 15 : 8) : -7)),
@@ -919,17 +931,18 @@ function traiterMedicalApresMatch(a: EtatCarriereAvancee, m: Manager, effectif: 
 
   const actifs = new Set(medical.filter((d) => d.phase !== 'clos').map((d) => d.joueurId));
   const intensite = m.tactique.rythme === 'intense' ? 1.25 : m.tactique.rythme === 'gestion' ? .82 : 1;
-  const blessureLive = resultat?.blessures?.find((b) => !actifs.has(b.joueurId));
-  const candidatLive = blessureLive ? effectif.find((j) => j.id === blessureLive.joueurId) : undefined;
-  const candidat = candidatLive ?? effectif.filter((j) => alignes.has(j.id) && !actifs.has(j.id)).find((j) => {
-    const profil = profilsMedicaux[j.id];
-    return profil && rng() < risqueMedicalJoueur(profil, j, a.chargeEntrainement, 'match', intensite) / 5_500;
-  });
-  if (candidat) {
-    const dossier = creerIncidentMedical(m, candidat, profilsMedicaux[candidat.id], 'match', blessureLive?.activite ?? 'match', rng);
-    if (blessureLive) dossier.minute = blessureLive.minute;
-    medical.push(dossier);
-    actualites.push(nouvelleActualite({ saison: m.saison, semaine: m.semaine, categorie: 'blessure', importance: dossier.gravite === 'grave' ? 3 : 2, club: m.club, titre: `${candidat.nom} sort à la ${dossier.minute}e`, texte: dossier.diagnosticInitial ?? dossier.type }));
+  const incidents = (resultat?.blessures ?? []).filter(b => !actifs.has(b.joueurId));
+  const candidats: { j: Coequipier | undefined; b?: NonNullable<ResultatMatchManager['blessures']>[number] }[] = incidents.map(b => ({ j: effectif.find(j => j.id === b.joueurId), b }));
+  if (!resultat?.blessures) {
+    const j = effectif.find(j => alignes.has(j.id) && !actifs.has(j.id) && rng() < risqueMedicalJoueur(profilsMedicaux[j.id], j, a.chargeEntrainement, 'match', intensite) * (1 - centreMedical(m).prevention * .35) / 5_500);
+    if (j) candidats.push({ j });
+  }
+  for (const { j: candidat, b } of candidats) {
+    if (!candidat || actifs.has(candidat.id)) continue;
+    const dossier = creerIncidentMedical(m, candidat, profilsMedicaux[candidat.id], 'match', b?.activite ?? 'match', rng);
+    if (b) dossier.minute = b.minute;
+    medical.push(dossier); actifs.add(candidat.id);
+    actualites.push(nouvelleActualite({ saison: m.saison, semaine: m.semaine, categorie: 'blessure', importance: dossier.gravite === 'grave' ? 3 : 2, club: m.club, titre: candidat.nom + ' sort à la ' + dossier.minute + 'e', texte: dossier.type + ' · ' + dossier.semaines + ' semaines estimées. Suivi dans l’Infirmerie.' }));
   }
   return { ...a, medical, profilsMedicaux, actualites: actualitesBornees(actualites) };
 }
@@ -1005,42 +1018,6 @@ export function actualiserConvocationsClub(m: Manager, effectif: Coequipier[], n
   return convocations;
 }
 
-function faireEvoluerDossier(dossier: DossierMedical): DossierMedical {
-  const d = normaliserDossier(dossier);
-  if (d.phase === 'clos') return d;
-  if (d.phase === 'suspicion') {
-    const diagnosticDans = Math.max(0, (d.diagnosticDans ?? 0) - 1);
-    return diagnosticDans > 0 ? { ...d, diagnosticDans } : {
-      ...d, phase: 'diagnostic', diagnosticDans: 0, diagnosticInitial: undefined,
-      disponibilite: 0, decision: 'attente',
-    };
-  }
-  if (d.phase === 'diagnostic' || d.phase === 'guerison') {
-    if (d.decision === 'attente') return d;
-    const vitesse = d.decision === 'repos' ? 1 : d.decision === 'traitement' || d.decision === 'disponible' ? .72 : .42;
-    const semaines = Math.max(0, d.semaines - vitesse);
-    const guerison = borne((d.guerison ?? 0) + (d.gravite === 'grave' ? 5 : d.gravite === 'moyenne' ? 10 : 16) * vitesse);
-    if (semaines <= 0 || guerison >= 100) return {
-      ...d, phase: 'reprise', semaines: 0, guerison: 100, disponibilite: 55,
-      condition: Math.max(35, d.condition ?? 45), rythme: Math.max(20, d.rythme ?? 30),
-      risqueRechute: Math.max(12, d.risqueRechute ?? 20), decision: 'attente', penalitePerformance: 18,
-    };
-    return { ...d, phase: 'guerison', semaines: Math.ceil(semaines), guerison,
-      douleur: borne(d.douleur - 9 * vitesse), disponibilite: d.decision === 'repos' ? 0 : d.disponibilite };
-  }
-  const retour = d.decision;
-  const gainCondition = retour === 'reserve' ? 14 : retour === 'reprise20' ? 10 : retour === 'reprise40' ? 8 : retour === 'retourDirect' || retour === 'forcer' ? 4 : 7;
-  const gainRythme = retour === 'reserve' ? 12 : retour === 'reprise20' ? 14 : retour === 'reprise40' ? 16 : retour === 'retourDirect' || retour === 'forcer' ? 18 : 5;
-  const condition = borne((d.condition ?? 50) + gainCondition);
-  const rythme = borne((d.rythme ?? 35) + gainRythme);
-  const risqueRechute = Math.max(4, (d.risqueRechute ?? 20) - (retour === 'reserve' ? 7 : retour === 'reprise20' ? 5 : 3));
-  const clos = condition >= 92 && rythme >= 88 && risqueRechute <= 8;
-  return { ...d, phase: clos ? 'clos' : 'reprise', condition, rythme, risqueRechute,
-    disponibilite: clos ? 100 : retour === 'reserve' || retour === 'attente' || retour === 'repos' ? 0 : retour === 'reprise20' ? 65 : retour === 'reprise40' ? 78 : 92,
-    penalitePerformance: clos ? 0 : retour === 'reprise20' ? 16 : retour === 'reprise40' ? 10 : retour === 'retourDirect' || retour === 'forcer' ? 18 : 0,
-    decision: clos ? 'repos' : d.decision };
-}
-
 function actualiserContratsJoueurs(a: EtatCarriereAvancee, m: Manager, effectif: Coequipier[], semaineSuivante: number): Record<string, ContratJoueurAvance> {
   const contrats = { ...a.contratsJoueurs };
   const force = forceEffectif(m.club, m.saison);
@@ -1080,7 +1057,8 @@ function actualiserContratsJoueurs(a: EtatCarriereAvancee, m: Manager, effectif:
 export function avancerSemaineCarriereAvancee(m: Manager, effectif: Coequipier[], semaineSuivante: number): EtatCarriereAvancee {
   let a = assurerEtatCarriereAvancee(m, effectif);
   const avantMedical = a.medical.map(normaliserDossier);
-  let medical = avantMedical.map(faireEvoluerDossier);
+  const joursAvances = Math.max(0, (dateMedicale(m.saison, semaineSuivante).getTime() - dateMedicale(m.saison, m.semaine).getTime()) / 86_400_000);
+  let medical = avantMedical.map(d => evoluerSoin(d, niveauMedical(m), joursAvances));
   const profilsMedicaux = { ...a.profilsMedicaux };
   const soignes = new Set(avantMedical.filter((d) => d.phase !== 'clos' && (d.disponibilite ?? 0) < 100).map((d) => d.joueurId));
   for (const j of effectif) {
@@ -1091,7 +1069,7 @@ export function avancerSemaineCarriereAvancee(m: Manager, effectif: Coequipier[]
       const index = lignes.findIndex((d) => d.saison === m.saison);
       lignes[index] = { ...lignes[index],
         semainesBlessees: lignes[index].semainesBlessees + 1,
-        joursBlesse: lignes[index].joursBlesse + 7 };
+        joursBlesse: lignes[index].joursBlesse + Math.min(joursAvances, (avantMedical.find(d => d.joueurId === j.id)?.joursRestants ?? 0) / centreMedical(m).vitesse) };
     }
     profilsMedicaux[j.id] = { ...profil, disponibilites: lignes,
       fatigue: borne(profil.fatigue + charge * 1.7 - a.chargeEntrainement.recuperation * 4),
@@ -1099,7 +1077,7 @@ export function avancerSemaineCarriereAvancee(m: Manager, effectif: Coequipier[]
   }
   // Une blessure passée laisse enfin une trace durable : récidive et séquelle
   // influenceront les saisons suivantes et la visite médicale d'un contrat.
-  for (const d of medical.filter((x) => x.phase === 'reprise' || x.phase === 'clos')) {
+  for (const d of medical.filter((x) => x.phase === 'clos')) {
     if (!d.zone) continue;
     const profil = profilsMedicaux[d.joueurId];
     if (!profil || profil.historique.some((h) => h.saison === d.saison && h.semaine === d.semaine && h.type === d.type)) continue;
@@ -1107,7 +1085,7 @@ export function avancerSemaineCarriereAvancee(m: Manager, effectif: Coequipier[]
     // Les jours d'absence sont ce que l'écran « Disponibilité » affiche à côté
     // de chaque blessure : on les fige à la clôture du dossier, à partir de la
     // semaine où il s'est ouvert.
-    const jours = Math.max(3, (semaineSuivante - d.semaine) * 7);
+    const jours = Math.round(d.joursEcoules ?? Math.max(3, ((m.saison - d.saison) * 52 + semaineSuivante - d.semaine) * 7));
     profilsMedicaux[d.joueurId] = { ...profil,
       historique: [...profil.historique, { zone: d.zone, type: d.type, saison: d.saison, semaine: d.semaine, gravite: d.gravite, rechute: !!d.rechute, sequelle, jours }].slice(-24),
       commotions: profil.commotions + (d.zone === 'commotion' ? 1 : 0),
@@ -1122,7 +1100,7 @@ export function avancerSemaineCarriereAvancee(m: Manager, effectif: Coequipier[]
   //    tête — c’est elle qui donne son motif à la blessure.
   const activites: (keyof PlanChargeHebdo)[] = ["physique", "contacts", "sprint", "melee"];
   activites.sort((x, y) => a.chargeEntrainement[y] - a.chargeEntrainement[x]);
-  const candidat = effectif.filter((j) => !actifs.has(j.id)).find((j) => rng() < risqueMedicalJoueur(profilsMedicaux[j.id], j, a.chargeEntrainement, 'entrainement') / 7_200);
+  const candidat = effectif.filter((j) => !actifs.has(j.id)).find((j) => rng() < risqueMedicalJoueur(profilsMedicaux[j.id], j, a.chargeEntrainement, 'entrainement') * (1 - centreMedical(m).prevention) / 7_200);
   const nouvellesMedicales: ActualiteCarriere[] = [];
   if (candidat && chargeTotaleEntrainement(a.chargeEntrainement) > 3) {
     const dossier = creerIncidentMedical({ ...m, semaine: semaineSuivante }, candidat, profilsMedicaux[candidat.id], 'entrainement', activites[0], rng);
@@ -1205,26 +1183,7 @@ export function repondreDiscussionAvancee(a: EtatCarriereAvancee, m: Manager, id
 }
 
 export function deciderMedical(a: EtatCarriereAvancee, id: string, decision: Exclude<DecisionMedicale, 'attente'>): EtatCarriereAvancee {
-  return {
-    ...a,
-    medical: a.medical.map((brut) => {
-      if (brut.id !== id) return brut;
-      const d = normaliserDossier(brut);
-      // Le protocole commotion ne peut être contourné par une décision du coach.
-      if (d.protocoleCommotion && ['forcer', 'retourDirect', 'reprise20', 'reprise40'].includes(decision) && d.phase !== 'reprise') return d;
-      if (d.phase === 'suspicion') return d;
-      if (d.phase === 'reprise') {
-        const autorisee = ['repos', 'reprise20', 'reprise40', 'reserve', 'retourDirect', 'forcer'].includes(decision);
-        if (!autorisee) return d;
-        return { ...d, decision, disponibilite: decision === 'reprise20' ? 65 : decision === 'reprise40' ? 78 : decision === 'retourDirect' || decision === 'forcer' ? 92 : 0,
-          risqueRechute: Math.min(100, (d.risqueRechute ?? 15) + (decision === 'retourDirect' || decision === 'forcer' ? 18 : 0)) };
-      }
-      if (decision === 'repos') return { ...d, decision, disponibilite: 0, risqueAggravation: Math.max(2, d.risqueAggravation - 8), penalitePerformance: 0 };
-      if (decision === 'traitement' || decision === 'disponible') return { ...d, decision: 'disponible', disponibilite: 72, risqueAggravation: Math.min(100, d.risqueAggravation + 14), penalitePerformance: 14 };
-      if (decision === 'forcer') return { ...d, decision, disponibilite: 90, risqueAggravation: Math.min(100, d.risqueAggravation + 30), risqueRechute: Math.min(100, (d.risqueRechute ?? 15) + 24), penalitePerformance: 22 };
-      return d;
-    }),
-  };
+  return { ...a, medical: a.medical.map(d => d.id === id ? choisirReprise(d, decision) : d) };
 }
 
 export function definirChargeEntrainement(
@@ -1310,7 +1269,7 @@ export function signerRenegociationJoueur(
 export function indisponiblesCarriereAvancee(a: EtatCarriereAvancee | undefined, semaine: number): string[] {
   if (!a) return [];
   const medical = a.medical.map(normaliserDossier).filter((d) => d.phase !== 'clos'
-    && (d.phase === 'suspicion' || d.decision === 'repos' || d.decision === 'attente' || d.decision === 'reserve')).map((d) => d.joueurId);
+    && autorisationMedicale(d) === 'aucune').map((d) => d.joueurId);
   const selection = a.convocations.filter((c) => semaine >= c.debut && semaine <= c.fin).map((c) => c.joueurId);
   return [...new Set([...medical, ...selection])];
 }
@@ -1455,7 +1414,7 @@ function evoluerMonde(a: EtatCarriereAvancee, m: Manager): Pick<EtatCarriereAvan
       entraineursIA[coach.id] = { ...coach, club: '', confiance, contrat: 0, saisons: coach.saisons + 1 };
       entraineurId = id;
       if (club === m.club || rng() > 0.94) actualites.push(nouvelleActualite({ saison: m.saison, semaine: 43, categorie: 'manager', importance: 2, club, titre: `Changement d'entraîneur à ${club}`, texte: `${coach.nom} quitte son poste. ${entraineursIA[id].nom} prend la suite.` }));
-      if (m.prestige >= Math.max(8, richesse - 12) && club !== m.club && offresBanc.length < 8) offresBanc.push({ id: `offre-${m.saison}-${club}`, club, division: comp?.id ?? '', salaire: Math.round(Math.max(12_000, richesse * richesse * 85) / 1000) * 1000, duree: 2 + Math.floor(rng() * 3), statut: 'offre', exigePrestige: Math.max(0, richesse - 12), saison: m.saison + 1 });
+      if (m.prestige >= Math.max(8, richesse - 12) && club !== m.club && offresBanc.length < 8) offresBanc.push({ id: `offre-${m.saison}-${club}`, club, division: comp?.id ?? '', salaire: Math.round(Math.max(12_000, richesse * richesse * 85) / 1000) * 1000, duree: 2 + Math.floor(rng() * 2), statut: 'offre', exigePrestige: Math.max(0, richesse - 12), saison: m.saison + 1 });
     } else entraineursIA[coach.id] = { ...coach, confiance, contrat: Math.max(0, coach.contrat - 1), saisons: coach.saisons + 1 };
     clubsMonde[club] = { ...c, richesse, infrastructures, entraineurId, tendance, professionnel: c.professionnel || (richesse >= 58 && infrastructures >= 52) };
     identites[club] = apresLaSaison(identites[club] ?? identiteHistorique(club), { partJeunesFormes: c.strategie === 'formation' ? 0.32 : 0.12, partLocaux: c.strategie === 'local' ? 0.75 : 0.42, partEtrangers: c.strategie === 'international' ? 0.64 : 0.22, grosSalaires: c.strategie === 'stars' ? 4 : 1, essaisMarques: 2.1 + tendance / 15, essaisEncaisses: 2.2 - tendance / 18, cartons: 2, departs: rng() > 0.75 ? 3 : 1, changementDEntraineur: entraineurId !== c.entraineurId, positionRelative: position, investissementFormation: Math.round(infrastructures / 25) });
@@ -1510,13 +1469,9 @@ export function postulerBancAvance(a: EtatCarriereAvancee, m: Manager, club: str
   return { ...a, offresBanc: [...a.offresBanc.filter((o) => o.club !== club || o.saison !== m.saison), offre] };
 }
 
-export function negocierContratManagerAvance(a: EtatCarriereAvancee, m: Manager): { etat: EtatCarriereAvancee; contrat: Manager['contrat']; confiance: number } {
-  if (!m.club || !m.contrat) return { etat: a, contrat: m.contrat, confiance: 0 };
-  const rng = graine(`contrat-manager#${m.club}#${m.saison}#${Math.round(m.confiance)}`);
-  const accepte = m.confiance >= 58 && rng() < Math.min(0.9, m.confiance / 100 + m.prestige / 250);
-  const contrat = accepte ? { saisons: Math.max(2, m.contrat.saisons + 2), salaire: Math.round(m.contrat.salaire * (1.08 + m.prestige / 1000) / 1000) * 1000 } : m.contrat;
-  const actualite = nouvelleActualite({ saison: m.saison, semaine: m.semaine, categorie: 'manager', importance: 2, club: m.club, titre: accepte ? `Le contrat de ${m.nom} prolongé` : 'La direction attend avant de prolonger', texte: accepte ? `Le club sécurise son entraîneur pour ${contrat.saisons} saisons.` : 'Le président veut voir davantage de résultats avant de rouvrir les négociations.' });
-  return { etat: { ...a, actualites: actualitesBornees([...a.actualites, actualite]) }, contrat, confiance: accepte ? 2 : -2 };
+export function negocierContratManagerAvance(a: EtatCarriereAvancee, m: Manager) {
+  const retour = accepterProlongation(m);
+  return { etat: a, ...retour, confiance: 0 };
 }
 
 export function accepterSelectionAvance(a: EtatCarriereAvancee, m: Manager): EtatCarriereAvancee {

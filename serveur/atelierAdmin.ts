@@ -1,3 +1,7 @@
+import { clubParNom } from '../src/data/clubs.js';
+import { verifierDonneesClubs } from '../src/lib/donneesClubs.js';
+import { coordonneesValides } from '../src/lib/localisationClub.js';
+import type { LocalisationClub } from '../src/lib/localisationClub.js';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { CATALOGUE_ADMIN_VIDE, catalogueAdmin, fournirCatalogueAdmin, type CatalogueAdmin, type EditionJoueur } from '../src/lib/ligue/atelierCatalogue.js';
 import { bandesGaranties, carteDansPack, catalogueBaseCarriere, catalogueMondialCarriere, packsCatalogueAdmin, RARETES_CARRIERE } from '../src/lib/ligue/catalogueCarriere.js';
@@ -126,6 +130,32 @@ export function validerArticleLabo(v: unknown): ArticleLabo {
   }
   return article;
 }
+export function vueDonneesClubs() { return { revision: catalogueAdmin().revision, clubs: verifierDonneesClubs(), rivalites: catalogueAdmin().rivalitesHistoriques ?? [] }; }
+export function validerLocalisation(v: unknown): LocalisationClub {
+  const d = objet(v), sortie: LocalisationClub = {};
+  for (const cle of ['ville', 'stade', 'adresseStade', 'departement', 'departementNum', 'region', 'pays', 'codePostal'] as const) {
+    if (d[cle] !== undefined && d[cle] !== '') sortie[cle] = texte(d[cle], cle === 'adresseStade' ? 300 : 120);
+  }
+  for (const cle of ['latitude', 'longitude', 'latitudeVille', 'longitudeVille'] as const) {
+    if (d[cle] !== undefined && d[cle] !== null && d[cle] !== '') sortie[cle] = nombre(d[cle], cle.includes('latitude') ? -90 : -180, cle.includes('latitude') ? 90 : 180);
+  }
+  for (const cle of ['sourceLocalisation', 'sourceCoordonnees'] as const) if (d[cle]) {
+    const source = texte(d[cle], 2000); let url: URL;
+    try { url = new URL(source); } catch { return refuser('Une source HTTPS est requise.'); }
+    if (url.protocol !== 'https:' || url.username || url.password) refuser('Une source HTTPS est requise.');
+    sortie[cle] = source;
+  }
+  if (!['stade', 'siege', 'commune', 'fallback'].includes(String(d.precisionLieu))) refuser('Précision géographique invalide.');
+  if (!['verifie', 'nonVerifie'].includes(String(d.statutGeographique))) refuser('Statut géographique invalide.');
+  sortie.precisionLieu = d.precisionLieu as LocalisationClub['precisionLieu'];
+  sortie.statutGeographique = d.statutGeographique as LocalisationClub['statutGeographique'];
+  if (sortie.statutGeographique === 'verifie') {
+    if (!coordonneesValides(sortie) || !sortie.ville || !sortie.pays || !sortie.region || !sortie.sourceLocalisation || sortie.precisionLieu === 'fallback') refuser('Pour vérifier un club, renseigne ville, pays, région, coordonnées et source fiable.');
+    sortie.verifieLe = new Date().toISOString().slice(0,10);
+  }
+  return sortie;
+}
+
 export function vueAtelier(q: string) {
   const normaliser=(s:string)=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
   const recherche=normaliser(q.slice(0,100));
@@ -154,7 +184,21 @@ export async function enregistrerAtelier(stockage: StockageAtelier, corps: Recor
   if(corps.revision !== courant.revision) refuser('Le catalogue a changé. Recharge l’atelier avant d’enregistrer.');
   const suivant=structuredClone(courant);
   let compteRendu: Record<string, unknown> | undefined;
-  if(corps.operation === 'pack') {
+  if (corps.operation === 'localisationClub') {
+    const club = clubParNom(texte(corps.club, 150)); if (!club) refuser('Club introuvable.');
+    suivant.clubs = { ...suivant.clubs, [club.nom]: validerLocalisation(corps.localisation) };
+  } else if (corps.operation === 'rivaliteHistorique') {
+    const a = clubParNom(texte(corps.clubA, 150)), b = clubParNom(texte(corps.clubB, 150));
+    if (!a || !b || a.nom === b.nom) refuser('Deux clubs distincts sont requis.');
+    const paire = [a.nom,b.nom].sort();
+    const reste = (suivant.rivalitesHistoriques ?? []).filter(r => [r.clubA,r.clubB].sort().join('|') !== paire.join('|'));
+    if (corps.supprimer === true) suivant.rivalitesHistoriques = reste;
+    else {
+      const source = validerLocalisation({ sourceLocalisation: corps.source, precisionLieu: 'commune', statutGeographique: 'nonVerifie' }).sourceLocalisation;
+      if (!source) refuser('Une source est requise pour cette rivalité.');
+      suivant.rivalitesHistoriques = [...reste, { clubA: paire[0], clubB: paire[1], source }];
+    }
+  } else if(corps.operation === 'pack') {
     const pack=validerPack(corps.pack); suivant.packs[pack.id]=pack;
     if(Object.keys(suivant.packs).length>100) refuser('Maximum de 100 packs personnalisés.');
   } else if(corps.operation === 'supprimerPack') {

@@ -77,10 +77,11 @@ console.log('OK — signatures, vente, totaux et reports des trois enveloppes');
 
 const groupe = effectifDuClub(vendu.club, 1);
 const objectifs = objectifsDeSaison(vendu, groupe);
-assert.equal(objectifs.length, 4);
+assert.ok(objectifs.length >= 4 && objectifs.length <= 5);
+assert.ok(objectifs.some(o => o.indicateur === 'parcoursCoupe'), 'Un club européen reçoit un objectif de Coupe');
 const objectifsSuivants = objectifsDeSaison({ ...vendu, saison: 2 }, groupe);
 assert.notDeepEqual(objectifs.map((o) => o.indicateur), objectifsSuivants.map((o) => o.indicateur), 'Les priorités changent la saison suivante');
-assert.ok(!objectifs.slice(2).some((o) => objectifsSuivants.slice(2).some((n) => n.indicateur === o.indicateur)), 'Les deux priorités complémentaires ne se répètent pas la saison suivante');
+assert.ok(!objectifs.slice(2, 4).some((o) => objectifsSuivants.slice(2, 4).some((n) => n.indicateur === o.indicateur)), 'Les deux priorités complémentaires ne se répètent pas la saison suivante');
 const finance = objectifs.find((o) => o.indicateur === 'masseSalariale')!;
 assert.ok(evaluerObjectif(finance, vendu, groupe, 1, true).atteint);
 const depasse = evaluerObjectif(finance, { ...vendu, budgetSalarial: 1 }, groupe, 1, true);

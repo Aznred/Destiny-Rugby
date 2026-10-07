@@ -21,7 +21,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { DirectCinema } from '../src/components/match/DirectCinema';
 import { extraireTerrain, RESSERREMENT_REGLES_2, type VueMatchEnLigne } from '../src/lib/ligue/matchCarriere';
-import { cadrerFilm, extraireFilm, filmer, reperesFilm, type FilmDirect } from '../src/lib/ligue/filmDirect';
+import { cadrerFilm, extraireChrono, filmer, reperesChrono, type ChronoDirect } from '../src/lib/ligue/filmDirect';
 import { avancer, choisirPenalite, creerMatch, infoPenalite, patienter } from '../src/lib/moteur/moteur';
 import { effectifDuClub } from '../src/lib/effectif';
 import { clubParNom } from '../src/data/clubs';
@@ -36,7 +36,7 @@ const vitesse = Number(reglages.get('vitesse')) || 1;
 const latence = Number(reglages.get('latence')) || 0;
 const regles2 = reglages.get('regles') !== '1';
 const ancienChemin = reglages.get('releve') === '1';
-const INTERVALLE_RELEVE = 2000;
+const INTERVALLE_RELEVE = 3000;
 const avecDecisions = reglages.get('decision') !== '0';
 /** La décision en attente du « serveur » de l'aperçu : même arrêt, même attente jouée que sur le vrai. */
 const attente: { debut?: number; horloge?: number } = {};
@@ -55,10 +55,13 @@ if (reglages.get('pilote') === '1') {
 
 function vue(e: ReturnType<typeof creerMatch>): VueMatchEnLigne {
   // Le film remplace le relevé, comme sur le serveur ; avant le premier pas, la caméra n'a rien.
-  const film = ancienChemin ? undefined : extraireFilm(e, reperesFilm.get('apercu-3d'));
+  // L'écran annonce son dernier pas et sa somme de contrôle, comme au vrai serveur (`&tl=`).
+  const [depuis, somme] = (reperesChrono.get('apercu-3d') ?? '').split('.').map(Number);
+  const extrait = ancienChemin ? undefined : extraireChrono(e, Number.isInteger(depuis) && depuis > 0 ? { depuis, somme } : {}, true);
+  const film = extrait && extrait !== 'refilmer' ? extrait : undefined;
   const decision = penaliteATrancher(e);
-  // La caméra ne filme que ce qui est regardé : la demande ci-dessus l'allume, on la cadre pour la suite.
-  if (!ancienChemin) cadrerFilm(e, 0);
+  // La caméra ne filme que ce qui est regardé : on la garde allumée pour la suite.
+  if (!ancienChemin) cadrerFilm(e, e.sim, true);
   const stats = (cote: 'A' | 'B') => {
     const pions = e.pions.filter((p) => p.cote === cote);
     const somme = (cle: 'metres' | 'plaquages') => Math.round(pions.reduce((n, p) => n + (p.stats[cle] ?? 0), 0));
@@ -76,7 +79,7 @@ function vue(e: ReturnType<typeof creerMatch>): VueMatchEnLigne {
     fil: e.commentaires.slice(-30).map((c) => ({ minute: c.minute, seconde: c.seconde, texte: c.texte, type: c.type, cote: c.camp === 'A' ? 'domicile' : 'exterieur' })) as VueMatchEnLigne['fil'],
     stats: { domicile: stats('A'), exterieur: stats('B') },
     terrain: film ? undefined : extraireTerrain(e, Date.now()),
-    film: film ? JSON.parse(JSON.stringify(film)) as FilmDirect : undefined, moments: [],
+    chrono: film ? JSON.parse(JSON.stringify(film)) as ChronoDirect : undefined, moments: [],
     monCote: 'domicile', gele: !!decision,
     decision: decision && attente.debut !== undefined ? {
       cote: 'domicile', distance: decision.distance, angle: decision.angle, probabilite: Math.round(decision.probabilite * 100),
@@ -94,7 +97,7 @@ function Apercu() {
     });
   const e = moteur.current;
   filmer(e);
-  cadrerFilm(e, 0);
+  cadrerFilm(e, 0, true);
   const [m, setM] = useState(() => vue(e));
   useEffect(() => {
     let dernier = performance.now();
@@ -132,7 +135,7 @@ function Apercu() {
   return (
     <main className="cel" style={{ maxWidth: 1020, margin: '18px auto', padding: 12 }}>
       <p style={{ color: '#cfd8c8', fontSize: 13 }}>
-        Aperçu du direct en ligne · {ancienChemin ? 'un relevé' : 'un envoi du film'} toutes les {INTERVALLE_RELEVE / 1000} s
+        Aperçu du direct en ligne · {ancienChemin ? 'un relevé' : 'un envoi de la chronologie'} toutes les {INTERVALLE_RELEVE / 1000} s
         · règles {regles2 ? 2 : 1} · vitesse ×{vitesse}{latence ? ` · latence jusqu'à ${latence} ms` : ''}
       </p>
       <DirectCinema match={m} domicile={DOMICILE} exterieur={EXTERIEUR} couleurs={couleurs}

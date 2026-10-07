@@ -28,6 +28,18 @@ function jouer(gagne = true) {
   });
   return a;
 }
+/**
+ * Perd tout ce qui reste à jouer ce week-end.
+ * ⚠️ Depuis le Correctif 26, un week-end de phase finale peut porter PLUSIEURS matchs couperets : le tour de sa poule
+ * puis le tournoi final de la division. La semaine ne passe que lorsque tous sont joués.
+ */
+function perdreLeWeekEnd() {
+  for (let garde = 0; garde < 8; garde++) {
+    const a = afficheDuClub(manager());
+    if (!a || manager().resultats[a.cle]) return;
+    jouer(false);
+  }
+}
 function gagnerJusqua(semaine: number) {
   for (let garde = 0; manager().semaine < semaine && garde < 100; garde++) {
     const m = manager();
@@ -84,7 +96,7 @@ console.log('✓ promotion, trophée et tailles des divisions sur trois étages'
 // Le finaliste malheureux a son vrai match d'accès, dont le résultat compte.
 creer(COMPETITIONS.find((c) => c.id === 'reg2')!.clubs[0].nom);
 gagnerJusqua(playoffs('finale'));
-jouer(false);
+perdreLeWeekEnd();
 etat().semaineManager();
 assert.equal(afficheDuClub(manager())?.tour, 'accession');
 const acces = jouer();
@@ -103,12 +115,16 @@ console.log('✓ barrage d’accès et résultats rechargés');
 // Une élimination en demi-finale ne doit pas proposer de finale au perdant.
 creer(COMPETITIONS.find((c) => c.id === 'reg3')!.clubs[0].nom);
 gagnerJusqua(playoffs('demie'));
-jouer(false);
+perdreLeWeekEnd();
 etat().semaineManager();
 assert.equal(afficheDuClub(manager()), null);
 
 // Une dernière place entraîne bien une descente effective la saison suivante.
 creer('Stade Toulousain');
+// Isoler la relégation : le contrôle du licenciement est couvert par verifierCorrectif27.
+useGame.setState({ manager: { ...manager(), conseil: { club: manager().club, score: 60,
+  detail: { sportif: 60, objectifs: 60, finances: 85, groupe: 65 },
+  avertissement: { saison: 1, debut: 0, cible: 2, matchs: 5, victoires: 2, termine: true } } } });
 for (let garde = 0; manager().semaine < playoffs('acces') && garde < 100; garde++) {
   const a = afficheDuClub(manager());
   if (a && !manager().resultats[a.cle]) jouer(false); else etat().semaineManager();

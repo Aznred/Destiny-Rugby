@@ -1,4 +1,5 @@
 import { LOGO_COMPETITION } from '../data/logosCompetitions.js';
+import { couleursDuTableau, departagerLesSigles, enHex } from './tenuesMatch.js';
 import { LOGO_COMPETITION_NOUVEAU } from '../data/nouvellesLigues.js';
 import type { EtatMatch } from './moteur/etat.js';
 
@@ -14,6 +15,8 @@ export interface IdentiteTV {
 }
 export interface EquipeTV {
   nom: string; couleur: string; texte?: string; logo?: string; score: number;
+  /** La seconde couleur du club : un liseré sous son score. */
+  lisere?: string;
   /** Essais marqués : affichés dans l'onglet au-dessus du score (« 4E »). */
   essais?: number;
 }
@@ -41,9 +44,18 @@ export const PALETTE_TV: PaletteTV = {
 export const PALETTE_TOP14: PaletteTV = {
   principale: '#090b0a', secondaire: '#f3f5f6', fond: '#040605', accent: '#b99a42', texte: '#ffffff',
 };
-export function couleursEquipeTV(couleur: string, exterieur = false): Pick<EquipeTV, 'couleur' | 'texte'> {
-  const franche = couleur.toLowerCase() === '#c1121f' ? '#d5001c' : couleur;
-  return exterieur ? { couleur: '#f3f5f6', texte: '#102f49' } : { couleur: franche, texte: texteSurCouleur(franche) };
+/**
+ * Ce que le tableau affiche pour une équipe : la couleur qu'elle PORTE, un texte lisible dessus, et sa seconde couleur en liseré.
+ *
+ * ⚠️ LE VISITEUR N'EST PLUS BLANC D'OFFICE (Correctif 24). Il recevait `#f3f5f6` quelle que soit sa couleur : un club
+ * rouge en déplacement s'affichait en blanc, et deux clubs sur trois avaient le même tableau. Les deux tenues sont
+ * départagées AVANT (`lib/tenuesMatch.ts`), une fois, pour le terrain comme pour le tableau.
+ */
+export function couleursEquipeTV(couleur: string, secondaire?: string | boolean): Pick<EquipeTV, 'couleur' | 'texte' | 'lisere'> {
+  const hex = enHex(couleur);
+  const franche = hex === '#c1121f' ? '#d5001c' : hex;
+  const c = couleursDuTableau({ principal: franche, secondaire: typeof secondaire === 'string' ? secondaire : franche });
+  return { couleur: c.couleur, texte: c.texte, ...(typeof secondaire === 'string' ? { lisere: c.lisere } : {}) };
 }
 export function logoTV(logo?: string): string {
   return (logo && (LOGO_COMPETITION[logo] ?? LOGO_COMPETITION_NOUVEAU[logo]
@@ -59,6 +71,10 @@ export function abreviationTV(nom: string): string {
     'section paloise': 'PAU', 'rc vannes': 'VAN', 'aviron bayonnais': 'BAY', 'stade français': 'SFP' };
   return connu[nom.toLowerCase()] ?? nom.replace(/^(stade |racing |union |rc |us |ca |fc |as )/i, '')
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/gi, '').slice(0, 3).toUpperCase();
+}
+/** Les deux sigles du tableau, jamais identiques (« TOU » contre « RCT », pas « TOU » contre « TOU »). */
+export function siglesTV(nomA: string, nomB: string): [string, string] {
+  return departagerLesSigles(abreviationTV(nomA), nomA, abreviationTV(nomB), nomB);
 }
 export function texteSurCouleur(couleur: string): string {
   const hex = couleur.match(/^#([\da-f]{6}|[\da-f]{3})$/i)?.[1];

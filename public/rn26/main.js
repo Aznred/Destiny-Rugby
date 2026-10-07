@@ -19,12 +19,16 @@ function nouveauMatch(){const etat=moteur.creerApercuDestiny();etat.carriereDixM
 let scene,match,paused=false,last=0,frames=0,fps=0,fpsStart=0,previousEvents='',hudAt=0;
 const speedFactor=()=>Number($('#speed').value);
 
+// ?sans=squelettes,soudure,elagage,cadence : coupe une optimisation, pour la mesurer.
+// ?banc=1 : la page n'avance que sur demande (rn26.play, rn26.mesurer) — deux chargements donnent alors la MÊME image.
+const BANC=new URLSearchParams(location.search).has('banc');
+const SANS=Object.fromEntries((new URLSearchParams(location.search).get('sans')||'').split(',').filter(Boolean).map(n=>[n,false]));
 async function boot(){
   $('#loading').textContent='Chargement du stade, des équipements et des mouvements…';
-  scene=await creerScene3D($('#scene'),{outils,equipes:EQUIPES,capture:true,camera:'tv',habillage:{nom:'Destiny Rugby'},stade:new URLSearchParams(location.search).get('stade')||undefined,ballon:new URLSearchParams(location.search).get('ballon')||undefined});
+  scene=await creerScene3D($('#scene'),{outils,equipes:EQUIPES,capture:true,camera:'tv',habillage:{nom:'Destiny Rugby'},stade:new URLSearchParams(location.search).get('stade')||undefined,ballon:new URLSearchParams(location.search).get('ballon')||undefined,...SANS});
   majSon();
   match=scene.brancher(nouveauMatch());
-  $('#loading').remove();requestAnimationFrame(frame);
+  $('#loading').remove();if(!BANC)requestAnimationFrame(frame);
   // Accès de contrôle pour les vérifications automatisées (aucun effet en jeu).
   const i=scene.interne;
   window.rn26={get match(){return match;},set match(m){match=scene.brancher(m);},scene3D:scene,actors:i.actors,officials:i.officials,camera:i.camera,scene:i.scene,renderer:i.renderer,motions:i.motions,THREE:i.THREE,rig:i.rig,ballState:i.ballState,hud,nouveauMatch,
@@ -33,6 +37,31 @@ async function boot(){
     get view(){return scene.vue;},set view(v){scene.vue=v;},
     /** Avance la simulation de n pas en rendant chaque image intermédiaire. */
     advance(n=1,dt=TICK){for(let k=0;k<n;k++){match.step(dt);scene.image(dt,{still:true});}hud();},
+    /** Ce que coûte une image : joue `secondes` de match hors de la boucle d'affichage, puis compte sous chaque caméra. */
+    mesurer(secondes=8){
+      const R=i.renderer,dessin=R.render.bind(R);let tRendu=0,n=0;
+      if(!paused)togglePause();
+      R.render=(s,c)=>{const t0=performance.now();dessin(s,c);tRendu+=performance.now()-t0;n++;};
+      const t0=performance.now();
+      try{window.rn26.play(secondes,60);}finally{R.render=dessin;}
+      const total=performance.now()-t0,cameras={};
+      for(const c of ['tv','follow','close','wide','aerienne','basse','enbut']){
+        scene.camera=c;scene.recadrer();for(let k=0;k<3;k++)scene.image(.016,{still:true,fige:true});
+        cameras[c]={appels:R.info.render.calls,triangles:R.info.render.triangles,horsChamp:scene.mesures().elagues};
+      }
+      scene.camera=$('#camera').value;scene.recadrer();
+      let fixes=0,animes=0;const squelettes=new Set();
+      i.scene.traverse(o=>{if(!o.isMesh)return;if(o.isSkinnedMesh){animes++;squelettes.add(o.skeleton);}else fixes++;});
+      return {stade:new URLSearchParams(location.search).get('stade')||'international',sans:Object.keys(SANS),images:n,msParImage:+(total/n).toFixed(2),msRendu:+(tRendu/n).toFixed(2),toile:R.domElement.width+'x'+R.domElement.height,maillagesFixes:fixes,maillagesAnimes:animes,squelettes:squelettes.size,geometries:R.info.memory.geometries,textures:R.info.memory.textures,cameras};
+    },
+    /** Une somme de l'image affichée sous une caméra, match arrêté : deux réglages qui rendent la même image rendent la même somme. */
+    empreinte(camera='wide'){
+      scene.camera=camera;scene.recadrer();for(let k=0;k<3;k++)scene.image(.016,{still:true,fige:true});
+      const gl=i.renderer.getContext(),l=gl.drawingBufferWidth,h=gl.drawingBufferHeight,p=new Uint8Array(l*h*4);
+      gl.readPixels(0,0,l,h,gl.RGBA,gl.UNSIGNED_BYTE,p);
+      let s=2166136261;for(let k=0;k<p.length;k++)s=Math.imul(s^p[k],16777619);
+      return {camera,somme:(s>>>0).toString(16),pixels:p};
+    },
     /** Recadre immédiatement la caméra et les poses à la prochaine image. */
     snap(){scene.recadrer();},
     /** Joue le match hors de la boucle d'affichage, image par image, comme à l'écran. */

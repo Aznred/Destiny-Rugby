@@ -122,6 +122,11 @@ export interface ClubCarriere {
   /** Lots planifiés par l'administrateur, indexés par jour UTC. Jamais exposés aux autres clubs. */
   packsGratuitsProgrammes?: Record<string, IdPackCarriere[]>;
   dernierLotPacksGratuits?: string;
+  /**
+   * Ovas déjà débités pour un achat ou une enchère du marché commun, tant que l'affaire n'est pas conclue : rendus si
+   * l'annonce part à un autre, consommés à la livraison de la carte. `ref` = annonce + montant.
+   */
+  reservesMarche?: { ref: string; montant: number; le: string }[];
 }
 export interface ResultatCarriere {
   pointsD: number; pointsE: number; essaisD: number; essaisE: number;
@@ -163,6 +168,13 @@ export interface VenteCarriere {
   enchere?: { clubId: string; montant: number }; acheteurId?: string;
   /** Conservé après la vente, même si la carte quitte ensuite la ligue. */
   joueurNom?: string;
+  /**
+   * L'annonce vit sur le MARCHÉ COMMUN des divisions publiques (`marchePartage.ts`) : toutes les divisions du cycle la
+   * voient et peuvent l'acheter. La ligue ne la conclut, ne l'annule et ne la fait expirer que sur ordre du serveur.
+   */
+  partagee?: boolean;
+  /** Acheteur d'une autre division : son club n'existe pas dans cette ligue. */
+  acheteurNom?: string;
 }
 export interface EchangeCarriere {
   id: string; de: string; vers: string; cartesDonnees: string[]; cartesDemandees: string[];
@@ -288,7 +300,9 @@ export type CommandeCarriere =
   // une par une passerait les quatre premières puis échouerait sur la
   // cinquième, en laissant l'effectif à moitié démantelé.
   | { type: 'venteRapideGroupee'; carteIds: string[] }
-  | { type: 'vendre'; carteId: string; prix: number; mode: 'directe' | 'enchere'; dureeHeures: number }
+  | { type: 'vendre'; carteId: string; prix: number; mode: 'directe' | 'enchere'; dureeHeures: number;
+      /** Posé par le SERVEUR (jamais lu d'un client) : l'annonce part sur le marché commun des divisions publiques. */
+      partagee?: boolean }
   | { type: 'acheter'; venteId: string }
   | { type: 'encherir'; venteId: string; montant: number }
   | { type: 'annulerVente'; venteId: string }

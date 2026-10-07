@@ -1,3 +1,4 @@
+import type { LocalisationClub } from './lib/localisationClub';
 // Types du domaine — Destiny Rugby 🏉
 import type { SituationRecrutement } from './lib/economie';
 import type { JeuneJoueur } from './lib/jeunes';
@@ -134,6 +135,9 @@ export interface ResponsabilitesJoueur {
 }
 
 export interface Joueur {
+  /** Identité aléatoire de cette sauvegarde pour les agrégats du Labo. */
+  usageId?: string;
+  usageDebut?: string;
   nom: string;
   poste: PosteId;
   nation: string;
@@ -592,7 +596,7 @@ export type Ecran =
 // (définis ici plutôt que dans data/clubs.ts : le fichier généré
 // data/mondeReel.ts en a besoin, et clubs.ts importe ce fichier généré.)
 // ---------------------------------------------------------------------------
-export interface Club {
+export interface Club extends LocalisationClub {
   nom: string;
   ville?: string;
   /** Données administratives FFR, présentes pour les clubs français importés. */
@@ -609,6 +613,8 @@ export interface Club {
   c2: string;
   logo?: string; // logo officiel (public/logos/*.png)
 }
+
+
 
 export interface Competition {
   id: string;
@@ -695,6 +701,7 @@ export interface SaisonManager {
   descente?: boolean;
   /** Le club a-t-il remercié son entraîneur à la fin de cette saison ? */
   licencie?: boolean;
+  nonRenouvele?: boolean;
 }
 
 export type RoleRecrueManager = 'cadre' | 'rotation' | 'espoir';
@@ -1017,6 +1024,7 @@ export interface ResultatMatchManager {
   essaisPour: number;
   essaisContre: number;
   blessures?: { joueurId: string; minute: number; activite: string }[];
+  minutesJouees?: Record<string, number>;
 }
 
 // ---------------------------------------------------------------------------
@@ -1129,6 +1137,8 @@ export interface ReponseJeuneManager {
 export type ActionAcademieManager = 'u18' | 'espoirs' | 'pret' | 'senior' | 'liberer';
 
 export interface Manager {
+  usageId?: string;
+  usageDebut?: string;
   nom: string;
   nation: string;
   age: number;
@@ -1165,6 +1175,10 @@ export interface Manager {
    */
   budgetStructure: number;
   contrat: { saisons: number; salaire: number } | null;
+  /** Installation du club, de 1 à 5 ; les anciennes sauvegardes commencent à 1. */
+  centresMedicaux?: Record<string, number>;
+  departsCoach?: Record<string, number>;
+  conseil?: import('./lib/conseilManager').SuiviConseil;
   decision: DecisionManager | null;
   composition: CompositionManager;
   tactique: TactiqueManager;

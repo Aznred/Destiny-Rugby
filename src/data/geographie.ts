@@ -511,7 +511,9 @@ const cache = new Map<string, PositionClub>();
  * tout le monde au centre de la région.
  */
 export function positionDuClub(nomDuClub: string): PositionClub {
-  const memo = cache.get(nomDuClub);
+  const ficheActuelle = clubParNom(nomDuClub);
+  const cleCache = `${nomDuClub}|${ficheActuelle?.latitude}|${ficheActuelle?.longitude}|${ficheActuelle?.region}|${ficheActuelle?.ville}`;
+  const memo = cache.get(cleCache);
   if (memo) return memo;
 
   // ⚠️ ON RÉSOUT LA VILLE ICI, ET NULLE PART AILLEURS. Les appelants passaient
@@ -531,11 +533,11 @@ export function positionDuClub(nomDuClub: string): PositionClub {
         (a.lat - lat) ** 2 + (a.lon - lon) ** 2 - ((b.lat - lat) ** 2 + (b.lon - lon) ** 2)
       ))[0].id;
     const exacte = { region: idRegion, lat, lon, place: true };
-    cache.set(nomDuClub, exacte);
+    cache.set(cleCache, exacte);
     return exacte;
   }
   const cle = cleLieu(fiche?.ville ?? nomDuClub);
-  const villeReconnue = INDEX_VILLES.find(([k]) => cle.includes(k));
+  const villeReconnue = INDEX_VILLES.find(([k]) => cle === k);
   let pos: PositionClub;
 
   if (villeReconnue) {
@@ -563,7 +565,7 @@ export function positionDuClub(nomDuClub: string): PositionClub {
       place: false,
     };
   }
-  cache.set(nomDuClub, pos);
+  cache.set(cleCache, pos);
   return pos;
 }
 

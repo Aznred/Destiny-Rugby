@@ -24,7 +24,8 @@ import {
 import type { Camera3D, ReperesScene, Scene3D } from '../match3D';
 import { INDEX_BOUTON, LecteurManette, MANETTE_ABSENTE, type EtatManette, type TypeManette } from './manette';
 import { actionDeLaTouche, apprendreTouche, type ActionClavier } from './touches';
-import { sortiesPossibles } from '../moteur/pack';
+import { largeurDeFenetre, sortiesPossibles } from '../moteur/pack';
+import { REGLAGES_CONQUETE } from '../moteur/conquete';
 import { lirePreferencesControle, ecrirePreferencesControle } from './prefs';
 import { tutorielsDesactives } from '../tutoriel/memoire';
 import { ExplicationsContextuelles, TutorielDirect, type SnapContexte, type SnapTuto } from './tutoriel';
@@ -128,6 +129,14 @@ export interface SnapPack {
   sortie: 'ramasser' | 'passer' | 'detacher' | null;
   /** Instant (performance.now) où ces durées ont été mesurées : le HUD les fait avancer entre deux clichés. */
   recuA: number;
+  /**
+   * L'heure du moteur à ce cliché, EN CONTINU (pas simulés + ce qui s'est écoulé depuis le dernier). Le HUD en tire la
+   * cadence réelle du match entre deux clichés : les temps avancent à l'écran exactement comme dans le moteur, même en
+   * pause ou en accéléré.
+   */
+  sim: number;
+  /** Les fenêtres de justesse de CE joueur pour ce geste (secondes) : le HUD annonce le verdict à l'appui, sans attendre le moteur. */
+  fenetres: { parfait: number; correct: number };
 }
 
 const DUREE_ENTREE = 1.45;
@@ -724,6 +733,26 @@ export class PilotageDirect {
     void scene; void sy; void moi;
   }
 
+  /**
+   * Le geste dans un pack, tel que le HUD le dessine.
+   *
+   * ⚠️ L'HEURE EST CELLE DU MOTEUR À L'IMAGE PRÈS (Correctif 24). Les temps étaient datés depuis `e.sim`, qui n'avance que
+   * par pas de 0,15 s : entre deux pas, le repère affiché était faux d'autant — le joueur appuyait quand le temps touchait
+   * le cercle et tombait à côté, et la piste tressautait à chaque cliché. On ajoute donc ce qui s'est écoulé depuis le
+   * dernier pas (`reliquat`), exactement comme le fait l'horodatage de l'appui (`demanderDirect`).
+   */
+  private clichePack(e: EtatMatch, pack: NonNullable<NonNullable<EtatMatch['direct']>['pack']>, moi: EtatMatch['pions'][number] | null | undefined): SnapPack {
+    const sim = e.sim + Math.min(e.reliquat ?? 0, 0.15);
+    const largeur = moi ? largeurDeFenetre(moi, pack.type) : 1;
+    return {
+      type: pack.type, poste: pack.poste, score: Math.round(pack.score * 100) / 100,
+      temps: pack.temps.filter((b) => b.t > sim - 1.4 && b.t < sim + 2.4).map((b) => ({ dans: Math.round((b.t - sim) * 1000) / 1000, q: b.q ?? null })),
+      derniere: pack.derniere ? { q: pack.derniere.q, depuis: Math.round((sim - pack.derniere.t) * 100) / 100 } : null,
+      sorties: sortiesPossibles(pack), sortie: pack.sortie ?? null, recuA: performance.now(), sim,
+      fenetres: { parfait: REGLAGES_CONQUETE.fenetreParfaite * largeur, correct: REGLAGES_CONQUETE.fenetreCorrecte * largeur },
+    };
+  }
+
   /** « Fais ce qu'il faut faire » : l'action évidente de la situation (la barre d'espace, A, le gros bouton). */
   private actionPrincipale(vue: VueDirecte): ActionDirecte | null {
     if (vue.porte) return 'raffut';
@@ -797,12 +826,7 @@ export class PilotageDirect {
       resp: this.resp.lire,
       indication: e?.indicationJeu && e.sim - e.indicationJeu.t < 3 && e.sim >= e.indicationJeu.t
         ? { cle: e.indicationJeu.cle, pour: !!moi && moi.cote === e.indicationJeu.cote, n: Math.round(e.indicationJeu.t * 100) } : null,
-      pack: e && d?.pack ? {
-        type: d.pack.type, poste: d.pack.poste, score: Math.round(d.pack.score * 100) / 100,
-        temps: d.pack.temps.filter((t) => t.t > e.sim - 1.4 && t.t < e.sim + 2.4).map((t) => ({ dans: Math.round((t.t - e.sim) * 100) / 100, q: t.q ?? null })),
-        derniere: d.pack.derniere ? { q: d.pack.derniere.q, depuis: Math.round((e.sim - d.pack.derniere.t) * 10) / 10 } : null,
-        sorties: sortiesPossibles(d.pack), sortie: d.pack.sortie ?? null, recuA: performance.now(),
-      } : null,
+      pack: e && d?.pack ? this.clichePack(e, d.pack, moi) : null,
     };
   }
 

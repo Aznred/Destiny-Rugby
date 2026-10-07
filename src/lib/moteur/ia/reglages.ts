@@ -19,7 +19,7 @@
  * et l'IA par poste n'y est pas étalonnée (mesuré : 11,6 essais par match).
  * La remettre à 1 suffit à revenir au moteur d'origine.
  */
-export const IA_MATCH_DE_CARRIERE = 4;
+export const IA_MATCH_DE_CARRIERE = 5;
 
 export const REGLAGES_IA = {
   // ── Le duel porteur / plaqueur (`avantageDuPorteur`) ──────────────────────
@@ -115,6 +115,26 @@ export const REGLAGES_IA = {
   piedReel: 0.5,
   /** Ce que le soutien à l'épaule ajoute à la vitesse du ballon de ruck, en temps réel. */
   soutienReel: 0.3,
+  /**
+   * Niveau 5, temps réel (ligue en ligne) : l'usure générale de chaque joueur. Les deux réserves du Correctif 23 ont été
+   * étalonnées pour dix minutes d'écran ; sur quatre-vingts minutes réelles elles laissaient les titulaires deux fois plus
+   * frais à l'heure de jeu (38 contre 20) et le match marquait un quart de points en plus. Mesuré au banc `mesure:rugby -- 72 ligue 5`.
+   */
+  usureReel: 1.5,
+  /**
+   * Niveau 5, temps réel : ce que la fatigue générale coûte à la course. ⚠️ C'EST ELLE QUI PORTAIT L'ÉCART. Les deux réserves
+   * gardent 90 % de son allure à un joueur à plat (réglé pour dix minutes d'écran : on ne veut pas d'un joueur planté) ; le
+   * moteur d'avant lui en laissait 58 %. Sur quatre-vingts minutes réelles le jeu ne ralentissait donc plus jamais :
+   * 75 points par match contre 59. Ces deux valeurs rendent à la ligue la courbe d'avant ; la barre de sprint reste.
+   */
+  allureReel: 0.58,
+  accelerationReel: 0.35,
+  /**
+   * Niveau 5, temps réel : ce que vaut la grosse percussion du Correctif 23 (un porteur plus fort, plus lourd et lancé perce
+   * plus souvent). Réglée pour dix minutes d'écran ; en quatre-vingts minutes réelles elle se présente huit fois plus et les
+   * centres marquaient deux fois plus d'essais (1,6 → 3,2 par match). Le geste et la chute du défenseur ne changent pas.
+   */
+  percussionReel: 0.3,
   /** Part des ballons volés au sol, en temps réel : multiplie les trois `protection*`. */
   protectionReel: 1.4,
   /** Joueurs qui accompagnent une percée, en temps réel (trois dans un match condensé). */

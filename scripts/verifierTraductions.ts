@@ -89,6 +89,13 @@ for (const langue of LANGUES) {
 definirLangue('en');
 assert.equal(tn('blessure.legere', 1, { nom: 'Ankle sprain' }), 'Ankle sprain. Nothing serious: 1 week of treatment, then you are back.');
 assert.equal(tn('blessure.legere', 2, { nom: 'Ankle sprain' }), 'Ankle sprain. Nothing serious: 2 weeks of treatment, then you are back.');
+assert.equal(tn('staff.med.day', 1), 'day');
+assert.equal(tn('staff.med.day', 12), 'days');
+assert.equal(tn('staff.med.injuryCount', 1, { n: 1 }), '1 injury');
+assert.equal(tn('staff.med.injuryCount', 5, { n: 5 }), '5 injuries');
+chargerTextes({ ...TEXTES, '__audit.englishFallback': { fr: 'Continuer' } });
+assert.equal(t('__audit.englishFallback'), 'Translation unavailable');
+chargerTextes(TEXTES);
 definirLangue('fr');
 assert.equal(texteTraduit(null), '');
 console.log(`OK — ${Object.keys(TEXTES).length} clés, ${Object.keys(TEXTES_INTERFACE).length} nouveaux libellés, sept langues, variables et références vérifiées.`);

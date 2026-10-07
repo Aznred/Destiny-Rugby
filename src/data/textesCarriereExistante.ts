@@ -67,6 +67,9 @@ export const TEXTES_CARRIERE_EXISTANTE: Record<string, Traduction> = {
   'cr.existant.annuler': tr('Changer de joueur', 'Change player', 'Elegir otro jugador', 'Scegli un altro giocatore', 'Anderen Spieler wählen', 'Escolher outro jogador', '別の選手を選ぶ'),
   'cr.existant.echec': tr('Ce joueur ne peut pas être incarné.', 'This player cannot be played.', 'Este jugador no puede encarnarse.', 'Questo giocatore non può essere interpretato.', 'Dieser Spieler kann nicht gespielt werden.', 'Este jogador não pode ser encarnado.', 'この選手は選べません。'),
 
+  // ═══ FIN DE MATCH (Correctif 26) ═══
+  'ml.finalisation': tr('Finalisation du match…', 'Finalising the match…', 'Finalizando el partido…', 'Chiusura della partita…', 'Spiel wird abgeschlossen…', 'A finalizar o jogo…', '試合を確定中…'),
+  'ml.prolongation': tr('Égalité à la sirène : {club} l’emporte en prolongation, {score}.', 'Level at full time: {club} win it in extra time, {score}.', 'Empate al final: {club} gana en la prórroga, {score}.', 'Parità al fischio finale: {club} vince ai supplementari, {score}.', 'Unentschieden nach 80 Minuten: {club} gewinnt in der Verlängerung, {score}.', 'Empate no final: {club} vence no prolongamento, {score}.', '80分終了時は同点。延長戦で{club}が勝利、{score}。'),
   // ═══ SE FAIRE REMPLACER / SIMULER LA FIN DU MATCH (Correctif 19, suite) ═══════════════════════════════════
   'ml.sortie.bouton': tr('Se faire remplacer ou simuler la fin du match', 'Get substituted or simulate the rest of the match', 'Pedir el cambio o simular el resto del partido', 'Farsi sostituire o simulare il resto della partita', 'Sich auswechseln lassen oder den Rest simulieren', 'Pedir a substituição ou simular o resto do jogo', '交代する／残りをシミュレート'),
   'ml.sortie.titre': tr('Sortir du match', 'Leave the match', 'Salir del partido', 'Uscire dalla partita', 'Das Spiel verlassen', 'Sair do jogo', '試合から離れる'),

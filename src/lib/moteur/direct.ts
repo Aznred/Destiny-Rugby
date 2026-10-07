@@ -117,6 +117,8 @@ export const REGLAGES_DIRECT = {
   // ── Le ruck ───────────────────────────────────────────────────────────────
   /** À moins de ce rayon (m) du ballon au sol, on peut s'engager dans le regroupement. */
   porteeRuck: 4.6,
+  /** Niveau 5 : on ne gratte que si l'on est SUR le ballon — deux mètres et demi, pas un regroupement aperçu de loin. */
+  porteeGrattage: 2.6,
   // ── Réclamer le ballon ────────────────────────────────────────────────────
   /** Durée de l'appel (s) ; il ne garantit rien : l'IA lit et décide. */
   dureeAppel: 5,
@@ -268,6 +270,8 @@ export interface PackHumain {
   engage?: boolean;
   /** Le joueur a choisi de sortir du pack (3ᵉ ligne qui se détache, 8 qui part ballon en main). */
   sortie?: 'detacher' | 'ramasser' | 'passer';
+  /** Niveau 5 : dans le maul de son équipe, une fois lié, il peut en sortir ballon en main ou servir le 9, quel que soit son poste. */
+  libre?: boolean;
 }
 
 export interface EtatDirect {
@@ -851,6 +855,28 @@ export function cibleDePlaquage(e: EtatMatch, p: Pion, portee: number = REGLAGES
   return distance(p.pos, porteur.pos) <= portee ? porteur : null;
 }
 
+/**
+ * LE GRATTAGE EST-IL POSSIBLE, LÀ, POUR CE DÉFENSEUR ? (niveau 5)
+ *
+ * Demande : « Le bouton ne doit devenir actif que si le joueur remplit réellement les conditions. » Il faut être debout, sur
+ * le ballon, y être entré par son camp (pas par le côté ni de dos), et que le ruck ne soit pas déjà fermé : deux soutiens
+ * liés au-dessus du ballon, et les mains n'y vont plus — ce serait une faute.
+ */
+export function peutGratter(e: EtatMatch, p: Pion): boolean {
+  const ruck = e.ruck;
+  if (e.phase !== 'ruck' || !ruck || ruck.duel || p.cote === ruck.attaque) return false;
+  if (!p.surLeTerrain || p.sanction > 0 || p.corps || p.battu > 0) return false;
+  if (distance(p.pos, e.ballon) > REGLAGES_DIRECT.porteeGrattage) return false;
+  if ((p.pos.x - e.ballon.x) * sens(ruck.attaque) < -0.6) return false;
+  let lies = 0;
+  for (const q of e.pions) {
+    if (q.cote !== ruck.attaque || !q.surLeTerrain || q.corps || q.id === ruck.porteurId) continue;
+    const dx = q.pos.x - e.ballon.x, dy = q.pos.y - e.ballon.y;
+    if (dx * dx + dy * dy < 1.3 * 1.3) lies += 1;
+  }
+  return lies < 2;
+}
+
 /** Le regroupement est-il assez près pour s'y engager ? */
 export function ruckAPortee(e: EtatMatch, p: Pion, portee: number = REGLAGES_DIRECT.porteeRuck): boolean {
   return e.phase === 'ruck' && !!e.ruck && distance(p.pos, e.ballon) <= portee;
@@ -929,7 +955,7 @@ export function majVueDirecte(e: EtatMatch): void {
   poss.feinte = libre && v.porte && !p.avant && recharge('feinte') <= 0;
   // Niveau 4 : on peut se jeter dès que le porteur est à `porteeLancer` — la distance n'est plus une garantie de contact.
   poss.plaquage = libre && recharge('plaquage') <= 0 && (!!cible || (plongeonDirige(e) && !!cibleDePlaquage(e, p, REGLAGES_DIRECT.porteeLancer)));
-  poss.grattage = libre && v.ruckAPortee && !v.attaque && recharge('grattage') <= 0;
+  poss.grattage = libre && ((e.ia ?? 1) >= 5 ? peutGratter(e, p) : v.ruckAPortee) && !v.attaque && recharge('grattage') <= 0;
   poss.engager = libre && v.ruckAPortee && v.attaque;
   poss.pousser = !!d.pack;
   poss.quitter = !!d.pack && sortiesPossibles(d.pack).length > 0;

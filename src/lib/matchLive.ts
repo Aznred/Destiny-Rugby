@@ -20,6 +20,37 @@ export interface AfficheSemaine {
   cle: string;
 }
 
+/** La clé d'un match de préparation : il ne compte dans aucun classement. */
+export const PREFIXE_PREPARATION = 'prepa#';
+/** Les deux derniers week-ends d'août, juste avant la première journée. */
+const SEMAINES_DE_PREPARATION = [7, 8];
+
+/**
+ * LE MATCH DE PRÉPARATION DU CLUB (Correctif 24). Demande : « Lorsqu'on démarre une carrière avec un joueur existant, les
+ * matchs d'été semblent toujours utiliser la même équipe. Il faut utiliser le véritable club du joueur sélectionné. »
+ *
+ * L'été n'avait de matchs que pour les internationaux — et c'étaient ceux de leur sélection. Le club, lui, ne jouait rien
+ * avant la première journée. Il dispute maintenant deux amicaux, l'un à domicile, l'autre à l'extérieur, contre deux
+ * adversaires de SA poule, tirés de son nom et de la saison (donc différents d'un club à l'autre, et d'un été au suivant).
+ *
+ * ⚠️ SA CLÉ COMMENCE PAR `prepa#` : le championnat ne lit que les clés de sa propre grille, ce résultat n'entre donc dans
+ * aucun classement. Le match se joue ou se laisse passer ; il ne se simule pas en fond.
+ */
+export function matchDePreparation(c: CarriereDeClub, bonus = 0): AfficheSemaine | null {
+  const rang = SEMAINES_DE_PREPARATION.indexOf(c.semaine);
+  if (rang < 0 || !c.club || !c.division) return null;
+  const autres = pouleDe(c.division, c.club).filter((nom) => nom !== c.club);
+  if (!autres.length) return null;
+  // Un tirage stable, sans générateur : la somme des lettres du club et la saison.
+  let h = c.saison * 7919;
+  for (let i = 0; i < c.club.length; i++) h = (h * 31 + c.club.charCodeAt(i)) >>> 0;
+  const premier = h % autres.length;
+  const adversaire = autres[(premier + rang * Math.max(1, Math.floor(autres.length / 2))) % autres.length];
+  const [d, e] = rang % 2 === 0 ? [c.club, adversaire] : [adversaire, c.club];
+  const cle = `${PREFIXE_PREPARATION}${c.division}#${c.saison}#${c.semaine}#${d}#${e}`;
+  return { journee: 0, match: jouerRencontre(d, e, c.saison, cle, { club: c.club, bonus }), cle };
+}
+
 export interface CarriereDeClub {
   division: string;
   club: string;
@@ -98,10 +129,11 @@ export function nomPoste(c: Coequipier): string {
 // règle de jeu qui vit dans un composant ne peut pas servir à un second mode :
 // on la remonte donc ici, et les deux carrières lisent la même.
 
-import { phaseFinale } from './phaseFinale.js';
+import { phaseFinale, type MatchFinal } from './phaseFinale.js';
+import { tournoiDeFinDAnnee } from './tournoi.js';
 import { coupeEnDirect, coupesDuClub, matchDuTourCourant } from './coupe.js';
 import { semaine as semaineDuCalendrier, CALENDRIER } from '../data/calendrier.js';
-import { divisionAuDessus, divisionEnDessous, resoudrePyramide } from './promotion.js';
+import { divisionAuDessus, divisionEnDessous, nomDivision, resoudrePyramide } from './promotion.js';
 
 /** D'où vient l'affiche du week-end. Le rendu s'en sert pour l'annoncer. */
 export type NatureAffiche = 'championnat' | 'phaseFinale' | 'coupe';
@@ -111,6 +143,8 @@ export interface AfficheComplete extends AfficheSemaine {
   /** Le nom du tour, pour une phase finale ou une coupe. */
   tour?: string;
   competition?: string;
+  /** Le nom du tour tel que le tableau l'annonce (« Seizièmes », « Quarts de finale ») quand `tour` ne suffit pas. */
+  libelleTour?: string;
 }
 
 export function libelleAfficheManager(affiche: AfficheComplete, division: string): string {
@@ -118,7 +152,92 @@ export function libelleAfficheManager(affiche: AfficheComplete, division: string
     barrage: affiche.nature === 'coupe' ? 'Huitième de finale' : 'Barrage',
     quart: 'Quart de finale', demie: 'Demi-finale', finale: 'Finale', accession: 'Barrage d’accès',
   };
-  return `${affiche.competition ?? division} · ${affiche.tour ? tours[affiche.tour] ?? affiche.tour : `Journée ${affiche.journee}`}`;
+  return `${affiche.competition ?? division} · ${affiche.libelleTour ?? (affiche.tour ? tours[affiche.tour] ?? affiche.tour : `Journée ${affiche.journee}`)}`;
+}
+
+/** Les tours du TOURNOI FINAL disputés à chaque week-end de phase finale : le même découpage que le tableau affiché. */
+const TOURS_DU_TOURNOI: Record<string, MatchFinal['tour'][]> = {
+  barrage: ['barrage', 'quart'], demie: ['demie'], finale: ['finale'], acces: [],
+};
+
+/**
+ * TOUS les matchs couperets de ce club pour ce week-end de phase finale, dans l'ordre où ils se jouent.
+ *
+ * ⚠️ LE TOURNOI FINAL DES DIVISIONS À POULES N'ÉTAIT PROPOSÉ NULLE PART (Correctif 26). De la Nationale 2 à la
+ * Régionale 3, le champion sort d'un tableau sec entre les meilleurs de chaque poule (`lib/tournoi.ts`) : l'écran
+ * Résultats l'affichait, la fin de saison s'en servait, mais ni l'entraîneur ni le joueur ne pouvaient en disputer
+ * un seul match — le titre se jouait sans eux, sur un score tiré au sort. Ses matchs passent maintenant par la même
+ * affiche que les autres, donc par le même moteur, les mêmes vitesses et la même simulation.
+ *
+ * ⚠️ LA CLÉ EST CELLE QUE LE TABLEAU RELIT (`MatchFinal.cle`, `duel`) : le score joué décide du tour suivant.
+ */
+export function affichesDePhaseFinale(c: CarriereDeClub, bonus = 0): AfficheComplete[] {
+  const sem = semaineDuCalendrier(c.semaine);
+  if (!c.club || !c.division || sem.type !== 'phaseFinale' || !sem.tourFinal) return [];
+  const affiches: AfficheComplete[] = [];
+  const duelEnAffiche = (m: MatchFinal): MatchChampionnat => ({
+    domicile: m.domicile, exterieur: m.exterieur,
+    scoreD: m.scoreD, scoreE: m.scoreE,
+    // ⚠️ UN DUEL NE COMPTE PAS LES ESSAIS. `MatchFinal` ne porte que le
+    // score : le moteur les recalculera au coup d’envoi, et les afficher
+    // à zéro avant le match serait un chiffre faux, pas une absence.
+    essaisD: 0, essaisE: 0,
+  } as MatchChampionnat);
+
+  // 1. Le tour de SA poule (barrage, demie, finale) ou le match d'accès.
+  const phase = phaseFinale(c.division, c.saison, c.club, bonus);
+  const tour = sem.tourFinal === 'acces' ? 'accession' : sem.tourFinal;
+  const acces = tour === 'accession' ? resoudrePyramide(c.division, c.saison, c.club, bonus) : null;
+  const m = (acces ? [acces.accesVersLeHaut, acces.accesDepuisLeBas] : phase.matchs)
+    .find((x) => x && x.tour === tour && (x.domicile === c.club || x.exterieur === c.club));
+  if (m) affiches.push({
+    journee: 0,
+    tour,
+    nature: 'phaseFinale',
+    cle: acces
+      ? `acces#${acces.accesVersLeHaut === m ? divisionAuDessus(c.division) : c.division}#${acces.accesVersLeHaut === m ? c.division : divisionEnDessous(c.division)}#${c.saison}#${m.domicile}#${m.exterieur}`
+      : `phase#${c.division}#${c.saison}#${tour}#${m.domicile}#${m.exterieur}`,
+    match: duelEnAffiche(m),
+  });
+
+  // 2. Le tournoi final de la division, pour les qualifiés des divisions à poules.
+  const tours = TOURS_DU_TOURNOI[sem.tourFinal] ?? [];
+  const tournoi = tours.length ? tournoiDeFinDAnnee(c.division, c.saison, nomDivision(c.division), c.club, bonus) : null;
+  for (const t of tournoi?.matchs ?? []) {
+    if (!t.cle || !tours.includes(t.tour) || (t.domicile !== c.club && t.exterieur !== c.club)) continue;
+    affiches.push({
+      journee: 0, tour: t.tour, nature: 'phaseFinale', competition: tournoi!.nom, cle: t.cle,
+      // « Seizièmes : A - B » → « Seizièmes » ; la finale s'écrit en capitales dans le tableau.
+      libelleTour: t.tour === 'finale' ? 'Finale' : t.libelle.split(' : ')[0],
+      match: duelEnAffiche(t),
+    });
+  }
+  return affiches;
+}
+
+/**
+ * L'affiche du week-end pour la CARRIÈRE JOUEUR.
+ *
+ * ⚠️ LA MÊME QUE CELLE DE L'ENTRAÎNEUR pour tout ce qui est couperet (Correctif 26). L'écran du joueur fabriquait ses
+ * propres clés (« phase#division#saison#semaine », « coupe#saison#semaine ») : aucune n'était celle que le tableau
+ * relit. On gagnait son barrage sur le terrain et le tableau gardait son score tiré au sort — éliminé après une
+ * victoire, ou qualifié après une défaite. Le championnat garde son chemin d'origine (une journée par week-end).
+ */
+export function afficheDuJoueur(j: Joueur, bonus = 0): AfficheComplete | null {
+  const c: CarriereDeClub = {
+    division: j.division ?? '', club: j.club, saison: j.saison, semaine: j.semaine ?? 1, resultats: j.resultatsClub,
+  };
+  const sem = semaineDuCalendrier(c.semaine);
+  if (sem.type === 'phaseFinale' || (sem.type === 'coupe' && !estJourneeDe(c.division, sem))) return afficheDuClub(c, bonus);
+  const championnat = matchDeLaSemaine(j, bonus);
+  return championnat ? { ...championnat, nature: 'championnat' } : null;
+}
+
+/** Reste-t-il au joueur un match couperet à disputer CE week-end (deuxième tour du tournoi final le même jour) ? */
+export function resteUnMatchCeWeekEnd(j: Joueur, bonus = 0): boolean {
+  if (semaineDuCalendrier(j.semaine ?? 1).type !== 'phaseFinale') return false;
+  const affiche = afficheDuJoueur(j, bonus);
+  return !!affiche && !j.resultatsClub?.[affiche.cle];
 }
 
 /**
@@ -140,28 +259,10 @@ export function afficheDuClub(c: CarriereDeClub, bonus = 0): AfficheComplete | n
 
   // ── Les trois semaines de phase finale ────────────────────────────────────
   if (sem.type === 'phaseFinale' && sem.tourFinal) {
-    const phase = phaseFinale(c.division, c.saison, c.club, bonus);
-    const tour = sem.tourFinal === 'acces' ? 'accession' : sem.tourFinal;
-    const acces = tour === 'accession' ? resoudrePyramide(c.division, c.saison, c.club, bonus) : null;
-    const m = (acces ? [acces.accesVersLeHaut, acces.accesDepuisLeBas] : phase.matchs)
-      .find((x) => x && x.tour === tour && (x.domicile === c.club || x.exterieur === c.club));
-    if (!m) return null;
-    return {
-      journee: 0,
-      tour,
-      nature: 'phaseFinale',
-      cle: acces
-        ? `acces#${acces.accesVersLeHaut === m ? divisionAuDessus(c.division) : c.division}#${acces.accesVersLeHaut === m ? c.division : divisionEnDessous(c.division)}#${c.saison}#${m.domicile}#${m.exterieur}`
-        : `phase#${c.division}#${c.saison}#${tour}#${m.domicile}#${m.exterieur}`,
-      match: {
-        domicile: m.domicile, exterieur: m.exterieur,
-        scoreD: m.scoreD, scoreE: m.scoreE,
-        // ⚠️ UN DUEL NE COMPTE PAS LES ESSAIS. `MatchFinal` ne porte que le
-        // score : le moteur les recalculera au coup d’envoi, et les afficher
-        // à zéro avant le match serait un chiffre faux, pas une absence.
-        essaisD: 0, essaisE: 0,
-      } as MatchChampionnat,
-    };
+    // Un même week-end peut porter PLUSIEURS matchs couperets (le tour de sa poule, puis le tournoi final de la
+    // division) : on rend le premier qui n'a pas encore été joué, et le dernier quand tout l'est.
+    const affiches = affichesDePhaseFinale(c, bonus);
+    return affiches.find((a) => !c.resultats?.[a.cle]) ?? affiches.at(-1) ?? null;
   }
 
   // ── Les huit dates de coupe d'Europe ──────────────────────────────────────

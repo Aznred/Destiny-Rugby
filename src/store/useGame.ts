@@ -95,6 +95,7 @@ function passeesDuType(numeroSemaine: number, type: string): number {
   return SEMAINES.slice(0, Math.max(0, numeroSemaine - 1)).filter((s) => s.type === type).length;
 }
 import { matchDeLaSemaine, afficheDuClub } from '../lib/matchLive';
+import { departager, estMatchCouperet } from '../lib/couperet';
 import {
   filDeLaSemaine, messageSpontane, invitationCoequipier, effetSurRelation, reponseLocale,
   tonDuMessage, reactionsPour,
@@ -162,7 +163,7 @@ import {
 // disent — c’est ce qui permet au banc d’essai de les mesurer sans navigateur.
 import {
   MARGE_AMBITION, PRESTIGE_DEBUT, appliquerVerdict, noteMaximale, objectifDuBoard,
-  prestigeDepuisJoueur, salaireManager, verdictDeSaison, CONFIANCE_LICENCIEMENT,
+  prestigeDepuisJoueur, salaireManager, verdictDeSaison,
 } from '../lib/manager';
 import {
   coutAmelioration, gainEntrainement, installationsVierges,
@@ -203,6 +204,9 @@ import { risqueDeBlessure, tirerBlessure, messageBlessure, deltasBlessure } from
 import { effetsTraits, MAX_TRAITS, TRAIT_PAR_ID } from '../data/traits';
 import { nouerRelations, bonusVestiaire, meriteLeBrassard } from '../lib/vestiaire';
 import { evaluerResponsabilites, ligneDeJournal, responsabilitesInitiales } from '../lib/responsabilites';
+import { compositionMedicale, niveauMedical, CENTRES_MEDICAUX, evoluerSoin, dateMedicale } from '../lib/infirmerieManager';
+import { suivreConseil, bilanContrat } from '../lib/conseilManager';
+import { classementManagerEnDirect } from '../lib/tableauManager';
 import { apparenceValide, personnaliser } from '../lib/apparenceJoueur';
 import { interviewAleatoire, scenarioDuPool, type JugementMJ } from '../lib/ia';
 import { agentDe } from '../data/agents';
@@ -1031,6 +1035,7 @@ interface GameState {
   signerBanc: (club: string) => void;
   /** Répondre à une discussion et, le cas échéant, enregistrer une promesse. */
   repondreDiscussionAvancee: (id: string, reponse: ReponseDiscussion) => void;
+  ameliorerCentreMedicalManager: () => void;
   deciderMedicalManager: (id: string, decision: Exclude<DecisionMedicale, 'attente'>) => void;
   definirChargeEntrainementManager: (axe: keyof PlanChargeHebdo, niveau: PlanChargeHebdo[keyof PlanChargeHebdo]) => void;
   ouvrirRenegociationJoueurManager: (joueurId: string) => void;
@@ -1112,7 +1117,7 @@ interface GameState {
    */
   avancerJusquaManager: (numeroSemaine: number, deleguerMatchs?: boolean) => {
     semaines: number;
-    arret: 'arrive' | 'decision' | 'match' | 'saison' | 'sansBanc' | 'approche';
+    arret: 'arrive' | 'decision' | 'match' | 'saison' | 'sansBanc' | 'approche' | 'contrat';
   };
   setTheme: (t: Theme) => void;
   setLangue: (l: Langue) => void;
@@ -1336,9 +1341,7 @@ function resultatDeLaRencontre(
   cle: string, equipe: string, adversaire: string, domicile: boolean,
   scorePour: number, scoreContre: number, essaisPour: number, essaisContre: number,
 ): MatchChampionnat {
-  if (/^(phase|coupe|acces|tournoi)#/.test(cle) && scorePour === scoreContre) {
-    if (graine(`departage#${cle}`)() < 0.5) scorePour += 3; else scoreContre += 3;
-  }
+  ({ scorePour, scoreContre } = departager(cle, scorePour, scoreContre));
   return {
     domicile: domicile ? equipe : adversaire,
     exterieur: domicile ? adversaire : equipe,
@@ -1560,6 +1563,7 @@ export const useGame = create<GameState>()(
         // sous un identifiant technique que rien ne rattachait à lui.
         const nomChoisi = input.nom.trim() || nomAleatoirePourNation(input.nation);
         const joueur: Joueur = {
+          usageId: crypto.randomUUID(), usageDebut: new Date().toISOString().slice(0, 10),
           // ⚠️ PLUS DE « Anonyme ». Un champ laissé vide donne désormais un nom
           // tiré dans le vivier de SA nationalité (lib/nomsJoueurs.ts) : on
           // recombine le prénom et le nom de deux des 11 916 joueurs étiquetés
@@ -1644,7 +1648,7 @@ export const useGame = create<GameState>()(
         const avecRoles: Joueur = { ...base, responsabilites: responsabilitesDeDepart(base, forceEffectif(base.club, base.saison)) };
         // ⚠️ SON APPORT AU CLUB DÈS LA PREMIÈRE SAISON. Une carrière ordinaire commence à zéro (un débutant ne pèse
         // pas encore sur son club) ; ici le joueur est retiré de l'effectif, donc le club doit déjà compter sur lui.
-        const joueur: Joueur = { ...avecRoles, apportClub: calculerApportClub(avecRoles) };
+        const joueur: Joueur = { ...avecRoles, usageId: crypto.randomUUID(), usageDebut: new Date().toISOString().slice(0, 10), apportClub: calculerApportClub(avecRoles) };
         set(etatDeDepartDeCarriere(joueur));
         return true;
       },
@@ -3804,6 +3808,7 @@ export const useGame = create<GameState>()(
         const objectif = objectifDuBoard(club, comp, 1);
         const budgets = budgetsDuClub(club, 1);
         const manager: Manager = {
+          usageId: crypto.randomUUID(), usageDebut: new Date().toISOString().slice(0, 10),
           // ⚠️ MÊME RÈGLE QUE POUR UN JOUEUR, et pour la même raison : l’écran
           // de création PROMET « laissé vide, un nom de ta nation est tiré ».
           // Retomber sur la chaîne « Entraîneur » aurait été un troisième
@@ -4069,7 +4074,7 @@ export const useGame = create<GameState>()(
 
       signerBanc: (club) => {
         const m = get().manager;
-        if (!m || !clubParNom(club)) return;
+        if (!m || !clubParNom(club) || club === m.club || (m.departsCoach?.[club] ?? 0) >= m.saison || (m.conseil?.depart?.club === club && m.conseil.depart.saison >= m.saison)) return;
         const comp = competitionEffective(club);
         const force = forceEffectif(club, m.saison);
         // ⚠️ ON NE VÉRIFIE PAS SEULEMENT « le club existe » : un banc au-dessus
@@ -4077,9 +4082,11 @@ export const useGame = create<GameState>()(
         // la création, pas en cours de route.
         if (!m.libre && force > noteMaximale(m.prestige) + MARGE_AMBITION) return;
         const budgets = budgetsDuClub(club, m.saison);
+        const offre = m.avancee?.offresBanc.find(o => o.club === club && o.statut === 'offre' && o.saison === m.saison);
         const suivant: Manager = {
           ...m,
           club,
+          departsCoach: { ...m.departsCoach, ...(m.club ? { [m.club]: m.saison } : {}) },
           division: comp?.id ?? '',
           divisionNom: comp?.nom ?? '',
           objectif: objectifDuBoard(club, comp, m.saison),
@@ -4092,7 +4099,7 @@ export const useGame = create<GameState>()(
           // du nouveau, souvent inexistant. L'épargne, elle, appartenait au
           // club qu'on vient de quitter.
           budgetStructure: budgets.structure,
-          contrat: { saisons: 3, salaire: salaireManager(force) },
+          contrat: { saisons: offre ? Math.max(2, Math.min(3, offre.duree)) : 3, salaire: offre?.salaire ?? salaireManager(force) },
           decision: null,
           composition: compositionManagerParDefaut(effectifDuClub(club, m.saison), new Set(indisponiblesCarriereAvancee(m.avancee, m.semaine))),
           tactique: { ...TACTIQUE_MANAGER_DEFAUT },
@@ -4108,6 +4115,7 @@ export const useGame = create<GameState>()(
           ventes: [],
           clubs: m.clubs[m.clubs.length - 1] === club ? m.clubs : [...m.clubs, club],
         };
+        suivant.conseil = { club, score: 62, detail: { sportif: 60, objectifs: 60, finances: 85, groupe: 65 }, depart: m.conseil?.depart };
         suivant.avancee = changerClubCarriereAvancee(m.avancee, suivant, effectifDuClub(club, m.saison));
         set({
           manager: suivant,
@@ -4121,11 +4129,22 @@ export const useGame = create<GameState>()(
         set({ manager: { ...m, avancee: repondreDiscussionAvancee(avancee, m, id, reponse) } });
       },
 
+      ameliorerCentreMedicalManager: () => {
+        const m = get().manager;
+        if (!m?.club) return;
+        const niveau = niveauMedical(m);
+        if (niveau >= 5) return;
+        const prix = CENTRES_MEDICAUX[niveau].prix;
+        if (m.budgetStructure < prix) return;
+        set({ manager: { ...m, budgetStructure: m.budgetStructure - prix, centresMedicaux: { ...m.centresMedicaux, [m.club]: niveau + 1 } } });
+      },
+
       deciderMedicalManager: (id, decision) => {
         const m = get().manager;
         if (!m?.club) return;
         const avancee = assurerEtatCarriereAvancee(m, effectifDuClub(m.club, m.saison));
-        set({ manager: { ...m, avancee: deciderMedical(avancee, id, decision) } });
+        const prochain = deciderMedical(avancee, id, decision);
+        set({ manager: { ...m, avancee: prochain, composition: compositionMedicale(effectifDuClub(m.club, m.saison), m.composition, prochain.medical, new Set(indisponiblesCarriereAvancee(prochain, m.semaine))) } });
       },
 
       definirChargeEntrainementManager: (axe, niveau) => {
@@ -4356,7 +4375,8 @@ export const useGame = create<GameState>()(
         if (!m?.club) return;
         const avancee = assurerEtatCarriereAvancee(m, effectifDuClub(m.club, m.saison));
         const resultat = negocierContratManagerAvance(avancee, m);
-        set({ manager: { ...m, avancee: resultat.etat, contrat: resultat.contrat, confiance: borne(m.confiance + resultat.confiance) } });
+        set({ manager: { ...m, avancee: resultat.etat, contrat: resultat.contrat, conseil: resultat.conseil,
+          budgetTransferts: Math.round(m.budgetTransferts * (1 + resultat.budgetBonus)), budgetStructure: Math.round(m.budgetStructure * (1 + resultat.budgetBonus)) } });
       },
 
       demissionnerManager: () => {
@@ -4364,7 +4384,7 @@ export const useGame = create<GameState>()(
         if (!m?.club) return;
         const avancee = changerClubCarriereAvancee(m.avancee, { ...m, club: '', division: '', divisionNom: '' }, []);
         set((s) => ({
-          manager: { ...m, club: '', division: '', divisionNom: '', contrat: null, composition: { titulaires: [], remplacants: [], capitaineId: '', buteurId: '' }, confiance: 58, avancee },
+          manager: { ...m, departsCoach: { ...m.departsCoach, [m.club]: m.saison }, club: '', division: '', divisionNom: '', contrat: null, conseil: m.conseil ? { ...m.conseil, offre: undefined, depart: { club: m.club, saison: m.saison } } : { club: m.club, score: m.confiance, detail: { sportif: m.confiance, objectifs: m.confiance, finances: 60, groupe: 60 }, depart: { club: m.club, saison: m.saison } }, composition: { titulaires: [], remplacants: [], capitaineId: '', buteurId: '' }, confiance: 58, avancee },
           journal: [...s.journal, { id: idUnique(), saison: m.saison, role: 'mj' as const, titre: '🚪 Démission', texte: `${m.nom} quitte ${m.club}. Sa réputation reste intacte, mais il doit désormais convaincre un nouveau président.` }],
         }));
       },
@@ -4425,6 +4445,7 @@ export const useGame = create<GameState>()(
       semaineManager: () => {
         const m = get().manager;
         if (!m) return;
+        if (m.club && (m.contrat?.saisons ?? 0) <= 0) return;
         // Sans banc, le temps ne passe pas : on cherche un club.
         if (!m.club) return;
         // Le championnat du manager est désormais joué, pas seulement simulé.
@@ -4459,9 +4480,7 @@ export const useGame = create<GameState>()(
           // ⚠️ ET ON LIT L’ÉTAT NEUF, pas l’ancien : `avancee` et `suivante`
           //    portent les blessures qui viennent de tomber cette semaine.
           const absents = new Set(indisponiblesCarriereAvancee(avancee, suivante));
-          const composition = delegations.compositions
-            ? compositionManagerParDefaut(groupe, absents)
-            : reconcilerCompositionManager(groupe, m.composition, absents);
+          const composition = compositionMedicale(groupe, delegations.compositions ? undefined : m.composition, avancee.medical, absents);
           // ⚠️ UNE APPROCHE QUI N'OUVRE PAS DE CONVERSATION N'EXISTE PAS. Elle
           // naît dans la couche pure (`avancerSemaineCarriereAvancee`), qui ne
           // connaît ni les messages ni les notifications : c'est ici, et
@@ -4494,12 +4513,14 @@ export const useGame = create<GameState>()(
         const depart = get().manager?.semaine ?? 1;
         let semaines = 0;
         if (!get().manager?.club) return { semaines, arret: 'sansBanc' as const };
+        if ((get().manager?.contrat?.saisons ?? 0) <= 0) return { semaines, arret: 'contrat' as const };
         if (cible <= depart) return { semaines, arret: 'arrive' as const };
 
-        let arret: 'arrive' | 'decision' | 'match' | 'saison' | 'sansBanc' | 'approche' = 'arrive';
+        let arret: 'arrive' | 'decision' | 'match' | 'saison' | 'sansBanc' | 'approche' | 'contrat' = 'arrive';
         while ((get().manager?.semaine ?? 1) < cible) {
           const avant = get().manager;
           if (!avant?.club) { arret = 'sansBanc'; break; }
+          if ((avant.contrat?.saisons ?? 0) <= 0) { arret = 'contrat'; break; }
           // ⚠️ ON S'ARRÊTE À CE QUI DEMANDE L'ENTRAÎNEUR, exactement comme la
           // carrière joueur s'arrête sur une scène du MJ. Enjamber une décision
           // du board ou un match à coacher, c'est refaire l'ancien mode
@@ -4587,7 +4608,7 @@ export const useGame = create<GameState>()(
         const m = get().manager;
         if (!m?.club) return;
         const effectif = effectifDuClub(m.club, m.saison);
-        set({ manager: { ...m, composition: reconcilerCompositionManager(effectif, composition, new Set(indisponiblesCarriereAvancee(m.avancee, m.semaine))) } });
+        set({ manager: { ...m, composition: compositionMedicale(effectif, composition, m.avancee?.medical, new Set(indisponiblesCarriereAvancee(m.avancee, m.semaine))) } });
       },
 
       definirTactiqueManager: (tactique) => {
@@ -4599,16 +4620,11 @@ export const useGame = create<GameState>()(
       enregistrerResultatManager: (resultat) => {
         const m = get().manager;
         if (!m?.club || resultat.club !== m.club || m.resultats[resultat.cle]) return;
+        if (m.club && (m.contrat?.saisons ?? 0) <= 0) return;
         // Pas de nul en match couperet. Le départage est sauvegardé avec le
         // score, donc identique dans le calendrier, le tableau et le palmarès.
-        if (/^(phase|coupe|acces|tournoi)#/.test(resultat.cle)
-          && resultat.scorePour === resultat.scoreContre) {
-          const victoire = graine(`departage#${resultat.cle}`)() < .5;
-          resultat = { ...resultat,
-            scorePour: resultat.scorePour + (victoire ? 3 : 0),
-            scoreContre: resultat.scoreContre + (victoire ? 0 : 3),
-          };
-        }
+        const tranche = departager(resultat.cle, resultat.scorePour, resultat.scoreContre);
+        if (tranche.prolongation) resultat = { ...resultat, scorePour: tranche.scorePour, scoreContre: tranche.scoreContre };
         const domicile = resultat.domicile ? resultat.club : resultat.adversaire;
         const exterieur = resultat.domicile ? resultat.adversaire : resultat.club;
         const scoreD = resultat.domicile ? resultat.scorePour : resultat.scoreContre;
@@ -4635,14 +4651,17 @@ export const useGame = create<GameState>()(
           ...m,
           resultats,
           tempsDeJeu,
-          confiance: borne(m.confiance + (victoire ? 2 : nul ? 0 : -2)),
+          confiance: m.confiance,
           prestige: borne(m.prestige + (victoire ? 0.35 : nul ? 0.05 : -0.12)),
         };
         const bilanAvance = apresResultatCarriereAvancee(
           avecResultat, effectifDuClub(m.club, m.saison), resultat,
         );
         avecResultat.avancee = bilanAvance.etat;
-        avecResultat.confiance = borne(avecResultat.confiance + bilanAvance.confiance);
+        const rang = classementManagerEnDirect(avecResultat)?.classement.find(l => l.club === m.club)?.position;
+        const evaluation = suivreConseil(avecResultat, effectifDuClub(m.club, m.saison), rang);
+        avecResultat.confiance = evaluation.confiance;
+        avecResultat.conseil = evaluation.conseil;
         const matchsJoues = Object.values(resultats)
           .filter((r) => r.saison === m.saison && r.club === m.club).length;
         const besoin = demandeAGenerer(
@@ -4676,9 +4695,12 @@ export const useGame = create<GameState>()(
           type: 'club',
           ...statsDepuisVues(1_200 + rngPost() * 18_000, rngPost),
         };
-        const managerSuivant = demande
+        let managerSuivant = demande
           ? { ...avecResultat, demandes: [...avecResultat.demandes, demande] }
           : avecResultat;
+        if (evaluation.licencie) managerSuivant = { ...managerSuivant, departsCoach: { ...m.departsCoach, [m.club]: m.saison }, club: '', division: '', divisionNom: '', contrat: null,
+          budgetTransferts: 0, budgetSalarial: 0, budgetStructure: 0, decision: null,
+          composition: { titulaires: [], remplacants: [], capitaineId: '', buteurId: '' } };
         set((s) => ({
           manager: managerSuivant,
           posts: fusionner([postResultat], s.posts),
@@ -4702,7 +4724,7 @@ export const useGame = create<GameState>()(
               ? t('mgr.x.demandeDepartCourt') : t('mgr.x.demandeTempsCourt'),
             saison: m.saison, semaine: m.semaine, creeLe: Date.now(), lue: false,
           }, ...s.notifsSocial].slice(0, 40) : s.notifsSocial,
-          journal: [...s.journal, {
+          journal: [...s.journal, ...(evaluation.nouveauMessage || evaluation.licencie ? [{ id: idUnique(), saison: m.saison, role: 'mj' as const, titre: evaluation.licencie ? 'Licenciement par le conseil' : 'Avertissement du conseil', texte: evaluation.licencie ? evaluation.conseil.motif! : evaluation.nouveauMessage! }] : []), {
             id: idUnique(), saison: m.saison, role: 'systeme' as const,
             titre: victoire ? '🏉 Victoire du manager' : nul ? '🤝 Match nul' : '📋 Défaite du manager',
             texte: `${m.club} ${resultat.scorePour}-${resultat.scoreContre} ${resultat.adversaire} · `
@@ -5322,6 +5344,7 @@ export const useGame = create<GameState>()(
       saisonManager: () => {
         const m = get().manager;
         if (!m || !m.club) return;
+        if (m.club && (m.contrat?.saisons ?? 0) <= 0) return;
         const rang = rangFinal(m.division, m.saison, m.club);
         const py = resoudreSaisonClub(m.division, m.saison, m.club);
         const monte = py.mouvements.some((x) => x.club === m.club && x.sens === 'montee');
@@ -5385,7 +5408,8 @@ export const useGame = create<GameState>()(
         // Les reports se mesurent dans l'ancienne division, avant les mouvements.
         const reports = reportsBudgets(m);
         const prestige = verdictBoard.prestige;
-        const confiance = borne(verdictBoard.confiance + bilanAvance.confiance);
+        const conseil = bilanContrat(m, groupe, rang);
+        const confiance = borne(m.confiance * .35 + conseil.score * .65);
 
         // On fige les titres et l'histoire AVANT de changer les poules.
         setMouvementsClubs(majMouvements);
@@ -5405,7 +5429,8 @@ export const useGame = create<GameState>()(
         // surprise à la sirène. Un contrat qui expire ne protège de rien.
         // Le mode libre sert aussi de bac à sable tactique et structurel : il
         // est hors classement, donc le board ne peut pas interrompre l'essai.
-        const licencie = !m.libre && confiance < CONFIANCE_LICENCIEMENT;
+        const nonRenouvele = conseil.decision === 'nonRenouvele';
+        const licencie = nonRenouvele;
         const saisonsContrat = Math.max(0, (m.contrat?.saisons ?? 1) - 1);
         const budgets = budgetsDuClub(m.club, m.saison + 1);
 
@@ -5507,7 +5532,7 @@ export const useGame = create<GameState>()(
               saison: m.saison, club: m.club, division: m.division,
             }))]
             : m.palmares,
-          historique: [...m.historique, { ...ligne, ...(licencie ? { licencie: true } : {}) }],
+          historique: [...m.historique, { ...ligne, ...(licencie ? { nonRenouvele: true } : {}) }],
           // Sans banc, le temps s’arrête : on cherche un club avant de repartir.
           club: licencie ? '' : m.club,
           // ⚠️ LA DIVISION SUIT LE MOUVEMENT DU CLUB, pas la saison précédente.
@@ -5535,8 +5560,12 @@ export const useGame = create<GameState>()(
             ? { ...d, etat: 'refusee' as const } : d),
           ventes: [],
           avancee: bilanAvance.etat,
+          conseil,
+          departsCoach: { ...m.departsCoach, ...(nonRenouvele ? { [m.club]: m.saison + 1 } : {}) },
         };
-        suivant.avancee = { ...bilanAvance.etat, objectifs: objectifsDeSaison(suivant,
+        if (conseil.offre && conseil.score >= 75) suivant.objectif = Math.max(1, suivant.objectif - 1);
+        const joursInterSaison = Math.max(0, Math.round((dateMedicale(suivant.saison, 1).getTime() - dateMedicale(m.saison, m.semaine).getTime()) / 86400000));
+        suivant.avancee = { ...bilanAvance.etat, medical: bilanAvance.etat.medical.map(d => evoluerSoin(d, niveauMedical(m), joursInterSaison)), objectifs: objectifsDeSaison(suivant,
           suivant.club ? effectifDuClub(suivant.club, suivant.saison) : []) };
 
         // ⚠️ CE QUE LES STRUCTURES ONT PRODUIT SE DIT, sinon elles n'existent
@@ -5598,11 +5627,12 @@ export const useGame = create<GameState>()(
             saison: m.saison,
             role: 'mj' as const,
             titre: licencie
-              ? t('mgr.journal.licencie')
+              ? 'Contrat non renouvelé'
               : t('mgr.journal.bilanTitre', { saison: m.saison }),
             texte: t('mgr.journal.bilanTexte', {
               club: m.club, rang, objectif: m.objectif, prestige: prestige.toFixed(0),
             })
+              + (conseil.motif ? ' ' + conseil.motif : '')
               + (titres.length ? ` ${titres.map((id) => TROPHEES[id]?.nom ?? id).join(' · ')}.` : '')
               + (monte ? ` ${t('mgr.journal.montee')}` : '')
               + (descendu ? ` ${t('mgr.journal.descente')}` : '')
@@ -6531,7 +6561,12 @@ export const useGame = create<GameState>()(
         const inter = situationInternationale(joueur);
         if (inter.indisponibleClub && (!inter.match || inter.role === 'horsGroupe')) return;
         const cle = `${joueur.saison}#${joueur.semaine ?? 1}`;
-        if (get().matchRegarde === cle) return; // déjà comptabilisé
+        // ⚠️ UN MATCH NE SE COMPTE QU'UNE FOIS — mais un week-end de phase finale peut en porter DEUX (le tour de sa
+        // poule puis le tournoi final de la division, Correctif 26) : le second est une autre rencontre, reconnue à
+        // sa clé couperet encore absente du registre des résultats joués.
+        const autreCouperet = !!contexte?.cle && estMatchCouperet(contexte.cle)
+          && contexte.cle !== inter.match?.cle && !joueur.resultatsClub?.[contexte.cle];
+        if (get().matchRegarde === cle && !autreCouperet) return; // déjà comptabilisé
         const vecu = joueur.saisonEnCours ?? {
           matchs: 0, titularisations: 0, essais: 0, notes: [], capes: 0, stats: STATS_VIDES,
         };
@@ -7128,7 +7163,7 @@ export const useGame = create<GameState>()(
     }),
     {
       name: 'destin-ovalie',
-      version: 30,
+      version: 31,
       storage: stockageJeu,
       // Sauvegardes d'avant les 15 postes : le poste stocké est une famille
       // (« pilier »), on lui attribue un numéro de maillot.
@@ -7531,6 +7566,11 @@ export const useGame = create<GameState>()(
           s.manager.budgetSalarial = reparerPlafondSalarial(s.manager, s.transfertsSociaux ?? []);
           s.manager.avancee = assurerEtatCarriereAvancee(s.manager, effectifDuClub(s.manager.club, s.manager.saison));
         }
+        // Contrat historique : l'ancien bouton pouvait ajouter des saisons sans limite.
+        if (s.manager?.contrat && s.manager.contrat.saisons > 3) {
+          s.manager.contrat = { ...s.manager.contrat, saisons: 3 };
+        }
+        if (s.manager) s.manager.centresMedicaux ??= {};
         // Les responsabilités (Correctif 17) : une sauvegarde d'avant ne les a pas, on les évalue une première fois.
         if (version < 30 && s.joueur && !s.joueur.responsabilites) {
           try {

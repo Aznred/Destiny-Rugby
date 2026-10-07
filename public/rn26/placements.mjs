@@ -1,4 +1,5 @@
 // correctif23-touche
+import { GrilleProximite } from './proximite.mjs';
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 const distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 
@@ -117,6 +118,7 @@ export class PhysicalPlayers {
     const arret=ARRETS.has(match.phase);
     for(let tick=0;tick<steps;tick++){
       const starts=new Map(active.map(p=>[p.id,{...this.bodies.get(p.id)}]));
+      const grille=match.broadphase===false||active.length<12?null:new GrilleProximite(active,this.bodies);
       for(const p of active){
         const b=this.bodies.get(p.id);
         if(this.pins.has(p.id))continue;
@@ -129,7 +131,7 @@ export class PhysicalPlayers {
         // elle-même (mêlée, ruck, alignement) ou qui revient de loin.
         // Le trajet du pas est réparti sur ses sous-pas : la vitesse du corps reste
         // celle de sa course (c'est elle qui choisit l'allure et le cap à l'image).
-        if(match.e.placementJoue&&!slots.has(p.id)&&d<1.6){const k=1/(steps-tick);b.x+=dx*k;b.z+=dz*k;b.vx=h?dx*k/h:0;b.vz=h?dz*k/h:0;continue;}
+        if(match.e.placementJoue&&!slots.has(p.id)&&d<1.6){const k=1/(steps-tick);b.x+=dx*k;b.z+=dz*k;b.vx=h?dx*k/h:0;b.vz=h?dz*k/h:0;grille?.actualiser(p,b);continue;}
         let vx=dx*9,vz=dz*9;
         // On rejoint une phase arrêtée en trottinant : seul un chasseur sprinte.
         // Quand le moteur joue lui-même le placement (`placementJoue`), le corps
@@ -138,7 +140,7 @@ export class PhysicalPlayers {
         const max=Math.min(plafond,Math.max(3.5,p.source.vitesseMax||8.5)),speed=Math.hypot(vx,vz);
         if(speed>max){vx*=max/speed;vz*=max/speed;}
         // Anticipate a crossing and walk around a standing body.
-        if(!slots.has(p.id))for(const q of active){if(q.id===p.id||q.source.corps)continue;const other=this.bodies.get(q.id);
+        if(!slots.has(p.id))for(const q of grille?grille.voisins(b):active){if(q.id===p.id||q.source.corps)continue;const other=this.bodies.get(q.id);
           const rx=other.x-b.x,rz=other.z-b.z,dist=Math.hypot(rx,rz),along=d>0?(rx*dx+rz*dz)/d:0;
           if(dist<1.15&&dist>.01&&along>0&&d>.5){
             const cross=dx*rz-dz*rx,sign=Math.abs(cross)>.03?Math.sign(cross):p.id<q.id?1:-1;
@@ -148,6 +150,7 @@ export class PhysicalPlayers {
         const change=Math.hypot(vx-b.vx,vz-b.vz),limit=(d<.5?35:24)*h;
         const k=change>limit?limit/change:1;b.vx+=(vx-b.vx)*k;b.vz+=(vz-b.vz)*k;
         b.x+=b.vx*h;b.z+=b.vz*h;
+        grille?.actualiser(p,b);
       }
       for(let pass=0;pass<5;pass++)for(let i=0;i<active.length;i++)for(let j=i+1;j<active.length;j++){
         const p=active[i],q=active[j];if(p.source.corps||q.source.corps)continue;
@@ -159,7 +162,10 @@ export class PhysicalPlayers {
         const a=this.bodies.get(p.id),b=this.bodies.get(q.id);
         const lifting=match.phase==='touche'&&(match.liftGroups||[]).some(g=>[g.jumper,...g.lifters].includes(p.id)&&[g.jumper,...g.lifters].includes(q.id));
         const radius=lifting?.46:(maul&&p.number<=8&&q.number<=8)||p.source.role===q.source.role&&['melee','ruck'].includes(p.source.role)?.60:.72;
-        let dx=b.x-a.x,dz=b.z-a.z,d=Math.hypot(dx,dz);if(d>=radius)continue;
+        let dx=b.x-a.x,dz=b.z-a.z;
+        // Broadphase exacte sur les axes : la plupart des 435 paires n'exigent aucune racine carrée.
+        if(match.broadphase!==false&&(Math.abs(dx)>=radius||Math.abs(dz)>=radius))continue;
+        let d=Math.hypot(dx,dz);if(d>=radius)continue;
         if(d<.00001){dx=p.id<q.id?.001:-.001;dz=.001;d=Math.hypot(dx,dz);}
         dx/=d;dz/=d;
         // Deux corps qui se rentrent dedans sont séparés tout de suite ; un simple

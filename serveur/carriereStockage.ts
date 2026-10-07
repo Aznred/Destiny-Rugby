@@ -1,4 +1,5 @@
 import { atelierNeon, type StockageAtelier } from './atelierStockage.js';
+import { debutPeriode, decaler, MODES_USAGE, type EnvoiUsage, type MatiereUsage, type ModeUsage, type PeriodeUsage } from '../src/lib/usage/agregats.js';
 import { neon } from '@neondatabase/serverless';
 import { pushNeon, type StockagePush } from './pushStockage.js';
 import type { AdministrationCarriere, EtatCarriereEnLigne, StatistiquesGlobalesCarriere } from '../src/lib/ligue/typesCarriere.js';
@@ -6,7 +7,7 @@ import { echeanceLigue, prochaineEcheanceMatch } from '../src/lib/ligue/echeance
 import { assemblerTransfert, champsDepuisForme, decoderBloc, encoderTransfert, formeTransfert, type BlocTransfert, type ManifestTransfert } from './transfertCarriere.js';
 import { creerLimiteurReserve } from './limiteurReserve.js';
 import type { EtatBoutiqueCompte, ModificationsBoutiqueCompte } from '../src/lib/boutiqueCompte.js';
-import type { PageOffresSolo, LotCartesSolo } from '../src/lib/echangesSolo.js';
+import type { PageOffresSolo, LotCartesSolo, OffreSolo, SuiviEchangesSolo } from '../src/lib/echangesSolo.js';
 
 export interface CompteStocke {
   id: string; identifiant: string; pseudo: string; empreinte?: string;
@@ -28,6 +29,7 @@ export interface RecompensesAchat {
 export interface LigueStockee { id: string; code: string; version: number; comptes: string[]; etat: EtatCarriereEnLigne; echeance?: number | null }
 export interface ResumeDivisionPublique { id: string; code: string; division: number; comptes: string[]; nombreClubs: number; phase: string; finLe?: string }
 export interface PresenceMatchStockee { match: string; compte: string; vu: number }
+export interface MarcheStocke { id: string; revision: number; donnees: unknown }
 export interface SalonAmicalStocke {
   code: string;
   revision: number;
@@ -59,6 +61,12 @@ export interface StockageCarriere {
     accepter(offre: string, compte: string, proposition?: string): Promise<void>;
     refuser(offre: string, compte: string, proposition: string): Promise<void>;
     annuler(offre: string, compte: string): Promise<void>;
+    /** Correctif 26 — mes offres qui ont reçu une proposition, et les offres où la mienne attend. */
+    suivi?(compte: string): Promise<SuiviEchangesSolo>;
+    /** Une offre telle que ce compte la voit (les propositions des autres restent privées). */
+    lire?(offre: string, compte: string): Promise<OffreSolo | null>;
+    /** Retire MA proposition d'une offre ouverte. */
+    retirer?(offre: string, compte: string): Promise<void>;
   };
   atelier?: StockageAtelier;
   push?: StockagePush;
@@ -132,6 +140,21 @@ export interface StockageCarriere {
   /** Purge les données temporaires : présences, sessions expirées et compteurs de débit. */
   nettoyerPresences(avant: number): Promise<void>;
   /** Petit état temps réel, séparé des lourdes sauvegardes de carrière. */
+  /**
+   * LES STATISTIQUES D'UTILISATION (`src/lib/usage/agregats.ts`) : un relevé anonyme par appareil, additionné par jour.
+   * `enregistrerUsage` rend faux et `matiereUsage` rend `undefined` quand les tables ne sont pas posées.
+   */
+  enregistrerUsage?(envoi: EnvoiUsage): Promise<boolean>;
+  matiereUsage?(periode: PeriodeUsage, aujourdhui: string): Promise<MatiereUsage | undefined>;
+  /**
+   * LE MARCHÉ COMMUN des divisions publiques (`src/lib/ligue/marchePartage.ts`) : un petit document par cycle, écrit par
+   * comparaison de version — c'est cette comparaison qui fait qu'un seul acheteur obtient une annonce.
+   * `lireMarche` rend `null` quand le document n'existe pas encore, et `undefined` quand la table n'est pas posée
+   * (le marché reste alors celui de chaque division, comme avant).
+   */
+  lireMarche?(id: string): Promise<MarcheStocke | null | undefined>;
+  /** `revision` : celle qu'on a lue (`null` : le document n'existait pas). Faux si quelqu'un a écrit entre-temps. */
+  comparerEtEcrireMarche?(id: string, revision: number | null, donnees: unknown): Promise<boolean>;
   salonAmical?(code: string): Promise<SalonAmicalStocke | null>;
   creerSalonAmical?(salon: SalonAmicalStocke): Promise<boolean>;
   comparerEtEcrireSalonAmical?(salon: SalonAmicalStocke, revision: number): Promise<boolean>;
@@ -159,6 +182,16 @@ async function sansColonne<T>(complete: () => Promise<T>, repli: () => Promise<T
     if ((erreur as { code?: string }).code !== '42703') throw erreur;
     return repli();
   }
+}
+
+/** Une ligne de `collection_offres` → l'offre du jeu. */
+function offreDepuisLigne(ligne: Record<string, unknown>): OffreSolo {
+  return {
+    id: String(ligne.id), compteId: String(ligne.compte), pseudo: String(ligne.pseudo),
+    offertes: ligne.offertes as LotCartesSolo, souhaitees: ligne.souhaitees as LotCartesSolo,
+    propositions: (ligne.propositions ?? []) as OffreSolo['propositions'],
+    creeLe: new Date(ligne.cree_le as string).toISOString(), statut: ligne.statut as OffreSolo['statut'],
+  };
 }
 
 export function stockageNeon(url: string): StockageCarriere {
@@ -302,6 +335,36 @@ export function stockageNeon(url: string): StockageCarriere {
       },
       async annuler(offre, compte) {
         confirmerEchange(await sql`select collection_annuler(${offre}::uuid,${compte}::uuid) as ok`);
+      },
+      // ── Correctif 26 : sans migration — les trois requêtes ne lisent que les colonnes déjà en place.
+      async suivi(compte) {
+        const mienne = JSON.stringify([{ compteId: compte }]);
+        const lignes = await sql`select id, compte, pseudo, offertes, souhaitees,
+          case when compte=${compte}::uuid then propositions else coalesce(
+            (select jsonb_agg(p) from jsonb_array_elements(propositions) p where p->>'compteId'=${compte}),
+            '[]'::jsonb) end as propositions, cree_le, statut
+          from collection_offres where statut='ouverte'
+            and ((compte=${compte}::uuid and jsonb_array_length(propositions)>0)
+              or (compte<>${compte}::uuid and propositions @> ${mienne}::jsonb))
+          order by cree_le desc limit 60`;
+        const offres = lignes.map(offreDepuisLigne);
+        return { recues: offres.filter(o => o.compteId === compte), envoyees: offres.filter(o => o.compteId !== compte) };
+      },
+      async lire(offre, compte) {
+        const lignes = await sql`select id, compte, pseudo, offertes, souhaitees,
+          case when compte=${compte}::uuid then propositions else coalesce(
+            (select jsonb_agg(p) from jsonb_array_elements(propositions) p where p->>'compteId'=${compte}),
+            '[]'::jsonb) end as propositions, cree_le, statut
+          from collection_offres where id=${offre}::uuid`;
+        return lignes[0] ? offreDepuisLigne(lignes[0]) : null;
+      },
+      async retirer(offre, compte) {
+        const mienne = JSON.stringify([{ compteId: compte }]);
+        // Une seule instruction : atomique sans fonction ni verrou supplémentaire.
+        const lignes = await sql`update collection_offres set propositions=coalesce(
+            (select jsonb_agg(p) from jsonb_array_elements(propositions) p where p->>'compteId'<>${compte}), '[]'::jsonb)
+          where id=${offre}::uuid and statut='ouverte' and propositions @> ${mienne}::jsonb returning id`;
+        if (!lignes.length) throw new Error('Proposition introuvable ou déjà traitée.');
       },
     },
     atelier: atelierNeon(url),
@@ -800,6 +863,128 @@ export function stockageNeon(url: string): StockageCarriere {
       catch (erreur) { if ((erreur as { code?: string }).code !== '42P01') throw erreur; }
       await sql`delete from sessions where expire_le<now()`;
       await sql`delete from carriere_debits where debut<${avant}`;
+    },
+    async enregistrerUsage(e) {
+      try {
+        // Une ligne par appareil et par jour : le relevé s'AJOUTE à ce qui est déjà là, mode par mode.
+        await sql`with releve as (insert into usage_jours (jour,appareil,premier,mode_premier,secondes,sessions,jauges)
+          values (${e.jour}::date,${e.appareil},${e.premier}::date,${e.modePremier},${JSON.stringify(e.secondes)}::jsonb,${e.sessions},${e.jauges ? JSON.stringify(e.jauges) : null}::jsonb)
+          on conflict (jour,appareil) do update set
+            secondes=(select coalesce(jsonb_object_agg(k, least(86400, coalesce((usage_jours.secondes->>k)::int,0)+coalesce((excluded.secondes->>k)::int,0))),'{}'::jsonb)
+              from jsonb_object_keys(usage_jours.secondes || excluded.secondes) as k),
+            sessions=least(200, usage_jours.sessions+excluded.sessions),
+            mode_premier=case when usage_jours.mode_premier='autre' then excluded.mode_premier else usage_jours.mode_premier end,
+            premier=case when usage_jours.mode_premier='autre' and excluded.mode_premier<>'autre' then excluded.premier else usage_jours.premier end,
+            jauges=coalesce(excluded.jauges, usage_jours.jauges) returning jour),
+          compteurs as (insert into usage_compteurs (jour,cle,n)
+          select ${e.jour}::date, key, value::bigint from jsonb_each_text(${JSON.stringify(e.compteurs)}::jsonb)
+          on conflict (jour,cle) do update set n=usage_compteurs.n+excluded.n returning cle)
+          insert into usage_carrieres (appareil,id,debut,dernier,donnees)
+          select ${e.appareil}, c->>'id', (c->>'debut')::date, (c->>'dernier')::date, c
+          from jsonb_array_elements(${JSON.stringify(e.carrieres ?? [])}::jsonb) c
+          on conflict (appareil,id) do update set dernier=excluded.dernier,
+            donnees=excluded.donnees || jsonb_build_object('secondes',greatest((usage_carrieres.donnees->>'secondes')::int,(excluded.donnees->>'secondes')::int),
+              'matchs',greatest((usage_carrieres.donnees->>'matchs')::int,(excluded.donnees->>'matchs')::int),
+              'saisons',greatest((usage_carrieres.donnees->>'saisons')::int,(excluded.donnees->>'saisons')::int),
+              'fermee',(usage_carrieres.donnees->>'fermee')::boolean or (excluded.donnees->>'fermee')::boolean)
+          where excluded.dernier>=usage_carrieres.dernier`;
+        return true;
+      } catch (erreur) {
+        if ((erreur as { code?: string }).code === '42P01') return false;
+        throw erreur;
+      }
+    },
+    async matiereUsage(periode, aujourdhui) {
+      const debut = debutPeriode(periode, aujourdhui);
+      try {
+        // Petites requêtes agrégées dans Postgres : aucune identité d'appareil ne traverse le réseau vers le Labo.
+        const [actifs, modes, compteurs, collections, retention, rares, carrieres, clubsExistants, joueursXV] = await Promise.all([
+          sql`select count(distinct appareil) filter (where jour=${aujourdhui}::date) as jour,
+              count(distinct appareil) filter (where jour>=${decaler(aujourdhui, -6)}::date) as j7,
+              count(distinct appareil) filter (where jour>=${decaler(aujourdhui, -29)}::date) as j30,
+              count(distinct appareil) filter (where ${debut}::date is null or jour>=${debut}::date) as periode,
+              coalesce(sum(sessions) filter (where ${debut}::date is null or jour>=${debut}::date),0) as sessions
+            from usage_jours where jour<=${aujourdhui}::date`,
+          sql`select m.key as mode, sum(m.value::int) as secondes, count(distinct u.appareil) as utilisateurs, count(*) as jours
+            from usage_jours u, jsonb_each_text(u.secondes) m
+            where (${debut}::date is null or u.jour>=${debut}::date) and u.jour<=${aujourdhui}::date and m.value::int>0 group by 1`,
+          sql`select cle, sum(n) as n from usage_compteurs
+            where (${debut}::date is null or jour>=${debut}::date) and jour<=${aujourdhui}::date group by 1`,
+          sql`select count(*) as nombre, coalesce(avg((jauges->>'taille')::int),0) as taille,
+              coalesce(avg((jauges->>'exemplaires')::int),0) as exemplaires, coalesce(avg((jauges->>'packs')::int),0) as packs,
+              avg((jauges->>'genEquipe')::int) as gen
+            from (select distinct on (appareil) jauges from usage_jours
+              where jauges is not null and (jauges->>'packs')::int>0 and jour<=${aujourdhui}::date order by appareil, jour desc) x`,
+          sql`with entree as (select distinct on (appareil) appareil, premier, mode_premier from usage_jours order by appareil, (mode_premier='autre'), jour)
+            select e.mode_premier as mode, count(*) as cohorte,
+              count(*) filter (where e.premier+1<=${aujourdhui}::date) as mures1,
+              count(*) filter (where e.premier+7<=${aujourdhui}::date) as mures7,
+              count(*) filter (where e.premier+30<=${aujourdhui}::date) as mures30,
+              count(*) filter (where exists (select 1 from usage_jours r where r.appareil=e.appareil and r.jour=e.premier+1)) as j1,
+              count(*) filter (where exists (select 1 from usage_jours r where r.appareil=e.appareil and r.jour between e.premier+7 and e.premier+13)) as j7,
+              count(*) filter (where exists (select 1 from usage_jours r where r.appareil=e.appareil and r.jour between e.premier+30 and e.premier+36)) as j30
+            from entree e where (${debut}::date is null or e.premier>=${debut}::date) and e.premier<=${aujourdhui}::date group by 1`,
+          sql`select c->>'nom' as nom, c->>'rarete' as rarete, max((c->>'note')::int) as note, sum((c->>'n')::int) as n
+            from (select distinct on (appareil) jauges from usage_jours where jauges is not null and jour<=${aujourdhui}::date order by appareil, jour desc) x,
+              jsonb_array_elements(coalesce(x.jauges->'rares','[]'::jsonb)) c
+            group by 1,2 order by (c->>'rarete'='star') desc, note desc, n asc limit 20`,
+          sql`select donnees->>'type' as type, count(*) as nombre,
+              count(*) filter (where not (donnees->>'fermee')::boolean and dernier>=${decaler(aujourdhui, -29)}::date) as actives,
+              count(*) filter (where (donnees->>'fermee')::boolean or dernier<${decaler(aujourdhui, -29)}::date) as abandonnees,
+              avg(dernier-debut+1) as jours, avg((donnees->>'secondes')::int) as secondes,
+              avg((donnees->>'matchs')::int) as matchs, avg((donnees->>'saisons')::int) as saisons,
+              avg((donnees->>'matchs')::int) filter (where (donnees->>'fermee')::boolean or dernier<${decaler(aujourdhui, -29)}::date) as abandon
+            from usage_carrieres where (${debut}::date is null or dernier>=${debut}::date) and dernier<=${aujourdhui}::date group by 1`,
+          sql`select donnees->>'club' as nom, count(*) as n from usage_carrieres
+            where donnees->>'type'='existant' and (${debut}::date is null or dernier>=${debut}::date) and dernier<=${aujourdhui}::date
+            group by 1 order by n desc, nom limit 15`,
+          sql`select nom, count(*) as n from
+            (select distinct on (appareil) jauges from usage_jours where jauges is not null and jour<=${aujourdhui}::date order by appareil, jour desc) x,
+            jsonb_array_elements_text(coalesce(x.jauges->'xv','[]'::jsonb)) nom
+            group by 1 order by n desc, nom limit 20`,
+        ]);
+        const n = (v: unknown) => Number(v ?? 0);
+        const parMode = new Map(modes.map(m => [String(m.mode), m]));
+        return {
+          actifs: { jour: n(actifs[0]?.jour), j7: n(actifs[0]?.j7), j30: n(actifs[0]?.j30), periode: n(actifs[0]?.periode) },
+          parMode: MODES_USAGE.map(mode => ({ mode, secondes: n(parMode.get(mode)?.secondes), utilisateurs: n(parMode.get(mode)?.utilisateurs), joursActifs: n(parMode.get(mode)?.jours) })),
+          sessions: n(actifs[0]?.sessions),
+          compteurs: Object.fromEntries(compteurs.map(c => [String(c.cle), n(c.n)])),
+          collections: { nombre: n(collections[0]?.nombre), taille: n(collections[0]?.taille), exemplaires: n(collections[0]?.exemplaires), packs: n(collections[0]?.packs),
+            genEquipe: collections[0]?.gen == null ? null : n(collections[0].gen), rares: rares.map(c => ({ nom: String(c.nom), rarete: String(c.rarete) as 'elite' | 'star', note: n(c.note), n: n(c.n) })), joueursXV: joueursXV.map(c => ({ nom: String(c.nom), n: n(c.n) })) },
+          carrieres: { bilans: carrieres.map(c => ({ type: String(c.type) as import('../src/lib/usage/carrieres.js').TypeCarriereUsage, nombre: n(c.nombre), actives: n(c.actives), abandonnees: n(c.abandonnees),
+            dureeJours: n(c.jours), secondes: n(c.secondes), matchs: n(c.matchs), saisons: n(c.saisons), matchsAvantAbandon: c.abandon == null ? null : n(c.abandon) })),
+            clubsExistants: clubsExistants.map(c => ({ nom: String(c.nom), n: n(c.n) })) },
+          retention: retention.filter(r => MODES_USAGE.includes(String(r.mode) as ModeUsage)).map(r => ({ mode: String(r.mode) as ModeUsage, cohorte: n(r.cohorte),
+            j1: n(r.j1), j7: n(r.j7), j30: n(r.j30), mures1: n(r.mures1), mures7: n(r.mures7), mures30: n(r.mures30) })),
+        };
+      } catch (erreur) {
+        if ((erreur as { code?: string }).code === '42P01') return undefined;
+        throw erreur;
+      }
+    },
+    async lireMarche(id) {
+      try {
+        const r = await sql`select id,revision,donnees from carriere_marches where id=${id}`;
+        return r[0] ? { id: String(r[0].id), revision: Number(r[0].revision), donnees: r[0].donnees } : null;
+      } catch (erreur) {
+        // Table pas encore posée : le marché commun n'existe pas sur cette base.
+        if ((erreur as { code?: string }).code === '42P01') return undefined;
+        throw erreur;
+      }
+    },
+    async comparerEtEcrireMarche(id, revision, donnees) {
+      try {
+        const r = revision === null
+          ? await sql`insert into carriere_marches (id,revision,donnees) values (${id},1,${JSON.stringify(donnees)}::jsonb)
+              on conflict do nothing returning id`
+          : await sql`update carriere_marches set donnees=${JSON.stringify(donnees)}::jsonb,revision=revision+1,modifie_le=now()
+              where id=${id} and revision=${revision} returning id`;
+        return r.length === 1;
+      } catch (erreur) {
+        if ((erreur as { code?: string }).code === '42P01') return false;
+        throw erreur;
+      }
     },
     async salonAmical(code) {
       try {

@@ -1,5 +1,5 @@
 import { creerPaiement, diagnosticErreurStripe, journalErreurStripe } from './paiementsStripe.js';
-import { contexteAtelier, enregistrerAtelier, vueAtelier } from './atelierAdmin.js';
+import { contexteAtelier, enregistrerAtelier, vueAtelier, vueDonneesClubs } from './atelierAdmin.js';
 import { lotImport, vueImports, vueSpeciales } from './atelierSpeciales.js';
 import { catalogueSpecial, specialesPubliques } from '../src/lib/ligue/catalogueSpecial.js';
 import { catalogueAdmin, CATALOGUE_ADMIN_VIDE, type CatalogueAdmin } from '../src/lib/ligue/atelierCatalogue.js';
@@ -8,6 +8,9 @@ import { isDeepStrictEqual, promisify } from 'node:util';
 import { configurationPush, envoyerPush, idPush, notifierMatchs, validerAbonnement } from './notificationsPush.js';
 import { agirCarriere, avancerCarriere as actualiserCarriere, avancerCarrierePourDirect, creerCarriere, creerDivisionPublique, creerLaboratoireCarriere, memeEtatDurable, vueCarriere, vueCarriereObservateur, vueRencontreCarriere, vueRencontreCarriereObservateur } from '../src/lib/ligue/carriere.js';
 import { planifierDivisionsPubliques } from './divisionsPubliques.js';
+import { creerMarcheCommun } from './marcheCommun.js';
+import { differenceVue } from '../src/lib/ligue/deltaVue.js';
+import { assemblerStatistiques, jourUTC, validerEnvoi, type PeriodeUsage } from '../src/lib/usage/agregats.js';
 import { echeanceLigue } from '../src/lib/ligue/echeanceCarriere.js';
 import type { CommandeCarriere, EtatCarriereEnLigne } from '../src/lib/ligue/typesCarriere.js';
 import { DELAI_PRESENCE } from '../src/lib/ligue/matchCarriere.js';
@@ -16,7 +19,7 @@ import { OAuth2Client } from 'google-auth-library';
 import { appliquerModificationsBoutiqueCompte, validerEtatBoutiqueCompte, validerModificationsBoutiqueCompte } from '../src/lib/boutiqueCompte.js';
 import { catalogueBaseCarriere, MEZE_RUGBY_EMBLEME } from '../src/lib/ligue/catalogueCarriere.js';
 import { cleCarteSolo } from '../src/lib/collectionSolo.js';
-import { lotCartesSolo } from '../src/lib/echangesSolo.js';
+import { cartesEngagees, doublonsLibres, lotCartesSolo, type EvenementEchangeSolo, type SuiviEchangesSolo } from '../src/lib/echangesSolo.js';
 import { PACK_ICONES_KIRI } from '../src/lib/packsPrivesSolo.js';
 import { packsPrivesSolo, tirerPackIconesKiri } from './packsPrivesSolo.js';
 
@@ -115,7 +118,20 @@ function protegerOrigine(req: RequeteCarriere) {
  * deux listes du banc, la consigne, la feuille. Elles pesaient les deux tiers
  * de chaque réponse et repartaient à l'identique toutes les deux secondes.
  */
-const PARTIES_LENTES = ['fil', 'moments', 'surLeTerrain', 'surLeBanc', 'maStrategie', 'feuille', 'signalAdverse'] as const;
+const PARTIES_LENTES = ['fil', 'moments', 'surLeTerrain', 'surLeBanc', 'maStrategie', 'feuille', 'signalAdverse', 'stats'] as const;
+/**
+ * Les statistiques bougent d'un mètre ou d'un point de possession à chaque
+ * sondage : les renvoyer toutes les trois secondes coûtait un quart de la
+ * réponse pour un tableau que personne ne lit à la seconde. Elles repartent
+ * quand elles ont VRAIMENT changé (possession à 4 points près, mètres à 30 près,
+ * tout le reste exactement).
+ */
+function statistiquesGrossies(stats: unknown): unknown {
+  if (!stats || typeof stats !== 'object') return stats;
+  return Object.fromEntries(Object.entries(stats as Record<string, Record<string, number>>).map(([cote, s]) => [cote, {
+    ...s, possession: Math.round((s?.possession ?? 0) / 4), metres: Math.round((s?.metres ?? 0) / 30), plaquages: Math.round((s?.plaquages ?? 0) / 3),
+  }]));
+}
 function hacher(h: number, texte: string): number {
   for (let i = 0; i < texte.length; i++) { h ^= texte.charCodeAt(i); h = Math.imul(h, 16777619); }
   return h;
@@ -154,7 +170,7 @@ function allegerDirect(rencontre: { match?: unknown }, annonce: string | null): 
       }
       return;
     }
-    const marque = empreinteCourte(JSON.stringify(valeur));
+    const marque = empreinteCourte(JSON.stringify(cle === 'stats' ? statistiquesGrossies(valeur) : valeur));
     reperes.push(`${i}-${marque}`);
     if (connus.get(String(i)) === marque) { delete match[cle]; gardes.push(cle); }
   });
@@ -166,6 +182,18 @@ const publicCompte = (c: CompteStocke) => ({ id: c.id, pseudo: c.pseudo, adminis
 const comptesEtat = (e: EtatCarriereEnLigne) => e.clubs.map(c => c.compteId);
 
 export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer?: (etat: EtatCarriereEnLigne) => Promise<void>) {
+  /** Mes propositions reçues et envoyées. `null` si le stockage ne sait pas (ou échoue) : l'écran garde sa liste. */
+  const suiviEchanges = async (compte: string): Promise<SuiviEchangesSolo | null> => {
+    try { return await stockage.echangesSolo?.suivi?.(compte) ?? null; } catch { return null; }
+  };
+  /** Refuse un lot dont une carte est déjà promise dans une autre proposition en attente. */
+  const verifierDoublonsLibres = async (compte: string, lot: Record<string, number>) => {
+    const suivi = await suiviEchanges(compte);
+    if (!suivi?.envoyees.length) return;
+    const coffre = await stockage.boutique(compte);
+    if (coffre && !doublonsLibres(coffre.collectionSolo, lot, cartesEngagees(suivi, compte)))
+      throw new ErreurHttp(409, 'Une de ces cartes est déjà engagée dans une autre proposition en attente.');
+  };
   const googleClientId = process.env.GOOGLE_CLIENT_ID?.trim() ?? '';
   const google = googleClientId ? new OAuth2Client(googleClientId) : null;
   let catalogueCache: CatalogueAdmin = CATALOGUE_ADMIN_VIDE;
@@ -228,7 +256,11 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
    * d'écrans et de matchs de la ligue. Il ne sert qu'à apprendre ce qu'une
    * AUTRE instance a écrit ; nos propres écritures l'effacent aussitôt.
    */
-  const PAS_SONDAGE_DIRECT_MS = 3_000;
+  // ⚠️ 3,3 s ET PAS 3 (Correctif 24). L'écran sonde toutes les trois secondes : avec une fenêtre de trois
+  // secondes pile, chaque sondage la trouvait tout juste expirée et relisait l'en-tête. Un rien plus
+  // large, un sondage sur deux est servi de mémoire. La marge d'autorité (4,8 s) couvre cette
+  // fenêtre et laisse une seconde et demie à l'écriture d'un ordre.
+  const PAS_SONDAGE_DIRECT_MS = 3_300;
   type EnteteLigue = { version: number; comptes: string[]; echeance: number | null; catalogueRevision?: number };
   type SondageDirect = { entete: EnteteLigue; presences?: PresenceMatchStockee[] | null } | null;
   const sondagesDirects = new Map<string, { lu: number; resultat: Promise<SondageDirect> }>();
@@ -377,6 +409,13 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
     }
     return ligne;
   };
+  /** Le marché commun des divisions publiques (Correctif 24) : voir `marcheCommun.ts`. Inerte sans sa table. */
+  const marcheCommun = creerMarcheCommun({
+    stockage,
+    appliquer: (ligue, compte, requete, operation, verifierRecu) => appliquer(ligue, compte, requete, operation, false, verifierRecu),
+    lireEtat: async (ligue) => (await lireLigue(ligue))?.etat ?? null,
+    refus: (statut, message) => new ErreurHttp(statut, message),
+  });
   async function lireLigue(id: string, connue?: { version: number; comptes: string[]; echeance: number | null }) {
     const cache = liguesChaudes.get(id);
     if (!cache) {
@@ -565,7 +604,8 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
       }
     };
     await Promise.all(Array.from({ length: Math.min(8, ids.length) }, () => ouvrier()));
-    await assurerDivisionsPubliques(Date.now());
+    const publicCourant = await assurerDivisionsPubliques(Date.now());
+    if (publicCourant.divisions.length > 0 && await marcheCommun.disponible().catch(() => false)) await marcheCommun.entretenir(publicCourant.cycle).catch(() => {});
     return { actualisees: traitees, supprimees: supprimees.length };
   }
   async function assurerLaboratoireKiri(compte: CompteStocke, maintenant: number) {
@@ -696,6 +736,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
           ? { revision: config.revision }
           : { revision: config.revision, joueurs: config.joueurs, ajouts: config.ajouts ?? {}, speciales: specialesPubliques(config),
               // Les cosmétiques du Labo : SEULS les publiés quittent le serveur, dans la même réponse (aucune requête de plus).
+              clubs: config.clubs ?? {}, rivalitesHistoriques: config.rivalitesHistoriques ?? [],
               boutique: Object.values(config.boutique ?? {}).filter(a => a.publie) });
       }
       // ⚠️ Les écussons se demandent à part, PAS dans la vue de la ligue :
@@ -786,6 +827,19 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         // Aucun contenu de compte : permet de retrouver les anciens clients
         // qui continuent d'envoyer des coffres entiers dans les logs Vercel.
         console.warn('[carriere-transfert]', JSON.stringify({ action, octets, format: corps.modifications ? 'delta' : 'complet' }));
+      }
+      /**
+       * ⚠️ LE RELEVÉ D'UTILISATION N'A PAS DE COMPTE (Correctif 25). Les modes solo vivent dans le navigateur : pour
+       * savoir combien de temps on y joue, chaque appareil envoie un petit relevé anonyme. Tout y est borné
+       * (`validerEnvoi`), le débit est limité par adresse, et ce point d'entrée ne répond JAMAIS une erreur : un
+       * relevé perdu ne doit rien montrer au joueur.
+       */
+      if (action === 'usage') {
+        const envoi = validerEnvoi(corps.releve, maintenant);
+        if (!envoi || !stockage.enregistrerUsage) return res.status(200).json({ ok: false });
+        const adresse = entete(req, 'x-forwarded-for').split(',')[0] || req.socket?.remoteAddress || 'local';
+        if (!await stockage.limiter(empreinteJeton(`usage:${adresse}`), 60, 10 * 60_000, maintenant).catch(() => false)) return res.status(200).json({ ok: false });
+        return res.status(200).json({ ok: await stockage.enregistrerUsage(envoi).catch(() => false) });
       }
       if (action === 'google') {
         if (!google || !googleClientId) throw new ErreurHttp(503, 'La connexion Google attend sa configuration.');
@@ -892,6 +946,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         if (compte.identifiant !== 'kiri') throw new ErreurHttp(404, 'Page introuvable.');
         if (req.method === 'GET') {
           const section = url.searchParams.get('section');
+          if (section === 'clubs') return res.status(200).json(vueDonneesClubs());
           if (section === 'speciales') return res.status(200).json(vueSpeciales(maintenant));
           if (section === 'imports') return res.status(200).json(vueImports(await lotImport(url.searchParams.get('lot') ?? '')));
           return res.status(200).json(vueAtelier(url.searchParams.get('q') ?? ''));
@@ -949,27 +1004,51 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
           && isDeepStrictEqual(visible(enregistree), visible(boutique)) ? null : enregistree });
       }
       if (action === 'creerOffreSolo' || action === 'proposerOffreSolo' || action === 'accepterOffreSolo'
-        || action === 'refuserOffreSolo' || action === 'annulerOffreSolo') {
+        || action === 'refuserOffreSolo' || action === 'annulerOffreSolo' || action === 'retirerPropositionSolo') {
         if (!stockage.echangesSolo) throw new ErreurHttp(503, 'Les échanges ne sont pas disponibles sur ce serveur.');
         const marche = stockage.echangesSolo;
-        const id = action === 'creerOffreSolo' ? '' : texte(corps.offre, 36, 36, 'Offre');
+        let id = action === 'creerOffreSolo' ? '' : texte(corps.offre, 36, 36, 'Offre');
         if (id && !idValide(id)) throw new ErreurHttp(400, 'Offre invalide.');
+        // Ce que l'action vient de changer (Correctif 26) : l'écran met à jour ses listes sans rien recharger.
+        const evenements: Record<string, EvenementEchangeSolo> = {
+          creerOffreSolo: 'tradeCreated', proposerOffreSolo: 'tradeProposed', accepterOffreSolo: 'tradeAccepted',
+          refuserOffreSolo: 'tradeRefused', annulerOffreSolo: 'tradeCancelled', retirerPropositionSolo: 'tradeWithdrawn',
+        };
         try {
           if (action === 'creerOffreSolo') {
             const offertes = lotCartesSolo(corps.offertes, cartesEchangeables());
             const souhaitees = lotCartesSolo(corps.souhaitees, cartesEchangeables(), true);
-            await marche.creer(randomUUID(), compte.id, compte.pseudo, offertes, souhaitees);
+            // ⚠️ Un doublon déjà promis dans une proposition en attente ne peut pas partir en plus dans une offre.
+            await verifierDoublonsLibres(compte.id, offertes);
+            id = randomUUID();
+            await marche.creer(id, compte.id, compte.pseudo, offertes, souhaitees);
           } else if (action === 'proposerOffreSolo') {
             const cartes = lotCartesSolo(corps.cartes, cartesEchangeables());
+            // ⚠️ AVANT D'ENVOYER : la carte est possédée (le stockage le revérifie), échangeable (`lotCartesSolo`),
+            // et pas déjà engagée dans une autre proposition. Rien n'est transféré : elle reste chez son
+            // propriétaire jusqu'à l'acceptation, où tout est revérifié dans la même transaction.
+            await verifierDoublonsLibres(compte.id, cartes);
             await marche.proposer(randomUUID(), id, compte.id, compte.pseudo, cartes);
           } else if (action === 'accepterOffreSolo') {
             const proposition = corps.proposition == null ? undefined : texte(corps.proposition, 36, 36, 'Proposition');
             if (proposition && !idValide(proposition)) throw new Error('Proposition invalide.');
-            await marche.accepter(id, compte.id, proposition);
+            try { await marche.accepter(id, compte.id, proposition); }
+            catch (erreur) {
+              // Le joueur n'a plus les cartes promises : sa proposition est morte, on la retire au lieu de la
+              // laisser échouer à chaque appui.
+              if (proposition && erreur instanceof Error && /doublon/i.test(erreur.message)) {
+                await marche.refuser(id, compte.id, proposition).catch(() => {});
+                throw new ErreurHttp(409, 'Ce joueur ne possède plus les cartes proposées : sa proposition a été retirée.');
+              }
+              throw erreur;
+            }
           } else if (action === 'refuserOffreSolo') {
             const proposition = texte(corps.proposition, 36, 36, 'Proposition');
             if (!idValide(proposition)) throw new Error('Proposition invalide.');
             await marche.refuser(id, compte.id, proposition);
+          } else if (action === 'retirerPropositionSolo') {
+            if (!marche.retirer) throw new ErreurHttp(503, 'Le retrait d’une proposition n’est pas disponible sur ce serveur.');
+            await marche.retirer(id, compte.id);
           } else await marche.annuler(id, compte.id);
         } catch (erreur) {
           if (erreur instanceof ErreurHttp) throw erreur;
@@ -977,7 +1056,13 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
             throw new ErreurHttp(409, erreur.message);
           throw erreur;
         }
-        return res.status(200).json({ ok: true, boutique: await stockage.boutique(compte.id) });
+        // L'échange est fait : une lecture de suivi en échec ne doit pas le faire passer pour raté.
+        const [boutique, offre, suivi] = await Promise.all([
+          stockage.boutique(compte.id),
+          marche.lire?.(id, compte.id).catch(() => null) ?? null,
+          suiviEchanges(compte.id),
+        ]);
+        return res.status(200).json({ ok: true, boutique, delta: { evenement: evenements[action], offreId: id, offre, suivi } });
       }
       if (action === 'supprimerLigue') {
         const id = texte(corps.ligue, 36, 36, 'Ligue');
@@ -1131,7 +1216,16 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         if (url.searchParams.has('echangesSolo')) {
           if (!stockage.echangesSolo) throw new ErreurHttp(503, 'Les échanges ne sont pas disponibles sur ce serveur.');
           const offset = Math.max(0, Math.min(10000, Number(url.searchParams.get('offset')) || 0));
-          return res.status(200).json(await stockage.echangesSolo.lister(compte.id, offset));
+          const page = await stockage.echangesSolo.lister(compte.id, offset);
+          // Ce qui me concerne ne dépend pas de la page ; et si un échange a été conclu pendant mon absence, ma
+          // collection arrive avec la liste (l'écran annonce sa révision : rien ne voyage si elle est à jour).
+          const revision = url.searchParams.get('rev');
+          const [suivi, coffre] = await Promise.all([
+            suiviEchanges(compte.id),
+            revision == null ? null : stockage.boutique(compte.id).catch(() => null),
+          ]);
+          const collection = coffre && (coffre.collectionSolo.revision ?? 0) > (Number(revision) || 0) ? coffre.collectionSolo : undefined;
+          return res.status(200).json({ ...page, suivi, ...(collection ? { collectionSolo: collection } : {}) });
         }
         if (url.searchParams.has('boutique')) {
           return res.status(200).json({ boutique: await stockage.boutique(compte.id) });
@@ -1143,6 +1237,14 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         if (url.searchParams.get('statistiques') === 'globales') {
           if (compte.identifiant !== 'kiri') throw new ErreurHttp(404, 'Page introuvable.');
           return res.status(200).json(await stockage.statistiquesGlobales());
+        }
+        // Les statistiques d'utilisation du Labo : des sommes, jamais un appareil.
+        if (url.searchParams.get('statistiques') === 'usage') {
+          if (compte.identifiant !== 'kiri') throw new ErreurHttp(404, 'Page introuvable.');
+          const demandee = url.searchParams.get('periode');
+          const periode: PeriodeUsage = demandee === 'jour' || demandee === '7' || demandee === '30' ? demandee : 'tout';
+          const matiere = stockage.matiereUsage ? await stockage.matiereUsage(periode, jourUTC(maintenant)) : undefined;
+          return res.status(200).json(matiere ? assemblerStatistiques(matiere, periode) : { indisponible: true });
         }
         const id = url.searchParams.get('ligue');
         if (!id) {
@@ -1165,6 +1267,13 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
           if (!ligne || !ligne.comptes.includes(compte.id)) throw new ErreurHttp(404, 'Ligue introuvable.');
           const { collectionCarriere } = await import('../src/lib/ligue/collectionCarriere.js');
           return res.status(200).json(collectionCarriere(ligne.etat, compte.id, url.searchParams, maintenant));
+        }
+        // Le marché commun vu de cette division : un petit document, relu seulement quand sa révision a changé.
+        if (url.searchParams.get('marche') === '1') {
+          const ligne = await lireLigue(id);
+          if (!ligne || !ligne.comptes.includes(compte.id)) throw new ErreurHttp(404, 'Ligue introuvable.');
+          const mv = url.searchParams.get('mv');
+          return res.status(200).json(await marcheCommun.vue(ligne.etat, mv && /^\d{1,9}$/.test(mv) ? Number(mv) : null));
         }
 
         /**
@@ -1214,14 +1323,27 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
           const annonce = url.searchParams.get('film');
           const pas = annonce === null ? NaN : Number(annonce);
           const film = annonce === null ? undefined : { depuis: annonce !== '' && Number.isInteger(pas) && pas >= 0 ? pas : undefined };
+          // La chronologie (Correctif 24) : `tl=<dernier pas>.<somme de contrôle>`,
+          // vide quand l'écran n'a encore rien. Elle prime sur le film v1.
+          const fil = url.searchParams.get('tl');
+          let chrono: { depuis?: number; somme?: number } | undefined;
+          if (fil !== null) {
+            const [n, somme] = fil.split('.').map(Number);
+            chrono = fil !== '' && Number.isInteger(n) && n >= 0
+              ? { depuis: n, ...(Number.isInteger(somme) ? { somme } : {}) } : {};
+          }
           const rencontre = observateur
-            ? vueRencontreCarriereObservateur(e, direct, film, true)
-            : vueRencontreCarriere(e, compte.id, direct, film, true);
+            ? vueRencontreCarriereObservateur(e, direct, chrono ? undefined : film, true, chrono)
+            : vueRencontreCarriere(e, compte.id, direct, chrono ? undefined : film, true, chrono);
           if (!rencontre) throw new ErreurHttp(404, 'Match introuvable.');
           // `r=` : les repères des parties lentes que l'écran tient déjà (fil,
           // temps forts, banc). Ce qui n'a pas changé ne repart pas.
           const allege = allegerDirect(rencontre, url.searchParams.get('r'));
-          return res.status(200).json({ id: e.id, version: e.version, rencontre, ...allege, ...(present ? { presence: true } : {}) });
+          // L'écran de la chronologie tient déjà l'affiche (clubs, horaires, journée) : seul le match repart.
+          // À la sirène, la rencontre repart entière, avec son résultat.
+          const enCours = rencontre.match && !rencontre.match.termine && !rencontre.resultat;
+          const envoyee = chrono && enCours ? { id: rencontre.id, match: rencontre.match } : rencontre;
+          return res.status(200).json({ id: e.id, version: e.version, rencontre: envoyee, ...allege, ...(present ? { presence: true } : {}) });
         }
         if (Number.isInteger(connue) && connue > 0) {
           // Kiri peut observer une ligue sans en devenir membre. Le sondage SQL
@@ -1331,8 +1453,35 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
             }
           }
         }
-        const e = await appliquer(id, compte.id, requete, (e, n, g) => agirCarriere(e, compte.id, commande as unknown as CommandeCarriere, n, g, compte.identifiant === 'kiri'));
-        return res.status(200).json(vueCarriere(e, compte.id));
+        /**
+         * ⚠️ LA RÉPONSE COMPACTE (Correctif 25). Une commande répondait par la vue ENTIÈRE de la ligue — 300 à 400 Ko
+         * pour apprendre qu'on a gagné trois cartes. L'écran annonce maintenant la version qu'il tient (`v`) et qu'il
+         * sait lire un delta : si c'est bien de cette version que la commande est partie, on ne lui rend que ce qui a
+         * changé (`deltaVue.ts`). Dans tous les autres cas — écran d'avant, version décalée, requête rejouée — la vue
+         * entière, comme avant.
+         */
+        const versionEcran = corps.delta === true && Number.isSafeInteger(corps.v) ? Number(corps.v) : null;
+        const repondre = (avant: EtatCarriereEnLigne | undefined, apres: EtatCarriereEnLigne) => {
+          if (versionEcran !== null && avant && avant.version === versionEcran && apres.version >= avant.version) {
+            return res.status(200).json({ delta: differenceVue(vueCarriere(avant, compte.id), vueCarriere(apres, compte.id)) });
+          }
+          return res.status(200).json(vueCarriere(apres, compte.id));
+        };
+        // ⚠️ `partagee` NE SE LIT JAMAIS D'UN CLIENT : c'est le serveur qui décide qu'une annonce part sur le marché commun.
+        if (commande.type === 'vendre') delete commande.partagee;
+        if (typeof commande.type === 'string' && ['vendre', 'acheter', 'encherir', 'annulerVente'].includes(commande.type)) {
+          const ligne = await lireLigue(id);
+          if (ligne?.etat.publique && ligne.comptes.includes(compte.id)) {
+            const traite = await marcheCommun.traiter(ligne.etat, compte, commande, requete);
+            if (traite) return repondre(ligne.etat, traite);
+          }
+        }
+        let avantCommande: EtatCarriereEnLigne | undefined;
+        const e = await appliquer(id, compte.id, requete, (e, n, g) => {
+          avantCommande = e;
+          return agirCarriere(e, compte.id, commande as unknown as CommandeCarriere, n, g, compte.identifiant === 'kiri');
+        });
+        return repondre(avantCommande, e);
       }
       if (action === 'presence') {
         const id = texte(corps.ligue, 36, 36, 'Ligue');

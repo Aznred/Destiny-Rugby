@@ -60,6 +60,12 @@ export function profilJoueurFfr(nom: string, club?: string): JoueurFfr | undefin
     const candidats = joueursFfrDuClub(club).filter(j => normaliserNomFfr(j.nom) === cle);
     return candidats.length === 1 ? candidats[0] : undefined;
   }
+  // ⚠️ UN NOM SEUL NE DÉSIGNE PERSONNE (Correctif 24, audit des postes). Quand le club demandé n'était pas une structure
+  // FFR (tout le Top 14, la Pro D2, l'étranger), on cherchait ce nom dans TOUTE la France amateur : s'il n'y avait qu'un
+  // licencié de ce nom, le professionnel héritait de son poste et de son portrait. Arthur Retière (UBB) devenait
+  // deuxième ligne parce qu'un Arthur Retière joue deuxième ligne à Clisson ; 95 professionnels avaient ainsi changé de
+  // famille de poste depuis l'import FFR du 1ᵉʳ octobre. Un club demandé et inconnu ne rend donc plus rien.
+  if (club) return undefined;
   if (!profilsParNom) {
     profilsParNom = new Map();
     for (const c of structures.keys()) for (const j of joueursFfrDuClub(c)) {

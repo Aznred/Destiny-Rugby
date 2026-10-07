@@ -186,14 +186,28 @@ export function ControleDirect({ pilotage, surReprendre }: { pilotage: PilotageD
 function Souffle({ valeur, sprint }: { valeur: number; sprint: SnapPilotage['reserve'] }) {
   // Deux réserves : l'endurance générale (fine, lente) et la barre de sprint (franche, qui se vide et se recharge).
   if (sprint) {
+    // ⚠️ LA BARRE DIT SON NIVEAU PAR SA COULEUR (Correctif 25). Verte au-dessus de 60 %, elle vire à l'ambre puis au rouge
+    // sous 30 % — en dégradé continu, pas par paliers : on lit la tendance sans regarder le chiffre. Elle se mesure à ce
+    // qu'on PEUT encore sprinter (son plafond du moment), pas à cent : un joueur fatigué dont la réserve est pleine reste
+    // au vert, et c'est le repère du plafond, plus à gauche, qui dit la fatigue du match.
+    const plafond = Math.max(1, borner(sprint.max, 0, 100));
+    const niveau = borner(sprint.valeur / plafond, 0, 1);
+    const teinte = Math.round(borner((niveau - 0.14) / 0.5, 0, 1) * 132);
+    const palier = sprint.essouffle || niveau < 0.3 ? 'alerte' : niveau < 0.6 ? 'moyen' : 'bon';
     return (
-      <div className="cd-souffle" data-deux="oui" data-bas={valeur < 30 ? 'oui' : undefined} data-essouffle={sprint.essouffle ? 'oui' : undefined}
-        title={`${t('cd.souffle')} ${valeur} % · ${t('cd.sprint')} ${sprint.valeur} %`} aria-label={`${t('cd.souffle')} ${valeur} %, ${t('cd.sprint')} ${sprint.valeur} %`}>
-        <Icone nom="batterie" taille={14} />
+      <div className="cd-souffle" data-deux="oui" data-palier={palier} data-essouffle={sprint.essouffle ? 'oui' : undefined}
+        style={{ ['--cd-teinte' as string]: String(teinte) }}
+        title={`${t('cd.sprint')} ${sprint.valeur} % · ${t('cd.souffle.plafond')} ${Math.round(plafond)} % · ${t('cd.souffle')} ${valeur} %`}
+        aria-label={`${t('cd.sprint')} ${sprint.valeur} %, ${t('cd.souffle.plafond')} ${Math.round(plafond)} %, ${t('cd.souffle')} ${valeur} %`}>
+        <Icone nom="eclair" taille={15} />
         <span className="cd-souffle-barres">
-          <span className="cd-souffle-sprint" style={{ ['--cd-max' as string]: `${borner(sprint.max, 0, 100)}%` }}><i style={{ width: `${borner(sprint.valeur, 0, 100)}%` }} /></span>
-          <span className="cd-souffle-fond"><i style={{ width: `${borner(valeur, 0, 100)}%` }} /></span>
+          <span className="cd-souffle-sprint" style={{ ['--cd-max' as string]: `${plafond}%` }}>
+            <i style={{ width: `${borner(sprint.valeur, 0, 100)}%` }} />
+            {plafond < 97 && <b className="cd-souffle-plafond" aria-hidden />}
+          </span>
+          <span className="cd-souffle-fond" title={t('cd.souffle')}><i style={{ width: `${borner(valeur, 0, 100)}%` }} /></span>
         </span>
+        <span className="cd-souffle-chiffre" aria-hidden>{Math.round(sprint.valeur)}</span>
       </div>
     );
   }
@@ -220,17 +234,68 @@ const COULEURS_Q = ['#ff6b57', '#ffd257', '#7ee08f'];
  */
 function Rythme({ pilotage, snap, tactile }: { pilotage: PilotageDirect; snap: SnapPilotage; tactile: boolean }) {
   const p = snap.pack!;
-  const [, tick] = useState(0);
-  // Les temps avancent à chaque image, entre deux clichés du moteur.
+  const piste = useRef<HTMLDivElement>(null);
+  const boutonRef = useRef<HTMLButtonElement>(null);
+  /**
+   * ⚠️ LA BOUCLE D'AFFICHAGE LIT ICI, PAS DANS L'ÉTAT DE REACT (Correctif 24). La piste était redessinée par React à chaque
+   * image et datée par un cliché pris dix fois par seconde sur une horloge à pas de 0,15 s : elle tressautait, et le
+   * verdict d'un appui attendait le pas suivant du moteur puis le cliché d'après — un quart de seconde. Désormais :
+   *   · la position des temps est écrite directement dans le DOM, à chaque image, depuis l'heure exacte du moteur ;
+   *   · la cadence du match (pause, ×2…) se mesure entre deux clichés, les temps avancent donc comme dans le moteur ;
+   *   · l'appui est jugé ICI, tout de suite, avec les fenêtres du joueur — le moteur confirmera, il lit le même instant.
+   */
+  const vif = useRef({ p, cadence: 1, locaux: new Map<number, 0 | 1 | 2>() });
+  const precedent = useRef<{ sim: number; recuA: number } | null>(null);
+  if (precedent.current && p.recuA !== precedent.current.recuA) {
+    const reel = (p.recuA - precedent.current.recuA) / 1000;
+    if (reel > 0.03) vif.current.cadence = borner((p.sim - precedent.current.sim) / reel, 0, 12);
+  }
+  if (!precedent.current || p.recuA !== precedent.current.recuA) precedent.current = { sim: p.sim, recuA: p.recuA };
+  vif.current.p = p;
+  /** Un temps garde son identité d'un cliché à l'autre par son instant dans le moteur. */
+  const cleDe = (dans: number, ref: SnapPilotage['pack'] & object) => Math.round((ref.sim + dans) * 12);
+  const [verdict, setVerdict] = useState<{ q: 0 | 1 | 2; n: number } | null>(null);
+
   useEffect(() => {
     let id = 0;
-    const boucle = () => { tick((n) => (n + 1) % 1e6); id = requestAnimationFrame(boucle); };
+    const boucle = () => {
+      const { p: courant, cadence } = vif.current;
+      const ecoule = ((performance.now() - courant.recuA) / 1000) * cadence;
+      const noeuds = piste.current?.querySelectorAll<HTMLElement>('.cd-rythme-temps');
+      noeuds?.forEach((noeud, i) => {
+        const b = courant.temps[i];
+        const dans = b ? b.dans - ecoule : 99;
+        const visible = !!b && dans <= HORIZON_RYTHME && dans >= -0.5;
+        noeud.style.visibility = visible ? 'visible' : 'hidden';
+        if (visible) noeud.style.left = `${14 + (dans / HORIZON_RYTHME) * 86}%`;
+      });
+      id = requestAnimationFrame(boucle);
+    };
     id = requestAnimationFrame(boucle);
     return () => cancelAnimationFrame(id);
   }, []);
-  const ecoule = (performance.now() - p.recuA) / 1000;
+
   const touche = p.type === 'touche';
-  const appuyer = () => { pousser(pilotage, { type: 'action' }); pilotage.vibrer(14); };
+  const appuyer = () => {
+    const { p: courant, cadence, locaux } = vif.current;
+    const ecoule = ((performance.now() - courant.recuA) / 1000) * cadence;
+    // Le temps encore à jouer le plus proche de l'instant de l'appui.
+    let ecart = Infinity, cle = -1;
+    for (const b of courant.temps) {
+      const k = cleDe(b.dans, courant);
+      if (b.q !== null || locaux.has(k)) continue;
+      const d = Math.abs(b.dans - ecoule);
+      if (d < ecart) { ecart = d; cle = k; }
+    }
+    const q: 0 | 1 | 2 = cle < 0 ? 0 : ecart <= courant.fenetres.parfait ? 2 : ecart <= courant.fenetres.correct ? 1 : 0;
+    // Hors temps, le moteur ne « consomme » pas le temps suivant (sauf au ruck, où le premier appui engage) : nous non plus.
+    if (cle >= 0 && (q > 0 || courant.type === 'ruck')) { locaux.set(cle, q); if (locaux.size > 24) locaux.delete(locaux.keys().next().value!); }
+    setVerdict({ q, n: performance.now() });
+    const b = boutonRef.current;
+    if (b) { b.dataset.frappe = String(q); window.setTimeout(() => { if (b.dataset.frappe === String(q)) delete b.dataset.frappe; }, 140); }
+    pousser(pilotage, { type: 'action' });
+    pilotage.vibrer(q === 2 ? 24 : 12);
+  };
   const cle = `${p.type}${touche ? '.' + p.poste : ''}`;
   const bouton = p.type === 'ruck' ? t('cd.pack.bouton.ruck') : touche ? t(`cd.pack.bouton.${p.poste === 'lifteur' ? 'lifteur' : 'sauteur'}`) : t('cd.pack.bouton');
   const titre = p.type === 'melee' && p.poste === 'talonneur' ? t('cd.pack.titre.talonne') : t(`cd.pack.titre.${cle}`);
@@ -241,31 +306,32 @@ function Rythme({ pilotage, snap, tactile }: { pilotage: PilotageDirect; snap: S
   useEffect(() => {
     if (!aideVue && jouesNb >= 2) ecrirePreferencesControle({ tutosContext: [...lirePreferencesControle().tutosContext, `pack.${p.type}`].slice(-16) });
   }, [aideVue, jouesNb, p.type]);
-  const dernier = p.derniere && p.derniere.depuis + ecoule < 1.1 ? p.derniere : null;
+  // Le verdict du joueur d'abord (immédiat) ; celui du moteur ne sert plus qu'aux temps laissés passer.
+  const local = verdict && performance.now() - verdict.n < 1000 ? verdict : null;
+  const moteur = !local && p.derniere && p.derniere.depuis < 1.1 ? p.derniere : null;
+  const montre = local ? { q: local.q, cle: `l${local.n}` } : moteur ? { q: moteur.q, cle: `m${Math.round((p.sim - moteur.depuis) * 10)}` } : null;
   return (
     <div className="cd-rythme" data-type={p.type} role="group" aria-label={titre}>
       <div className="cd-rythme-titre"><b>{titre}</b>
         {!touche && p.type !== 'ruck' && <span className="cd-rythme-synchro" title={t('cd.pack.synchro')}><i style={{ width: `${Math.round(p.score * 100)}%` }} /></span>}
       </div>
       {!aideVue && <p className="cd-rythme-aide">{t(`cd.pack.aide.${p.type}`)}</p>}
-      <div className="cd-rythme-piste">
+      <div className="cd-rythme-piste" ref={piste}>
         <span className="cd-rythme-repere" />
         {p.temps.map((b, i) => {
-          const dans = b.dans - ecoule;
-          if (dans > HORIZON_RYTHME || dans < -0.5) return null;
-          const x = 14 + (dans / HORIZON_RYTHME) * 86;
-          return <i key={i} className="cd-rythme-temps" data-q={b.q ?? undefined} style={{ left: `${x}%`, ...(b.q !== null ? { background: COULEURS_Q[b.q] } : {}) }} />;
+          const q = b.q ?? vif.current.locaux.get(cleDe(b.dans, p)) ?? null;
+          return <i key={i} className="cd-rythme-temps" data-q={q ?? undefined} style={{ visibility: 'hidden', ...(q !== null ? { background: COULEURS_Q[q] } : {}) }} />;
         })}
-        {dernier && <em key={dernier.depuis + ':' + dernier.q} className="cd-rythme-verdict" style={{ color: COULEURS_Q[dernier.q] }}>{t(`cd.pack.q.${dernier.q}`)}</em>}
+        {montre && <em key={montre.cle} className="cd-rythme-verdict" style={{ color: COULEURS_Q[montre.q] }}>{t(`cd.pack.q.${montre.q}`)}</em>}
       </div>
       <div className="cd-rythme-actions">
-        <button type="button" className="cd-rythme-bouton" onPointerDown={(ev) => { ev.preventDefault(); appuyer(); }}>
+        <button type="button" className="cd-rythme-bouton" ref={boutonRef} onPointerDown={(ev) => { ev.preventDefault(); appuyer(); }}>
           {tactile ? bouton : <>{bouton} <kbd className="cd-touche">{libelleDeTouche(lirePreferencesControle().touches.action[0])}</kbd></>}
         </button>
         {sorties.map((s) => (
           <button key={s} type="button" className="cd-rythme-sortie" data-actif={p.sortie === s ? 'oui' : undefined}
             onPointerDown={(ev) => { ev.preventDefault(); pousser(pilotage, s === 'ramasser' ? { type: 'raffut' } : { type: 'passe', cote: 1, longue: false }); }}>
-            {t(`cd.pack.sortie.${s}`)}
+            {t(p.type === 'maul' && s === 'ramasser' ? 'cd.pack.sortie.maul' : `cd.pack.sortie.${s}`)}
           </button>
         ))}
       </div>

@@ -36,6 +36,8 @@ export interface MatchFinal {
   scoreE: number;
   vainqueur: string;
   perdant: string;
+  /** La clé sous laquelle un résultat JOUÉ est relu (tournoi de fin d'année) : c'est elle que l'affiche du week-end doit porter. */
+  cle?: string;
 }
 
 export interface PhaseFinale {

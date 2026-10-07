@@ -23,6 +23,15 @@ const saisie = (ancre: string): string => {
 
 const modaleDePackOuverte = (): boolean => document.querySelector('.pack-show') !== null;
 
+/** La ligue ouverte est-elle une division publique ? (marque posée par l'écran sur sa racine) */
+const liguePublique = (): boolean => document.querySelector('.cel[data-publique="1"]') !== null;
+
+/** Le curseur est-il dans le champ de cette ancre ? */
+const champActif = (ancre: string): boolean => {
+  const actif = document.activeElement;
+  return actif instanceof HTMLInputElement && actif.closest(`[data-tuto="${ancre}"]`) !== null;
+};
+
 export const PARCOURS_LIGUE: ParcoursTuto[] = [
   // ── Le compte : la porte d'entrée ────────────────────────────────────────
   {
@@ -40,7 +49,11 @@ export const PARCOURS_LIGUE: ParcoursTuto[] = [
     ],
   },
 
-  // ── Le portail : rejoindre ou créer, réglage de la ligue en petites étapes ──
+  // ── Le portail : on rejoint d'abord la Ligue Publique (Correctif 25) ─────────
+  // Demande : « Au lieu de simplement expliquer Créer une ligue / Rejoindre une ligue, le tutoriel doit proposer
+  // directement de rejoindre la Ligue Publique. » Un nouveau joueur n'a ni code d'invitation ni amis inscrits : la
+  // division publique est la seule porte qu'il peut pousser tout de suite. Présenter, nommer son club, choisir son
+  // écusson s'il le veut, rejoindre — le VRAI bouton, la vraie inscription — puis le tour du club prend la suite.
   {
     id: 'league.portail',
     famille: 'league',
@@ -53,24 +66,59 @@ export const PARCOURS_LIGUE: ParcoursTuto[] = [
     },
     valide: () => surLigue() && ancrePresente('cel-portail'),
     etapes: [
-      { id: 'bienvenue', type: 'carte', titre: true, icone: 'equipe', avant: remonter },
+      { id: 'bienvenue', type: 'carte', titre: true, icone: 'monde', avant: remonter },
       { id: 'public', cible: 'cel-public', icone: 'monde', cote: 'gauche', patience: 700 },
-      { id: 'bascules', cible: 'cel-bascules', icone: 'lien', cote: 'bas' },
       {
-        id: 'nomLigue', type: 'action', cible: 'cel-nom-ligue', icone: 'trophee', cote: 'bas', patience: 700,
+        // Déjà inscrit (rejeu du guide) : il n'y a plus de nom à saisir, le bouton rouvre sa division.
+        id: 'clubPublic', type: 'action', cible: 'cel-public-club', cle: 'tg.league.portail.nomClub', icone: 'stade', cote: 'gauche', patience: 700,
+        ignorerSi: () => !ancrePresente('cel-public-club'),
+        jusqua: stable(() => saisie('cel-public-club').length >= 3, 1300),
+      },
+      { id: 'emblemePublic', cible: 'cel-public-embleme', icone: 'medaille', cote: 'gauche', patience: 700, ignorerSi: () => !ancrePresente('cel-public-embleme') },
+      { id: 'rejoindre', type: 'clic', cible: 'cel-public-rejoindre', icone: 'ballon', anim: 'clic', cote: 'gauche', patience: 700 },
+    ],
+  },
+
+  // ── Les ligues privées : dites une fois, jamais imposées ─────────────────
+  // « Après l'inscription à la Ligue Publique, expliquer rapidement : tu peux également créer ou rejoindre des ligues
+  // privées avec tes amis. Mais ne pas obliger le joueur à le faire dans le tutoriel. » Une carte, à l'arrivée dans sa
+  // division, pour le seul nouveau venu (il sort du portail et n'a pas encore fait le tour de son club).
+  {
+    id: 'league.privees',
+    famille: 'league',
+    priorite: 18,
+    declencheur: () => surLigue() && liguePublique() && ancrePresente('cel-bureau') && dejaVu('league.portail') && !dejaVu('league.club'),
+    valide: () => surLigue() && ancrePresente('cel-bureau'),
+    etapes: [
+      { id: 'info', type: 'carte', titre: true, icone: 'lien', avant: remonter },
+    ],
+  },
+
+  // ── Créer sa ligue privée : le pas-à-pas d'avant, seulement pour qui s'y met ──
+  // Il ne se lance que si le joueur pose lui-même le curseur dans « Nom de la ligue » : personne n'y est conduit.
+  {
+    id: 'league.creation',
+    famille: 'league',
+    priorite: 13,
+    declencheur: () => surLigue() && ancrePresente('cel-portail') && dejaVu('league.portail') && champActif('cel-nom-ligue'),
+    valide: () => surLigue() && ancrePresente('cel-portail'),
+    etapes: [
+      { id: 'bascules', cible: 'cel-bascules', cle: 'tg.league.portail.bascules', icone: 'lien', cote: 'bas' },
+      {
+        id: 'nomLigue', type: 'action', cible: 'cel-nom-ligue', cle: 'tg.league.portail.nomLigue', icone: 'trophee', cote: 'bas', patience: 700,
         jusqua: stable(() => saisie('cel-nom-ligue').length >= 3, 1300),
       },
       {
-        id: 'nomClub', type: 'action', cible: 'cel-nom-club', icone: 'stade', cote: 'bas', patience: 700,
+        id: 'nomClub', type: 'action', cible: 'cel-nom-club', cle: 'tg.league.portail.nomClub', icone: 'stade', cote: 'bas', patience: 700,
         jusqua: stable(() => saisie('cel-nom-club').length >= 3, 1300),
       },
-      { id: 'embleme', cible: 'cel-embleme', icone: 'medaille', cote: 'bas', patience: 700 },
-      { id: 'participants', cible: 'cel-rythme-clubs', titre: true, icone: 'calendrier', cote: 'bas', patience: 700 },
-      { id: 'ovas', cible: 'cel-ovas-depart', icone: 'ova', cote: 'bas', patience: 700 },
-      { id: 'packsGratuits', cible: 'cel-packs-gratuits', icone: 'cadeau', cote: 'bas', patience: 700 },
-      { id: 'packs', cible: 'cel-options-packs', icone: 'boutique', cote: 'haut', patience: 700 },
-      { id: 'playoffs', cible: 'cel-playoffs', titre: true, icone: 'trophee', cote: 'haut', patience: 700 },
-      { id: 'creer', type: 'clic', cible: 'cel-creer-ligue', icone: 'ballon', anim: 'clic', cote: 'haut', patience: 700 },
+      { id: 'embleme', cible: 'cel-embleme', cle: 'tg.league.portail.embleme', icone: 'medaille', cote: 'bas', patience: 700 },
+      { id: 'participants', cible: 'cel-rythme-clubs', cle: 'tg.league.portail.participants', titre: true, icone: 'calendrier', cote: 'bas', patience: 700 },
+      { id: 'ovas', cible: 'cel-ovas-depart', cle: 'tg.league.portail.ovas', icone: 'ova', cote: 'bas', patience: 700 },
+      { id: 'packsGratuits', cible: 'cel-packs-gratuits', cle: 'tg.league.portail.packsGratuits', icone: 'cadeau', cote: 'bas', patience: 700 },
+      { id: 'packs', cible: 'cel-options-packs', cle: 'tg.league.portail.packs', icone: 'boutique', cote: 'haut', patience: 700 },
+      { id: 'playoffs', cible: 'cel-playoffs', cle: 'tg.league.portail.playoffs', titre: true, icone: 'trophee', cote: 'haut', patience: 700 },
+      { id: 'creer', type: 'clic', cible: 'cel-creer-ligue', cle: 'tg.league.portail.creer', icone: 'ballon', anim: 'clic', cote: 'haut', patience: 700 },
     ],
   },
 

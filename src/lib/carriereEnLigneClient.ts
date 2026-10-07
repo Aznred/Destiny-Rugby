@@ -1,6 +1,8 @@
 import type { AdministrationCarriere, CommandeCarriere, VueCarriereEnLigne, PageCollection, StatistiquesGlobalesCarriere } from './ligue/typesCarriere.js';
+import type { ReponseDelta } from './ligue/deltaVue';
+import type { VueMarchePartage } from './ligue/marchePartage';
 import type { EtatBoutiqueCompte, ModificationsBoutiqueCompte } from './boutiqueCompte.js';
-import type { LotCartesSolo, PageOffresSolo } from './echangesSolo.js';
+import type { DeltaEchangeSolo, LotCartesSolo, PageOffresSolo } from './echangesSolo.js';
 
 export interface CompteCarriere { id: string; pseudo: string; administrateur?: boolean }
 export interface SessionCarriere {
@@ -109,14 +111,16 @@ export const chargerLigueCarriere = (id: string, signal?: AbortSignal, version?:
   requete<VueCarriereEnLigne>(undefined, undefined, signal,
     `?ligue=${encodeURIComponent(id)}${version ? `&v=${version}` : ''}`);
 /**
- * `film` : le dernier pas du film que l'écran connaît (`null` : aucun). Le
- * serveur ne renvoie alors que les pas suivants, à la place du relevé du terrain.
+ * L'écran annonce le dernier pas de la chronologie qu'il connaît : le serveur
+ * ne renvoie alors que la suite, à la place du relevé du terrain.
  */
-export const chargerDirectCarriere = (id: string, matchId: string, signal?: AbortSignal, version?: number, film?: number | null,
+export const chargerDirectCarriere = (id: string, matchId: string, signal?: AbortSignal, version?: number,
+  /** La chronologie : « dernier pas . somme de contrôle » (`''` : rien encore). Le serveur ne renvoie que la suite. */
+  chrono?: string,
   /** Repères des parties lentes déjà tenues (`''` : aucune) ; le serveur ne renvoie que celles qui ont changé. */
   reperes?: string) =>
   requete<MiseAJourDirectCarriere>(undefined, undefined, signal,
-    `?ligue=${encodeURIComponent(id)}&direct=${encodeURIComponent(matchId)}${version ? `&v=${version}` : ''}${film === undefined ? '' : `&film=${film ?? ''}`}${reperes === undefined ? '' : `&r=${encodeURIComponent(reperes)}`}`);
+    `?ligue=${encodeURIComponent(id)}&direct=${encodeURIComponent(matchId)}${version ? `&v=${version}` : ''}${chrono === undefined ? '' : `&tl=${chrono}`}${reperes === undefined ? '' : `&r=${encodeURIComponent(reperes)}`}`);
 const notifierCompte = (type: 'connecte' | 'deconnecte') => {
   if (typeof window !== 'undefined') window.dispatchEvent(new Event(`destiny-compte-${type}`));
 };
@@ -151,24 +155,30 @@ export const modifierBoutiqueCompte = (modifications: ModificationsBoutiqueCompt
   requete<{ boutique: EtatBoutiqueCompte | null }>({ action: 'sauvegarderBoutique', modifications, compact: true },
     undefined, undefined, '?action=sauvegarderBoutique&format=delta');
 const lecturesEchanges = new Map<number, Promise<PageOffresSolo>>();
-export const listerEchangesSolo = (offset = 0): Promise<PageOffresSolo> => {
+/** `revision` : celle de ma collection — le serveur ne la renvoie que si la sienne est plus récente (échange conclu). */
+export const listerEchangesSolo = (offset = 0, revision?: number): Promise<PageOffresSolo> => {
   const existante = lecturesEchanges.get(offset);
   if (existante) return existante;
-  const lecture = requete<PageOffresSolo>(undefined, undefined, undefined, `?echangesSolo=1&offset=${offset}`)
+  const lecture = requete<PageOffresSolo>(undefined, undefined, undefined,
+    `?echangesSolo=1&offset=${offset}${revision == null ? '' : `&rev=${revision}`}`)
     .finally(() => { if (lecturesEchanges.get(offset) === lecture) lecturesEchanges.delete(offset); });
   lecturesEchanges.set(offset, lecture);
   return lecture;
 };
+/** La réponse d'une action d'échange : le coffre à jour et ce qui vient de changer dans la bourse. */
+export interface ReponseEchangeSolo { boutique: EtatBoutiqueCompte; delta?: DeltaEchangeSolo }
 export const creerOffreSolo = (offertes: LotCartesSolo, souhaitees: LotCartesSolo) =>
-  requete<{ boutique: EtatBoutiqueCompte }>({ action: 'creerOffreSolo', offertes, souhaitees });
+  requete<ReponseEchangeSolo>({ action: 'creerOffreSolo', offertes, souhaitees });
 export const proposerOffreSolo = (offre: string, cartes: LotCartesSolo) =>
-  requete<{ boutique: EtatBoutiqueCompte }>({ action: 'proposerOffreSolo', offre, cartes });
+  requete<ReponseEchangeSolo>({ action: 'proposerOffreSolo', offre, cartes });
 export const accepterOffreSolo = (offre: string, proposition?: string) =>
-  requete<{ boutique: EtatBoutiqueCompte }>({ action: 'accepterOffreSolo', offre, proposition });
+  requete<ReponseEchangeSolo>({ action: 'accepterOffreSolo', offre, proposition });
 export const refuserOffreSolo = (offre: string, proposition: string) =>
-  requete<{ boutique: EtatBoutiqueCompte }>({ action: 'refuserOffreSolo', offre, proposition });
+  requete<ReponseEchangeSolo>({ action: 'refuserOffreSolo', offre, proposition });
 export const annulerOffreSolo = (offre: string) =>
-  requete<{ boutique: EtatBoutiqueCompte }>({ action: 'annulerOffreSolo', offre });
+  requete<ReponseEchangeSolo>({ action: 'annulerOffreSolo', offre });
+export const retirerPropositionSolo = (offre: string) =>
+  requete<ReponseEchangeSolo>({ action: 'retirerPropositionSolo', offre });
 export const supprimerLigueCarriere = (ligue: string) => requete<{ ok: boolean }>({ action: 'supprimerLigue', ligue });
 export interface IdentiteLigue { embleme?: string; logo?: string; tropheeId?: string; playoffs?: boolean; dotationOvas?: number; packsActifs?: string[]; packsGratuitsParJour?: number; doublonsAutorises?: boolean; cartesSpeciales?: boolean }
 export const creerLigueCarriere = (nom: string, clubNom: string, rythme: number, maxClubs: number, identite: IdentiteLigue = {}) =>
@@ -176,11 +186,26 @@ export const creerLigueCarriere = (nom: string, clubNom: string, rythme: number,
 export const rejoindreLigueCarriere = (code: string, clubNom: string, embleme?: string) => requete<VueCarriereEnLigne>({ action: 'rejoindre', code, clubNom, embleme });
 export const rejoindreDivisionPublique = (clubNom: string, embleme?: string) =>
   requete<VueCarriereEnLigne>({ action: 'rejoindreDivisionPublique', clubNom, embleme });
-export const commanderCarriere = (ligue: string, commande: CommandeCarriere, requeteId: string) =>
-  requete<VueCarriereEnLigne>({ action: 'commande', ligue, commande, requeteId });
+/**
+ * Une commande. `version` : celle de la vue que l'écran tient — le serveur peut alors ne rendre que ce qui a changé
+ * (`ReponseDelta`, à appliquer avec `appliquerDeltaVue`) au lieu de la ligue entière.
+ */
+export const commanderCarriere = (ligue: string, commande: CommandeCarriere, requeteId: string, version?: number) =>
+  requete<VueCarriereEnLigne | ReponseDelta>({ action: 'commande', ligue, commande, requeteId, ...(version ? { v: version, delta: true } : {}) });
 /** Battement léger : le serveur répond seulement `{ok:true}` et ne renvoie pas la ligue. */
 export const signalerPresenceCarriere = (ligue: string, matchId: string) =>
   requete<{ ok: boolean }>({ action: 'presence', ligue, matchId });
+
+/**
+ * Le marché commun des divisions publiques, vu de ma division. `revision` : celle que l'écran tient déjà — le serveur
+ * répond alors « inchangé » en vingt octets. `null` : pas de marché commun ici (ligue privée, serveur sans sa table).
+ */
+export async function chargerMarchePartage(ligue: string, revision?: number, signal?: AbortSignal): Promise<VueMarchePartage | null | typeof INCHANGE> {
+  const r = await requete<VueMarchePartage | { indisponible: true }>(undefined, undefined, signal,
+    `?ligue=${encodeURIComponent(ligue)}&marche=1${revision === undefined ? '' : `&mv=${revision}`}`);
+  if ((r as unknown) === INCHANGE) return INCHANGE;
+  return 'indisponible' in r ? null : r;
+}
 
 export function chargerCollectionCarriere(ligue: string, filtres: Record<string, string>, signal?: AbortSignal) {
   const params = new URLSearchParams({ ...filtres, ligue, collection: '1' });

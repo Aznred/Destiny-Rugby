@@ -324,14 +324,33 @@
   transition: width 0.4s ease, background 0.3s ease;
 }
 /* Deux réserves : une barre de sprint épaisse (le plafond baisse avec la fatigue) sur l'endurance générale, fine et lente. */
-.cd-souffle[data-deux='oui'] { width: min(30%, 220px); }
+.cd-souffle[data-deux='oui'] { width: min(36%, 270px); padding: 5px 10px 5px 8px; gap: 7px; border: 1px solid rgba(255, 255, 255, 0.12); }
 .cd-souffle-barres { flex: 1; display: grid; gap: 2px; background: none !important; height: auto !important; overflow: visible !important; }
 .cd-souffle-barres > span { display: block; border-radius: 3px; background: rgba(255, 255, 255, 0.14); overflow: hidden; position: relative; }
-.cd-souffle-sprint { height: 6px; }
+.cd-souffle-sprint { height: 11px; border-radius: 6px !important; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35); }
 .cd-souffle-sprint::after { content: ''; position: absolute; top: 0; bottom: 0; left: var(--cd-max, 100%); right: 0; background: repeating-linear-gradient(135deg, rgba(0,0,0,.45) 0 2px, transparent 2px 4px); }
-.cd-souffle-sprint > i { background: linear-gradient(90deg, #3aa8d8, #8fe0ff) !important; }
+/* La couleur EST le niveau (Correctif 25) : une teinte continue, du rouge (réserve vide) au vert (pleine), posée par le HUD. */
+.cd-souffle-sprint > i {
+  background: linear-gradient(90deg, hsl(calc(var(--cd-teinte, 132) * 1deg) 82% 42%), hsl(calc((var(--cd-teinte, 132) + 16) * 1deg) 88% 56%)) !important;
+  box-shadow: 0 0 8px hsl(calc(var(--cd-teinte, 132) * 1deg) 90% 50% / 0.55);
+  transition: width 0.18s linear, background 0.3s ease !important;
+}
+/* Le plafond du moment : au-delà, la fatigue du match a mangé la réserve. */
+.cd-souffle-plafond { position: absolute; top: -2px; bottom: -2px; left: var(--cd-max, 100%); width: 2px; margin-left: -1px; background: #fff; border-radius: 1px; box-shadow: 0 0 4px rgba(255, 255, 255, 0.8); }
+.cd-souffle-sprint { overflow: visible !important; }
+/* ⚠️ Le remplissage n'avait ni hauteur ni affichage en bloc dans la version à deux barres : la réserve ne se voyait pas du tout. */
+.cd-souffle-barres > span > i { display: block; height: 100%; }
+.cd-souffle > span.cd-souffle-chiffre { flex: 0 0 auto; height: auto; background: none; overflow: visible; border-radius: 0; line-height: 1; }
+.cd-souffle-sprint > i { border-radius: 6px; }
+.cd-souffle-chiffre { min-width: 2ch; text-align: right; font-weight: 800; font-size: 12px; font-variant-numeric: tabular-nums; color: hsl(calc(var(--cd-teinte, 132) * 1deg) 85% 68%); }
+.cd-souffle[data-palier='alerte'] { border-color: rgba(255, 96, 72, 0.6); animation: cd-souffle-alerte 0.9s ease-in-out infinite; }
+.cd-souffle[data-palier='alerte'] > svg { color: #ff7a5c; }
+.cd-souffle[data-palier='moyen'] > svg { color: #f6c453; }
+.cd-souffle[data-palier='bon'] > svg { color: #8fe28f; }
+@keyframes cd-souffle-alerte { 0%, 100% { box-shadow: 0 0 0 0 rgba(255, 96, 72, 0); } 50% { box-shadow: 0 0 0 4px rgba(255, 96, 72, 0.28); } }
+@media (prefers-reduced-motion: reduce) { .cd-souffle[data-palier='alerte'] { animation: none; } }
 .cd-souffle-fond { height: 3px; }
-.cd-souffle[data-essouffle='oui'] .cd-souffle-sprint > i { background: linear-gradient(90deg, #ff8a4d, #ff4d4d) !important; }
+.cd-souffle-fond > i { background: linear-gradient(90deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.8)) !important; }
 .cd-souffle[data-essouffle='oui'] { color: #ffb066; }
 .cd-souffle[data-bas='oui'] { color: #ffb066; }
 .cd-souffle[data-bas='oui'] > span > i { background: linear-gradient(90deg, #ff8a4d, #ff4d4d); }
@@ -745,7 +764,14 @@
   letter-spacing: 0.04em;
   cursor: pointer;
 }
+.cd-rythme-bouton { touch-action: none; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
 .cd-rythme-bouton:active { transform: scale(0.97); background: rgba(244, 205, 99, 0.55); }
+/* L'appui se voit à l'instant où il part : rouge raté, ambre correct, vert parfait. */
+.cd-rythme-bouton[data-frappe] { transform: scale(0.96); }
+.cd-rythme-bouton[data-frappe='0'] { border-color: #ff6b57; background: rgba(255, 107, 87, 0.42); }
+.cd-rythme-bouton[data-frappe='1'] { border-color: #ffd257; background: rgba(255, 210, 87, 0.5); }
+.cd-rythme-bouton[data-frappe='2'] { border-color: #7ee08f; background: rgba(126, 224, 143, 0.5); box-shadow: 0 0 18px rgba(126, 224, 143, 0.6); }
+.cd-rythme-temps { will-change: left; }
 .cd-rythme-sortie {
   flex: 0 1 auto;
   min-height: 44px;

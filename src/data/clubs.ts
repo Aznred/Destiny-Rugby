@@ -12,6 +12,7 @@ import { CLUBS_AMATEURS, CLUBS_REGIONAUX, LOGO_AMATEUR, type ClubAmateurFfr } fr
 import { COMPETITIONS_NOUVELLES } from './nouvellesLigues.js';
 import { CODE_PAR_NATION } from './nations.js';
 import { cleClub } from '../lib/cleClub.js';
+import { enrichirClub, localisationCorrigee } from '../lib/localisationClub.js';
 
 export type { Club, Competition };
 
@@ -500,7 +501,7 @@ export const COMPETITIONS: Competition[] = [
   ...AMATEURS,
   ...COMPETITIONS_REELLES.filter((c) => c.zone === 'Monde'),
   ...NOUVELLES,
-];
+].map(c => ({ ...c, clubs: c.clubs.map(cl => enrichirClub(cl, c.pays)) }));
 
 // Divisions françaises, de l'élite (indice 0) vers le bas de la pyramide.
 export const DIVISIONS_FRANCE = COMPETITIONS.filter((c) => c.zone === 'France');
@@ -520,12 +521,24 @@ export function competitionDuClub(nomClub: string): Competition | undefined {
 }
 
 // Fiche d'un club (nom, ville, logo, couleurs), toutes compétitions confondues.
+/**
+ * Les couleurs de ce club ont-elles été SAISIES (base réelle) ? Sinon elles sortent du hachage de son nom — dix teintes
+ * au hasard, sans rapport avec son écusson : l'écran de match lit alors l'écusson (`lib/tenuesMatch.ts`).
+ */
+export function couleursSaisies(nomClub: string): boolean {
+  const c = clubParNom(nomClub);
+  if (!c) return false;
+  const g = couleurs(c.nom);
+  return c.c1 !== g.c1 || c.c2 !== g.c2;
+}
+
 export function clubParNom(nomClub: string): Club | undefined {
   for (const comp of COMPETITIONS) {
     const trouve = comp.clubs.find((c) => c.nom === nomClub);
-    if (trouve) return trouve;
+    if (trouve) return localisationCorrigee(trouve);
   }
-  return clubsParIdentite.get(cleClub(nomClub));
+  const trouve = clubsParIdentite.get(cleClub(nomClub));
+  return trouve ? localisationCorrigee(trouve) : undefined;
 }
 
 const clubsParIdentite = new Map<string, Club>();

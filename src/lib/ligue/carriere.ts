@@ -11,7 +11,8 @@ import { affichesToutesRondes } from './calendrier.js';
 import { horairesChampionnat } from './horaires.js';
 import { graine as hasard, tirerPondere } from './aleatoire.js';
 import { packsCatalogueAdmin, bandesGaranties, carteDepuisSource, catalogueMondialCarriere, coequipierDepuisCarte, dotationBronzeCarriere, emblemeValide, logoCompetitionValide, nomTrophee, PACKS_CARRIERE, RARETES_CARRIERE, rayonDePack, tirerDuRayon, tropheeValide, vivierRestant } from './catalogueCarriere.js';
-import { actualiserCahierMatchEnLigne, avancerMatchEnLigne, commanderMatchEnLigne, conclureMatchEnLigne, creerMatchEnLigne, DUREE_REELLE, forceFeuille, STRATEGIE_EN_LIGNE_DEFAUT, strategieValide, vueMatchEnLigne } from './matchCarriere.js';
+import { actualiserCahierMatchEnLigne, avancerMatchEnLigne, commanderMatchEnLigne, conclureMatchEnLigne, creerMatchEnLigne, DUREE_REELLE, forceFeuille, MARGE_AUTORITE, STRATEGIE_EN_LIGNE_DEFAUT, strategieValide, vueMatchEnLigne } from './matchCarriere.js';
+import type { RepereChrono } from './filmDirect.js';
 import type { CarteCarriere, ClubCarriere, CommandeCarriere, CompetitionCarriere, CreationCarriere, EtatCarriereEnLigne, LigneClassementCarriere, ObjectifCarriere, PackCarriere, RencontreCarriere, TransactionCarriere, VueCarriereEnLigne } from './typesCarriere.js';
 import { LOT_VENTE_RAPIDE_MAX, valeurVenteRapide } from './venteRapideCarriere.js';
 import { bonusCollectif, collectifCarriere } from './collectifCarriere.js';
@@ -75,11 +76,18 @@ function actualiserCartesCatalogue(cartes: CarteCarriere[]): void {
       carte.poste = source.poste;
       carte.famille = source.famille;
       carte.postesSecondaires = source.postesSecondaires ? [...source.postesSecondaires] : undefined;
-      carte.photo = source.photo;
+      // ⚠️ UN PORTRAIT NE S'EFFACE PAS. Un import qui n'en a plus pour ce joueur laisse celui que la carte portait.
+      carte.photo = source.photo ?? carte.photo;
       carte.statistiques = statistiquesCarte(carte.note, source.famille, source.sourceId);
       continue;
     }
     if (source.origine !== 'professionnel' && !catalogueAdmin().joueurs[carte.sourceId]) continue;
+    // ⚠️ UN HOMONYME NE PREND PAS LA CARTE D'UN AUTRE (Correctif 24, audit des données). L'identifiant d'un joueur est son
+    // nom : quand un import ajoute un professionnel du même nom qu'un licencié amateur déjà distribué, c'est le mieux
+    // noté qui porte l'identifiant — et la carte du licencié devenait ce professionnel : autre club, autre poste, autre
+    // portrait (mesuré : 81 identifiants ont ainsi changé de titulaire entre le 28 septembre et le 5 octobre). Une carte
+    // d'amateur ne suit donc un professionnel que s'il s'agit du même club, ou si le Labo l'a décidé.
+    if (carte.origine === 'ffr' && source.origine === 'professionnel' && carte.clubReel !== source.clubReel && !catalogueAdmin().joueurs[carte.sourceId]) continue;
     // L'identité de collection et la valeur sportive suivent le catalogue actuel.
     // L'historique de propriété, la fatigue, les blessures et les statistiques de
     // carrière restent ceux de cette carte déjà distribuée.
@@ -90,7 +98,7 @@ function actualiserCartesCatalogue(cartes: CarteCarriere[]): void {
     carte.postesSecondaires = source.postesSecondaires ? [...source.postesSecondaires] : undefined;
     carte.potentiel = catalogueAdmin().joueurs[carte.sourceId] || echelleFfrDuClub(source.clubReel) ? source.potentiel : Math.max(carte.potentiel, source.potentiel);
     carte.rarete = source.rarete;
-    carte.photo = source.photo;
+    carte.photo = source.photo ?? carte.photo;
     carte.statistiques = { ...source.statistiques };
     carte.clubReel = source.clubReel;
     carte.championnat = source.championnat;
@@ -358,14 +366,14 @@ function verifierComposition(etat: EtatCarriereEnLigne, club: ClubCarriere, vale
     // un sens — `feuilleGeleeEnLigne` pèse la note par l'adéquation avant de
     // geler la feuille du match.
     //
-    // ⚠️ SAUF LA PREMIÈRE LIGNE. Celle-là reste fermée aux non-spécialistes,
-    // et ce n'est pas une question d'équilibrage : une mêlée avec un ailier au
-    // pilier, c'est un arbitre qui ordonne des mêlées simulées. Le règlement
-    // du rugby l'exige, le jeu aussi.
-    if (i < 3 || (i >= 15 && i < 18)) exiger(
-      [c.poste, ...(c.postesSecondaires ?? [])].some(p => POSTE_PAR_ID[p].famille === POSTE_PAR_ID[poste].famille),
-      `${c.nom} ne peut pas jouer au poste ${i + 1} : la première ligne exige un pilier ou un talonneur du bon poste.`,
-    );
+    // ⚠️ ET LA PREMIÈRE LIGNE NE FAIT PLUS EXCEPTION (Correctif 24). Elle restait
+    // fermée aux non-spécialistes — au XV comme sur les trois premières places
+    // du banc, alors même que l'écran annonce « sur le banc, on met qui on
+    // veut » : il suffisait d'un trois-quarts en seizième pour que le serveur
+    // refuse la feuille entière. Demande : « Ne pas empêcher la sauvegarde.
+    // Laisser le joueur assumer son choix. » Un ailier au poste de pilier est
+    // donc accepté, et joue à la moitié de sa valeur (`rendementAuPoste`).
+    void poste;
   });
 }
 
@@ -494,8 +502,15 @@ export function creerDivisionPublique(config: Pick<CreationCarriere, 'id' | 'cod
     packsActifs: [...PACKS_DIVISION_PUBLIQUE], playoffs: false }, maintenant, graine);
   etat.publique = { cycle, division };
   if (herites.length) {
-    etat.clubs = herites.map(({ club }) => ({ ...copier(club), packsGratuits: [], dernierLotPacksGratuits: undefined }));
-    etat.cartes = herites.flatMap(({ cartes }) => copier(cartes));
+    // ⚠️ LE MARCHÉ D'UN CYCLE SE FERME AVEC LUI. Une carte restée en vente repart déverrouillée (son annonce est restée
+    // dans l'ancienne ligue : elle serait verrouillée pour toujours), et les Ovas réservés pour une enchère sont rendus.
+    etat.clubs = herites.map(({ club }) => {
+      const copie = { ...copier(club), packsGratuits: [], dernierLotPacksGratuits: undefined };
+      copie.ovas += (copie.reservesMarche ?? []).reduce((total, r) => total + r.montant, 0);
+      delete copie.reservesMarche;
+      return copie;
+    });
+    etat.cartes = herites.flatMap(({ cartes }) => copier(cartes)).map(c => { delete c.verrou; return c; });
     etat.transactions = []; etat.objectifs = [];
     if (herites.length === etat.maxClubs) demarrerSaison(etat, maintenant);
   }
@@ -1258,7 +1273,7 @@ function elaguerArchives(etat: EtatCarriereEnLigne) {
 
 function expirerMarche(etat: EtatCarriereEnLigne, maintenant: number) {
   const date = dateServeur(maintenant);
-  for (const v of etat.ventes.filter(v => v.etat === 'ouverte' && Date.parse(v.expireLe) <= maintenant)) {
+  for (const v of etat.ventes.filter(v => v.etat === 'ouverte' && !v.partagee && Date.parse(v.expireLe) <= maintenant)) {
     const carte = carteParId(etat, v.carteId);
     // Une enchère reste sous séquestre jusqu'à la fin d'un match déjà commencé.
     if (etat.rencontres.some(r => r.match && !r.resultat && [r.domicile, r.exterieur].some(id => id === v.vendeurId || id === v.enchere?.clubId))) continue;
@@ -1418,7 +1433,8 @@ export function avancerCarrierePourDirect(
       ? avancerCarriere(etat, maintenant, graine)
       : { ...etat, version: etat.version + 1 };
   }
-  const match = avancerMatchEnLigne(cible.match, maintenant);
+  // Ce match est regardé : sa caméra tourne (une instance qui le rejoue à froid filme d'emblée la fin).
+  const match = avancerMatchEnLigne(cible.match, maintenant, true);
   if (match.termine) return avancerCarriere(etat, maintenant, graine);
   return {
     ...etat,
@@ -1504,7 +1520,8 @@ export function agirCarriere(etat: EtatCarriereEnLigne, compteId: string, comman
         const r = nouveau.rencontres.find(r => r.id === commande.matchId);
         exiger(r?.match && !r.resultat && !r.match.termine, 'Lancez d’abord cette rencontre.');
         exiger(commande.minute > r.match.horloge, 'Choisissez une minute après l’horloge actuelle.');
-        r.match.debut = maintenant - commande.minute * 60_000 - r.match.gel;
+        // Le moteur joue une marge d'autorité derrière l'heure : on l'ajoute pour tomber sur la minute demandée.
+        r.match.debut = Math.round(maintenant - (commande.minute * 60 + MARGE_AUTORITE) * 1000);
         r.match = avancerMatchEnLigne(r.match, maintenant);
         break;
       }
@@ -1595,10 +1612,12 @@ export function agirCarriere(etat: EtatCarriereEnLigne, compteId: string, comman
         const carte = carteParId(nouveau, commande.carteId); exiger(carte.proprietaire === club.id && !carte.verrou, 'Cette carte ne peut pas être mise en vente.');
         exiger(carteSurMarcheAutorisee(carte, nouveau.cartesSpeciales === true), 'Cette carte spéciale ne peut pas être mise sur le marché.');
         verifierHorsFeuille(nouveau, club, [carte.id], 'vente'); verifierDepart(nouveau, club.id, [carte.id]); const id = prochainId(nouveau, 'vente', nouveau.ventes.length); carte.verrou = id;
-        nouveau.ventes.push({ id, carteId: carte.id, vendeurId: club.id, type: commande.mode, prix: commande.prix, expireLe: dateServeur(maintenant + commande.dureeHeures * HEURE), etat: 'ouverte' }); break;
+        nouveau.ventes.push({ id, carteId: carte.id, vendeurId: club.id, type: commande.mode, prix: commande.prix, expireLe: dateServeur(maintenant + commande.dureeHeures * HEURE), etat: 'ouverte',
+          ...(commande.partagee === true && nouveau.publique ? { partagee: true } : {}) }); break;
       }
       case 'acheter': {
         const v = nouveau.ventes.find(v => v.id === commande.venteId); exiger(v && v.etat === 'ouverte' && v.type === 'directe' && Date.parse(v.expireLe) > maintenant, 'Cette vente n’est plus disponible.');
+        exiger(!v.partagee, MARCHE_COMMUN_SEUL);
         exiger(v.vendeurId !== club.id, 'Vous ne pouvez pas acheter votre propre carte.'); clubLibre(nouveau, club.id); clubLibre(nouveau, v.vendeurId);
         const vendeur = clubParId(nouveau, v.vendeurId), carte = carteParId(nouveau, v.carteId);
         exiger(carte.proprietaire === vendeur.id && carte.verrou === v.id, 'La propriété de cette carte a changé.');
@@ -1610,6 +1629,7 @@ export function agirCarriere(etat: EtatCarriereEnLigne, compteId: string, comman
       case 'encherir': {
         entier(commande.montant, 1); const v = nouveau.ventes.find(v => v.id === commande.venteId);
         exiger(v && v.etat === 'ouverte' && v.type === 'enchere' && Date.parse(v.expireLe) > maintenant, 'Cette enchère est fermée.'); exiger(v.vendeurId !== club.id, 'Vous ne pouvez pas enchérir sur votre carte.');
+        exiger(!v.partagee, MARCHE_COMMUN_SEUL);
         exiger(carteSurMarcheAutorisee(carteParId(nouveau, v.carteId), nouveau.cartesSpeciales === true), 'Cette carte spéciale n’est plus proposée sur le marché.');
         exiger(commande.montant >= (v.enchere ? v.enchere.montant + Math.max(25, Math.ceil(v.enchere.montant * .05)) : v.prix), 'Votre offre doit dépasser la meilleure enchère d’au moins 5 % (minimum 25 Ovas).');
         if (v.enchere) journal(nouveau, clubParId(nouveau, v.enchere.clubId), 'enchere', v.enchere.montant, [], 'Enchère dépassée : Ovas restitués', date);
@@ -1617,6 +1637,7 @@ export function agirCarriere(etat: EtatCarriereEnLigne, compteId: string, comman
       }
       case 'annulerVente': {
         const v = nouveau.ventes.find(v => v.id === commande.venteId); exiger(v && v.vendeurId === club.id && v.etat === 'ouverte' && !v.enchere, 'Cette vente ne peut pas être annulée.');
+        exiger(!v.partagee, MARCHE_COMMUN_SEUL);
         v.etat = 'annulee'; delete carteParId(nouveau, v.carteId).verrou; break;
       }
       case 'proposerEchange': {
@@ -1745,18 +1766,17 @@ export function agirCarriere(etat: EtatCarriereEnLigne, compteId: string, comman
  * Un match TERMINÉ garde donc tous ses champs comparés : son fil et sa feuille
  * sont, eux, la seule trace qui restera.
  */
-const DERIVES_DU_DIRECT = ['horloge', 'essais', 'penalites', 'fil', 'stats'] as const;
+const DERIVES_DU_DIRECT = ['horloge', 'essais', 'penalites', 'fil', 'stats', 'decision', 'gel'] as const;
 
 /**
- * ⚠️ LE GEL D'UNE DÉCISION EN ATTENTE EST UNE HORLOGE, PAS UNE INFORMATION.
- * Tant qu'un manager réfléchit, `gel` grandit à chaque lecture (il vaut
- * « maintenant − coup d'envoi − chrono arrêté ») : le comparer faisait réécrire
- * la ligue entière à chaque tick du direct, vingt secondes durant — mesuré,
- * dix-neuf écritures de l'état complet pour une seule décision. Il se recalcule
- * de l'heure qu'il est ; sa valeur DÉFINITIVE part avec la décision, quand elle
- * tombe (clic ou délai), et cette écriture-là a toujours lieu.
+ * ⚠️ UNE DÉCISION EN ATTENTE N'EST PLUS UNE INFORMATION, ELLE SE DÉDUIT
+ * (Correctif 24). Toutes les instances arrêtent le moteur au même pas — la
+ * veille des bancs est au journal — et lisent donc la même pénalité à trancher,
+ * avec la même échéance. L'écrire coûtait une réécriture de la ligue entière
+ * par décision, et c'était surtout la porte d'entrée des matchs divergents :
+ * l'instance qui l'apprenait en retard avait déjà joué la suite. Ce qui
+ * s'écrit, c'est le CHOIX (au journal), une fois.
  */
-const gelDerive = (match: { decision?: unknown }) => Boolean(match.decision);
 
 export function empreinteEcriture(etat: EtatCarriereEnLigne, version: number): string {
   return JSON.stringify({
@@ -1766,7 +1786,6 @@ export function empreinteEcriture(etat: EtatCarriereEnLigne, version: number): s
       if (!r.match || r.match.termine) return r;
       const durable: Record<string, unknown> = { ...r.match };
       for (const cle of DERIVES_DU_DIRECT) delete durable[cle];
-      if (gelDerive(r.match)) delete durable.gel;
       return { ...r, match: durable };
     }),
   });
@@ -1824,9 +1843,8 @@ function memeRencontreDurable(a: RencontreCarriere, b: RencontreCarriere): boole
     const enCours = cle === 'match' && a.match && b.match && !a.match.termine && !b.match.termine;
     if (!enCours) { if (!memeContenu(x[cle], y[cle])) return false; continue; }
     const m = a.match as unknown as Record<string, unknown>, n = b.match as unknown as Record<string, unknown>;
-    const sansGel = gelDerive(a.match!) && gelDerive(b.match!);
     for (const champ of new Set([...Object.keys(m), ...Object.keys(n)])) {
-      if ((DERIVES_DU_DIRECT as readonly string[]).includes(champ) || (sansGel && champ === 'gel')) continue;
+      if ((DERIVES_DU_DIRECT as readonly string[]).includes(champ)) continue;
       if (!memeContenu(m[champ], n[champ])) return false;
     }
   }
@@ -1859,6 +1877,112 @@ function statistiquesLigue(etat: EtatCarriereEnLigne) {
   return { packsOuverts: packs.length, parClub,
     meilleurOuvreur: parClub[0]?.packs ? { clubId: parClub[0].clubId, pseudo: parClub[0].pseudo, packs: parClub[0].packs } : undefined,
     meilleurPack: candidats[0], plusGrosAchat: achats[0] };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// LE MARCHÉ COMMUN DES DIVISIONS PUBLIQUES — ce qu'il fait dans UNE ligue
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// Une annonce partagée se conclut entre DEUX ligues (celle du vendeur, celle de l'acheteur) et un document commun qui
+// arbitre (`marchePartage.ts`). Aucune écriture ne couvre les trois : chaque étape est donc une opération sur une seule
+// ligue, REJOUABLE SANS EFFET — le serveur les reprend tant que le document commun dit qu'elles restent à faire.
+//
+// ⚠️ CE NE SONT PAS DES COMMANDES. Aucune n'est dans `agirCarriere` : un client ne peut ni se livrer une carte, ni se
+// rembourser. Seul `serveur/marcheCommun.ts` les appelle, après avoir fait trancher le document commun.
+
+const MARCHE_COMMUN_SEUL = 'Cette annonce se traite sur le marché commun des divisions.';
+
+export type OperationMarche =
+  /** L'acheteur ou l'enchérisseur paie d'avance : ses Ovas sont réservés sous `ref`. */
+  | { type: 'reserver'; compteId: string; ref: string; montant: number; libelle: string; carte: Pick<CarteCarriere, 'sourceId' | 'speciale'>;
+      /** Un achat ferme demande une équipe qui ne joue pas ; une enchère, non (comme dans une ligue). */
+      clubLibre: boolean }
+  /** L'affaire ne s'est pas faite (annonce déjà prise, enchère dépassée) : les Ovas réservés sont rendus. */
+  | { type: 'restituer'; clubId: string; ref: string; libelle: string }
+  /** La carte arrive chez l'acheteur ; sa réserve est consommée. */
+  | { type: 'livrer'; clubId: string; ref: string; carte: CarteCarriere }
+  /** La carte quitte le vendeur, qui est payé. */
+  | { type: 'solder'; venteId: string; montant: number; acheteur: string }
+  /** L'annonce sort du marché sans vente : la carte est déverrouillée. */
+  | { type: 'clore'; venteId: string; issue: 'annulee' | 'expiree' };
+
+/**
+ * Applique UNE opération du marché commun à une ligue. Rejouée, elle ne fait rien : la réserve dit si l'on a déjà payé
+ * ou déjà été livré, l'état de la vente dit si le vendeur a déjà été soldé.
+ * `carte` : pour `solder`, la carte telle qu'elle était chez le vendeur à l'instant de partir (c'est elle qu'on livre).
+ */
+export function operationMarcheCarriere(etat: EtatCarriereEnLigne, op: OperationMarche, maintenant: number): { etat: EtatCarriereEnLigne; carte?: CarteCarriere; fait: boolean } {
+  const date = dateServeur(maintenant);
+  const nouveau = copier(etat);
+  const rendre = (fait: boolean, carte?: CarteCarriere) => {
+    if (!fait) return { etat, fait, carte };
+    nouveau.version = etat.version + 1;
+    return { etat: nouveau, fait, carte };
+  };
+  switch (op.type) {
+    case 'reserver': {
+      identifiant(op.compteId); identifiant(op.ref); entier(op.montant, 1);
+      exiger(nouveau.publique, 'Le marché commun est réservé aux divisions publiques.');
+      exiger(!nouveau.publique.finLe || maintenant < Date.parse(nouveau.publique.finLe), 'Cette saison publique est terminée. Retrouve ta nouvelle division dans le portail.');
+      const club = monClub(nouveau, op.compteId);
+      if (club.reservesMarche?.some(r => r.ref === op.ref)) return rendre(false);
+      if (op.clubLibre) clubLibre(nouveau, club.id);
+      exiger(carteSurMarcheAutorisee(op.carte, nouveau.cartesSpeciales === true), 'Cette carte spéciale n’est pas autorisée dans ta division.');
+      journal(nouveau, club, 'vente', -op.montant, [], op.libelle, date);
+      (club.reservesMarche ??= []).push({ ref: op.ref, montant: op.montant, le: date });
+      return rendre(true);
+    }
+    case 'restituer': {
+      const club = nouveau.clubs.find(c => c.id === op.clubId);
+      const reserve = club?.reservesMarche?.find(r => r.ref === op.ref);
+      if (!club || !reserve) return rendre(false);
+      club.reservesMarche = club.reservesMarche!.filter(r => r !== reserve);
+      if (!club.reservesMarche.length) delete club.reservesMarche;
+      journal(nouveau, club, 'vente', reserve.montant, [], op.libelle, date);
+      return rendre(true);
+    }
+    case 'livrer': {
+      const club = nouveau.clubs.find(c => c.id === op.clubId);
+      const reserve = club?.reservesMarche?.find(r => r.ref === op.ref);
+      // Pas de réserve : la carte est déjà arrivée (ou l'acheteur n'a jamais payé) — on ne livre pas deux fois.
+      if (!club || !reserve) return rendre(false);
+      club.reservesMarche = club.reservesMarche!.filter(r => r !== reserve);
+      if (!club.reservesMarche.length) delete club.reservesMarche;
+      const { verrou: _verrou, favori: _favori, ...reste } = op.carte;
+      // Un exemplaire neuf DANS cette ligue : l'identifiant d'origine appartient à celle du vendeur.
+      const carte: CarteCarriere = { ...copier(reste as CarteCarriere), id: idNouvelExemplaire(nouveau, nouveau.cartes.length), proprietaire: club.id };
+      while (nouveau.cartes.some(c => c.id === carte.id)) carte.id += ':m';
+      carte.clubs = [...(carte.clubs ?? []), { clubId: club.id, saison: nouveau.saison }];
+      nouveau.cartes.push(carte);
+      nouveau.transactions.push({ id: prochainId(nouveau, 'transaction', nouveau.transactions.length), clubId: club.id, nature: 'vente', ovas: 0,
+        cartes: [carte.id], libelle: `Achat : ${carte.nom} (${reserve.montant} Ovas déjà réservés)`, date });
+      ajusterComposition(nouveau, club, maintenant);
+      return rendre(true, carte);
+    }
+    case 'solder': {
+      const v = nouveau.ventes.find(x => x.id === op.venteId);
+      if (!v || v.etat !== 'ouverte') return rendre(false);
+      const vendeur = nouveau.clubs.find(c => c.id === v.vendeurId);
+      const carte = nouveau.cartes.find(c => c.id === v.carteId && c.proprietaire === v.vendeurId);
+      v.etat = 'vendue'; v.acheteurNom = op.acheteur; if (carte) v.joueurNom = carte.nom;
+      if (v.type === 'enchere') v.enchere = { clubId: '', montant: op.montant };
+      if (carte) nouveau.cartes = nouveau.cartes.filter(c => c !== carte);
+      if (vendeur) {
+        journal(nouveau, vendeur, v.type === 'enchere' ? 'enchere' : 'vente', op.montant, carte ? [carte.id] : [],
+          `${v.type === 'enchere' ? 'Vente aux enchères' : 'Vente'} : ${carte?.nom ?? v.joueurNom ?? 'joueur'} (${op.acheteur})`, date);
+        ajusterComposition(nouveau, vendeur, maintenant);
+      }
+      return rendre(true, carte ? copier(carte) : undefined);
+    }
+    case 'clore': {
+      const v = nouveau.ventes.find(x => x.id === op.venteId);
+      if (!v || v.etat !== 'ouverte') return rendre(false);
+      v.etat = op.issue;
+      const carte = nouveau.cartes.find(c => c.id === v.carteId);
+      if (carte?.verrou === v.id) delete carte.verrou;
+      return rendre(true);
+    }
+  }
 }
 
 function construireVueCarriere(etat: EtatCarriereEnLigne, club?: ClubCarriere): VueCarriereEnLigne {
@@ -1894,12 +2018,14 @@ export function vueRencontreCarriere(
   film?: { depuis?: number },
   /** La réponse part aussitôt sur le réseau : inutile de recopier le fil et les temps forts. */
   sansCopie = false,
+  /** L'écran lit la chronologie (film v2) : son dernier pas et sa somme de contrôle. */
+  chrono?: RepereChrono,
 ): VueCarriereEnLigne['rencontres'][number] | null {
-  return vueRencontreInterne(etat, matchId, monClub(etat, compteId).id, film, sansCopie);
+  return vueRencontreInterne(etat, matchId, monClub(etat, compteId).id, film, sansCopie, chrono);
 }
 
 function vueRencontreInterne(
-  etat: EtatCarriereEnLigne, matchId: string, clubId: string, film?: { depuis?: number }, sansCopie = false,
+  etat: EtatCarriereEnLigne, matchId: string, clubId: string, film?: { depuis?: number }, sansCopie = false, chrono?: RepereChrono,
 ): VueCarriereEnLigne['rencontres'][number] | null {
   const rencontre = etat.rencontres.find(r => r.id === matchId);
   if (!rencontre) return null;
@@ -1907,18 +2033,19 @@ function vueRencontreInterne(
   // ⚠️ PAS DE `copier` SUR LE FILM : il est déjà fait de valeurs neuves, et le
   // recopier doublerait le coût de chaque sondage du direct.
   if (!match) return copier(publics);
-  const { film: pas, ...vue } = vueMatchEnLigne(match, clubId, undefined, film);
+  const { film: pas, chrono: suite, ...vue } = vueMatchEnLigne(match, clubId, undefined, film, chrono);
   // ⚠️ LE DIRECT NE RECOPIE PLUS SA RÉPONSE. Cloner deux cents lignes de fil à
   // chaque sondage pour les sérialiser l'instant d'après coûtait autant que de
   // les envoyer. La vue est un objet neuf ; ce qu'elle référence n'est que lu.
-  if (sansCopie) return { ...copier(publics), match: { ...vue, ...(pas ? { film: pas } : {}) } as ReturnType<typeof vueMatchEnLigne> };
+  if (sansCopie) return { ...copier(publics), match: { ...vue, ...(pas ? { film: pas } : {}), ...(suite ? { chrono: suite } : {}) } as ReturnType<typeof vueMatchEnLigne> };
   const copie = copier({ ...publics, match: vue as ReturnType<typeof vueMatchEnLigne> });
   if (pas && copie.match) copie.match.film = pas;
+  if (suite && copie.match) copie.match.chrono = suite;
   return copie;
 }
 
 export function vueRencontreCarriereObservateur(
-  etat: EtatCarriereEnLigne, matchId: string, film?: { depuis?: number }, sansCopie = false,
+  etat: EtatCarriereEnLigne, matchId: string, film?: { depuis?: number }, sansCopie = false, chrono?: RepereChrono,
 ): VueCarriereEnLigne['rencontres'][number] | null {
-  return vueRencontreInterne(etat, matchId, '', film, sansCopie);
+  return vueRencontreInterne(etat, matchId, '', film, sansCopie, chrono);
 }

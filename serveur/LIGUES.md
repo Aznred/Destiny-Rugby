@@ -482,6 +482,33 @@ classe `ErreurCarriere`.
 
 ---
 
+## Correctif 24 : trois changements de fond
+
+### Le direct ne joue plus que ce qui est définitif
+
+`MARGE_AUTORITE` (4,8 s, `matchCarriere.ts`). Chaque instance serverless tient son moteur ; avant, elle le jouait jusqu'à
+« maintenant », et un ordre écrit par une autre instance tombait dans son passé — elle rejouait, l'écran reculait. Le moteur
+s'arrête maintenant une marge avant l'heure réelle ; un ordre est daté à l'heure réelle, donc devant tous les moteurs. La
+présence d'un entraîneur est un événement du journal (`veille`), une décision en attente se déduit du moteur, et son délai
+se compte en pas de simulation : toutes les instances prennent la même décision de l'adjoint, au même pas. L'écran reçoit
+une chronologie (`ChronoDirect`) qu'il anime lui-même, et annonce sa somme de contrôle pour ne recevoir que la suite.
+Mesuré : −40 % d'octets, −25 % de requêtes SQL, 0 recul sur trois instances routées au hasard (`npm run verify:chronologie`).
+
+### Le marché commun des divisions publiques
+
+Une division = une ligue = une ligne ; aucune écriture ne couvre deux lignes. Les annonces d'un cycle vivent donc dans un
+troisième document, `carriere_marches` (`public:<cycle>`), écrit par comparaison de version : **c'est lui qui dit à qui va
+une carte**. Les ligues ne font qu'exécuter (`operationMarcheCarriere` : réserver, restituer, livrer, solder, clore), chaque
+étape rejouable sans effet, et le document garde la liste de ce qui reste à faire. Détail et invariants en tête de
+`src/lib/ligue/marchePartage.ts` et de `serveur/marcheCommun.ts`. ⚠️ L'invariant 3 (« rien ne traverse d'une ligue à
+l'autre ») a désormais cette exception, bornée aux divisions publiques d'un même cycle : une carte achetée change de
+division, et les Ovas qu'elle coûte passent de l'acheteur au vendeur — le banc vérifie qu'aucun n'est créé ni perdu.
+
+### Une commande répond par ce qui a changé
+
+`deltaVue.ts` : l'écran annonce la version qu'il tient, le serveur compare la vue d'avant à celle d'après. 394 Ko → 8,5 Ko
+pour une ouverture de pack à seize clubs. Un écran d'avant ne demande rien et reçoit tout, comme avant.
+
 ## La base
 
 `serveur/schema-carriere.sql`, à appliquer **après** `schema-vercel.sql` puis

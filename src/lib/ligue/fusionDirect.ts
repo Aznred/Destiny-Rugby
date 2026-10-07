@@ -27,7 +27,8 @@ export interface DeltaDirect {
  */
 function completerMatch(precedente: RencontreVue | undefined, delta: DeltaDirect): RencontreVue {
   const recu = delta.rencontre.match;
-  if (!recu || delta.reperes === undefined) return delta.rencontre;
+  // Le serveur n'envoie plus l'affiche à chaque sondage (clubs, horaires) : on garde celle qu'on tient.
+  if (!recu || delta.reperes === undefined) return precedente ? { ...precedente, ...delta.rencontre } : delta.rencontre;
   const avant = precedente?.match as Record<string, unknown> | undefined;
   const match = { ...recu } as Record<string, unknown>;
   let complet = true;
@@ -38,7 +39,7 @@ function completerMatch(precedente: RencontreVue | undefined, delta: DeltaDirect
   if (delta.filSuite?.length && Array.isArray(match.fil)) match.fil = [...match.fil, ...delta.filSuite];
   // Une partie gardée que l'écran n'a pas : on ne prétend rien, tout reviendra.
   if (complet) match.reperesDirect = delta.reperes;
-  return { ...delta.rencontre, match: match as unknown as RencontreVue['match'] };
+  return { ...precedente, ...delta.rencontre, match: match as unknown as RencontreVue['match'] };
 }
 
 /**

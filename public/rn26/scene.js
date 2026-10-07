@@ -1,3 +1,4 @@
+// correctif24-scene
 // correctif23-touche
 import * as THREE from '/rn26/vendor/three/build/three.module.js';
 import { GLTFLoader } from '/rn26/vendor/three/examples/jsm/loaders/GLTFLoader.js';
@@ -5,7 +6,7 @@ import { clone } from '/rn26/vendor/three/examples/jsm/utils/SkeletonUtils.js';
 import { loadMotions,preparePose,applyPose,rootAt } from './motion.js';
 import { DestinyMatch,xyz,clamp,TICK } from './destiny.mjs';
 import { armChain } from './liaisons.js';
-import { appearance,souhaitDepuisCarte,tirage,prepareBody,groundBody,grip,trackBall,bindLift,findHairMesh,fitToHead,raiseTorso,COIFFURES,BARBES } from './corps.js';
+import { appearance,souhaitDepuisCarte,tirage,prepareBody,groundBody,grip,trackBall,bindLift,findHairMesh,fitToHead,fitBeard,raiseTorso,COIFFURES,BARBES } from './corps.js';
 import { prepareGaits,locomotion } from './allures.js';
 import { tenueDepuisImage,creerTenue,numeroter,creerPanneaux,creerAbords,creerPublic,creerEtiquette,creerBallon,nettoyerStade,chargerImage,texture,departagerTenues,nomCourt,luminance,hexa,MAILLOT_DEFAUT } from './habillage.js';
 import { creerSons } from './sons.js';
@@ -58,16 +59,16 @@ function habiller(r,model,kind,look){
   const head=model.getObjectByName('CC_Base_Head');let headMesh=null;
   model.traverse(o=>{if(o.isSkinnedMesh&&/head_/.test(o.name))headMesh=o;});
   if(!head||!headMesh)return;
-  const attach=(source,color,marge,roughness=.82)=>{
+  const attach=(source,color,marge,roughness=.82,ajuster=fitToHead,decalageY=0)=>{
     if(!source)return;
     // Le masque de la planche découpe les mèches : sans lui, chaque coupe est un bloc plein.
     const masque=source.material?.map||null;
-    const mesh=new THREE.Mesh(fitToHead(source,headMesh,kind,marge),new THREE.MeshStandardMaterial({color,roughness,metalness:0,side:THREE.DoubleSide,map:masque,alphaTest:masque?.38:0}));
-    mesh.name=source.name;model.add(mesh);model.updateMatrixWorld(true);head.attach(mesh);
+    const mesh=new THREE.Mesh(ajuster(source,headMesh,kind,marge),new THREE.MeshStandardMaterial({color,roughness,metalness:0,side:THREE.DoubleSide,map:masque,alphaTest:masque?.38:0}));
+    mesh.name=source.name;mesh.position.y=decalageY;model.add(mesh);model.updateMatrixWorld(true);head.attach(mesh);
   };
   const casque=look.accessory==='casque';
-  if(look.hair&&!casque)attach(findHairMesh(r.hair,'Hair',look.hair,COIFFURES),look.color,.007);
-  if(look.beard)attach(findHairMesh(r.hair,'Beard',look.beard,BARBES),look.teinteBarbe?new THREE.Color(look.teinteBarbe):new THREE.Color(look.color).multiplyScalar(.85),.004);
+  if(look.hair&&!casque)attach(findHairMesh(r.hair,'Hair',look.hair,COIFFURES),look.color,.007,.82,fitToHead,.01);
+  if(look.beard)attach(findHairMesh(r.hair,'Beard',look.beard,BARBES),look.teinteBarbe?new THREE.Color(look.teinteBarbe):new THREE.Color(look.color).multiplyScalar(.85),.002,.82,fitBeard);
   if(casque){
     // Le casque que le joueur porte (modèle de la boutique, teinte comprise) ; les autres tirent dans la réserve.
     const demande=look.casqueModele,reserve=POOL_CASQUES.map(n=>equipementPret.get(n)).filter(Boolean);
@@ -197,9 +198,11 @@ function allegerDecor(decor,materiaux,origine){
   decor.traverse(o=>{if(o.isMesh)o.material=Array.isArray(o.material)?o.material.map(convertir):convertir(o.material);});
 }
 /** Rend la mémoire des stades gardés (textures, géométries). Une scène encore vivante les recharge d'elle-même. */
-function libererStades(sauf){
+function libererStades(sauf,gardes=1){
+  // Les plus anciens d'abord : la Map garde l'ordre d'arrivée, et un stade resservi repasse en dernier (`chargerStade`).
+  const autres=[...decors.keys()].filter(c=>c!==sauf),aRendre=new Set(autres.slice(0,Math.max(0,autres.length-(gardes-1))));
   for(const [cle,promesse] of decors){
-    if(cle===sauf)continue;
+    if(!aRendre.has(cle))continue;
     decors.delete(cle);
     promesse.then(({decor})=>decor.traverse(o=>{if(!o.isMesh)return;o.geometry?.dispose?.();
       for(const m of Array.isArray(o.material)?o.material:[o.material]){m?.map?.dispose?.();m?.dispose?.();}})).catch(()=>{});
@@ -213,10 +216,21 @@ function pelouseDeSecours(){
   const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.wrapS=t.wrapT=THREE.RepeatWrapping;
   return t;
 }
+// ── Le décor ne bouge pas (Correctif 25) ───────────────────────────────────
+// Les matrices de ses morceaux ne sont plus recomposées à chaque image. La racine, elle, tourne au changement de
+// côté : elle garde sa mise à jour et entraîne ses enfants.
+// ⚠️ ON NE SOUDE PAS LES MORCEAUX DU STADE. Essayé et mesuré (`correctif_25_stade.cjs`) : three.js les élague déjà un
+// par un, il n'en reste qu'une cinquantaine à l'image ; soudés, on gagne dix appels et on dessine 15 % de triangles en plus.
+function figerDecor(decor){
+  decor.updateMatrixWorld(true);
+  decor.traverse(o=>{if(o===decor)return;o.updateMatrix();o.matrixAutoUpdate=false;});
+}
 function chargerStade(nom,leger=false){
   const fichier=(STADES[nom]||STADES.international),cle=fichier+(leger?'#leger':'');
-  // Un téléphone ne garde pas le stade du match d'avant.
-  if(leger)libererStades(cle);
+  // Un téléphone ne garde pas le stade du match d'avant ; un ordinateur garde celui du match et le précédent
+  // (il les gardait TOUS : cinq stades décodés au bout d'une soirée de jeu).
+  if(decors.has(cle)){const dejaLa=decors.get(cle);decors.delete(cle);decors.set(cle,dejaLa);}
+  libererStades(cle,leger?1:2);
   if(!decors.has(cle))decors.set(cle,(async()=>{
     const stadium=await new GLTFLoader().loadAsync(RACINE_DECOR+fichier);
     const decor=stadium.scene,origine={},materiaux={};
@@ -240,6 +254,7 @@ function chargerStade(nom,leger=false){
       }
     }catch(e){console.warn('Marquage Destiny Rugby :',e);}
     if(leger)allegerDecor(decor,materiaux,origine);
+    figerDecor(decor);
     return {decor,origine,materiaux};
   })().catch(e=>{
     // Un décor absent ou illisible : on retombe sur l'enceinte d'origine, jamais sur un terrain vide.
@@ -247,6 +262,91 @@ function chargerStade(nom,leger=false){
     console.warn('Stade « '+nom+' » indisponible :',e);return chargerStade('international',leger);
   }));
   return decors.get(cle);
+}
+// ── Un squelette par joueur (Correctif 25) ─────────────────────────────────
+// Corps, tête, yeux, maillot, short, chaussettes : chaque pièce du modèle arrive avec SON squelette, et three.js
+// recalcule puis renvoie à la carte graphique une texture d'os par squelette et par image — 192 pour un match.
+// Les os de toutes les pièces sont rangés à la suite dans UN squelette (chacune y garde ses matrices de repos), et
+// chaque géométrie reçoit une copie de ses indices d'os décalée d'autant. L'image est la même, pour six fois moins d'envois.
+// ⚠️ Les géométries sont partagées par tous les joueurs : la copie décalée est faite une fois par pièce et gardée.
+const peauxDecalees=new Map(),piecesSoudees=new Map();
+function unirSquelettes(model){
+  const peaux=[];model.traverse(o=>{if(o.isSkinnedMesh&&o.skeleton&&o.geometry?.attributes?.skinIndex)peaux.push(o);});
+  if(peaux.length<2)return;
+  const os=[],repos=[];
+  for(const m of peaux){
+    const base=os.length,ancien=m.skeleton;
+    os.push(...ancien.bones);repos.push(...ancien.boneInverses);
+    if(!base)continue;
+    const cle=m.geometry.uuid+'#'+base;let g=peauxDecalees.get(cle);
+    if(!g){
+      const src=m.geometry,si=src.attributes.skinIndex,n=si.itemSize;
+      g=new THREE.BufferGeometry();g.name=src.name;
+      for(const nom in src.attributes)g.setAttribute(nom,src.attributes[nom]);
+      g.setIndex(src.index);for(const gr of src.groups)g.addGroup(gr.start,gr.count,gr.materialIndex);
+      g.boundingBox=src.boundingBox;g.boundingSphere=src.boundingSphere;g.morphAttributes=src.morphAttributes;g.morphTargetsRelative=src.morphTargetsRelative;g.userData=src.userData;
+      const decales=new Uint16Array(si.count*n);
+      for(let i=0;i<si.count;i++){decales[i*n]=si.getX(i)+base;if(n>1)decales[i*n+1]=si.getY(i)+base;if(n>2)decales[i*n+2]=si.getZ(i)+base;if(n>3)decales[i*n+3]=si.getW(i)+base;}
+      g.setAttribute('skinIndex',new THREE.BufferAttribute(decales,n));
+      peauxDecalees.set(cle,g);
+    }
+    m.geometry=g;
+  }
+  const commun=new THREE.Skeleton(os,repos);
+  for(const m of peaux){const ancien=m.skeleton;m.skeleton=commun;ancien.dispose?.();}
+}
+// ── Les pièces qui se dessinent pareil sont soudées (Correctif 25) ─────────
+// Maillot, short et chaussettes portent le même atlas et les mêmes réglages ; corps et tête, la même peau : un appel
+// de dessin chacun au lieu de trois et de deux. ⚠️ La règle ne connaît pas les noms : deux pièces ne se soudent que si
+// TOUT ce qui les dessine est identique (matière, textures, squelette, pose de repos, forme des tampons). Les tenues
+// des arbitres (une couleur par pièce) et les yeux (leur propre texture) restent donc à part.
+// ⚠️ À appeler après `unirSquelettes` : c'est le squelette commun qui rend les indices d'os comparables.
+const TEXTURES_DE_MATIERE=['map','normalMap','roughnessMap','metalnessMap','aoMap','emissiveMap','alphaMap','bumpMap','lightMap','envMap'];
+const REGLAGES_DE_MATIERE=['type','side','transparent','opacity','alphaTest','depthWrite','depthTest','roughness','metalness','vertexColors','flatShading','envMapIntensity','emissiveIntensity','aoMapIntensity','wireframe','fog','toneMapped','blending'];
+function dessinDeLaPiece(o){
+  const m=o.material,g=o.geometry;
+  if(!m||Array.isArray(m)||!o.skeleton||o.bindMode!=='attached'||g.groups.length>1||Object.keys(g.morphAttributes).length)return null;
+  const tampons=Object.keys(g.attributes).sort().map(n=>{const a=g.attributes[n];return a.isInterleavedBufferAttribute?null:n+a.itemSize+a.array.constructor.name+(a.normalized?'n':'');});
+  if(tampons.includes(null))return null;
+  return [o.skeleton.uuid,o.bindMatrix.elements.join(','),o.renderOrder,o.layers.mask,tampons.join(','),
+    m.color?.getHexString?.()??'',m.emissive?.getHexString?.()??'',m.normalScale?m.normalScale.x+','+m.normalScale.y:'',
+    ...REGLAGES_DE_MATIERE.map(k=>m[k]),...TEXTURES_DE_MATIERE.map(k=>m[k]?.uuid??'')].join('|');
+}
+function souderLesPieces(model){
+  const lots=new Map();
+  model.traverse(o=>{
+    if(!o.isSkinnedMesh||!o.visible||o.children.length)return;
+    const cle=dessinDeLaPiece(o);if(!cle)return;
+    let lot=lots.get(cle);if(!lot)lots.set(cle,lot=[]);lot.push(o);
+  });
+  for(const pieces of lots.values()){
+    if(pieces.length<2)continue;
+    const cle=pieces.map(o=>o.geometry.uuid).join('+');let g=piecesSoudees.get(cle);
+    if(!g){
+      let sommets=0,nIndices=0;
+      for(const o of pieces){const n=o.geometry.attributes.position.count;sommets+=n;nIndices+=o.geometry.index?o.geometry.index.count:n;}
+      g=new THREE.BufferGeometry();g.name=pieces.map(o=>o.geometry.name||o.name).join('+');
+      for(const nom of Object.keys(pieces[0].geometry.attributes)){
+        const modele=pieces[0].geometry.attributes[nom],k=modele.itemSize,tout=new modele.array.constructor(sommets*k);let s=0;
+        for(const o of pieces){const a=o.geometry.attributes[nom];tout.set(a.array.subarray(0,a.count*k),s*k);s+=a.count;}
+        g.setAttribute(nom,new THREE.BufferAttribute(tout,k,modele.normalized));
+      }
+      const indices=sommets>65535?new Uint32Array(nIndices):new Uint16Array(nIndices);let s0=0,i0=0;
+      for(const o of pieces){
+        const src=o.geometry.index,n=o.geometry.attributes.position.count,nb=src?src.count:n;
+        for(let i=0;i<nb;i++)indices[i0+i]=s0+(src?src.getX(i):i);
+        s0+=n;i0+=nb;
+      }
+      g.setIndex(new THREE.BufferAttribute(indices,1));g.computeBoundingBox();g.computeBoundingSphere();
+      piecesSoudees.set(cle,g);
+    }
+    const premiere=pieces[0],soudee=new THREE.SkinnedMesh(g,premiere.material);
+    soudee.name='pieces_soudees';soudee.bindMode=premiere.bindMode;soudee.bind(premiere.skeleton,premiere.bindMatrix);
+    soudee.frustumCulled=premiere.frustumCulled;soudee.renderOrder=premiere.renderOrder;soudee.layers.mask=premiere.layers.mask;
+    soudee.position.copy(premiere.position);soudee.quaternion.copy(premiere.quaternion);soudee.scale.copy(premiere.scale);
+    premiere.parent.add(soudee);
+    for(const o of pieces){o.parent.remove(o);if(o.material!==premiere.material)o.material.dispose?.();}
+  }
 }
 /** Remplace la texture d'un matériau du stade en gardant son cadrage. */
 function repeindre(materiau,canvas,renderer){
@@ -322,7 +422,7 @@ export async function creerScene3D(conteneur,options={}){
     propres[o.material.name]??=o.material.clone();o.material=propres[o.material.name];
   });
   jetables.push(...Object.values(propres));
-  const [tenueA,tenueB]=departagerTenues({...MAILLOT_DEFAUT,...options.equipes?.[0]?.maillot},{...MAILLOT_DEFAUT,principal:'#f2f4f3',secondaire:'#dfe5e8',accent:'#c8102e',short:'#f2f4f3',chaussettes:'#0b1f44',...options.equipes?.[1]?.maillot});
+  const [tenueA,tenueB]=(options.tenuesDepartagees?(a,b)=>[a,b]:departagerTenues)({...MAILLOT_DEFAUT,...options.equipes?.[0]?.maillot},{...MAILLOT_DEFAUT,principal:'#f2f4f3',secondaire:'#dfe5e8',accent:'#c8102e',short:'#f2f4f3',chaussettes:'#0b1f44',...options.equipes?.[1]?.maillot});
   const blasons=await Promise.all([0,1].map(i=>chargerImage(options.equipes?.[i]?.blason)));
   await document.fonts?.load?.('40px Anton').catch(()=>{});
   const tailleTenue=leger?512:1024;
@@ -415,7 +515,10 @@ export async function creerScene3D(conteneur,options={}){
       leftHand:model.getObjectByName('CC_Base_L_Hand'),rightHand:model.getObjectByName('CC_Base_R_Hand'),leftArm:armChain(model,'L'),rightArm:armChain(model,'R'),
       rightForearm:model.getObjectByName('CC_Base_R_Forearm'),
       gait:{phase:(index*.173)%1},idleClock:index*.61,cycle:0,key:undefined,fade:1,fadeFor:.2,snapshot:new Float32Array(pose.bones.length*4+3),anchorBlend:0,entry:new THREE.Vector3(),shown:new THREE.Vector3()};
-    prepareBody(actor);return actor;
+    prepareBody(actor);
+    // Un squelette pour tout le corps, et les pièces qui se dessinent pareil soudées (`squelettes`, `soudure` : false pour mesurer sans).
+    if(options.squelettes!==false){unirSquelettes(model);if(options.soudure!==false)souderLesPieces(model);}
+    return actor;
   }
   /** Ce que la carte du joueur sait de son apparence, traduit pour le modèle. */
   const souhait=p=>{const a=options.apparences?.[p.id]??p.source.apparence;return a&&(a.coiffure!==undefined||a.cheveux!==undefined||a.barbe!==undefined||typeof a.peau==='string')?souhaitDepuisCarte(a):a||{};};
@@ -568,12 +671,12 @@ export async function creerScene3D(conteneur,options={}){
   // ── Poses : fondus entre deux gestes, allures, superpositions ────────────
   function snapshot(a){
     const s=a.snapshot;let i=0;
-    for(const b of a.pose.bones){b.bone.quaternion.toArray(s,i);i+=4;}
+    for(const b of a.osComplets||a.pose.bones){b.bone.quaternion.toArray(s,i);i+=4;}
     s[i]=a.pose.hips.position.x;s[i+1]=a.pose.hips.position.y;s[i+2]=a.pose.hips.position.z;
   }
   function crossFade(a,k){
     const s=a.snapshot;let i=0;
-    for(const b of a.pose.bones){qa.fromArray(s,i);b.bone.quaternion.copy(qa.slerp(b.bone.quaternion,k));i+=4;}
+    for(const b of a.osComplets||a.pose.bones){qa.fromArray(s,i);b.bone.quaternion.copy(qa.slerp(b.bone.quaternion,k));i+=4;}
     const h=a.pose.hips.position;h.set(s[i]+(h.x-s[i])*k,s[i+1]+(h.y-s[i+1])*k,s[i+2]+(h.z-s[i+2])*k);
   }
   /**
@@ -795,14 +898,29 @@ export async function creerScene3D(conteneur,options={}){
         else if(m.regard)heading=Math.atan2(m.regard.x-base.x,m.regard.z-base.z)+Math.PI;
       }
       if(!m.anchor)orient(a,heading,snap?1:simDt||.0001,m.pivot??(m.regard&&speedNow<=.35?2.2:9));
+      // Hors champ, seule la position continue : aucune pose ni IK n'est calculée inutilement.
+      // La sphère est volontairement large ; une coupe de caméra ou un geste remet immédiatement la pose complète.
+      bouleCorps.center.set(base.x,.95,base.z);bouleCorps.radius=3.5;
+      const loinDuBallon=Math.hypot(base.x-ball.x,base.z-ball.z)>25;
+      const horsVue=options.animationsEconomes!==false&&!snap&&!still&&open&&m.loco&&!m.upper&&!m.carry&&loinDuBallon&&!champ.intersectsSphere(bouleCorps);
+      if(horsVue){
+        a.group.position.copy(base);a.shown.copy(base);a.poseIgnoree=true;continue;
+      }
+      if(a.poseIgnoree){a.key=undefined;a.poseIgnoree=false;}
+      const distant=options.animationsEconomes!==false&&!snap&&!still&&open&&m.loco&&!m.upper&&!m.carry&&loinDuBallon&&camera.position.distanceToSquared(base)>4900;
+      // À distance, les doigts et les yeux ne demandent aucun échantillonnage. Les membres, le visage et la foulée restent interpolés.
+      const osComplets=a.pose.bones;
+      a.osComplets??=osComplets;
+      if(distant){a.osLointains??=osComplets.filter(b=>!/Thumb|Index|Ring|Mid|Pinky|Eye|Jaw/.test(b.name));a.pose.bones=a.osLointains;}
       const played=posePlayer(a,m,{x:p.vx,z:p.vz},simDt,still);
+      a.pose.bones=osComplets;
       placePlayer(a,p,m,played,base,simDt,still);
       a.shown.copy(a.group.position);
       if(m.air){a.model.position.y=a.baseY;a.lift=0;a.group.updateMatrixWorld(true);}else groundBody(a,simDt||.016);
       if(m.proc)gestesConstruits.push([a,m.proc]);
       if(m.ouvre)ouvrir(a,m.ouvre);
-      else if(m.watch||match.flight?.type==='pied'&&m.loco)trackBall(a,tmp.set(ball.x,Math.max(.3,ball.y),ball.z),m.watch?.55:.28);
-      else if(m.regard&&m.loco)trackBall(a,tmp.set(m.regard.x,m.regard.y??1.5,m.regard.z),.5);
+      else if(!distant&&(m.watch||match.flight?.type==='pied'&&m.loco))trackBall(a,tmp.set(ball.x,Math.max(.3,ball.y),ball.z),m.watch?.55:.28);
+      else if(!distant&&m.regard&&m.loco)trackBall(a,tmp.set(m.regard.x,m.regard.y??1.5,m.regard.z),.5);
     }
     // Après la pose de tout le monde : un geste construit vise le corps de l'adversaire tel qu'il est affiché.
     for(const [a,proc] of gestesConstruits)construire(a,proc);
@@ -825,7 +943,9 @@ export async function creerScene3D(conteneur,options={}){
       sp.position.set(porteur.group.position.x,-.06,porteur.group.position.z);sp.scale.set(h*4,h,1);sp.visible=true;
     }else etiquette.sprite.visible=false;
     if(!still&&!fige)tele.enregistrer(visualTime);
+    const horsChamp=elaguer();
     renderer.render(scene,camera);snap=false;
+    for(const g of horsChamp)g.visible=true;
   }
 
   // ── Arbitres ──────────────────────────────────────────────────────────────
@@ -939,14 +1059,17 @@ export async function creerScene3D(conteneur,options={}){
       const surTee=()=>{ballMesh.rotation.set(Math.PI/2+.16,0,0);t.set(place.x,teeMesh.userData.top+.14,place.z);orientation='tee';};
       teeMesh.position.set(place.x,teeMesh.userData.floor,place.z);
       if(!tir.etape){teeMesh.visible=true;surTee();key='tee';}
-      else if(tir.etape==='celebration'||tir.etape==='approche'){const sol=xyz(tir.ballonAuSol||tir.lieu||e.ballon);t.set(sol.x,SOL,sol.z);key='sol:tir';}
+      else if(tir.etape==='celebration'||tir.etape==='approche'){const sol=xyz(tir.ballonAuSol||tir.lieu||e.ballon);
+        // correctif24-tee : sur une pénalité, le ballon est déjà à la marque — le tee y est posé pendant l'approche.
+        if(tir.etape==='approche'&&tir.rituel&&depuis>1.1&&Math.hypot(sol.x-place.x,sol.z-place.z)<.7){teeMesh.visible=true;surTee();key='tee';}
+        else{t.set(sol.x,SOL,sol.z);key='sol:tir';}}
       else if(tir.etape==='ramassage'){
         const sol=xyz(tir.ballonAuSol||tir.lieu||e.ballon);
         if(depuis<.5||!kicker){t.set(sol.x,SOL,sol.z);key='sol:tir';}else{hands(kicker,t);key='main:'+tir.buteur.id;heading=kicker.heading;orientation='main';}
       }else if(tir.etape==='transport'&&kicker){hands(kicker,t);key='main:'+tir.buteur.id;heading=kicker.heading;orientation='main';}
       else if(tir.etape==='pose'&&kicker){
         // Le buteur s'accroupit, cale le tee puis y dépose le ballon.
-        const u=depuis/(match.outils.RITUEL_TIR?.pose??9.6);teeMesh.visible=u>.095;
+        const fait=tir.humain?0:(tir.rituel?.de??0),u=fait+(1-fait)*depuis/(tir.humain?(match.outils.RITUEL_TIR?.poseHumain??2.4):(tir.rituel?.pose??match.outils.RITUEL_TIR?.pose??9.6));teeMesh.visible=u>.095;
         if(u<.2){hands(kicker,t);key='main:'+tir.buteur.id;heading=kicker.heading;orientation='main';}else{surTee();key='tee';}
       }else{teeMesh.visible=true;surTee();key='tee';}
     }else if(tir){teeMesh.visible=true;teeMesh.position.set(xyz(tir.lieu||e.ballon).x,teeMesh.userData.floor,xyz(tir.lieu||e.ballon).z);key='sol:apres';}
@@ -1026,7 +1149,7 @@ export async function creerScene3D(conteneur,options={}){
     st.shown.copy(ballMesh.position);
     if(orientation==='main')ballMesh.rotation.set(.3,heading,1.3);
     else if(orientation==='sol')ballMesh.rotation.set(0,st.spin*.2,Math.PI/2+st.spin);
-    else if(orientation==='libre'){const o=e.ballonLibre.orientation||0;ballMesh.rotation.set(o,0,o*.37);}
+    else if(orientation==='libre'){const o=e.ballonLibre?.orientation||0;ballMesh.rotation.set(o,0,o*.37);}
   }
 
   // ── Caméra : suivi amorti, jamais de changement de cadre brutal ──────────
@@ -1275,26 +1398,87 @@ export async function creerScene3D(conteneur,options={}){
     miseEnPose(real);
   }
 
-  // ── Définition adaptative : on préfère une image un peu moins fine à une image saccadée ──
-  let cumul=0,images=0,ips=60;
-  function mesurer(dt){
+  // ── Définition, puis cadence adaptatives (Correctif 25) ───────────────────
+  // « Il vaut mieux un 30 images par seconde stable qu'un 60 qui oscille entre 20 et 60. »
+  //   1. l'image s'affine moins (définition) ;
+  //   2. si cela ne suffit pas, la scène vise 30 : elle ne pose et ne dessine plus qu'une image sur deux (écran à
+  //      60 Hz ; une sur quatre à 120 Hz), RÉGULIÈREMENT — le moteur du match, lui, avance à chaque appel de l'hôte ;
+  //   3. elle ne retente la pleine cadence que si une image lui coûte assez peu pour y tenir, et de plus en plus
+  //      rarement si l'essai échoue.
+  // Sur téléphone la pleine cadence est 60 : un écran à 120 Hz ne fait pas travailler la scène deux fois plus.
+  // ⚠️ La période de l'écran se LIT (l'écart le plus courant entre deux appels de l'hôte), elle ne se suppose pas.
+  const regulee=options.cadence!==false,PLEINE=leger?60:Infinity,PLANCHER=.72,definitionDeDepart=definition;
+  let cible=regulee&&options.profil==='bas'?30:PLEINE,pas=1,periode=1/60,dette=0,saute=0;
+  let cumul=0,coutCumule=0,images=0,ips=60,lentes=0,horloge=0,essaiLe=12,attenteEssai=12,enEssai=false,imagesTotales=0,tempsTotal=0;
+  const appelsHote=[];
+  function mesurer(dt,cout){
     // Au-delà d'un dixième de seconde par image, ce n'est plus la carte graphique
     // qui peine : c'est le navigateur qui bride un onglet caché.
-    if(dt>.1||document.hidden)return;
-    cumul+=dt;images++;
-    if(images<75)return;
-    const moyenne=cumul/images;ips=Math.round(1/moyenne);cumul=0;images=0;
-    if(moyenne>1/40&&definition>.72&&!paused){definition=Math.max(.72,definition-.16);renderer.setPixelRatio(definition);renderer.setSize(largeur,hauteur,false);}
+    if(dt>.1*pas||document.hidden)return;
+    cumul+=dt;coutCumule+=cout;images++;horloge+=dt;imagesTotales++;tempsTotal+=dt;
+    if(cumul<1.5)return;
+    const moyenne=cumul/images,coutMoyen=coutCumule/images;ips=Math.round(1/moyenne);cumul=0;coutCumule=0;images=0;
+    if(appelsHote.length>=12){appelsHote.sort((a,b)=>a-b);periode=appelsHote[Math.floor(appelsHote.length*.2)];}
+    appelsHote.length=0;
+    if(!regulee||paused)return;
+    const lente=moyenne>(cible===30?1/24:1/45);
+    if(lente){
+      // Un essai de pleine cadence qui échoue : retour immédiat à 30, et le prochain essai attendra deux fois plus.
+      if(enEssai){cible=30;enEssai=false;attenteEssai=Math.min(120,attenteEssai*2);essaiLe=horloge+attenteEssai;}
+      else if(definition>PLANCHER){definition=Math.max(PLANCHER,definition-.16);renderer.setPixelRatio(definition);renderer.setSize(largeur,hauteur,false);lentes=0;}
+      else if(cible>30&&++lentes>=2){cible=30;lentes=0;essaiLe=horloge+attenteEssai;}
+    }else{
+      lentes=0;
+      if(enEssai){enEssai=false;attenteEssai=12;}
+      else if(cible===30&&PLEINE>30&&horloge>=essaiLe&&coutMoyen<7){cible=PLEINE;enEssai=true;}
+    }
+    pas=cible===Infinity?1:Math.max(1,Math.round(1/(cible*periode)));
   }
 
+  // ── L'élagage (Correctif 25) : un joueur hors du champ de la caméra n'est pas dessiné ───
+  const champ=new THREE.Frustum(),vueProjection=new THREE.Matrix4(),bouleCorps=new THREE.Sphere(),horsChampListe=[];
+  let elagues=0;
+  function elaguer(){
+    horsChampListe.length=0;
+    if(options.elagage===false)return horsChampListe;
+    camera.updateMatrixWorld();
+    vueProjection.multiplyMatrices(camera.projectionMatrix,camera.matrixWorldInverse);champ.setFromProjectionMatrix(vueProjection);
+    const tester=g=>{
+      if(!g||!g.visible)return;
+      bouleCorps.center.set(g.position.x,g.position.y+.95,g.position.z);bouleCorps.radius=2.6;
+      if(!champ.intersectsSphere(bouleCorps)){g.visible=false;horsChampListe.push(g);}
+    };
+    for(const a of actors.values())tester(a.group);
+    for(const a of officials)tester(a.group);
+    elagues=horsChampListe.length;
+    return horsChampListe;
+  }
+  // ── Le profileur (Correctif 25) : ce que coûte une image, lu par le Labo ───
+  const couts=new Float32Array(240),ecarts=new Float32Array(240),coutsCpu=new Float32Array(240),coutsGpu=new Float32Array(120);let nCouts=0,nGpu=0;
+  function noterCout(ms,dt,cpu){couts[nCouts%240]=ms;ecarts[nCouts%240]=dt*1000;coutsCpu[nCouts%240]=cpu;nCouts++;}
+  function resumerCouts(t,compte=nCouts){const n=Math.min(compte,t.length);if(!n)return{moyenne:0,p95:0,max:0};const v=Array.from(t.subarray(0,n)).sort((a,b)=>a-b);return{moyenne:v.reduce((s,x)=>s+x,0)/n,p95:v[Math.min(n-1,Math.floor(n*.95))],max:v[n-1]};}
+  let mesureGpu=false,extensionGpu=null;const contexteGpu=renderer.getContext(),requetesGpu=[];
+  function arreterGpu(){mesureGpu=false;for(const q of requetesGpu)contexteGpu.deleteQuery(q);requetesGpu.length=0;}
+  function commencerGpu(){
+    if(!mesureGpu||!extensionGpu||contexteGpu.isContextLost())return null;
+    const disjoint=contexteGpu.getParameter(extensionGpu.GPU_DISJOINT_EXT);
+    while(requetesGpu.length&&(disjoint||contexteGpu.getQueryParameter(requetesGpu[0],contexteGpu.QUERY_RESULT_AVAILABLE))){
+      const q=requetesGpu.shift();if(!disjoint){coutsGpu[nGpu++%120]=contexteGpu.getQueryParameter(q,contexteGpu.QUERY_RESULT)/1e6;}contexteGpu.deleteQuery(q);
+    }
+    if(disjoint||requetesGpu.length>=8)return null;
+    const q=contexteGpu.createQuery();if(!q)return null;contexteGpu.beginQuery(extensionGpu.TIME_ELAPSED_EXT,q);return q;
+  }
   const projete=new THREE.Vector3();
   const api={
     /** Vue forcée [dx, y, dz, hauteur visée] pour les vérifications ; `null` en jeu. */
     vue:null,
     get match(){return match;},
     get ips(){return ips;},
+    /** Le profileur : coût du rendu et écart entre deux images (ms, sur les 240 dernières), compteurs de three.js. */
+    mesures(){const i=renderer.info;return{images:nCouts,rendu:resumerCouts(couts),cpu:resumerCouts(coutsCpu),gpu:nGpu?resumerCouts(coutsGpu,nGpu):undefined,ecart:resumerCouts(ecarts),ips,appels:i.render.calls,triangles:i.render.triangles,geometries:i.memory.geometries,textures:i.memory.textures,definition,largeur,hauteur,leger:!!options.leger,elagues,cadence:cible===Infinity?0:cible,pas,definitionDeDepart,moyenneMatch:tempsTotal>0?imagesTotales/tempsTotal:0,dureeMesuree:tempsTotal};},
+    mesurerGpu(actif){if(!actif){arreterGpu();return;}extensionGpu??=contexteGpu.getExtension('EXT_disjoint_timer_query_webgl2');mesureGpu=!!extensionGpu;},
     get definition(){return definition;},
-    interne:{actors,officials,camera,scene,renderer,motions,THREE,rig,ballState,tenues,tele},
+    interne:{actors,officials,camera,scene,renderer,motions,THREE,rig,ballState,tenues,tele,unirSquelettes,souderLesPieces},
     /** Branche un état de match. `direct` : état déjà interpolé (relevés du direct en ligne). */
     brancher(etat,{direct=false}={}){
       match=etat instanceof DestinyMatch?etat:new DestinyMatch({etat,outils:options.outils,direct});
@@ -1306,9 +1490,17 @@ export async function creerScene3D(conteneur,options={}){
       if(detruite||!match)return;
       paused=fige;speed=vitesse;
       if(match.observe())api.surPas?.(match);
+      // Cadence réduite : l'image sautée n'est ni posée ni dessinée, et son temps est rendu à la suivante.
+      if(regulee&&!still){
+        if(dt>.004&&appelsHote.length<240)appelsHote.push(dt);
+        if(pas>1){dette+=dt;if(++saute<pas)return;dt=dette;dette=0;saute=0;}
+      }
+      const debutCpu=performance.now();
       if(!still){realiser(match.time+match.offset(),fige,vitesse);sons?.surImage(match,dt,{fige,vitesse});}
-      render(dt,still);
-      if(!fige&&!still)mesurer(dt);
+      const q=commencerGpu(),debutRendu=performance.now();
+      try{render(dt,still);}finally{if(q){contexteGpu.endQuery(extensionGpu.TIME_ELAPSED_EXT);requetesGpu.push(q);}}
+      const coutImage=performance.now()-debutRendu;noterCout(coutImage,dt,performance.now()-debutCpu);
+      if(!fige&&!still)mesurer(dt,coutImage);
     },
     /** Entrée des équipes : `k` de 0 (tunnel) à 1 (en place), `null` pour rendre la main au match. */
     entrer(k,dt){match?.entrer(k,dt);if(k==null)snap=true;},
@@ -1371,8 +1563,35 @@ export async function creerScene3D(conteneur,options={}){
       return {x:(projete.x+1)/2*largeur,y:(1-projete.y)/2*hauteur,dedans:projete.z<1&&Math.abs(projete.x)<.98&&Math.abs(projete.y)<.98};
     },
     cadrer,
+    /**
+     * La même destruction que `detruire`, PAR TRANCHES : l'image disparaît tout de suite, la mémoire graphique est
+     * rendue ensuite un peu à chaque image. Rend une promesse tenue quand tout est libéré.
+     */
+    async detruireParEtapes(){
+      if(detruite)return;detruite=true;arreterGpu();observateur.disconnect();
+      toile.removeEventListener('webglcontextlost',surPerteDeContexte);
+      toile.removeEventListener('pointerdown',passerAuToucher);sons?.detruire();tele.detruire();
+      toile.style.display='none';
+      // Un onglet caché ne tire plus requestAnimationFrame : la minuterie tient lieu d'image.
+      const souffler=()=>new Promise(fin=>{let fait=false;const finir=()=>{if(!fait){fait=true;fin();}};if(typeof requestAnimationFrame==='function')requestAnimationFrame(finir);setTimeout(finir,40);});
+      await souffler();
+      const acteurs=[...actors.values(),...officials];
+      for(let i=0;i<acteurs.length;i+=6){
+        for(const a of acteurs.slice(i,i+6)){a.kit?.dispose();a.model.traverse(o=>{if(o.isMesh&&o.material?.dispose&&o.material!==undefined){const ms=Array.isArray(o.material)?o.material:[o.material];ms.forEach(m=>m.dispose());}});scene.remove(a.group);if(a.flag)scene.remove(a.flag);if(a.card)scene.remove(a.card);}
+        await souffler();
+      }
+      actors.clear();
+      for(let i=0;i<jetables.length;i+=16){for(const j of jetables.slice(i,i+16))j.dispose?.();await souffler();}
+      etiquette.sprite.material.map.dispose();etiquette.sprite.material.dispose();
+      scene.remove(decor);
+      await souffler();
+      renderer.renderLists?.dispose?.();renderer.dispose();renderer.forceContextLoss?.();toile.remove();
+      await souffler();
+      // Sur téléphone, le stade n'attend pas le match suivant en mémoire.
+      if(leger)libererStades();
+    },
     detruire(){
-      if(detruite)return;detruite=true;observateur.disconnect();
+      if(detruite)return;detruite=true;arreterGpu();observateur.disconnect();
       toile.removeEventListener('webglcontextlost',surPerteDeContexte);
       toile.removeEventListener('pointerdown',passerAuToucher);sons?.detruire();tele.detruire();
       for(const a of [...actors.values(),...officials]){a.kit?.dispose();a.model.traverse(o=>{if(o.isMesh&&o.material?.dispose&&o.material!==undefined){const ms=Array.isArray(o.material)?o.material:[o.material];ms.forEach(m=>m.dispose());}});scene.remove(a.group);if(a.flag)scene.remove(a.flag);if(a.card)scene.remove(a.card);}

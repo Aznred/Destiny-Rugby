@@ -23,6 +23,8 @@ export type ArticleLabo = Pick<import('../../data/boutique.js').ArticleEquipemen
 
 export interface CatalogueAdmin {
   revision: number;
+  clubs?: Record<string, import('../localisationClub.js').LocalisationClub>;
+  rivalitesHistoriques?: import('../localisationClub.js').RivaliteHistorique[];
   /** Les packs spéciaux ne tournent dans les boutiques que si Kiri l'active. */
   rotationPacks: boolean;
   packs: Record<string, PackCarriere>;

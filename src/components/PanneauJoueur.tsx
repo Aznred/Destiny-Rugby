@@ -16,15 +16,14 @@ import { Drapeau } from './Drapeau';
 import { nomNation, nomNationTraduit } from '../lib/nations';
 import { Confirmation } from './Confirmation';
 import { Selecteur } from './Selecteur';
-import { semaine, libelleDate, libelleSemaine, SEMAINES_PAR_SAISON, CALENDRIER } from '../data/calendrier';
+import { semaine, libelleDate, libelleSemaine, SEMAINES_PAR_SAISON } from '../data/calendrier';
 import { AGE_RETRAITE_LIBRE, AGE_RETRAITE_FORCEE, RECONVERSIONS } from '../store/useGame';
 import { amisPresents } from '../lib/vestiaire';
 import { TRAIT_PAR_ID, descriptionTrait, nomTrait } from '../data/traits';
 import { nombre, t, tn, texteTraduit } from '../lib/i18n';
-import { matchDeLaSemaine } from '../lib/matchLive';
+import { afficheDuJoueur, libelleAfficheManager, matchDePreparation, resteUnMatchCeWeekEnd, PREFIXE_PREPARATION } from '../lib/matchLive';
+import { apresLEcran, ecrituresGroupees } from '../lib/finMatch';
 import { equipeU20 } from '../lib/international';
-import { coupeEnDirect, coupesDuClub, matchDuTourCourant } from '../lib/coupe';
-import { matchPhaseFinaleDuJoueur } from '../lib/phaseFinale';
 import { situationInternationale } from '../lib/rassemblements';
 import { CalendrierMondial } from './CalendrierMondial';
 import { nomBlessure } from '../lib/blessures';
@@ -87,7 +86,9 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
   // existait bien et disait au joueur qu’il est libre ; ce qui manquait,
   // c'était le VERROU sur l'action.
   const sansContrat = contratBloque(joueur);
-  const bloque = aRepondre || sansContrat;
+  // La semaine tourne juste après la fermeture d'un match (Correctif 26) : rien ne s'actionne pendant ce court instant.
+  const [passage, setPassage] = useState(false);
+  const bloque = aRepondre || sansContrat || passage;
   const motifBlocage = sansContrat ? t('pj.sansContrat') : motifAttente;
   const semaineActuelle = semaine(joueur.semaine ?? 1);
   const vecu = joueur.saisonEnCours;
@@ -161,57 +162,33 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
     ? (inter.u20 ? equipeU20(joueur.nation) : nomNation(joueur.nation))
     : null;
 
-  const coupe = useMemo(() => {
-    if (semaineActuelle.type !== 'coupe') return null;
-    const id = coupesDuClub(joueur.club, joueur.saison)[0];
-    if (!id) return null;
-    const date = CALENDRIER.slice(0, joueur.semaine ?? 1).filter((s) => s.type === 'coupe').length;
-    const etat = coupeEnDirect(id, joueur.saison, joueur.club, date);
-    if (!etat) return null;
-    const poule = etat.poules.find((p) => p.clubs.includes(joueur.club));
-    const matchPoule = date <= etat.totalJournees
-      ? poule?.journees[date - 1]?.find((m) => m.domicile === joueur.club || m.exterieur === joueur.club)
-      : undefined;
-    // ⚠️ LE TOUR EN COURS, PAS LE PREMIER DU TABLEAU. `etat.bracket` contient
-    // TOUS les tours déjà joués : un `find` y retombait chaque semaine sur le
-    // quart de finale du club, et le lui refaisait jouer contre le même
-    // adversaire, avec le même score, jusqu’à la fin de la coupe. Bug signalé
-    // en jeu, mot pour mot : « je joue toujours contre la même équipe jusqu’à
-    // la finale avec le même score ».
-    const matchFinal = matchDuTourCourant(etat, joueur.club);
-    const match = matchPoule ?? (matchFinal
-      ? { ...matchFinal, essaisD: Math.floor(matchFinal.scoreD / 7), essaisE: Math.floor(matchFinal.scoreE / 7) }
-      : undefined);
-    return match ? { id, nom: etat.nom, journee: date, match } : null;
-  }, [joueur, semaineActuelle.type]);
-
-  const phase = useMemo(() => (
-    semaineActuelle.type === 'phaseFinale'
-      ? matchPhaseFinaleDuJoueur(joueur, bonusClubDuJoueur(joueur))
-      : null
-  ), [joueur, semaineActuelle.type]);
+  // ⚠️ UNE SEULE DÉFINITION DE L'AFFICHE DU WEEK-END (`afficheDuJoueur`, lib/matchLive.ts) : championnat, coupe,
+  // phase finale de sa poule ET tournoi final de la division. Cet écran fabriquait ses propres clés pour les matchs
+  // couperets : le tableau ne les relisait pas, et le tournoi final n'était proposé nulle part (Correctif 26).
+  const club = useMemo(() => afficheDuJoueur(joueur, bonusClubDuJoueur(joueur)), [joueur]);
 
   const affiche = useMemo(
     () => (situation.indisponibleClub && !inter ? null : inter
       ? { journee: inter.affiche.journee, match: inter.affiche.match, cle: inter.affiche.cle }
-      : coupe
-        ? { journee: coupe.journee, match: coupe.match, cle: `${coupe.id}#${joueur.saison}#${joueur.semaine}` }
-        : phase
-          ? {
-              journee: 0,
-              match: { ...phase, essaisD: Math.floor(phase.scoreD / 7), essaisE: Math.floor(phase.scoreE / 7) },
-              cle: `phase#${joueur.division}#${joueur.saison}#${joueur.semaine}`,
-            }
-          : matchDeLaSemaine(joueur, bonusClubDuJoueur(joueur))),
-    [joueur, inter, coupe, phase, situation.indisponibleClub],
+      : club
+        // L'été, avant la première journée : le club du joueur dispute ses matchs de préparation.
+        ?? matchDePreparation({ division: joueur.division ?? '', club: joueur.club, saison: joueur.saison, semaine: joueur.semaine ?? 1 },
+          bonusClubDuJoueur(joueur))),
+    [joueur, inter, club, situation.indisponibleClub],
   );
+  // Un match couperet (phase finale, tournoi final, coupe à élimination) s'annonce par son tour, pas par une journée.
+  const couperet = !inter && club && club.nature !== 'championnat' && club.tour ? club : null;
+  // ⚠️ DEUX TOURS LE MÊME WEEK-END : le tournoi final enchaîne ses premiers tours. Tant qu'il en reste un à jouer,
+  // le bouton du match revient, même si un match a déjà été suivi cette semaine.
+  const encoreUnTour = !inter && !!club && club.nature === 'phaseFinale' && !joueur.resultatsClub?.[club.cle];
+  const preparation = !!affiche && affiche.cle.startsWith(PREFIXE_PREPARATION);
   const monEquipe = inter ? (inter.u20 ? equipeU20(joueur.nation) : nomNation(joueur.nation)) : joueur.club;
   const adversaire = affiche
     ? (affiche.match.domicile === monEquipe ? affiche.match.exterieur : affiche.match.domicile)
     : null;
   // Déjà suivi cette semaine ? Alors on repasse sur les boutons classiques.
   const matchAJouer = !!affiche && !blesse && situation.role !== 'horsGroupe'
-    && matchRegarde !== `${joueur.saison}#${joueur.semaine ?? 1}`;
+    && (matchRegarde !== `${joueur.saison}#${joueur.semaine ?? 1}` || encoreUnTour);
 
   return (
     <aside id="carriere-joueur" className="carte panneau-joueur">
@@ -480,7 +457,8 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
                 ? t('pj.reponds')
                 : inter ? t(inter.u20 ? 'pj.jouerU20' : 'pj.jouerSelection') : t('pj.jouerMatch')}</b>
               <span>
-                {inter ? `${inter.affiche.competition.emoji} ${inter.affiche.competition.nom}` : `J${affiche!.journee}`}
+                {inter ? `${inter.affiche.competition.emoji} ${inter.affiche.competition.nom}` : preparation ? t('pj.preparation')
+                  : couperet ? libelleAfficheManager(couperet, division?.nom ?? '').split(' · ').pop() : `J${affiche!.journee}`}
                 {' · '}{affiche!.match.domicile === monEquipe ? t('pj.recoit') : t('pj.chez')} {adversaire}
               </span>
             </button>
@@ -633,13 +611,25 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
           selection={!!inter}
           titre={inter
             ? `${inter.affiche.competition.nom} · ${libelleDate(semaineActuelle)} · ${t('tb.journee', { n: inter.affiche.journee })}`
-            : `${division?.nom ?? t('pj.championnat')} · ${libelleDate(semaineActuelle)} · ${t('tb.journee', { n: affiche.journee })}`}
+            : couperet ? `${couperet.competition ?? division?.nom ?? t('pj.championnat')} · ${libelleDate(semaineActuelle)} · ${libelleAfficheManager(couperet, division?.nom ?? '').split(' · ').pop()}`
+            : `${division?.nom ?? t('pj.championnat')} · ${libelleDate(semaineActuelle)} · ${preparation ? t('pj.preparation') : t('tb.journee', { n: affiche.journee })}`}
           onTermine={() => setMatchTermine(true)}
           onFermer={() => {
             setMatchOuvert(false);
             // ⚠️ La semaine n'avance QUE si le match est allé au bout. Fermer en
             // cours de match (Échap) ne doit rien faire passer.
-            if (matchTermine) { setMatchTermine(false); semaineSuivante(); }
+            if (!matchTermine) return;
+            setMatchTermine(false);
+            setPassage(true);
+            // ⚠️ ET PAS DANS L'IMAGE OÙ LE MATCH SE DÉMONTE (Correctif 26). Passer la semaine rejoue le week-end du
+            // monde, écrit le journal et la sauvegarde : fait dans le même instant que la fermeture, c'était une
+            // seule image de plusieurs centaines de millisecondes sur téléphone. L'écran de carrière revient d'abord.
+            void apresLEcran().then(() => ecrituresGroupees(() => {
+              const j = useGame.getState().joueur;
+              // Un autre tour du tournoi final attend ce même week-end : il se joue avant de tourner la page.
+              if (j && resteUnMatchCeWeekEnd(j, bonusClubDuJoueur(j))) return;
+              semaineSuivante();
+            })).finally(() => setPassage(false));
           }}
         />
         </Suspense>

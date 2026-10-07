@@ -47,3 +47,6 @@ if ('serviceWorker' in navigator) {
     window.dispatchEvent(new Event('destiny-ouvrir-match'));
   });
 }
+
+// Le relevé d'utilisation (anonyme, Correctif 25) : chargé à part, après le premier rendu, et jamais bloquant.
+void import('./lib/usage/suivi').then((m) => m.demarrerLeSuivi()).catch(() => {})

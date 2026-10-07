@@ -17,7 +17,7 @@
 // Tout est déterministe (graine = division + saison + tour) : rien à
 // sauvegarder, et rouvrir l'écran ne rejoue pas le tournoi.
 
-import { poulesDe, type LigneTableau } from './championnat.js';
+import { poulesDe, versionResultatsJoues, type LigneTableau } from './championnat.js';
 import { phaseFinale, duel, type MatchFinal } from './phaseFinale.js';
 import { forceEffectif } from './effectif.js';
 
@@ -62,8 +62,25 @@ export function tournoiDeFinDAnnee(
   clubJoueur = '',
   bonusJoueur = 0,
 ): Tournoi | null {
+  // ⚠️ ON JOUE TOUTES LES POULES DE LA DIVISION : jusqu'à vingt-deux championnats entiers (de 40 à 700 ms selon
+  // l'étage). L'affiche du week-end (`afficheDuClub`) le demande à chaque rendu : sans mémoire, l'écran de carrière
+  // se figeait pendant les phases finales. Le résultat ne dépend que de ses paramètres et des résultats JOUÉS
+  // (`versionResultatsJoues`). La mémoire se lit AVANT tout : découper la division en poules coûte déjà 30 ms.
+  const empreinte = `${divisionId}#${saison}#${nomDivision}#${clubJoueur}#${bonusJoueur}#${versionResultatsJoues()}`;
+  const connu = memoire.get(empreinte);
+  if (connu !== undefined) return connu;
   const poules = poulesDe(divisionId);
-  if (poules.length < 2) return null;
+  const tournoi = poules.length < 2 ? null : calculerTournoi(poules, divisionId, saison, nomDivision, clubJoueur, bonusJoueur);
+  if (memoire.size >= 24) memoire.clear();
+  memoire.set(empreinte, tournoi);
+  return tournoi;
+}
+
+const memoire = new Map<string, Tournoi | null>();
+
+function calculerTournoi(
+  poules: string[][], divisionId: string, saison: number, nomDivision: string, clubJoueur: string, bonusJoueur: number,
+): Tournoi {
 
   // 1. On joue TOUTES les poules jusqu'au bout.
   const classements = poules.map((_, i) =>
@@ -109,14 +126,15 @@ export function tournoiDeFinDAnnee(
       const b = tour[taille - 1 - i];
       // Le mieux classé reçoit — sauf en finale, terrain neutre.
       const finale = taille === 2;
+      const cle = `tournoi#${divisionId}#${saison}#${taille}#${a}#${b}`;
       const m = duel(
         a, b, saison,
-        `tournoi#${divisionId}#${saison}#${taille}#${a}#${b}`,
+        cle,
         finale ? 'finale' : taille === 4 ? 'demie' : taille === 8 ? 'quart' : 'barrage',
         `${finale ? 'FINALE' : libelleTour} : ${a} - ${b}`,
         finale ? 0 : 3,
       );
-      matchs.push(m);
+      matchs.push({ ...m, cle });
       suivant.push(m.vainqueur);
     }
     // Le tour suivant est reclassé par force d'effectif : le plus solide des

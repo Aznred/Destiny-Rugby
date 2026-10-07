@@ -131,6 +131,7 @@ export const TEXTES_SUPPLEMENTAIRES: Record<string, Traduction> = {
   'pj.confirmerTransfert.oui': { fr: 'Oui, contacte les clubs', en: 'Yes, contact clubs', es: 'Sí, contacta con clubes', it: 'Sì, contatta i club', de: 'Ja, Vereine kontaktieren', pt: 'Sim, contacta os clubes', ja: 'クラブへ連絡する' },
   'pj.confirmerTransfert.non': { fr: 'Rester concentré', en: 'Stay focused', es: 'Mantener la concentración', it: 'Resta concentrato', de: 'Konzentriert bleiben', pt: 'Manter o foco', ja: '今のクラブに集中する' },
   'pj.championnat': { fr: 'Championnat', en: 'League', es: 'Liga', it: 'Campionato', de: 'Liga', pt: 'Campeonato', ja: 'リーグ' },
+  'pj.preparation': { fr: 'Match de préparation', en: 'Pre-season friendly', es: 'Partido de pretemporada', it: 'Amichevole di preparazione', de: 'Vorbereitungsspiel', pt: 'Jogo de pré-época', ja: 'プレシーズンマッチ' },
   'pj.retraiteAide': { fr: 'Terminer la carrière et rejoindre le Hall des Légendes', en: 'End your career and join the Hall of Legends', es: 'Terminar la carrera y entrar en el Salón de Leyendas', it: 'Termina la carriera ed entra nella Hall delle Leggende', de: 'Karriere beenden und in die Ruhmeshalle einziehen', pt: 'Terminar a carreira e entrar no Hall das Lendas', ja: 'キャリアを終え、レジェンド殿堂入りする' },
   'ml.fermerAide': { fr: 'Fermer (Échap)', en: 'Close (Escape)', es: 'Cerrar (Escape)', it: 'Chiudi (Esc)', de: 'Schließen (Esc)', pt: 'Fechar (Escape)', ja: '閉じる（Esc）' },
   'ml.possession': { fr: 'Possession', en: 'Possession', es: 'Posesión', it: 'Possesso', de: 'Ballbesitz', pt: 'Posse de bola', ja: 'ボール保持率' },
