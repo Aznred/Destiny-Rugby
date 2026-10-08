@@ -1,5 +1,5 @@
 import { createJSONStorage, type PersistStorage, type StorageValue } from 'zustand/middleware';
-import { cleDe, emplacementActif, stockageParEmplacement } from './sauvegardes';
+import { CLE_STOCKAGE_SERRE, cleDe, emplacementActif, stockageParEmplacement } from './sauvegardes';
 
 /** Les projections coûteuses ne sont refaites que si leurs sources changent. */
 export function projectionMemoisee<T extends object, P extends object>(projeter: (s: T) => P): (s: T) => P {
@@ -53,6 +53,52 @@ export function suspendreEcritures(): () => void {
 /** Diagnostic et banc : combien de sérialisations complètes une suspension a épargnées. */
 export function ecrituresEpargnees(): number { return ecrituresEvitees; }
 
+// ── UNE ÉCRITURE REFUSÉE N'ARRÊTE PLUS LE JEU ────────────────────────────────────────────────────────────────────
+// `localStorage.setItem` LÈVE une erreur quand le stockage du site est plein (5 Mo dans Safari, comptés deux fois plus
+// vite que dans Chrome — voir `jsonEtroit`). `persist` ne la rattrape pas : elle remontait dans le `set()` du store, et
+// l'action en cours s'arrêtait au milieu. À la fin d'un match elle sortait de la reprise des écritures : la
+// finalisation n'aboutissait jamais, « Terminer » restait verrouillé, il fallait relancer le jeu.
+//   1. on rend ce qui se retélécharge (le catalogue gardé d'une visite à l'autre) et on réessaie ;
+//   2. si rien n'y fait, le jeu CONTINUE en mémoire, l'écran le dit (`EVENEMENT_STOCKAGE`), et chaque écriture
+//      suivante réessaie — supprimer une ancienne partie suffit à tout rattraper.
+export const EVENEMENT_STOCKAGE = 'destiny-rugby:stockage';
+/** Ce qui se retrouve sans rien perdre : rendu en premier quand la place manque. */
+const CACHES_RECREABLES = ['destiny-rugby:catalogue-solo'];
+let plein = false;
+let serreCetteVisite = false;
+
+/** La dernière écriture de la partie a-t-elle été refusée ? (Le jeu tourne alors en mémoire seulement.) */
+export function stockagePlein(): boolean { return plein; }
+
+/**
+ * Le stockage a déjà manqué de place sur cet appareil : les caches de confort ne s'y rangent plus, sinon chaque
+ * sauvegarde les chasserait et chaque visite les remettrait. Supprimer une partie lève la marque (`supprimerEmplacement`).
+ */
+export function stockageSerre(): boolean {
+  if (serreCetteVisite) return true;
+  try { return typeof localStorage !== 'undefined' && localStorage.getItem(CLE_STOCKAGE_SERRE) === '1'; } catch { return false; }
+}
+
+function annoncerStockage(refuse: boolean): void {
+  if (refuse === plein) return;
+  plein = refuse;
+  try { window.dispatchEvent(new CustomEvent<{ plein: boolean }>(EVENEMENT_STOCKAGE, { detail: { plein } })); } catch { /* hors navigateur */ }
+}
+
+/** Écrit sans jamais lever d'erreur. Rend `false` quand le navigateur a refusé, caches rendus compris. */
+export function ecrireSansFaillir(ecrire: () => void): boolean {
+  try { ecrire(); return true; } catch { /* quota atteint, ou stockage refusé */ }
+  let rendu = false;
+  try {
+    for (const cache of CACHES_RECREABLES) if (localStorage.getItem(cache) !== null) { localStorage.removeItem(cache); rendu = true; }
+  } catch { /* pas de stockage du tout */ }
+  serreCetteVisite = true;
+  if (rendu) {
+    try { ecrire(); try { localStorage.setItem(CLE_STOCKAGE_SERRE, '1'); } catch { /* plus un octet */ } return true; } catch { /* toujours refusé */ }
+  }
+  return false;
+}
+
 /** Aucune temporisation : les achats restent sauvegardés immédiatement. */
 export function stockageCarriereOptimise<T extends object>(): PersistStorage<T> {
   const brut = stockageParEmplacement();
@@ -64,11 +110,13 @@ export function stockageCarriereOptimise<T extends object>(): PersistStorage<T> 
     const entree = valeur.state as Record<string, unknown>;
     const identique = !!avant && avant.version === valeur.version && Object.keys(entree)
       .every(k => k === 'ecransVus' || entree[k] === (avant.state as Record<string, unknown>)[k]);
-    if (!identique) json.setItem(nom, valeur);
+    const ecrite = identique || ecrireSansFaillir(() => { json.setItem(nom, valeur); });
     if (!avant || entree.ecransVus !== (avant.state as Record<string, unknown>).ecransVus) {
-      brut.setItem(`${cle()}:navigation`, JSON.stringify(entree.ecransVus ?? []));
+      ecrireSansFaillir(() => { brut.setItem(`${cle()}:navigation`, JSON.stringify(entree.ecransVus ?? [])); });
     }
-    dernier.set(cle(), valeur);
+    // ⚠️ Une écriture REFUSÉE n'est pas retenue comme la dernière : la suivante réessaiera, même si rien n'a changé.
+    if (ecrite) dernier.set(cle(), valeur);
+    if (!identique) annoncerStockage(!ecrite);
   };
   return {
     getItem(nom) {

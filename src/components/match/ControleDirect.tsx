@@ -66,7 +66,14 @@ function eteindre(el: HTMLElement | null): void { if (el) delete el.dataset.pres
 // LE COMPOSANT
 // ---------------------------------------------------------------------------
 
-export function ControleDirect({ pilotage, surReprendre }: { pilotage: PilotageDirect; surReprendre: () => void }) {
+export function ControleDirect({ pilotage, surReprendre, suspendu = false }: {
+  pilotage: PilotageDirect; surReprendre: () => void;
+  /**
+   * L'écran pose sa propre question par-dessus (une bagarre attend un ordre) : le HUD se tait — ni commandes, ni
+   * panneau de pause. Sans cela la pause que la bagarre déclenche ouvrait la liste des commandes PAR-DESSUS les ordres.
+   */
+  suspendu?: boolean;
+}) {
   const snap = useSyncExternalStore(pilotage.abonner, pilotage.lire, pilotage.lire);
   const prefs = usePreferencesControle();
   const racine = useRef<HTMLDivElement>(null);
@@ -106,7 +113,8 @@ export function ControleDirect({ pilotage, surReprendre }: { pilotage: PilotageD
 
   const tactile = snap.appareil === 'tactile';
   /** Le jeu attend la réponse du joueur : les commandes de jeu s'éteignent. */
-  const occupe = snap.resp.panneau !== null;
+  const occupe = snap.resp.panneau !== null || suspendu;
+  const pauseAffichee = snap.pause && snap.phase === 'actif' && !suspendu;
   const style = { '--cd-taille': prefs.tailleHud, '--cd-opa': prefs.opaciteHud } as CSSProperties;
   return (
     <div
@@ -117,7 +125,7 @@ export function ControleDirect({ pilotage, surReprendre }: { pilotage: PilotageD
       data-joy={prefs.positionJoystick === 'droite' ? 'droite' : undefined}
       data-act={prefs.positionActions === 'gauche' ? 'gauche' : undefined}
       data-pause={snap.pause ? 'oui' : undefined}
-      data-modale={(snap.pause && snap.phase === 'actif') || snap.tuto?.carte || snap.resp.tuto ? 'oui' : undefined}
+      data-modale={pauseAffichee || snap.tuto?.carte || snap.resp.tuto ? 'oui' : undefined}
       style={style}
     >
       {snap.visible && <Souffle valeur={snap.endurance} sprint={snap.reserve} />}
@@ -171,7 +179,7 @@ export function ControleDirect({ pilotage, surReprendre }: { pilotage: PilotageD
           <p>{t(`${snap.ctx.cle}.texte`)}</p>
         </div>
       )}
-      {snap.pause && snap.phase === 'actif' && (
+      {pauseAffichee && (
         <PanneauPause snap={snap} touches={prefs.touches} surReprendre={surReprendre} />
       )}
     </div>

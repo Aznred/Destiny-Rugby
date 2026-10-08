@@ -34,6 +34,12 @@ export const CLE_JEU = 'destin-ovalie';
 const CLE_ACTIF = 'destin-ovalie:emplacement';
 
 /**
+ * Posée quand le stockage a manqué de place pour une partie (`lib/persistanceNavigation.ts`) : tant qu'elle est là,
+ * les caches de confort ne s'y rangent plus. Supprimer une partie la retire — la place est revenue.
+ */
+export const CLE_STOCKAGE_SERRE = 'destiny-rugby:stockage-serre';
+
+/**
  * ⚠️ SIX, ET PAS PLUS. Une sauvegarde complète pèse quelques centaines de
  * kilo-octets (le journal, les publications de L'Ovale, les statistiques
  * réelles d'une saison) et `localStorage` plafonne autour de 5 Mo par origine.
@@ -103,6 +109,36 @@ function poserActif(id: number): void {
 }
 
 // ---------------------------------------------------------------------------
+// UNE SAUVEGARDE QUI TIENT DANS LE STOCKAGE D'UN iPhone
+// ---------------------------------------------------------------------------
+
+/**
+ * Réécrit un texte JSON sans aucun caractère au-delà de U+00FF : chacun prend sa forme `\uXXXX`, que `JSON.parse`
+ * relit à l'identique.
+ *
+ * ⚠️ POURQUOI. Safari plafonne le stockage d'un site à 5 Mo, comptés en OCTETS, et le moteur d'Apple tient une chaîne
+ * sur deux octets par caractère dès qu'elle contient UN caractère « large » — une apostrophe typographique (’), un
+ * « œ », un nom japonais. Toute la sauvegarde double alors, pas ce caractère-là : une carrière d'entraîneur
+ * (900 000 caractères mesurés) y pèse 1,8 Mo, et la troisième partie ne s'écrit plus, là où Chrome en accepte le
+ * double. Une écriture refusée à la sirène laissait « Terminer » verrouillé : il fallait relancer le jeu.
+ * Sans caractère large, la chaîne redevient étroite — le décodeur la reconstruit sur un octet par caractère.
+ *
+ * ⚠️ POUR UN TEXTE JSON SEULEMENT : dans un texte ordinaire, `’` resterait six caractères.
+ * ⚠️ Déduit du code du moteur, PAS mesuré sur un iPhone. Si Safari compte autrement, on n'y gagne rien et on n'y
+ * perd rien : le texte reste le même JSON.
+ */
+export function jsonEtroit(texte: string): string {
+  if (!/[Ā-￿]/.test(texte)) return texte;
+  const echappe = texte.replace(/[Ā-￿]/g, (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`);
+  try {
+    const etroit = new TextDecoder().decode(new TextEncoder().encode(echappe));
+    return etroit.length === echappe.length ? etroit : echappe;
+  } catch {
+    return echappe;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // L'ADAPTATEUR DE STOCKAGE
 // ---------------------------------------------------------------------------
 
@@ -126,7 +162,8 @@ export function stockageParEmplacement(): Storage {
     key: () => null,
     clear: () => { memoire.clear(); },
     getItem: (nom: string) => stockage().getItem(cible(nom)),
-    setItem: (nom: string, valeur: string) => stockage().setItem(cible(nom), valeur),
+    // La partie est écrite en JSON étroit (`jsonEtroit`) : deux fois moins lourde dans le stockage de Safari.
+    setItem: (nom: string, valeur: string) => stockage().setItem(cible(nom), nom === CLE_JEU ? jsonEtroit(valeur) : valeur),
     removeItem: (nom: string) => stockage().removeItem(cible(nom)),
   } as Storage;
 }
@@ -241,7 +278,11 @@ export function ouvrirEmplacement(id: number): void {
 /** Supprime une partie. L'emplacement actif ne peut pas être supprimé ainsi. */
 export function supprimerEmplacement(id: number): void {
   if (id < 1 || id > NB_EMPLACEMENTS) return;
-  try { stockage().removeItem(cleDe(id)); } catch { /* rien à faire */ }
+  try {
+    stockage().removeItem(cleDe(id));
+    stockage().removeItem(`${cleDe(id)}:navigation`);
+    stockage().removeItem(CLE_STOCKAGE_SERRE);
+  } catch { /* rien à faire */ }
 }
 
 /**
@@ -343,7 +384,7 @@ export function ecrireCompte(etat: Record<string, unknown>): void {
   dernierExtrait = extrait;
   if (json === dernierCompte) return;
   dernierCompte = json;
-  try { stockage().setItem(CLE_COMPTE, json); } catch { /* stockage plein */ }
+  try { stockage().setItem(CLE_COMPTE, jsonEtroit(json)); } catch { /* stockage plein */ }
 }
 
 /**

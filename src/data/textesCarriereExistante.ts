@@ -67,8 +67,21 @@ export const TEXTES_CARRIERE_EXISTANTE: Record<string, Traduction> = {
   'cr.existant.annuler': tr('Changer de joueur', 'Change player', 'Elegir otro jugador', 'Scegli un altro giocatore', 'Anderen Spieler wählen', 'Escolher outro jogador', '別の選手を選ぶ'),
   'cr.existant.echec': tr('Ce joueur ne peut pas être incarné.', 'This player cannot be played.', 'Este jugador no puede encarnarse.', 'Questo giocatore non può essere interpretato.', 'Dieser Spieler kann nicht gespielt werden.', 'Este jogador não pode ser encarnado.', 'この選手は選べません。'),
 
+  // ═══ STOCKAGE PLEIN : la partie continue, mais elle n'est plus écrite (voir `lib/persistanceNavigation.ts`) ═══
+  'stockage.plein.titre': tr('Sauvegarde impossible', 'Unable to save', 'No se puede guardar', 'Salvataggio impossibile', 'Speichern nicht möglich', 'Não é possível guardar', '保存できません'),
+  'stockage.plein.texte': tr(
+    'Le stockage de cet appareil est plein : ta partie continue, mais elle n’est plus enregistrée. Supprime une ancienne partie pour que la sauvegarde reprenne.',
+    'This device’s storage is full: your game carries on, but it is no longer being saved. Delete an old save so saving can resume.',
+    'El almacenamiento de este dispositivo está lleno: tu partida continúa, pero ya no se guarda. Borra una partida antigua para que vuelva a guardarse.',
+    'Lo spazio di questo dispositivo è pieno: la partita continua, ma non viene più salvata. Elimina una vecchia partita per riprendere il salvataggio.',
+    'Der Speicher dieses Geräts ist voll: Dein Spiel läuft weiter, wird aber nicht mehr gespeichert. Lösche einen alten Spielstand, damit wieder gespeichert wird.',
+    'O armazenamento deste dispositivo está cheio: o teu jogo continua, mas já não é guardado. Apaga um jogo antigo para voltar a guardar.',
+    'この端末の保存領域がいっぱいです。プレーは続けられますが、保存されていません。古いセーブデータを削除すると保存が再開されます。',
+  ),
+  'stockage.plein.bouton': tr('Mes parties', 'My saves', 'Mis partidas', 'Le mie partite', 'Meine Spielstände', 'Os meus jogos', 'セーブデータ'),
+
   // ═══ FIN DE MATCH (Correctif 26) ═══
-  'ml.finalisation': tr('Finalisation du match…', 'Finalising the match…', 'Finalizando el partido…', 'Chiusura della partita…', 'Spiel wird abgeschlossen…', 'A finalizar o jogo…', '試合を確定中…'),
+  'ml.finalisation':tr('Finalisation du match…', 'Finalising the match…', 'Finalizando el partido…', 'Chiusura della partita…', 'Spiel wird abgeschlossen…', 'A finalizar o jogo…', '試合を確定中…'),
   'ml.prolongation': tr('Égalité à la sirène : {club} l’emporte en prolongation, {score}.', 'Level at full time: {club} win it in extra time, {score}.', 'Empate al final: {club} gana en la prórroga, {score}.', 'Parità al fischio finale: {club} vince ai supplementari, {score}.', 'Unentschieden nach 80 Minuten: {club} gewinnt in der Verlängerung, {score}.', 'Empate no final: {club} vence no prolongamento, {score}.', '80分終了時は同点。延長戦で{club}が勝利、{score}。'),
   // ═══ PROLONGATIONS ET ZONES DU CLASSEMENT (Correctif 29) ═══
   'ml.departage.essais': tr('Égalité après prolongation, {score} : {club} passe au nombre d’essais.', 'Level after extra time, {score}: {club} go through on tries scored.', 'Empate tras la prórroga, {score}: {club} pasa por número de ensayos.', 'Parità dopo i supplementari, {score}: {club} passa per numero di mete.', 'Unentschieden nach Verlängerung, {score}: {club} kommt dank der Versuche weiter.', 'Empate após o prolongamento, {score}: {club} passa pelo número de ensaios.', '延長戦でも{score}の同点：トライ数で{club}が勝ち上がり。'),

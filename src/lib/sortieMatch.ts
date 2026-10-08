@@ -14,9 +14,17 @@
 // refuse le plein écran ou le verrou d'orientation ne doit pas bloquer la
 // sortie), et un second appel PENDANT la séquence ne fait rien : « Continuer »
 // est verrouillé dès le premier appui.
+//
+// ⚠️ ET LA NAVIGATION A LIEU QUOI QU'IL ARRIVE. Pendant la séquence la fenêtre du match ne reçoit plus aucun
+// toucher et le reste de l'application est inerte : une seule attente sans fin (une scène qui ne se rend pas, une
+// image que le système ne dessine pas) laissait un écran mort qu'il fallait fermer à la main — signalé sur
+// iPhone 15 et iPad. Tout ce qui précède la navigation tient donc dans `DELAI_SORTIE` ; passé ce délai on change de
+// page, et ce qui restait à faire se termine derrière.
 
-import { annoncerNouvelleTaille, attendreViewportStable, estInstallee, estTactile, installerEcouteursApp, recalculerViewport, tailleVisible, estPaysage } from './viewport';
+import { annoncerNouvelleTaille, attendreViewportStable, estTactile, installerEcouteursApp, recalculerViewport, tailleVisible, estPaysage } from './viewport';
 import { libererArrierePlan } from './useModalDialog';
+import { auPlus, tracer } from './finMatch';
+import { oublierLeVerrou, paysageVerrouilleParLeJeu } from './pleinEcran';
 
 export type EtapeSortie =
   | 'repos' | 'entrees-coupees' | 'boucle-arretee' | 'plein-ecran-quitte' | 'orientation-stable'
@@ -40,6 +48,10 @@ export interface CrochetsSortie {
 type OrientationVerrouillable = ScreenOrientation & { unlock?: () => void };
 const attendre = (ms: number) => new Promise<void>((fin) => { window.setTimeout(fin, ms); });
 
+/** Ce que l'hôte obtient pour arrêter sa boucle et rendre sa scène, puis la séquence entière avant la navigation. */
+export const DELAI_BOUCLE = 4000;
+export const DELAI_SORTIE = 7000;
+
 let enCours = false;
 let etapeCourante: EtapeSortie = 'repos';
 
@@ -58,6 +70,43 @@ async function quitterLePleinEcran(): Promise<void> {
   await Promise.race([sortie, attendre(1200)]);
 }
 
+/** Tout ce qui précède le changement de page. Ne lève jamais d'erreur. */
+async function preparer(c: CrochetsSortie, aller: (e: EtapeSortie) => void): Promise<void> {
+  const etaitPaysage = estPaysage(tailleVisible());
+  const etaitPleinEcran = typeof document !== 'undefined' && !!document.fullscreenElement;
+  // ⚠️ L'ÉCRAN NE REVIENT DEBOUT QUE SI C'EST LE JEU QUI L'A COUCHÉ (`verrouillerPaysage`). Un iPhone ou un iPad tenu
+  // en paysage ne pivotera pas à la sortie — iOS ne verrouille jamais l'orientation : attendre ce retour, c'était
+  // 1,8 seconde d'écran mort après chaque « Terminer » (mesuré en paysage tactile : la navigation partait 1 990 ms
+  // après l'appui, 143 ms depuis).
+  const pivotAttendu = paysageVerrouilleParLeJeu() && estTactile() && etaitPaysage;
+
+  aller('boucle-arretee');
+  await auPlus(new Promise<void>((fin) => { fin(c.arreterBoucle()); }), DELAI_BOUCLE);
+  // Deux images : React a démonté ce qu'on vient de retirer.
+  await attendreViewportStable({ delaiMax: 150, stable: 2 });
+
+  aller('plein-ecran-quitte');
+  await quitterLePleinEcran();
+  oublierLeVerrou();
+
+  aller('orientation-stable');
+  const t = await attendreViewportStable(pivotAttendu
+    ? { attendue: 'portrait', delaiMax: 1800 }
+    : { delaiMax: etaitPleinEcran ? 400 : 120, stable: etaitPleinEcran ? 3 : 2 });
+
+  aller('viewport-recalcule');
+  const dim = recalculerViewport();
+  annoncerNouvelleTaille();
+  try { c.recalculer?.(dim ?? t); } catch { /* ignoré */ }
+
+  aller('ecouteurs-recrees');
+  try { c.retirerEcouteursMatch?.(); } catch { /* ignoré */ }
+  installerEcouteursApp();
+
+  aller('entrees-reactivees');
+  try { c.reactiverEntrees?.(); } catch { /* ignoré */ }
+}
+
 /**
  * Déroule la séquence. Retourne `false` si une sortie est déjà en cours
  * (le double appui ne fait strictement rien).
@@ -65,47 +114,30 @@ async function quitterLePleinEcran(): Promise<void> {
 export async function sortirDuMatch(c: CrochetsSortie): Promise<boolean> {
   if (enCours) return false;
   enCours = true;
-  const aller = (e: EtapeSortie) => { etapeCourante = e; c.surEtape?.(e); };
+  let atteinte: EtapeSortie = 'repos';
+  const aller = (e: EtapeSortie) => {
+    atteinte = etapeCourante = e;
+    tracer(`sortie-${e}`);
+    try { c.surEtape?.(e); } catch { /* le suivi ne retient jamais la sortie */ }
+  };
   try {
-    // Seul un appareil tactile a pu verrouiller le paysage ; sur ordinateur la fenêtre ne tourne pas.
-    const etaitPaysage = estPaysage(tailleVisible());
-    const devraitPivoter = estTactile() && etaitPaysage;
-
     aller('entrees-coupees');
     try { c.couperEntrees(); } catch { /* l'hôte peut être déjà démonté */ }
 
-    aller('boucle-arretee');
-    try { await c.arreterBoucle(); } catch { /* idem */ }
-    // Deux images : React a démonté ce qu'on vient de retirer.
-    await attendreViewportStable({ delaiMax: 150, stable: 2 });
-
-    aller('plein-ecran-quitte');
-    await quitterLePleinEcran();
-
-    aller('orientation-stable');
-    // Dans l'application installée, le système tourne l'écran SANS plein écran à quitter : on attend quand même.
-    const attendue = devraitPivoter || estInstallee() && estTactile() ? 'portrait' : undefined;
-    const t = await attendreViewportStable({ attendue, delaiMax: attendue ? 1800 : 400 });
-
-    aller('viewport-recalcule');
-    const dim = recalculerViewport();
-    annoncerNouvelleTaille();
-    try { c.recalculer?.(dim ?? t); } catch { /* ignoré */ }
-
-    aller('ecouteurs-recrees');
-    try { c.retirerEcouteursMatch?.(); } catch { /* ignoré */ }
-    installerEcouteursApp();
-    libererArrierePlan();
-
-    aller('entrees-reactivees');
-    try { c.reactiverEntrees?.(); } catch { /* ignoré */ }
+    const preparee = await auPlus(preparer(c, aller).then(() => true), DELAI_SORTIE);
+    if (!preparee) tracer(`sortie-forcee-apres-${atteinte}`);
 
     aller('navigation');
-    c.naviguer();
+    try { c.naviguer(); } catch (erreur) { console.error('[sortie de match] navigation en échec', erreur); }
     aller('fini');
     return true;
   } finally {
     // Un prochain match repart d'un état propre : la séquence se rejoue entière.
-    window.setTimeout(() => { enCours = false; etapeCourante = 'repos'; }, 400);
+    window.setTimeout(() => {
+      enCours = false; etapeCourante = 'repos';
+      // ⚠️ APRÈS le démontage du match, pas avant : tant que sa fenêtre est ouverte ce filet ne fait rien. S'il ne
+      // reste aucune fenêtre et que quelque chose est encore inerte, toute l'application retrouve le toucher.
+      libererArrierePlan();
+    }, 400);
   }
 }

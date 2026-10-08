@@ -394,6 +394,26 @@ export function declencherBagarre(
   for (const q of e.pions) stopper(q);
 }
 
+/**
+ * ⚠️ UNE BAGARRE EN ATTENTE TIENT LE MATCH (Correctif 32). `e.phase` valait « bagarre » à la déclaration, mais rien ne
+ * l'y maintenait : le contrôle direct continuait d'obéir au joueur (une passe, un coup de pied relancent un vol), une
+ * décision de capitaine en attente pouvait tomber, une altercation être jugée — et la phase repartait AVEC la bagarre
+ * encore posée. `phaseBagarre` ne tournait alors plus jamais : l'ordre cliqué n'était pas résolu, le panneau restait
+ * à l'écran pour toujours (signalé : « ça bloque le jeu, on ne peut cliquer sur aucun des choix »). Le moteur ramène
+ * donc le match à la bagarre tant qu'elle n'est pas résolue, dans l'état où `declencherBagarre` l'avait mis.
+ */
+export function tenirLaBagarre(e: EtatMatch): void {
+  if (!e.bagarre) return;
+  // Un coup de pied déjà armé ne part pas pendant une bagarre : c'est lui qui relançait un vol sous elle, même sans joueur aux commandes.
+  delete e.piedPrepare;
+  if (e.phase === 'bagarre') return;
+  e.phase = 'bagarre';
+  e.porteur = null;
+  e.vol = null;
+  e.placement = null;
+  for (const q of e.pions) stopper(q);
+}
+
 /** L'ordre du joueur, posé par l'interface. Le tick suivant le résout. */
 export function donnerOrdre(e: EtatMatch, ordre: OrdreBagarre): void {
   if (e.bagarre && !e.bagarre.ordre) e.bagarre.ordre = ordre;

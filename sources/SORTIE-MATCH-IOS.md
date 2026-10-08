@@ -105,3 +105,12 @@ Sources techniques : [restitution des objets Three.js](https://threejs.org/manua
 (squelettes et images des textures), [redimensionnement WebGL et mémoire dans WebKit](https://bugs.webkit.org/show_bug.cgi?id=219780).
 Le second lien décrit un ancien défaut de WebKit et ne prouve pas sa présence
 dans la version iOS du signalement.
+
+## Suite du 8 octobre 2026 (Correctif 32)
+
+Le gel persistait après ces corrections de mémoire. Lecture du chemin de sortie : sur téléphone, « Terminer » est la seule
+issue de l’écran de fin, et deux attentes n’avaient aucune limite (scène 3D, reprise des écritures — qui lève une erreur
+quand le stockage refuse) ; la sortie attendait aussi 1,8 s un retour à la verticale impossible sur iOS. Tout est borné,
+le stockage plein ne lève plus rien, et la fin d’un match laisse un fil sur l’appareil : voir « Correctif 32 » dans
+`CLAUDE.md`. Toujours aucun essai sur iPhone ou iPad : le fil (Labo → Statistiques → Fluidité 3D → « Fins de match ») est
+là pour dire où un appareil s’arrête si le gel revient.

@@ -1502,24 +1502,27 @@ export async function creerScene3D(conteneur,options={}){
   }
   const projete=new THREE.Vector3();
   let liberation=null,nettoyage=null,stadeRendu=false;
+  // Correctif 32 : chaque étape tient seule. Un son qui refuse de se fermer ou une requête GPU supprimée sur un
+  // contexte déjà repris par le système ne doit pas empêcher de rendre le contexte et la toile : ce sont eux qui pèsent.
+  const tenter=etape=>{try{etape();}catch(e){console.warn('Libération de la scène :',e);}};
   function commencerLiberation(){
     if(detruite)return;
-    detruite=true;paused=true;arreterGpu();observateur.disconnect();
-    toile.removeEventListener('webglcontextlost',surPerteDeContexte);
-    toile.removeEventListener('pointerdown',passerAuToucher);
-    liberation=planLiberation([scene],jetables);
-    sons?.detruire();tele.detruire();
+    detruite=true;paused=true;
+    tenter(arreterGpu);tenter(()=>observateur.disconnect());
+    tenter(()=>{toile.removeEventListener('webglcontextlost',surPerteDeContexte);toile.removeEventListener('pointerdown',passerAuToucher);});
+    tenter(()=>{liberation=planLiberation([scene],jetables);});
+    tenter(()=>sons?.detruire());tenter(()=>tele.detruire());
     // Le contexte doit disparaître AVANT la sauvegarde, le pivot de l'écran
     // et le montage du bureau. Le nettoyage CPU se poursuit par tranches.
-    renderer.forceContextLoss?.();renderer.renderLists?.dispose?.();
-    toile.width=1;toile.height=1;toile.remove();
-    actors.clear();officials.length=0;scene.clear();match=null;reperes=null;
-    jetables.length=0;api.surRalenti=null;api.vue=null;
-    for(const c of tenues){c.width=1;c.height=1;}
+    tenter(()=>{renderer.forceContextLoss?.();renderer.renderLists?.dispose?.();});
+    tenter(()=>{toile.width=1;toile.height=1;toile.remove();});
+    tenter(()=>{actors.clear();officials.length=0;scene.clear();match=null;reperes=null;jetables.length=0;api.surRalenti=null;api.vue=null;});
+    tenter(()=>{for(const c of tenues){c.width=1;c.height=1;}});
   }
   function finirLiberation(){
-    if(stadeRendu)return;stadeRendu=true;renderer.dispose();locales.oublier();stade.restituer();
-    if(leger)libererStades();
+    if(stadeRendu)return;stadeRendu=true;
+    tenter(()=>renderer.dispose());tenter(()=>locales.oublier());tenter(()=>stade.restituer());
+    tenter(()=>{if(leger)libererStades();});
   }
   // Une tâche courte plutôt qu'une image : les minuteries et rappels ne
   // restent pas en attente quand iOS masque l'onglet pendant la transition.
@@ -1626,7 +1629,9 @@ export async function creerScene3D(conteneur,options={}){
       if(nettoyage)return nettoyage;
       commencerLiberation();
       nettoyage=(async()=>{
-        try{while(liberation?.restant){await souffler();liberation.tranche(16);}}
+        // Correctif 32 : six millisecondes de travail par tâche. Le contexte est déjà rendu, libérer une ressource
+        // n'est plus qu'une écriture en mémoire — seize par tâche, c'était des centaines de minuteries pour rien.
+        try{while(liberation?.restant){await souffler();const limite=performance.now()+6;do liberation.tranche(32);while(liberation.restant&&performance.now()<limite);}}
         finally{liberation?.tout();finirLiberation();}
       })();
       return nettoyage;
@@ -1686,7 +1691,7 @@ export async function creerApercuJoueur(conteneur,options={}){
     optionsCourantes=opt;
     await chargerEquipementsDe({a:{equipement:opt.apparence?.equipement}},false);
     if(detruit||mien!==version)return;
-    if(acteur){groupe.remove(acteur.model);}
+    // Correctif 32 : l'ancien modèle reste à l'image jusqu'à ce que le nouveau soit prêt, puis il est RENDU (voir plus bas).
     const avant=!!opt.avant,kind=avant?'male_forward':'male_back',modele=clone(avant?r.forward:r.back);
     const souhait=souhaitDepuisCarte(opt.apparence||{});
     const look={...appearance(0,souhait,false),graine:0};
@@ -1702,7 +1707,11 @@ export async function creerApercuJoueur(conteneur,options={}){
       const m={...MAILLOT_DEFAUT,...tenue},img=tenue.texture?await chargerImage(tenue.texture):null;
       const base=img?tenueDepuisImage(img,m,1024):creerTenue(r.kit,m,null,1024);
       kitTex=numeroter(base,opt.numero??9,renderer,1024);
+      // La tenue sans numéro ne sert plus : sa toile (4 Mo) est rendue tout de suite, sans attendre le ramasse-miettes.
+      base.width=1;base.height=1;
     }catch(e){console.warn('Kit de l\'aperçu :',e);}
+    // Une reconstruction plus récente est partie pendant qu'on peignait ce maillot : on le rend et on s'arrête là.
+    if(detruit||mien!==version){rendreTexture(kitTex);return;}
     modele.traverse(o=>{if(!o.isSkinnedMesh)return;o.frustumCulled=false;
       if(/body_|head_/.test(o.name)){o.material=o.material.clone();o.material.map=null;o.material.vertexColors=false;o.material.color.set(look.skin);o.material.roughness=.92;return;}
       if(/shirt|short|sock|boot/.test(o.name)){o.material=o.material.clone();o.material.roughness=.85;
@@ -1714,16 +1723,26 @@ export async function creerApercuJoueur(conteneur,options={}){
     const pose=preparePose(modele,motions.rigs[kind]);
     const clip=motions.clips[options.pose||'menu_idle_breathing_legs_apart']||motions.clips.idle||motions.clips.light_idle;
     acteur={model:modele,pose,clip};
+    // Le nouveau joueur est en place : tout autre modèle encore dans la scène est retiré ET rendu.
+    for(const ancien of [...groupe.children])if(ancien!==modele){groupe.remove(ancien);rendreModele(ancien);}
     applyPose(pose,clip,0,true);modele.updateMatrixWorld(true);
     const total=new THREE.Box3().setFromObject(modele,true);
     modele.position.y-=total.min.y;modele.updateMatrixWorld(true);
     hauteurCorps=Math.max(1.4,total.max.y-total.min.y);
     cadrer();
   }
+  // Correctif 32 : ce qu'une reconstruction remplace est RENDU — matériaux clonés, squelette, maillot peint et sa toile.
+  // Les modèles en cache sont protégés (`ressources.mjs`) : seul ce qui appartient à ce modèle-ci part.
+  function rendreModele(m){try{planLiberation([m]).tout();}catch(e){console.warn('Aperçu du joueur :',e);}}
+  function rendreTexture(t){if(!t)return;try{t.dispose();const im=t.image;if(im&&typeof im.getContext==='function'){im.width=1;im.height=1;}}catch{}}
+  // Sorti de l'écran (page défilée, onglet du profil replié), l'aperçu ne pose ni ne dessine plus rien.
+  let aLEcran=true;
+  const veilleur=typeof IntersectionObserver!=='undefined'?new IntersectionObserver(vues=>{aLEcran=vues[vues.length-1].isIntersecting;}):null;veilleur?.observe(conteneur);
   let trame=0;
   function boucle(t){
     if(detruit)return;
     trame=requestAnimationFrame(boucle);
+    if(!aLEcran){horloge=t;return;}
     const dt=Math.min(.05,(t-horloge)/1000||0);horloge=t;
     if(acteur){applyPose(acteur.pose,acteur.clip,t/1000,true);}
     if(!enGlisse)angle+=(cible-angle)*Math.min(1,dt*8);
@@ -1745,6 +1764,6 @@ export async function creerApercuJoueur(conteneur,options={}){
     cadrer(mode){cadrage=mode==='visage'?'visage':'corps';cadrer();},
     get angle(){return angle;},interne:{scene,renderer,camera,groupe},
     recadrer:cadrer,
-    detruire(){detruit=true;cancelAnimationFrame(trame);toile.removeEventListener('pointerdown',bas);toile.removeEventListener('pointermove',bouge);toile.removeEventListener('pointerup',haut);toile.removeEventListener('pointercancel',haut);observateur?.disconnect();renderer.dispose();renderer.forceContextLoss?.();toile.remove();},
+    detruire(){detruit=true;cancelAnimationFrame(trame);toile.removeEventListener('pointerdown',bas);toile.removeEventListener('pointermove',bouge);toile.removeEventListener('pointerup',haut);toile.removeEventListener('pointercancel',haut);observateur?.disconnect();veilleur?.disconnect();rendreModele(scene);acteur=null;renderer.dispose();renderer.forceContextLoss?.();toile.width=1;toile.height=1;toile.remove();},
   };
 }

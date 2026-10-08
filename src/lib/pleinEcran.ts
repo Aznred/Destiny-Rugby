@@ -15,6 +15,29 @@ type OrientationVerrouillable = ScreenOrientation & { lock?: (o: string) => Prom
 
 const attendre = (ms: number) => new Promise<void>((fin) => { window.setTimeout(fin, ms); });
 
+// ── LE JEU A-T-IL TOURNÉ L'ÉCRAN LUI-MÊME ? ──────────────────────────────────────────────────────────────────────
+// La sortie d'un match attendait que l'écran « revienne debout » dès qu'un appareil tactile était tenu en paysage :
+// 1,8 seconde d'écran mort à chaque match sur un iPhone ou un iPad, où le navigateur ne verrouille JAMAIS
+// l'orientation — rien n'allait donc pivoter. On n'attend ce retour que si le verrou a réellement pris.
+let paysageVerrouille = false;
+
+/** Demande le paysage (après le plein écran). Rend `true` seulement si le navigateur l'a accordé. */
+export async function verrouillerPaysage(): Promise<boolean> {
+  paysageVerrouille = false;
+  try {
+    const orientation = screen.orientation as OrientationVerrouillable | undefined;
+    if (typeof orientation?.lock !== 'function') return false;
+    await orientation.lock('landscape');
+    paysageVerrouille = true;
+  } catch { /* refusé (iOS, ordinateur) : l'écran reste comme le joueur le tient */ }
+  return paysageVerrouille;
+}
+
+export function paysageVerrouilleParLeJeu(): boolean { return paysageVerrouille; }
+
+/** Le plein écran est quitté : le navigateur a rendu l'orientation avec lui. */
+export function oublierLeVerrou(): void { paysageVerrouille = false; }
+
 /** Deux images dessinées : React a eu le temps de démonter ce qu'on vient de retirer. */
 export function deuxImages(): Promise<void> {
   return new Promise<void>((fin) => {

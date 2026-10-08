@@ -11,6 +11,7 @@ import type { LigneClassee, PeriodeUsage, StatistiquesUsage } from '../lib/usage
 import { POSTE_PAR_ID } from '../data/rugby';
 import type { PosteId } from '../types';
 import { annoterSeance, oublierLesSeances, profileurActif, reglerProfileur, seancesProfilees, type SeanceProfilee } from '../lib/profileur';
+import { dernierFil } from '../lib/finMatch';
 import './LaboStatistiques.css';
 import type { BilanCarriereUsage } from '../lib/usage/carrieres';
 
@@ -74,7 +75,7 @@ function BilanCarrieres({ lignes }: { lignes: BilanCarriereUsage[] }) {
  */
 const PLATEFORMES_FLUIDITE = [['ordinateur', 'Ordinateur'], ['android', 'Android'], ['ios', 'iPhone et iPad'], ['autre', 'Autre tactile']] as const;
 const FILTRES_FLUIDITE = [['tous', 'Tous'], ['ordinateur', 'Ordinateur'], ['mobile', 'Mobile'], ['ios', 'iOS'], ['android', 'Android']] as const;
-function PanneauFluidite({ compteurs }: { compteurs: LigneClassee[] }) {
+function PanneauFluidite({ compteurs, sorties }: { compteurs: LigneClassee[]; sorties: LigneClassee[] }) {
   const [filtre, setFiltre] = useState<typeof FILTRES_FLUIDITE[number][0]>('tous');
   const lu = (cle: string) => compteurs.find((c) => c.nom === cle)?.n ?? 0;
   const lignes = PLATEFORMES_FLUIDITE.map(([id, libelle]) => {
@@ -105,7 +106,56 @@ function PanneauFluidite({ compteurs }: { compteurs: LigneClassee[] }) {
       </table></div>}
       <p className="ls-note">Images par seconde tenues sur tout le match, pas un instantané. « De 25 à 39 » contient les appareils que la scène a stabilisés à trente images par seconde : c’est voulu — trente régulières valent mieux que soixante en dents de scie. « Autre tactile » : un écran tactile qui n’est ni un iPhone ni un Android.</p>
     </section>
+    <BlocSorties sorties={sorties} filtre={filtre} />
   </>;
+}
+
+/**
+ * LES FINS DE MATCH (Correctif 32). Chaque match laisse un compteur anonyme : sortie menée au bout, ou restée en chemin
+ * avec la DERNIÈRE ÉTAPE atteinte — relevée au lancement suivant (`lib/finMatch.ts`). C'est ce qui dit où un iPhone
+ * se fige quand on ne l'a pas en main. « Après db_save_end » n'est pas un gel : le match était finalisé, le joueur a
+ * fermé le jeu sur la feuille de match au lieu d'appuyer sur « Terminer ».
+ */
+function BlocSorties({ sorties, filtre }: { sorties: LigneClassee[]; filtre: typeof FILTRES_FLUIDITE[number][0] }) {
+  const lignes = PLATEFORMES_FLUIDITE.map(([id, libelle]) => {
+    const miennes = sorties.filter((s) => s.nom.startsWith(`${id}.`)).map((s) => ({ issue: s.nom.slice(id.length + 1), n: s.n }));
+    const coupees = miennes.filter((s) => s.issue.startsWith('coupee-')).map((s) => ({ etape: s.issue.slice(7), n: s.n })).sort((a, b) => b.n - a.n);
+    return { id, libelle, ok: miennes.find((s) => s.issue === 'ok')?.n ?? 0, stockage: miennes.find((s) => s.issue === 'stockage')?.n ?? 0,
+      coupees, gels: coupees.filter((c) => c.etape !== 'db_save_end').reduce((s, c) => s + c.n, 0), fermes: coupees.find((c) => c.etape === 'db_save_end')?.n ?? 0 };
+  }).filter((l) => (filtre === 'tous' || (filtre === 'mobile' ? l.id !== 'ordinateur' : l.id === filtre)) && l.ok + l.stockage + l.coupees.length > 0);
+  return <section className="ls-bloc">
+    <h4>Fins de match</h4>
+    {lignes.length === 0 ? <p className="ls-vide">Aucune fin de match relevée sur cette période pour cette sélection.</p> : <div className="ls-defile"><table className="ls-tableau">
+      <thead><tr><th scope="col">Plateforme</th><th scope="col">Menées au bout</th><th scope="col">Restées en chemin</th><th scope="col">Où</th><th scope="col">Jeu fermé sur la feuille</th><th scope="col">Stockage plein</th></tr></thead>
+      <tbody>{lignes.map((l) => <tr key={l.id}><th scope="row">{l.libelle}</th><td>{nombre(l.ok)}</td><td>{nombre(l.gels)}</td>
+        <td>{l.coupees.filter((c) => c.etape !== 'db_save_end').map((c) => `${c.etape} × ${nombre(c.n)}`).join(' · ') || '—'}</td>
+        <td>{nombre(l.fermes)}</td><td>{nombre(l.stockage)}</td></tr>)}</tbody>
+    </table></div>}
+    <p className="ls-note">« Restées en chemin » : la sortie n’a pas atteint la carrière, et « Où » donne la dernière étape notée avant que le jeu soit fermé ou gelé (relevée au lancement suivant). « Jeu fermé sur la feuille » n’est pas un gel : le match était finalisé. « Stockage plein » : la sauvegarde a été refusée par le navigateur pendant cette fin de match.</p>
+  </section>;
+}
+
+/**
+ * LA DERNIÈRE FIN DE MATCH DE CET APPAREIL (Correctif 32) : le fil noté étape par étape dans le stockage. Après un gel,
+ * rouvrir le jeu et venir ici dit où la sortie s'est arrêtée — c'est la seule trace qu'un téléphone figé laisse.
+ */
+function DerniereFinDeMatch() {
+  const fil = dernierFil();
+  if (!fil) return null;
+  const derniere = fil.etapes.at(-1);
+  return <section className="ls-bloc">
+    <h4>Dernière fin de match sur cet appareil</h4>
+    <p className="ls-note">
+      {new Date(fil.le).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })} ·{' '}
+      {fil.fini ? 'menée au bout' : `restée en chemin après « ${derniere?.[0] ?? 'la sirène'} »`}
+      {fil.stockage ? ' · stockage plein pendant la sauvegarde' : ''}
+    </p>
+    <div className="ls-defile"><table className="ls-tableau">
+      <thead><tr><th scope="col">Étape</th><th scope="col">Depuis la sirène</th></tr></thead>
+      <tbody>{fil.etapes.map(([etape, t], i) => <tr key={`${etape}-${i}`}><th scope="row">{etape}</th><td>{nombre(t)} ms</td></tr>)}</tbody>
+    </table></div>
+    <p className="ls-note">Entre « db_save_end » et « sortie-entrees-coupees », le temps est celui que le joueur passe sur la feuille de match. Un fil arrêté sur « db_save_end » n’est pas un gel : le jeu a été fermé avant d’appuyer sur « Terminer ».</p>
+  </section>;
 }
 
 /**
@@ -124,6 +174,7 @@ function PanneauProfileur() {
       <p className="ls-note">Allumé, un cartouche s’affiche en bas à gauche de chaque match en 3D (carrière et direct de ligue) : images par seconde, temps entre deux images, coût du dessin, appels de dessin, triangles, mémoire, requêtes du match. Il ne mesure que cet appareil et ne s’envoie nulle part.</p>
       <button type="button" className="ls-bascule" aria-pressed={actif} onClick={() => { reglerProfileur(!actif); setActif(!actif); }}><i />{actif ? 'Profileur allumé' : 'Profileur éteint'}</button>
     </section>
+    <DerniereFinDeMatch />
     <section className="ls-bloc">
       <h4>Séances mesurées</h4>
       <label>Appareil <select aria-label="Filtrer les mesures par appareil" value={filtre} onChange={e => setFiltre(e.target.value)}>
@@ -279,7 +330,7 @@ export function LaboStatistiques() {
         <BilanCarrieres lignes={s.details?.carrieres?.bilans.filter(c => c.type === 'existant') ?? []} />
       </>}
 
-      {onglet === 'fluidite' && <PanneauFluidite compteurs={s.details?.fluidite ?? []} />}
+      {onglet === 'fluidite' && <PanneauFluidite compteurs={s.details?.fluidite ?? []} sorties={s.details?.sorties ?? []} />}
 
       {onglet === 'retention' && <section className="ls-bloc">
         <h4>Qui revient, selon le mode joué en premier</h4>

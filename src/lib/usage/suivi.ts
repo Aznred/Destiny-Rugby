@@ -13,7 +13,8 @@ import { estCarriereClassee } from '../carriereExistante';
 import type { Ecran, Joueur, Manager } from '../../types';
 import { jourUTC, type EnvoiUsage, type JaugesUsage, type ModeUsage } from './agregats';
 import type { CarriereUsage } from './carrieres';
-import { EVENEMENT_FLUIDITE, type DetailFluidite } from '../profilAppareil';
+import { EVENEMENT_FLUIDITE, plateforme, type DetailFluidite } from '../profilAppareil';
+import { EVENEMENT_SORTIE, releverFilInterrompu, type DetailSortie } from '../finMatch';
 import { fusionnerJaugesCollection, jaugesCollection, nomCarteUsage } from './collection';
 import { EVENEMENT_MATCHS_LIGUE, type DetailMatchsLigue } from './matchsLigue';
 
@@ -231,6 +232,14 @@ export function demarrerLeSuivi(): void {
         if (e.detail.cadence30) compter(`fluidite.${e.detail.plateforme}.cadence30`);
         if (e.detail.definitionReduite) compter(`fluidite.${e.detail.plateforme}.definition`);
       }) as EventListener);
+      // Les fins de match (Correctif 32) : menées au bout, restées en chemin — avec la dernière étape atteinte —, ou
+      // jouées avec un stockage plein. C'est ce qui dit où un téléphone se fige quand on ne peut pas l'avoir en main.
+      window.addEventListener(EVENEMENT_SORTIE, ((e: CustomEvent<DetailSortie>) => { try {
+        const { issue, etape } = e.detail;
+        compter(`sortie.${plateforme()}.${issue === 'coupee' ? `coupee-${(etape || 'inconnue').slice(0, 50)}` : issue}`);
+      } catch { /* idem */ } }) as EventListener);
+      // La fin de match de la visite précédente est-elle restée ouverte ? (Jeu fermé à la main, ou gelé.)
+      try { releverFilInterrompu(); } catch { /* idem */ }
       useGame.subscribe((etat, avant) => { try {
         if (modeDeLEcran(etat.ecran, etat.joueur, etat.manager) !== modeDeLEcran(avant.ecran, avant.joueur, avant.manager)) pas(false, avant);
         observer(true);

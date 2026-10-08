@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { ModalesMonnaie } from './components/ModalesMonnaie';
+import { AlerteStockage } from './components/AlerteStockage';
 import { Personnalisation } from './components/Personnalisation';
 import { installerEcouteursApp } from './lib/viewport';
 import { useSynchroApparenceJoueur } from './lib/synchroApparenceJoueur';
@@ -226,6 +227,8 @@ export default function App() {
       {/* Les fenêtres d'achat (monnaie à choisir, solde insuffisant, confirmation, recharge de Crédits) : une seule, pour tout l'écran. */}
       <ModalesMonnaie />
       <Personnalisation />
+      {/* Le stockage de l'appareil a refusé la sauvegarde : un bandeau, et la liste des parties pour faire de la place. */}
+      <AlerteStockage />
       {/* Cérémonie : le trophée gagné s'affiche en 3D, un par un */}
       <AnimatePresence>
         {tropheesEnAttente.length > 0 && (

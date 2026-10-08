@@ -32,6 +32,8 @@
     "verify:saison-manager": "vite-node scripts/verifierSaisonManager.ts",
     "verify:tournoi-final": "vite-node scripts/verifierTournoiFinal.ts",
     "verify:fin-match": "vite-node scripts/verifierFinMatch.ts",
+    "verify:sortie-match": "vite-node scripts/verifierSortieMatch.ts",
+    "verify:bagarre": "vite-node scripts/verifierBagarre.ts",
     "verify:memoire-3d": "node scripts/verifierMemoire3D.mjs && vite-node scripts/verifierSortieIos.ts",
     "verify:propositions-collection": "vite-node scripts/verifierPropositionsCollection.ts",
     "verify:calendrier-mondial": "vite-node scripts/verifierCalendrierMondial.ts",

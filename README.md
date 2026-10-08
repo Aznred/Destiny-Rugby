@@ -1935,3 +1935,37 @@ La retransmission française utilise F5-TTS sur l'ordinateur via un service loca
 - Match couperet à égalité : prolongation jouée par le moteur (2 × 10 minutes, fatigue conservée), puis nombre d'essais et tirs au but selon la compétition.
 - Classement : une vraie vue téléphone (position, équipe, MJ, différence, points ; détail en touchant l'équipe), zones colorées et légende calculées par le règlement.
 - Banc : `npm run verify:reglements`. Aperçu : `/scripts/apercuClassement.html`.
+
+## Correctif 32 — sortie de match, stockage plein, bagarre, onglets de l'entraîneur (08/10/2026)
+
+Trois retours de jeu : sur iPad et iPhone 15 le retour à la carrière après un match restait figé (il fallait relancer le
+jeu) ; une bagarre bloquait le match, aucun ordre ne se laissait toucher ; l'Infirmerie et le Vestiaire de l'entraîneur ne
+défilaient pas.
+
+- **Bagarre** : en contrôle direct, le panneau des ordres passait SOUS les zones tactiles du pilote (joystick, balayages,
+  caméra) et sous son panneau de pause. Il passe au-dessus, le pilote se tait pendant la question, et les ordres se donnent
+  aussi au clavier (1 à 4). Et le moteur ne « tenait » pas la bagarre : une passe, un coup de pied déjà armé ou une
+  décision en attente faisaient repartir le jeu dessous, et l'ordre choisi n'était alors jamais appliqué — le panneau
+  restait à l'écran. Le match attend maintenant l'ordre, quoi qu'il arrive.
+- **Entraîneur** : au-delà de 1 120 px de large (ordinateur, iPad en paysage) seules certaines zones du bureau défilent ;
+  l'Infirmerie et le Vestiaire n'en faisaient pas partie. Corrigé, ainsi que « Contrats de l'effectif » dans le Marché, qui
+  sortait de la fenêtre une fois déplié.
+- **Sortie de match** : « Terminer » ne peut plus rester verrouillé ni la sortie rester en chemin — chaque attente a une
+  durée maximale, et on revient à la carrière quoi qu'il arrive. Sur un iPhone ou un iPad tenu en paysage, la sortie
+  attendait 1,8 seconde un retour à la verticale qui ne pouvait pas venir : le retour part maintenant en 0,14 seconde
+  (mesuré en émulation tactile). La scène 3D se libère quatre fois plus vite (429 → 99 ms).
+- **Stockage plein** : quand le navigateur refuse d'écrire la partie, le jeu ne s'arrête plus au milieu d'une action. Il
+  rend d'abord la place qu'il peut, sinon il continue et l'affiche (« Sauvegarde impossible » → « Mes parties » pour en
+  supprimer une). La partie est aussi écrite dans un format qui devrait peser moitié moins dans Safari.
+- **Aperçu 3D du joueur** (profil, création, boutique) : il rend maintenant les maillots qu'il peint à chaque changement.
+- **Diagnostic** : la fin d'un match laisse un fil sur l'appareil. Après un gel, le lancement suivant sait où la sortie
+  s'est arrêtée (Labo → Statistiques → Fluidité 3D → « Fins de match », et Profileur → « Dernière fin de match »).
+
+```bash
+npm run verify:sortie-match   # 85 contrôles : sortie bornée, stockage plein, format étroit, fil de la fin de match
+npm run verify:bagarre        # 44 contrôles : la bagarre attend son ordre, tient le match et se résout toujours
+```
+
+**Pas essayé sur un iPhone ni un iPad** : causes lues dans le code et mesurées dans un navigateur d'ordinateur. Le gain de
+place dans Safari est déduit du code de son moteur, pas mesuré. Mesuré mais pas corrigé : au lancement, le catalogue des
+78 000 joueurs bloque la page 3,6 secondes sur ordinateur (bien plus sur téléphone).

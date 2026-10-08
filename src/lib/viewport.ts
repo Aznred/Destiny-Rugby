@@ -57,9 +57,15 @@ export function annoncerNouvelleTaille(): void {
 
 const attendre = (ms: number) => new Promise<void>((fin) => { window.setTimeout(fin, ms); });
 
+// ⚠️ JAMAIS SANS FILET : une image attendue qui ne vient pas (page gelée par le système pendant une transition,
+// onglet qui passe en arrière-plan entre le test et l'appel) retiendrait toute la sortie de match. La minuterie
+// tient alors lieu d'image.
 const image = () => new Promise<void>((fin) => {
   if (typeof requestAnimationFrame !== 'function' || document.hidden) { window.setTimeout(fin, 32); return; }
-  requestAnimationFrame(() => fin());
+  let faite = false;
+  const finir = () => { if (!faite) { faite = true; fin(); } };
+  requestAnimationFrame(finir);
+  window.setTimeout(finir, 120);
 });
 
 /**

@@ -1735,6 +1735,112 @@ Toute retouche du lecteur se fait dans `../analyse-rn26/apercu/match/` (par un `
 - Aperçu sans sauvegarde : `/scripts/apercuClassement.html`. Banc : `npm run verify:reglements` (~6 min : 40 matchs
   détaillés pour la sirène, 36 prolongations).
 
+### La sortie d'un match ne peut plus rester figée — stockage plein, bagarre, onglets qui défilent (Correctif 32)
+
+Signalé le 8 octobre 2026 : « sur iPad et iPhone 15, au moment de revenir sur l'écran d'accueil de la carrière ça crashe,
+on est figé et on doit relancer le jeu » ; « quand il y a une bagarre ça bloque le jeu, on ne peut cliquer sur aucun des
+choix » ; « en carrière entraîneur on ne peut pas scroller dans Infirmerie et Vestiaire ».
+
+⚠️ **AUCUN iPhone ICI, NI MOTEUR WEBKIT.** Les causes ci-dessous sont lues dans le code et mesurées dans Chromium (émulation
+tactile). Elles expliquent un écran figé ; rien ne prouve qu'elles expliquent TOUT ce qui est vu sur l'appareil — d'où le
+fil de la fin de match, qui dira où un iPhone s'arrête (voir plus bas).
+
+**Bagarre** (`MatchLive`, `ControleDirect`, `.ml-hud .ml-bagarre`)
+
+- ⚠️ **EN CONTRÔLE DIRECT, AUCUN ORDRE NE RECEVAIT LE DOIGT.** Le HUD du pilote (`.cd`, z-index 6) pose trois zones tactiles
+  qui couvrent presque tout l'écran (joystick, balayages, caméra) et prennent le toucher MÊME éteintes ; le panneau de la
+  bagarre, sans rang, passait dessous. Mesuré : `elementFromPoint` au centre de chacun des quatre ordres rendait
+  `cd-zone-stick` ou `cd-zone-gestes`. Et la pause que la bagarre déclenche ouvrait le panneau « Pause » du pilote
+  (z-index 40) par-dessus. Or `phaseBagarre` n'avance pas sans ordre : il fallait relancer le jeu.
+- Le panneau passe au rang 45 ; `ControleDirect` reçoit `suspendu` (ni commandes ni panneau de pause tant que l'écran pose
+  sa question) ; les ordres se donnent aussi au clavier, 1 à 4 (le chiffre n'est affiché que là où il y a un clavier).
+- ⚠️ **TOUT CE QUI SE CLIQUE DANS `.ml-hud` PENDANT LE CONTRÔLE DIRECT DOIT AVOIR UN RANG AU-DESSUS DE `.cd`.**
+- ⚠️ **ET LE MOTEUR NE TENAIT PAS LA BAGARRE** (`tenirLaBagarre`, `moteur/bagarre.ts`). `e.phase` valait « bagarre » à la
+  déclaration, mais rien ne l'y maintenait : le contrôle direct continuait d'obéir (`piloterDirect` ne regardait pas
+  `e.bagarre`, contrairement au contrôle par cartes), un coup de pied déjà armé partait (`e.piedPrepare`), une décision en
+  attente pouvait tomber — la phase repartait AVEC la bagarre posée, `phaseBagarre` ne tournait plus, et l'ordre cliqué
+  n'était jamais résolu : panneau affiché pour toujours. Reproduit dans le navigateur (bagarre posée, phase
+  `ballonEnLAir`). Le pas du moteur ramène maintenant le match à la bagarre (au début du pas et avant de jouer la phase),
+  annule le coup de pied armé, et personne ne conduit tant que l'ordre n'est pas donné. Sans joueur incarné il n'y a pas
+  de bagarre : la ligue et l'empreinte du moteur ne bougent pas (`90b6ea8a` avant et après).
+  Banc : `npm run verify:bagarre` (44 contrôles : chaque ordre, phase déplacée sous la bagarre, soixante pas de commandes
+  en contrôle direct, garde-fou des 90 s, six matchs conduits au hasard — une bagarre posée est toujours la phase du match).
+
+**Onglets du bureau d'entraîneur** (`App.css`, bloc `@media (min-width:1121px)`)
+
+- Au-delà de 1 120 px (ordinateur, iPad en paysage) `.carriere-manager` est une colonne à hauteur FIXE et `overflow: hidden` ;
+  seules les zones listées défilent. L'Infirmerie et le Vestiaire refaits (`.infirmerie27`, `.vestiaire27`) n'y étaient
+  pas : leur contenu était coupé (mesuré : dernier bloc 184 px sous la fenêtre, aucun défilement). Ajoutés, avec
+  `.manager-match-centre`. Dans le Marché, « Contrats de l'effectif » déplié mesurait 5 960 px dans une colonne de 793 et
+  réduisait le marché à zéro : il prend au plus 55 % de la colonne et défile en lui-même.
+- ⚠️ **TOUT NOUVEL ONGLET, ENFANT DIRECT DE `.carriere-manager`, DOIT ENTRER DANS CETTE LISTE.**
+
+**Sortie de match** (`lib/sortieMatch.ts`, `lib/finMatch.ts`, `lib/pleinEcran.ts`, `lib/viewport.ts`, `MatchLive`)
+
+- ⚠️ **SUR TÉLÉPHONE, « TERMINER » EST LA SEULE SORTIE DE L'ÉCRAN DE FIN** (ni Échap, ni bord de fenêtre où cliquer) : tout
+  ce qui le retient fige le jeu. Deux attentes n'avaient aucune limite — la scène 3D (`scenesRendues`) et la reprise des
+  écritures, qui LÈVE une erreur si le stockage refuse (voir plus bas) : la promesse de finalisation échouait, le bouton
+  restait éteint pour toujours.
+- `auPlus(attente, ms)` borne chaque attente et ne rejette jamais. La finalisation accorde `ATTENTE_SCENE_MAX` (2,5 s) à la
+  scène et rattrape toute erreur de sauvegarde ; `MatchLive` déverrouille « Terminer » que la finalisation ait abouti ou
+  non, et de toute façon huit secondes après la sirène. `sortirDuMatch` : la boucle obtient `DELAI_BOUCLE` (4 s), toute la
+  préparation `DELAI_SORTIE` (7 s), puis **on navigue quoi qu'il arrive** ; `libererArrierePlan()` passe APRÈS le démontage
+  du match (avant, c'était un filet sans effet : la fenêtre du match comptait encore comme ouverte).
+- ⚠️ **ON N'ATTEND UN RETOUR DEBOUT QUE SI LE JEU A TOURNÉ L'ÉCRAN** (`verrouillerPaysage` → `paysageVerrouilleParLeJeu`). La
+  sortie attendait « portrait » dès qu'un appareil tactile était tenu en paysage : 1,8 s d'écran mort après chaque match
+  sur iPhone et iPad, où le navigateur ne verrouille jamais l'orientation. Mesuré en paysage tactile : la navigation
+  partait 1 990 ms après l'appui, **143 ms** depuis. `image()` (viewport) a un filet de 120 ms : une image que le système
+  ne dessine pas ne retient plus rien.
+
+**Stockage plein** (`lib/persistanceNavigation.ts`, `lib/sauvegardes.ts`, `components/AlerteStockage.tsx`)
+
+- ⚠️ **`localStorage.setItem` LÈVE UNE ERREUR QUAND LE SITE N'A PLUS DE PLACE, ET `persist` NE LA RATTRAPE PAS** : elle
+  remontait dans le `set()` du store. Une carrière d'entraîneur pèse 600 000 à 900 000 caractères (mesuré sur deux vraies
+  parties, dont 520 000 à 740 000 pour `manager.avancee`) : six emplacements pleins approchent le plafond de Chrome
+  (environ 5 millions de caractères) et dépassent de loin celui de Safari.
+- `ecrireSansFaillir` : rend d'abord ce qui se retélécharge (le catalogue gardé d'une visite à l'autre) et réessaie ;
+  sinon le jeu CONTINUE en mémoire, `AlerteStockage` le dit (bandeau + liste des parties pour en supprimer une) et chaque
+  écriture suivante réessaie — une écriture refusée n'est pas retenue comme « la dernière », l'ancienne sauvegarde n'est
+  jamais tronquée. Un appareil où la place a manqué est noté (`destiny-rugby:stockage-serre`) : le catalogue ne s'y range
+  plus tant qu'on n'a pas supprimé une partie.
+- **`jsonEtroit`** : la partie, le compte et le catalogue sont écrits sans caractère au-delà de U+00FF (`\uXXXX`, que
+  `JSON.parse` relit tel quel). Le moteur d'Apple tient une chaîne sur deux octets par caractère dès qu'elle en contient UN
+  large, et Safari plafonne à 5 Mo d'OCTETS : la même carrière y pèserait 0,9 Mo au lieu de 1,8 (615 caractères larges sur
+  899 717 dans la partie mesurée). ⚠️ **Déduit du code de WebKit, PAS mesuré sur un iPhone** : si Safari compte autrement,
+  on n'y gagne rien et on n'y perd rien — vérifié sur une vraie sauvegarde, relue à l'identique après rechargement.
+
+**Scène 3D** (hors git : `../analyse-rn26/correctif_32_sortie.cjs`, puis `node installer_apercu.mjs`)
+
+- Chaque étape de `commencerLiberation` / `finirLiberation` tient seule (`tenter`) : une erreur ne retient plus le contexte
+  graphique ni la toile. Les tranches se comptent en millisecondes de travail (6 ms par tâche), plus par seize ressources :
+  libération 429 → 99 ms, attente avant la finalisation 411 → 45 ms.
+- `creerApercuJoueur` (profil, création, personnalisation, boutique) ne rendait RIEN : chaque reconstruction laissait un
+  maillot peint de 1 024 px (deux toiles de 4 Mo), des matériaux clonés et un squelette. L'ancien modèle est rendu quand
+  le nouveau est prêt (`planLiberation` : les modèles en cache restent protégés), deux reconstructions croisées ne
+  laissent plus deux joueurs dans la scène, et l'aperçu ne dessine plus hors de l'écran.
+
+**Le fil de la fin de match** (`tracer`, `dernierFil`, `releverFilInterrompu` dans `lib/finMatch.ts`)
+
+- Un téléphone figé ne laisse aucune trace. Chaque étape (jalons, étapes de la sortie, passage de semaine) est notée dans
+  `localStorage` (`destiny-rugby:fin-match`) ; au lancement suivant, un fil resté ouvert part en compteur anonyme
+  `sortie.<plateforme>.coupee-<dernière étape>` (famille `sortie`, `lib/usage/`), une sortie menée au bout en
+  `sortie.<plateforme>.ok`, un refus du stockage en `.stockage`. **Labo → Statistiques → Fluidité 3D → « Fins de match »**
+  les aligne par plateforme ; **Profileur → « Dernière fin de match sur cet appareil »** montre le fil en clair.
+- ⚠️ Un fil arrêté sur `db_save_end` n'est pas un gel : le match était finalisé, le jeu a été fermé sur la feuille.
+
+**Bancs** : `npm run verify:sortie-match` (85 contrôles : JSON étroit, stockage compté comme Safari, finalisation et sortie
+bornées, fil) ; `npm run verify:bagarre` (44) ; `verify:fin-match` (111) ; `verify:memoire-3d`, `verify:modales`,
+`verify:usage` inchangés.
+
+**Mesuré au passage, PAS corrigé** : le catalogue mondial (78 083 cartes) est matérialisé au chargement de la page
+(`catalogueBaseCarriere()` à l'import de `catalogueSoloCommun.ts`, puis au premier `effectifDuClub`) — une tâche de
+**3,6 s** qui bloque le fil principal sur ordinateur, 58 Mo gardés ; plus de la moitié part dans la recherche des
+portraits (`photoReelle`). Sur téléphone, c'est le plus gros gel du jeu, à chaque lancement.
+
+**Pas fait / à dire** : rien n'a été essayé sur iPhone, iPad ni Safari ; la mémoire graphique n'est toujours pas mesurée ;
+la sauvegarde reste dans `localStorage` (IndexedDB lèverait le plafond, mais rend la relecture asynchrone) ; `avancee`
+pèse 80 % d'une partie d'entraîneur et n'a pas été allégé.
+
 ## ⚠️ Équilibrage : ce qui ne se retouche pas sans mesurer
 
 ### Difficulté
@@ -1975,7 +2081,9 @@ npm run verify:vue-legere         # vue légère : détail d'un match terminé �
 npm run audit:joueurs             # audit des données joueurs, lecture seule : photographie, comparaison, ligues, base (voir serveur/AUDIT-JOUEURS.md)
 npm run verify:usage              # statistiques d'utilisation : relevés bornés, sommes, rétention, lecture réservée à Kiri (65 contrôles)
 npm run verify:tournoi-final      # tournoi final des divisions à poules jouable, clés du tableau, départage (97 contrôles, ~55 s)
-npm run verify:fin-match          # finalisation par étapes, une écriture, scène par tranches, dix matchs de suite (105 contrôles)
+npm run verify:fin-match          # finalisation par étapes, une écriture, scène par tranches, dix matchs de suite (111 contrôles)
+npm run verify:sortie-match       # sortie de match bornée, stockage plein sans erreur, JSON étroit, fil de la fin de match (85 contrôles, ~12 s)
+npm run verify:bagarre            # une bagarre attend son ordre, tient le match (contrôle direct compris) et se résout toujours (44 contrôles, ~45 s)
 npm run verify:propositions-collection # propositions de cartes : reçues, envoyées, refus, retrait, aucune duplication (83 contrôles)
 
 npx vite-node scripts/verif.ts    # banc général : divisions, effectifs, 8 saisons

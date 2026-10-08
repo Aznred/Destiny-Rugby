@@ -159,7 +159,8 @@ import { HabillageTV } from './match/HabillageTV';
 import { couleursEquipeTV, DUREE_EQUIPE_TV, exclusionsDepuisEtat, logoTV, type IdentiteTV } from '../lib/habillageTV';
 import { couleursDepuisEcusson, departagerLesTenues, enHex } from '../lib/tenuesMatch';
 import { sortirDuMatch } from '../lib/sortieMatch';
-import { apresLEcran, finaliserMatch, jalon } from '../lib/finMatch';
+import { apresLEcran, ATTENTE_SCENE_MAX, auPlus, finaliserMatch, jalon } from '../lib/finMatch';
+import { oublierLeVerrou, verrouillerPaysage } from '../lib/pleinEcran';
 import { scenesRendues } from '../lib/match3D';
 import { departager, departageDuMatch, inscrireIssueJouee } from '../lib/couperet';
 import { bulleDuMoment, marqueurDepuisEtat, memoireBullesVide, phraseDuMarqueur, ventPourLeTir, type ContexteStatsTV, type PhraseTV } from '../lib/statsTV';
@@ -456,7 +457,8 @@ export function MatchLive({
         // Démonter la scène lance sa destruction par tranches (`detruireScene`) ; à la sirène c'est déjà fait.
         setSortie(true);
         await apresLEcran();
-        await scenesRendues();
+        // Bornée : une scène qui tarde finit de se rendre derrière la carrière, elle ne retient pas la sortie.
+        await auPlus(scenesRendues(), ATTENTE_SCENE_MAX);
       },
       naviguer: () => {
         jalon('navigation_start', idMatch.current);
@@ -1326,6 +1328,20 @@ export function MatchLive({
   useEffect(() => {
     if (bagarre) setEnPause(true);
   }, [bagarre]);
+  // ⚠️ ET L'ORDRE SE DONNE AUSSI AU CLAVIER (1 à 4, dans l'ordre des boutons). En contrôle direct on a les mains sur
+  // les touches ou la manette : sans cela, le seul moyen de sortir de la bagarre était d'aller chercher la souris.
+  useEffect(() => {
+    if (!bagarre) return;
+    const auClavier = (ev: KeyboardEvent) => {
+      const ordre = ORDRES[Number(/^(?:Digit|Numpad)([1-9])$/.exec(ev.code)?.[1] ?? 0) - 1];
+      if (!ordre || ev.repeat || e.bagarre !== bagarre || bagarre.ordre) return;
+      ev.preventDefault();
+      ordonner(e, ordre.id);
+      setEnPause(false);
+    };
+    window.addEventListener('keydown', auClavier);
+    return () => window.removeEventListener('keydown', auClavier);
+  }, [bagarre, e]);
 
   // --- LE COACHING EN DIRECT ------------------------------------------------
   const envoyerConsigne = async () => {
@@ -1493,8 +1509,17 @@ export function MatchLive({
       etapes.push(() => appliquerSanctionMatch(discipline));
     }
     // La scène vient d'être démontée par l'écran de fin : on la laisse se rendre AVANT d'écrire quoi que ce soit.
-    finalisation.current = finaliserMatch(idMatch.current, etapes, { avant: scenesRendues }).then(() => setFinalise(true));
+    // ⚠️ « TERMINER » SE DÉVERROUILLE DANS TOUS LES CAS. Une finalisation qui échouerait ne doit jamais laisser le
+    // bouton éteint : sur téléphone, c'est la seule sortie de cet écran (ni Échap, ni bord de fenêtre où cliquer).
+    const deverrouiller = () => setFinalise(true);
+    finalisation.current = finaliserMatch(idMatch.current, etapes, { avant: scenesRendues }).then(deverrouiller, deverrouiller);
   }, [e.fini, e, monPion, enregistrerMatchVecu, appliquerSanctionMatch, onTermine, titre, cle]);
+  // Le dernier filet : huit secondes après la sirène, le bouton répond quoi qu'il soit arrivé à la finalisation.
+  useEffect(() => {
+    if (!e.fini || finalise) return;
+    const garde = window.setTimeout(() => setFinalise(true), 8000);
+    return () => window.clearTimeout(garde);
+  }, [e.fini, finalise]);
 
   // --- LE RENDU DES PIONS ---------------------------------------------------
   // ⚠️ Interpolation exacte : le moteur avance par pas de 0,15 s, l'écran à
@@ -1731,7 +1756,11 @@ export function MatchLive({
   // Le plein écran porte sur la fenêtre du match entière : cartes de décision,
   // bandeaux et commandes y restent, sinon on ne pourrait plus jouer.
   useEffect(() => {
-    const suivre = () => setPleinEcran(document.fullscreenElement === dialogRef.current);
+    const suivre = () => {
+      setPleinEcran(document.fullscreenElement === dialogRef.current);
+      // Quitter le plein écran rend l'orientation : il n'y a plus de retour debout à attendre à la sortie du match.
+      if (!document.fullscreenElement) oublierLeVerrou();
+    };
     document.addEventListener('fullscreenchange', suivre);
     return () => document.removeEventListener('fullscreenchange', suivre);
   }, [dialogRef]);
@@ -1741,7 +1770,8 @@ export function MatchLive({
     if (document.fullscreenElement) { void document.exitFullscreen(); return; }
     fenetre.requestFullscreen?.({ navigationUI: 'hide' })
       // Un téléphone se tourne : en plein écran, le match se regarde en paysage.
-      .then(() => (screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> }).lock?.('landscape'))
+      // `verrouillerPaysage` retient si le verrou a pris : la sortie du match n'attend un retour debout que dans ce cas.
+      .then(() => verrouillerPaysage())
       .catch(() => { /* refusé par le navigateur : le match reste dans sa fenêtre */ });
   };
   const pleinEcranPossible = typeof document !== 'undefined' && !!document.fullscreenEnabled;
@@ -2095,7 +2125,7 @@ export function MatchLive({
                       Le HUD ne se montre qu'une fois le joueur entré et la caméra venue derrière lui ; sur le
                       banc il ne rend rien. Il porte aussi la pause (liste des commandes) et le tutoriel. */}
                   {directVoulu && !e.fini && (
-                    <ControleDirect pilotage={pilotage.current!} surReprendre={() => setEnPause(false)} />
+                    <ControleDirect pilotage={pilotage.current!} surReprendre={() => setEnPause(false)} suspendu={!!e.bagarre} />
                   )}
 
                   {/* ---------- LA PREMIÈRE FOIS ---------- */}
@@ -2123,14 +2153,14 @@ export function MatchLive({
                       <b>{t('ml.bagarre.titre')}</b>
                       <p>{t('ml.bagarre.texte', { nom: e.bagarre.adversaire.nom })}</p>
                       <div className="ml-ordres">
-                        {ORDRES.map((o) => (
+                        {ORDRES.map((o, i) => (
                           <button
                             key={o.id}
                             type="button"
                             className="ml-ordre"
                             onClick={() => { ordonner(e, o.id); setEnPause(false); }}
                           >
-                            <b><IconeEmoji emoji={o.emoji} /> {t(o.cle)}</b>
+                            <b><kbd className="ml-ordre-touche" aria-hidden>{i + 1}</kbd><IconeEmoji emoji={o.emoji} /> {t(o.cle)}</b>
                             <span>{t(o.aide)}</span>
                           </button>
                         ))}

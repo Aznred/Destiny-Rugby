@@ -29,7 +29,7 @@ export const LIBELLES_MODES: Record<ModeUsage, string> = {
 };
 
 /** Les familles de compteurs acceptées. Toute autre clé est refusée à l'entrée. */
-const PREFIXES = ['carrieres', 'matchs', 'saisons', 'packs', 'collection', 'poste', 'club', 'incarne', 'sessions', 'obtenue', 'utilisee', 'fluidite'] as const;
+const PREFIXES = ['carrieres', 'matchs', 'saisons', 'packs', 'collection', 'poste', 'club', 'incarne', 'sessions', 'obtenue', 'utilisee', 'fluidite', 'sortie'] as const;
 const CLE_VALIDE = /^[a-z]+(\.[\p{L}\p{N} _'’-]{1,60}){1,2}$/u;
 
 export interface CarteRareUsage { nom: string; rarete: 'elite' | 'star'; note: number; n: number }
@@ -231,7 +231,9 @@ export interface StatistiquesUsage {
   entraineur: { creees: number; actifs: number; saisons: number; temps: number; tempsParUtilisateur: number };
   retention: { mode: ModeUsage; libelle: string; cohorte: number; j1: number | null; j7: number | null; j30: number | null }[];
   details: { carrieres?: DetailCarrieresUsage; genEquipe: number | null; rares: CarteRareUsage[]; obtenues: LigneClassee[]; utilisees: LigneClassee[]; joueursXV: LigneClassee[];
-    sessions: Partial<Record<ModeUsage, { nombre: number; moyenne: number; parJoueur: number }>>; fluidite: LigneClassee[] };
+    sessions: Partial<Record<ModeUsage, { nombre: number; moyenne: number; parJoueur: number }>>; fluidite: LigneClassee[];
+    /** Les fins de match en 3D ou vues de haut : `<plateforme>.ok`, `<plateforme>.coupee-<dernière étape>`, `<plateforme>.stockage`. */
+    sorties?: LigneClassee[] };
 }
 
 const taux = (n: number, sur: number): number | null => (sur > 0 ? n / sur : null);
@@ -288,6 +290,7 @@ export function assemblerStatistiques(m: MatiereUsage, periode: PeriodeUsage): S
     retention: m.retention.map((x) => ({ mode: x.mode, libelle: LIBELLES_MODES[x.mode], cohorte: x.cohorte, j1: taux(x.j1, x.mures1), j7: taux(x.j7, x.mures7), j30: taux(x.j30, x.mures30) })),
     details: { carrieres: m.carrieres, genEquipe: m.collections.genEquipe ?? null, rares: m.collections.rares ?? [], joueursXV: m.collections.joueursXV ?? [], obtenues: classer('obtenue.', 20), utilisees: classer('utilisee.', 20),
       sessions: Object.fromEntries(MODES_USAGE.map(id => [id, { nombre: c(`sessions.${id}`), moyenne: div(mode(id).secondes, c(`sessions.${id}`)), parJoueur: div(c(`sessions.${id}`), mode(id).utilisateurs) }])),
-      fluidite: Object.entries(m.compteurs).filter(([cle]) => cle.startsWith('fluidite.')).map(([cle, n]) => ({ nom: cle.slice(9), n })) },
+      fluidite: Object.entries(m.compteurs).filter(([cle]) => cle.startsWith('fluidite.')).map(([cle, n]) => ({ nom: cle.slice(9), n })),
+      sorties: Object.entries(m.compteurs).filter(([cle]) => cle.startsWith('sortie.')).map(([cle, n]) => ({ nom: cle.slice(7), n })) },
   };
 }

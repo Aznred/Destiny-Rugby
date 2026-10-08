@@ -7,6 +7,8 @@ import type { AjoutJoueur } from './ligue/importsJoueurs';
 import { assemblerCatalogueSpecial, type CatalogueSpecial, type DefinitionCarteSpeciale, type EvenementSpecial } from './ligue/cartesSpeciales';
 import { fournirCatalogueEffectifs } from './catalogueEffectifs';
 import { enregistrerArticlesLabo, type ArticleEquipement } from '../data/boutique';
+import { stockageSerre } from './persistanceNavigation';
+import { jsonEtroit } from './sauvegardes';
 
 let revision = -1;
 let courant: readonly SourceCarte[] = catalogueBaseCarriere();
@@ -76,9 +78,10 @@ function relireLaMemoire(): void {
   } catch { /* stockage refusé ou contenu abîmé : on redemandera tout */ }
 }
 function ranger(donnees: ReponseCatalogue): void {
-  if (typeof localStorage === 'undefined') return;
+  // ⚠️ LA SAUVEGARDE PASSE AVANT CE CACHE : sur un appareil où la place a déjà manqué, il ne se range plus.
+  if (typeof localStorage === 'undefined' || stockageSerre()) return;
   try {
-    const brut = JSON.stringify(donnees);
+    const brut = jsonEtroit(JSON.stringify(donnees));
     if (brut.length <= TAILLE_MAXIMALE) localStorage.setItem(CLE_CATALOGUE, brut); else localStorage.removeItem(CLE_CATALOGUE);
   } catch { /* quota atteint : le catalogue se retéléchargera, rien de plus */ }
 }

@@ -181,9 +181,12 @@ const sauvegardes = () => ecritures[CLE_SAUVEGARDE] ?? 0;
   const debut = source.indexOf('    detruireParEtapes(){');
   ok(debut > 0, 'le lecteur installé (public/rn26/scene.js) a sa destruction par tranches');
   const corps = source.slice(debut, source.indexOf('    detruire(){', debut));
-  for (const geste of ['commencerLiberation()', 'liberation.tranche(16)', 'liberation?.tout()', 'finirLiberation()'])
+  for (const geste of ['commencerLiberation()', 'liberation.tranche(', 'liberation?.tout()', 'finirLiberation()'])
     ok(corps.includes(geste), `la destruction par tranches fait aussi « ${geste} »`);
   ok(corps.includes('await souffler()'), 'et rend la main au navigateur entre les tranches');
+  // Correctif 32 : les tranches se comptent en millisecondes de travail, plus en nombre de ressources.
+  ok(/performance\.now\(\)\+\d+;do liberation\.tranche\(\d+\);while\(liberation\.restant&&performance\.now\(\)<limite\)/.test(corps), 'chaque tranche a un budget de temps, pas un nombre fixe de ressources');
+  ok(/const tenter=etape=>\{try\{etape\(\);\}catch/.test(source), 'chaque étape de la libération tient seule (une erreur ne retient pas le contexte graphique)');
   const preparation = source.slice(source.indexOf('  function commencerLiberation(){'), source.indexOf('  const api={', source.indexOf('  function commencerLiberation(){')));
   for (const geste of ['sons?.detruire()', 'tele.detruire()', 'renderer.dispose()', 'renderer.forceContextLoss?.()', 'toile.remove()', 'observateur.disconnect()', 'officials.length=0', 'scene.clear()', 'stade.restituer()'])
     ok(preparation.includes(geste), `la libération complète fait aussi « ${geste} »`);

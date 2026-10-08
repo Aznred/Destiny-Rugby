@@ -22,7 +22,7 @@ import { amisPresents } from '../lib/vestiaire';
 import { TRAIT_PAR_ID, descriptionTrait, nomTrait } from '../data/traits';
 import { nombre, t, tn, texteTraduit } from '../lib/i18n';
 import { afficheDuJoueur, libelleAfficheManager, matchDePreparation, resteUnMatchCeWeekEnd, PREFIXE_PREPARATION } from '../lib/matchLive';
-import { apresLEcran, ecrituresGroupees } from '../lib/finMatch';
+import { apresLEcran, ecrituresGroupees, tracer } from '../lib/finMatch';
 import { equipeU20 } from '../lib/international';
 import { situationInternationale } from '../lib/rassemblements';
 import { CalendrierMondial } from './CalendrierMondial';
@@ -628,8 +628,12 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
               const j = useGame.getState().joueur;
               // Un autre tour du tournoi final attend ce même week-end : il se joue avant de tourner la page.
               if (j && resteUnMatchCeWeekEnd(j, bonusClubDuJoueur(j))) return;
+              // Le fil de la fin de match (`lib/finMatch.ts`) : si l'écran se fige ICI, le lancement suivant le saura.
+              tracer('semaine-suivante');
               semaineSuivante();
-            })).finally(() => setPassage(false));
+              tracer('semaine-passee');
+            })).catch((erreur: unknown) => { console.error('[fin de match] la semaine n’a pas pu tourner', erreur); })
+              .finally(() => setPassage(false));
           }}
         />
         </Suspense>

@@ -39,7 +39,7 @@ import {
 } from './etat.js';
 import {
   apresGesteIllegal, chauffer, donnerOrdre, frictions, irregularite, refroidir,
-  resoudreBagarre, sanctionApresMatch, vieillirBulles,
+  resoudreBagarre, sanctionApresMatch, tenirLaBagarre, vieillirBulles,
 } from './bagarre.js';
 import {
   consommerIntention, demanderAction, intentionEst, intervalle, metresDeLaLigne,
@@ -684,6 +684,8 @@ export function avancer(e: EtatMatch, secondesSimulees: number): void {
 function tick(e: EtatMatch): void {
   const dt = DT;
   e.sim += dt;
+  // Une bagarre qui attend son ordre tient le match : si la phase a bougé sous elle, on y revient (`tenirLaBagarre`).
+  if (e.bagarre) tenirLaBagarre(e);
   avancerArbitre(e, dt);
   avancerCorps(e, dt);
   if (e.sifflet) {
@@ -834,7 +836,10 @@ function tick(e: EtatMatch): void {
   lancerAppelsCombinaison(e);
   if (iaParPoste(e)) soutenirLaPercee(e);
   if (lectureLocale(e)) conduireLeSurnombre(e);
-  if (e.direct?.actif) piloterDirect(e);
+  // ⚠️ PERSONNE NE CONDUIT PENDANT UNE BAGARRE (Correctif 32). Le contrôle par cartes s'en gardait déjà (`controle.ts`) ;
+  // le contrôle direct, non : une passe ou un coup de pied demandés à cet instant relançaient le jeu sous la bagarre.
+  if (e.bagarre) { /* le jeu attend l'ordre */ }
+  else if (e.direct?.actif) piloterDirect(e);
   else if (e.controle) piloterMonJoueur(e);
   // Niveau 4 : le geste du joueur dans son pack — les temps, les appuis, la justesse.
   if (e.direct) majPack(e);
@@ -1127,6 +1132,8 @@ function tick(e: EtatMatch): void {
   }
 
   if (!retenirLePlacement(e) && !attendLeLancer(e)) e.minuteur -= dt * cadenceDeLArret(e);
+  // Dernier filet avant de jouer la phase : rien de ce qui précède dans ce pas n'a pu faire repartir le jeu.
+  if (e.bagarre) tenirLaBagarre(e);
   switch (e.phase) {
     case 'coupEnvoi': return phaseCoupEnvoi(e);
     case 'renvoi22': return phaseRenvoi22(e);

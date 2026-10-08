@@ -779,7 +779,13 @@
   .manager-equipe,
   .manager-calendrier,
   .manager-marche,
-  .manager-ovale {
+  .manager-ovale,
+  /* ⚠️ TOUT NOUVEL ONGLET DOIT ENTRER DANS CETTE LISTE. L'Infirmerie et le Vestiaire refaits n'y étaient pas :
+     enfants directs d'une colonne à hauteur fixe et `overflow: hidden`, ils gardaient leur hauteur de contenu
+     (`flex: 0 0 auto`) et tout ce qui dépassait de la fenêtre était coupé, sans rien pour défiler. */
+  .carriere-manager > .infirmerie27,
+  .carriere-manager > .vestiaire27,
+  .carriere-manager > .manager-match-centre {
     flex: 1 1 auto;
     /* ⚠️ `min-height: 0` EST INDISPENSABLE : un élément flexible refuse par
        défaut de descendre sous sa taille de contenu, et la zone déborderait
@@ -798,6 +804,16 @@
        même piège que sur `.manager-dossier-jeune`, un cran plus haut. */
     align-content: start;
     grid-auto-rows: max-content;
+  }
+  /* Le Marché porte deux zones : les contrats de l'effectif, repliés, puis le marché. Dépliée, la liste des contrats
+     mesurait 5 960 px dans une colonne de 793 : elle sortait de la fenêtre, coupée, et le marché n'avait plus un
+     pixel de haut. Elle prend au plus la moitié de la colonne et défile en elle-même ; le marché garde le reste. */
+  .carriere-manager > details.carte[open] {
+    flex: 0 1 auto;
+    min-height: 0;
+    max-height: 55%;
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
   /* Les dossiers de détection s'affichent aussi dans Formation : même liste,
      même plancher de rangée que dans Recruteurs — sans quoi la grille écrase
@@ -5183,6 +5199,15 @@
 }
 .ml-ordre:hover { border-color: var(--or-clair); background: rgba(212, 175, 55, 0.12); }
 .ml-ordre b { font-size: 0.84rem; }
+/* Le chiffre du clavier : seulement là où il y a un clavier (au doigt, il ne dit rien). */
+.ml-ordre-touche { display: none; }
+@media (hover: hover) and (pointer: fine) {
+  .ml-ordre-touche {
+    display: inline-grid; place-items: center; min-width: 1.15rem; height: 1.15rem; margin-right: 0.35rem;
+    border: 1px solid rgba(255, 255, 255, 0.28); border-radius: 4px;
+    font: 600 0.66rem/1 'Archivo', system-ui, sans-serif; color: var(--craie-dim); vertical-align: 0.08em;
+  }
+}
 .ml-ordre span { font-size: 0.68rem; color: var(--craie-dim); line-height: 1.25; }
 
 /* --- ⏸️ LA CARTE DE DÉCISION -------------------------------------------
@@ -6435,13 +6460,20 @@ img, svg, canvas { max-width: 100%; }
 .ml-tuto-carte b { font-family: 'Archivo', system-ui, sans-serif; color: var(--or-clair); }
 .ml-tuto-carte p { margin: 0; font-size: 0.84rem; color: var(--craie); line-height: 1.35; }
 
-/* La bagarre attend un ordre : elle se pose AU MILIEU du terrain, pas sous lui. */
+/* La bagarre attend un ordre : elle se pose AU MILIEU du terrain, pas sous lui.
+   ⚠️ ET AU-DESSUS DU CONTRÔLE DIRECT. Le HUD du pilote (`.cd`, z-index 6, 40 en pause) couvre presque tout l'écran de
+   zones tactiles — joystick, balayages, caméra — qui prennent le toucher même éteintes : sans rang, ce panneau passait
+   dessous et aucun ordre ne recevait le doigt, alors que le moteur n'avance plus tant qu'on n'en a pas donné un. */
 .ml-hud .ml-bagarre {
   position: absolute;
+  z-index: 45;
   left: 0.6rem;
   right: 0.6rem;
   top: 50%;
   transform: translateY(-50%);
+  max-height: calc(100% - 1.2rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   margin: 0;
   background: linear-gradient(180deg, rgba(120, 20, 20, 0.96), rgba(40, 8, 8, 0.96));
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
@@ -9201,3 +9233,28 @@ select:focus {
 }
 .fin-de-poule { border-left: 4px solid var(--zone, var(--bordure-forte)); display: grid; gap: 0.45rem; }
 .fin-de-poule p { margin: 0; overflow-wrap: anywhere; }
+
+/* ── Stockage de l'appareil plein (`components/AlerteStockage.tsx`) ───────────────────────────────────────────────
+   La partie continue mais n'est plus écrite : un bandeau de cuir sous la navigation, jamais par-dessus un match
+   (rang 90 : au-dessus de la navigation, sous les fenêtres et sous le match). */
+.alerte-stockage {
+  position: fixed; z-index: 90;
+  top: calc(env(safe-area-inset-top, 0px) + 66px); left: 50%; transform: translateX(-50%);
+  width: min(640px, calc(100vw - 1.4rem));
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 0.75rem;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid color-mix(in srgb, var(--cuir-400) 70%, transparent);
+  border-left: 4px solid var(--or-500);
+  border-radius: var(--rayon-sm);
+  background: linear-gradient(180deg, #2a160c, #1b0f08);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.55);
+  color: var(--craie);
+}
+.alerte-stockage > svg { color: var(--or-400); }
+.alerte-stockage p { margin: 0; font-size: 0.8rem; line-height: 1.4; color: var(--craie-dim); }
+.alerte-stockage p b { display: block; color: var(--craie); font-size: 0.86rem; }
+.alerte-stockage .btn { white-space: nowrap; }
+@media (max-width: 560px) {
+  .alerte-stockage { grid-template-columns: auto minmax(0, 1fr); }
+  .alerte-stockage .btn { grid-column: 1 / -1; justify-self: stretch; justify-content: center; }
+}
