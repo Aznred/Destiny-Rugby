@@ -116,9 +116,12 @@ export function useCatalogueSolo(): readonly SourceCarte[] {
     const afficher = () => { if (actif) setCatalogue(courant); };
     const actualiser = () => { if (!document.hidden) void synchroniserCatalogueSolo().then(afficher); };
     const surVisibilite = () => { if (!document.hidden) actualiser(); };
+    const surCompte = () => { revision = -1; dernierChargement = 0; actualiser(); };
     actualiser();
     window.addEventListener('destiny-catalogue-solo-actualise', afficher);
     window.addEventListener('focus', actualiser);
+    window.addEventListener('destiny-compte-connecte', surCompte);
+    window.addEventListener('destiny-compte-deconnecte', surCompte);
     document.addEventListener('visibilitychange', surVisibilite);
     const intervalle = window.setInterval(actualiser, FRAICHEUR_CATALOGUE);
     return () => {
@@ -126,7 +129,9 @@ export function useCatalogueSolo(): readonly SourceCarte[] {
       window.clearInterval(intervalle);
       window.removeEventListener('destiny-catalogue-solo-actualise', afficher);
       window.removeEventListener('focus', actualiser);
-          document.removeEventListener('visibilitychange', surVisibilite);
+      window.removeEventListener('destiny-compte-connecte', surCompte);
+      window.removeEventListener('destiny-compte-deconnecte', surCompte);
+      document.removeEventListener('visibilitychange', surVisibilite);
     };
   }, []);
   return catalogue;

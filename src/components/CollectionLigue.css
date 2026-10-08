@@ -36,6 +36,7 @@
 .cel-collection-type.type-icon.actif { border-color: #d8aa45; background: linear-gradient(135deg, #fffaf0, #ecdcb6); color: #3a2b10; }
 .cel-collection-type.type-icon.actif b { background: #15110c1f; }
 .cel-collection-type.type-halloween { letter-spacing: .12em; }
+.cel-collection-type.type-influencer.actif { border-color: #b97aff; background: linear-gradient(135deg, #3a155e, #150e25); color: #ead4ff; box-shadow: 0 0 14px #9146ff55; }
 .cel-collection-type.type-halloween.actif { border-color: #ff8a1c; background: linear-gradient(135deg, #26262b, #0d0d0f); color: #ff9a2e; box-shadow: 0 0 14px #ff7a0040; }
 .cel-collection-intertitre { grid-column: 1 / -1; margin: 6px 0 -4px; padding-bottom: 6px; border-bottom: 1px solid var(--bordure-forte); font: 1rem var(--police-titre); letter-spacing: .08em; text-transform: uppercase; color: var(--craie-dim); }
 .cel-collection-intertitre.speciales { color: var(--or-400); border-bottom-color: color-mix(in srgb, var(--or-400) 45%, transparent); }

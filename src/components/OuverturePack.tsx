@@ -38,7 +38,7 @@ export default function OuverturePack({ cartes, pack, modele, garantie, apparenc
   // leur couleur en boutique, puis le joueur révèle chaque palier du tirage.
   const rangInitial = Math.max(0, PALIERS_PACK.indexOf(apparenceInitiale ?? garantie ?? 'bronze'));
   const [rang, setRang] = useState(rangInitial);
-  const meilleurRang = cartes?.reduce((meilleur, carte) => Math.max(meilleur, rangPack(carte)), rangInitial) ?? rangInitial;
+  const meilleurRang = Math.min(PALIERS_PACK.length - 1, cartes?.reduce((meilleur, carte) => Math.max(meilleur, rangPack(carte)), rangInitial) ?? rangInitial);
   const prochainPalier = !modele && pret && rang < meilleurRang;
   const attenteTirage = !modele && !pret;
   // Le libellé ne doit pas annoncer une amélioration avant de toucher le pack.
@@ -60,7 +60,7 @@ export default function OuverturePack({ cartes, pack, modele, garantie, apparenc
   // ⚠️ SEULEMENT À L'OUVERTURE : avant, la pochette ne dit que son palier, sinon
   // la lueur orange trahirait la Halloween avant même qu'on touche le pack.
   const speciale = ordre.find(c => c.speciale)?.speciale?.type;
-  const eclatSpecial = speciale && (phase === 'ouverture' || phase === 'cartes') ? ` speciale-${speciale === 'halloween' ? 'halloween' : 'icon'}` : '';
+  const eclatSpecial = speciale && (phase === 'ouverture' || phase === 'cartes') ? ` speciale-${speciale === 'influencer' ? 'influencer' : speciale === 'halloween' ? 'halloween' : 'icon'}` : '';
   // La première carte spéciale tirée a droit à son explication (file du tutoriel : jamais par-dessus un autre).
   useEffect(() => { if (speciale) signaler('context.carteSpeciale'); }, [speciale]);
   useEffect(() => {

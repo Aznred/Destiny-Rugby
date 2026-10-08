@@ -34,7 +34,7 @@ import type { CarteCarriere, InfoCarteSpeciale, PackCarriere } from './typesCarr
 // ═══════════════════════════════════════════════════════════════════════════
 
 /** Ouvert : une nouvelle famille n'a besoin que de son entrée dans `FAMILLES_SPECIALES`. */
-export type TypeCarteSpeciale = 'icon' | 'halloween' | (string & {});
+export type TypeCarteSpeciale = 'icon' | 'halloween' | 'influencer' | (string & {});
 export type CardType = 'normal' | TypeCarteSpeciale;
 export type StatutCarteSpeciale = 'draft' | 'image_missing' | 'ready' | 'published';
 export const STATUTS_CARTE_SPECIALE: readonly StatutCarteSpeciale[] = ['draft', 'image_missing', 'ready', 'published'];
@@ -53,6 +53,19 @@ export interface DefinitionCarteSpeciale {
   /** La carte ordinaire du même joueur, s'il joue encore (`reel:antoine dupont`). */
   basePlayerId?: string;
   nom: string;
+  display_name?: string;
+  real_name?: string;
+  first_name?: string;
+  last_name?: string;
+  description?: string;
+  rarity?: CarteCarriere['rarete'];
+  statistiques?: Record<string, number>;
+  /** Vide = aucun pack ; absent = tous les packs éligibles. */
+  allowedPackIds?: string[];
+  market_allowed?: boolean;
+  trade_allowed?: boolean;
+  sansClub?: 'nation' | 'neutre' | 'creator';
+  niveauInfluenceur?: 'fun' | 'rare' | 'evenement';
   poste: PosteId;
   postesSecondaires?: PosteId[];
   /** Le GEN. */
@@ -152,6 +165,10 @@ export const FAMILLES_SPECIALES: Readonly<Record<string, FamilleSpeciale>> = {
     type: 'halloween', nom: 'HALLOWEEN', designId: 'halloween-citrouilles', specialLogo: 'citrouille', evenementDefaut: 'halloween-2026',
     collectifDefaut: 10, overallMin: 82, overallMax: 92, retraitesSeulement: false, clubDefaut: 'Halloween', ligueDefaut: 'Halloween',
   },
+  influencer: {
+    type: 'influencer', nom: 'INFLUENCEUR', designId: 'influencer-live', specialLogo: 'creator', evenementDefaut: 'influencers',
+    overallMin: 60, overallMax: 99, retraitesSeulement: false, clubDefaut: '', ligueDefaut: '',
+  },
 };
 
 /**
@@ -169,6 +186,10 @@ export const PACK_HALLOWEEN: PackCarriere = {
 };
 
 export const EVENEMENTS_DEPART: readonly EvenementSpecial[] = [
+  { id: 'influencers', cardType: 'influencer', nom: 'Influenceurs', actif: false, repere: 'mythique', tauxPacksNormaux: .2,
+    pack: { id: 'evenement-influencers', nom: 'Créateurs', prix: 200, cartes: 10, famille: 'general',
+      promesse: 'Dix cartes, dont une carte Influenceur garantie.',
+      probabilites: { bronze: 10, argent: 40, or: 44, elite: 5.4, star: .6 }, speciales: { influencers: 1 }, garantieSpeciale: 'influencers' } },
   { id: 'icons', cardType: 'icon', nom: 'ICONS', actif: true, repere: 'mythique', tauxPacksNormaux: .8 },
   // « De maintenant jusqu'à fin novembre » : du 5 octobre 2026 à 0 h au
   // 1er décembre 2026 à 0 h, heure de Paris.
@@ -210,6 +231,8 @@ export function infoSpeciale(def: DefinitionCarteSpeciale): InfoCarteSpeciale {
   return {
     type: def.cardType, evenement: def.specialEventId, design: def.designId, logo: def.specialLogo,
     animation: def.rarityAnimation,
+    ...(def.cardType === 'influencer' ? { sansClub: def.sansClub ?? 'nation', market_allowed: def.market_allowed ?? def.canAppearOnMarket,
+      trade_allowed: def.trade_allowed ?? true, description: def.description } : {}),
     ...(def.collectif !== undefined ? { collectif: def.collectif } : {}),
     ...(def.basePlayerId ? { base: def.basePlayerId } : {}),
     ...(def.retraite ? { retraite: true } : {}),
@@ -219,11 +242,11 @@ export function infoSpeciale(def: DefinitionCarteSpeciale): InfoCarteSpeciale {
 function sourceSpeciale(def: DefinitionCarteSpeciale, base: SourceCarte | undefined): SourceCarte {
   const famille = POSTE_PAR_ID[def.poste].famille;
   return {
-    sourceId: def.id, nom: def.nom, poste: def.poste, famille,
+    sourceId: def.id, nom: def.display_name || def.nom, poste: def.poste, famille,
     postesSecondaires: def.postesSecondaires?.length ? [...def.postesSecondaires] : undefined,
     note: def.overall, potentiel: def.overall, age: def.age, nation: def.nation, clubReel: def.club,
     championnat: def.league, pays: base?.pays ?? 'Légendes', photo: def.image, origine: 'professionnel',
-    rarete: rareteCarriere(def.overall), statistiques: statistiquesCarte(def.overall, famille, def.id),
+    rarete: def.rarity ?? rareteCarriere(def.overall), statistiques: { ...statistiquesCarte(def.overall, famille, def.id), ...def.statistiques },
     speciale: infoSpeciale(def),
   };
 }
@@ -265,12 +288,14 @@ export function fenetreCarte(def: DefinitionCarteSpeciale, ev?: EvenementSpecial
 
 /** Publiée, avec image, et sa famille est allumée. */
 export function carteSpecialePubliee(def: DefinitionCarteSpeciale, cat: CatalogueSpecial): boolean {
+  if (def.cardType === 'influencer' && cat.evenementParId.get(FAMILLES_SPECIALES.influencer.evenementDefaut)?.actif !== true) return false;
   return statutCarteSpeciale(def) === 'published' && cat.evenementParId.get(def.specialEventId)?.actif === true;
 }
 
 /** Peut sortir d'un pack à cet instant. */
 export function carteSpecialePackable(def: DefinitionCarteSpeciale, cat: CatalogueSpecial, maintenant: number): boolean {
   if (!carteSpecialePubliee(def, cat) || !def.canBePacked) return false;
+  if (def.cardType === 'influencer' && !def.canAppearInCollection) return false;
   const { du, au } = fenetreCarte(def, cat.evenementParId.get(def.specialEventId));
   return dans(maintenant, du, au);
 }
@@ -300,6 +325,7 @@ export function packEvenementOuvert(pack: Pick<PackCarriere, 'evenement'>, ligue
  */
 export function identiteJoueur(c: Pick<CarteCarriere, 'sourceId' | 'nom' | 'speciale'>): string {
   if (!c.speciale) return c.sourceId;
+  if (c.speciale.type === 'influencer') return c.sourceId;
   return c.speciale.base ?? `legende:${normaliserNom(c.nom)}`;
 }
 
@@ -347,6 +373,7 @@ export function preparerTirageSpecial(
     const candidats: SourceCarte[] = [], poids: number[] = [];
     for (const def of cat.definitions) {
       if (def.specialEventId !== ev.id || pris.has(def.id) || !carteSpecialePackable(def, cat, maintenant)) continue;
+      if (def.allowedPackIds && !def.allowedPackIds.includes(pack.id)) continue;
       const source = cat.sources.get(def.id)!;
       if (!carteDansPack(source, pack.filtre) || !(def.packWeight > 0)) continue;
       candidats.push(source); poids.push(def.packWeight);

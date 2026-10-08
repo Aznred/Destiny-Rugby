@@ -9,7 +9,7 @@ import { statistiquesCarte } from '../lib/ligue/statistiquesCarte';
 import { nomPoste, POSTES, POSTE_PAR_ID } from '../data/rugby';
 import type { PosteId } from '../types';
 import { CarteJoueurEnLigne } from './CarteJoueurEnLigne';
-import { Citrouille, EmblemeIcon } from './EmblemesSpeciaux';
+import { Citrouille, EmblemeIcon, EmblemeInfluenceur } from './EmblemesSpeciaux';
 import { Selecteur } from './Selecteur';
 import { Confirmation } from './Confirmation';
 import { Drapeau } from './Drapeau';
@@ -24,7 +24,7 @@ import './LaboCartesSpeciales.css';
 
 type CarteLabo = DefinitionCarteSpeciale & { statut: StatutCarteSpeciale; packable: boolean };
 type EvenementLabo = EvenementSpecial & { chances: { pack: string; chance: number }[] };
-interface VueLabo { revision: number; maintenant: number; familles: Record<string, FamilleSpeciale>; evenements: EvenementLabo[]; cartes: CarteLabo[]; nations: string[] }
+interface VueLabo { revision: number; maintenant: number; familles: Record<string, FamilleSpeciale>; evenements: EvenementLabo[]; cartes: CarteLabo[]; nations: string[]; packs: { id: string; nom: string }[]; clubs: string[] }
 
 async function requete<T>(chemin: string, corps?: unknown): Promise<T> {
   const r = await fetch(`/api/carriere?atelier=1${chemin}`, { method: corps ? 'POST' : 'GET', credentials: 'same-origin', cache: 'no-store',
@@ -67,13 +67,13 @@ async function preparerImage(fichier: File): Promise<string> {
 /** Une carte de ligue fictive, pour l'aperçu — exactement le rendu du jeu. */
 function carteApercu(d: CarteLabo, image?: string): CarteCarriere {
   const famille = POSTE_PAR_ID[d.poste].famille;
-  return { id: `apercu-${d.id}`, sourceId: d.id, nom: d.nom, poste: d.poste, famille, postesSecondaires: d.postesSecondaires, note: d.overall,
+  return { id: `apercu-${d.id}`, sourceId: d.id, nom: d.display_name || d.nom, poste: d.poste, famille, postesSecondaires: d.postesSecondaires, note: d.overall,
     potentiel: d.overall, age: d.age, nation: d.nation, clubReel: d.club, championnat: d.league, pays: '', photo: image ?? d.image,
-    origine: 'professionnel', rarete: rareteCarriere(d.overall) as RareteCarriere, statistiques: statistiquesCarte(d.overall, famille, d.id),
+    origine: 'professionnel', rarete: d.rarity ?? rareteCarriere(d.overall) as RareteCarriere, statistiques: { ...statistiquesCarte(d.overall, famille, d.id), ...d.statistiques },
     proprietaire: null, fatigue: 0, matchs: 0, essais: 0, clubs: [], speciale: infoSpeciale(d) };
 }
 
-const EmblemeType = ({ type, taille = 18 }: { type: string; taille?: number }) => (type === 'halloween' ? <Citrouille taille={taille} /> : <EmblemeIcon taille={taille} />);
+const EmblemeType = ({ type, taille = 18 }: { type: string; taille?: number }) => (type === 'influencer' ? <EmblemeInfluenceur taille={taille} /> : type === 'halloween' ? <Citrouille taille={taille} /> : <EmblemeIcon taille={taille} />);
 
 export function LaboCartesSpeciales() {
   const [vue, setVue] = useState<VueLabo | null>(null);
@@ -111,7 +111,7 @@ export function LaboCartesSpeciales() {
   const filtrees = useMemo(() => {
     const n = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
     return (vue?.cartes ?? []).filter(c => (!type || c.cardType === type) && (!statut || c.statut === statut)
-      && (!recherche || n(`${c.nom} ${c.nation} ${c.club}`).includes(n(recherche))));
+      && (!recherche || n(`${c.nom} ${c.display_name ?? ''} ${c.real_name ?? ''} ${c.nation} ${c.club}`).includes(n(recherche))));
   }, [vue, type, statut, recherche]);
   const compte = (s: StatutCarteSpeciale) => (vue?.cartes ?? []).filter(c => (!type || c.cardType === type) && c.statut === s).length;
   const pretes = filtrees.filter(c => c.statut === 'ready');
@@ -120,6 +120,7 @@ export function LaboCartesSpeciales() {
 
   return <section className="labo-speciales">
     <nav className="ls-panneaux" aria-label="Cartes spéciales">
+      <button type="button" className={type === 'influencer' && panneau === 'cartes' ? 'actif' : ''} onClick={() => { setPanneau('cartes'); setType('influencer'); setStatut(''); }}><EmblemeInfluenceur taille={18} /> Influenceurs</button>
       {([['cartes', `Cartes (${vue.cartes.length})`], ['evenements', 'Familles & packs'], ['creation', 'Nouvelle carte'], ['import', 'Import en masse']] as const).map(([id, libelle]) =>
         <button key={id} type="button" className={panneau === id ? 'actif' : ''} aria-pressed={panneau === id} onClick={() => setPanneau(id)}>{libelle}</button>)}
     </nav>
@@ -127,20 +128,21 @@ export function LaboCartesSpeciales() {
     {message && <p role="status" className="ak-succes">{message}</p>}
 
     {panneau === 'evenements' && <div className="ls-evenements">{vue.evenements.map(ev => <EditeurEvenement key={ev.id} ev={ev} occupe={occupe} operer={operer} />)}</div>}
-    {panneau === 'creation' && <CreationCarte vue={vue} occupe={occupe} operer={async (champs) => {
+    {panneau === 'creation' && <CreationCarte typeInitial={type || 'icon'} vue={vue} occupe={occupe} operer={async (champs) => {
       const r = await operer('creerCarteSpeciale', { carte: champs }, 'Carte créée. Ajoute son image avant de la publier.');
       if (r?.id) { setPanneau('cartes'); setSelection(String(r.id)); }
     }} />}
     {panneau === 'import' && <ImportCartes occupe={occupe} operer={operer} />}
 
     {panneau === 'cartes' && <>
+      {type === 'influencer' && <div className="ls-influenceurs-entete"><h3>Cartes Influenceurs</h3><p>Identité publique, club partenaire, collectif et disponibilité. La famille est désactivée au départ ; son activation se règle dans « Familles & packs ».</p><button type="button" className="btn primaire" onClick={() => setPanneau('creation')}>Créer un Influenceur</button></div>}
       <div className="ls-compteurs">
         {(['draft', 'image_missing', 'ready', 'published'] as const).map(s => <button key={s} type="button" className={`ls-compteur statut-${s}${statut === s ? ' actif' : ''}`} aria-pressed={statut === s} onClick={() => setStatut(statut === s ? '' : s)}>
           <b>{compte(s)}</b><span>{LIBELLES_STATUT[s]}</span></button>)}
       </div>
       <div className="ls-filtres">
         <div className="ls-types" role="group" aria-label="Famille">
-          {[['', 'Toutes'], ['icon', 'ICONS'], ['halloween', 'HALLOWEEN']].map(([valeur, libelle]) => <button key={valeur} type="button" className={type === valeur ? 'actif' : ''} aria-pressed={type === valeur} onClick={() => setType(valeur)}>{valeur && <EmblemeType type={valeur} />}{libelle}</button>)}
+          {[['', 'Toutes'], ...Object.values(vue.familles).map(f => [f.type, f.nom])].map(([valeur, libelle]) => <button key={valeur} type="button" className={type === valeur ? 'actif' : ''} aria-pressed={type === valeur} onClick={() => setType(valeur)}>{valeur && <EmblemeType type={valeur} />}{libelle}</button>)}
         </div>
         <label className="ls-recherche">Rechercher<input type="search" value={recherche} placeholder="Nom, nation, club" onChange={e => setRecherche(e.target.value)} /></label>
       </div>
@@ -157,7 +159,7 @@ export function LaboCartesSpeciales() {
             <input type="checkbox" aria-label={`Sélectionner ${c.nom}`} checked={cochees.has(c.id)} onChange={() => setCochees(courantes => { const n = new Set(courantes); if (n.has(c.id)) n.delete(c.id); else n.add(c.id); return n; })} />
             <button type="button" onClick={() => setSelection(c.id)}>
               <span className="ls-vignette">{c.image ? <img src={c.image} alt="" loading="lazy" /> : <EmblemeType type={c.cardType} taille={26} />}</span>
-              <span className="ls-identite"><b>{c.nom}</b><small><Drapeau nation={c.nation} taille={.8} /> {c.nation} · n° {numeros(c)}{c.lot ? ` · ${c.lot}` : ''}</small></span>
+              <span className="ls-identite"><b>{c.display_name || c.nom}</b><small><Drapeau nation={c.nation} taille={.8} /> {c.nation} · {c.club || 'Sans club'} · n° {numeros(c)}{c.lot ? ` · ${c.lot}` : ''}</small></span>
               <span className="ls-gen"><b>{c.overall}</b><small>COL {c.collectif ?? 'auto'}</small></span>
               <span className={`ls-statut statut-${c.statut}`}>{LIBELLES_STATUT[c.statut]}{c.packable ? ' · en packs' : ''}</span>
             </button>
@@ -187,6 +189,9 @@ function EditeurCarte({ carte, vue, occupe, operer, supprimer }: { carte: CarteL
     nation: c.nation, club: c.club, league: c.league, packWeight: c.packWeight, availableFrom: c.availableFrom ?? '', availableUntil: c.availableUntil ?? '',
     canBePacked: c.canBePacked, canAppearInCollection: c.canAppearInCollection, canAppearOnMarket: c.canAppearOnMarket,
     brouillon: Boolean(c.brouillon), published: c.published, rarityAnimation: c.rarityAnimation,
+    ...(c.cardType === 'influencer' ? { display_name: c.display_name ?? '', real_name: c.real_name ?? '', first_name: c.first_name ?? '', last_name: c.last_name ?? '',
+      description: c.description ?? '', rarity: c.rarity ?? null, statistiques: c.statistiques ?? null, allowedPackIds: c.allowedPackIds ?? null,
+      market_allowed: c.market_allowed ?? c.canAppearOnMarket, trade_allowed: c.trade_allowed ?? true, sansClub: c.sansClub ?? 'nation', niveauInfluenceur: c.niveauInfluenceur ?? 'rare' } : {}),
   } }, `${c.nom} enregistrée.`);
   const choisirImage = async (e: ChangeEvent<HTMLInputElement>) => {
     const fichier = e.target.files?.[0]; e.target.value = '';
@@ -208,33 +213,46 @@ function EditeurCarte({ carte, vue, occupe, operer, supprimer }: { carte: CarteL
             <label>Nom<input required maxLength={60} value={c.nom} onChange={e => maj('nom', e.target.value)} /></label>
             <label>GEN ({famille?.overallMin ?? 20}-{famille?.overallMax ?? 99})<input required type="number" min={famille?.overallMin ?? 20} max={famille?.overallMax ?? 99} value={c.overall} onChange={e => maj('overall', Number(e.target.value))} /></label>
           </div>
+          {c.cardType === 'influencer' && <>
+            <div className="ak-champs"><label>Prénom<input maxLength={80} value={c.first_name ?? ''} onChange={e => maj('first_name', e.target.value)} /></label><label>Nom de famille<input maxLength={80} value={c.last_name ?? ''} onChange={e => maj('last_name', e.target.value)} /></label></div>
+            <div className="ak-champs"><label>Pseudo / nom affiché<input maxLength={60} value={c.display_name ?? ''} onChange={e => maj('display_name', e.target.value)} /></label><label>Nom réel (facultatif)<input maxLength={80} value={c.real_name ?? ''} onChange={e => maj('real_name', e.target.value)} /></label></div>
+            <label>Description<textarea maxLength={1000} value={c.description ?? ''} onChange={e => maj('description', e.target.value)} /></label>
+            <div className="ak-champs"><label>Rareté<select value={c.rarity ?? ''} onChange={e => maj('rarity', e.target.value as RareteCarriere || undefined)}><option value="">Selon le GEN</option>{(['bronze', 'argent', 'or', 'elite', 'star'] as const).map(r => <option key={r} value={r}>{r}</option>)}</select></label>
+              <label>Niveau<select value={c.niveauInfluenceur ?? 'rare'} onChange={e => maj('niveauInfluenceur', e.target.value as CarteLabo['niveauInfluenceur'])}><option value="fun">Fun</option><option value="rare">Très rare</option><option value="evenement">Événement / partenariat</option></select></label></div>
+            <label>Collectif sans club<select value={c.sansClub ?? 'nation'} onChange={e => maj('sansClub', e.target.value as CarteLabo['sansClub'])}><option value="nation">Liens de nation uniquement</option><option value="neutre">Neutre : aucun lien automatique</option><option value="creator">Groupe Creator + nation</option></select></label>
+            <p className="ak-note">Avec un club associé, les liens de club et de nation fonctionnent comme pour les joueurs de ce club.</p>
+            <details><summary>Stats personnalisées (20–99)</summary><div className="ak-poids">{Object.entries(apercu.statistiques).map(([k, v]) => <label key={k}>{k}<input type="number" min={20} max={99} value={c.statistiques?.[k] ?? ''} placeholder={String(v)} onChange={e => { const stats = { ...c.statistiques }; if (e.target.value === '') delete stats[k]; else stats[k] = Number(e.target.value); maj('statistiques', stats); }} /></label>)}</div></details>
+            <details><summary>Packs autorisés</summary><label className="ls-bascule"><input type="checkbox" checked={c.allowedPackIds === undefined} onChange={e => maj('allowedPackIds', e.target.checked ? undefined : [])} /><span>Tous les packs éligibles</span></label>
+              {c.allowedPackIds !== undefined && <div className="ls-packs-autorises">{vue.packs.map(p => <label key={p.id}><input type="checkbox" checked={c.allowedPackIds!.includes(p.id)} onChange={e => maj('allowedPackIds', e.target.checked ? [...c.allowedPackIds!, p.id] : c.allowedPackIds!.filter(id => id !== p.id))} />{p.nom}</label>)}</div>}<p className="ak-note">Sans pack coché, la carte ne sort jamais. Le poids règle sa fréquence parmi les cartes de l’événement ; le taux de la famille se règle dans « Familles & packs ».</p></details>
+            <div className="ls-bascules"><label className="ls-bascule"><input type="checkbox" checked={c.market_allowed ?? c.canAppearOnMarket} onChange={e => { maj('market_allowed', e.target.checked); maj('canAppearOnMarket', e.target.checked); }} /><span>Vente autorisée</span></label><label className="ls-bascule"><input type="checkbox" checked={c.trade_allowed ?? true} onChange={e => maj('trade_allowed', e.target.checked)} /><span>Échange autorisé</span></label></div>
+          </>}
           <div className="ak-champs">
             <label>COL (collectif garanti, vide = calculé)<input type="number" min={0} max={10} value={c.collectif ?? ''} onChange={e => maj('collectif', e.target.value === '' ? undefined : Number(e.target.value))} /></label>
             <label>Poids dans les packs<input type="number" min={0} max={100} step=".1" value={c.packWeight} onChange={e => maj('packWeight', Number(e.target.value))} /></label>
           </div>
           <div className="ak-champs">
             <div className="ls-champ"><span>Poste</span><Selecteur valeur={c.poste} onChange={v => maj('poste', v as PosteId)} options={POSTES.map(p => ({ valeur: p.id, label: `${p.numero} · ${p.nom}` }))} /></div>
-            <div className="ls-champ"><span>Nation</span><Selecteur valeur={c.nation} recherche onChange={v => maj('nation', v)} options={vue.nations.map(n => ({ valeur: n, label: n, vignette: <Drapeau nation={n} taille={.9} /> }))} /></div>
+            <div className="ls-champ"><span>Nation</span><Selecteur valeur={c.nation} recherche onChange={v => maj('nation', v)} options={[...(c.cardType === 'influencer' ? [{ valeur: '', label: 'Sans nation' }] : []), ...vue.nations.map(n => ({ valeur: n, label: n, vignette: <Drapeau nation={n} taille={.9} /> }))]} /></div>
           </div>
           <div className="ls-champ"><span>Postes secondaires</span><div className="ls-postes">{POSTES.filter(p => p.id !== c.poste).map(p => {
             const actif = (c.postesSecondaires ?? []).includes(p.id);
             return <button key={p.id} type="button" className={actif ? 'actif' : ''} aria-pressed={actif} title={nomPoste(p.id)} onClick={() => maj('postesSecondaires', actif ? (c.postesSecondaires ?? []).filter(x => x !== p.id) : [...(c.postesSecondaires ?? []), p.id])}>{p.numero}</button>;
           })}</div></div>
           <div className="ak-champs">
-            <label>Club{c.retraite ? '' : ' (joueur actif)'}<input maxLength={100} value={c.club} onChange={e => maj('club', e.target.value)} /></label>
+            <label>{c.cardType === 'influencer' ? 'Club associé (facultatif)' : `Club${c.retraite ? '' : ' (joueur actif)'}`}<input list={`clubs-${c.id}`} maxLength={100} value={c.club} onChange={e => maj('club', e.target.value)} /><datalist id={`clubs-${c.id}`}>{vue.clubs.map(club => <option key={club} value={club} />)}</datalist></label>
             <label>Ligue (non affichée sur la carte)<input maxLength={100} value={c.league} onChange={e => maj('league', e.target.value)} /></label>
           </div>
           <div className="ak-champs">
             <label>Disponible à partir du<input type="datetime-local" value={versLocal(c.availableFrom)} onChange={e => maj('availableFrom', depuisLocal(e.target.value) || undefined)} /></label>
             <label>Jusqu’au<input type="datetime-local" value={versLocal(c.availableUntil)} onChange={e => maj('availableUntil', depuisLocal(e.target.value) || undefined)} /></label>
           </div>
-          <p className="ak-note">Sans dates propres, la carte suit celles de son événement. {c.basePlayerId ? `Rattachée au joueur actif ${c.basePlayerId}.` : 'Joueur retraité.'}</p>
+          <p className="ak-note">Sans dates propres, la carte suit celles de son événement. {c.cardType === 'influencer' ? 'Carte créateur jouable, disponible à nouveau dès que ses dates et sa famille le permettent.' : c.basePlayerId ? `Rattachée au joueur actif ${c.basePlayerId}.` : 'Joueur retraité.'}</p>
           <div className="ls-bascules">
-            {([['published', 'Publiée'], ['canBePacked', 'Dans les packs'], ['canAppearInCollection', 'Dans la collection'], ['canAppearOnMarket', 'Sur le marché'], ['brouillon', 'Brouillon']] as const).map(([cle, libelle]) =>
+            {([['published', 'Publiée'], ['canBePacked', 'Dans les packs'], ['canAppearInCollection', 'Visible'], ['canAppearOnMarket', 'Sur le marché'], ['brouillon', 'Brouillon']] as const).filter(([cle]) => c.cardType !== 'influencer' || cle !== 'canAppearOnMarket').map(([cle, libelle]) =>
               <label key={cle} className={`ls-bascule${cle === 'published' && !c.imageReady ? ' bloquee' : ''}`}><input type="checkbox" checked={Boolean(c[cle])} disabled={cle === 'published' && !c.imageReady && !c.published} onChange={e => maj(cle, e.target.checked)} /><span>{libelle}</span></label>)}
           </div>
           {!c.imageReady && <p className="ak-note ls-alerte">Pas d’image : la carte ne peut ni être publiée, ni sortir d’un pack, ni apparaître en collection.</p>}
-          <div className="ls-champ"><span>Animation d’ouverture</span><Selecteur valeur={c.rarityAnimation} onChange={v => maj('rarityAnimation', v as CarteLabo['rarityAnimation'])} options={[{ valeur: 'mythique', label: 'Mythique (premium)' }, { valeur: 'elite', label: 'Élite' }, { valeur: 'or', label: 'Or' }]} /></div>
+          <div className="ls-champ"><span>Animation d’ouverture</span><Selecteur valeur={c.rarityAnimation} onChange={v => maj('rarityAnimation', v as CarteLabo['rarityAnimation'])} options={[{ valeur: 'influenceur', label: 'Influenceur · violet / rouge LIVE' }, { valeur: 'mythique', label: 'Mythique (premium)' }, { valeur: 'elite', label: 'Élite' }, { valeur: 'or', label: 'Or' }]} /></div>
           <div className="ls-actions">
             <button className="btn primaire" type="submit">{occupe ? 'Enregistrement…' : 'Enregistrer la carte'}</button>
             <button type="button" className="btn ak-supprimer" onClick={supprimer}>Retirer du catalogue</button>
@@ -259,6 +277,7 @@ function EditeurEvenement({ ev, occupe, operer }: { ev: EvenementLabo; occupe: b
   const [e, setE] = useState(ev);
   useEffect(() => setE(ev), [ev]);
   const pack = e.pack;
+  const familleNom = e.cardType === 'influencer' ? 'Influenceurs' : e.cardType === 'icon' ? 'ICONS' : 'Halloween';
   const total = pack ? Object.values(pack.probabilites).reduce((a, b) => a + b, 0) : 100;
   const enregistrer = () => operer('evenementSpecial', { id: e.id, evenement: {
     nom: e.nom, availableFrom: e.availableFrom ?? '', availableUntil: e.availableUntil ?? '', tauxPacksNormaux: e.tauxPacksNormaux, repere: e.repere,
@@ -272,7 +291,7 @@ function EditeurEvenement({ ev, occupe, operer }: { ev: EvenementLabo; occupe: b
         <div><span className="eyebrow">{e.cardType === 'icon' ? 'Légendes retraitées · toute l’année' : 'Événement limité'}</span><h3>{e.nom}</h3>
           <small>{ev.availableFrom || ev.availableUntil ? `Du ${dateCourte(ev.availableFrom) || '…'} au ${dateCourte(ev.availableUntil ? new Date(Date.parse(ev.availableUntil) - 1).toISOString() : undefined) || '…'}` : 'Sans date de fin'}</small></div>
         <button type="button" className={`ls-interrupteur${ev.actif ? ' actif' : ''}`} aria-pressed={ev.actif} onClick={() => { void operer('evenementSpecial', { id: e.id, evenement: { actif: !ev.actif } }, ev.actif ? `${e.nom} désactivé : plus aucune carte ne sort.` : `${e.nom} activé.`); }}>
-          <i />{ev.actif ? `${e.cardType === 'icon' ? 'ICONS' : 'Halloween'} activé` : `Activer ${e.cardType === 'icon' ? 'ICONS' : 'Halloween'}`}
+          <i />{ev.actif ? `${familleNom} activé` : `Activer ${familleNom}`}
         </button>
       </header>
       <div className="ak-champs">
@@ -293,11 +312,11 @@ function EditeurEvenement({ ev, occupe, operer }: { ev: EvenementLabo; occupe: b
         <label>Promesse<textarea maxLength={180} value={pack.promesse ?? ''} onChange={x => majPack({ promesse: x.target.value })} /></label>
         <div className="ak-champs">
           <label>Cartes par pack<input required type="number" min={1} max={20} value={pack.cartes} onChange={x => majPack({ cartes: Number(x.target.value) })} /></label>
-          <label>Chance {e.cardType === 'icon' ? 'ICON' : 'Halloween'} par carte (%)<input type="number" min={0} max={100} step=".1" value={pack.speciales?.[e.id] ?? 0} onChange={x => majPack({ speciales: { ...(pack.speciales ?? {}), [e.id]: Number(x.target.value) } })} /></label>
+          <label>Chance {familleNom} par carte (%)<input type="number" min={0} max={100} step=".1" value={pack.speciales?.[e.id] ?? 0} onChange={x => majPack({ speciales: { ...(pack.speciales ?? {}), [e.id]: Number(x.target.value) } })} /></label>
         </div>
         <div className="ak-poids">{(['bronze', 'argent', 'or', 'elite', 'star'] as const).map(r => <label key={r}>{r}<input required type="number" min={0} max={100} step=".01" value={pack.probabilites[r]} onChange={x => majPack({ probabilites: { ...pack.probabilites, [r]: Number(x.target.value) } })} /></label>)}</div>
         <p className={Math.abs(total - 100) > .001 ? 'ak-erreur' : 'ak-note'}>Bandes ordinaires : {Number(total.toFixed(2))} % (doit faire 100 %).</p>
-        <label className="ls-bascule"><input type="checkbox" checked={pack.garantieSpeciale === e.id} onChange={x => majPack({ garantieSpeciale: x.target.checked ? e.id : undefined })} /><span>Une carte {e.cardType === 'icon' ? 'ICON' : 'Halloween'} garantie par pack</span></label>
+        <label className="ls-bascule"><input type="checkbox" checked={pack.garantieSpeciale === e.id} onChange={x => majPack({ garantieSpeciale: x.target.checked ? e.id : undefined })} /><span>Une carte {familleNom} garantie par pack</span></label>
       </div>}
       <div className="ls-actions"><button className="btn primaire" disabled={Boolean(pack) && Math.abs(total - 100) > .001}>Enregistrer {e.nom}</button></div>
       <p className="ak-note">Le pack se vend dans la boutique de packs spéciaux de la Collection solo, jamais dans les ligues ; ses cartes peuvent aussi sortir des packs ordinaires des ligues qui les autorisent. Fin de l’événement : le pack quitte la boutique, ses cartes ne sortent plus d’aucun pack, celles déjà obtenues restent.</p>
@@ -305,11 +324,11 @@ function EditeurEvenement({ ev, occupe, operer }: { ev: EvenementLabo; occupe: b
   </form>;
 }
 
-function CreationCarte({ vue, occupe, operer }: { vue: VueLabo; occupe: boolean; operer: (champs: Record<string, unknown>) => Promise<void> }) {
-  const [champs, setChamps] = useState({ cardType: 'icon', specialEventId: 'icons', nom: '', poste: 'demi_ouverture', nation: 'France', overall: 90, lot: '' });
+function CreationCarte({ typeInitial, vue, occupe, operer }: { typeInitial: string; vue: VueLabo; occupe: boolean; operer: (champs: Record<string, unknown>) => Promise<void> }) {
+  const [champs, setChamps] = useState({ cardType: typeInitial, specialEventId: vue.familles[typeInitial]?.evenementDefaut ?? 'icons', nom: '', poste: 'demi_ouverture', nation: 'France', overall: 85, lot: '', display_name: '', first_name: '', last_name: '', club: '' });
   const evenements = vue.evenements.filter(ev => ev.cardType === champs.cardType);
   const famille = vue.familles[champs.cardType];
-  return <form className="ls-creation" onSubmit={e => { e.preventDefault(); void operer({ ...champs, lot: champs.lot || undefined }); }}>
+  return <form className="ls-creation" onSubmit={e => { e.preventDefault(); void operer({ ...champs, real_name: `${champs.first_name} ${champs.last_name}`.trim(), lot: champs.lot || undefined }); }}>
     <fieldset disabled={occupe}>
       <legend>Ajouter une carte spéciale</legend>
       <div className="ak-champs">
@@ -317,15 +336,16 @@ function CreationCarte({ vue, occupe, operer }: { vue: VueLabo; occupe: boolean;
         <div className="ls-champ"><span>Événement</span><Selecteur valeur={champs.specialEventId} onChange={v => setChamps({ ...champs, specialEventId: v })} options={evenements.map(ev => ({ valeur: ev.id, label: ev.nom }))} /></div>
       </div>
       <div className="ak-champs">
-        <label>Nom complet<input required maxLength={60} value={champs.nom} onChange={e => setChamps({ ...champs, nom: e.target.value })} /></label>
+        <label>{champs.cardType === 'influencer' ? 'Nom de carte / pseudo' : 'Nom complet'}<input required maxLength={60} value={champs.nom} onChange={e => setChamps({ ...champs, nom: e.target.value, ...(champs.cardType === 'influencer' ? { display_name: e.target.value } : {}) })} /></label>
         <label>GEN ({famille?.overallMin}-{famille?.overallMax})<input required type="number" min={famille?.overallMin} max={famille?.overallMax} value={champs.overall} onChange={e => setChamps({ ...champs, overall: Number(e.target.value) })} /></label>
       </div>
       <div className="ak-champs">
         <div className="ls-champ"><span>Poste</span><Selecteur valeur={champs.poste} onChange={v => setChamps({ ...champs, poste: v })} options={POSTES.map(p => ({ valeur: p.id, label: `${p.numero} · ${p.nom}` }))} /></div>
-        <div className="ls-champ"><span>Nation</span><Selecteur valeur={champs.nation} recherche onChange={v => setChamps({ ...champs, nation: v })} options={vue.nations.map(n => ({ valeur: n, label: n, vignette: <Drapeau nation={n} taille={.9} /> }))} /></div>
+        <div className="ls-champ"><span>Nation</span><Selecteur valeur={champs.nation} recherche onChange={v => setChamps({ ...champs, nation: v })} options={[...(champs.cardType === 'influencer' ? [{ valeur: '', label: 'Sans nation' }] : []), ...vue.nations.map(n => ({ valeur: n, label: n, vignette: <Drapeau nation={n} taille={.9} /> }))]} /></div>
       </div>
+      {champs.cardType === 'influencer' && <><div className="ak-champs"><label>Prénom<input maxLength={80} value={champs.first_name} onChange={e => setChamps({ ...champs, first_name: e.target.value })} /></label><label>Nom de famille<input maxLength={80} value={champs.last_name} onChange={e => setChamps({ ...champs, last_name: e.target.value })} /></label></div><label>Club associé (facultatif)<input list="clubs-creation-influenceur" maxLength={100} value={champs.club} onChange={e => setChamps({ ...champs, club: e.target.value })} /><datalist id="clubs-creation-influenceur">{vue.clubs.map(club => <option key={club} value={club} />)}</datalist></label></>}
       <label>Lot (facultatif, ex. « Équipe Halloween · XV de départ »)<input maxLength={80} value={champs.lot} onChange={e => setChamps({ ...champs, lot: e.target.value })} /></label>
-      <p className="ak-note">{famille?.retraitesSeulement ? 'Une ICON est un joueur retraité.' : 'Une Halloween peut être un joueur actif ou retraité.'} La carte naît en « image manquante » : elle ne sortira nulle part avant son image et sa publication.</p>
+      <p className="ak-note">{champs.cardType === 'influencer' ? 'Une carte Influenceur naît en brouillon. Son collectif suit son club et sa nation ; son GEN reste entre 60 et 99.' : famille?.retraitesSeulement ? 'Une ICON est un joueur retraité.' : 'Une Halloween peut être un joueur actif ou retraité.'} Elle ne sortira nulle part avant son image, sa publication et l’activation de sa famille.</p>
       <button className="btn primaire" disabled={!champs.nom.trim() || !champs.specialEventId}>Créer la carte</button>
     </fieldset>
   </form>;
@@ -346,7 +366,7 @@ function ImportCartes({ occupe, operer }: { occupe: boolean; operer: Operer }) {
     return brut.split(/\r?\n/).map(l => l.trim()).filter(l => l && !/^famille\s*;/i.test(l)).map(l => {
       const [famille, nom, postes, nation, gen, col, club, ligue, poids, evenement] = l.split(';').map(x => x.trim());
       const { poste, postesSecondaires } = postesDepuisNumeros(postes || '10');
-      return { cardType: famille.toLowerCase().startsWith('h') ? 'halloween' : 'icon', nom, poste, postesSecondaires, nation, overall: Number(gen),
+      return { cardType: famille.toLowerCase().startsWith('influ') ? 'influencer' : famille.toLowerCase().startsWith('h') ? 'halloween' : 'icon', nom, poste, postesSecondaires, nation, overall: Number(gen),
         ...(col ? { collectif: Number(col) } : {}), ...(club ? { club } : {}), ...(ligue ? { league: ligue } : {}), ...(poids ? { packWeight: Number(poids) } : {}),
         ...(evenement ? { specialEventId: evenement } : {}) };
     });

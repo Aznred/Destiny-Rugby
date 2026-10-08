@@ -119,6 +119,31 @@ function ArtHalloween({ id }: { id: string }) {
   </svg>;
 }
 
+function ArtInfluenceur({ id }: { id: string }) {
+  return <svg className="dr-player-art" viewBox="0 0 240 360" aria-hidden="true">
+    <defs>
+      <linearGradient id={`${id}-live`} x1="0" y1="0" x2="1" y2="1"><stop stopColor="#6227b9" /><stop offset=".4" stopColor="#21113f" /><stop offset="1" stopColor="#080711" /></linearGradient>
+      <linearGradient id={`${id}-neon`} x1="0" y1="0" x2="1" y2="1"><stop stopColor="#e2c0ff" /><stop offset=".35" stopColor="#a669ff" /><stop offset=".7" stopColor="#ff314e" /><stop offset="1" stopColor="#cba4ff" /></linearGradient>
+      <pattern id={`${id}-scan`} width="6" height="6" patternUnits="userSpaceOnUse"><path d="M0 1 H6" stroke="#b878ff" strokeWidth=".5" opacity=".2" /></pattern>
+      <clipPath id={`${id}-clip`}><path d={SILHOUETTE} /></clipPath>
+    </defs>
+    <path d={SILHOUETTE} fill={`url(#${id}-live)`} />
+    <g clipPath={`url(#${id}-clip)`}>
+      <rect width="240" height="360" fill={`url(#${id}-scan)`} />
+      <path d="M-35 238 L217 -14 H252 L-3 278Z" fill="#9146ff" opacity=".22" />
+      <path d="M145 -15 L240 95 M132 -15 L240 108 M170 130 L260 220" stroke="#ff314e" strokeWidth="3" opacity=".5" />
+      <g stroke="#ba83ff" fill="none" opacity=".5"><path d="M83 48 H151 M83 48 V73 M192 151 V185 H168" strokeWidth="1.5" /><rect x="156" y="67" width="48" height="30" rx="7" /><path d="M175 76 L188 82 L175 89Z" fill="#ba83ff" /></g>
+      <g fill="#f4deff"><circle cx="108" cy="71" r="2" /><circle cx="206" cy="116" r="2" /><path d="M159 30 h7 M162.5 26.5 v7" stroke="#f4deff" /></g>
+      <rect x="159" y="42" width="47" height="16" rx="4" fill="#ff314e" /><circle cx="166" cy="50" r="2" fill="#fff" /><text x="173" y="53" fill="#fff" fontSize="8" fontWeight="800" letterSpacing="1">LIVE</text>
+      <path d="M8 213 Q120 238 232 213 L240 365 H0Z" fill="#0b0819" opacity=".95" />
+      <path d="M8 213 Q120 238 232 213 M44 276 H196" stroke={`url(#${id}-neon)`} strokeWidth="2" fill="none" />
+      <path d="M23 285 V307 H42 M217 285 V307 H198" stroke="#ff314e" strokeWidth="1.5" fill="none" />
+    </g>
+    <path d={SILHOUETTE} fill="none" stroke={`url(#${id}-neon)`} strokeWidth="4" />
+    <path d={SILHOUETTE} transform="translate(8 11) scale(.933 .94)" stroke="#c899ff" strokeWidth="1" fill="none" opacity=".6" />
+  </svg>;
+}
+
 export function CarteJoueurEnLigne({ carte, proprietaire, logoClub, onClick, compacte = false, etatCollection }: {
   carte: CarteCarriere; proprietaire?: string; logoClub?: string; onClick?: () => void; compacte?: boolean; etatCollection?: 'inconnue' | 'decouverte';
 }) {
@@ -134,7 +159,7 @@ export function CarteJoueurEnLigne({ carte, proprietaire, logoClub, onClick, com
   const photo = [carte.photo, photoIndexee].find((candidate) => candidate && !photosRatees.has(candidate));
   const [clair, couleur, sombre, bord] = PALETTES[carte.rarete];
   const speciale = carte.speciale;
-  const design = speciale?.type === 'halloween' ? 'halloween' : speciale ? 'icon' : null;
+  const design = speciale?.type === 'influencer' ? 'influencer' : speciale?.type === 'halloween' ? 'halloween' : speciale ? 'icon' : null;
   const stats = Object.entries(carte.statistiques).slice(0, 6);
   const Balise = onClick ? 'button' : 'div';
   const poste = nomPoste(carte.poste).replace(/\s*\(\d+\)\s*$/, '');
@@ -143,7 +168,7 @@ export function CarteJoueurEnLigne({ carte, proprietaire, logoClub, onClick, com
     .map((p) => ({ numero: POSTE_PAR_ID[p]?.numero, nom: nomPoste(p).replace(/\s*\(\d+\)\s*$/, '') }))
     .filter((p) => p.numero !== undefined);
   return <Balise type={onClick ? 'button' : undefined} className={`cel-carte dr-player ${carte.rarete}${design ? ` speciale design-${design}` : ''}${compacte ? ' compacte' : ''}${etatCollection ? ` collection-${etatCollection}` : ''}`} onClick={onClick}>
-    {design === 'icon' ? <ArtIcon id={id} /> : design === 'halloween' ? <ArtHalloween id={id} /> : <svg className="dr-player-art" viewBox="0 0 240 360" aria-hidden="true">
+    {design === 'influencer' ? <ArtInfluenceur id={id} /> : design === 'icon' ? <ArtIcon id={id} /> : design === 'halloween' ? <ArtHalloween id={id} /> : <svg className="dr-player-art" viewBox="0 0 240 360" aria-hidden="true">
       <defs>
         <linearGradient id={`${id}-metal`} x1="0" y1="0" x2="1" y2="1"><stop stopColor={clair} /><stop offset=".38" stopColor={couleur} /><stop offset=".78" stopColor={sombre} /><stop offset="1" stopColor={couleur} /></linearGradient>
         <clipPath id={`${id}-clip`}><path d={SILHOUETTE} /></clipPath>
@@ -170,7 +195,7 @@ export function CarteJoueurEnLigne({ carte, proprietaire, logoClub, onClick, com
       speciale ? <>{!speciale.retraite && blason && <EcussonClub logo={blason} nom={carte.clubReel} taille={25} />}<span className="dr-player-embleme" title={nomFamilleSpeciale(speciale.type)}><EmblemeSpecial logo={speciale.logo} /></span></>
       : <>{blason ? <EcussonClub logo={blason} nom={carte.clubReel} taille={25} /> : <span className="dr-player-blason-fallback"><Blason club={clubParNom(carte.clubReel) ?? { nom: carte.clubReel, c1: '#0a2a6b', c2: '#c1121f' }} taille={25} /></span>}{competition && <img className="dr-player-compet" src={competition} alt="" title={carte.championnat} loading="lazy" decoding="async" draggable={false} />}</>}</span>
     <span className="dr-player-photo">{photo ? <img draggable={false} src={photo} alt="" loading="lazy" onError={() => setPhotosRatees((ratees) => new Set(ratees).add(photo))} /> : <img draggable={false} src={SANS_PHOTO} alt={t('online.card.defaultPortrait')} />}</span>
-    <span className="dr-player-identity"><strong>{carte.nom}</strong><small>{speciale?.retraite ? carte.nation : carte.clubReel}</small></span>
+    <span className="dr-player-identity"><strong>{carte.nom}</strong><small>{speciale?.retraite ? carte.nation : carte.clubReel || (speciale?.type === 'influencer' ? 'Creator / Influencer' : '')}</small></span>
     <span className="dr-player-stats">{stats.map(([cle, valeur]) => <span key={cle}><b>{valeur}</b><small>{cle}</small></span>)}</span>
     {speciale
       ? <span className="dr-player-rarity dr-player-famille">{nomFamilleSpeciale(speciale.type)}<i> · {speciale.retraite ? t('special.legend') : `${carte.age} ${t('compo.ans')}`}</i></span>

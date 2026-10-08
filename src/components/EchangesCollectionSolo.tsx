@@ -89,6 +89,7 @@ export function EchangesCollectionSolo() {
 
   // Les doublons PROPOSABLES : possédés en double, une fois retirés ceux déjà promis ailleurs.
   const doublons = useMemo(() => catalogue
+    .filter(c => c.speciale?.trade_allowed !== false)
     .filter(c => { const cle = cleCarteSolo(c.sourceId); return (collection.quantites[cle] ?? 0) - (engagees[cle] ?? 0) > 1; })
     .sort((a, b) => b.note - a.note || a.nom.localeCompare(b.nom, 'fr')), [catalogue, collection.quantites, engagees]);
   const cartesDoublons = useMemo(() => doublons.filter(c => normaliser(`${c.nom} ${c.clubReel} ${c.poste}`).includes(normaliser(rechercheDoublon.trim())))
@@ -101,7 +102,7 @@ export function EchangesCollectionSolo() {
   const trouvailles = useMemo(() => {
     const terme = normaliser(recherche.trim());
     if (terme.length < 2) return [];
-    return catalogue.filter(c => normaliser(`${c.nom} ${c.clubReel}`).includes(terme)).slice(0, 12);
+    return catalogue.filter(c => c.speciale?.trade_allowed !== false && normaliser(`${c.nom} ${c.clubReel}`).includes(terme)).slice(0, 12);
   }, [catalogue, recherche]);
 
   /** Une lecture de la bourse : la page, le suivi, et la collection si le serveur en connaît une plus récente. */

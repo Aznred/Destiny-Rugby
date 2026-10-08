@@ -158,5 +158,6 @@
 .solo-type.type-icon { letter-spacing: .16em; }
 .solo-type.type-icon.actif { border-color: #d8aa45; background: linear-gradient(135deg, #fffaf0, #ecdcb6); color: #3a2b10; }
 .solo-type.type-halloween { letter-spacing: .12em; }
+.solo-type.type-influencer.actif { border-color: #b97aff; background: linear-gradient(135deg, #3a155e, #150e25); color: #ead4ff; box-shadow: 0 0 14px #9146ff55; }
 .solo-type.type-halloween.actif { border-color: #ff8a1c; background: linear-gradient(135deg, #26262b, #0d0d0f); color: #ff9a2e; box-shadow: 0 0 14px #ff7a0040; }
 @media (max-width: 560px) { .solo-types { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; } .solo-type { flex: none; } }

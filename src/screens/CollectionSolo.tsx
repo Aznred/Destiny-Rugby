@@ -13,8 +13,8 @@ import { SoldesMonnaies } from '../components/SoldesMonnaies';
 import { demanderPaiement } from '../lib/achatUi';
 import { montantEn, type Devise } from '../lib/monnaies';
 import { nomPackCarriere } from '../lib/presentationPacks';
-import { carteSpecialePackable, carteSpecialeVisibleCollection, chanceSpecialeParCarte, nomFamilleSpeciale } from '../lib/ligue/cartesSpeciales';
-import { Citrouille, EmblemeIcon } from '../components/EmblemesSpeciaux';
+import { carteSpecialeVisibleCollection, preparerTirageSpecial, nomFamilleSpeciale } from '../lib/ligue/cartesSpeciales';
+import { Citrouille, EmblemeIcon, EmblemeInfluenceur } from '../components/EmblemesSpeciaux';
 import { nombre, t } from '../lib/i18n';
 import { apparencePack, modelePackParNom, packAvecSkin } from '../lib/presentationPacks';
 import { chargerPacksPrivesSolo, ouvrirPackPriveSolo } from '../lib/carriereEnLigneClient';
@@ -61,11 +61,11 @@ export function CollectionSolo() {
   const chancesSpeciales = (packId: string) => {
     const pack = packsRoue.find(p => p.id === packId);
     if (!pack || !speciales || idsPacksGratuits.has(pack.id)) return [];
-    return speciales.evenements.filter(ev => ev.actif && speciales.definitions.some(d => d.specialEventId === ev.id && carteSpecialePackable(d, speciales, instant)))
-      .map(ev => ({ nom: nomFamilleSpeciale(ev.cardType), chance: Math.round(chanceSpecialeParCarte(pack, ev) * 1000) / 1000 }))
+    return (preparerTirageSpecial(pack, true, instant, new Set(), speciales)?.lots ?? [])
+      .map(lot => ({ nom: nomFamilleSpeciale(speciales.evenementParId.get(lot.evenement)!.cardType), chance: Math.round(lot.chance * 1000) / 1000 }))
       .filter(c => c.chance > 0);
   };
-  const [typeCartes, setTypeCartes] = useState<'' | 'normal' | 'icon' | 'halloween'>('');
+  const [typeCartes, setTypeCartes] = useState<'' | 'normal' | 'icon' | 'halloween' | 'influencer'>('');
   const comptesSpeciaux = useMemo(() => {
     const comptes: Record<string, number> = {};
     for (const carte of catalogue) if (carte.speciale && (etat.quantites[cleCarteSolo(carte.sourceId)] || visibleSiInconnue(carte))) comptes[carte.speciale.type] = (comptes[carte.speciale.type] ?? 0) + 1;
@@ -256,10 +256,10 @@ export function CollectionSolo() {
       <div className="solo-titre-ligne"><div><div className="eyebrow">{t('solo.playersSubtitle')}</div><h2>{t('solo.playersTitle')}</h2></div><span>{t('solo.badgeNotice')}</span></div>
       {Object.keys(comptesSpeciaux).length > 0 && <div className="solo-types" role="group" aria-label={t('special.filter.label')}>
         {([['', t('online.collection.all'), null], ['normal', t('special.filter.players'), null],
-          ['icon', t('special.icons'), <EmblemeIcon key="i" taille={20} />], ['halloween', t('special.halloween'), <Citrouille key="h" taille={20} />]] as const).map(([valeur, libelle, embleme]) =>
-          (valeur === 'icon' || valeur === 'halloween') && !comptesSpeciaux[valeur] ? null
+          ['icon', t('special.icons'), <EmblemeIcon key="i" taille={20} />], ['halloween', t('special.halloween'), <Citrouille key="h" taille={20} />], ['influencer', t('special.influencers'), <EmblemeInfluenceur key="c" taille={20} />]] as const).map(([valeur, libelle, embleme]) =>
+          (valeur === 'icon' || valeur === 'halloween' || valeur === 'influencer') && !comptesSpeciaux[valeur] ? null
             : <button key={valeur} type="button" className={`solo-type type-${valeur || 'tout'}${typeCartes === valeur ? ' actif' : ''}`} aria-pressed={typeCartes === valeur} onClick={() => { setTypeCartes(valeur); setPage(0); }}>
-              {embleme}<span>{libelle}</span>{(valeur === 'icon' || valeur === 'halloween') && <b>{nombre(comptesSpeciaux[valeur] ?? 0)}</b>}
+              {embleme}<span>{libelle}</span>{(valeur === 'icon' || valeur === 'halloween' || valeur === 'influencer') && <b>{nombre(comptesSpeciaux[valeur] ?? 0)}</b>}
             </button>)}
       </div>}
       <div className="solo-filtres">

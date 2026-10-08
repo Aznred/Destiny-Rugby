@@ -153,7 +153,7 @@ export function packsEvenementSolo(speciales: CatalogueSpecial | null, maintenan
   return speciales.evenements.filter(ev => ev.pack).map((ev): PackCarriere => ({
     ...structuredClone(ev.pack!),
     evenement: { id: ev.id, type: ev.cardType, actif: ev.actif, ...(ev.availableFrom ? { du: ev.availableFrom } : {}), ...(ev.availableUntil ? { au: ev.availableUntil } : {}),
-      cartes: speciales.definitions.filter(d => d.specialEventId === ev.id && d.published && d.canBePacked).length },
+      cartes: preparerTirageSpecial(ev.pack!, true, maintenant, new Set(), speciales)?.lots.find(l => l.evenement === ev.id)?.candidats.length ?? 0 },
   })).filter(pack => packEvenementOuvert(pack, true, maintenant));
 }
 

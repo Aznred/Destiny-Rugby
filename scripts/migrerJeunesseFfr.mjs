@@ -19,6 +19,7 @@ if(audit.database_host!==new URL(url).hostname)throw new Error('Base différente
 const sql=neon(url),stockage=stockageNeon(url),sources=new Set(JSON.parse(readFileSync(`${root}/withdrawn-sources.json`,'utf8')));
 const avant=JSON.parse(readFileSync(`${root}/catalogue-before.json`,'utf8'));
 const correspondances=compensationsSoloFfr(avant,catalogueBaseCarriere(),sources);
+const mappingSolo=JSON.stringify(Object.fromEntries(correspondances));
 const nettoyer=anonymiseurJeunesse(avant.filter(c=>sources.has(c.sourceId)));
 const keys=JSON.stringify([...correspondances.keys()]),now=Date.now();
 const bilan={version,mode:appliquer?'APPLY':'DRY_RUN',ligues:0,cartesRetirees:0,compensationsRegens:0,marches:0,
@@ -85,23 +86,35 @@ for(const {id} of ligues){
 const coffres=await sql`select compte,donnees from compte_boutique where (donnees->'collectionSolo'->'quantites') ?|
   array(select jsonb_array_elements_text(${keys}::jsonb)) order by compte`;
 for(const b of coffres){
-  for(let essai=0;essai<12;essai++){
-    const [actuel]=essai?await sql`select donnees from compte_boutique where compte=${b.compte}::uuid`:[b];
-    const {collection,log}=migrerCollectionFfr(actuel.donnees.collectionSolo,correspondances);
-    if(!log.length)break;
-    if(appliquer){
-      const donnees={...actuel.donnees,collectionSolo:collection};
-      const [r]=await sql`with cible as (select * from compte_boutique where compte=${b.compte}::uuid and donnees=${JSON.stringify(actuel.donnees)}::jsonb for update),
-       snapshot as (insert into player_migration_snapshots(migration,kind,entity_id,revision,data)
-         select ${version},'solo',compte::text,${collection.revision-1},donnees from cible on conflict do nothing returning entity_id),
-       change as (update compte_boutique set donnees=${JSON.stringify(donnees)}::jsonb,modifie_le=now() where compte in(select compte from cible) returning compte),
-       log as (insert into player_migration_snapshots(migration,kind,entity_id,revision,data)
-         select ${version},'solo-compensation',compte::text,${collection.revision},${JSON.stringify(log)}::jsonb from change on conflict do nothing returning entity_id)
-       select count(*)::int n from change`;
-      if(!r.n){if(essai===11)throw new Error('Collection modifiée pendant la migration. Relancez.');continue;}
-    }
-    bilan.comptesSolo++;bilan.exemplairesSolo+=log.reduce((n,c)=>n+c.exemplaires,0);break;
+  if(!appliquer){
+    const {log}=migrerCollectionFfr(b.donnees.collectionSolo,correspondances);
+    if(log.length){bilan.comptesSolo++;bilan.exemplairesSolo+=log.reduce((n,c)=>n+c.exemplaires,0);}
+    continue;
   }
+  // Lire, convertir, sauvegarder et journaliser sous le même verrou SQL.
+  // Aucune fenêtre entre une lecture réseau et une sauvegarde concurrente.
+  const [r]=await sql`with mapping as (select key source,value from jsonb_each(${mappingSolo}::jsonb)),
+    cible as materialized (select * from compte_boutique where compte=${b.compte}::uuid
+      and (donnees->'collectionSolo'->'quantites') ?| array(select source from mapping) for update),
+    entrees as (select q.key source,q.value::bigint exemplaires,coalesce(m.value->>'cle',q.key) destination,m.value compensation
+      from cible c cross join lateral jsonb_each_text(c.donnees->'collectionSolo'->'quantites') q left join mapping m on m.source=q.key),
+    sommes as (select destination,sum(exemplaires)::bigint exemplaires from entrees group by destination),
+    conversion as (select c.compte,c.donnees,
+      coalesce((c.donnees->'collectionSolo'->>'revision')::int,0) revision,
+      (c.donnees->'collectionSolo') || jsonb_build_object('quantites',(select jsonb_object_agg(destination,exemplaires) from sommes),
+        'doublons',(select coalesce(sum(greatest(0,exemplaires-1)),0) from sommes),
+        'revision',coalesce((c.donnees->'collectionSolo'->>'revision')::int,0)+1) collection,
+      (select jsonb_agg(jsonb_build_object('source',source,'remplacement',destination,'exemplaires',exemplaires,
+        'genAvant',(compensation->>'genAvant')::int,'genApres',(compensation->>'genApres')::int))
+        from entrees where compensation is not null and exemplaires>0) journal from cible c),
+    snapshot as (insert into player_migration_snapshots(migration,kind,entity_id,revision,data)
+      select ${version},'solo',compte::text,revision,donnees from conversion where journal is not null on conflict do nothing returning entity_id),
+    change as (update compte_boutique b set donnees=jsonb_set(b.donnees,'{collectionSolo}',c.collection),modifie_le=now()
+      from conversion c where b.compte=c.compte and c.journal is not null returning b.compte),
+    log as (insert into player_migration_snapshots(migration,kind,entity_id,revision,data)
+      select ${version},'solo-compensation',c.compte::text,c.revision+1,c.journal from conversion c join change on change.compte=c.compte on conflict do nothing returning entity_id)
+    select count(*)::int n,(select coalesce(sum(exemplaires),0)::int from entrees where compensation is not null and exemplaires>0) exemplaires from change`;
+  if(r.n){bilan.comptesSolo++;bilan.exemplairesSolo+=r.exemplaires;}
 }
 // Les reprises sont des instantanés privés du moteur ; conserver leurs clés et scores.
 const reprises=await sql`select ligue,match,code,donnees from carriere_reprises`;

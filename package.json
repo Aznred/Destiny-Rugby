@@ -4,6 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "verify:influenceurs": "vite-node scripts/verifierInfluenceurs.ts",
     "verify:complement29": "vite-node scripts/verifierComplement29.ts",
     "verify:reglements": "vite-node scripts/verifierReglements.ts",
     "verify:voix": "vite-node scripts/verifierVoix.ts",

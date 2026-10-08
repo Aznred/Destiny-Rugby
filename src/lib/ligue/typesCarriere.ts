@@ -41,7 +41,11 @@ export interface InfoCarteSpeciale {
   /** L'emblème posé à la place du logo de championnat (`specialLogo`). */
   logo: string;
   /** L'animation d'ouverture de pack (`rarityAnimation`). */
-  animation: 'mythique' | 'elite' | 'or';
+  animation: 'mythique' | 'elite' | 'or' | 'influenceur';
+  sansClub?: 'nation' | 'neutre' | 'creator';
+  market_allowed?: boolean;
+  trade_allowed?: boolean;
+  description?: string;
   /** Plancher de collectif de la carte (0-10). Absent : calculé normalement. */
   collectif?: number;
   /** `basePlayerId` : la carte ordinaire du même joueur, s'il joue encore. */

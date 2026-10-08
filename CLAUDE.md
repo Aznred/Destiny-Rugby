@@ -264,6 +264,16 @@ depuis un pseudo ou un drapeau envoyé par le client. Le cahier adverse reste
 privé dans la vue de ligue. Banc : `npm run verify:combinaisons`.
 
 **Cartes spéciales** (`ligue/cartesSpeciales.ts`, graine `data/cartesSpeciales.ts`) :
+Influenceurs (`influencer`, Correctif 32) : famille désactivée par défaut, sans graine nominative,
+design violet/rouge LIVE, rang de révélation 5 (pochette ordinaire bornée à 4). GEN 60–99,
+`display_name` / identité réelle, rareté, stats, description, niveau, club et nation facultatifs.
+Labo → Cartes spéciales → Influenceurs ; brouillon à la création. `allowedPackIds` absent =
+tous les packs éligibles, vide = aucun ; poids nul exclu. Pack Créateurs 200 Ovas / dix cartes /
+une garantie, absent si aucun candidat. Taux ordinaire par défaut 0,2 × Mythique. Permissions
+`market_allowed` / `trade_allowed` revérifiées lors des échanges et à l’acceptation. Sans club,
+`sansClub` = nation / neutre / creator ; les valeurs vides restent vides. Le catalogue public
+masque les cartes inactives ou pas encore sorties ; les exemplaires du compte authentifié
+restent disponibles. Banc : `npm run verify:influenceurs`.
 ICONS (100 retraités, toute l'année) et Halloween 2026 (23 cartes, 5 oct. → 30 nov.,
 pack dédié). Définitions et événements dans `CatalogueAdmin.speciales` (diff de la
 graine, même révision que l'Atelier) ; images dans `carriere_cartes_speciales_images`,

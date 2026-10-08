@@ -25,6 +25,10 @@ Chaque sauvegarde de ligue est prise avant l'écriture par comparaison de versio
 
 L'audit de production initial a trouvé 934 cartes de jeunes dans 34 ligues, 369 utilisées en composition, 3 annonces locales, 2 annonces communes et des exemplaires dans 65 collections solo. Les nombres évoluent avec l'activité des joueurs : consulter `migration-plan.json` pour la simulation la plus récente et `migration-result.json` après application. Le socle historique `cartes` a été vérifié vide.
 
+**Compensations appliquées en production le 8 octobre 2026** : 935 cartes fictives dans 34 ligues et 523 029 exemplaires convertis dans 70 collections solo. L'audit après application constate zéro carte jeunesse active, possédée, en composition, en vente ou en échange. Les anciennes références sont conservées ; aucun GEN de compensation solo n'est inférieur au GEN retiré. Les totaux consolidés sont dans `compensations-verification.json`, le rapport après migration dans `production-audit-after.json`.
+
+La conversion solo travaille entièrement sous verrou SQL : elle prend le snapshot du coffre courant, regroupe les exemplaires par carte de remplacement, incrémente la révision et écrit le journal dans la même transaction. Elle ne dépend pas d'une pause entre deux sauvegardes utilisateur et ne réécrit pas les autres champs du coffre. La recherche de compensation trie une seule fois les cartes seniors, puis cherche par famille et GEN ; elle conserve le choix déterministe utilisé lors de la première application. Les annulations d'échanges de ligue rendent les Ovas réservés et libèrent aussi les cartes adultes qui accompagnaient la carte retirée.
+
 ## Formation
 
 7 433 agrégats club/genre sont conservés en base privée. La note de formation utilise volume, niveau des équipes, apparitions et surclassements lorsqu'ils sont renseignés. Elle influence le nombre de jeunes, leur GEN initial, leur potentiel et les probabilités de pépite. Les distributions de postes observés sont lissées pour conserver tous les postes du rugby. Noms, photos et identifiants des personnes sources ne sont jamais recopiés dans les regens.

@@ -6,6 +6,7 @@ import type { Traduction } from '../lib/i18n.js';
  * collection, imprimés sur la carte. Le Labo, réservé à Kiri, reste en français.
  */
 export const TEXTES_CARTES_SPECIALES: Record<string, Traduction> = {
+  'special.influencers': { fr: 'Influenceurs', en: 'Influencers', es: 'Influencers', it: 'Influencer', de: 'Influencer', pt: 'Influenciadores', ja: 'インフルエンサー' },
   'special.legend': { fr: 'Légende', en: 'Legend', es: 'Leyenda', it: 'Leggenda', de: 'Legende', pt: 'Lenda', ja: 'レジェンド' },
   'special.icons': { fr: 'ICONS', en: 'ICONS', es: 'ICONS', it: 'ICONS', de: 'ICONS', pt: 'ICONS', ja: 'ICONS' },
   'special.halloween': { fr: 'HALLOWEEN', en: 'HALLOWEEN', es: 'HALLOWEEN', it: 'HALLOWEEN', de: 'HALLOWEEN', pt: 'HALLOWEEN', ja: 'HALLOWEEN' },

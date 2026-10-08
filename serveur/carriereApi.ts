@@ -71,7 +71,7 @@ let sourcesCartesSolo: readonly SourceCarte[] | undefined;
 const cartesEchangeables = () => {
   const sources = catalogueBaseCarriere();
   if (sources !== sourcesCartesSolo) { sourcesCartesSolo = sources; clesCartesSolo = new Set(sources.map(c => cleCarteSolo(c.sourceId))); }
-  const speciales = specialesPubliques().definitions;
+  const speciales = catalogueSpecial().definitions.filter(d => d.imageReady && (d.published || d.publieeLe) && d.trade_allowed !== false);
   if (!speciales.length) return clesCartesSolo;
   return new Set([...clesCartesSolo, ...speciales.map(d => cleCarteSolo(d.id))]);
 };
@@ -784,6 +784,15 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
       }
       if (req.method === 'GET' && url.searchParams.get('catalogueSolo') === '1') {
         const config = catalogueAdmin();
+        const influenceurs = catalogueSpecial(config).definitions.filter(d => d.cardType === 'influencer');
+        const possedees = new Set<string>();
+        if (influenceurs.length) {
+          const jetonCatalogue = lireJeton(req);
+          const proprietaire = jetonCatalogue ? await stockage.session(empreinteJeton(jetonCatalogue), maintenant, false) : null;
+          const coffre = proprietaire ? await stockage.boutique(proprietaire.id) : null;
+          for (const d of influenceurs) if (coffre?.collectionSolo?.quantites[cleCarteSolo(d.id)]) possedees.add(d.id);
+          res.setHeader('Cache-Control', 'private, no-store');
+        }
         const connue = Number(url.searchParams.get('revision'));
         const contexteCatalogue = contexteFfr.getStore();
         const revisionFfr = contexteCatalogue?.revisionFfr ?? '';
@@ -792,9 +801,9 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         // ajouts de joueurs de la base en ligne traversent le réseau — et les cartes
         // spéciales PUBLIÉES, avec leurs événements (pack Halloween compris) :
         // jamais un brouillon ni une carte sans image.
-        return res.status(200).json(connue === config.revision && url.searchParams.get('revisionFfr') === revisionFfr
+        return res.status(200).json(connue === config.revision && url.searchParams.get('revisionFfr') === revisionFfr && !influenceurs.length
           ? { revision: config.revision, revisionFfr }
-          : { revision: config.revision, revisionFfr, ffr: (contexteCatalogue?.joueurs ?? []).filter(c=>c.gender!=='female' && !c.retiree), joueurs: Object.fromEntries(Object.entries(config.joueurs).filter(([id])=>actifs.has(id))), ajouts: Object.fromEntries(Object.entries(config.ajouts ?? {}).filter(([,c])=>actifs.has(c.sourceId))), speciales: specialesPubliques(config),
+          : { revision: config.revision, revisionFfr, ffr: (contexteCatalogue?.joueurs ?? []).filter(c=>c.gender!=='female' && !c.retiree), joueurs: Object.fromEntries(Object.entries(config.joueurs).filter(([id])=>actifs.has(id))), ajouts: Object.fromEntries(Object.entries(config.ajouts ?? {}).filter(([,c])=>actifs.has(c.sourceId))), speciales: specialesPubliques(config, maintenant, possedees),
               // Les cosmétiques du Labo : SEULS les publiés quittent le serveur, dans la même réponse (aucune requête de plus).
               clubs: config.clubs ?? {}, rivalitesHistoriques: config.rivalitesHistoriques ?? [],
               boutique: Object.values(config.boutique ?? {}).filter(a => a.publie) });

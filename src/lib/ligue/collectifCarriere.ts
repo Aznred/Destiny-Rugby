@@ -110,9 +110,10 @@ export function collectifCarriere(
       return valeur ? tailles.get(valeur) ?? 0 : 0;
     };
   };
-  const tailleClub = compter((c) => clubCollectif(c));
-  const tailleNation = compter((c) => nationCollectif(c));
-  const tailleChampionnat = compter((c) => c.championnat);
+  const influenceurSansClub = (c: CarteCarriere) => c.speciale?.type === 'influencer' && !c.clubReel;
+  const tailleClub = compter((c) => influenceurSansClub(c) ? c.speciale?.sansClub === 'creator' ? 'special:creator' : undefined : clubCollectif(c));
+  const tailleNation = compter((c) => influenceurSansClub(c) && c.speciale?.sansClub === 'neutre' ? undefined : nationCollectif(c));
+  const tailleChampionnat = compter((c) => influenceurSansClub(c) ? undefined : c.championnat);
 
   const parCarte: Record<string, AffiniteCarte> = {};
   for (const carte of titulaires) {

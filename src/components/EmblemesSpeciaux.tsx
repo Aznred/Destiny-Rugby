@@ -53,6 +53,15 @@ export function EmblemeIcon({ taille = 24, className }: { taille?: number; class
 }
 
 /** L'emblème d'une famille spéciale, quelle qu'elle soit (repli : l'emblème ICON). */
+export function EmblemeInfluenceur({ taille = 24, className }: { taille?: number; className?: string }) {
+  return <svg className={className} width={taille} height={taille} viewBox="0 0 48 48" aria-hidden="true">
+    <path d="M7 9 H37 V31 L27 41 H18 V34 H7Z" fill="#9146ff" stroke="#e4cfff" strokeWidth="2" />
+    <rect x="15" y="17" width="25" height="17" rx="5" fill="#ff314e" stroke="#fff" strokeWidth="1.4" />
+    <path d="M25 21 L33 25.5 L25 30Z" fill="#fff" />
+    <circle cx="11" cy="5" r="3" fill="#ff314e" />
+  </svg>;
+}
+
 export function EmblemeSpecial({ logo, taille, className }: { logo: string; taille?: number; className?: string }) {
-  return logo === 'citrouille' ? <Citrouille taille={taille} className={className} /> : <EmblemeIcon taille={taille} className={className} />;
+  return logo === 'creator' ? <EmblemeInfluenceur taille={taille} className={className} /> : logo === 'citrouille' ? <Citrouille taille={taille} className={className} /> : <EmblemeIcon taille={taille} className={className} />;
 }

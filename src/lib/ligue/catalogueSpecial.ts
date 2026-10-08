@@ -12,7 +12,7 @@ import { catalogueAdmin, type CatalogueAdmin } from './atelierCatalogue.js';
 import { catalogueMondialCarriere } from './catalogueCarriere.js';
 import { sourceRetireeFfr } from './eligibiliteJoueurs.js';
 import {
-  assemblerCatalogueSpecial, carteSpecialePubliee, chanceSpecialeParCarte, EVENEMENTS_DEPART, FAMILLES_SPECIALES,
+  assemblerCatalogueSpecial, carteSpecialePubliee, carteSpecialeVisibleCollection, chanceSpecialeParCarte, EVENEMENTS_DEPART, FAMILLES_SPECIALES,
   postesDepuisNumeros, slugSpecial, type CatalogueSpecial, type DefinitionCarteSpeciale, type EvenementSpecial,
 } from './cartesSpeciales.js';
 import type { CarteCarriere, PackCarriere } from './typesCarriere.js';
@@ -47,7 +47,7 @@ export function definitionsDepart(): readonly DefinitionCarteSpeciale[] {
 }
 
 
-const CHAMPS_REQUIS: (keyof DefinitionCarteSpeciale)[] = ['id', 'cardType', 'specialEventId', 'nom', 'poste', 'overall', 'nation'];
+const CHAMPS_REQUIS: (keyof DefinitionCarteSpeciale)[] = ['id', 'cardType', 'specialEventId', 'nom', 'poste', 'overall'];
 const caches = new WeakMap<object, CatalogueSpecial>();
 
 
@@ -77,15 +77,17 @@ export function catalogueSpecial(config: CatalogueAdmin = catalogueAdmin()): Cat
     if (sourceRetireeFfr(brut.id!) || (brut.basePlayerId && sourceRetireeFfr(brut.basePlayerId)) || (Number(brut.age)>0 && Number(brut.age)<18)) continue;
     const famille = FAMILLES_SPECIALES[brut.cardType!];
     const base = brut.basePlayerId ? mondial.get(brut.basePlayerId) : undefined;
-    // Une variante ne réintroduit pas une identité jeunesse exclue.
+    // A variant must never resurrect an excluded real youth identity.
     if(brut.basePlayerId && !base) continue;
     const def: DefinitionCarteSpeciale = {
       packWeight: 1, published: false, canBePacked: true, canAppearInCollection: true, canAppearOnMarket: true,
       rarityAnimation: 'mythique', retraite: !brut.basePlayerId,
       designId: famille?.designId ?? `special-${brut.cardType}`, specialLogo: famille?.specialLogo ?? 'etoile',
       ...brut,
-      club: brut.club || base?.clubReel || famille?.clubDefaut || 'Légendes',
-      league: brut.league || base?.championnat || famille?.ligueDefaut || 'Légendes',
+      nation: brut.nation ?? '',
+      club: brut.cardType === 'influencer' ? brut.club ?? '' : brut.club || base?.clubReel || famille?.clubDefaut || 'Légendes',
+      league: brut.cardType === 'influencer' ? brut.league || [...mondial.values()].find(s => s.clubReel === brut.club)?.championnat || '' : brut.league || base?.championnat || famille?.ligueDefaut || 'Légendes',
+      ...(brut.cardType === 'influencer' ? { retraite: false, rarityAnimation: brut.rarityAnimation ?? 'influenceur' } : {}),
       age: brut.age || base?.age || 30,
       imageReady: Boolean(brut.image),
     } as DefinitionCarteSpeciale;
@@ -102,10 +104,12 @@ export function catalogueSpecial(config: CatalogueAdmin = catalogueAdmin()): Cat
  * événements. Servi avec le catalogue de la Collection solo.
  */
 export interface SpecialesPubliques { definitions: DefinitionCarteSpeciale[]; evenements: EvenementSpecial[] }
-export function specialesPubliques(config: CatalogueAdmin = catalogueAdmin()): SpecialesPubliques {
+export function specialesPubliques(config: CatalogueAdmin = catalogueAdmin(), maintenant = Date.now(), possedees: ReadonlySet<string> = new Set()): SpecialesPubliques {
   const cat = catalogueSpecial(config);
   return {
-    definitions: cat.definitions.filter(d => d.imageReady && !d.brouillon && (d.published || Boolean(d.publieeLe))),
+    definitions: cat.definitions.filter(d => d.cardType === 'influencer'
+      ? carteSpecialeVisibleCollection(d, cat, maintenant) || (possedees.has(d.id) && d.imageReady && Boolean(d.published || d.publieeLe))
+      : d.imageReady && !d.brouillon && (d.published || Boolean(d.publieeLe))),
     evenements: cat.evenements.map(ev => structuredClone(ev)),
   };
 }
@@ -118,8 +122,16 @@ export function carteSurMarcheAutorisee(carte: Pick<CarteCarriere, 'sourceId' | 
   const cat = catalogueSpecial(config);
   const def = cat.parId.get(carte.sourceId);
   // Une définition retirée du Labo n'enferme pas les exemplaires déjà distribués.
-  if (!def) return true;
-  return carteSpecialePubliee(def, cat) && def.canAppearOnMarket;
+  if (!def) return carte.speciale.market_allowed !== false;
+  return carteSpecialePubliee(def, cat) && def.canAppearOnMarket && def.market_allowed !== false;
+}
+
+/** L'autorisation est relue lors de la proposition et de son acceptation. */
+export function carteEchangeAutorise(carte: Pick<CarteCarriere, 'sourceId' | 'speciale'>, ligueAutorise: boolean, config: CatalogueAdmin = catalogueAdmin()): boolean {
+  if (!carte.speciale) return true;
+  if (!ligueAutorise) return false;
+  const def = catalogueSpecial(config).parId.get(carte.sourceId);
+  return def ? def.trade_allowed !== false : carte.speciale.trade_allowed !== false;
 }
 
 
@@ -155,6 +167,7 @@ export function resumeSpeciauxLigue(packs: readonly PackCarriere[], config: Cata
     evenements: actifs.map(({ ev, cartes }) => ({ id: ev.id, type: ev.cardType, nom: ev.nom, cartes,
       ...(ev.availableFrom ? { du: ev.availableFrom } : {}), ...(ev.availableUntil ? { au: ev.availableUntil } : {}) })),
     chances: Object.fromEntries(packs.map(p => [p.id, Object.fromEntries(ouverts
+      .filter(({ ev }) => cat.definitions.some(d => d.specialEventId === ev.id && d.packWeight > 0 && (!d.allowedPackIds || d.allowedPackIds.includes(p.id)) && d.canBePacked && carteSpecialePubliee(d, cat)))
       .map(({ ev }) => [ev.id, Math.round(chanceSpecialeParCarte(p, ev) * 1000) / 1000] as const).filter(([, c]) => c > 0))])),
   };
 }

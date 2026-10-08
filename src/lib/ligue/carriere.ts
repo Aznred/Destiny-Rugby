@@ -19,7 +19,7 @@ import type { RepereChrono } from './filmDirect.js';
 import type { CarteCarriere, ClubCarriere, CommandeCarriere, CompetitionCarriere, CreationCarriere, EtatCarriereEnLigne, LigneClassementCarriere, ObjectifCarriere, PackCarriere, RencontreCarriere, TransactionCarriere, VueCarriereEnLigne } from './typesCarriere.js';
 import { LOT_VENTE_RAPIDE_MAX, valeurVenteRapide } from './venteRapideCarriere.js';
 import { bonusCollectif, collectifCarriere } from './collectifCarriere.js';
-import { carteSurMarcheAutorisee, catalogueSpecial, identiteJoueur, preparerTirageSpecial, resumeSpeciauxLigue, tirerSpeciale } from './catalogueSpecial.js';
+import { carteEchangeAutorise, carteSurMarcheAutorisee, catalogueSpecial, identiteJoueur, preparerTirageSpecial, resumeSpeciauxLigue, tirerSpeciale } from './catalogueSpecial.js';
 import { estPuissanceDeDeux, nombreQualifiesPlayoffs, nombreQualifiesPoules, repartirPoules } from './poulesCarriere.js';
 
 const HEURE = 3_600_000;
@@ -1660,7 +1660,7 @@ export function agirCarriere(etat: EtatCarriereEnLigne, compteId: string, comman
         exiger(commande.vers !== club.id, 'Choisissez un autre club.'); const destinataire = clubParId(nouveau, commande.vers);
         exiger(commande.cartesDonnees.length + commande.cartesDemandees.length > 0, 'Un échange doit contenir au moins une carte.');
         exiger(nouveau.echanges.filter(e => e.de === club.id && e.etat === 'propose').length < 10, 'Vous avez déjà dix offres en cours.');
-        for (const id of [...commande.cartesDonnees, ...commande.cartesDemandees]) exiger(!carteParId(nouveau, id).speciale || nouveau.cartesSpeciales === true, 'Les cartes spéciales ne s’échangent pas dans cette ligue.');
+        for (const id of [...commande.cartesDonnees, ...commande.cartesDemandees]) exiger(carteEchangeAutorise(carteParId(nouveau, id), nouveau.cartesSpeciales === true), 'Cette carte ne peut pas être échangée.');
         for (const id of commande.cartesDonnees) { const c = carteParId(nouveau, id); exiger(c.proprietaire === club.id && !c.verrou, 'Une carte proposée est indisponible.'); }
         for (const id of commande.cartesDemandees) { const c = carteParId(nouveau, id); exiger(c.proprietaire === destinataire.id && !c.verrou, 'Une carte demandée est indisponible.'); }
         verifierDepart(nouveau, club.id, commande.cartesDonnees, commande.cartesDemandees); verifierDepart(nouveau, destinataire.id, commande.cartesDemandees, commande.cartesDonnees);
@@ -1675,6 +1675,7 @@ export function agirCarriere(etat: EtatCarriereEnLigne, compteId: string, comman
         if (!annule) exiger(typeof commande.accepter === 'boolean', 'Réponse invalide.');
         const emetteur = clubParId(nouveau, e.de), destinataire = clubParId(nouveau, e.vers);
         if (!annule && commande.accepter) {
+          for (const id of [...e.cartesDonnees, ...e.cartesDemandees]) exiger(carteEchangeAutorise(carteParId(nouveau, id), nouveau.cartesSpeciales === true), 'Cette carte ne peut plus être échangée.');
           clubLibre(nouveau, e.de); clubLibre(nouveau, e.vers);
           for (const id of e.cartesDonnees) { const c = carteParId(nouveau, id); exiger(c.proprietaire === e.de && c.verrou === e.id, 'Une carte proposée n’est plus disponible.'); }
           for (const id of e.cartesDemandees) { const c = carteParId(nouveau, id); exiger(c.proprietaire === e.vers && !c.verrou, 'Une carte demandée n’est plus disponible.'); }

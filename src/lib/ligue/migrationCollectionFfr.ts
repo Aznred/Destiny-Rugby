@@ -5,13 +5,19 @@ import { carteSeniorAutorisee } from './eligibiliteJoueurs.js';
 
 /** Carte senior au même poste et GEN aussi proche que possible, jamais inférieur. */
 export function compensationsSoloFfr(anciens: readonly SourceCarte[], catalogue: readonly SourceCarte[], sourcesRetirees: ReadonlySet<string>) {
-  const seniors = catalogue.filter(c => carteSeniorAutorisee(c) && !c.speciale);
+  const seniors = catalogue.filter(c => carteSeniorAutorisee(c) && !c.speciale)
+    .sort((a,b)=>a.note-b.note || a.sourceId.localeCompare(b.sourceId));
+  const familles = new Map<string,SourceCarte[]>();
+  for(const senior of seniors){const famille=familles.get(senior.famille)??[];famille.push(senior);familles.set(senior.famille,famille);}
+  const equivalente=(liste:readonly SourceCarte[],note:number)=>{
+    let debut=0,fin=liste.length;
+    while(debut<fin){const milieu=(debut+fin)>>>1;if(liste[milieu].note<note)debut=milieu+1;else fin=milieu;}
+    return liste[debut];
+  };
   const correspondances = new Map<string, { cle: string; genAvant: number; genApres: number }>();
   for (const ancienne of anciens) {
     if (!sourcesRetirees.has(ancienne.sourceId)) continue;
-    const memePoste = seniors.filter(c => c.famille === ancienne.famille && c.note >= ancienne.note);
-    const choix = (memePoste.length ? memePoste : seniors.filter(c => c.note >= ancienne.note))
-      .sort((a, b) => a.note - b.note || a.sourceId.localeCompare(b.sourceId))[0];
+    const choix = equivalente(familles.get(ancienne.famille)??[],ancienne.note) ?? equivalente(seniors,ancienne.note);
     if (!choix) throw new Error('Aucune compensation senior équivalente. Migration interrompue.');
     correspondances.set(cleCarteSolo(ancienne.sourceId), { cle: cleCarteSolo(choix.sourceId), genAvant: ancienne.note, genApres: choix.note });
   }

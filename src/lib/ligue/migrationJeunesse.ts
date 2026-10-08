@@ -62,7 +62,16 @@ export function migrerCartesJeunesse(etat: EtatCarriereEnLigne,now:number): void
       sale.etat='annulee';
     }
   }
-  for(const e of etat.echanges)if(e.etat==='propose'&&[...e.cartesDonnees,...e.cartesDemandees].some(id=>ids.has(id)))e.etat='annule';
+  for(const e of etat.echanges)if(e.etat==='propose'&&[...e.cartesDonnees,...e.cartesDemandees].some(id=>ids.has(id))){
+    e.etat='annule';
+    for(const c of etat.cartes)if(c.verrou===e.id)delete c.verrou;
+    const emetteur=etat.clubs.find(c=>c.id===e.de);
+    if(emetteur&&e.ovasDonnes){
+      emetteur.ovas+=e.ovasDonnes;
+      etat.transactions.push({id:`${etat.id}:migration-ffr-echange:${e.id}`,clubId:emetteur.id,nature:'echange',ovas:e.ovasDonnes,
+        cartes:[],libelle:'Retrait jeunesse : Ovas réservés à l’échange restitués',date});
+    }
+  }
   for(const club of etat.clubs){
     for(const comp of [club.composition,...(club.compositionsSauvegardees??[]).map(s=>s.composition)]){
       comp.titulaires=comp.titulaires.map(id=>replacements.get(id)??id);comp.remplacants=comp.remplacants.map(id=>replacements.get(id)??id);

@@ -68,6 +68,39 @@ const nationsConnues = (config: CatalogueAdmin) => new Set([...catalogueMondialC
 function validerChamps(brut: Record<string, unknown>, config: CatalogueAdmin): Partial<DefinitionCarteSpeciale> {
   const c: Partial<DefinitionCarteSpeciale> = {};
   if (brut.nom !== undefined) c.nom = texte(brut.nom, 60, 'Nom');
+  for (const champ of ['display_name', 'real_name', 'first_name', 'last_name', 'description'] as const) {
+    if (brut[champ] !== undefined) c[champ] = brut[champ] === '' || brut[champ] === null ? undefined : texte(brut[champ], champ === 'description' ? 1000 : 80, champ);
+  }
+  if (brut.rarity !== undefined) {
+    if (brut.rarity === '' || brut.rarity === null) c.rarity = undefined;
+    else { if (!RARETES_CARRIERE.includes(brut.rarity as RareteCarriere)) refuser('Rareté inconnue.'); c.rarity = brut.rarity as RareteCarriere; }
+  }
+  if (brut.allowedPackIds !== undefined) {
+    if (brut.allowedPackIds === null) c.allowedPackIds = undefined;
+    else {
+      if (!Array.isArray(brut.allowedPackIds) || brut.allowedPackIds.length > 100) refuser('Liste de packs invalide.');
+      const connus = new Set([...packsCatalogueAdmin().map(p => p.id), ...catalogueSpecial(config).evenements.flatMap(e => e.pack ? [e.pack.id] : [])]);
+      c.allowedPackIds = [...new Set(brut.allowedPackIds.map(id => texte(id, 100, 'Pack')))];
+      if (c.allowedPackIds.some(id => !connus.has(id))) refuser('Pack inconnu.');
+    }
+  }
+  if (brut.sansClub !== undefined) {
+    if (!['nation', 'neutre', 'creator'].includes(String(brut.sansClub))) refuser('Collectif sans club inconnu.');
+    c.sansClub = brut.sansClub as DefinitionCarteSpeciale['sansClub'];
+  }
+  if (brut.niveauInfluenceur !== undefined) {
+    if (!['fun', 'rare', 'evenement'].includes(String(brut.niveauInfluenceur))) refuser('Niveau Influenceur inconnu.');
+    c.niveauInfluenceur = brut.niveauInfluenceur as DefinitionCarteSpeciale['niveauInfluenceur'];
+  }
+  if (brut.statistiques !== undefined) {
+    if (brut.statistiques === null) c.statistiques = undefined;
+    else {
+      const stats = objet(brut.statistiques);
+      const cles = new Set(['MEL', 'PHY', 'DEF', 'RCK', 'END', 'TEC', 'VIT', 'PAS', 'JDP']);
+      if (Object.keys(stats).some(k => !cles.has(k))) refuser('Statistique inconnue.');
+      c.statistiques = Object.fromEntries(Object.entries(stats).map(([k, v]) => [k, entier(v, 20, 99, k)]));
+    }
+  }
   if (brut.poste !== undefined) c.poste = posteValide(brut.poste, 'Poste');
   if (brut.postesSecondaires !== undefined) {
     if (!Array.isArray(brut.postesSecondaires) || brut.postesSecondaires.length > 14) refuser('Postes secondaires invalides.');
@@ -78,18 +111,18 @@ function validerChamps(brut: Record<string, unknown>, config: CatalogueAdmin): P
   if (brut.packWeight !== undefined) c.packWeight = nombre(brut.packWeight, 0, 100, 'Poids');
   if (brut.availableFrom !== undefined) c.availableFrom = dateOuVide(brut.availableFrom, 'Début');
   if (brut.availableUntil !== undefined) c.availableUntil = dateOuVide(brut.availableUntil, 'Fin');
-  for (const champ of ['published', 'brouillon', 'canBePacked', 'canAppearInCollection', 'canAppearOnMarket'] as const) {
+  for (const champ of ['published', 'brouillon', 'canBePacked', 'canAppearInCollection', 'canAppearOnMarket', 'market_allowed', 'trade_allowed'] as const) {
     if (brut[champ] !== undefined) c[champ] = booleen(brut[champ], champ);
   }
   if (brut.nation !== undefined) {
-    c.nation = texte(brut.nation, 80, 'Nation');
-    if (!nationsConnues(config).has(c.nation)) refuser('Nation inconnue du catalogue.');
+    c.nation = brut.nation === '' ? '' : texte(brut.nation, 80, 'Nation');
+    if (c.nation && !nationsConnues(config).has(c.nation)) refuser('Nation inconnue du catalogue.');
   }
-  if (brut.club !== undefined) c.club = texte(brut.club, 100, 'Club');
-  if (brut.league !== undefined) c.league = texte(brut.league, 100, 'Ligue');
+  if (brut.club !== undefined) c.club = brut.club === '' ? '' : texte(brut.club, 100, 'Club');
+  if (brut.league !== undefined) c.league = brut.league === '' ? '' : texte(brut.league, 100, 'Ligue');
   if (brut.age !== undefined) c.age = entier(brut.age, 16, 60, 'Âge');
   if (brut.rarityAnimation !== undefined) {
-    if (!['mythique', 'elite', 'or'].includes(String(brut.rarityAnimation))) refuser('Animation inconnue.');
+    if (!['mythique', 'elite', 'or', 'influenceur'].includes(String(brut.rarityAnimation))) refuser('Animation inconnue.');
     c.rarityAnimation = brut.rarityAnimation as DefinitionCarteSpeciale['rarityAnimation'];
   }
   if (brut.specialLogo !== undefined) c.specialLogo = texte(brut.specialLogo, 40, 'Emblème');
@@ -119,6 +152,8 @@ function verifierCoherence(def: DefinitionCarteSpeciale, config: CatalogueAdmin)
   const ev = catalogueSpecial(config).evenementParId.get(def.specialEventId);
   if (!ev) refuser('Événement inconnu.');
   if (ev.cardType !== def.cardType) refuser('Cet événement ne porte pas ce type de carte.');
+  if (def.cardType !== 'influencer' && !def.nation) refuser('Nation requise pour cette famille.');
+  if (def.cardType === 'influencer' && def.basePlayerId) refuser('Un influenceur possède sa propre identité.');
   if (famille) {
     if (def.overall < famille.overallMin || def.overall > famille.overallMax) refuser(`${famille.nom} : GEN entre ${famille.overallMin} et ${famille.overallMax}.`);
     // ⚠️ UNE ICON EST UNE LÉGENDE QUI NE JOUE PLUS. Rattachée à une carte
@@ -205,14 +240,18 @@ export async function appliquerOperationSpeciale(courant: CatalogueAdmin, suivan
       designId: champs.designId ?? famille?.designId ?? `special-${cardType}`, packWeight: champs.packWeight ?? 1,
       availableFrom: champs.availableFrom, availableUntil: champs.availableUntil, published: false, imageReady: Boolean(champs.image),
       image: champs.image, canBePacked: champs.canBePacked ?? true, canAppearInCollection: champs.canAppearInCollection ?? true,
-      canAppearOnMarket: champs.canAppearOnMarket ?? true, nation: champs.nation ?? texte(brut.nation, 80, 'Nation'),
-      club: champs.club ?? '', league: champs.league ?? '', rarityAnimation: champs.rarityAnimation ?? 'mythique',
-      specialLogo: champs.specialLogo ?? famille?.specialLogo ?? 'etoile', retraite: !champs.basePlayerId,
-      age: champs.age ?? 0, basePlayerId: champs.basePlayerId, brouillon: champs.brouillon, lot: champs.lot,
+      canAppearOnMarket: champs.canAppearOnMarket ?? true, nation: champs.nation ?? (cardType === 'influencer' ? '' : texte(brut.nation, 80, 'Nation')),
+      club: champs.club ?? '', league: champs.league ?? '', rarityAnimation: champs.rarityAnimation ?? (cardType === 'influencer' ? 'influenceur' : 'mythique'),
+      specialLogo: champs.specialLogo ?? famille?.specialLogo ?? 'etoile', retraite: cardType !== 'influencer' && !champs.basePlayerId,
+      age: champs.age ?? 0, basePlayerId: champs.basePlayerId, brouillon: champs.brouillon ?? (cardType === 'influencer'), lot: champs.lot,
+      display_name: champs.display_name, real_name: champs.real_name, first_name: champs.first_name, last_name: champs.last_name,
+      description: champs.description, rarity: champs.rarity, statistiques: champs.statistiques, allowedPackIds: champs.allowedPackIds,
+      market_allowed: champs.market_allowed ?? true, trade_allowed: champs.trade_allowed ?? true,
+      sansClub: champs.sansClub ?? 'nation', niveauInfluenceur: champs.niveauInfluenceur ?? 'rare',
     };
-    if (!nationsConnues(courant).has(def.nation)) refuser('Nation inconnue du catalogue.');
+    if (def.nation && !nationsConnues(courant).has(def.nation)) refuser('Nation inconnue du catalogue.');
     verifierCoherence({ ...def, club: def.club || 'x', league: def.league || 'x', age: def.age || 30 }, courant);
-    const propre = Object.fromEntries(Object.entries(def).filter(([, v]) => v !== undefined && v !== '' && v !== 0)) as Partial<DefinitionCarteSpeciale>;
+    const propre = Object.fromEntries(Object.entries(def).filter(([k, v]) => v !== undefined && ((cardType === 'influencer' && ['club', 'league', 'nation', 'packWeight', 'collectif'].includes(k)) || (v !== '' && v !== 0)))) as Partial<DefinitionCarteSpeciale>;
     cartesDuLabo(suivant)[id] = { ...propre, published: false, imageReady: Boolean(def.image) };
     if (suivant.speciales!.supprimees) suivant.speciales!.supprimees = suivant.speciales!.supprimees.filter(s => s !== id);
     return { id, cree: true };
@@ -429,6 +468,8 @@ export function vueSpeciales(maintenant: number, config: CatalogueAdmin = catalo
     revision: config.revision,
     maintenant,
     familles: FAMILLES_SPECIALES,
+    packs: [...packsCatalogueAdmin(), ...cat.evenements.flatMap(e => e.pack ? [e.pack] : [])].map(p => ({ id: p.id, nom: p.nom })),
+    clubs: [...new Set(catalogueMondialCarriere(config).map(c => c.clubReel))].filter(Boolean).sort((a, b) => a.localeCompare(b, 'fr')),
     evenements: cat.evenements.map(ev => ({
       ...ev,
       // Ce que l'événement représente dans les packs de la boutique, par carte.

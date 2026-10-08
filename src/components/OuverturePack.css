@@ -131,3 +131,8 @@
 .pack-show.speciale-halloween .pack-show-beams { background: repeating-conic-gradient(from 0deg, transparent 0deg 18deg, #ff7a0038 21deg 23deg, transparent 26deg 40deg); opacity: .85; }
 .pack-show.speciale-halloween .pack-show-main.cel-panneau { background: radial-gradient(ellipse at center, #ff7a0018, transparent 62%), linear-gradient(#141416, #0b0b0d); }
 .pack-show.speciale-halloween .pack-show-heading h2 { color: #ff8a1c; text-shadow: 0 0 16px #ff7a0088; }
+.pack-show.speciale-influencer { --pack-color: #b97aff !important; }
+.pack-show.speciale-influencer .pack-show-flash { background: radial-gradient(ellipse, #fff 0%, #ff314e 10%, #9146ff99 27%, transparent 64%); }
+.pack-show.speciale-influencer .pack-show-beams { background: repeating-conic-gradient(from 0deg, transparent 0deg 18deg, #b773ff55 20deg 24deg, transparent 26deg 40deg, #ff314e33 42deg 45deg); }
+.pack-show.speciale-influencer .pack-show-main.cel-panneau { background: radial-gradient(ellipse at center, #9146ff30, transparent 65%), linear-gradient(#1a1029, #08070f); border-color: #b773ff66; }
+.pack-show.speciale-influencer .pack-show-heading h2 { color: #dbb4ff; text-shadow: 0 0 22px #9146ffaa; }

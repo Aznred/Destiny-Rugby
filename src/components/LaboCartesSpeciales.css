@@ -123,3 +123,9 @@
   .ls-apercu .cel-carte { width: 12rem; }
   .labo-speciales .ak-champs, .labo-speciales .ak-poids { grid-template-columns: 1fr 1fr; }
 }
+.ls-influenceurs-entete { padding: 20px; border: 1px solid #a669ff66; border-radius: 16px; background: linear-gradient(120deg, #35134d, #140d20); margin-bottom: 20px; }
+.ls-influenceurs-entete h3 { color: #e3c5ff; margin-top: 0; }
+.ls-packs-autorises { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; padding: 12px 0; }
+.ls-packs-autorises label { display: flex; align-items: center; gap: 8px; }
+.ls-liste .type-influencer, .ls-evenement.type-influencer { border-color: #a669ff66; }
+.ls-edition select, .ls-edition textarea { width: 100%; padding: 8px; border: 1px solid var(--bordure-forte); border-radius: 8px; background: var(--fond); color: var(--craie); }

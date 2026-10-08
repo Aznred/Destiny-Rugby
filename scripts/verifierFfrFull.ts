@@ -53,9 +53,11 @@ assert.ok(!carteSeniorAutorisee(female));assert.ok(carteSeniorAutorisee(female,'
 const state=creerCarriere({id:randomUUID(),nom:'Fixture',code:'DR-FIXTURE',compteId:randomUUID(),pseudo:'Fixture',clubNom:'Fixture club',rythme:1,maxClubs:2},Date.now(),'fixture-seed');
 const original=state.cartes[0],oldId=original.id;original.age=16;original.nom='Identité mineure fixture';original.photo='https://example.test/private.webp';
 state.ventes.push({id:'sale',carteId:oldId,vendeurId:original.proprietaire!,type:'enchere',prix:100,expireLe:'2099-01-01',etat:'ouverte',enchere:{clubId:original.proprietaire!,montant:125}});
-state.echanges.push({id:'trade',de:original.proprietaire!,vers:'another',cartesDonnees:[oldId],cartesDemandees:[],ovasDonnes:0,ovasDemandes:0,etat:'propose',expireLe:'2099-01-01'});
+const soldeAvant=state.clubs[0].ovas,adulteVerrouille=state.cartes[1];adulteVerrouille.verrou='trade';original.verrou='trade';
+state.echanges.push({id:'trade',de:original.proprietaire!,vers:'another',cartesDonnees:[oldId,adulteVerrouille.id],cartesDemandees:[],ovasDonnes:75,ovasDemandes:0,etat:'propose',expireLe:'2099-01-01'});
 assert.equal(cartesJeunesseARetirer(state).length,1);migrerCartesJeunesse(state,Date.now());
 assert.equal(state.cartes.find(c=>c.id===oldId)!.retiree,true);assert.equal(state.ventes[0].etat,'annulee');assert.equal(state.echanges[0].etat,'annule');
+assert.equal(adulteVerrouille.verrou,undefined);assert.equal(state.clubs[0].ovas,soldeAvant+125+75,'Les deux réserves distinctes sont restituées une seule fois.');
 assert.ok(state.cartes.some(c=>c.origine==='formation'&&c.sourceId.startsWith('regen:')));
 assert.equal(state.cartes.find(c=>c.id===oldId)!.photo,undefined);const count=state.cartes.length;migrerCartesJeunesse(state,Date.now());assert.equal(state.cartes.length,count);
 const market=marcheVide(1);market.annonces.push({id:'withdrawn',carte:{...male,age:16},vendeur:{ligueId:state.id,clubId:'club',pseudo:'x',nom:'x',division:1},type:'directe',prix:100,expireLe:'2099-01-01',etat:'ouverte'});
