@@ -27,6 +27,11 @@ import { cleCarteSolo, cleSoloRetireeFfr } from '../src/lib/collectionSolo.js';
 import { cartesEngagees, doublonsLibres, lotCartesSolo, type EvenementEchangeSolo, type SuiviEchangesSolo } from '../src/lib/echangesSolo.js';
 import { PACK_ICONES_KIRI } from '../src/lib/packsPrivesSolo.js';
 import { packsPrivesSolo, tirerPackIconesKiri } from './packsPrivesSolo.js';
+import {
+  CARTES_MAX_PACK_INTERNE, estPackInterne, packInternePourBoutique, PACKS_INTERNES_MAX, PERMISSION_PACKS_INTERNES, PREFIXE_PACK_INTERNE,
+  validerDefinitionPackInterne, type PackInterne, type PackInterneBoutique,
+} from '../src/lib/packsInternes.js';
+import { apparencePackInterne, contenuPackInterne, detailPackInterne, rechercherCartes, resoudreCartes, universCartes } from './packsInternes.js';
 
 export interface RequeteCarriere {
   method?: string; url?: string; body?: unknown;
@@ -344,6 +349,8 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
     return tablePresences === true;
   }
   const sessionsChaudes = new Map<string, { compte: CompteStocke; jusqua: number; toucheLe: number }>();
+  /** La permission des packs de test, gardée une minute pour les LECTURES seulement (voir `peutCreerDesPacks`). */
+  const permissionsPacks = new Map<string, { valeur: boolean; jusqua: number }>();
   /** `comptes.vu_le` sert à repérer les comptes inactifs depuis deux semaines : dix minutes de précision suffisent. */
   const PAS_VU_LE_MS = 10 * 60_000;
   const lireSalonAmical = async (code: string): Promise<SalonAmicalServeur | null> => {
@@ -1002,8 +1009,94 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         catch(e){throw new ErreurHttp(409,(e as Error).message);}
         ffr.invalidate();return res.status(200).json({ok:true});
       }
+      // Instantané privé du monde solo : la session existante protège les identités,
+      // le catalogue de cartes continue d'utiliser uniquement ses profils seniors.
+      if (url.searchParams.has('jeunesCarriere')) {
+        if (req.method !== 'GET') throw new ErreurHttp(405, 'Lecture du vivier uniquement.');
+        if (!stockage.joueurs?.jeunesCarriere) throw new ErreurHttp(503, 'Vivier de carrière non préparé.');
+        res.setHeader('Cache-Control', 'private, no-store');
+        res.setHeader('Vary', 'Cookie, Authorization');
+        if (!await stockage.limiter(empreinteJeton(`jeunes-carriere:${compte.id}`), 120, 10 * 60_000, maintenant))
+          throw new ErreurHttp(429, 'Le chargement du vivier reprendra dans quelques instants.');
+        try { return res.status(200).json(await stockage.joueurs.jeunesCarriere(url.searchParams)); }
+        catch (erreur) {
+          if ((erreur as {code?:string}).code === '42P01') throw new ErreurHttp(503, 'Vivier de carrière non préparé.');
+          if ((erreur as Error).message.includes('invalide')) throw new ErreurHttp(400, (erreur as Error).message);
+          if ((erreur as Error).message.includes('indisponible')) throw new ErreurHttp(404, (erreur as Error).message);
+          throw erreur;
+        }
+      }
+      // ═══ PACKS DE TEST (Correctif 33) ═══════════════════════════════════════
+      // ⚠️ LA PERMISSION EST UNE LIGNE DE LA BASE, relue ici — jamais un pseudo, jamais un drapeau du navigateur. Sans elle,
+      // ces routes répondent 403 à tout le monde, y compris à qui connaît leur nom. Une lecture peut s'appuyer une minute
+      // sur la réponse précédente ; une ÉCRITURE (créer, supprimer, ouvrir) relit toujours la base.
+      const peutCreerDesPacks = async (frais: boolean) => {
+        if (!stockage.packsInternes) return false;
+        const connue = permissionsPacks.get(compte.id);
+        if (!frais && connue && connue.jusqua > maintenant) return connue.valeur;
+        const valeur = await stockage.packsInternes.permission(compte.id, PERMISSION_PACKS_INTERNES);
+        permissionsPacks.set(compte.id, { valeur, jusqua: maintenant + (valeur ? 60_000 : 600_000) });
+        if (permissionsPacks.size > 2048) permissionsPacks.delete(permissionsPacks.keys().next().value!);
+        return valeur;
+      };
+      // Les joueuses validées n'entrent dans l'univers que si le compte a aussi l'accès à la bêta féminine.
+      const universDesPacks = async () => universCartes(catalogueAdmin(),
+        contexte?.authorized ? await ffr.avecPool('women', () => contexteFfr.getStore()?.joueurs ?? []) : undefined);
+      if (url.searchParams.has('packsInternes') || action === 'packInterne') {
+        if (!await peutCreerDesPacks(req.method !== 'GET')) throw new ErreurHttp(403, 'FORBIDDEN');
+        const packs = stockage.packsInternes!;
+        res.setHeader('Cache-Control', 'private, no-store');
+        const u = await universDesPacks();
+        if (req.method === 'GET') {
+          if (url.searchParams.has('recherche')) {
+            const p = url.searchParams;
+            return res.status(200).json(rechercherCartes(u, { q: p.get('q')?.slice(0, 80), club: p.get('club')?.slice(0, 80), poste: p.get('poste')?.slice(0, 40),
+              rarete: p.get('rarete')?.slice(0, 20), type: p.get('type')?.slice(0, 40) }));
+          }
+          return res.status(200).json({
+            packs: (await packs.lister(compte.id)).map(pack => detailPackInterne(u, pack)),
+            journal: await packs.journal(compte.id, 60),
+            limites: { cartes: CARTES_MAX_PACK_INTERNE, packs: PACKS_INTERNES_MAX },
+            types: [...new Set(u.liste.map(e => e.type))],
+          });
+        }
+        if (!await stockage.limiter(`pack-interne:${compte.id}`, 40, 60_000, maintenant)) throw new ErreurHttp(429, 'Patiente quelques secondes.');
+        if (corps.operation === 'supprimer') {
+          const id = texte(corps.id, 36, 36, 'Pack');
+          if (!idValide(id) || !await packs.supprimer(compte.id, id)) throw new ErreurHttp(404, 'Pack introuvable.');
+          return res.status(200).json({ ok: true });
+        }
+        if (corps.operation !== 'creer') throw new ErreurHttp(400, 'Opération inconnue.');
+        let definition;
+        try { definition = validerDefinitionPackInterne(corps.pack); resoudreCartes(u, definition.cartes); }
+        catch (erreur) { throw new ErreurHttp(400, (erreur as Error).message); }
+        const pack: PackInterne = { id: randomUUID(), ...definition, creeLe: new Date(maintenant).toISOString(), ouvertures: 0 };
+        if (!await packs.creer(compte.id, pack)) throw new ErreurHttp(409, `Tu as déjà ${PACKS_INTERNES_MAX} packs de test : supprimes-en un.`);
+        return res.status(200).json({ pack: detailPackInterne(u, pack) });
+      }
       if (req.method === 'GET' && url.searchParams.has('packsPrivesSolo')) {
-        return res.status(200).json({ packs: packsPrivesSolo(compte.identifiant, catalogueSpecial(), maintenant) });
+        // Les packs de test du compte s'ajoutent à sa liste privée ; personne d'autre ne reçoit ce champ.
+        let packsDeTest: PackInterneBoutique[] = [];
+        if (await peutCreerDesPacks(false)) {
+          const u = await universDesPacks();
+          packsDeTest = (await stockage.packsInternes!.lister(compte.id)).map(pack => packInternePourBoutique(pack, apparencePackInterne(u, pack)));
+        }
+        return res.status(200).json({ packs: packsPrivesSolo(compte.identifiant, catalogueSpecial(), maintenant), ...(packsDeTest.length ? { packsDeTest } : {}) });
+      }
+      if (action === 'ouvrirPackPriveSolo' && typeof corps.pack === 'string' && estPackInterne(corps.pack)) {
+        if (!await peutCreerDesPacks(true)) throw new ErreurHttp(403, 'FORBIDDEN');
+        const id = corps.pack.slice(PREFIXE_PACK_INTERNE.length);
+        if (!idValide(id)) throw new ErreurHttp(404, 'Pack introuvable.');
+        if (!await stockage.limiter(`pack-prive:${compte.id}`, 60, 60_000, maintenant)) throw new ErreurHttp(429, 'Patiente quelques secondes avant le prochain pack.');
+        const pack = await stockage.packsInternes!.lire(compte.id, id);
+        if (!pack) throw new ErreurHttp(404, 'Pack introuvable.');
+        // ⚠️ AUCUN TIRAGE, ET RIEN QUI VIENNE DE LA DEMANDE : le contenu est la liste enregistrée, relue dans le catalogue.
+        let contenu;
+        try { contenu = contenuPackInterne(await universDesPacks(), pack); }
+        catch (erreur) { throw new ErreurHttp(409, (erreur as Error).message); }
+        const boutique = await stockage.packsInternes!.ouvrir(compte.id, id, contenu.quantites, contenu.ordre);
+        if (!boutique) throw new ErreurHttp(409, 'Recharge la page pour synchroniser ta collection.');
+        return res.status(200).json({ boutique, cartes: contenu.cartes, ordreImpose: true });
       }
       if (action === 'ouvrirPackPriveSolo') {
         if (compte.identifiant !== 'kiri' || corps.pack !== PACK_ICONES_KIRI.id) throw new ErreurHttp(404, 'Pack introuvable.');

@@ -391,6 +391,8 @@ export interface Avatar {
 export interface OptionsMatch {
   /** Les anciens directs gardent leur garde-fou historique ; les nouveaux attendent la transformation. */
   reglesSirene?: 'historique' | 'transformation';
+  /** `historique` : les directs de ligue créés avant les règles 8 gardent l'ancienne pénaltouche (voir `EtatMatch.reglesPenaltouche`). */
+  reglesPenaltouche?: 'historique';
   /** Un générateur dont le serveur conserve l'état permet les reprises exactes. */
   rng?: () => number;
   scoreSurTerrain?: boolean;
@@ -612,6 +614,7 @@ export function creerMatch(
     styles: options.cadenceDetaillee || (options.ia ?? 1) >= 2 ? { A: styleDuClub(clubA), B: styleDuClub(clubB) } : undefined,
     scoreSurTerrain: options.scoreSurTerrain ?? true, meteoTir: options.meteoTir,
     reglesSirene: options.reglesSirene,
+    ...(options.reglesPenaltouche ? { reglesPenaltouche: options.reglesPenaltouche } : {}),
     ...(options.departage && (options.scoreSurTerrain ?? true) ? { departage: {
       periodes: options.departage.periodes, duree: options.departage.minutes * 60, criteres: options.departage.criteres,
     } } : {}),
@@ -1152,6 +1155,8 @@ function tick(e: EtatMatch): void {
       }
     }
     lancerVol(e, auteur, arrivee, attente.intention, duree, hauteur, auteur.pos, true, courbe);
+    // La pénalité tapée vers la touche garde son lancer, où que le ballon retombe (`Vol.dePenalite`).
+    if (attente.dePenalite && e.vol?.type === 'pied' && e.vol.auteur === auteur) e.vol.dePenalite = true;
     return;
   }
 
@@ -2555,7 +2560,8 @@ function phaseBallonEnLAir(e: EtatMatch): void {
     // La touche se joue là où le ballon a COUPÉ la ligne, pas au bout de son
     // vol un mètre derrière : sur une diagonale, l'écart se compte en mètres.
     const sortie = pointDeSortie(v.de, arrivee);
-    if (v.intention === 'penaltouche') {
+    // `dePenalite` : la pénaltouche « manquée » que le vent a tout de même poussée dehors reste une pénaltouche.
+    if (v.intention === 'penaltouche' || v.dePenalite) {
       dire(e, 'touche', camp, C.texteMatch('toucheASuivre', { club: nomClub(e, camp) }));
       return arret(e, 'touche', camp, sortie, false, false, true);
     }
@@ -2696,6 +2702,7 @@ function demarrerBallonLibre(
     auteur: vol.auteur,
     age: 0,
     rebonds: 0,
+    ...(vol.dePenalite ? { dePenalite: true } : {}),
   };
   dire(e, 'pied', null, rasant
     ? 'Le ballon fuse au ras du sol : la course à la récupération est lancée.'
@@ -2761,9 +2768,17 @@ function phaseBallonLibre(e: EtatMatch, dt: number): void {
   if (e.ballon.y <= 0 || e.ballon.y >= LARGEUR) {
     const lieu = { x: e.ballon.x, y: e.ballon.y <= 0 ? 0 : LARGEUR };
     e.ballonLibre = null;
+    const camp = libre.auteurCote;
+    // ═══ LA PÉNALTOUCHE GARDE SON LANCER, REBONDS COMPRIS (Correctif 33) ═════
+    // ⚠️ LE LANCER VIENT DE LA PÉNALITÉ, PAS DE LA TRAJECTOIRE. Une pénalité tapée vers la touche qui retombait dans le
+    // champ — manquée de peu, ou rabattue par le vent — devenait un ballon libre ordinaire : sorti un ou deux rebonds
+    // plus loin, il donnait la touche à l'équipe sanctionnée. Signalé en jeu. La touche se joue où le ballon est sorti.
+    if (libre.dePenalite) {
+      dire(e, 'touche', camp, C.texteMatch('toucheASuivre', { club: nomClub(e, camp) }));
+      return arret(e, 'touche', camp, lieu, false, false, true);
+    }
     // LE 50/22 SUR REBOND (IA par poste) : tapé de son camp, le ballon a touché
     // le sol avant de sortir dans les 22 adverses — le lancer reste au botteur.
-    const camp = libre.auteurCote;
     if (iaParPoste(e) && libre.depuis && libre.intention !== 'touche' && libre.rebonds >= 1
       && dansSonCamp(libre.depuis, camp) && dansLes22Adverses(lieu, camp) && !franchieLigne(lieu, camp)) {
       if (libre.auteur) {
@@ -2827,6 +2842,9 @@ function phaseBallonLibre(e: EtatMatch, dt: number): void {
     libre.vitesseVerticale = Math.max(libre.vitesseVerticale, 1.2);
     libre.hauteur = Math.max(libre.hauteur, 0.12);
     premier.battu = Math.max(premier.battu, 0.25);
+    // Touché par un partenaire du botteur, ce n'est plus « le coup de pied de pénalité » qui sort : touche ordinaire.
+    // Effleuré par un adversaire, le lancer reste acquis.
+    if (libre.dePenalite && premier.cote === libre.auteurCote) delete libre.dePenalite;
     return;
   }
 
@@ -8319,6 +8337,8 @@ function phasePenalite(e: EtatMatch): void {
     buteur.stats.coupsDePied += 1;
     e.placement = null;
     lancerVol(e, buteur, arrivee, trouvee ? 'penaltouche' : 'occupation', vol, 0.4, info.lieu);
+    // Trouvée ou non, c'est le coup de pied de la pénalité : s'il finit en touche, même après rebonds, le lancer est à nous.
+    if (e.reglesPenaltouche !== 'historique' && e.piedPrepare?.auteurId === buteur.id) e.piedPrepare.dePenalite = true;
     dire(e, 'pied', cote, C.texteMatch('penaltouche', {
       nom: buteur.nom, distance: Math.round(metresAvantLaLigne(arrivee, cote)),
     }), 0, buteur.moi);

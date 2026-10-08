@@ -38,6 +38,110 @@ export function paysageVerrouilleParLeJeu(): boolean { return paysageVerrouille;
 /** Le plein écran est quitté : le navigateur a rendu l'orientation avec lui. */
 export function oublierLeVerrou(): void { paysageVerrouille = false; }
 
+// ── ENTRER EN PLEIN ÉCRAN, Y COMPRIS LÀ OÙ LE NAVIGATEUR NE SAIT PAS (Correctif 33) ───────────────────────────────
+// Signalé en jeu : « on ne peut plus mettre en plein écran sur les matchs — sur mobile, le bouton n'apparaît pas ».
+// Le bouton ne s'affichait que si `document.fullscreenEnabled` valait vrai : c'est faux sur iPhone, où Safari ne
+// propose le plein écran qu'aux vidéos, et sur un iPad d'avant Safari 16.4, qui ne connaît que la forme préfixée.
+// Trois cas, du meilleur au repli :
+//   natif    — l'API standard, ou sa forme `webkit` ; le téléphone passe en paysage quand il sait le faire ;
+//   simulé   — pas d'API du tout (iPhone) : le cadre du match est posé par-dessus toute la page, à la taille de la
+//              fenêtre. La barre du navigateur reste (lui seul peut la retirer), mais le match prend tout l'écran
+//              et suit le téléphone quand on le tourne ;
+// et dans les deux cas le MÊME bouton, la même classe d'état, la même sortie.
+type DocumentWebkit = Document & { webkitFullscreenEnabled?: boolean; webkitFullscreenElement?: Element | null; webkitExitFullscreen?: () => void };
+type ElementWebkit = HTMLElement & { webkitRequestFullscreen?: () => void };
+
+const CLASSE_SIMULE = 'plein-ecran-simule';
+const CLASSE_ANCETRE = 'plein-ecran-simule-ancetre';
+const CLASSE_PAGE = 'plein-ecran-simule-actif';
+let simule: HTMLElement | null = null;
+const abonnes = new Set<() => void>();
+const prevenir = () => { for (const abonne of [...abonnes]) abonne(); };
+
+/** En développement, `?pleinEcran=simule` force le repli : c'est le seul moyen de l'essayer ailleurs que sur un iPhone. */
+const repliForce = () => import.meta.env?.DEV === true && typeof location !== 'undefined' && new URLSearchParams(location.search).get('pleinEcran') === 'simule';
+
+export function pleinEcranNatifPossible(): boolean {
+  if (typeof document === 'undefined' || repliForce()) return false;
+  const d = document as DocumentWebkit;
+  return d.fullscreenEnabled === true || d.webkitFullscreenEnabled === true;
+}
+
+/** Ce qui occupe l'écran en ce moment : l'élément en plein écran natif, ou celui qu'on a posé par-dessus la page. */
+export function elementEnPleinEcran(): Element | null {
+  if (typeof document === 'undefined') return null;
+  if (simule && !simule.isConnected) quitterPleinEcranSimule();
+  const d = document as DocumentWebkit;
+  return d.fullscreenElement ?? d.webkitFullscreenElement ?? simule;
+}
+
+/** S'abonner aux entrées et sorties de plein écran, natif ou simulé. Rend la fonction de désabonnement. */
+export function surPleinEcran(ecouteur: () => void): () => void {
+  abonnes.add(ecouteur);
+  document.addEventListener('fullscreenchange', ecouteur);
+  document.addEventListener('webkitfullscreenchange', ecouteur);
+  return () => {
+    abonnes.delete(ecouteur);
+    document.removeEventListener('fullscreenchange', ecouteur);
+    document.removeEventListener('webkitfullscreenchange', ecouteur);
+  };
+}
+
+/**
+ * Retire le plein écran simulé. ⚠️ SYNCHRONE ET SANS CONDITION : c'est aussi le filet de la sortie de match — un cadre
+ * resté « par-dessus la page » après la fermeture du match laisserait le défilement de la page verrouillé.
+ */
+export function quitterPleinEcranSimule(): void {
+  if (typeof document === 'undefined') return;
+  const etait = simule !== null;
+  simule?.classList.remove(CLASSE_SIMULE);
+  simule = null;
+  for (const ancetre of document.querySelectorAll(`.${CLASSE_ANCETRE}`)) ancetre.classList.remove(CLASSE_ANCETRE);
+  document.documentElement.classList.remove(CLASSE_PAGE);
+  if (etait) { window.dispatchEvent(new Event('resize')); prevenir(); }
+}
+
+function simulerPleinEcran(element: HTMLElement): void {
+  quitterPleinEcranSimule();
+  simule = element;
+  element.classList.add(CLASSE_SIMULE);
+  // ⚠️ UN ANCÊTRE TRANSFORMÉ OU FLOUTÉ PIÈGE LES `position: fixed` (c'est le piège des `.carte` et des fenêtres animées) :
+  // le cadre resterait enfermé dans son panneau. Le temps du plein écran, ses ancêtres rendent leur bloc conteneur.
+  for (let ancetre = element.parentElement; ancetre && ancetre !== document.documentElement; ancetre = ancetre.parentElement) ancetre.classList.add(CLASSE_ANCETRE);
+  document.documentElement.classList.add(CLASSE_PAGE);
+  // La scène 3D et les caméras relisent la taille de leur cadre sur cet événement.
+  window.dispatchEvent(new Event('resize'));
+  prevenir();
+}
+
+/**
+ * Passe `element` en plein écran. Natif quand le navigateur le permet (et le téléphone se tourne en paysage s'il sait
+ * verrouiller l'orientation), simulé sinon. Ne lève jamais : un refus du navigateur retombe sur le plein écran simulé.
+ */
+export async function entrerEnPleinEcran(element: HTMLElement): Promise<'natif' | 'simule'> {
+  if (pleinEcranNatifPossible()) {
+    try {
+      const e = element as ElementWebkit;
+      if (typeof e.requestFullscreen === 'function') await e.requestFullscreen({ navigationUI: 'hide' });
+      else if (typeof e.webkitRequestFullscreen === 'function') e.webkitRequestFullscreen();
+      else throw new Error('aucune méthode');
+      void verrouillerPaysage();
+      return 'natif';
+    } catch { /* refusé : on retombe sur le plein écran simulé */ }
+  }
+  simulerPleinEcran(element);
+  return 'simule';
+}
+
+/** Quitte le plein écran, quel qu'il soit. */
+export function sortirDuPleinEcran(): void {
+  if (typeof document === 'undefined') return;
+  const d = document as DocumentWebkit;
+  if (d.fullscreenElement) void document.exitFullscreen().catch(() => { /* déjà sorti */ });
+  else if (d.webkitFullscreenElement) d.webkitExitFullscreen?.();
+  quitterPleinEcranSimule();
+}
+
 /** Deux images dessinées : React a eu le temps de démonter ce qu'on vient de retirer. */
 export function deuxImages(): Promise<void> {
   return new Promise<void>((fin) => {

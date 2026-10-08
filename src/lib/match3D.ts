@@ -105,6 +105,11 @@ export interface Scene3D {
   recadrer(): void;
   /** Position à l'écran, en pixels du cadre, du dessus de la tête d'un joueur. */
   ecran(id: string, hauteurTete?: number): { x: number; y: number } | null;
+  /**
+   * Le ballon est-il dans le cadre ? Sinon `dx`, `dy` : la direction où le chercher, vue de l'écran (y vers le bas),
+   * juste même quand il est derrière la caméra. `dx`/`dy` sont absents d'un lecteur installé avant le Correctif 33.
+   */
+  ballonAEcran?(): { x: number; y: number; dedans: boolean; dx?: number; dy?: number };
   detruire(): void;
   /** La même destruction, par tranches (Correctif 26). Absente d'un lecteur installé avant ce correctif. */
   detruireParEtapes?(): Promise<void>;

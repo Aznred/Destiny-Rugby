@@ -447,6 +447,7 @@ export interface DossierRecrutementClub {
 
 // Un transfert ANNONCÉ sur L'Ovale — et réellement appliqué au monde du jeu.
 export interface TransfertAnnonce {
+  sourcePlayerId?: string;
   nom: string; // joueur concerné
   de: string; // club quitté
   vers: string; // club rejoint
@@ -1056,6 +1057,7 @@ export type InstallationsClub = Record<TypeInstallation, number>;
  * annoncés sur L'Ovale, et `effectif.ts` le reçoit par registre.
  */
 export interface JeuneForme {
+  sourcePlayerId?: string;
   developmentCurve?: number[];
   potentielEstime?: [number, number];
   id: string;
@@ -1108,6 +1110,7 @@ export type ObjectifJeuneManager =
 
 /** Un jeune qui a réellement choisi le centre du club. Son potentiel reste caché. */
 export interface AcademicienManager extends JeuneJoueur {
+  entrainementSenior?: boolean;
   clubOrigine: string;
   clubCentre: string;
   recruteSaison: number;
@@ -1143,9 +1146,12 @@ export interface ReponseJeuneManager {
   saison: number;
 }
 
-export type ActionAcademieManager = 'u18' | 'espoirs' | 'pret' | 'senior' | 'liberer';
+export type ActionAcademieManager = 'u18' | 'espoirs' | 'pret' | 'senior' | 'liberer' | 'entrainement_senior';
 
 export interface Manager {
+  /** Snapshot réel épinglé et décisions de cette timeline ; les sources restent dans IndexedDB. */
+  mondeJeunes?: import('./lib/mondeJeunes').MondeJeunesCarriere;
+  jeunesSuivis?: Record<string, boolean>;
   usageId?: string;
   usageDebut?: string;
   nom: string;

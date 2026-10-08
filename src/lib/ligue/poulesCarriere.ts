@@ -1,3 +1,5 @@
+import { qualifiesPlayoffsEnLigne, tableauPlayoffs } from '../competitionRules.js';
+
 /** Taille du tableau final : finale, demi-finales ou quarts selon l'effectif. */
 export function nombreQualifiesPoules(nombre: number): 2 | 4 | 8 {
   return nombre >= 9 ? 8 : nombre >= 4 ? 4 : 2;
@@ -25,8 +27,43 @@ export function repartirPoules(participants: readonly string[]): string[][] {
 export function estPuissanceDeDeux(nombre: number): boolean {
   return nombre >= 2 && (nombre & (nombre - 1)) === 0;
 }
-/** Tableau de phase finale : de la finale directe jusqu'aux seizièmes (32 clubs). */
+
+/**
+ * Phase finale d'un championnat : 4 clubs → 2 qualifiés, 6 → 4, 8 → 4, 10 → 6, 16 et plus → 8.
+ * La définition vit dans le règlement (`qualifiesPlayoffsEnLigne`) : le serveur, le tableau et le classement la lisent.
+ */
 export function nombreQualifiesPlayoffs(clubs: number): number {
-  if (!Number.isFinite(clubs) || clubs < 2) return 0;
-  return 2 ** Math.floor(Math.log2(Math.min(32, Math.floor(clubs))));
+  return qualifiesPlayoffsEnLigne(clubs);
+}
+
+/** Matchs par tour d'une phase finale à `qualifies` clubs : six qualifiés → 2 barrages, 2 demi-finales, 1 finale. */
+export function toursPlayoffs(qualifies: number): number[] {
+  return tableauPlayoffs(qualifies).tours;
+}
+
+export interface TourPlayoffs {
+  /** Les affiches du prochain tour : le mieux classé reçoit. Vide quand le champion est connu. */
+  paires: { domicile: string; exterieur: string }[];
+  /** Le dernier club en lice, une fois la finale jouée. */
+  champion?: string;
+}
+
+/**
+ * LE PROCHAIN TOUR D'UNE PHASE FINALE, déduit de deux faits : l'ordre des qualifiés au classement régulier, et ceux
+ * qui ont déjà perdu.
+ *
+ * ⚠️ ON NE SE FIE NI AU NUMÉRO DU TOUR NI AU NOMBRE D'AFFICHES DU TOUR PRÉCÉDENT. Apparier « les vainqueurs du dernier
+ * tour » oubliait les exemptés d'un tableau à six : les deux vainqueurs des barrages se seraient retrouvés en finale,
+ * sans que le premier ni le deuxième aient joué. Ici, tant qu'il reste plus de clubs qu'une puissance de deux, les
+ * moins bien classés jouent un barrage ; ensuite le premier rencontre le dernier, le deuxième l'avant-dernier.
+ */
+export function prochainTourPlayoffs(qualifies: readonly string[], elimines: ReadonlySet<string>): TourPlayoffs {
+  const vivants = qualifies.filter(id => !elimines.has(id));
+  if (vivants.length <= 1) return { paires: [], champion: vivants[0] };
+  const plein = 2 ** Math.floor(Math.log2(vivants.length));
+  const barrages = vivants.length - plein;
+  const enLice = barrages ? vivants.slice(vivants.length - 2 * barrages) : vivants;
+  return {
+    paires: Array.from({ length: enLice.length / 2 }, (_, i) => ({ domicile: enLice[i], exterieur: enLice[enLice.length - 1 - i] })),
+  };
 }

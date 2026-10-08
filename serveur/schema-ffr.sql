@@ -43,6 +43,13 @@ create table if not exists academy_profiles (
   dataset_version text not null references player_datasets(version), club_id text not null, gender text not null,
   data jsonb not null, primary key(dataset_version,club_id,gender)
 );
+-- Instantanés minimaux de carrière : jamais joints à game_players ni aux cartes.
+create table if not exists youth_career_sources (
+  dataset_version text not null references player_datasets(version), id text not null,
+  club text not null, age integer not null, position text not null, data jsonb not null,
+  primary key(dataset_version,id)
+);
+create index if not exists youth_career_sources_club on youth_career_sources(dataset_version,club,id);
 -- These tables are accessed only by the authenticated server/service connection.
 alter table source_players enable row level security;
 alter table game_players enable row level security;
@@ -50,3 +57,4 @@ alter table player_feature_access enable row level security;
 alter table player_reviews enable row level security;
 alter table player_migration_snapshots enable row level security;
 alter table academy_profiles enable row level security;
+alter table youth_career_sources enable row level security;

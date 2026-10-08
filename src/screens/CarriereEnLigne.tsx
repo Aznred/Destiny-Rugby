@@ -35,7 +35,7 @@ import { Confirmation } from '../components/Confirmation';
 import { useGame } from '../store/useGame';
 import { nomPoste, POSTE_PAR_ID } from '../data/rugby';
 import { meilleureComposition } from '../lib/meilleureComposition';
-import { estPuissanceDeDeux, nombreQualifiesPlayoffs, nombreQualifiesPoules, repartirPoules } from '../lib/ligue/poulesCarriere';
+import { estPuissanceDeDeux, nombreQualifiesPlayoffs, nombreQualifiesPoules, repartirPoules, toursPlayoffs } from '../lib/ligue/poulesCarriere';
 import { EFFECTIF_MINIMUM, POSTES_XV_MANAGER } from '../lib/compositionManager';
 import type { CompositionManager } from '../types';
 import type { Coequipier } from '../lib/effectif';
@@ -1027,7 +1027,9 @@ function Classement({ vue, onClub }: { vue: VueCarriereEnLigne; onClub?: (clubId
   const logos = useLogosDeClub();
   if (!vue.classement.length) return <p className="cel-note">{t('online.table.pending')}</p>;
   const joue = vue.classement.some(l => l.joues > 0);
-  const nombrePlayoffs = vue.playoffs ? nombreQualifiesPlayoffs(vue.classement.length) : 0;
+  // Le nombre de qualifiés est gelé par le serveur à l'ouverture de la phase finale ; avant, il suit la taille de la ligue.
+  const championnat = vue.competitions.find(c => c.saison === vue.saison && c.format === 'championnat' && c.playoffs);
+  const nombrePlayoffs = vue.playoffs ? qualifiesDuChampionnat(championnat, vue.classement.length) : 0;
 
   // ⚠️ LE MÊME TABLEAU QUE LES CARRIÈRES (Correctif 29), ET LES MÊMES ZONES : elles viennent du règlement de la ligue
   // (`onlineRules`), pas d'un rang écrit ici. Sur téléphone, toute la ligue se lit sans défilement horizontal.
@@ -1121,6 +1123,21 @@ function nomTour(index: number, total: number, taillePremier = 2 ** Math.max(0, 
   return index === 0 ? t('online.cup.preliminary') : t('online.cup.round', { n: index + 1 });
 }
 
+/**
+ * Combien de clubs disputent la phase finale d'un championnat. ⚠️ La MÊME règle que le serveur (`nombreQualifiesPlayoffs`),
+ * et sa valeur gelée (`qualifies`) dès que la phase finale est ouverte : l'écran calculait la sienne, et à seize clubs
+ * il dessinait un tableau de huit pour seize qualifiés.
+ */
+function qualifiesDuChampionnat(competition: Pick<VueCarriereEnLigne['competitions'][number], 'qualifies' | 'participants'> | undefined, clubs: number): number {
+  return competition?.qualifies ?? nombreQualifiesPlayoffs(competition?.participants.length ?? clubs);
+}
+
+/** Le nom d'un tour de phase finale de championnat : « Barrages » quand des clubs sont exemptés du premier tour. */
+function nomTourPlayoffs(index: number, tours: number[]): string {
+  const barrages = tours.length > 1 && tours[0] !== 2 ** (tours.length - 1);
+  return barrages && index === 0 ? t('online.cup.playIn') : nomTour(index, tours.length);
+}
+
 function matchsParTour(nombreParticipants: number): number[] {
   const tours: number[] = [];
   let restants = Math.max(0, nombreParticipants);
@@ -1171,10 +1188,9 @@ function nomEtapeCompetition(
   // Championnat
   if (competition.playoffs && competition.journeesRegulieres && journee > competition.journeesRegulieres) {
     const debutPlayoffs = competition.journeesRegulieres + 1;
-    const nombre = Math.min(competition.participants.length, Math.max(4, 2 ** Math.floor(Math.log2(competition.participants.length / 2))));
-    const totalTours = matchsParTour(nombre).length;
+    const tours = toursPlayoffs(qualifiesDuChampionnat(competition, competition.participants.length));
     const index = Math.max(0, journee - debutPlayoffs);
-    const nom = nomTour(index, totalTours);
+    const nom = nomTourPlayoffs(index, tours);
     return {
       titreCourt: `Play-offs · ${nom}`,
       titreComplet: t('online.cup.playoffsTitle', { name: nom }),
@@ -2237,12 +2253,13 @@ function TableauCoupe({ vue, competition, rencontres, suivre }: {
   const nombreTableau = competition.format === 'poules'
     ? competition.qualifies ?? nombreQualifiesPoules(competition.participants.length)
     : competition.format === 'championnat'
-      ? Math.min(competition.participants.length, Math.max(4, 2 ** Math.floor(Math.log2(competition.participants.length / 2))))
+      ? qualifiesDuChampionnat(competition, competition.participants.length)
       : competition.participants.length;
   const debutTableau = (competition.format === 'poules' || competition.format === 'championnat')
     ? (competition.journeesRegulieres ?? 0) + 1
     : 1;
-  const tailles = matchsParTour(nombreTableau);
+  // Championnat : six qualifiés jouent deux barrages, les deux premiers attendent en demi-finale.
+  const tailles = competition.format === 'championnat' ? toursPlayoffs(nombreTableau) : matchsParTour(nombreTableau);
   const intervalle = 7 * 86_400_000 / vue.rythme;
   return <section className="cel-panneau cel-panneau-tableau">
     <div className="cel-titre-ligne">
@@ -2258,7 +2275,7 @@ function TableauCoupe({ vue, competition, rencontres, suivre }: {
       const datePrevue = new Date(Date.parse(competition.debut) + journee * intervalle).toISOString();
       return <div className="cel-tour-coupe" key={journee}>
         <div className="cel-entete-tour">
-          <b>{nomTour(index, tailles.length, tailles[0])}</b>
+          <b>{competition.format === 'championnat' ? nomTourPlayoffs(index, tailles) : nomTour(index, tailles.length, tailles[0])}</b>
           <small>{date(matchs[0]?.ferme ?? datePrevue)}</small>
         </div>
         {Array.from({ length: taille }, (_, numero) => {

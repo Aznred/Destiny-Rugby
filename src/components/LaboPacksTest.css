@@ -1,0 +1,94 @@
+/* Le Labo · packs de test. Même matière que l'Atelier (cuir sombre, filets dorés) ; deux colonnes au-delà de 1 120 px,
+   une seule en dessous : la recherche d'abord, le pack ensuite. */
+.labo-packs-test { display: grid; gap: 1rem; min-width: 0; }
+.lp-entete { display: flex; flex-wrap: wrap; align-items: start; justify-content: space-between; gap: .75rem 1.5rem; }
+.lp-entete h3 { margin: 0 0 .3rem; font: 1.35rem/1.1 var(--police-titre); letter-spacing: .02em; }
+.lp-entete p { max-width: 62ch; margin: 0; color: var(--brume); font-size: .8rem; line-height: 1.55; }
+.lp-compte { padding: .45rem .8rem; border: 1px solid var(--bordure); border-radius: var(--rayon-pilule); color: var(--brume); font: 700 .74rem/1 var(--police-forte); white-space: nowrap; }
+.lp-compte b { color: var(--or-400); font-size: .95rem; }
+
+.lp-atelier { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 1rem; align-items: start; }
+.lp-recherche, .lp-composition { display: grid; gap: .75rem; min-width: 0; padding: 1.1rem; border: 1px solid var(--bordure); border-radius: var(--rayon); background: color-mix(in srgb, var(--surface) 82%, #000); }
+.labo-packs-test h4 { display: flex; align-items: center; gap: .45rem; margin: 0; color: var(--or-400); font: 700 .78rem/1 var(--police-forte); letter-spacing: .08em; text-transform: uppercase; }
+.lp-titre { margin-top: .4rem !important; }
+.lp-champs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem .75rem; }
+.lp-filtres { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.labo-packs-test label { display: grid; gap: .4rem; color: var(--brume); font: 700 .72rem/1.2 var(--police-forte); }
+.labo-packs-test input[type='search'], .lp-composition input {
+  width: 100%; min-height: 2.6rem; padding: .55rem .75rem; border: 1px solid var(--bordure); border-radius: var(--rayon-controle);
+  background: #0003; color: var(--craie); font: 500 .84rem/1.2 var(--police-forte);
+}
+.labo-packs-test input:focus-visible { outline: 2px solid var(--or-400); outline-offset: 1px; }
+
+/* Les deux listes : une ligne par carte, le nom ne déborde jamais. Conteneurs de défilement en grille : rangées à
+   leur hauteur naturelle (sans quoi elles s'écrasent au lieu de défiler). */
+.lp-resultats, .lp-ordre { display: grid; align-content: start; grid-auto-rows: min-content; gap: .3rem; max-height: 30rem; margin: 0; padding: .35rem; overflow: auto; list-style: none; border: 1px solid var(--bordure); border-radius: var(--rayon-controle); background: #0002; }
+.lp-resultats[aria-busy='true'] { opacity: .65; }
+.lp-resultats li, .lp-ordre li { display: grid; align-items: center; gap: .6rem; min-width: 0; padding: .4rem .5rem; border: 1px solid transparent; border-radius: 10px; }
+.lp-resultats li { grid-template-columns: 2.6rem minmax(0, 1fr) auto auto; }
+.lp-ordre li { grid-template-columns: 1.6rem 2.6rem minmax(0, 1fr) auto; }
+.lp-resultats li:hover, .lp-ordre li:hover { border-color: var(--bordure); background: var(--surface); }
+.lp-ordre li.principale { border-color: var(--or-400); background: color-mix(in srgb, var(--or-500) 14%, var(--surface)); }
+.lp-vide { display: block !important; padding: .9rem !important; color: var(--brume); font-size: .8rem; }
+.lp-rang { color: var(--brume); font: 1.05rem/1 var(--police-titre); text-align: center; }
+.lp-vignette { display: grid; place-items: center; width: 2.6rem; height: 2.6rem; overflow: hidden; border-radius: 8px; background: #0005; color: var(--brume); box-shadow: inset 0 0 0 1px var(--bordure); }
+.lp-vignette img { width: 100%; height: 100%; object-fit: cover; object-position: top; }
+.lp-vignette.rarete-or { box-shadow: inset 0 0 0 1px #ffd15b88; }
+.lp-vignette.rarete-elite { box-shadow: inset 0 0 0 1px #54e4ff88; }
+.lp-vignette.rarete-star { box-shadow: inset 0 0 0 1px #ff405799; }
+.lp-vignette.type-icon { background: linear-gradient(160deg, #fffaf0, #e4d4ae); color: #7a5a1a; }
+.lp-vignette.type-halloween { background: linear-gradient(160deg, #2a2a30, #0b0b0d); box-shadow: inset 0 0 0 1px #ff8a1c77; }
+.lp-vignette.type-influencer { background: linear-gradient(160deg, #3b1a5c, #5c1420); box-shadow: inset 0 0 0 1px #c45cff88; }
+.lp-identite { display: grid; gap: .15rem; min-width: 0; }
+.lp-identite b { overflow: hidden; font: 700 .84rem/1.2 var(--police-forte); white-space: nowrap; text-overflow: ellipsis; }
+.lp-identite small, .lp-note small { overflow: hidden; color: var(--brume); font-size: .68rem; white-space: nowrap; text-overflow: ellipsis; }
+.lp-note { display: grid; justify-items: end; gap: .1rem; max-width: 9rem; }
+.lp-note b { color: var(--or-400); font: 1.15rem/1 var(--police-titre); }
+.lp-resultats .btn { min-height: 2.4rem; padding: .4rem .75rem; font-size: .72rem; white-space: nowrap; }
+
+.lp-actions { display: flex; gap: .25rem; }
+.lp-icone { display: grid; place-items: center; width: 2.4rem; height: 2.4rem; padding: 0; border: 1px solid var(--bordure); border-radius: 9px; background: #0003; color: var(--craie-dim); cursor: pointer; }
+.lp-icone:hover:not(:disabled) { border-color: var(--bordure-forte); color: var(--craie); }
+.lp-icone:disabled { opacity: .3; cursor: default; }
+.lp-icone.actif { border-color: var(--or-400); background: color-mix(in srgb, var(--or-500) 24%, transparent); color: var(--or-400); }
+.lp-icone.danger:hover { border-color: #d46b60; color: #ffd2cd; }
+.lp-fleche { display: grid; }
+.lp-fleche.haut { transform: rotate(180deg); }
+.lp-alerte { margin: 0 !important; color: #ffd9a8 !important; }
+.lp-composition > .btn { justify-self: start; }
+
+.lp-packs { display: grid; grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr)); gap: .75rem; margin: 0; padding: 0; list-style: none; }
+.lp-packs > li { display: grid; align-content: start; gap: .65rem; min-width: 0; padding: 1rem; border: 1px solid var(--bordure); border-radius: var(--rayon); background: color-mix(in srgb, var(--surface) 82%, #000); }
+.lp-packs > li.lp-vide { grid-column: 1 / -1; }
+.lp-pack-tete { display: grid; gap: .25rem; }
+.lp-pack-tete b { font: 1.05rem/1.15 var(--police-titre); letter-spacing: .02em; }
+.lp-pack-tete small { color: var(--brume); font-size: .7rem; line-height: 1.45; }
+.lp-pack-cartes { display: grid; gap: .2rem; margin: 0; padding: 0 0 0 1.4rem; color: var(--craie-dim); font-size: .78rem; }
+.lp-pack-cartes b { color: var(--or-400); font: 700 .78rem/1 var(--police-forte); }
+.lp-pack-cartes small { color: var(--brume); font-size: .66rem; }
+.lp-pack-cartes .manquante { color: #ffb4a8; }
+.lp-pack-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
+.lp-pack-actions .btn { min-height: 2.4rem; padding: .4rem .8rem; font-size: .72rem; }
+
+.lp-journal { padding: .75rem 1rem; border: 1px solid var(--bordure); border-radius: var(--rayon); }
+.lp-journal summary { color: var(--craie-dim); font: 700 .76rem/1.3 var(--police-forte); cursor: pointer; }
+.lp-journal table { width: 100%; margin-top: .7rem; border-collapse: collapse; font-size: .74rem; }
+.lp-journal th { padding: .35rem .5rem; color: var(--brume); font: 700 .66rem/1 var(--police-forte); letter-spacing: .06em; text-align: left; text-transform: uppercase; }
+.lp-journal td { padding: .4rem .5rem; border-top: 1px solid var(--bordure); color: var(--craie-dim); }
+.lp-journal code, .labo-packs-test .ak-erreur code { font-size: .7rem; color: var(--or-400); }
+
+@media (max-width: 1120px) {
+  .lp-atelier { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 700px) {
+  .lp-champs, .lp-filtres { grid-template-columns: minmax(0, 1fr); }
+  /* Sur téléphone, le bouton d'ajout passe sous l'identité : le nom garde toute la largeur. */
+  .lp-resultats li { grid-template-columns: 2.6rem minmax(0, 1fr) auto; grid-template-areas: 'vignette identite note' 'bouton bouton bouton'; }
+  .lp-resultats li > .lp-vignette { grid-area: vignette; } .lp-resultats li > .lp-identite { grid-area: identite; }
+  .lp-resultats li > .lp-note { grid-area: note; } .lp-resultats li > .btn { grid-area: bouton; min-height: 2.75rem; }
+  .lp-ordre li { grid-template-columns: 1.4rem 2.6rem minmax(0, 1fr); grid-template-areas: 'rang vignette identite' 'actions actions actions'; }
+  .lp-ordre li > .lp-rang { grid-area: rang; } .lp-ordre li > .lp-vignette { grid-area: vignette; }
+  .lp-ordre li > .lp-identite { grid-area: identite; } .lp-ordre li > .lp-actions { grid-area: actions; justify-content: end; }
+  .lp-icone { width: 2.75rem; height: 2.75rem; }
+  .lp-journal { overflow-x: auto; }
+}

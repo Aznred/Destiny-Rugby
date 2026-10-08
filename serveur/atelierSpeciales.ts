@@ -288,13 +288,18 @@ export async function appliquerOperationSpeciale(courant: CatalogueAdmin, suivan
     case 'publierCartesSpeciales': {
       if (!Array.isArray(corps.ids) || !corps.ids.length || corps.ids.length > 500) refuser('Sélection invalide.');
       const publier = booleen(corps.published, 'Publication');
-      const bilan = { modifiees: 0, ignorees: [] as string[] };
+      // `ignorees` : les cartes SANS IMAGE (ou inconnues). `brouillons` : celles que cette publication a sorties du brouillon.
+      const bilan = { modifiees: 0, ignorees: [] as string[], brouillons: 0 };
       for (const brut of corps.ids) {
         const id = texte(brut, 160, 'Carte'), def = cat.parId.get(id);
         if (!def) { bilan.ignorees.push(id); continue; }
         // Publier en masse ne force rien : une carte sans image reste en attente.
-        if (publier && statutCarteSpeciale(def) === 'image_missing') { bilan.ignorees.push(def.nom); continue; }
-        if (publier && def.brouillon) { bilan.ignorees.push(def.nom); continue; }
+        if (publier && !def.imageReady) { bilan.ignorees.push(def.nom); continue; }
+        // ⚠️ UN BROUILLON AVEC SON IMAGE, COCHÉ PUIS PUBLIÉ, SORT DU BROUILLON (Correctif 33). Il était rangé avec les
+        // cartes « en attente d'image » : un Influenceur naît en brouillon, et le Labo répondait « image manquante »
+        // alors que l'image était là. Cocher une carte et demander sa publication est une décision explicite ;
+        // « Publier les prêtes » ne touche toujours aucun brouillon, et la famille reste à activer à part.
+        if (publier && def.brouillon) { ecrireCarte(id, { published: true, brouillon: false }); bilan.modifiees++; bilan.brouillons++; continue; }
         ecrireCarte(id, { published: publier }); bilan.modifiees++;
       }
       return bilan;

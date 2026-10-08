@@ -143,6 +143,8 @@ export function ControleDirect({ pilotage, surReprendre, suspendu = false }: {
       {snap.visible && tactile && !snap.pause && !occupe && !snap.pack && (
         <Commandes pilotage={pilotage} snap={snap} sprint={sprint} />
       )}
+      {/* Le ballon hors du cadre (Correctif 33) : une flèche au bord de l'écran dit où le chercher, et qui le porte. */}
+      {snap.visible && enJeu && !snap.pause && !occupe && <RepereBallon pilotage={pilotage} />}
       {/* Le geste dans un pack (Correctif 23) : mêlée, maul, saut, lift, grattage — une piste de temps et un gros bouton. */}
       {snap.visible && enJeu && !snap.pause && !occupe && snap.pack && <Rythme pilotage={pilotage} snap={snap} tactile={tactile} />}
       {/* Les responsabilités : les panneaux de décision, de tir, d'engagement et de touche — et leurs cartes d'explication. */}
@@ -182,6 +184,55 @@ export function ControleDirect({ pilotage, surReprendre, suspendu = false }: {
       {pauseAffichee && (
         <PanneauPause snap={snap} touches={prefs.touches} surReprendre={surReprendre} />
       )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// LE BALLON HORS DU CADRE
+// ---------------------------------------------------------------------------
+
+/**
+ * « On sait toujours où se situe le porteur du ballon » (Correctif 33). La caméra assistée garde le ballon dans le cadre ;
+ * quand il en sort quand même — le joueur a tourné la vue, la caméra est en mode libre, un coup de pied part dans son dos —
+ * une flèche au bord de l'écran pointe vers lui, à la couleur de celui qui le porte (or : un coéquipier ; rouge : un
+ * adversaire ; blanc : personne), avec son nom.
+ *
+ * ⚠️ ÉCRITE DANS LE DOM À CHAQUE IMAGE, comme la piste des temps d'un pack : elle suit la caméra, que React ne voit pas bouger.
+ */
+function RepereBallon({ pilotage }: { pilotage: PilotageDirect }) {
+  const pastille = useRef<HTMLDivElement>(null);
+  const fleche = useRef<HTMLSpanElement>(null);
+  const nom = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    let id = 0;
+    const boucle = () => {
+      const el = pastille.current, r = pilotage.repereBallon;
+      const cadre = el?.parentElement;
+      if (el && cadre) {
+        if (!r) el.dataset.visible = 'non';
+        else {
+          // Le point du bord visé : on part du centre et on s'arrête avant le score (haut) et les commandes (bas).
+          const demiL = Math.max(40, cadre.clientWidth / 2 - 54), demiH = Math.max(40, cadre.clientHeight / 2 - 104);
+          const k = Math.min(demiL / Math.max(0.001, Math.abs(r.dx)), demiH / Math.max(0.001, Math.abs(r.dy)));
+          el.style.transform = `translate(${cadre.clientWidth / 2 + r.dx * k}px, ${cadre.clientHeight / 2 + r.dy * k}px) translate(-50%, -50%)`;
+          el.dataset.visible = 'oui';
+          el.dataset.camp = r.camp;
+          // Le chevron pointe vers le bas au repos.
+          if (fleche.current) fleche.current.style.transform = `rotate(${Math.atan2(r.dy, r.dx) - Math.PI / 2}rad)`;
+          if (nom.current && nom.current.textContent !== (r.nom ?? '')) nom.current.textContent = r.nom ?? '';
+        }
+      }
+      id = requestAnimationFrame(boucle);
+    };
+    id = requestAnimationFrame(boucle);
+    return () => cancelAnimationFrame(id);
+  }, [pilotage]);
+  return (
+    <div ref={pastille} className="cd-ballon" data-visible="non" aria-hidden>
+      <span ref={fleche} className="cd-ballon-fleche"><Icone nom="chevron" taille={15} /></span>
+      <Icone nom="ballon" taille={15} />
+      <span ref={nom} className="cd-ballon-nom" />
     </div>
   );
 }

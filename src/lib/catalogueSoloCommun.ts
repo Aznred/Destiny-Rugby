@@ -10,6 +10,7 @@ import { enregistrerArticlesLabo, type ArticleEquipement } from '../data/boutiqu
 import { stockageSerre } from './persistanceNavigation';
 import { jsonEtroit } from './sauvegardes';
 import { carteSeniorAutorisee, fournirPoolFfr } from './ligue/eligibiliteJoueurs';
+import { definirPortraitsDeCartes } from './avatars';
 
 let revision = -1;
 let revisionFfr = '';
@@ -57,6 +58,13 @@ function appliquerReponse(donnees: ReponseCatalogue): boolean {
   const parId = new Map(mondial.map(s => [s.sourceId, s]));
   speciales = assemblerCatalogueSpecial(definitions, evenements, id => parId.get(id));
   courant = speciales.definitions.length ? [...mondial, ...speciales.definitions.map(d => speciales!.sources.get(d.id)!)] : mondial;
+  // Un créateur qui a aussi sa place dans un effectif y porte le visage de sa carte publiée (identité réelle renseignée).
+  const portraits = new Map<string, string>();
+  for (const d of speciales.definitions) {
+    if (d.cardType !== 'influencer' || !d.image) continue;
+    for (const nom of [d.real_name, d.first_name && d.last_name ? `${d.first_name} ${d.last_name}` : undefined]) if (nom?.trim()) portraits.set(nom, d.image);
+  }
+  definirPortraitsDeCartes(portraits);
   // Les cosmétiques du Labo arrivent avec le catalogue : un seul aller-retour, relu au plus une fois par minute.
   if (Array.isArray(donnees.boutique)) { enregistrerArticlesLabo(donnees.boutique); if (typeof window !== 'undefined') window.dispatchEvent(new Event('destiny-boutique-labo')); }
   if (typeof window !== 'undefined') window.dispatchEvent(new Event('destiny-catalogue-solo-actualise'));

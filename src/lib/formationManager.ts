@@ -27,6 +27,11 @@ import {
 } from './signatureJeune.js';
 import { jeunesAPortee, jeunesInternationaux } from './viviers.js';
 import type { JeuneRepere } from './viviers.js';
+import { distanceKm, positionDuClub } from '../data/geographie.js';
+import {
+  jeunesMondeDuClub, candidatsMondeJeunes, jeuneMondeParId, sourcesMondeJeunes,
+  jeuneMondeEnJeuneJoueur, mondeJeunesDisponible,
+} from './mondeJeunes.js';
 
 export const OBJECTIFS_JEUNES: { id: ObjectifJeuneManager; nom: string; effet: string }[] = [
   { id: 'prise_masse', nom: 'Prise de masse', effet: 'physique et gabarit' },
@@ -73,8 +78,26 @@ export function tableauDetectionManager(manager: Manager): TableauDetectionManag
   const portee = etageDeDetection(notes.reseau);
   const estDisponible = (j: JeuneRepere) => !manager.academie.some((a) => a.id === j.id)
     && !manager.jeunesFormes.some((a) => a.id.endsWith(`-academie-${j.id}`));
-  const candidatsNationaux = jeunesAPortee(manager.club, manager.saison, rayon, 14).filter(estDisponible);
-  const candidatsEtrangers = portee === 'international'
+  let nationaux: JeuneRepere[];
+  if (manager.mondeJeunes) {
+    const monde = manager.mondeJeunes;
+    nationaux = mondeJeunesDisponible(monde)
+      ? candidatsMondeJeunes(monde, manager.club, { rayonKm: rayon, ageMin: 13, ageMax: 23, max: Infinity })
+        .filter(j => !('categorie' in j) || j.categorie !== 'senior') : [];
+    const presents = new Set(nationaux.map(j => j.id));
+    // Un dossier suivi reste consultable après un déménagement hors du réseau.
+    for (const id of new Set([...Object.keys(manager.jeunesSuivis ?? {}).filter(id => manager.jeunesSuivis?.[id]),
+      ...Object.keys(manager.observationsJeunes)])) {
+      if (presents.has(id)) continue;
+      const j = mondeJeunesDisponible(monde) ? jeuneMondeParId(monde, id) : undefined;
+      if (j && j.statut !== 'RETIRED' && j.categorie !== 'senior' && j.age >= 13 && j.age <= 23) {
+        nationaux.push({ ...jeuneMondeEnJeuneJoueur(j), niveauClub: j.niveauClub,
+          distance: j.club === manager.club ? 0 : distanceKm(positionDuClub(manager.club), positionDuClub(j.club)) });
+      }
+    }
+  } else nationaux = jeunesAPortee(manager.club, manager.saison, rayon, 14);
+  const candidatsNationaux = nationaux.filter(estDisponible);
+  const candidatsEtrangers = !manager.mondeJeunes && portee === 'international'
     ? jeunesInternationaux(manager.club, manager.saison).filter(estDisponible)
     : [];
   const candidats = [
@@ -120,7 +143,11 @@ export function tableauDetectionManager(manager: Manager): TableauDetectionManag
   const total = deplacementsParSaison(notes.reseau, notes.recrutement);
   const utilises = manager.missionsJeunes.saison === manager.saison
     ? manager.missionsJeunes.utilises : 0;
-  const capacite = capaciteAcademie(murs.formation);
+  // Les groupes réels présents au départ gardent leurs places, même lorsque
+  // leur taille dépasse celle de l'ancien centre procédural.
+  const natifs = manager.mondeJeunes
+    ? (sourcesMondeJeunes(manager.mondeJeunes.snapshotId) ?? []).filter(j => j.clubSource === manager.club).length : 0;
+  const capacite = Math.max(capaciteAcademie(murs.formation), natifs + murs.formation * 3);
   return {
     notes,
     noteGlobale: noteGlobaleCentre(notes),
@@ -227,8 +254,9 @@ export function motifObservationJeune(
   tableau = tableauDetectionManager(manager),
 ): string | null {
   const interne = manager.academie.find((j) => j.id === jeuneId && j.clubCentre === manager.club);
+  const candidat = tableau.vivier.find(j => j.id === jeuneId);
   const fiche = interne ? ficheAcademicienManager(manager, interne, tableau.notes)
-    : tableau.fiches.find((f) => f.jeune.id === jeuneId);
+    : candidat ? ficheDe(candidat, tableau.notes, manager.observationsJeunes[jeuneId], manager.club) : undefined;
   if (!fiche) return 'Ce dossier n’est plus disponible.';
   const auCentre = manager.academie.some((j) => j.id === jeuneId && j.clubCentre === manager.club);
   if (entretien && fiche.entretien) return 'Entretien déjà réalisé.';
@@ -277,7 +305,8 @@ export interface VerdictSignatureJeune {
 /** Le jeune compare réellement notre projet à ceux des centres qui le suivent. */
 export function proposerProjetJeune(manager: Manager, jeuneId: string): VerdictSignatureJeune {
   const tableau = tableauDetectionManager(manager);
-  const fiche = tableau.fiches.find((f) => f.jeune.id === jeuneId);
+  const candidat = tableau.vivier.find(j => j.id === jeuneId);
+  const fiche = candidat ? ficheDe(candidat, tableau.notes, manager.observationsJeunes[jeuneId], manager.club) : undefined;
   if (!fiche) return { indemnite: 0, etat: 'refuse', texte: 'Ce dossier n’est plus dans le rapport actif.' };
   if (manager.academie.some((j) => j.id === jeuneId)) {
     return { indemnite: 0, etat: 'refuse', texte: 'Ce jeune appartient déjà au centre.' };
@@ -373,6 +402,10 @@ export function appliquerActionAcademie(
 ): { academie: AcademicienManager[]; senior?: AcademicienManager; texte: string } {
   const jeune = manager.academie.find((j) => j.id === jeuneId && j.clubCentre === manager.club);
   if (!jeune) return { academie: manager.academie, texte: 'Jeune introuvable dans ce centre.' };
+  if (action === 'entrainement_senior') return {
+    academie: manager.academie.map(j => j.id === jeuneId ? { ...j, entrainementSenior: !j.entrainementSenior } : j),
+    texte: `${jeune.nom} ${jeune.entrainementSenior ? 'reprend les séances du centre' : 's’entraîne avec le groupe senior'}.`,
+  };
   if (action === 'senior') {
     if (jeune.age < 17) return { academie: manager.academie, texte: 'Il est encore trop jeune pour le groupe senior.' };
     return {
@@ -468,7 +501,7 @@ export function evoluerAcademieManager(manager: Manager): BilanAcademieManager {
     ));
     const blesse = rng() < risqueCorrige(ancien.risqueBlessure, notes.medical) / 520;
     const gain = progresser(ancien, {
-      coaching: notes.coaching,
+      coaching: Math.min(99, notes.coaching + (ancien.entrainementSenior ? 8 : 0) + (mentor ? 4 : 0)),
       infrastructures: notes.installations,
       tempsDeJeu,
       moral,
@@ -517,7 +550,7 @@ export function evoluerAcademieManager(manager: Manager): BilanAcademieManager {
       saison: manager.saison + 1,
     };
 
-    if (age > 23) {
+    if (age > 23 && !ancien.sourcePlayerId) {
       liberes.push(`${suivant.nom} (limite d’âge Espoirs)`);
       continue;
     }
@@ -527,7 +560,7 @@ export function evoluerAcademieManager(manager: Manager): BilanAcademieManager {
     const niveauActuel = competitionDuClub(manager.club)?.niveau ?? 8;
     const chanceDepart = Math.max(0, (suivant.potentielReel - 69) / 240)
       * Math.max(0.22, 1 - notes.reputation / 125);
-    if (age >= 18 && niveauActuel > 1 && rng() < chanceDepart) {
+    if (!ancien.sourcePlayerId && age >= 18 && niveauActuel > 1 && rng() < chanceDepart) {
       const rivaux = centresQuiObservent(manager.club, CLUBS_FRANCAIS)
         .filter((r) => (competitionDuClub(r.club)?.niveau ?? 10) < niveauActuel)
         .slice(0, 8);
@@ -553,4 +586,38 @@ export function evoluerAcademieManager(manager: Manager): BilanAcademieManager {
   }
 
   return { academie, observations, indemnites, revenus, liberes, progressions };
+}
+
+/** Le centre est une vue des mêmes personnes que le monde, jamais une seconde génération. */
+export function synchroniserAcademieReelle(manager: Manager): AcademicienManager[] {
+  const monde = manager.mondeJeunes;
+  if (!monde || !mondeJeunesDisponible(monde)) return manager.academie;
+  if (!manager.club) return manager.academie.filter(j => !j.sourcePlayerId);
+  const anciens = new Map(manager.academie.map(j => [j.id, j]));
+  const projets = new Map<string, { type: string; club?: string }>();
+  for (const a of monde.actions) if (a.type === 'liberation' || a.type === 'recrutement') projets.set(a.id, a);
+  const reels = jeunesMondeDuClub(monde, manager.club)
+    .filter(j => j.categorie !== 'senior' && j.statut !== 'RETIRED' && j.age >= 13 && j.age <= 23
+      && !(projets.get(j.id)?.type === 'liberation' && projets.get(j.id)?.club === manager.club))
+    .map(j => {
+      const ancien = anciens.get(j.id);
+      return {
+        ...jeuneMondeEnJeuneJoueur(j),
+        clubOrigine: ancien?.clubOrigine ?? j.clubOrigine,
+        clubCentre: j.clubProprietaire ?? manager.club,
+        recruteSaison: ancien?.recruteSaison ?? manager.saison,
+        derniereSaison: manager.saison,
+        categorie: j.categorie as AcademicienManager['categorie'],
+        objectif: ancien?.objectif ?? 'polyvalence',
+        moral: j.confiance,
+        tempsDeJeu: ancien?.tempsDeJeu ?? 60,
+        anneesFormees: ancien?.anneesFormees ?? 0,
+        mentorId: ancien?.mentorId,
+        clubPret: j.categorie === 'pret' ? j.club : undefined,
+        entrainementSenior: ancien?.entrainementSenior,
+        derniereProgression: ancien?.derniereProgression,
+      } satisfies AcademicienManager;
+    });
+  // Les jeunes fictifs déjà recrutés d'une ancienne sauvegarde gardent leur carrière.
+  return [...manager.academie.filter(j => !j.sourcePlayerId), ...reels];
 }

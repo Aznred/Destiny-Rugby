@@ -10,6 +10,7 @@ import { assemblerTransfert, champsDepuisForme, decoderBloc, encoderTransfert, f
 import { creerLimiteurReserve } from './limiteurReserve.js';
 import type { EtatBoutiqueCompte, ModificationsBoutiqueCompte } from '../src/lib/boutiqueCompte.js';
 import type { PageOffresSolo, LotCartesSolo, OffreSolo, SuiviEchangesSolo } from '../src/lib/echangesSolo.js';
+import { packsInternesSql, type StockagePacksInternes } from './packsInternesStockage.js';
 
 export interface CompteStocke {
   id: string; identifiant: string; pseudo: string; empreinte?: string;
@@ -76,6 +77,8 @@ export interface StockageCarriere {
     retirer?(offre: string, compte: string): Promise<void>;
   };
   atelier?: StockageAtelier;
+  /** Packs de test (Correctif 33) : permission serveur, packs composés, journal. Absent : l'outil n'existe pas. */
+  packsInternes?: StockagePacksInternes;
   push?: StockagePush;
   compteParIdentifiant(identifiant: string): Promise<CompteStocke | null>;
   compteParGoogle(sujet: string): Promise<CompteStocke | null>;
@@ -386,6 +389,7 @@ export function stockageNeon(url: string): StockageCarriere {
     },
     atelier: atelierNeon(url),
     joueurs: joueursNeon(url),
+    packsInternes: packsInternesSql((textes, ...valeurs) => sql(textes, ...valeurs) as Promise<Record<string, unknown>[]>),
     async snapshotFfr(l,migration) {
       await sql`insert into player_migration_snapshots(migration,kind,entity_id,revision,data)
         values(${migration},'league',${l.id},${l.version},${JSON.stringify(l.etat)}::jsonb) on conflict do nothing`;

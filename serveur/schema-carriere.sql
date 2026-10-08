@@ -158,3 +158,46 @@ create table if not exists carriere_reprises (
 );
 -- Ne pas purger carriere_commandes pendant la vie d'une ligue : ses reçus
 -- interdisent qu'une ancienne requête rejouée rachète un pack ou un joueur.
+
+-- ── Packs de test (Correctif 33) ────────────────────────────────────────────
+-- Les permissions internes. Une ligne par compte et par permission, rattachée à l'identifiant IMMUABLE du compte :
+-- aucun pseudo, aucun drapeau envoyé par le navigateur ne confère un droit. Sans cette table, personne n'a de permission.
+create table if not exists compte_permissions (
+  compte uuid not null references comptes(id) on delete cascade,
+  permission text not null,
+  accordee_le timestamptz not null default now(),
+  primary key (compte, permission)
+);
+-- Le compte interne est résolu UNE fois vers son identifiant ; retirer la ligne retire le droit.
+insert into compte_permissions (compte, permission)
+  select id, 'CAN_CREATE_CUSTOM_PACKS' from comptes where identifiant = 'kiri'
+  on conflict (compte, permission) do nothing;
+-- Un pack de test : une liste de cartes imposées, dans l'ordre de révélation. Lisible par son seul auteur ; il n'entre
+-- ni dans le catalogue des packs, ni dans une probabilité.
+create table if not exists packs_internes (
+  id uuid primary key,
+  compte uuid not null references comptes(id) on delete cascade,
+  nom text not null,
+  cartes jsonb not null check (jsonb_typeof(cartes) = 'array'),
+  principale text,
+  cree_le timestamptz not null default now(),
+  ouvertures integer not null default 0 check (ouvertures >= 0),
+  derniere_ouverture timestamptz
+);
+create index if not exists packs_internes_compte_idx on packs_internes (compte, cree_le desc);
+-- Le journal : chaque création, ouverture et suppression. `source` distingue une carte sortie de l'outil de test
+-- (INTERNAL_CUSTOM_PACK) d'une carte obtenue normalement. Le journal survit à la suppression du pack.
+create table if not exists packs_internes_journal (
+  id bigserial primary key,
+  pack_id uuid not null,
+  compte uuid not null references comptes(id) on delete cascade,
+  action text not null check (action in ('CREATE', 'OPEN', 'DELETE')),
+  source text not null default 'INTERNAL_CUSTOM_PACK',
+  nom text,
+  cartes jsonb not null check (jsonb_typeof(cartes) = 'array'),
+  date timestamptz not null default now()
+);
+create index if not exists packs_internes_journal_compte_idx on packs_internes_journal (compte, id desc);
+alter table compte_permissions enable row level security;
+alter table packs_internes enable row level security;
+alter table packs_internes_journal enable row level security;

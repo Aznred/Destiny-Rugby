@@ -40,6 +40,7 @@ import { forceDuGroupe, ouvrirNegociationManager, salairesEffectif } from './rec
 import { pseudoStable } from './comptes.js';
 import { centreMedical, niveauMedical, normaliserSoin, dateMedicale, evoluerSoin, choisirReprise, autorisationMedicale, risqueReprise } from './infirmerieManager.js';
 import { accepterProlongation } from './conseilManager.js';
+import { dossierMedicalOuvert, horsDEtatDeJouer, MATCHS_AVANT_DE_SE_PLAINDRE, tempsDeJeuReclamable } from './tempsDeJeuManager.js';
 
 const borne = (n: number) => Math.max(0, Math.min(100, Math.round(n)));
 
@@ -145,6 +146,12 @@ export interface DisponibiliteSaison {
   titularisations: number;
   semainesBlessees: number;
   joursBlesse: number;
+  /**
+   * Matchs qu'il n'a PAS PU jouer : absent (blessure, sélection), ou en convalescence et laissé au repos (Correctif 33).
+   * C'est ce compte que lit le temps de jeu réclamable (`tempsDeJeuManager.ts`) — pas `possibles − disponibles`, qui
+   * tient pour « disponible » un joueur autorisé à vingt minutes de reprise.
+   */
+  empeches?: number;
 }
 
 export interface ProfilMedicalJoueur {
@@ -739,6 +746,13 @@ function mettreAJourPromesses(a: EtatCarriereAvancee, m: Manager): EtatCarriereA
         ? (m.ventes.some((vente) => vente.joueurId === p.joueurId) ? 1 : 0)
         : Math.max(0, (m.tempsDeJeu[p.joueurId] ?? 0) - p.depart);
     const respectee = progression >= p.objectif;
+    // ⚠️ UNE PROMESSE DE TEMPS DE JEU NE COURT PAS PENDANT UNE BLESSURE (Correctif 33). Elle se « rompait » à son
+    // échéance alors que le joueur était à l'infirmerie : −22 de satisfaction pour un match qu'il ne pouvait pas jouer.
+    // Tant qu'il est hors d'état de jouer, l'échéance recule avec lui : à son retour, il reste à l'entraîneur le temps
+    // de lui donner ce qui manque (un match par feuille promise). Le calcul ne dépend que de la semaine : l'appeler
+    // deux fois la même semaine ne recule pas l'échéance deux fois.
+    const suspendue = !respectee && (p.type === 'PLAYTIME_PROMISE' || p.type === 'ROLE_PROMISE') && horsDEtatDeJouer(a, p.joueurId, m.semaine);
+    if (suspendue) return { ...p, progression, echeance: Math.max(p.echeance, m.semaine + Math.max(1, p.objectif - progression)) };
     const rompue = !respectee && m.semaine > p.echeance;
     if (respectee || rompue) {
       const profil = vestiaire[p.joueurId];
@@ -759,9 +773,14 @@ function mettreAJourPromesses(a: EtatCarriereAvancee, m: Manager): EtatCarriereA
 function genererDiscussion(a: EtatCarriereAvancee, m: Manager, effectif: Coequipier[]): EtatCarriereAvancee {
   if (a.discussions.some((d) => d.etat === 'ouverte')) return a;
   const dejaCetteSaison = new Set(a.discussions.filter((d) => d.id.includes(`-${m.saison}-`)).map((d) => d.joueurId));
-  const candidat = effectif
+  const matchsDuClub = Object.values(m.resultats).filter(r => r.club === m.club && r.saison === m.saison).length;
+  // ⚠️ UN JOUEUR QUI NE POUVAIT PAS JOUER NE VIENT PAS S'EN PLAINDRE (Correctif 33). Ni pendant sa blessure, sa
+  // convalescence ou sa sélection (`horsDEtatDeJouer`), ni à son retour tant qu'il n'a pas eu cinq matchs à sa portée :
+  // celui qui a peu joué PARCE QU'il était à l'infirmerie n'a pas encore de grief.
+  const candidat = matchsDuClub < MATCHS_AVANT_DE_SE_PLAINDRE ? undefined : effectif
     .map((j) => ({ j, p: a.vestiaire[j.id] }))
-    .filter(({ j, p }) => p && p.satisfaction < 47 && !dejaCetteSaison.has(j.id) && !indisponiblesCarriereAvancee(a, m.semaine).includes(j.id) && Object.values(m.resultats).filter(r => r.club === m.club && r.saison === m.saison).length >= 5)
+    .filter(({ j, p }) => p && p.satisfaction < 47 && !dejaCetteSaison.has(j.id) && !horsDEtatDeJouer(a, j.id, m.semaine)
+      && !((m.tempsDeJeu[j.id] ?? 0) <= 2 && tempsDeJeuReclamable(m, j.id, matchsDuClub, a).ouverts < MATCHS_AVANT_DE_SE_PLAINDRE))
     .sort((x, y) => x.p.satisfaction - y.p.satisfaction)[0];
   if (!candidat) return a;
   const { j, p } = candidat;
@@ -792,10 +811,16 @@ function mettreAJourVestiaire(a: EtatCarriereAvancee, m: Manager, effectif: Coeq
   const vestiaire = { ...a.vestiaire };
   for (const j of effectif) {
     const p = vestiaire[j.id] ?? profilDuJoueur(j, m.composition.capitaineId, m.saison);
-    const part = (m.tempsDeJeu[j.id] ?? 0) / matchs;
     const attendu = p.rang === 'leader' ? 0.75 : p.rang === 'influent' ? 0.55 : p.rang === 'groupe' ? 0.34 : 0.2;
     const caractere = p.traits.includes('professionnel') || p.traits.includes('calme') ? 0.7 : p.traits.includes('mauvaisPerdant') ? 1.35 : 1;
-    const deltaJeu = (part - attendu) * 9 * caractere;
+    // ⚠️ LE TEMPS DE JEU SE RAPPORTE AUX MATCHS QU'IL POUVAIT JOUER (Correctif 33, `tempsDeJeuManager.ts`). Rapporté à
+    // tous les matchs du club, un blessé perdait de la satisfaction à chaque journée passée à l'infirmerie, puis venait
+    // « réclamer du temps de jeu ». Hors d'état de jouer aujourd'hui : ce match ne lui apprend rien sur son entraîneur.
+    // À son retour, le grief se construit match après match (la frustration est entière au bout de quatre).
+    const reclamable = tempsDeJeuReclamable(m, j.id, matchs, a);
+    const empeche = horsDEtatDeJouer(a, j.id, m.semaine) || reclamable.part === null;
+    const ecart = empeche ? 0 : reclamable.part! - attendu;
+    const deltaJeu = (ecart < 0 ? ecart * Math.min(1, reclamable.ouverts / 4) : ecart) * 9 * caractere;
     const deltaResultat = (victoire ? 2.2 : nul ? 0 : -2.8) * caractere;
     vestiaire[j.id] = {
       ...p, rang: j.id === m.composition.capitaineId ? 'leader' : p.rang,
@@ -918,11 +943,14 @@ function traiterMedicalApresMatch(a: EtatCarriereAvancee, m: Manager, effectif: 
     const joue = minutes > 0;
     const lignes = ligneDisponibilite(profil, m.saison);
     const index = lignes.findIndex((d) => d.saison === m.saison);
+    // Empêché : absent, ou en convalescence et laissé au repos. Le temps de jeu qu'il réclamera ne comptera pas ce match.
+    const empeche = absents.has(j.id) || (!joue && dossierMedicalOuvert(a, j.id));
     lignes[index] = {
       ...lignes[index],
       possibles: lignes[index].possibles + 1,
       disponibles: lignes[index].disponibles + (absents.has(j.id) ? 0 : 1),
       titularisations: lignes[index].titularisations + (joue && m.composition.titulaires.includes(j.id) ? 1 : 0),
+      empeches: (lignes[index].empeches ?? Math.max(0, lignes[index].possibles - lignes[index].disponibles)) + (empeche ? 1 : 0),
     };
     profilsMedicaux[j.id] = { ...profil, disponibilites: lignes,
       fatigue: borne(profil.fatigue + (joue ? (m.composition.titulaires.includes(j.id) ? 15 : 8) : -7)),
@@ -1024,8 +1052,11 @@ function actualiserContratsJoueurs(a: EtatCarriereAvancee, m: Manager, effectif:
   const matchs = Math.max(1, Object.keys(m.resultats).filter((cle) => cle.startsWith(`${m.saison}-`) || cle.includes(`-${m.saison}-`)).length);
   for (const j of effectif) {
     const c = contrats[j.id] ?? contratJoueurInitial(m, j, a.vestiaire[j.id] ?? profilDuJoueur(j, m.composition.capitaineId, m.saison));
-    const part = (m.tempsDeJeu[j.id] ?? 0) / matchs;
     const attendu = c.role === 'cadre' ? .68 : c.role === 'rotation' ? .32 : .14;
+    // Même règle que le vestiaire (Correctif 33) : un contrat ne se dégrade pas pour des matchs que le joueur ne pouvait
+    // pas jouer. Hors d'état de jouer, ou sans aucun match à sa portée : son temps de jeu vaut ce que son rôle attendait.
+    const reclamable = tempsDeJeuReclamable(m, j.id, matchs, a);
+    const part = horsDEtatDeJouer(a, j.id, semaineSuivante) || reclamable.part === null ? attendu : reclamable.part;
     const satisfaction = borne(c.satisfaction + (part - attendu) * 5 + ((a.vestiaire[j.id]?.satisfaction ?? 55) - 55) * .035);
     const valeurSportive = Math.max(0, j.note - force) * 10 + Math.max(0, j.potentiel - j.note) * 3;
     // ⚠️ LA FIN DE CONTRAT SE LIT EN MOIS, PAS EN SAISONS. Un « fin de contrat

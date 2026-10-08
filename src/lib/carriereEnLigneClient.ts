@@ -148,9 +148,28 @@ export const deconnecterCarriere = async () => {
 export const chargerBoutiqueCompte = (signal?: AbortSignal) =>
   requete<{ boutique: EtatBoutiqueCompte | null }>(undefined, undefined, signal, '?boutique=1');
 export const chargerPacksPrivesSolo = (signal?: AbortSignal) =>
-  requete<{ packs: import('./ligue/typesCarriere').PackCarriere[] }>(undefined, undefined, signal, '?packsPrivesSolo=1');
+  requete<{ packs: import('./ligue/typesCarriere').PackCarriere[]; packsDeTest?: import('./packsInternes').PackInterneBoutique[] }>(undefined, undefined, signal, '?packsPrivesSolo=1');
+/** `ordreImpose` : un pack de test rend ses cartes dans l'ordre de révélation voulu, pas triées par rareté. */
 export const ouvrirPackPriveSolo = (pack: string, signal?: AbortSignal) =>
-  requete<{ boutique: EtatBoutiqueCompte; cartes: import('./ligue/catalogueCarriere').SourceCarte[] }>({ action: 'ouvrirPackPriveSolo', pack }, undefined, signal);
+  requete<{ boutique: EtatBoutiqueCompte; cartes: import('./ligue/catalogueCarriere').SourceCarte[]; ordreImpose?: boolean }>({ action: 'ouvrirPackPriveSolo', pack }, undefined, signal);
+
+// ── Packs de test (Correctif 33) — le serveur répond 403 à tout compte qui n'a pas la permission. ──
+export type PackInterneDetaille = import('./packsInternes').PackInterne & {
+  detail: (import('./packsInternes').CarteCandidate | { sourceId: string; manquante: true })[];
+};
+export interface VuePacksInternes {
+  packs: PackInterneDetaille[]; journal: import('./packsInternes').LigneJournalPackInterne[];
+  limites: { cartes: number; packs: number }; types: string[];
+}
+export const chargerPacksInternes = (signal?: AbortSignal) =>
+  requete<VuePacksInternes>(undefined, undefined, signal, '?packsInternes=1');
+export const rechercherCartesPackInterne = (filtre: { q?: string; club?: string; poste?: string; rarete?: string; type?: string }, signal?: AbortSignal) =>
+  requete<{ cartes: import('./packsInternes').CarteCandidate[]; total: number }>(undefined, undefined, signal,
+    `?packsInternes=1&recherche=1&${new URLSearchParams(Object.entries(filtre).filter(([, v]) => v) as [string, string][]).toString()}`);
+export const creerPackInterne = (pack: import('./packsInternes').DefinitionPackInterne) =>
+  requete<{ pack: PackInterneDetaille }>({ action: 'packInterne', operation: 'creer', pack });
+export const supprimerPackInterne = (id: string) =>
+  requete<{ ok: boolean }>({ action: 'packInterne', operation: 'supprimer', id });
 export const sauvegarderBoutiqueCompte = (boutique: EtatBoutiqueCompte) =>
   requete<{ boutique: EtatBoutiqueCompte | null }>({ action: 'sauvegarderBoutique', boutique, compact: true });
 export const modifierBoutiqueCompte = (modifications: ModificationsBoutiqueCompte) =>

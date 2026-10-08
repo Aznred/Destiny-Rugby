@@ -18,6 +18,7 @@ import { Citrouille, EmblemeIcon, EmblemeInfluenceur } from '../components/Emble
 import { nombre, t } from '../lib/i18n';
 import { apparencePack, modelePackParNom, packAvecSkin } from '../lib/presentationPacks';
 import { chargerPacksPrivesSolo, ouvrirPackPriveSolo } from '../lib/carriereEnLigneClient';
+import type { PackInterneBoutique } from '../lib/packsInternes';
 import { appliquerCollectionSoloDistante, attendreBoutiqueSoloEnregistree } from '../lib/synchronisationBoutiqueCompte';
 import './CollectionSolo.css';
 import { fournirCatalogueUsage } from '../lib/usage/collection';
@@ -76,11 +77,13 @@ export function CollectionSolo() {
   const [rarete, setRarete] = useState<RareteCarriere | 'toutes'>('toutes');
   const [statut, setStatut] = useState<'toutes' | 'trouvees' | 'manquantes'>('trouvees');
   const [page, setPage] = useState(0);
-  const [ouverture, setOuverture] = useState<{ pack: PackCarriere; indices: number[]; catalogue: readonly SourceCarte[] } | null>(null);
+  const [ouverture, setOuverture] = useState<{ pack: PackCarriere; indices: number[]; catalogue: readonly SourceCarte[]; ordreImpose?: boolean } | null>(null);
   const [bilan, setBilan] = useState('');
   const nomCompte = joueur?.pseudo ?? joueur?.nom ?? manager?.nom ?? 'Compte joueur';
   const [echangesOuverts, setEchangesOuverts] = useState(false);
   const [packsPrives, setPacksPrives] = useState<PackCarriere[]>([]);
+  // Packs de test (Correctif 33) : le serveur ne les envoie qu'au compte qui en a la permission.
+  const [packsDeTest, setPacksDeTest] = useState<PackInterneBoutique[]>([]);
   const [occupe, setOccupe] = useState(false);
   const verrouOuverture = useRef(false);
   /** La monnaie que le joueur vient de choisir dans la fenêtre d'achat (Correctif 21) ; les packs gratuits n'en demandent aucune. */
@@ -94,12 +97,12 @@ export function CollectionSolo() {
       controleur?.abort();
       controleur = new AbortController();
       const courant = controleur;
-      setPacksPrives([]);
+      setPacksPrives([]); setPacksDeTest([]);
       void chargerPacksPrivesSolo(courant.signal).then(resultat => {
-        if (vivant && !courant.signal.aborted) setPacksPrives(resultat.packs);
+        if (vivant && !courant.signal.aborted) { setPacksPrives(resultat.packs); setPacksDeTest(resultat.packsDeTest ?? []); }
       }).catch(() => { /* Aucun pack privé sans session vérifiée. */ });
     };
-    const deconnecter = () => { controleur?.abort(); controleurOuverture.current?.abort(); setPacksPrives([]); };
+    const deconnecter = () => { controleur?.abort(); controleurOuverture.current?.abort(); setPacksPrives([]); setPacksDeTest([]); };
     charger();
     window.addEventListener('destiny-compte-connecte', charger);
     window.addEventListener('destiny-compte-deconnecte', deconnecter);
@@ -135,7 +138,9 @@ export function CollectionSolo() {
     if (verrouOuverture.current || ouverture) return;
     verrouOuverture.current = true; setOccupe(true);
     try {
-      const prive = packsPrives.find(pack => pack.id === id);
+      // Un pack de test s'ouvre par le même chemin qu'un pack privé : le serveur vérifie la permission et rend les cartes.
+      const deTest = packsDeTest.find(pack => pack.id === id);
+      const prive = deTest ?? packsPrives.find(pack => pack.id === id);
       if (prive) {
         const controleur = new AbortController();
         controleurOuverture.current = controleur;
@@ -144,8 +149,9 @@ export function CollectionSolo() {
         const resultat = await ouvrirPackPriveSolo(id, controleur.signal);
         if (controleur.signal.aborted) return;
         appliquerCollectionSoloDistante(resultat.boutique.collectionSolo);
-        setBilan('Dix cartes ICONS ajoutées à ta collection.');
-        setOuverture({ pack: prive, indices: resultat.cartes.map((_, indice) => indice), catalogue: resultat.cartes });
+        setBilan(deTest ? `Pack de test : ${resultat.cartes.length} carte(s) ajoutée(s) à ta collection.` : 'Dix cartes ICONS ajoutées à ta collection.');
+        if (deTest) setPacksDeTest(packs => packs.map(pack => pack.id === id ? { ...pack, ouvertures: pack.ouvertures + 1 } : pack));
+        setOuverture({ pack: prive, indices: resultat.cartes.map((_, indice) => indice), catalogue: resultat.cartes, ordreImpose: resultat.ordreImpose === true });
         return;
       }
       const pack = packsRoue.find(candidat => candidat.id === id);
@@ -197,6 +203,17 @@ export function CollectionSolo() {
       {echangesOuverts ? t("ui.ad2d61675932") : t("ui.5c8f1fe771de")}
     </button>
     {echangesOuverts && <Suspense fallback={<p>{t("ui.f433895f5136")}</p>}><EchangesCollectionSolo /></Suspense>}
+
+    {packsDeTest.length > 0 && <section className="solo-rayon solo-packs-test" aria-labelledby="solo-packs-test-titre">
+      <div className="solo-titre-ligne"><div><div className="eyebrow">Outil interne</div><h2 id="solo-packs-test-titre">Packs de test</h2></div><span>Contenu imposé, composé dans le Labo. Ces packs n’existent que pour ce compte.</span></div>
+      <ul className="solo-liste-packs-test">{packsDeTest.map(pack => <li key={pack.id}>
+        <button type="button" className={`solo-pack-test palier-${apparencePack(pack)}`} disabled={occupe || Boolean(ouverture)} onClick={() => { void ouvrirDepuisRoue(pack.id); }}>
+          <span className="solo-pack-test-pochette" aria-hidden="true"><Icone nom="cadeau" taille={22} /></span>
+          <span className="solo-pack-test-nom"><b>{pack.nom}</b><small>{pack.cartes} carte(s) · {pack.ouvertures ? `ouvert ${pack.ouvertures} fois` : 'jamais ouvert'}</small></span>
+          <span className="solo-pack-test-action">Ouvrir</span>
+        </button>
+      </li>)}</ul>
+    </section>}
 
     {packsPrives.length > 0 && <section className="solo-rayon" aria-labelledby="solo-packs-prives-titre">
       <div className="solo-titre-ligne"><div><div className="eyebrow">{t('solo.privateAccount')}</div><h2 id="solo-packs-prives-titre">{t('solo.iconGuaranteed')}</h2></div><span>{t('solo.freeIconPack')}</span></div>
@@ -277,10 +294,13 @@ export function CollectionSolo() {
 
     {ouverture && <OuverturePack
       cartes={ouverture.indices.map((indice, position) => ({ ...carteDepuisSource(ouverture.catalogue[indice], 'solo', 'collection', 1), id: `solo-pack-${position}-${ouverture.catalogue[indice].sourceId}` }))}
-      pack={ouverture.pack.nom}
+      // Le titre de la fenêtre écrit déjà « Pack … » : un pack de test nommé « Pack Test » ne le dit pas deux fois.
+      pack={ouverture.ordreImpose ? ouverture.pack.nom.replace(/^pack\s+/i, '') || ouverture.pack.nom : ouverture.pack.nom}
       modele={packAvecSkin(ouverture.pack) ? modelePackParNom(ouverture.pack) : undefined}
       garantie={ouverture.pack.garantie}
-      apparenceInitiale={apparencePack(ouverture.pack)}
+      // Un pack de test part du bronze : la pochette monte palier par palier jusqu'à sa meilleure carte, comme un vrai tirage.
+      apparenceInitiale={ouverture.ordreImpose ? 'bronze' : apparencePack(ouverture.pack)}
+      ordreImpose={ouverture.ordreImpose}
       onFermer={() => setOuverture(null)}
       rendreCarte={carte => <CarteJoueurEnLigne carte={carte} compacte proprietaire="Ma collection" />}
     />}

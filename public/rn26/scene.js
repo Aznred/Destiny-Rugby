@@ -1400,23 +1400,51 @@ export async function creerScene3D(conteneur,options={}){
     //              fluide : jamais d'à-coup), sauf quand il bat en retraite face au jeu (on ne lui tourne pas le dos).
     // Dans les deux cas, une aide au ballon redresse la vue quand une passe arrive sur lui, qu'un ballon aérien approche, ou qu'un
     // partenaire porte tout près — mais plus lentement en mode libre, et jamais contre un geste en cours.
+    // ⚠️ LA CAMÉRA ASSISTÉE SUIT LA SITUATION (Correctif 33). Elle reste derrière notre joueur, mais elle sait où est le
+    // ballon : derrière la course quand il porte ; entre son orientation et le porteur quand un coéquipier porte ; tournée
+    // davantage vers le ballon en défense et sur un ballon aérien. Le ballon ne quitte pas le cadre (`marge`).
+    // Le geste du joueur (`orbiter`) passe toujours devant : après lui l'assistance attend 2 s, puis reprend en 1,6 s.
+    // Mode libre : inchangé — elle reste où il l'a mise, avec la seule aide lente au ballon franchement hors champ.
     const cap=null;
     J.age=(J.age??99)+dt;
     if(options.orbite){J.yaw-=options.orbite;options.orbite=0;J.age=0;}
+    const porteurJ=match.carrier?match.byId.get(match.carrier):null;
+    const moiPorte=match.carrier===options.moi;
+    const amiPorte=!!porteurJ&&!moiPorte&&porteurJ.team===equipe;
+    const advPorte=!!porteurJ&&porteurJ.team!==equipe;
+    const volJ=match.flights.get(options.moi),passeSurMoi=!!volJ&&match.time-volJ.start<volJ.duree+.2;
+    const aerienJ=!porteurJ&&ballMesh.position.y>2.2;
     if(!J.init||snap){J.yaw=Math.atan2(ax+dvx*wV,az+dvz*wV);J.age=99;}
     else{
       const libre=options.cameraLibre===true;
-      let voulu=null,vmax=.9,raideur=1.7;
-      if(!libre&&J.age>2.2&&sp>1.3&&dvx*ax+dvz*az>-.55){voulu=Math.atan2(dvx,dvz);}
-      // Le ballon que la vue doit garder dans le champ.
-      const vol=match.flights.get(options.moi),enVol=vol&&match.time-vol.start<vol.duree+.2;
-      const hautLoin=ballMesh.position.y>2.2&&db<24;
-      const partenaire=match.carrier&&match.carrier!==options.moi&&(match.byId.get(match.carrier)?.team??-1)===equipe&&db<9;
-      if((enVol||hautLoin||partenaire)&&J.age>.6){
-        const ab=Math.atan2(bx,bz),ecart=Math.atan2(Math.sin(ab-J.yaw),Math.cos(ab-J.yaw));
-        if(Math.abs(ecart)>1.05){voulu=ab;vmax=libre?.22:.5;raideur=1.2;}
+      const ab=Math.atan2(bx,bz);
+      const ecartVue=Math.atan2(Math.sin(ab-J.yaw),Math.cos(ab-J.yaw));
+      let voulu=null,vmax=0,raideur=1.7;
+      if(libre){
+        if((passeSurMoi||(aerienJ&&db<24)||(amiPorte&&db<9))&&J.age>.6&&Math.abs(ecartVue)>1.05){voulu=ab;vmax=.22;raideur=1.2;}
+      }else{
+        // Notre orientation : la course quand il avance ou court en travers ; le sens du jeu à l'arrêt ou en repli.
+        const enCourse=sp>1.3&&dvx*ax+dvz*az>-.55;
+        const base=enCourse?Math.atan2(dvx,dvz):Math.atan2(ax,az);
+        const versBallon=Math.atan2(Math.sin(ab-base),Math.cos(ab-base));
+        // La part du ballon dans la visée.
+        const part=moiPorte?0:passeSurMoi?.85:aerienJ?.6:advPorte?.68:amiPorte?.5:.4;
+        voulu=base+versBallon*part*clamp((db-2.5)/6,0,1);
+        // Et il ne sort pas du cadre : au plus `marge` radians entre l'axe de la vue et lui.
+        if(!moiPorte&&db>4){
+          const marge=aerienJ?.42:advPorte?.5:.58;
+          const reste=Math.atan2(Math.sin(ab-voulu),Math.cos(ab-voulu));
+          if(Math.abs(reste)>marge)voulu=ab-Math.sign(reste)*marge;
+        }
+        // Après un geste du joueur : deux secondes de silence, puis l'assistance reprend progressivement.
+        const reprise=clamp((J.age-2)/1.6,0,1);
+        // Ballon en main et à l'arrêt : rien à suivre, la vue reste où elle est.
+        const actif=moiPorte?enCourse:true;
+        // Un demi-tour complet (ballon dans le dos) se fait plus lentement qu'un simple recadrage.
+        vmax=actif?(moiPorte?.95:Math.abs(versBallon)>2?.9:1.25)*reprise:0;
+        raideur=moiPorte?1.7:2.1;
       }
-      if(voulu!==null){
+      if(voulu!==null&&vmax>0){
         const delta=Math.atan2(Math.sin(voulu-J.yaw),Math.cos(voulu-J.yaw));
         J.yaw+=clamp(delta*(1-Math.exp(-dt*raideur)),-vmax*dt,vmax*dt);
       }
@@ -1433,7 +1461,7 @@ export async function creerScene3D(conteneur,options={}){
     const defense=!!porteur&&porteur.team!==equipe;
     const percee=porte&&sp>6.5;
     const reception=!porteur&&db<9;
-    const zoomVoulu=1+.18*clamp((db-12)/30,0,1)-.08*impliquee-(reception?.06:0)+(percee?.14:0)+(defense?.1:0)+.05*clamp(sp/9,0,1);
+    const zoomVoulu=1+.18*clamp((db-12)/30,0,1)-.08*impliquee-(reception?.06:0)+(percee?.14:0)+(defense?.1:0)+(aerienJ?.12:0)+.05*clamp(sp/9,0,1);
     J.zoom+=(zoomVoulu-J.zoom)*(1-Math.exp(-dt/1.2));
     const asp=camera.aspect<1?1.3:camera.aspect<1.5?1.1:1;
     // Recul de base 11,8 m (6,6 avant) ; un téléphone (écran plus petit) recule encore de 12 % pour ne perdre ni un ailier ni un défenseur.
@@ -1445,8 +1473,10 @@ export async function creerScene3D(conteneur,options={}){
     cible_J.set(P.x-fx*dist+droiteX*decal,Math.max(2.1,haut),P.z-fz*dist+droiteZ*decal);
     cible_J.x=clamp(cible_J.x,-37,37);cible_J.z=clamp(cible_J.z,-72,72);
     // On regarde plus loin devant : l'espace et la ligne défensive comptent plus que le dos du joueur.
-    const avance=12+.7*sp;
-    viser_J.set(P.x+fx*avance+(B.x-P.x)*.1,1.1,P.z+fz*avance+(B.z-P.z)*.1);
+    // Quand un autre porte (ou que le ballon vole), le regard se pose entre l'espace devant le joueur et le ballon.
+    const poidsB=moiPorte?.1:.3,avance=(12+.7*sp)*(moiPorte?1:.8);
+    const eB=Math.min(1,16/Math.max(1,db));
+    viser_J.set(P.x+fx*avance+(B.x-P.x)*poidsB*eB,1.1,P.z+fz*avance+(B.z-P.z)*poidsB*eB);
     if(!J.init||snap){J.pos.copy(cible_J);J.posV.set(0,0,0);J.look.copy(viser_J);J.lookV.set(0,0,0);J.init=true;}
     else{dampVector(J.pos,cible_J,J.posV,.24,real);dampVector(J.look,viser_J,J.lookV,.16,real);}
     camera.position.copy(J.pos);camera.lookAt(J.look);
@@ -1773,7 +1803,11 @@ export async function creerScene3D(conteneur,options={}){
     /** Le ballon est-il dans le cadre ? Sinon, la direction où le chercher. */
     ballonAEcran(){
       projete.copy(ballMesh.position).project(camera);
-      return {x:(projete.x+1)/2*largeur,y:(1-projete.y)/2*hauteur,dedans:projete.z<1&&Math.abs(projete.x)<.98&&Math.abs(projete.y)<.98};
+      // Derrière la caméra, la projection est retournée : on rend la direction VRAIE (`dx`,`dy`, écran, y vers le bas).
+      const derriere=projete.z>1,nx=derriere?-projete.x:projete.x,ny=derriere?-projete.y:projete.y;
+      const dedans=!derriere&&Math.abs(projete.x)<.98&&Math.abs(projete.y)<.98;
+      const n=Math.hypot(nx*largeur,ny*hauteur)||1;
+      return {x:(projete.x+1)/2*largeur,y:(1-projete.y)/2*hauteur,dedans,largeur,hauteur,dx:nx*largeur/n,dy:-ny*hauteur/n};
     },
     cadrer,
     /**

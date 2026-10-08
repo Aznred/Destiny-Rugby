@@ -987,6 +987,7 @@ const BRUT: Record<string, string[]> = {
     'Jules BOUSQUET|3|19|45|51|16',
     'Jean PÉNÉTRO|4|20|45|55|16',
     'Jean SEUX|8|18|45|49|16',
+    'Gianluca DALLA RIVA|8|19|61|65|16',
   ],
   'US Colomiers': [
     'Rodrigo MARTA|7|25|81|81|33',
@@ -1239,6 +1240,7 @@ const BRUT: Record<string, string[]> = {
     'Bastien MASSÉ|6|20|46|53|16',
     'Maxence BIASOTTO|7|21|46|52|16',
     'Lewis NOON|8|20|46|49|2',
+    'Noé GODIGNON|6|28|72|75|16',
   ],
   'SU Agen': [
     'Santi SOCINO|1|34|74|74|3',

@@ -14,6 +14,7 @@ import { competitionDuClub, COMPETITIONS } from '../data/clubs.js';
 import { graine } from './championnat.js';
 import { pseudoStable } from './comptes.js';
 import { estAmateurNiveau, forceDuGroupe, saisonsDeContrat, valeurMarchande } from './recrutementManager.js';
+import { horsDEtatDeJouer, MATCHS_AVANT_DE_SE_PLAINDRE, tempsDeJeuReclamable } from './tempsDeJeuManager.js';
 import type {
   CibleRecrutementManager, DemandeJoueur, Manager, NegociationClubManager, OffreVente, VenteManager,
 } from '../types.js';
@@ -136,8 +137,6 @@ export function negocierAvecClub(
  * illisible — et le joueur aurait raison de le prendre pour un bug.
  */
 const PART_LESE = 0.34;
-/** On ne se plaint pas avant d'avoir laissé sa chance au manager. */
-const MATCHS_AVANT_DE_SE_PLAINDRE = 5;
 /** Un jeune de 19 ans ne réclame pas sa place ; un joueur fait, oui. */
 const AGE_MIN_DEMANDE = 22;
 
@@ -155,16 +154,20 @@ export function demandeAGenerer(
     m.demandes.filter((d) => d.saison === m.saison).map((d) => d.joueurId),
   );
   const force = forceDuGroupe(m.club, m.saison);
-  const seuil = matchsJoues * PART_LESE;
 
-  const laises = effectif.filter((j) => (
-    j.age >= AGE_MIN_DEMANDE
-    && !dejaVus.has(j.id)
-    && (m.tempsDeJeu[j.id] ?? 0) < seuil
-    // Un remplaçant qui vaut dix points de moins que le groupe sait pourquoi il
-    // ne joue pas. Celui qui se plaint, c'est celui qui a des arguments.
-    && j.note >= force - 3
-  ));
+  // ⚠️ ON NE RÉCLAME QUE LES MATCHS QU'ON POUVAIT JOUER (Correctif 33). Le seuil portait sur TOUS les matchs du club,
+  // et rien ne regardait si le joueur était disponible : un blessé de longue durée était le premier « lésé » de
+  // l'effectif, et son message arrivait pendant qu'il était à l'infirmerie. Ni blessé, ni convalescent, ni en
+  // sélection ; et cinq matchs à sa portée avant le premier grief (`tempsDeJeuManager.ts`).
+  const laises = effectif.filter((j) => {
+    if (j.age < AGE_MIN_DEMANDE || dejaVus.has(j.id) || horsDEtatDeJouer(m.avancee, j.id, m.semaine)) return false;
+    const reclamable = tempsDeJeuReclamable(m, j.id, matchsJoues);
+    return reclamable.ouverts >= MATCHS_AVANT_DE_SE_PLAINDRE
+      && reclamable.joues < reclamable.ouverts * PART_LESE
+      // Un remplaçant qui vaut dix points de moins que le groupe sait pourquoi il
+      // ne joue pas. Celui qui se plaint, c'est celui qui a des arguments.
+      && j.note >= force - 3;
+  });
   if (!laises.length) {
     // ⚠️ ON N'ÉTAIT CONVOITÉ QUE QUAND ON BOUDAIT. Jusqu'ici, la seule façon
     // qu'un joueur bouge était qu'il se PLAIGNE de son temps de jeu : une star

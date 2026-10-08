@@ -1995,6 +1995,94 @@ portraits (`photoReelle`). Sur téléphone, c'est le plus gros gel du jeu, à ch
 la sauvegarde reste dans `localStorage` (IndexedDB lèverait le plafond, mais rend la relecture asynchrone) ; `avancee`
 pèse 80 % d'une partie d'entraîneur et n'a pas été allégé.
 
+### Pénaltouches, blessés, playoffs, caméra joueur, packs de test, plein écran (Correctif 33)
+
+⚠️ La demande est arrivée tronquée : seuls ses points 21 à 32 et l'objectif final étaient lisibles. Ce qui suit couvre
+l'objectif final ; les points 1 à 20 n'ont jamais été lus.
+
+**Pénaltouche** (`moteur.ts`, `etat.ts`) — une pénalité tapée en touche qui REBONDISSAIT avant de sortir rendait le lancer
+à l'adversaire : seul le vol direct portait l'intention `penaltouche`. L'origine voyage maintenant avec le ballon
+(`piedPrepare.dePenalite` → `Vol.dePenalite` → `BallonLibre.dePenalite`, propagé par `demarrerBallonLibre`) et la sortie
+en touche rend le lancer au botteur quel que soit le nombre de rebonds. Le drapeau tombe si un partenaire du botteur
+touche le ballon. ⚠️ **RÈGLES 8 EN LIGUE** (`REGLES_MATCH_EN_LIGNE`) : un match créé avant garde l'ancien comportement
+(`reglesPenaltouche: 'historique'`, passé par `monter()` sous les règles 8) ; revenir en arrière = remettre 7. L'empreinte
+du moteur ne bouge pas (IA 6 : `90b6ea8a`). Banc : `npm run verify:penaltouche -- 6` (ancien moteur : 2 pénaltouches
+rendues sur 41 ; nouveau : 0 sur 47, dont 3 gardées après rebond).
+
+**Blessés et temps de jeu** (`lib/tempsDeJeuManager.ts`) — `tempsDeJeuReclamable(m, joueurId, matchsDuClub)` est LA
+définition de ce qu'un joueur peut réclamer : les matchs où il était hors d'état de jouer (dossier médical ouvert,
+reprise) sont retirés du compte (`DisponibiliteSaison.empeches`, incrémenté dans `traiterMedicalApresMatch`). La
+satisfaction du vestiaire, les discussions, les demandes (`demandeAGenerer`), les contrats et le store lisent celle-là.
+Personne ne se plaint avant `MATCHS_AVANT_DE_SE_PLAINDRE` = 5 matchs OUVERTS, et une promesse de temps de jeu est
+suspendue (échéance repoussée) pendant l'absence. ⚠️ Ne jamais recalculer une part de jeu à partir de `matchsDuClub`
+seul. Banc : `npm run verify:blesses` (26 contrôles).
+
+**Playoffs de la ligue en ligne** (`competitionRules.ts` : `qualifiesPlayoffsEnLigne`, `tableauPlayoffs` ;
+`ligue/poulesCarriere.ts` : `prochainTourPlayoffs`) — qualifiés selon la taille : moins de 6 clubs → 2, 6 à 9 → 4,
+10 à 15 → 6, 16 et plus → 8. À six, les deux premiers sont exemptés et les quatre autres jouent un barrage ; le mieux
+classé reçoit. Le nombre est GELÉ dans la compétition (`c.qualifies`) au premier tour : une ligue en cours garde le
+sien. Le tour suivant se déduit des équipes encore en vie (qualifiés moins éliminés), plus d'un découpage par
+puissance de deux — c'est ce qui cassait dans les grosses divisions. ⚠️ `classementCarriere` s'arrête à
+`journeesRegulieres` : les matchs de phase finale ne comptent plus au classement. Banc : `npm run verify:playoffs-ligue`
+(85 contrôles).
+
+**Remplacements au bon poste** (`feuilleGeleeEnLigne`, `feuilleDepuisComposition`) — un remplaçant garde SON poste sur
+la feuille gelée (il recevait celui du numéro de banc, 16 = talonneur…) : `remplacantPour` l'apparie donc par poste,
+famille, puis catégorie. Banc : `npm run verify:remplacements`.
+
+**Caméra « Joueur »** (hors git : `../analyse-rn26/correctif_33_camera.cjs`, sauvegarde
+`sauvegarde-avant-correctif-33/`) — l'assistance suit la SITUATION : notre joueur porte → derrière sa course ; un
+partenaire porte → entre notre orientation et le porteur ; ballon en l'air → cadre élargi (+12 %) ; l'adversaire porte →
+le ballon reste à l'image. Le geste manuel (360°) garde toujours la main ; après 2 s sans geste l'assistance revient
+sur 1,6 s. `scene.ballonAEcran()` nourrit un repère de bord d'écran (`RepereBallon`, `.cd-ballon`) quand le ballon sort
+du champ. Mesuré, joueur à l'arrêt : ballon à l'image 0 à 7 % du temps avant, 100 % après. Confirmé en jeu par
+l'utilisateur.
+
+**Plein écran** (`lib/pleinEcran.ts`) — le bouton n'apparaissait que si `document.fullscreenEnabled` : faux sur iPhone.
+`entrerEnPleinEcran` : natif (standard ou `webkit`), sinon SIMULÉ (cadre du match en `position: fixed` par-dessus la
+page ; classes `plein-ecran-simule`, `-ancetre` pour rendre leur bloc conteneur aux ancêtres transformés, `-actif` sur
+`<html>`). `surPleinEcran`, `elementEnPleinEcran`, `sortirDuPleinEcran` servent `MatchLive` et `TerrainEnDirect` ; la
+sortie de match appelle `quitterPleinEcranSimule`. ⚠️ `.ml-vue-outils` passe au rang 8 : à 3 il était SOUS les zones
+tactiles du contrôle direct, donc inatteignable au doigt. Essai : `?pleinEcran=simule` en développement.
+⚠️ Pas essayé sur un vrai iPhone.
+
+**Packs de test, privés** (`lib/packsInternes.ts`, `serveur/packsInternes.ts`, `serveur/packsInternesStockage.ts`,
+`components/LaboPacksTest.tsx`, Labo → « Packs de test ») — un pack dont on choisit exactement les cartes (recherche par
+nom, club, poste, rareté, type ; ordre ; carte principale révélée en dernier ; 20 cartes, 40 packs au plus). Il apparaît
+dans la Collection solo, section « Packs de test », et s'ouvre par le vrai `OuverturePack` (`ordreImpose`).
+- ⚠️ **L'AUTORISATION EST UNE PERMISSION SERVEUR, PAS UN PSEUDO** : `CAN_CREATE_CUSTOM_PACKS` dans `compte_permissions`,
+  relue en base à CHAQUE écriture (cache de 60 s pour les seules lectures). Sans elle, lire, chercher, créer, supprimer
+  ou ouvrir répond `403 FORBIDDEN` — même en connaissant la route et l'identifiant du pack.
+- Routes : `GET ?packsInternes=1` (`&recherche=1`), `POST action: 'packInterne'` (`creer` / `supprimer`), ouverture par
+  `ouvrirPackPriveSolo` avec `interne:<uuid>`. Les cartes sont résolues par le SERVEUR depuis le catalogue : le client
+  n'envoie que des identifiants.
+- Rien de public n'est touché : ni probabilités, ni packs réels, ni prix. Journal `packs_internes_journal` (compte, date,
+  cartes, packId, création/ouverture/suppression), source d'acquisition `INTERNAL_CUSTOM_PACK`.
+- ⚠️ **SANS LES TABLES, TOUT LE MONDE REÇOIT 403** (`42P01` → pas de permission) : `npm run base:appliquer` pose
+  `compte_permissions`, `packs_internes`, `packs_internes_journal` et accorde la permission au compte `kiri`. ⚠️ Ce SQL
+  n'a pas été essayé sur la vraie base (stockage fichier et banc seulement).
+- Banc : `npm run verify:packs-test` (79 contrôles, dont le refus d'un compte ordinaire sur chaque route). Aperçu :
+  `/scripts/apercuPacksTest.html`.
+
+**Influenceurs : « image manquante » à la publication** (`serveur/atelierSpeciales.ts`, `LaboCartesSpeciales.tsx`) — deux
+causes : l'éditeur gardait son brouillon local après l'envoi de l'image (`image`, `imageReady`, `statut` jamais relus —
+ils sont maintenant resynchronisés depuis le serveur), et une publication en masse ignorait une carte encore en
+brouillon. Une carte choisie explicitement, avec image, est publiée et sort du brouillon.
+
+**Joueurs ajoutés à la main** (`scripts/ajoutsJoueurs.cjs`, `scripts/appliquerAjoutsJoueurs.cjs`) — Gianluca DALLA RIVA
+(US Montauban, arrière, 19 ans, 61) et Noé GODIGNON (« Nogodi », CA Brive, deuxième centre, 28 ans, 72, potentiel 75).
+⚠️ `genMonde.cjs` ne reproduit plus `effectifsReels.ts` tel qu'il est commité (retouches à la main) : NE PAS le relancer
+pour un ajout. Le script d'application ajoute EN FIN de liste du club (les identifiants `<club>-reel-<i>` existants ne
+bougent pas), ne crée jamais de doublon, et écrit `postesExactsJoueurs.generated.ts`, que `postesJoueurReel` lit en
+premier. Portrait : `definirPortraitsDeCartes` (`avatars.ts`) fait suivre au joueur l'image de sa carte Influenceur
+publiée (identité réelle renseignée) ; un fichier `public/photos/noe_godignon.webp` passerait devant.
+
+**Base FFR : validation des profils en attente** — `node scripts/analyserValidationFfr.mjs` est une SIMULATION en lecture
+seule (plan privé `.ffr/2026_10_FFR_FULL/validation-plan.json`) : 180 hommes et 45 femmes validables tels quels,
+7 212 profils présents dans deux sources, 13 426 dont le poste est connu de l'autre source, 13 036 homonymes à
+départager, 173 628 exclus (sans licence, sans prénom ou réduits à une initiale), 131 789 insuffisants.
+⚠️ **RIEN N'EST APPLIQUÉ** : les règles de validation étaient dans la partie illisible de la demande.
+
 ## ⚠️ Équilibrage : ce qui ne se retouche pas sans mesurer
 
 ### Difficulté

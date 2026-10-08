@@ -1,13 +1,24 @@
 // Development-only indexed data. Never import this module from Vercel.
 import { DatabaseSync } from 'node:sqlite';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { filtreSource, vueSource } from './stockage.js';
 import type { StockageJoueurs } from './stockage.js';
 import type { ProfilFfr } from './classification.js';
 import { editionProfil, exigerPublication } from './validation.js';
+import { filtreJeunesCarriere, REFERENCE_JEUNES_FFR, versionFfrValide } from './jeunesCarriere.js';
+import type { SourceJeuneFfr } from '../../src/lib/jeunesFfr.js';
 export function joueursLocaux(version='2026_10_FFR_FULL', authorized: () => string | undefined): StockageJoueurs | undefined {
-  const path=resolve('.ffr',version,'sources.sqlite');if(!existsSync(path))return undefined;
+  let path=resolve('.ffr',version,'sources.sqlite');
+  // Un atelier neuf peut préparer son premier vivier sans posséder l'import historique.
+  const pointeurLocal = resolve('.ffr', 'active-career-dataset.json');
+  if (!existsSync(path) && version === '2026_10_FFR_FULL' && existsSync(pointeurLocal)) {
+    const premiereVersion = JSON.parse(readFileSync(pointeurLocal,'utf8')).version;
+    if (typeof premiereVersion === 'string' && versionFfrValide(premiereVersion)) {
+      version = premiereVersion;path = resolve('.ffr',version,'sources.sqlite');
+    }
+  }
+  if(!existsSync(path))return undefined;
   const db=new DatabaseSync(path);
   return {
     async acces(compte){return authorized()===compte;},
@@ -45,5 +56,25 @@ export function joueursLocaux(version='2026_10_FFR_FULL', authorized: () => stri
       }catch(e){db.exec('ROLLBACK');throw e;}
     },
     async rapport(){return JSON.parse(String(db.prepare("SELECT value FROM meta WHERE key='report'").get()!.value));},
+    async jeunesCarriere(params){
+      const filtre = filtreJeunesCarriere(params);
+      const pointeur = resolve('.ffr', 'active-career-dataset.json');
+      const active = existsSync(pointeur) ? JSON.parse(readFileSync(pointeur, 'utf8')).version : version;
+      const snapshotVersion = filtre.version || active;
+      if (typeof snapshotVersion !== 'string' || !versionFfrValide(snapshotVersion)) throw new Error('Version de vivier invalide.');
+      const fichier = resolve('.ffr', snapshotVersion, 'sources.sqlite');
+      if (!existsSync(fichier)) throw new Error('Cette version du vivier est indisponible.');
+      const snapshot = new DatabaseSync(fichier, {readOnly:true});
+      try {
+        const prepare = snapshot.prepare("SELECT value FROM meta WHERE key='career_youth_report'").get();
+        if (!prepare) return {version:null, referenceDate:REFERENCE_JEUNES_FFR, joueurs:[], next:null, total:0};
+        const rapport = JSON.parse(String(prepare.value));
+        const rows = snapshot.prepare('SELECT id,data FROM career_youth_sources WHERE id>? ORDER BY id LIMIT ?').all(filtre.after, filtre.limit + 1);
+        const page = rows.slice(0, filtre.limit);
+        return {version:snapshotVersion, referenceDate:String(rapport.referenceDate), total:Number(rapport.usable),
+          next:rows.length > filtre.limit ? String(page.at(-1)!.id) : null,
+          joueurs:page.map(row => JSON.parse(String(row.data)) as SourceJeuneFfr)};
+      } finally { snapshot.close(); }
+    },
   };
 }

@@ -19,6 +19,7 @@ import { classementManagerEnDirect } from '../lib/tableauManager';
 import { semaine, libelleDate, libelleSemaine, SEMAINES_PAR_SAISON } from '../data/calendrier';
 import { CalendrierManager } from '../components/CalendrierManager';
 import { TresorerieManager } from '../components/TresorerieManager';
+import { JeunesCarriere } from '../components/JeunesCarriere';
 import { evaluerObjectif } from '../lib/objectifsManager';
 import { competitionEffective } from '../lib/divisions';
 import { TROPHEES } from '../data/trophees';
@@ -1067,7 +1068,7 @@ export function Manager() {
           )}
 
           {(vue === 'formation' || vue === 'recruteurs' || vue === 'entrainement') && (
-            <div className={`manager-club manager-club-${vue}`}>
+            <div className={`manager-club manager-club-${vue}${manager.mondeJeunes ? ' manager-club-jeunes-reels' : ''}`}>
               <section className="carte manager-inst-tete">
                 <div>
                   <div className="eyebrow">{t('mgr.inst.eyebrow')}</div>
@@ -1155,7 +1156,7 @@ export function Manager() {
                     </div>
                   </section>
 
-                  <section className="carte manager-academie">
+                  {!manager.mondeJeunes && <section className="carte manager-academie">
                     <div className="comp-tete">
                       <div><b><Icone nom="formation" taille={16} />{t("ui.fb5736ec2496")}</b><small>{t("ui.7cb76e682a52")}</small></div>
                       <span className="comp-count">{academieClub.length}/{detectionJeunes.capacite}</span>
@@ -1219,7 +1220,7 @@ export function Manager() {
                         })}
                       </div>
                     )}
-                  </section>
+                  </section>}
                 </>
               )}
 
@@ -1264,7 +1265,7 @@ export function Manager() {
                               <span className="prog-age">{j.age}</span>
                               <span className="prog-note">{j.note}</span>
                               <span className={`prog-marge${marge > 0 ? ' positive' : ''}`}>
-                                {marge > 0 ? `↗ ${j.potentiel}` : '—'}
+                                {marge > 0 ? `↗ ${j.potentielEstime ? `${j.potentielEstime[0]}–${j.potentielEstime[1]}` : j.potentiel}` : '—'}
                               </span>
                             </button>
                           );
@@ -1321,7 +1322,11 @@ export function Manager() {
                 </section>
               )}
 
-              {(vue === 'recruteurs' || vue === 'formation') && detectionJeunes && (
+              {(vue === 'recruteurs' || vue === 'formation') && manager.mondeJeunes && (
+                <JeunesCarriere manager={manager} mode={vue === 'formation' ? 'formation' : 'recrutement'} />
+              )}
+
+              {(vue === 'recruteurs' || vue === 'formation') && !manager.mondeJeunes && detectionJeunes && (
                 <>
                   <section className="carte manager-detection-tete">
                     <div>

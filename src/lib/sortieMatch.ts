@@ -24,7 +24,7 @@
 import { annoncerNouvelleTaille, attendreViewportStable, estTactile, installerEcouteursApp, recalculerViewport, tailleVisible, estPaysage } from './viewport';
 import { libererArrierePlan } from './useModalDialog';
 import { auPlus, tracer } from './finMatch';
-import { oublierLeVerrou, paysageVerrouilleParLeJeu } from './pleinEcran';
+import { oublierLeVerrou, paysageVerrouilleParLeJeu, quitterPleinEcranSimule } from './pleinEcran';
 
 export type EtapeSortie =
   | 'repos' | 'entrees-coupees' | 'boucle-arretee' | 'plein-ecran-quitte' | 'orientation-stable'
@@ -61,6 +61,8 @@ export function sortieEnCours(): boolean { return enCours; }
 /** Rend l'orientation et quitte le plein écran en attendant la CONFIRMATION de chacun. */
 async function quitterLePleinEcran(): Promise<void> {
   try { (screen.orientation as OrientationVerrouillable | undefined)?.unlock?.(); } catch { /* jamais verrouillée */ }
+  // Le plein écran simulé (iPhone) se retire d'un geste : sans cela la page resterait verrouillée derrière le match fermé.
+  quitterPleinEcranSimule();
   if (typeof document === 'undefined' || !document.fullscreenElement) return;
   const sortie = new Promise<void>((fin) => {
     const surChangement = () => { if (!document.fullscreenElement) { document.removeEventListener('fullscreenchange', surChangement); fin(); } };

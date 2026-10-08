@@ -3,6 +3,8 @@ import { filtreSource, vueSource } from './stockage.js';
 import type { StockageJoueurs } from './stockage.js';
 import type { ProfilFfr } from './classification.js';
 import { editionProfil, exigerPublication } from './validation.js';
+import { filtreJeunesCarriere, REFERENCE_JEUNES_FFR } from './jeunesCarriere.js';
+import type { SourceJeuneFfr } from '../../src/lib/jeunesFfr.js';
 export function joueursNeon(url: string): StockageJoueurs {
   const sql=neon(url);
   return {
@@ -58,5 +60,21 @@ export function joueursNeon(url: string): StockageJoueurs {
       if(Number(result.n)!==1)throw new Error('Modification concurrente. Rechargez la page.');
     },
     async rapport(){const [r]=await sql`select version,report from player_datasets where status='ACTIVE'`;return r??null;},
+    async jeunesCarriere(params){
+      const filtre = filtreJeunesCarriere(params);
+      const [dataset] = await sql`select version,report from player_datasets
+        where (${filtre.version}='' and status='ACTIVE') or (${filtre.version}<>'' and version=${filtre.version} and status in ('ACTIVE','RETIRED'))`;
+      if (!dataset) {
+        if (filtre.version) throw new Error('Cette version du vivier est indisponible.');
+        return {version:null, referenceDate:REFERENCE_JEUNES_FFR, joueurs:[], next:null, total:0};
+      }
+      const rapport = (dataset.report as {career_youth?:{referenceDate:string;usable:number}})?.career_youth;
+      if (!rapport) return {version:null, referenceDate:REFERENCE_JEUNES_FFR, joueurs:[], next:null, total:0};
+      const rows = await sql`select id,data from youth_career_sources where dataset_version=${dataset.version}
+        and id>${filtre.after} order by id limit ${filtre.limit+1}`;
+      const page = rows.slice(0, filtre.limit);
+      return {version:String(dataset.version), referenceDate:rapport.referenceDate, total:Number(rapport.usable),
+        next:rows.length>filtre.limit ? String(page.at(-1)!.id) : null, joueurs:page.map(r => r.data as SourceJeuneFfr)};
+    },
   };
 }

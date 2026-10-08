@@ -134,7 +134,12 @@
     "mesure:endurance": "vite-node scripts/mesurerEndurance.ts",
     "verify:conquete": "vite-node scripts/verifierConquete.ts",
     "verify:animations": "vite-node scripts/verifierAnimations30.ts",
-    "mesure:animations": "vite-node scripts/mesurerAnimations30.ts"
+    "mesure:animations": "vite-node scripts/mesurerAnimations30.ts",
+    "verify:penaltouche": "vite-node scripts/verifierPenaltouche.ts",
+    "verify:playoffs-ligue": "vite-node scripts/verifierPlayoffsLigue.ts",
+    "verify:blesses": "vite-node scripts/verifierBlessesTempsDeJeu.ts",
+    "verify:remplacements": "vite-node scripts/verifierRemplacementsPoste.ts",
+    "verify:packs-test": "vite-node scripts/verifierPacksTest.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

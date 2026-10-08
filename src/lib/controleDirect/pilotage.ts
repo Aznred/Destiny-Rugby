@@ -265,6 +265,12 @@ export class PilotageDirect {
   readonly resp = new PiloteResp();
   /** Où pointe la souris, dans le repère de la scène (posé par le HUD quand la visée à la souris est voulue). */
   souris: { x: number; y: number; t: number; h: number } | null = null;
+  /**
+   * LE BALLON HORS DU CADRE (Correctif 33) : la direction où le chercher, vue de l'écran (`dx` vers la droite, `dy` vers
+   * le bas, vecteur unitaire), qui le porte, et son nom. `null` quand il est à l'image ou que notre joueur le tient.
+   * Écrit à chaque image par `conduire` ; le HUD le lit dans sa propre boucle d'affichage, sans passer par React.
+   */
+  repereBallon: { dx: number; dy: number; camp: 'ami' | 'adverse' | 'libre'; nom: string | null } | null = null;
 
   constructor(rappels: RappelsPilotage) {
     this.rappels = rappels;
@@ -393,6 +399,11 @@ export class PilotageDirect {
     const d = e.direct!;
     const vue = d.vue;
     const maintenant = performance.now();
+    // Où est le ballon à l'écran (Correctif 33) : le HUD pose une flèche au bord du cadre quand il en sort.
+    const aEcran = e.porteur === moi ? null : scene.ballonAEcran?.() ?? null;
+    this.repereBallon = aEcran && !aEcran.dedans && Number.isFinite(aEcran.dx) && Number.isFinite(aEcran.dy)
+      ? { dx: aEcran.dx!, dy: aEcran.dy!, camp: !e.porteur ? 'libre' : e.porteur.cote === moi.cote ? 'ami' : 'adverse', nom: e.porteur ? e.porteur.nom.split(' ').slice(1).join(' ') || e.porteur.nom : null }
+      : null;
     const rep = scene.reperesCamera();
     const t = prefs.touches;
     const cl = this.clavier;

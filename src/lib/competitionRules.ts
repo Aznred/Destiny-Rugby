@@ -170,6 +170,35 @@ export function nombreQualifies(taille: number): number {
   return Math.min(2, Math.max(0, taille));
 }
 
+/**
+ * LIGUE EN LIGNE : combien de clubs disputent la phase finale d'un championnat (Correctif 33).
+ * 4 clubs → 2 (finale sèche), 6 → 4, 8 → 4, 10 → 6 (barrages puis demi-finales), 16 et plus → 8.
+ *
+ * ⚠️ UNE SEULE DÉFINITION, lue par le serveur qui crée les affiches, par le tableau de l'écran et par les zones du
+ * classement. Il y en avait trois : le serveur qualifiait « la plus grande puissance de deux » (16 clubs sur 16,
+ * 8 sur 8), l'écran dessinait un tableau deux fois plus petit — à 16 clubs, huit matchs réels pour quatre cases,
+ * et une finale qui n'apparaissait jamais.
+ */
+export function qualifiesPlayoffsEnLigne(clubs: number): number {
+  if (!Number.isFinite(clubs) || clubs < 2) return 0;
+  const n = Math.floor(clubs);
+  return n >= 16 ? 8 : n >= 10 ? 6 : n >= 6 ? 4 : 2;
+}
+
+/**
+ * Le tableau d'une phase finale à `qualifies` clubs : combien sont exemptés du premier tour, et combien de matchs
+ * compte chaque tour. Six qualifiés : deux barrages (3ᵉ-6ᵉ, 4ᵉ-5ᵉ), les deux premiers attendent en demi-finale.
+ */
+export function tableauPlayoffs(qualifies: number): { exemptes: number; tours: number[] } {
+  const n = Math.max(0, Math.floor(qualifies));
+  if (n < 2) return { exemptes: n, tours: [] };
+  const plein = 2 ** Math.floor(Math.log2(n));
+  const barrages = n - plein;
+  const tours: number[] = barrages ? [barrages] : [];
+  for (let matchs = plein / 2; matchs >= 1; matchs /= 2) tours.push(matchs);
+  return { exemptes: barrages ? n - 2 * barrages : 0, tours };
+}
+
 export interface Zones {
   qualified: number;
   playoffs: number;
@@ -197,8 +226,11 @@ export function zones(rules: CompetitionRules, taille: number, poules = 1): Zone
     qualified = poules > 1 ? (poules <= 3 ? 2 : 1) : phase >= 6 ? 2 : phase;
     playoffs = s.playoffs === 'auto' ? Math.max(0, phase - qualified) : s.playoffs;
   } else {
-    qualified = s.qualified;
-    playoffs = s.playoffs === 'auto' ? Math.max(0, (taille >= 2 ? 2 ** Math.floor(Math.log2(Math.min(32, taille))) : 0) - qualified) : s.playoffs;
+    // Ligue en ligne : le nombre de qualifiés suit la taille du championnat. Avec des barrages (six qualifiés), les
+    // exemptés du premier tour sont « qualifiés » et les autres « en barrage » — le tableau dit la même chose.
+    const enLice = s.playoffs === 'auto' ? qualifiesPlayoffsEnLigne(taille) : 0;
+    qualified = s.playoffs === 'auto' ? Math.max(s.qualified, tableauPlayoffs(enLice).exemptes) : s.qualified;
+    playoffs = s.playoffs === 'auto' ? Math.max(0, enLice - qualified) : s.playoffs;
   }
   qualified = Math.min(qualified, taille);
   playoffs = Math.min(playoffs, taille - qualified);

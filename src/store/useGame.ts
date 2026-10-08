@@ -127,7 +127,7 @@ import type { Scenario } from '../data/scenarios';
 import { COMPETITIONS, divisionDuClub, competitionDuClub, clubParNom } from '../data/clubs';
 import {
   forceEffectif, forceMoyenneDivision, noteDuClub, setApportsDuCentre, setJoueurIncarne, setTransfertsSociaux,
-  effectifDuClub,
+  effectifDuClub, setEffectifJeunesCarriere,
 } from '../lib/effectif';
 import { nomAleatoirePourNation } from '../lib/nomsJoueurs';
 import { chantierVisible } from '../lib/modeDev';
@@ -172,8 +172,14 @@ import {
 import { explorer } from '../lib/recruteurs';
 import {
   appliquerActionAcademie, evoluerAcademieManager, proposerProjetJeune,
-  tableauDetectionManager, motifObservationJeune,
+  tableauDetectionManager, motifObservationJeune, synchroniserAcademieReelle,
 } from '../lib/formationManager';
+import {
+  creerMondeJeunes, setSourcesMondeJeunes, sourcesMondeJeunes, mondeJeunesDisponible,
+  enregistrerActionMondeJeune, avancerMondeJeunes, seniorsMondeDuClub, jeuneMondeParId,
+} from '../lib/mondeJeunes';
+import { chargerSnapshotJeunes } from '../lib/snapshotJeunesCarriere';
+import { VERSION_JEUNES_FFR } from '../data/versionJeunesFfr.generated';
 import {
   accepterDemandesJoueur, budgetsDuClub, coutPremiereSaison, joueurDejaRecrute,
   negocierAvecJoueur, ouvrirNegociationManager,
@@ -184,6 +190,7 @@ import {
   demandeAGenerer, negocierAvecClub, offresPourVente, ouvrirNegociationClub,
   valeurDeVente, type LevierClubManager,
 } from '../lib/vestiaireManager';
+import { tempsDeJeuReclamable } from '../lib/tempsDeJeuManager';
 import {
   exigerSurApproche, negocierApproche, reactionAuRefus, repondreApproche,
 } from '../lib/approchesClubs';
@@ -1021,6 +1028,8 @@ interface GameState {
   ameliorerInstallation: (type: TypeInstallation) => void;
   /** Mettre un joueur au programme individuel, ou l'en retirer. */
   basculerEntrainement: (nom: string) => void;
+  chargerJeunesCarriereManager: () => Promise<void>;
+  suivreJeuneManager: (jeuneId: string, suivi: boolean) => void;
   /** Investir un déplacement ou un entretien dans un rapport jeune. */
   observerJeuneManager: (jeuneId: string, entretien?: boolean) => void;
   /** Présenter le projet du centre ; le jeune reste libre de choisir. */
@@ -1421,6 +1430,45 @@ function etatDeDepartDeCarriere(joueur: Joueur): Partial<GameState> {
       },
     ],
   };
+}
+
+/** Le registre d'effectif suit l'emplacement actif, sans alimenter les cartes publiques. */
+function installerEffectifsJeunes(manager: Manager | null | undefined): void {
+  const monde = manager?.mondeJeunes;
+  setEffectifJeunesCarriere(monde && mondeJeunesDisponible(monde)
+    ? (club, saison) => seniorsMondeDuClub(monde, club, saison) : undefined,
+    monde && mondeJeunesDisponible(monde) ? new Set((sourcesMondeJeunes(monde.snapshotId) ?? []).map(s => s.id)) : undefined);
+}
+
+function mondeApresTransfertJeune(manager: Manager, joueur: { id: string }, club: string) {
+  let monde = manager.mondeJeunes;
+  if (!monde || !jeuneMondeParId(monde, joueur.id)) return monde;
+  monde = enregistrerActionMondeJeune(monde, {
+    id: joueur.id, saison: manager.saison, type: 'recrutement', club, controle: club === manager.club,
+  });
+  monde = enregistrerActionMondeJeune(monde, {
+    id: joueur.id, saison: manager.saison, type: 'senior', controle: club === manager.club,
+  });
+  installerEffectifsJeunes({ ...manager, mondeJeunes: monde });
+  return monde;
+}
+
+function gererMondeDuBanc(manager: Manager, clubPrecedent?: string): Manager {
+  let monde = manager.mondeJeunes;
+  if (!monde || !mondeJeunesDisponible(monde)) return manager;
+  if (clubPrecedent) for (const j of sourcesMondeJeunes(monde.snapshotId) ?? []) {
+    const joueur = jeuneMondeParId(monde, j.id);
+    if (joueur && (joueur.club === clubPrecedent || joueur.clubProprietaire === clubPrecedent)) {
+      monde = enregistrerActionMondeJeune(monde, { id: j.id, saison: manager.saison, type: 'gestion', controle: false });
+    }
+  }
+  let suivant = { ...manager, mondeJeunes: monde };
+  suivant.academie = synchroniserAcademieReelle(suivant);
+  for (const j of suivant.academie) if (j.sourcePlayerId && j.clubCentre === suivant.club) {
+    monde = enregistrerActionMondeJeune(monde, { id: j.id, saison: suivant.saison, type: 'gestion', controle: true });
+  }
+  suivant = { ...suivant, mondeJeunes: monde };
+  return suivant;
 }
 
 export const useGame = create<GameState>()(
@@ -3826,6 +3874,7 @@ export const useGame = create<GameState>()(
         setContexteJoueur('', 0);
         setTransfertsSociaux([]);
         setApportsDuCentre([], {});
+        setEffectifJeunesCarriere();
         const comp = competitionDuClub(club);
         const prestige = depuis ? prestigeDepuisJoueur(depuis) : PRESTIGE_DEBUT;
         // Plus de joueur incarné : le monde reprend tous ses joueurs avant qu'on lise un effectif.
@@ -3904,6 +3953,12 @@ export const useGame = create<GameState>()(
           // entraîneur issu d'un joueur existant vient de sa carrière, qui n'était pas comparable.
           ...(depuis?.horsClassement ? { horsClassement: true } : {}),
         };
+        manager.mondeJeunes = creerMondeJeunes([], {
+          snapshotId: `carriere-${manager.usageId}`, sourceVersion: 'en_attente',
+          graine: manager.usageId!, saison: 1, annee: 2026,
+        });
+        manager.mondeJeunes.sourceVersionDemandee = VERSION_JEUNES_FFR;
+        manager.jeunesSuivis = {};
         manager.avancee = creerEtatCarriereAvancee(manager, effectifDuClub(club, 1));
         set((s) => ({
           manager,
@@ -3926,6 +3981,37 @@ export const useGame = create<GameState>()(
             }) + (libre ? ` ${t('mgr.journal.horsClassement')}` : ''),
           }],
         }));
+      },
+
+      chargerJeunesCarriereManager: async () => {
+        const debut = get().manager;
+        if (!debut?.mondeJeunes) return;
+        const monde = debut.mondeJeunes;
+        if (mondeJeunesDisponible(monde)) return;
+        const snapshot = await chargerSnapshotJeunes(monde.snapshotId,
+          monde.sourceVersion === 'en_attente' ? monde.sourceVersionDemandee : monde.sourceVersion);
+        const actuel = get().manager;
+        // Le chargement d'une partie ne peut jamais écrire dans un autre emplacement.
+        if (!actuel?.mondeJeunes || actuel.mondeJeunes.snapshotId !== monde.snapshotId) return;
+        setSourcesMondeJeunes(monde.snapshotId, snapshot.sources);
+        let initialise = actuel.mondeJeunes;
+        if (initialise.sourceVersion === 'en_attente') {
+          initialise = creerMondeJeunes(snapshot.sources, {
+            snapshotId: monde.snapshotId, sourceVersion: snapshot.version,
+            graine: monde.graine, saison: monde.saisonDebut, annee: Number(snapshot.referenceDate.slice(0, 4)) || 2026,
+          });
+          while (initialise.saison < actuel.saison) initialise = avancerMondeJeunes(initialise);
+        }
+        const suivant = gererMondeDuBanc({ ...actuel, mondeJeunes: initialise });
+        installerEffectifsJeunes(suivant);
+        suivant.composition = reconcilerCompositionManager(effectifDuClub(suivant.club, suivant.saison), suivant.composition);
+        set({ manager: suivant });
+      },
+
+      suivreJeuneManager: (jeuneId, suivi) => {
+        const m = get().manager;
+        if (!m?.mondeJeunes || !jeuneMondeParId(m.mondeJeunes, jeuneId)) return;
+        set({ manager: { ...m, jeunesSuivis: { ...m.jeunesSuivis, [jeuneId]: suivi } } });
       },
 
       ameliorerInstallation: (type) => {
@@ -4017,9 +4103,13 @@ export const useGame = create<GameState>()(
         const m = get().manager;
         if (!m?.club) return;
         const verdict = proposerProjetJeune(m, jeuneId);
+        const mondeJeunes = verdict.academicien?.sourcePlayerId && m.mondeJeunes
+          ? enregistrerActionMondeJeune(m.mondeJeunes, { id: jeuneId, saison: m.saison, type: 'recrutement', club: m.club })
+          : m.mondeJeunes;
         set((st) => ({
           manager: st.manager && {
             ...st.manager,
+            mondeJeunes,
             budgetTransferts: verdict.academicien
               ? st.manager.budgetTransferts - verdict.indemnite
               : st.manager.budgetTransferts,
@@ -4045,8 +4135,19 @@ export const useGame = create<GameState>()(
         const m = get().manager;
         if (!m?.club) return;
         const resultat = appliquerActionAcademie(m, jeuneId, action);
+        const ancien = m.academie.find(j => j.id === jeuneId);
+        let mondeJeunes = m.mondeJeunes;
+        if (ancien?.sourcePlayerId && mondeJeunes && action !== 'entrainement_senior') {
+          const suivant = resultat.academie.find(j => j.id === jeuneId);
+          const accepte = resultat.senior || (action === 'liberer' && !suivant)
+            || (suivant && suivant !== ancien);
+          if (accepte) mondeJeunes = enregistrerActionMondeJeune(mondeJeunes, {
+            id: jeuneId, saison: m.saison, type: action === 'liberer' ? 'liberation' : action,
+            club: m.club, clubPret: suivant?.clubPret,
+          });
+        }
         let jeunesFormes = m.jeunesFormes;
-        if (resultat.senior) {
+        if (resultat.senior && !resultat.senior.sourcePlayerId) {
           const j = resultat.senior;
           jeunesFormes = [...jeunesFormes, {
             id: `${j.clubCentre}-academie-${j.id}`,
@@ -4064,6 +4165,7 @@ export const useGame = create<GameState>()(
         set((st) => ({
           manager: st.manager && {
             ...st.manager,
+            mondeJeunes,
             academie: resultat.academie,
             jeunesFormes,
           },
@@ -4072,6 +4174,7 @@ export const useGame = create<GameState>()(
             titre: '🎓 Décision du centre', texte: resultat.texte,
           }],
         }));
+        installerEffectifsJeunes(get().manager);
         if (resultat.senior) setApportsDuCentre(jeunesFormes, m.progres);
       },
 
@@ -4145,6 +4248,9 @@ export const useGame = create<GameState>()(
         };
         suivant.conseil = { club, score: 62, detail: { sportif: 60, objectifs: 60, finances: 85, groupe: 65 }, depart: m.conseil?.depart };
         suivant.avancee = changerClubCarriereAvancee(m.avancee, suivant, effectifDuClub(club, m.saison));
+        const gestion = gererMondeDuBanc(suivant, m.club);
+        suivant.mondeJeunes = gestion.mondeJeunes;
+        suivant.academie = gestion.academie;
         set({
           manager: suivant,
         });
@@ -4239,7 +4345,8 @@ export const useGame = create<GameState>()(
         if (!contrat || !joueur) return;
         const matchs = Math.max(1, Object.values(m.resultats).filter((r) => r.saison === m.saison && r.club === m.club).length);
         const reaction = reactionAuRefus(actuelle, contrat, avancee.vestiaire[actuelle.joueurId], {
-          partDeJeu: (m.tempsDeJeu[actuelle.joueurId] ?? 0) / matchs,
+          // Rapporté aux matchs qu'il pouvait jouer : une blessure n'est pas un banc de touche (Correctif 33).
+          partDeJeu: tempsDeJeuReclamable(m, actuelle.joueurId, matchs).part ?? 1,
           monterDEtage: (competitionEffective(actuelle.club)?.niveau ?? 9) < (competitionEffective(m.club)?.niveau ?? 9),
           indisponible: indisponiblesCarriereAvancee(avancee, m.semaine).includes(actuelle.joueurId),
         });
@@ -4342,6 +4449,7 @@ export const useGame = create<GameState>()(
         const montantNet = Math.max(0, approche.offre - reversement);
         const transfert: TransfertAnnonce = {
           nom: joueur.nom, de: m.club, vers: approche.club, saison: m.saison,
+          sourcePlayerId: joueur.sourcePlayerId,
           poste: POSTE_PAR_ID[joueur.poste]?.famille, age: joueur.age,
           note: joueur.note, nation: joueur.nation,
         };
@@ -4363,7 +4471,7 @@ export const useGame = create<GameState>()(
           setTransfertsSociaux(transfertsSociaux);
           return {
             manager: {
-              ...m, avancee: suite,
+              ...m, avancee: suite, mondeJeunes: mondeApresTransfertJeune(m, joueur, approche.club),
               budgetTransferts: m.budgetTransferts + montantNet,
               ventes: m.ventes.filter((v) => v.joueurId !== approche.joueurId),
               entrainements: m.entrainements.filter((n) => n !== joueur.nom),
@@ -5102,6 +5210,7 @@ export const useGame = create<GameState>()(
         if (actuelle.offre.salaire > situationSalariale(m).disponible) return;
         const transfert: TransfertAnnonce = {
           nom: actuelle.joueur.nom,
+          sourcePlayerId: m.mondeJeunes && jeuneMondeParId(m.mondeJeunes, actuelle.joueur.id)?.sourcePlayerId,
           de: actuelle.joueur.club,
           vers: m.club,
           saison: m.saison,
@@ -5125,6 +5234,7 @@ export const useGame = create<GameState>()(
             manager: {
               ...m,
               budgetTransferts: m.budgetTransferts - cout,
+              mondeJeunes: mondeApresTransfertJeune(m, actuelle.joueur, m.club),
               negociations: m.negociations.map((n) => n.id === id ? signee : n),
               recrues: [...m.recrues, {
                 club: m.club, joueur: actuelle.joueur, termes: actuelle.offre, saison: m.saison,
@@ -5314,6 +5424,7 @@ export const useGame = create<GameState>()(
           nom: joueur.nom,
           de: m.club,
           vers: offre.club,
+          sourcePlayerId: joueur.sourcePlayerId,
           saison: m.saison,
           poste: POSTE_PAR_ID[joueur.poste]?.famille,
           age: joueur.age,
@@ -5346,6 +5457,7 @@ export const useGame = create<GameState>()(
             manager: {
               ...m,
               budgetTransferts: m.budgetTransferts + montantNet,
+              mondeJeunes: mondeApresTransfertJeune(m, joueur, offre.club),
               ventes: m.ventes.filter((v) => v.joueurId !== joueurId),
               entrainements: m.entrainements.filter((n) => n !== joueur.nom),
               avancee,
@@ -5492,6 +5604,13 @@ export const useGame = create<GameState>()(
           progressions: [],
         } : evoluerAcademieManager(m);
         const jeunesFormes = m.jeunesFormes;
+        const mondeJeunes = m.mondeJeunes ? avancerMondeJeunes(m.mondeJeunes,
+          licencie ? [] : bilanAcademie.academie.filter(j => !!j.sourcePlayerId).map(j => ({
+            id: j.id, saison: m.saison, type: 'developpement' as const,
+            note: j.note, potentielReel: j.potentielReel, moral: j.moral,
+            tempsDeJeu: j.tempsDeJeu, postesSecondaires: j.polyvalence,
+            blesse: j.derniereProgression?.blesse,
+          }))) : undefined;
         const cleRevenus = `${m.club}|${m.saison}`;
         const revenusFormation = bilanAcademie.indemnites > 0
           ? {
@@ -5539,9 +5658,11 @@ export const useGame = create<GameState>()(
 
         // ⚠️ ON DÉVERSE AVANT DE LIRE L'EFFECTIF SUIVANT, pas après.
         setApportsDuCentre(jeunesFormes, progres);
+        installerEffectifsJeunes({ ...m, mondeJeunes, saison: m.saison + 1 });
 
         const suivant: Manager = {
           ...m,
+          mondeJeunes,
           saison: m.saison + 1,
           semaine: 1,
           age: m.age + 1,
@@ -5601,6 +5722,7 @@ export const useGame = create<GameState>()(
           conseil,
           departsCoach: { ...m.departsCoach, ...(nonRenouvele ? { [m.club]: m.saison + 1 } : {}) },
         };
+        suivant.academie = synchroniserAcademieReelle(suivant);
         if (conseil.offre && conseil.score >= 75) suivant.objectif = Math.max(1, suivant.objectif - 1);
         const joursInterSaison = Math.max(0, Math.round((dateMedicale(suivant.saison, 1).getTime() - dateMedicale(m.saison, m.semaine).getTime()) / 86400000));
         suivant.avancee = { ...bilanAvance.etat, medical: bilanAvance.etat.medical.map(d => evoluerSoin(d, niveauMedical(m), joursInterSaison)), objectifs: objectifsDeSaison(suivant,
@@ -7199,7 +7321,7 @@ export const useGame = create<GameState>()(
     }),
     {
       name: 'destin-ovalie',
-      version: 31,
+      version: 32,
       storage: stockageJeu,
       // Sauvegardes d'avant les 15 postes : le poste stocké est une famille
       // (« pilier »), on lui attribue un numéro de maillot.
@@ -7618,6 +7740,16 @@ export const useGame = create<GameState>()(
         // Le mode de simulation saison par saison a été supprimé. On enlève
         // aussi sa valeur persistée afin qu'une sauvegarde v4 ne puisse plus
         // réactiver une branche obsolète après fusion par Zustand.
+        if (s.manager && !s.manager.mondeJeunes) {
+          s.manager.usageId ??= crypto.randomUUID();
+          s.manager.mondeJeunes = creerMondeJeunes([], {
+            snapshotId: `carriere-${s.manager.usageId}`, sourceVersion: 'en_attente',
+            graine: s.manager.usageId, saison: 1, annee: 2026,
+          });
+          s.manager.mondeJeunes.saison = s.manager.saison;
+          s.manager.mondeJeunes.sourceVersionDemandee = VERSION_JEUNES_FFR;
+          s.manager.jeunesSuivis ??= {};
+        }
         delete s.rythme;
         return s;
       },
@@ -7638,6 +7770,10 @@ export const useGame = create<GameState>()(
         // (`lib/effectif.ts`). Sans cette ligne, une carrière rechargée verrait
         // sa promotion s'évaporer et son effectif rétrécir sans un mot.
         setApportsDuCentre(etat?.manager?.jeunesFormes, etat?.manager?.progres);
+        installerEffectifsJeunes(etat?.manager);
+        if (etat?.manager?.mondeJeunes) queueMicrotask(() => {
+          void etat.chargerJeunesCarriereManager().catch(() => {});
+        });
         setResultatsJoues(Object.values(etat?.manager?.resultats ?? {}).map((r) => ({
           cle: r.cle,
           match: {
@@ -7773,6 +7909,12 @@ if (import.meta.env.DEV) (globalThis as { __useGame?: unknown }).__useGame = use
  * réglages et la boutique sans payer une seconde sauvegarde à chaque `set()`.
  */
 useGame.subscribe((etat) => ecrireCompte(etat as unknown as Record<string, unknown>));
+useGame.subscribe((etat, avant) => {
+  if (etat.manager !== avant.manager) installerEffectifsJeunes(etat.manager);
+  if (etat.manager?.mondeJeunes && etat.manager.usageId !== avant.manager?.usageId) {
+    void etat.chargerJeunesCarriereManager().catch(() => {});
+  }
+});
 // Figer les convocations dès l'annonce, y compris création et rechargement.
 useGame.subscribe((etat, avant) => {
   if (etat.joueur && etat.joueur !== avant.joueur) {

@@ -161,3 +161,24 @@
 .solo-type.type-influencer.actif { border-color: #b97aff; background: linear-gradient(135deg, #3a155e, #150e25); color: #ead4ff; box-shadow: 0 0 14px #9146ff55; }
 .solo-type.type-halloween.actif { border-color: #ff8a1c; background: linear-gradient(135deg, #26262b, #0d0d0f); color: #ff9a2e; box-shadow: 0 0 14px #ff7a0040; }
 @media (max-width: 560px) { .solo-types { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; } .solo-type { flex: none; } }
+
+/* Packs de test (outil interne, Correctif 33) : une liste sobre, à part de la roue des packs de la boutique. */
+.solo-liste-packs-test { display: grid; grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr)); gap: .75rem; margin: 0; padding: 0; list-style: none; }
+.solo-pack-test {
+  --teinte: #d59a64;
+  display: grid; grid-template-columns: 3rem minmax(0, 1fr) auto; align-items: center; gap: .8rem; width: 100%; min-height: 4.25rem; padding: .7rem .9rem;
+  border: 1px solid color-mix(in srgb, var(--teinte) 45%, transparent); border-left-width: 4px; border-radius: var(--rayon);
+  background: linear-gradient(120deg, color-mix(in srgb, var(--teinte) 12%, var(--surface-solid)), var(--surface-solid)); color: var(--craie); text-align: left; cursor: pointer;
+  transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+}
+.solo-pack-test.palier-argent { --teinte: #d7e6f2; } .solo-pack-test.palier-or { --teinte: #ffd15b; }
+.solo-pack-test.palier-elite { --teinte: #54e4ff; } .solo-pack-test.palier-star { --teinte: #ff4057; }
+.solo-pack-test:hover:not(:disabled) { transform: translateY(-2px); border-color: var(--teinte); box-shadow: 0 10px 24px -14px var(--teinte); }
+.solo-pack-test:focus-visible { outline: 2px solid var(--or-400); outline-offset: 2px; }
+.solo-pack-test:disabled { opacity: .55; cursor: default; }
+.solo-pack-test-pochette { display: grid; place-items: center; width: 3rem; height: 3rem; border-radius: 10px; background: color-mix(in srgb, var(--teinte) 20%, #000); color: var(--teinte); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--teinte) 55%, transparent); }
+.solo-pack-test-nom { display: grid; gap: .2rem; min-width: 0; }
+.solo-pack-test-nom b { overflow: hidden; font: 1.05rem/1.15 var(--police-titre); letter-spacing: .02em; text-transform: uppercase; white-space: nowrap; text-overflow: ellipsis; }
+.solo-pack-test-nom small { color: var(--craie-dim); font-size: .74rem; }
+.solo-pack-test-action { padding: .45rem .8rem; border-radius: var(--rayon-pilule); background: color-mix(in srgb, var(--teinte) 22%, transparent); color: var(--teinte); font: 700 .72rem/1 var(--police-forte); letter-spacing: .06em; text-transform: uppercase; }
+@media (max-width: 560px) { .solo-liste-packs-test { grid-template-columns: minmax(0, 1fr); } }

@@ -7,6 +7,11 @@ useGame.getState().creerManager({
   nom: 'Test Formation', nation: 'France', club: 'Stade Toulousain', libre: true,
 });
 let manager = useGame.getState().manager as Manager;
+assert.equal(tableauDetectionManager(manager).fiches.length, 0, 'une nouvelle carrière attend le vivier réel sans inventer de joueurs');
+// Ce banc conserve les contrats des anciennes sauvegardes procédurales.
+// L'intégration du nouveau vivier est couverte par verifierIntegrationJeunesManager.
+manager = { ...manager, mondeJeunes: undefined };
+useGame.setState({ manager });
 
 const rapport = tableauDetectionManager(manager);
 assert.equal(rapport.fiches.length, 8, 'une académie neuve doit recevoir 8 dossiers');

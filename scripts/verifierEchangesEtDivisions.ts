@@ -12,7 +12,8 @@ import { creerGestionnaireCarriere, empreinteJeton } from '../serveur/carriereAp
 import type { EtatBoutiqueCompte } from '../src/lib/boutiqueCompte';
 import type { LigueStockee } from '../serveur/carriereStockage';
 
-for (const [clubs, qualifies] of [[2,2],[3,2],[4,4],[7,4],[8,8],[15,8],[16,16],[31,16],[32,32],[64,32]]) {
+// Correctif 33 : 4 clubs → 2 qualifiés, 6 → 4, 8 → 4, 10 → 6, 16 et plus → 8 (voir verifierPlayoffsLigue.ts).
+for (const [clubs, qualifies] of [[2,2],[3,2],[4,2],[6,4],[7,4],[8,4],[10,6],[15,6],[16,8],[31,8],[32,8],[64,8]]) {
   assert.equal(nombreQualifiesPlayoffs(clubs), qualifies);
 }
 const maintenant = Date.parse('2026-09-28T12:00:00Z');

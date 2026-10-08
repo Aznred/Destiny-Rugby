@@ -14,6 +14,7 @@ import { echeanceLigue, prochaineEcheanceMatch } from '../src/lib/ligue/echeance
 import { vueCarriere } from '../src/lib/ligue/carriere.js';
 import { appliquerModificationsBoutiqueCompte, validerEtatBoutiqueCompte, type EtatBoutiqueCompte } from '../src/lib/boutiqueCompte.js';
 import { ajouterCartesPackSolo } from '../src/lib/packsPrivesSolo.js';
+import { CLE_COFFRE_PACKS_INTERNES, PACKS_INTERNES_MAX, PERMISSION_PACKS_INTERNES, SOURCE_ACQUISITION_INTERNE, type LigneJournalPackInterne, type PackInterne } from '../src/lib/packsInternes.js';
 import type { OffreSolo } from '../src/lib/echangesSolo.js';
 import { modifierCollectionSolo, possedeDoublons } from '../src/lib/echangesSolo.js';
 
@@ -34,6 +35,12 @@ interface BaseLocale {
   usage?: { lignes: LigneUsage[]; compteurs: CompteurUsage[]; carrieres?: CarriereUsage[] };
   /** Le marché commun des divisions publiques : un document par cycle. */
   marches?: Record<string, { revision: number; donnees: unknown }>;
+  /** Packs de test (Correctif 33) : les mêmes trois tables que la base, en mémoire. */
+  permissions?: Record<string, string[]>;
+  /** Le compte interne a reçu sa permission une fois (comme l'`insert` du schéma) : la retirer ensuite est définitif. */
+  permissionsSemees?: boolean;
+  packsInternes?: (PackInterne & { compte: string })[];
+  journalPacksInternes?: (LigneJournalPackInterne & { compte: string })[];
 }
 export function stockageFichier(fichier: string): StockageCarriere {
   mkdirSync(dirname(fichier), { recursive: true });
@@ -60,7 +67,60 @@ export function stockageFichier(fichier: string): StockageCarriere {
   const presences = new Map<string, { match: string; compte: string; vu: number }>();
   const reprises = new Map<string, { match: string; debut: number; sim: number; code: string; donnees: string }>();
   const cleRecu = (l: string, c: string, r: string) => JSON.stringify([l, c, r]);
+  base.permissions ??= {};
+  base.packsInternes ??= [];
+  base.journalPacksInternes ??= [];
+  // L'équivalent local de l'`insert` du schéma : le compte interne reçoit sa permission UNE fois, par son identifiant
+  // immuable. Ensuite seule la table décide — la retirer ferme l'outil, même à ce compte.
+  const semerPermissions = () => {
+    if (base.permissionsSemees) return;
+    const interne = base.comptes.find(c => c.identifiant === 'kiri');
+    if (!interne) return;
+    base.permissions![interne.id] = [...new Set([...(base.permissions![interne.id] ?? []), PERMISSION_PACKS_INTERNES])];
+    base.permissionsSemees = true;
+  };
+  semerPermissions();
+  const tracer = (compte: string, pack: Pick<PackInterne, 'id' | 'nom'>, action: LigneJournalPackInterne['action'], cartes: string[]) => {
+    base.journalPacksInternes!.push({ compte, packId: pack.id, nom: pack.nom, action, cartes: [...cartes], source: SOURCE_ACQUISITION_INTERNE, date: new Date().toISOString() });
+  };
+  const sansCompte = ({ compte: _compte, ...pack }: PackInterne & { compte: string }): PackInterne => copie(pack);
   return {
+    packsInternes: {
+      async permission(compte, permission) { return base.permissions![compte]?.includes(permission) === true; },
+      async lister(compte) {
+        return base.packsInternes!.filter(p => p.compte === compte).sort((a, b) => b.creeLe.localeCompare(a.creeLe) || a.id.localeCompare(b.id)).map(sansCompte);
+      },
+      async lire(compte, id) {
+        const pack = base.packsInternes!.find(p => p.id === id && p.compte === compte);
+        return pack ? sansCompte(pack) : null;
+      },
+      async creer(compte, pack) {
+        if (base.packsInternes!.filter(p => p.compte === compte).length >= PACKS_INTERNES_MAX) return false;
+        base.packsInternes!.push({ ...copie(pack), compte });
+        tracer(compte, pack, 'CREATE', pack.cartes); sauver();
+        return true;
+      },
+      async supprimer(compte, id) {
+        const index = base.packsInternes!.findIndex(p => p.id === id && p.compte === compte);
+        if (index < 0) return false;
+        const [retire] = base.packsInternes!.splice(index, 1);
+        tracer(compte, retire, 'DELETE', retire.cartes); sauver();
+        return true;
+      },
+      async ouvrir(compte, id, quantites, cartes) {
+        const pack = base.packsInternes!.find(p => p.id === id && p.compte === compte);
+        const boutique = base.boutiques![compte];
+        if (!pack || !boutique) return null;
+        boutique.collectionSolo = ajouterCartesPackSolo(boutique.collectionSolo, CLE_COFFRE_PACKS_INTERNES, quantites);
+        pack.ouvertures += 1; pack.derniereOuverture = new Date().toISOString();
+        tracer(compte, pack, 'OPEN', cartes); sauver();
+        return copie(boutique);
+      },
+      async journal(compte, limite) {
+        return base.journalPacksInternes!.filter(l => l.compte === compte).slice(-Math.max(1, Math.min(200, limite))).reverse()
+          .map(({ compte: _compte, ...ligne }) => copie(ligne));
+      },
+    },
     joueurs: joueursLocaux(undefined, () => base.comptes.find(c => c.identifiant === 'kiri')?.id),
     async snapshotFfr(l,migration) {
       const directory=dirname(fichier)+'/snapshots-ffr';mkdirSync(directory,{recursive:true});
@@ -159,7 +219,7 @@ export function stockageFichier(fichier: string): StockageCarriere {
     async creerCompte(c) {
       if (base.comptes.some(x => x.identifiant === c.identifiant || (c.sujetExterne && x.sujetExterne === c.sujetExterne) || (c.courriel && x.courriel === c.courriel))) return false;
       const maintenant = new Date().toISOString();
-      base.comptes.push({ ...copie(c), creeLe: maintenant, vuLe: maintenant }); sauver(); return true;
+      base.comptes.push({ ...copie(c), creeLe: maintenant, vuLe: maintenant }); semerPermissions(); sauver(); return true;
     },
     async session(e, maintenant) {
       const s = base.sessions[e];

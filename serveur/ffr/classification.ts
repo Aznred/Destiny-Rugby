@@ -12,6 +12,7 @@ export interface SourceFfr {
   photo?: string; countryId?: string; clubId?: string; competitionId?: string;
   position_confidence?: number; identity_confidence?: number; club_strength?: number;
   promoted?: boolean; senior_appearances?: number; performance?: number;
+  minutes?: number; observed_progression?: number; pro_squad?: boolean;
 }
 export interface ProfilFfr {
   id: string; name: string; identity_key: string; gender: 'male' | 'female' | 'unknown';
@@ -70,7 +71,8 @@ export function classifierFfr(raw: SourceFfr, reference = '2026-10-08'): ProfilF
   const primary_position = posteFfr(raw.position);
   const position_confidence = primary_position ? born(raw.position_confidence ?? .8) : 0;
   const name = [raw.first_name, raw.last_name].filter(Boolean).join(' ').trim();
-  const identity_confidence = born(raw.identity_confidence ?? (raw.ffr_id && raw.first_name && raw.last_name ? .95 : raw.first_name && raw.last_name ? .7 : .3));
+  const licenceSource = raw.ffr_id || /^ffr[_-]\d+$/i.test(raw.player_id ?? '');
+  const identity_confidence = born(raw.identity_confidence ?? (licenceSource && raw.first_name && raw.last_name ? .95 : raw.first_name && raw.last_name ? .7 : .3));
   const matches = Math.max(0, Math.trunc(raw.matches ?? 0));
   const starts = raw.starts == null ? null : Math.max(0, Math.min(matches, raw.starts));
   const level = niveauFfr(raw.competition, gender);
@@ -102,7 +104,9 @@ export function classifierFfr(raw: SourceFfr, reference = '2026-10-08'): ProfilF
     : !name ? 'IGNORE' : 'NEEDS_REVIEW';
   const eligible = senior && gender !== 'unknown' && recent && matches >= 3 && !!raw.club && !!raw.competition && overall !== null
     && identity_confidence >= .85 && position_confidence >= .65 && data_confidence >= .65;
-  return { id: raw.ffr_id ? `ffr_${raw.ffr_id}` : raw.player_id ?? `unresolved:${normaliserFfr(name)}`, name, identity_key: normaliserFfr(name), gender,
+  const identifiantSource = raw.ffr_id ? `ffr_${raw.ffr_id}` : /^ffr[_-]\d+$/i.test(raw.player_id ?? '')
+    ? `ffr_${raw.player_id!.replace(/^ffr[_-]/i, '').replace(/^0+(?=\d)/, '')}` : raw.player_id ?? `unresolved:${normaliserFfr(name)}`;
+  return { id: identifiantSource, name, identity_key: normaliserFfr(name), gender,
     age_category: youth ? raw.category ?? 'youth' : espoir ? 'Espoirs' : senior ? 'Senior' : 'unknown',
     senior_status: youth ? 'youth' : espoir ? 'espoir' : senior ? 'senior' : 'unknown', age,
     club: raw.club ?? null, competition: raw.competition ?? null, level, primary_position,

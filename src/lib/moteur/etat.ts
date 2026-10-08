@@ -307,6 +307,12 @@ export interface Vol {
    * pied, ni second bruit de frappe.
    */
   rebond?: { duree: number; vers: Vec; hauteur: number };
+  /**
+   * LE COUP DE PIED D'UNE PÉNALITÉ TAPÉE VERS LA TOUCHE (Correctif 33). Le lancer reste à l'équipe qui a tapé, que le
+   * ballon sorte directement ou après un ou plusieurs rebonds : c'est la pénalité qui donne le lancer, pas la
+   * trajectoire. Porté à part de `intention`, parce qu'une pénaltouche manquée vole comme un coup de pied d'occupation.
+   */
+  dePenalite?: boolean;
 }
 
 /**
@@ -489,6 +495,11 @@ export interface BallonLibre {
   rebonds: number;
   /** Le ballon d'un tir au but manqué, resté en jeu (niveau 5) : mort ou aplati dans l'en-but, c'est un renvoi aux 22. */
   deTir?: boolean;
+  /**
+   * Le ballon d'une pénalité tapée vers la touche, retombé dans le champ (voir `Vol.dePenalite`) : s'il sort en touche
+   * après ses rebonds, le lancer reste au botteur. Tombe dès qu'un partenaire du botteur le touche.
+   */
+  dePenalite?: boolean;
 }
 
 /**
@@ -790,7 +801,9 @@ export interface EtatMatch {
   fautesVues?: Record<string, boolean>;
   piedPrepare?: { auteurId: string; arrivee: Vec; intention: IntentionPied; duree: number; hauteur: number; depuis: Vec; pretDepuis?: number; debut?: number; rapideArcade?: boolean; avaitBallon?: boolean;
     /** Courbe déjà calculée pour ce coup de pied (drop : dérive du vent, poteau). */
-    courbe?: Pick<Vol, 'derive' | 'ricochet'> };
+    courbe?: Pick<Vol, 'derive' | 'ricochet'>;
+    /** Pénalité tapée vers la touche : le vol gardera le lancer au botteur (`Vol.dePenalite`). */
+    dePenalite?: boolean };
   clubA: string;
   clubB: string;
 
@@ -810,6 +823,11 @@ export interface EtatMatch {
    */
   transformationDue?: boolean;
   reglesSirene?: 'historique' | 'transformation';
+  /**
+   * `historique` : une pénaltouche retombée dans le champ redevient un ballon ordinaire (les matchs de ligue créés avant
+   * les règles 8 se rejouent ainsi). Absent : le lancer reste au botteur, rebonds compris (Correctif 33).
+   */
+  reglesPenaltouche?: 'historique';
   /** Score à la fin du temps réglementaire, avant toute période supplémentaire. */
   scoreReglementaire?: [number, number];
   /**

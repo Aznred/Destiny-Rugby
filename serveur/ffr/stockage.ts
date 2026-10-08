@@ -1,4 +1,5 @@
 import type { ProfilFfr } from './classification.js';
+import type { PageJeunesFfr } from '../../src/lib/jeunesFfr.js';
 export interface PageSources { joueurs: (Omit<ProfilFfr, 'raw'> & { review: string; revision: number })[]; next: string | null; version: string | null }
 export interface StockageJoueurs {
   acces(compte: string): Promise<boolean>;
@@ -6,6 +7,8 @@ export interface StockageJoueurs {
   catalogue(gender: 'male' | 'female'): Promise<{ version: string; revision: string; joueurs: ProfilFfr[] }>;
   decider(id: string, revision: number, action: 'APPROVE' | 'REJECT' | 'EDIT', actor: string, edit?: Record<string, unknown>): Promise<void>;
   rapport(): Promise<unknown>;
+  /** Lecture privée de l'instantané initial de carrière, distinct du catalogue de cartes. */
+  jeunesCarriere?(params: URLSearchParams): Promise<PageJeunesFfr>;
 }
 export const filtreSource = (p: URLSearchParams) => ({ q: (p.get('q') ?? '').slice(0,80).trim(), gender: p.get('gender') ?? '',
   filter: p.get('filter') ?? '', after: (p.get('after') ?? '').slice(0,100), limit: Math.max(1,Math.min(50,Math.trunc(Number(p.get('limit')))||20)) });

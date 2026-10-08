@@ -7,7 +7,7 @@ import { creerGestionnaireCarriere, empreinteJeton } from '../serveur/carriereAp
 import { stockageFichier } from '../serveur/carriereFichier';
 import { contexteAtelier } from '../serveur/atelierAdmin';
 import { catalogueSpecial, specialesPubliques, carteEchangeAutorise, carteSurMarcheAutorisee } from '../src/lib/ligue/catalogueSpecial';
-import { carteSpecialePackable, preparerTirageSpecial, chanceSpecialeParCarte, EVENEMENTS_DEPART, identiteJoueur } from '../src/lib/ligue/cartesSpeciales';
+import { carteSpecialePackable, preparerTirageSpecial, chanceSpecialeParCarte, EVENEMENTS_DEPART, identiteJoueur, statutCarteSpeciale } from '../src/lib/ligue/cartesSpeciales';
 import { catalogueBaseCarriere, carteDepuisSource, PACKS_CARRIERE } from '../src/lib/ligue/catalogueCarriere';
 import { collectifCarriere } from '../src/lib/ligue/collectifCarriere';
 import { creerCarriere, agirCarriere } from '../src/lib/ligue/carriere';
@@ -60,6 +60,19 @@ try {
   egal((await edition(id, { published: true, brouillon: false })).statut, 400, 'Publication sans image refusée');
   egal((await ecrire('imageCarteSpeciale', { id, image: '/photos/silhouette.webp' })).statut, 200, 'Image préparée');
   egal((await edition(id, { published: true })).statut, 400, 'Un brouillon avec image ne se publie pas');
+  // Correctif 33 : « Publier la sélection » sur un brouillon. Sans image, il attend ; avec son image, il sort du brouillon.
+  const second = await ecrire('creerCarteSpeciale', { carte: { ...definition, nom: 'Lola', display_name: '@LolaLive' } });
+  egal(second.statut, 200, 'Second Influenceur créé en brouillon');
+  const idSecond = second.donnees.id as string;
+  const sansImage = await ecrire('publierCartesSpeciales', { ids: [idSecond], published: true });
+  egal([sansImage.statut, sansImage.donnees.modifiees, sansImage.donnees.ignorees, sansImage.donnees.brouillons], [200, 0, ['Lola'], 0], 'Publication en masse : un brouillon sans image attend son image');
+  egal((await ecrire('imageCarteSpeciale', { id: idSecond, image: '/photos/silhouette.webp' })).statut, 200, 'Image du second préparée');
+  egal(catalogueSpecial(await db.atelier!.lire()).parId.get(idSecond)?.imageReady, true, 'Le serveur voit l’image : la carte n’est plus « image manquante »');
+  const avecImage = await ecrire('publierCartesSpeciales', { ids: [idSecond], published: true });
+  egal([avecImage.statut, avecImage.donnees.modifiees, avecImage.donnees.ignorees, avecImage.donnees.brouillons], [200, 1, [], 1], 'Publication en masse : le brouillon avec image est publié');
+  const publie = catalogueSpecial(await db.atelier!.lire()).parId.get(idSecond)!;
+  egal([publie.published, Boolean(publie.brouillon), statutCarteSpeciale(publie)], [true, false, 'published'], 'Il est sorti du brouillon et porte le statut « Publiée »');
+  egal((await ecrire('supprimerCarteSpeciale', { id: idSecond })).statut, 200, 'Second Influenceur retiré');
   egal((await edition(id, { brouillon: false, published: true })).statut, 200, 'Publication après préparation');
   egal((await publicSolo()).donnees.speciales.definitions.length, 0, 'Famille inactive : aucune définition publique');
   egal((await ecrire('evenementSpecial', { id: 'influencers', evenement: { actif: true } })).statut, 200, 'Activation globale');

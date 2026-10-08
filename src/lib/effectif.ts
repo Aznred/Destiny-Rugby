@@ -20,6 +20,9 @@ import { definirJoueurIncarne, estJoueurIncarne, joueurIncarne } from './joueurI
 // NB : prêt à être remplacé par un import CSV réel (voir CLAUDE.md).
 
 export interface Coequipier {
+  /** Ancien jeune réel : son plafond interne reste remplacé à l'écran par une estimation. */
+  potentielEstime?: [number, number];
+  sourcePlayerId?: string;
   /** Sorti du centre de formation du club (🎓 à l'écran). */
   duCentre?: boolean;
   /**
@@ -528,6 +531,7 @@ function effectifAmateur(nomClub: string, saison: number, niveau: number): Coequ
     if (age <= retraite) {
       return {
         id: `${nomClub}-am-${i}`,
+        sourcePlayerId: brut.ffrId ? `ffr_${brut.ffrId}` : undefined,
         nom: brut.nom,
         poste,
         postesSecondaires: [...brut.postesSecondaires],
@@ -596,7 +600,12 @@ function romain(n: number): string {
 }
 
 export function effectifDuClub(nomClub: string, saison: number): Coequipier[] {
-  const liste = effectifDuClubComplet(nomClub, saison);
+  const base = effectifDuClubComplet(nomClub, saison);
+  const ajouts = EFFECTIF_JEUNES?.(nomClub, saison) ?? [];
+  const ids = new Set(ajouts.map(j => j.id));
+  const conserve = IDENTITES_JEUNES
+    ? base.filter(j => !IDENTITES_JEUNES!.has(j.sourcePlayerId ?? j.id)) : base;
+  const liste = ajouts.length ? [...conserve.filter(j => !ids.has(j.id)), ...ajouts] : conserve;
   // ⚠️ LE JOUEUR QUE L'ON INCARNE N'Y FIGURE PLUS (Correctif 19, `lib/joueurIncarne.ts`) : quand la carrière part
   // d'un joueur existant, le monde le contient déjà — deux Dupont sur la feuille, un club qui compte deux fois son
   // demi de mêlée. Il en sort ICI, au bout de la chaîne : le transfert, le mercato et la génération ont travaillé
@@ -750,7 +759,7 @@ function construireEffectif(nomClub: string, saison: number): Coequipier[] {
         return { ...regen, id: `${id}-succession-${generation}`, poste: source.poste };
       }
       return {
-        id, nom: source.nom, poste: source.poste, postesSecondaires: source.postesSecondaires ? [...source.postesSecondaires] : undefined,
+        id, sourcePlayerId: source.sourceId, nom: source.nom, poste: source.poste, postesSecondaires: source.postesSecondaires ? [...source.postesSecondaires] : undefined,
         photo: source.photo, nation: source.nation, age, potentiel: source.potentiel,
         note: saison === 1 ? source.note : noteALAge(source.note, source.age, source.potentiel, age, declin, 20),
         jeuAuPied: source.statistiques.JDP, clubReel: source.clubReel, championnat: source.championnat,
@@ -883,6 +892,15 @@ export function setTransfertsSociaux(liste: TransfertAnnonce[] | undefined): voi
 // même moment de la chaîne (voir `effectifDuClub`).
 // ---------------------------------------------------------------------------
 let JEUNES_FORMES: JeuneForme[] = [];
+let EFFECTIF_JEUNES: ((club: string, saison: number) => Coequipier[]) | undefined;
+let IDENTITES_JEUNES: Set<string> | undefined;
+/** Projection du monde jeune courant : aucun profil n'est recopié dans le catalogue en ligne. */
+export function setEffectifJeunesCarriere(projection?: (club: string, saison: number) => Coequipier[], identites?: Set<string>): void {
+  EFFECTIF_JEUNES = projection;
+  IDENTITES_JEUNES = identites;
+  cacheForce.clear();
+  cacheReference.clear();
+}
 let PROGRES_ENTRAINEMENT: Record<string, { depuis: number; gain: number }[]> = {};
 
 export function setApportsDuCentre(
@@ -1003,7 +1021,7 @@ function appliquerTransfertsSociaux(
   // chez un acheteur en creux (bonus destination appliqué). Neuf points
   // d'écart, jamais annoncés : « ils ont pas du tout les bons généraux ».
   for (const [cle, t] of dernier) {
-    if (t.vers !== nomClub) continue;
+    if (t.vers !== nomClub || (t.sourcePlayerId && IDENTITES_JEUNES?.has(t.sourcePlayerId))) continue;
     if (sortie.some((j) => normaliser(j.nom) === cle)) continue;
     const ancien = effectifBrut(t.de, saison).find((j) => normaliser(j.nom) === cle);
     const noteAnnoncee = Number.isFinite(t.note) ? Math.max(30, Math.min(95, t.note!)) : 60;

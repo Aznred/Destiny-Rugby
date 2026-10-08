@@ -1,5 +1,6 @@
 import { EVALUATION_ALLRUGBY, PROFIL_POSTES_ALLRUGBY } from '../data/evaluationsAllRugby.js';
 import { EVALUATION_JOUEUR_MAJ } from '../data/evaluationsJoueursMaj.js';
+import { POSTES_EXACTS_JOUEURS } from '../data/postesExactsJoueurs.generated.js';
 import { posteDepuisFamille } from '../data/rugby.js';
 import type { FamillePoste, PosteId } from '../types.js';
 
@@ -34,6 +35,9 @@ function grainePoste(nom: string): number {
 export function postesJoueurReel(
   nom: string, familleOrigine: FamillePoste,
 ): { poste: PosteId; postesSecondaires: PosteId[] } {
+  // Un joueur ajouté à la main porte le maillot qu'on lui a donné (`scripts/ajoutsJoueurs.cjs`) : ni tiré, ni déduit.
+  const exact = POSTES_EXACTS_JOUEURS[nom];
+  if (exact) return { poste: exact, postesSecondaires: [] };
   const profil = PROFIL_POSTES_ALLRUGBY[normaliserIdentiteJoueur(nom)];
   if (profil) {
     return {

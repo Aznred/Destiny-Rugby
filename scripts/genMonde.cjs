@@ -19,6 +19,7 @@ const fs = require('fs');
 const path = require('path');
 const { LIGUES, COUPES, INTERNATIONALES } = require('./ligues.cjs');
 const { VEDETTES } = require('./vedettes.cjs');
+const { appliquerAjouts, postesExacts } = require('./ajoutsJoueurs.cjs');
 
 // La base écrit les noms avec leurs vrais accents (« Péato MAUVAKA »), la table
 // des vedettes non : on compare sans accents ni casse.
@@ -411,6 +412,11 @@ for (const ligue of LIGUES) {
   }
 }
 
+// Les joueurs ajoutés à la main (`ajoutsJoueurs.cjs`) : à la FIN de l'effectif de leur club, jamais en double.
+for (const b of appliquerAjouts(EFFECTIFS)) {
+  if (b.action === 'refuse') avertir(`ajout manuel refusé : ${b.nom} — ${b.raison}`);
+}
+
 // ---------------------------------------------------------------------------
 // 6. Écriture — src/data/mondeReel.ts
 // ---------------------------------------------------------------------------
@@ -590,6 +596,16 @@ export function aEffectifReel(club: string): boolean {
 
 ecrireMonde();
 ecrireEffectifs();
+// Les maillots fixés à la main suivent les ajouts (même fichier que `appliquerAjoutsJoueurs.cjs`).
+{
+  const exacts = Object.entries(postesExacts()).sort(([a], [b]) => a.localeCompare(b));
+  fs.writeFileSync(path.join(RACINE, 'src', 'data', 'postesExactsJoueurs.generated.ts'),
+    `// ⚠️ FICHIER GÉNÉRÉ — ne pas éditer à la main.\r\n// Source : scripts/ajoutsJoueurs.cjs · Généré par scripts/appliquerAjoutsJoueurs.cjs (et genMonde.cjs).\r\n//\r\n`
+    + `// Le maillot d'un joueur ajouté à la main, quand sa famille de poste en couvre deux (un centre est 12 ou 13).\r\n`
+    + `// Lu par \`postesJoueurReel\` AVANT toute autre source : c'est une valeur donnée, pas déduite.\r\n`
+    + `import type { PosteId } from '../types.js';\r\n\r\nexport const POSTES_EXACTS_JOUEURS: Record<string, PosteId> = {\r\n`
+    + exacts.map(([nom, poste]) => `  ${esc(nom)}: ${esc(poste)},\r\n`).join('') + `};\r\n`, 'utf8');
+}
 
 // ---------------------------------------------------------------------------
 // 8. Récapitulatif

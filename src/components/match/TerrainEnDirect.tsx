@@ -76,6 +76,7 @@ import {
 } from '../../lib/match3D';
 import { OutilsTele } from './PresentationTV';
 import { useNomPorteur } from './useNomPorteur';
+import { elementEnPleinEcran, entrerEnPleinEcran, quitterPleinEcranSimule, sortirDuPleinEcran, surPleinEcran } from '../../lib/pleinEcran';
 import { logoTV } from '../../lib/habillageTV';
 import { creerMemoireEtat3D, etat3DDepuisDirect } from '../../lib/ligue/etat3DDepuisDirect';
 
@@ -645,18 +646,18 @@ function TerrainEnDirect({ terrain = TERRAIN_VIDE, film, chrono, matchId, surAff
   };
   // Le plein écran prend le cadre du direct entier : l'alerte de décision y reste visible.
   const cadrePleinEcran = () => scene.current?.closest<HTMLElement>('.dc-ecran') ?? scene.current;
+  // Natif ou simulé, le même chemin que les matchs de carrière (`lib/pleinEcran.ts`) : le bouton existe aussi sur iPhone.
   useEffect(() => {
-    const suivre = () => setPleinEcran(!!document.fullscreenElement && document.fullscreenElement === cadrePleinEcran());
-    document.addEventListener('fullscreenchange', suivre);
-    return () => document.removeEventListener('fullscreenchange', suivre);
+    const suivre = () => { const enPleinEcran = elementEnPleinEcran(); setPleinEcran(!!enPleinEcran && enPleinEcran === cadrePleinEcran()); };
+    const arreter = surPleinEcran(suivre);
+    // On quitte le direct : rien ne doit rester « par-dessus la page ».
+    return () => { arreter(); quitterPleinEcranSimule(); };
   }, []);
   const basculerPleinEcran = () => {
-    if (document.fullscreenElement) { void document.exitFullscreen(); return; }
-    cadrePleinEcran()?.requestFullscreen?.({ navigationUI: 'hide' })
-      .then(() => (screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> }).lock?.('landscape'))
-      .catch(() => { /* refusé par le navigateur : le direct reste dans la page */ });
+    if (elementEnPleinEcran()) { sortirDuPleinEcran(); return; }
+    const cadre = cadrePleinEcran();
+    if (cadre) void entrerEnPleinEcran(cadre);
   };
-  const pleinEcranPossible = typeof document !== 'undefined' && !!document.fullscreenEnabled;
 
   const dessiner = (p: TerrainDirect['pions'][number]) => {
     const pos = pions.current.get(p.id);
@@ -805,7 +806,7 @@ function TerrainEnDirect({ terrain = TERRAIN_VIDE, film, chrono, matchId, surAff
       <div className="cel-hud">
         {!modeDemo && (
           <div className="ml-vue-outils">
-            {pleinEcranPossible && (
+            {(
               <button type="button" onClick={basculerPleinEcran} className={pleinEcran ? 'actif' : undefined}
                 title={t(pleinEcran ? 'ml.quitterPleinEcran' : 'ml.pleinEcran')}
                 aria-label={t(pleinEcran ? 'ml.quitterPleinEcran' : 'ml.pleinEcran')}>

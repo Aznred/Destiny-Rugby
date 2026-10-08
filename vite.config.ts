@@ -88,6 +88,13 @@ let stockage: unknown;
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), carriereEnDeveloppement()],
+  server: {
+    fs: {
+      // Conserver les exclusions par défaut de Vite 8 et protéger les snapshots
+      // privés contre les URL directes, y compris /@fs/. Node continue de lire SQLite.
+      deny: ['.env', '.env.*', '*.{crt,pem,key,p12,pfx,cer,der}', '.npmrc', '.yarnrc.yml', '**/.git/**', '**/.ffr/**'],
+    },
+  },
   build: {
     // Three.js est volontairement un bloc fournisseur paresseux (~972 Ko
     // minifiés, 265 Ko gzip), partagé par toutes les scènes 3D. Le couper

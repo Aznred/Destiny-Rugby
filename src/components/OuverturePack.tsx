@@ -16,7 +16,7 @@ import './OuverturePack.css';
 const Pack3D = lazy(() => import('./Pack3D'));
 
 const COULEURS = ['#d59a64', '#d7e6f2', '#ffd15b', '#54e4ff', '#ff4057'];
-export default function OuverturePack({ cartes, pack, modele, garantie, apparenceInitiale, onFermer, rendreCarte }: {
+export default function OuverturePack({ cartes, pack, modele, garantie, apparenceInitiale, ordreImpose, onFermer, rendreCarte }: {
   /**
    * ⚠️ `null` VEUT DIRE « LE SERVEUR N'A PAS ENCORE RÉPONDU », et c'est un état
    * normal, pas une erreur. La pochette s'affiche AVANT que les cartes soient
@@ -27,13 +27,20 @@ export default function OuverturePack({ cartes, pack, modele, garantie, apparenc
    */
   cartes: CarteCarriere[] | null; pack: string; modele?: string; garantie?: RareteCarriere;
   apparenceInitiale?: RareteCarriere; onFermer: () => void; rendreCarte: (carte: CarteCarriere) => ReactNode;
+  /**
+   * Pack de test (Correctif 33) : `cartes` arrive DANS L'ORDRE DE RÉVÉLATION voulu (la première se retourne d'abord,
+   * la dernière est la tête d'affiche). Sans lui, les cartes sont rangées par niveau et la meilleure clôt le pack.
+   */
+  ordreImpose?: boolean;
 }) {
   const pret = cartes !== null;
   // L'écran final reprend la lecture d'un pack de football : la tête d'affiche
   // est à gauche, puis toutes les autres cartes se rangent par niveau. Pour
   // conserver le suspense, la cascade les retourne dans l'autre sens et finit
   // donc toujours par la meilleure.
-  const ordre = useMemo(() => cartes ? [...cartes].sort((a,b) => rangPack(b)-rangPack(a) || b.note-a.note) : [], [cartes]);
+  // La cascade retourne les cartes de la fin du tableau vers son début : un ordre imposé se lit donc à l'envers.
+  const ordre = useMemo(() => !cartes ? [] : ordreImpose ? [...cartes].reverse()
+    : [...cartes].sort((a,b) => rangPack(b)-rangPack(a) || b.note-a.note), [cartes, ordreImpose]);
   // Les skins dédiés gardent leur visuel. Les pochettes génériques partent de
   // leur couleur en boutique, puis le joueur révèle chaque palier du tirage.
   const rangInitial = Math.max(0, PALIERS_PACK.indexOf(apparenceInitiale ?? garantie ?? 'bronze'));

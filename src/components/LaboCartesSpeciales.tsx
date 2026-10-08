@@ -149,7 +149,7 @@ export function LaboCartesSpeciales() {
       <div className="ls-masse">
         <span>{cochees.size ? `${cochees.size} sélectionnée(s)` : `${filtrees.length} carte(s) affichée(s)`}</span>
         <button type="button" className="btn fantome" disabled={occupe || !filtrees.length} onClick={() => setCochees(cochees.size ? new Set() : new Set(filtrees.map(c => c.id)))}>{cochees.size ? 'Tout décocher' : 'Tout cocher'}</button>
-        <button type="button" className="btn primaire" disabled={occupe || !cochees.size} onClick={() => { void operer('publierCartesSpeciales', { ids: [...cochees], published: true }, r => `${r.modifiees} publiée(s).${(r.ignorees as string[])?.length ? ` En attente d’image : ${(r.ignorees as string[]).join(', ')}.` : ''}`).then(() => setCochees(new Set())); }}>Publier la sélection</button>
+        <button type="button" className="btn primaire" disabled={occupe || !cochees.size} onClick={() => { void operer('publierCartesSpeciales', { ids: [...cochees], published: true }, r => `${r.modifiees} publiée(s)${Number(r.brouillons) > 0 ? `, dont ${r.brouillons} sortie(s) du brouillon` : ''}.${(r.ignorees as string[])?.length ? ` En attente d’image : ${(r.ignorees as string[]).join(', ')}.` : ''}`).then(() => setCochees(new Set())); }}>Publier la sélection</button>
         <button type="button" className="btn fantome" disabled={occupe || !cochees.size} onClick={() => { void operer('publierCartesSpeciales', { ids: [...cochees], published: false }, r => `${r.modifiees} dépubliée(s).`).then(() => setCochees(new Set())); }}>Dépublier</button>
         <button type="button" className="btn fantome" disabled={occupe || !pretes.length} onClick={() => { void operer('publierCartesSpeciales', { ids: pretes.map(c => c.id), published: true }, r => `${r.modifiees} carte(s) prête(s) publiée(s).`); }}>Publier les prêtes ({pretes.length})</button>
       </div>
@@ -183,7 +183,22 @@ function EditeurCarte({ carte, vue, occupe, operer, supprimer }: { carte: CarteL
   const [urlImage, setUrlImage] = useState('');
   const [erreurImage, setErreurImage] = useState('');
   const famille = vue.familles[c.cardType];
-  const maj = <K extends keyof CarteLabo>(cle: K, valeur: CarteLabo[K]) => setC(courante => ({ ...courante, [cle]: valeur }));
+  // ⚠️ CE QUE LE SERVEUR DÉCIDE SUIT CHAQUE RELECTURE (Correctif 33). L'éditeur garde sa saisie tant qu'on reste sur la
+  // même carte ; il gardait donc aussi l'ancien « pas d'image » après l'envoi de l'image : « Publiée » restait grisée
+  // et la fiche affichait « Image manquante » sous une carte dont on voyait le portrait. L'image, le statut et la
+  // publication viennent du serveur ; les champs en cours de saisie ne sont pas touchés.
+  useEffect(() => {
+    setC(courante => ({ ...courante, image: carte.image, imageReady: carte.imageReady, statut: carte.statut, packable: carte.packable, publieeLe: carte.publieeLe }));
+  }, [carte.image, carte.imageReady, carte.statut, carte.packable, carte.publieeLe]);
+  useEffect(() => {
+    setC(courante => ({ ...courante, published: carte.published, brouillon: carte.brouillon }));
+  }, [carte.published, carte.brouillon]);
+  const maj = <K extends keyof CarteLabo>(cle: K, valeur: CarteLabo[K]) => setC(courante => ({
+    ...courante, [cle]: valeur,
+    // Publier, c'est sortir du brouillon ; remettre en brouillon, c'est dépublier. Le serveur refuse les deux à la fois.
+    ...(cle === 'published' && valeur === true ? { brouillon: false } : {}),
+    ...(cle === 'brouillon' && valeur === true ? { published: false } : {}),
+  }));
   const enregistrer = () => operer('carteSpeciale', { id: c.id, carte: {
     nom: c.nom, overall: c.overall, collectif: c.collectif ?? null, poste: c.poste, postesSecondaires: c.postesSecondaires ?? [],
     nation: c.nation, club: c.club, league: c.league, packWeight: c.packWeight, availableFrom: c.availableFrom ?? '', availableUntil: c.availableUntil ?? '',

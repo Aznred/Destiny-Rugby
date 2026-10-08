@@ -20,7 +20,7 @@ import type { CarteCarriere, ClubCarriere, CommandeCarriere, CompetitionCarriere
 import { LOT_VENTE_RAPIDE_MAX, valeurVenteRapide } from './venteRapideCarriere.js';
 import { bonusCollectif, collectifCarriere } from './collectifCarriere.js';
 import { carteEchangeAutorise, carteSurMarcheAutorisee, catalogueSpecial, identiteJoueur, preparerTirageSpecial, resumeSpeciauxLigue, tirerSpeciale } from './catalogueSpecial.js';
-import { estPuissanceDeDeux, nombreQualifiesPlayoffs, nombreQualifiesPoules, repartirPoules } from './poulesCarriere.js';
+import { estPuissanceDeDeux, nombreQualifiesPlayoffs, nombreQualifiesPoules, prochainTourPlayoffs, repartirPoules } from './poulesCarriere.js';
 
 const HEURE = 3_600_000;
 const JOUR = 24 * HEURE;
@@ -910,9 +910,24 @@ function demarrerSaison(etat: EtatCarriereEnLigne, maintenant: number) {
   renouvelerObjectifs(etat, maintenant);
 }
 
+/**
+ * ⚠️ LE CLASSEMENT D'UN CHAMPIONNAT S'ARRÊTE À SA DERNIÈRE JOURNÉE RÉGULIÈRE (Correctif 33). Les matchs de phase finale
+ * portent le même `competitionId` : comptés, une demi-finale gagnée rapportait quatre points, le classement affiché
+ * bougeait pendant les play-offs, les tours suivants étaient appariés sur ce classement faussé, et la dotation de fin
+ * de saison — « chacun est payé à sa place réelle » — suivait le tout.
+ */
 export function classementCarriere(etat: EtatCarriereEnLigne, competitionId?: string): LigneClassementCarriere[] {
   const competition = competitionId ? etat.competitions.find(c => c.id === competitionId) : etat.competitions.find(c => c.saison === etat.saison && c.nom.startsWith('Championnat ·'));
-  return classementCompetition(etat, competition?.id, competition?.participants ?? etat.clubs.map(c => c.id));
+  const reguliere = competition?.format === 'championnat' && competition.playoffs && competition.journeesRegulieres
+    ? competition.journeesRegulieres : Infinity;
+  return classementCompetition(etat, competition?.id, competition?.participants ?? etat.clubs.map(c => c.id), reguliere);
+}
+
+/** Une phase finale déjà ouverte sans `qualifies` (ligue d'avant le Correctif 33) : deux clubs par affiche du premier tour. */
+function qualifiesPlayoffsOuverts(c: CompetitionCarriere, matchs: readonly RencontreCarriere[]): number | undefined {
+  if (!c.journeesRegulieres) return undefined;
+  const premierTour = matchs.filter(r => r.journee === c.journeesRegulieres! + 1).length;
+  return premierTour ? premierTour * 2 : undefined;
 }
 
 function classementCompetition(etat: EtatCarriereEnLigne, competitionId: string | undefined, participants: readonly string[], journeeMax = Infinity): LigneClassementCarriere[] {
@@ -1089,6 +1104,7 @@ function avancerCompetitions(etat: EtatCarriereEnLigne, maintenant: number) {
     const matchs = etat.rencontres.filter(r => r.competitionId === c.id);
     if (!matchs.length || matchs.some(r => !r.resultat)) continue;
     if (c.format === 'championnat') {
+      // Le classement de la phase RÉGULIÈRE : les matchs de phase finale n'y entrent pas (`classementCarriere`).
       const classement = classementCarriere(etat, c.id);
       const rangs = classement.map(l => l.clubId);
       // ⚠️ LA PHASE FINALE NE REJOUE PAS LA SAISON, ELLE LA COURONNE. Le
@@ -1101,19 +1117,25 @@ function avancerCompetitions(etat: EtatCarriereEnLigne, maintenant: number) {
         continue;
       }
       const derniere = Math.max(...matchs.map(r => r.journee));
-      const gagnantDe = (r: RencontreCarriere) => vainqueurRencontre(r, etat);
       const debut = Math.max(...matchs.map(r => Date.parse(r.ferme)));
-      if (derniere === c.journeesRegulieres) {
-        const nombre = nombreQualifiesPlayoffs(rangs.length);
-        ajouterRencontres(etat, c, derniere + 1, Array.from({length: nombre / 2}, (_, i) => ({domicile: rangs[i], exterieur: rangs[nombre - 1 - i]})), debut);
-      } else if (matchs.filter(r => r.journee === derniere).length > 1) {
-        const qualifies = matchs.filter(r => r.journee === derniere).map(gagnantDe).sort((a,b) => rangs.indexOf(a)-rangs.indexOf(b));
-        ajouterRencontres(etat, c, derniere + 1, Array.from({length: qualifies.length / 2}, (_, i) => ({domicile: qualifies[i], exterieur: qualifies[qualifies.length - 1 - i]})), debut);
+      // ⚠️ LE NOMBRE DE QUALIFIÉS EST GELÉ À L'OUVERTURE DE LA PHASE FINALE (`c.qualifies`). Une phase finale ouverte
+      // par l'ancienne règle (toute la ligue qualifiée) garde son tableau : on le relit sur son premier tour.
+      c.qualifies ??= qualifiesPlayoffsOuverts(c, matchs) ?? nombreQualifiesPlayoffs(rangs.length);
+      const phaseFinale = matchs.filter(r => r.journee > c.journeesRegulieres!);
+      const elimines = new Set(phaseFinale.map(r => {
+        const vainqueur = vainqueurRencontre(r, etat);
+        return vainqueur === r.domicile ? r.exterieur : r.domicile;
+      }));
+      const tour = prochainTourPlayoffs(rangs.slice(0, c.qualifies), elimines);
+      if (tour.paires.length) {
+        ajouterRencontres(etat, c, derniere + 1, tour.paires, debut);
       } else {
-        const finale = matchs.find(r => r.journee === derniere)!;
-        const champion = gagnantDe(finale);
+        // Le dernier match joué est la finale : son perdant est le finaliste.
+        const finale = phaseFinale.filter(r => r.journee === derniere)[0];
+        const champion = tour.champion ?? rangs[0];
         cloturerCompetition(etat, c, champion,
-          finale.domicile === champion ? finale.exterieur : finale.domicile, maintenant, rangs);
+          finale ? (finale.domicile === champion ? finale.exterieur : finale.domicile) : rangs.find(id => id !== champion),
+          maintenant, rangs);
       }
     } else if (c.format === 'poules') {
       const derniere = Math.max(...matchs.map(r => r.journee));

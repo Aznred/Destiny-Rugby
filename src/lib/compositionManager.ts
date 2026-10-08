@@ -277,13 +277,15 @@ export function feuilleDepuisComposition(
   effectif: Coequipier[], composition: CompositionManager,
 ): Coequipier[] {
   const parId = new Map(effectif.map((j) => [j.id, j]));
-  const ligne = (ids: string[], postes: PosteId[]) => ids.map((id, i) => {
+  const ligne = (ids: string[], postes: PosteId[] | null) => ids.map((id, i) => {
     const joueur = parId.get(id);
-    return joueur ? { ...joueur, poste: postes[i] ?? joueur.poste } : null;
+    return joueur ? { ...joueur, poste: postes?.[i] ?? joueur.poste } : null;
   }).filter(Boolean) as Coequipier[];
   return [
     ...ligne(composition.titulaires, POSTES_XV_MANAGER),
-    ...ligne(composition.remplacants, POSTES_BANC_MANAGER),
+    // ⚠️ LE BANC GARDE SES POSTES (Correctif 33). Le moteur fait entrer un remplaçant à la place d'un titulaire de SON
+    // poste : lui donner le poste de sa place sur le banc (16 = talonneur…) faisait entrer un ailier en première ligne.
+    ...ligne(composition.remplacants, null),
   ];
 }
 

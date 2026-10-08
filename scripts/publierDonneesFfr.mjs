@@ -41,6 +41,21 @@ for(let start=0;start<academies.length;start+=200){
   await sql`insert into academy_profiles(dataset_version,club_id,gender,data) select ${version},club_id,gender,data
     from jsonb_to_recordset(${JSON.stringify(batch)}::jsonb) r(club_id text,gender text,data jsonb) on conflict do nothing`;
 }
+// Même version immuable que les sources ; les jeunes restent hors de game_players.
+if (report.career_youth) {
+  let cursor = '';
+  for (;;) {
+    const rows = db.prepare('SELECT * FROM career_youth_sources WHERE id>? ORDER BY id LIMIT 500').all(cursor);
+    if (!rows.length) break;
+    const payload = rows.map(r => ({...r, data:JSON.parse(r.data)}));
+    await sql`insert into youth_career_sources(dataset_version,id,club,age,position,data)
+      select ${version},id,club,age,position,data from jsonb_to_recordset(${JSON.stringify(payload)}::jsonb)
+        r(id text,club text,age integer,position text,data jsonb) on conflict(dataset_version,id) do nothing`;
+    cursor = rows.at(-1).id;
+  }
+  const [youthCount] = await sql`select count(*)::int n from youth_career_sources where dataset_version=${version}`;
+  if (youthCount.n !== report.career_youth.usable) throw new Error('Vivier incomplet. Version maintenue en STAGING.');
+}
 const [count]=await sql`select count(*)::int n from source_players where dataset_version=${version}`;
 if(count.n!==report.unique_sources)throw new Error('Le nombre de sources transférées ne correspond pas au rapport. Version maintenue en STAGING.');
 // Only the last small transaction activates the dataset, after complete upload and count verification.

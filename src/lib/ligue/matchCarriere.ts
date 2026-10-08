@@ -76,7 +76,7 @@ import type { Cote } from '../moteur/terrain.js';
 import { corpsPourAffichage, porteurPourAffichage } from '../moteur/dynamique.js';
 import { scorePossible } from '../championnat.js';
 import { POSTES_BANC_MANAGER, POSTES_XV_MANAGER } from '../compositionManager.js';
-import { adequationAuPoste, facteurDePerformance, rendementAuPoste } from '../carteJoueur.js';
+import { rendementAuPoste } from '../carteJoueur.js';
 import type { CompositionManager, PosteId, TactiqueManager } from '../../types.js';
 import type { Coequipier } from '../effectif.js';
 import { graine } from './aleatoire.js';
@@ -567,7 +567,9 @@ export interface EtatMatchEnLigne {
 // Règles 5 (Correctif 24) : les conquêtes lisibles du solo (touche, ruck, mêlée, maul : IA de niveau 4) et le jeu vivant (niveau 5).
 // Règles 7 (Correctif 30) : le jeu physique du solo (IA de niveau 6) — animations contextuelles, grattages et contre-rucks
 // en séquences, combinaisons de touche, plaquages dangereux jugés à leur gravité, altercations.
-export const REGLES_MATCH_EN_LIGNE = 7;
+// Règles 8 (Correctif 33) : les règles 7, plus la pénaltouche qui garde son lancer même retombée dans le champ et sortie
+// après rebonds (`reglesPenaltouche`). Même IA (niveau 6) : seul le sort de ce ballon change.
+export const REGLES_MATCH_EN_LIGNE = 8;
 /**
  * Défense resserrée des règles 2 : la cadence détaillée marque davantage, ce
  * réglage ramène le nombre d'essais à celui des matchs de ligue d'avant
@@ -751,11 +753,16 @@ export function feuilleGeleeEnLigne(
   return [...composition.titulaires, ...composition.remplacants].map((id, i) => {
     const joueur = parId.get(id);
     if (!joueur) return null;
+    // ⚠️ UN REMPLAÇANT GARDE SON POSTE, PAS CELUI DE SA PLACE SUR LE BANC (Correctif 33). Le banc recevait le poste de
+    // son numéro (16 = talonneur, 17 = pilier, 21 = demi de mêlée…) : un ailier assis à la place 16 entrait talonneur,
+    // puisque le moteur apparie l'entrant au titulaire de SON poste. Signalé en jeu : « les remplacements doivent
+    // rentrer au bon poste en fonction du mec sur le banc, pas par rapport au numéro ». Le numéro ne règle plus que
+    // l'ordre des entrées ; le poste est celui du joueur, et sa note n'est plus rabotée pour une place qu'il n'occupe pas.
+    if (i >= 15) return { ...joueur };
     const poste = POSTES_FEUILLE[i] ?? joueur.poste;
     // Le XV paie son placement au barème entier (`rendementAuPoste` : un contre-emploi coûte bien plus qu'un simple
-    // hors-poste). Le banc garde le barème d'avant : il n'occupe aucun poste tant qu'il n'est pas entré.
-    const facteur = i < 15 ? rendementAuPoste(joueur.poste, poste, joueur.postesSecondaires)
-      : facteurDePerformance(adequationAuPoste(joueur.poste, poste, joueur.postesSecondaires));
+    // hors-poste).
+    const facteur = rendementAuPoste(joueur.poste, poste, joueur.postesSecondaires);
     // Le numéro dans le dos devient celui du poste occupé — c'est déjà ce que
     // faisait `feuilleDepuisComposition`, et le moteur en a besoin pour la
     // mêlée, la touche et les remplacements.
@@ -993,6 +1000,9 @@ function monter(etat: EtatMatchEnLigne): EntreeCacheMoteur {
       tempsReel: true,
       scoreSurTerrain: true,
       reglesSirene: (etat.regles ?? 1) >= 6 ? 'transformation' : 'historique',
+      // ⚠️ UN MATCH COMMENCÉ AVANT LES RÈGLES 8 SE REJOUE AVEC SA PÉNALTOUCHE D'ORIGINE : sinon le lancer d'une touche
+      // déjà jouée changerait de camp à la rejoue, et le score annoncé avec lui.
+      ...((etat.regles ?? 1) < 8 ? { reglesPenaltouche: 'historique' as const } : {}),
       ...((etat.regles ?? 1) >= 6 && etat.departage?.extraTime ? {
         departage: { ...etat.departage.extraTime, criteres: etat.departage.thenCompetitionSpecificTiebreak },
       } : {}),

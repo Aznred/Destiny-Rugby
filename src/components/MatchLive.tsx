@@ -160,7 +160,7 @@ import { couleursEquipeTV, DUREE_EQUIPE_TV, exclusionsDepuisEtat, logoTV, type I
 import { couleursDepuisEcusson, departagerLesTenues, enHex } from '../lib/tenuesMatch';
 import { sortirDuMatch } from '../lib/sortieMatch';
 import { apresLEcran, ATTENTE_SCENE_MAX, auPlus, finaliserMatch, jalon } from '../lib/finMatch';
-import { oublierLeVerrou, verrouillerPaysage } from '../lib/pleinEcran';
+import { elementEnPleinEcran, entrerEnPleinEcran, oublierLeVerrou, quitterPleinEcranSimule, sortirDuPleinEcran, surPleinEcran } from '../lib/pleinEcran';
 import { scenesRendues } from '../lib/match3D';
 import { departager, departageDuMatch, inscrireIssueJouee } from '../lib/couperet';
 import { bulleDuMoment, marqueurDepuisEtat, memoireBullesVide, phraseDuMarqueur, ventPourLeTir, type ContexteStatsTV, type PhraseTV } from '../lib/statsTV';
@@ -1755,26 +1755,27 @@ export function MatchLive({
   };
   // Le plein écran porte sur la fenêtre du match entière : cartes de décision,
   // bandeaux et commandes y restent, sinon on ne pourrait plus jouer.
+  // ⚠️ NATIF OU SIMULÉ, UN SEUL CHEMIN (`lib/pleinEcran.ts`, Correctif 33). Le bouton ne s'affichait que si le navigateur
+  // annonçait l'API : il manquait sur iPhone. Là où elle n'existe pas, la fenêtre du match est posée par-dessus la page.
   useEffect(() => {
     const suivre = () => {
-      setPleinEcran(document.fullscreenElement === dialogRef.current);
+      const enPleinEcran = elementEnPleinEcran();
+      setPleinEcran(!!enPleinEcran && enPleinEcran === dialogRef.current);
       // Quitter le plein écran rend l'orientation : il n'y a plus de retour debout à attendre à la sortie du match.
-      if (!document.fullscreenElement) oublierLeVerrou();
+      if (!enPleinEcran) oublierLeVerrou();
     };
-    document.addEventListener('fullscreenchange', suivre);
-    return () => document.removeEventListener('fullscreenchange', suivre);
+    const arreter = surPleinEcran(suivre);
+    // Le match se ferme : rien ne doit rester « par-dessus la page ».
+    return () => { arreter(); quitterPleinEcranSimule(); };
   }, [dialogRef]);
   const basculerPleinEcran = () => {
     const fenetre = dialogRef.current;
     if (!fenetre) return;
-    if (document.fullscreenElement) { void document.exitFullscreen(); return; }
-    fenetre.requestFullscreen?.({ navigationUI: 'hide' })
-      // Un téléphone se tourne : en plein écran, le match se regarde en paysage.
-      // `verrouillerPaysage` retient si le verrou a pris : la sortie du match n'attend un retour debout que dans ce cas.
-      .then(() => verrouillerPaysage())
-      .catch(() => { /* refusé par le navigateur : le match reste dans sa fenêtre */ });
+    if (elementEnPleinEcran()) { sortirDuPleinEcran(); return; }
+    // Un téléphone se tourne : en plein écran natif, le match se regarde en paysage (`verrouillerPaysage` retient si le
+    // verrou a pris : la sortie du match n'attend un retour debout que dans ce cas).
+    void entrerEnPleinEcran(fenetre);
   };
-  const pleinEcranPossible = typeof document !== 'undefined' && !!document.fullscreenEnabled;
   const montrerTuto = enJeu && jePeuxJouer && !tutoMatchVu && !e.fini && !directVoulu && !prefsTutoriel.desactive;
   // ⚠️ LA BOUCLE LE LIT DANS UNE REF, comme la carte de décision : la poser en
   // dépendance de `useEffect` relancerait la boucle et remettrait `dernierTemps`
@@ -2047,7 +2048,7 @@ export function MatchLive({
                   {/* Les commandes de la vue : plein écran, caméra, terrain plat. */}
                   {!e.fini && (
                     <div className="ml-vue-outils">
-                      {pleinEcranPossible && (
+                      {(
                         <button type="button" onClick={basculerPleinEcran}
                           className={pleinEcran ? 'actif' : undefined}
                           title={t(pleinEcran ? 'ml.quitterPleinEcran' : 'ml.pleinEcran')}

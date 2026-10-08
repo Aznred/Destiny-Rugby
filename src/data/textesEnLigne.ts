@@ -570,6 +570,7 @@ export const TEXTES_EN_LIGNE: Record<string, Traduction> = {
 
   // Tours de coupe
   'online.cup.preliminary': tr('Tour préliminaire', 'Preliminary round', 'Ronda previa', 'Turno preliminare', 'Vorrunde', 'Ronda preliminar', '予備予選'),
+  'online.cup.playIn': tr('Barrages', 'Play-in round', 'Repesca', 'Spareggi', 'Barrage-Spiele', 'Barragens', 'プレーイン'),
   'online.cup.final': tr('Finale', 'Final', 'Final', 'Finale', 'Finale', 'Final', '決勝'),
   'online.cup.semiFinals': tr('Demi-finales', 'Semi-finals', 'Semifinales', 'Semifinali', 'Halbfinale', 'Meias-finais', '準決勝'),
   'online.cup.quarterFinals': tr('Quarts de finale', 'Quarter-finals', 'Cuartos de final', 'Quarti di finale', 'Viertelfinale', 'Quartos-de-final', '準々決勝'),

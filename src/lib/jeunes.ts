@@ -47,6 +47,9 @@ export type Personnalite =
   | 'fort_caractere' | 'perfectionniste' | 'fragile';
 
 export interface JeuneJoueur {
+  sourcePlayerId?: string;
+  youthPlayerId?: string;
+  ageEstime?: boolean;
   /** Courbe fictive par tranche d'âge ; absente des anciennes sauvegardes. */
   developmentCurve?: number[];
   /** Déterministe : `club#cohorte#rang`. Il ne change jamais. */

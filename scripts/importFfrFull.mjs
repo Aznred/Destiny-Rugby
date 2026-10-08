@@ -1,19 +1,38 @@
 import { createReadStream, existsSync, mkdirSync, writeFileSync, copyFileSync, readFileSync } from 'node:fs';
 import { createInterface } from 'node:readline';
 import { createHash } from 'node:crypto';
+import { createRequire } from 'node:module';
 import { resolve, dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { classifierFfr, normaliserFfr } from '../serveur/ffr/classification.ts';
 import { catalogueBaseCarriere } from '../src/lib/ligue/catalogueCarriere.ts';
 import { empreinteSourceFfr } from '../src/lib/ligue/eligibiliteJoueurs.ts';
+import { preparerVivierJeunesFfr, activerCarriereLocale } from './preparationJeunesFfr.mjs';
+import { REFERENCE_JEUNES_FFR } from '../serveur/ffr/jeunesCarriere.ts';
 
 const input = resolve(process.argv[2] ?? '../Objectif Ffr/exports/joueurs.json');
 const version = process.argv[3] ?? '2026_10_FFR_FULL';
+const dateReference = process.argv.find(v => v.startsWith('--date-reference='))?.slice('--date-reference='.length) ?? REFERENCE_JEUNES_FFR;
+if (!/^\d{4}-\d{2}-\d{2}$/.test(dateReference) || new Date(dateReference).toISOString().slice(0,10) !== dateReference) throw new Error('Date de référence FFR invalide.');
 if (!/^[A-Za-z0-9_]{3,60}$/.test(version)) throw new Error('Version invalide.');
 const root = resolve('.ffr', version); mkdirSync(root, { recursive: true });
+const priveSeulement = process.argv.includes('--prive-seulement');
 const path = resolve(root, 'sources.sqlite');
 const resume=existsSync(path)&&process.argv.includes('--reprendre');
 if (existsSync(path) && !resume) throw new Error('Version déjà préparée. Utiliser une nouvelle version pour préserver le snapshot.');
+// La reprise conserve la même entrée : une mise à jour réelle exige sa propre version.
+const manifeste = resolve(root, 'source-input.json');
+const rapportExistant = resolve(root, 'report.json');
+const empreinteEntree = createHash('sha256');
+for await (const line of createInterface({input:createReadStream(input,{encoding:'utf8'}),crlfDelay:Infinity})) empreinteEntree.update(line+'\n');
+const shaEntree = empreinteEntree.digest('hex');
+const entreePrecedente = existsSync(manifeste) ? JSON.parse(readFileSync(manifeste,'utf8')) : undefined;
+const rapportPrecedent = existsSync(rapportExistant) ? JSON.parse(readFileSync(rapportExistant,'utf8')) : undefined;
+const attendu = entreePrecedente?.sha256 ?? rapportPrecedent?.source_sha256;
+const referencePrecedente = entreePrecedente?.referenceDate ?? rapportPrecedent?.career_youth?.referenceDate;
+if (resume && attendu && attendu !== shaEntree) throw new Error('Cette version appartient à une autre entrée FFR. Préparer une nouvelle version.');
+if (resume && referencePrecedente && referencePrecedente !== dateReference) throw new Error('Cette version appartient à une autre date de référence FFR. Préparer une nouvelle version.');
+if (!existsSync(manifeste)) writeFileSync(manifeste,JSON.stringify({sha256:shaEntree,referenceDate:dateReference}),{mode:0o600});
 const old = resume ? JSON.parse(readFileSync(resolve(root,'catalogue-before.json'),'utf8')) : catalogueBaseCarriere();
 if(!resume)writeFileSync(resolve(root, 'catalogue-before.json'), JSON.stringify(old), { mode: 0o600 });
 const db = new DatabaseSync(path);
@@ -29,22 +48,29 @@ const insert = db.prepare(`INSERT INTO sources(id,identity_key,gender,usage,card
   overall=excluded.overall,confidence=excluded.confidence,data=excluded.data
   WHERE coalesce(json_extract(excluded.data,'$.season'),'') > coalesce(json_extract(sources.data,'$.season'),'')
   OR (coalesce(json_extract(excluded.data,'$.season'),'')=coalesce(json_extract(sources.data,'$.season'),'') AND excluded.confidence>sources.confidence)`);
-const hash = createHash('sha256'); let rows = 0, sameId = 0;
+const termine = db.prepare("SELECT value FROM meta WHERE key='source_import_complete'").get();
+const importComplet = resume && (termine || existsSync(rapportExistant));
+const bilanPrecedent = termine ? JSON.parse(termine.value) : existsSync(rapportExistant) ? JSON.parse(readFileSync(rapportExistant,'utf8')) : null;
+const hash = createHash('sha256'); let rows = 0, sameId = importComplet ? bilanPrecedent?.same_id_duplicates ?? 0 : 0;
+const vus = new Set();
 db.exec('BEGIN');
 // FFR compact exporter writes one object per line. Reject other formats rather than partially importing them.
 for await (const line of createInterface({ input: createReadStream(input, { encoding: 'utf8' }), crlfDelay: Infinity })) {
   hash.update(line + '\n'); const text = line.trim().replace(/,$/, '');
   if (!text || text === '[' || text === ']') continue;
-  if(resume){rows++;continue;}
+  if(importComplet){rows++;continue;}
   if (!text.startsWith('{') || !text.endsWith('}')) throw new Error(`Format FFR inattendu à la ligne ${rows + 2}.`);
-  const raw = JSON.parse(text), p = classifierFfr(raw);
+  const raw = JSON.parse(text), p = classifierFfr(raw, dateReference);
   if (!raw.player_id && !raw.ffr_id) throw new Error('Profil sans identifiant source : import interrompu.');
-  if (db.prepare('SELECT 1 FROM sources WHERE id=?').get(p.id)) sameId++;
+  if (vus.has(p.id)) sameId++; vus.add(p.id);
   insert.run(p.id,p.identity_key,p.gender,p.usage,p.card_status,p.club,p.competition,p.primary_position,p.overall,p.data_confidence,JSON.stringify(p));
   rows++;
   if (rows % 10000 === 0) { db.exec('COMMIT; BEGIN'); if (rows % 100000 === 0) process.stdout.write(`${rows} profils classifiés\n`); }
 }
 db.exec('COMMIT');
+const shaImport = hash.digest('hex');
+if (shaImport !== shaEntree) throw new Error('L’entrée FFR a changé pendant l’import. Version non activée.');
+db.prepare('INSERT OR REPLACE INTO meta VALUES(?,?)').run('source_import_complete',JSON.stringify({input_rows:rows,same_id_duplicates:sameId,source_sha256:shaImport}));
 db.exec(`CREATE TABLE IF NOT EXISTS sources_name_tokens(token TEXT NOT NULL,id TEXT NOT NULL,PRIMARY KEY(token,id));
   INSERT OR IGNORE INTO sources_name_tokens(token,id)
   WITH RECURSIVE words(id,rest,token) AS (
@@ -58,9 +84,14 @@ const youthNames = db.prepare("SELECT identity_key FROM sources WHERE usage='YOU
 const youths = new Set(youthNames.map(r => r.identity_key));
 const profilesForName = db.prepare('SELECT data FROM sources WHERE identity_key=?');
 const withdrawn = [];
+// MAJORITÉ ATTESTÉE (Correctif 33). Un joueur ajouté à la main l'a été avec son âge, donné par le responsable du jeu et
+// vérifié majeur (`scripts/ajoutsJoueurs.cjs` refuse moins de 18 ans). La source le range encore en catégorie U19 :
+// son nom ne doit pas faire retirer sa carte au prochain import. La liste est nominative, courte, et versionnée.
+const attestes = new Map(createRequire(import.meta.url)('./ajoutsJoueurs.cjs').AJOUTS_JOUEURS.map(a => [normaliserFfr(a.nom), normaliserFfr(a.club)]));
 for (const c of old) {
   const key = normaliserFfr(c.nom);
   if (!youths.has(key)) continue;
+  if (attestes.get(key) === normaliserFfr(c.clubReel)) continue;
   const profiles = profilesForName.all(key).map(r => JSON.parse(r.data));
   const sameClub = profiles.filter(p => normaliserFfr(p.club ?? '') === normaliserFfr(c.clubReel));
   const matches = sameClub.length ? sameClub : profiles;
@@ -71,7 +102,7 @@ for (const c of old) {
 writeFileSync(resolve(root,'withdrawn-sources.json'),JSON.stringify(withdrawn),{mode:0o600});
 const protection = resolve('src/data/protectionFfr.generated.ts');
 if (existsSync(protection)&&!existsSync(resolve(root,'protection-before.ts'))) copyFileSync(protection, resolve(root,'protection-before.ts'));
-writeFileSync(protection, `// Generated. Opaque hashes only; source identities remain private.\nexport const VERSION_PROTECTION_FFR = ${JSON.stringify(version)};\nexport const SOURCES_FFR_RETIREES: readonly string[] = ${JSON.stringify([...new Set(withdrawn.map(empreinteSourceFfr))].sort())};\n`);
+if (!priveSeulement) writeFileSync(protection, `// Generated. Opaque hashes only; source identities remain private.\nexport const VERSION_PROTECTION_FFR = ${JSON.stringify(version)};\nexport const SOURCES_FFR_RETIREES: readonly string[] = ${JSON.stringify([...new Set(withdrawn.map(empreinteSourceFfr))].sort())};\n`);
 const academies = {};
 const youthStatement=db.prepare("SELECT data FROM sources WHERE usage='YOUTH_REGEN_SOURCE' AND club IS NOT NULL");
 for (const row of youthStatement.iterate()) {
@@ -89,18 +120,22 @@ for(const a of Object.values(academies)) {
   delete a.level_sum;delete a.level_count;
 }
 writeFileSync(resolve(root,'academies.json'),JSON.stringify(academies),{mode:0o600});
-// Only aggregates from male youth cohorts feed the current solo career. No identities, photographs or licence ids.
+// Ces agrégats publics servent aux installations ; les identités de carrière restent dans SQLite.
 const publicAcademies=Object.fromEntries(Object.entries(academies).filter(([,a])=>a.gender==='male'&&a.youth_count>=5).map(([k,a])=>[k.slice(5),{rating:a.academy_rating,count:a.youth_count,positions:a.positions,confidence:a.confidence}]));
-writeFileSync(resolve('src/data/academiesFfr.generated.ts'),`// Aggregated cohorts of at least five; no real youth identities.\nexport const ACADEMIES_FFR: Record<string,{rating:number;count:number;positions:Record<string,number>;confidence:number}> = ${JSON.stringify(publicAcademies)};\n`);
+if (!priveSeulement) writeFileSync(resolve('src/data/academiesFfr.generated.ts'),`// Aggregated cohorts of at least five; no real youth identities.\nexport const ACADEMIES_FFR: Record<string,{rating:number;count:number;positions:Record<string,number>;confidence:number}> = ${JSON.stringify(publicAcademies)};\n`);
+const vivier = db.prepare("SELECT value FROM meta WHERE key='career_youth_report'").get();
+const career_youth = vivier ? JSON.parse(vivier.value) : preparerVivierJeunesFfr(db, dateReference);
+writeFileSync(resolve(root, 'career-youth-report.json'), JSON.stringify(career_youth, null, 2), { mode: 0o600 });
 const counts = db.prepare('SELECT usage,card_status,count(*) AS n FROM sources GROUP BY usage,card_status').all();
 const report = {version,input_rows:rows,unique_sources:db.prepare('SELECT count(*) n FROM sources').get().n,same_id_duplicates:sameId,
   name_duplicate_candidates:db.prepare('SELECT count(*) n FROM sources WHERE duplicate=1').get().n,
-  source_sha256:hash.digest('hex'),counts,youth_players_found:db.prepare("SELECT count(*) n FROM sources WHERE usage='YOUTH_REGEN_SOURCE'").get().n,youth_cards_existing:withdrawn.length,
+  source_sha256:shaImport,counts,youth_players_found:db.prepare("SELECT count(*) n FROM sources WHERE usage='YOUTH_REGEN_SOURCE'").get().n,youth_cards_existing:withdrawn.length,
   youth_cards_owned:null,youth_cards_on_market:null,youth_cards_in_lineups:null,
   production_audit:existsSync(resolve(root,'production-audit.json'))?'COMPLETED':'NOT_RUN',
   ...(existsSync(resolve(root,'production-audit.json'))?{production:JSON.parse(readFileSync(resolve(root,'production-audit.json'),'utf8'))}:{}),
-  academies:Object.keys(academies).length,created_at:new Date().toISOString()};
+  academies:Object.keys(academies).length,career_youth,created_at:new Date().toISOString()};
 db.prepare('INSERT OR REPLACE INTO meta VALUES(?,?)').run('report',JSON.stringify(report));
 db.exec('PRAGMA wal_checkpoint(TRUNCATE)');db.close();
 writeFileSync(resolve(root,'report.json'),JSON.stringify(report,null,2),{mode:0o600});
+if (process.argv.includes('--activer-carriere-locale')) activerCarriereLocale(version, career_youth);
 process.stdout.write(JSON.stringify(report,null,2)+'\n');

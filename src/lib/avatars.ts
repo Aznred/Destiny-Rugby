@@ -232,10 +232,25 @@ function amputations(cle: string): string[] {
 // et de post du fil social : on garde le résultat, index compris.
 const memoire = new Map<string, string | undefined>();
 
+/**
+ * LE PORTRAIT D'UNE CARTE SPÉCIALE PUBLIÉE (Correctif 33). Un créateur qui a sa carte Influenceur ET sa place dans un
+ * effectif (Nogodi au CA Brive) garde le même visage des deux côtés : la carte porte son image, l'effectif n'a qu'un nom.
+ * Registre de module, alimenté par le catalogue en ligne quand il arrive (`catalogueSoloCommun.ts`) ; un portrait rangé
+ * dans `public/photos/` passe toujours devant, et sans réseau le joueur garde simplement la silhouette.
+ */
+const portraitsDeCartes = new Map<string, string>();
+export function definirPortraitsDeCartes(portraits: ReadonlyMap<string, string>): void {
+  const suivants = new Map([...portraits].map(([nom, image]) => [normaliserNom(nom), image] as const).filter(([cle]) => cle));
+  if (suivants.size === portraitsDeCartes.size && [...suivants].every(([cle, image]) => portraitsDeCartes.get(cle) === image)) return;
+  portraitsDeCartes.clear();
+  for (const [cle, image] of suivants) portraitsDeCartes.set(cle, image);
+  memoire.clear();
+}
+
 export function photoReelle(nom: string, club?: string): string | undefined {
   const cleMemo = `${club ?? ''}|${nom}`;
   if (memoire.has(cleMemo)) return memoire.get(cleMemo);
-  const trouvee = photoJoueurFfr(nom, club) ?? chercherPhoto(nom);
+  const trouvee = photoJoueurFfr(nom, club) ?? chercherPhoto(nom) ?? portraitsDeCartes.get(normaliserNom(nom));
   memoire.set(cleMemo, trouvee);
   return trouvee;
 }
