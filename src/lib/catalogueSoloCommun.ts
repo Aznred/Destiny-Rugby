@@ -9,8 +9,10 @@ import { fournirCatalogueEffectifs } from './catalogueEffectifs';
 import { enregistrerArticlesLabo, type ArticleEquipement } from '../data/boutique';
 import { stockageSerre } from './persistanceNavigation';
 import { jsonEtroit } from './sauvegardes';
+import { carteSeniorAutorisee, fournirPoolFfr } from './ligue/eligibiliteJoueurs';
 
 let revision = -1;
+let revisionFfr = '';
 let courant: readonly SourceCarte[] = catalogueBaseCarriere();
 /**
  * Les cartes spéciales publiées (ICONS, Halloween…) et leurs événements, tels
@@ -34,6 +36,7 @@ export const catalogueSpecialSolo = (): CatalogueSpecial | null => speciales;
  * Et elles n'entrent jamais dans les bandes de rareté (`rayonsDuPack`).
  */
 interface ReponseCatalogue {
+  revisionFfr?: string; ffr?: SourceCarte[];
   revision?: number; joueurs?: Record<string, EditionJoueur>; ajouts?: Record<string, AjoutJoueur>;
   clubs?: Record<string, LocalisationClub>; rivalitesHistoriques?: RivaliteHistorique[];
   speciales?: { definitions?: DefinitionCarteSpeciale[]; evenements?: EvenementSpecial[] }; boutique?: Partial<ArticleEquipement>[];
@@ -43,6 +46,9 @@ interface ReponseCatalogue {
 function appliquerReponse(donnees: ReponseCatalogue): boolean {
   if (!Number.isInteger(donnees.revision) || !donnees.joueurs || typeof donnees.joueurs !== 'object') return false;
   revision = donnees.revision!;
+  revisionFfr = donnees.revisionFfr ?? '';
+  const sourcesFfr = (donnees.ffr ?? []).filter(c => carteSeniorAutorisee(c));
+  fournirPoolFfr(() => ({pool:'men',joueurs:sourcesFfr}));
   appliquerLocalisations(donnees.clubs ?? {}, donnees.rivalitesHistoriques ?? []);
   const mondial = catalogueMondialCarriere({ revision, joueurs: donnees.joueurs, ajouts: donnees.ajouts, packs: {}, rotationPacks: false });
   fournirCatalogueEffectifs(mondial);
@@ -90,7 +96,7 @@ export function synchroniserCatalogueSolo(): Promise<readonly SourceCarte[]> {
   if (attente) return attente;
   if (Date.now() - dernierChargement < FRAICHEUR_CATALOGUE) return Promise.resolve(courant);
   relireLaMemoire();
-  attente = fetch(`/api/carriere?catalogueSolo=1&revision=${revision}`, { cache: 'no-store' })
+  attente = fetch(`/api/carriere?catalogueSolo=1&revision=${revision}&revisionFfr=${encodeURIComponent(revisionFfr)}`, { cache: 'no-store' })
     .then(async reponse => {
       if (!reponse.ok) throw new Error('Catalogue indisponible');
       const donnees = await reponse.json() as ReponseCatalogue;
@@ -120,7 +126,7 @@ export function useCatalogueSolo(): readonly SourceCarte[] {
       window.clearInterval(intervalle);
       window.removeEventListener('destiny-catalogue-solo-actualise', afficher);
       window.removeEventListener('focus', actualiser);
-      document.removeEventListener('visibilitychange', surVisibilite);
+          document.removeEventListener('visibilitychange', surVisibilite);
     };
   }, []);
   return catalogue;

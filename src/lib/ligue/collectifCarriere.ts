@@ -31,6 +31,8 @@
 
 import type { CompositionManager } from '../../types.js';
 import type { CarteCarriere } from './typesCarriere.js';
+import { clubCollectif, nationCollectif } from './identiteCollectif.js';
+export { calculateChemistry } from './identiteCollectif.js';
 
 /** Le maximum d'un joueur. Le total d'équipe est la moyenne du XV sur 100. */
 export const COLLECTIF_MAX = 10;
@@ -108,8 +110,8 @@ export function collectifCarriere(
       return valeur ? tailles.get(valeur) ?? 0 : 0;
     };
   };
-  const tailleClub = compter((c) => c.clubReel);
-  const tailleNation = compter((c) => c.nation);
+  const tailleClub = compter((c) => clubCollectif(c));
+  const tailleNation = compter((c) => nationCollectif(c));
   const tailleChampionnat = compter((c) => c.championnat);
 
   const parCarte: Record<string, AffiniteCarte> = {};

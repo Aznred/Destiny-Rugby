@@ -2541,3 +2541,8 @@ match** — ne pas s'en servir pour retoucher la difficulté tant qu'ils n'ont p
 - **Bundle** : `useGame` 115 Ko gzip, textes 155 Ko, fournisseur Three.js
   263 Ko (partagé et paresseux). Le build signale des morceaux > 1 000 Ko.
 - **Paiements** : voir `serveur/PAIEMENTS.md` (Stripe vend des CRÉDITS depuis le Correctif 21, plus d'Ovas ; webhook et SQL Neon des Crédits à essayer en test Stripe).
+
+
+## Intégration FFR 2026_10_FFR_FULL
+
+Base privée de 470 742 profils, retrait des identités jeunesse, agrégats de formation et bêta féminine réservée au compte Kiri par autorisation serveur. Voir [serveur/FFR-INTEGRATION.md](serveur/FFR-INTEGRATION.md) pour les seuils, snapshots, commandes et limites de validation.

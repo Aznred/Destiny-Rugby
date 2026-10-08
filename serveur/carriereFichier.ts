@@ -1,4 +1,5 @@
 import { CATALOGUE_ADMIN_VIDE, type CatalogueAdmin } from '../src/lib/ligue/atelierCatalogue.js';
+import { joueursLocaux } from './ffr/stockageLocal.js';
 import { fusionnerEnvoi, matiereDepuisLignes, type CompteurUsage, type LigneUsage } from '../src/lib/usage/agregats.js';
 import { bilanCarrieres, fusionnerCarrieres, type CarriereUsage } from '../src/lib/usage/carrieres.js';
 // Serveur de développement uniquement. Jamais importé par la fonction Vercel.
@@ -60,6 +61,13 @@ export function stockageFichier(fichier: string): StockageCarriere {
   const reprises = new Map<string, { match: string; debut: number; sim: number; code: string; donnees: string }>();
   const cleRecu = (l: string, c: string, r: string) => JSON.stringify([l, c, r]);
   return {
+    joueurs: joueursLocaux(undefined, () => base.comptes.find(c => c.identifiant === 'kiri')?.id),
+    async snapshotFfr(l,migration) {
+      const directory=dirname(fichier)+'/snapshots-ffr';mkdirSync(directory,{recursive:true});
+      const target=`${directory}/${migration}-${l.id}-${l.version}.json`;
+      if(!existsSync(target))writeFileSync(target,JSON.stringify(l),{mode:0o600,flag:'wx'});
+    },
+    async poolLigue(id) { return base.ligues.find(l => l.id === id)?.etat.playerPool ?? 'men'; },
     echangesSolo: {
       async lister(compte, offset) {
         const offres = base.offresSolo!.filter(o => o.statut === 'ouverte' || o.compteId === compte)
@@ -269,7 +277,7 @@ export function stockageFichier(fichier: string): StockageCarriere {
         return {
           id: l.etat.id, nom: l.etat.nom, phase: l.etat.phase, logo: l.etat.logo,
           clubNom: club?.nom ?? '', ovas: club?.ovas ?? 0, clubEmbleme: club?.embleme,
-          laboratoire: l.etat.laboratoire === true,
+          laboratoire: l.etat.laboratoire === true, playerPool: l.etat.playerPool ?? 'men',
           createurId: l.etat.createurId,
           publique: l.etat.publique,
         };

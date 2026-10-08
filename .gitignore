@@ -25,6 +25,7 @@ dist-ssr
 
 # variables d'environnement locales
 .env
+.ffr/
 .env.local
 .env.*.local
 

@@ -28,6 +28,7 @@
 // ⚠️ CE FICHIER TOURNE DES DEUX CÔTÉS et ne contient que des règles : ni base, ni horloge implicite, ni texte d'écran
 // autre que les refus. Le déroulé (qui écrit quoi, dans quel ordre) est dans `serveur/marcheCommun.ts`.
 import type { CarteCarriere, VenteCarriere } from './typesCarriere.js';
+import { carteSeniorAutorisee } from './eligibiliteJoueurs.js';
 
 export class ErreurMarche extends Error {}
 function exiger(condition: unknown, message: string): asserts condition { if (!condition) throw new ErreurMarche(message); }
@@ -81,6 +82,7 @@ const memeClub = (a: Pick<PartieMarche, 'ligueId' | 'clubId'>, b: Pick<PartieMar
 
 /** Publie une annonce. Rejouée (reprise après une coupure), elle ne s'ajoute pas deux fois. */
 export function publierAnnonce(m: EtatMarchePartage, annonce: AnnoncePartagee): boolean {
+  exiger(carteSeniorAutorisee(annonce.carte), 'Cette carte est indisponible.');
   if (trouver(m, annonce.id)) return false;
   const { verrou: _verrou, favori: _favori, ...carte } = annonce.carte;
   m.annonces.push({ ...annonce, carte: carte as CarteCarriere, etat: 'ouverte' });
@@ -95,6 +97,7 @@ export function publierAnnonce(m: EtatMarchePartage, annonce: AnnoncePartagee): 
 export function reclamerAnnonce(m: EtatMarchePartage, id: string, acheteur: PartieMarche, maintenant: number): AnnoncePartagee {
   const a = trouver(m, id);
   exiger(a && a.etat === 'ouverte' && a.type === 'directe' && Date.parse(a.expireLe) > maintenant, 'Cette vente n’est plus disponible.');
+  exiger(carteSeniorAutorisee(a.carte), 'Cette carte est indisponible.');
   exiger(!memeClub(a.vendeur, acheteur), 'Vous ne pouvez pas acheter votre propre carte.');
   a.etat = 'reclamee';
   a.acheteur = { ...acheteur, montant: a.prix, le: new Date(maintenant).toISOString() };
@@ -105,6 +108,7 @@ export function reclamerAnnonce(m: EtatMarchePartage, id: string, acheteur: Part
 export function placerEnchere(m: EtatMarchePartage, id: string, encherisseur: PartieMarche, montant: number, maintenant: number): AnnoncePartagee {
   const a = trouver(m, id);
   exiger(a && a.etat === 'ouverte' && a.type === 'enchere' && Date.parse(a.expireLe) > maintenant, 'Cette enchère est fermée.');
+  exiger(carteSeniorAutorisee(a.carte), 'Cette carte est indisponible.');
   exiger(!memeClub(a.vendeur, encherisseur), 'Vous ne pouvez pas enchérir sur votre carte.');
   exiger(Number.isSafeInteger(montant) && montant >= enchereMinimale(a), 'Votre offre doit dépasser la meilleure enchère d’au moins 5 % (minimum 25 Ovas).');
   if (a.enchere) m.remboursements.push({ ligueId: a.enchere.ligueId, clubId: a.enchere.clubId, ref: refReserve(a.id, a.enchere.montant) });
@@ -127,6 +131,15 @@ export function annulerAnnonce(m: EtatMarchePartage, id: string, vendeur: Pick<P
 export function echeancesMarche(m: EtatMarchePartage, maintenant: number): boolean {
   let change = false;
   for (const a of [...m.annonces]) {
+    if(!carteSeniorAutorisee(a.carte)){
+      // Une vente partiellement soldée exige la lecture des deux ligues : la
+      // rembourser ici pourrait payer le vendeur ET rendre l'argent à l'acheteur.
+      if(a.etat==='reclamee')continue;
+      change=true;
+      if(a.enchere)m.remboursements.push({ligueId:a.enchere.ligueId,clubId:a.enchere.clubId,ref:refReserve(a.id,a.enchere.montant)});
+      if(a.acheteur&&!a.acheteur.livre)m.remboursements.push({ligueId:a.acheteur.ligueId,clubId:a.acheteur.clubId,ref:refReserve(a.id,a.acheteur.montant)});
+      m.annonces=m.annonces.filter(x=>x!==a);m.clotures.push({ligueId:a.vendeur.ligueId,venteId:a.id,issue:'annulee'});continue;
+    }
     if (a.etat !== 'ouverte' || Date.parse(a.expireLe) > maintenant) continue;
     change = true;
     if (a.enchere) {
@@ -152,7 +165,7 @@ export function noterEtape(m: EtatMarchePartage, id: string, etape: 'solde' | 'l
 /** Y a-t-il des suites à donner dans les ligues ? */
 export function travailEnAttente(m: EtatMarchePartage, maintenant: number): boolean {
   return m.remboursements.length > 0 || m.clotures.length > 0
-    || m.annonces.some((a) => a.etat === 'reclamee' || Date.parse(a.expireLe) <= maintenant);
+    || m.annonces.some((a) => !carteSeniorAutorisee(a.carte) || a.etat === 'reclamee' || Date.parse(a.expireLe) <= maintenant);
 }
 
 /** Ce que le document garde d'une réserve : sert à décider si une réserve restée dans une ligue est encore justifiée. */
@@ -192,6 +205,7 @@ export function vueMarchePartage(m: EtatMarchePartage, version: number, ligueId:
   };
   const ventes: VenteCarriere[] = [], cartes: CarteCarriere[] = [];
   for (const a of m.annonces) {
+    if(!carteSeniorAutorisee(a.carte))continue;
     if (a.etat !== 'ouverte' || Date.parse(a.expireLe) <= maintenant) continue;
     const vendeurId = idDe(a.vendeur);
     ventes.push({ id: a.id, carteId: a.carte.id, vendeurId, type: a.type, prix: a.prix, expireLe: a.expireLe, etat: 'ouverte', partagee: true,

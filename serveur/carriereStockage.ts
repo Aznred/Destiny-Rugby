@@ -1,4 +1,6 @@
 import { atelierNeon, type StockageAtelier } from './atelierStockage.js';
+import { joueursNeon } from './ffr/stockageNeon.js';
+import type { StockageJoueurs } from './ffr/stockage.js';
 import { debutPeriode, decaler, MODES_USAGE, type EnvoiUsage, type MatiereUsage, type ModeUsage, type PeriodeUsage } from '../src/lib/usage/agregats.js';
 import { neon } from '@neondatabase/serverless';
 import { pushNeon, type StockagePush } from './pushStockage.js';
@@ -45,15 +47,20 @@ export interface SalonAmicalStocke {
  * champs lui-même : seul le résumé traverse le réseau.
  */
 export interface ResumeLigue {
+  playerPool?: 'men' | 'women' | 'mixed';
   id: string; nom: string; phase: string; logo?: string;
   clubNom: string; ovas: number; clubEmbleme?: string; laboratoire?: boolean; createurId?: string;
   publique?: { cycle: number; division: number };
 }
 const resumeEtat = (etat: EtatCarriereEnLigne) => ({
+  playerPool: etat.playerPool ?? 'men',
   nom: etat.nom, phase: etat.phase, logo: etat.logo, laboratoire: etat.laboratoire === true, createurId: etat.createurId, publique: etat.publique,
   clubs: etat.clubs.map(c => ({ compteId: c.compteId, nom: c.nom, ovas: c.ovas, embleme: c.embleme })),
 });
 export interface StockageCarriere {
+  snapshotFfr?(ligue: LigueStockee, migration: string): Promise<void>;
+  joueurs?: StockageJoueurs;
+  poolLigue?(id: string): Promise<string | null>;
   echangesSolo?: {
     lister(compte: string, offset: number): Promise<PageOffresSolo>;
     creer(id: string, compte: string, pseudo: string, offertes: LotCartesSolo, souhaitees: LotCartesSolo): Promise<void>;
@@ -378,6 +385,12 @@ export function stockageNeon(url: string): StockageCarriere {
       },
     },
     atelier: atelierNeon(url),
+    joueurs: joueursNeon(url),
+    async snapshotFfr(l,migration) {
+      await sql`insert into player_migration_snapshots(migration,kind,entity_id,revision,data)
+        values(${migration},'league',${l.id},${l.version},${JSON.stringify(l.etat)}::jsonb) on conflict do nothing`;
+    },
+    async poolLigue(id) { const [r] = await sql`select coalesce(resume->>'playerPool',donnees->>'playerPool','men') as pool from carriere_ligues where id=${id}`; return r ? String(r.pool) : null; },
     push: pushNeon(url),
     async compteParIdentifiant(identifiant) {
       const r = await sql`select id, identifiant, pseudo, empreinte from comptes where identifiant=${identifiant}`;
@@ -546,14 +559,14 @@ export function stockageNeon(url: string): StockageCarriere {
      */
     async ligues(compte) {
       const lire = (resume: boolean) => resume ? sql`
-        select l.id,l.resume->>'nom' as nom,l.phase,l.resume->>'logo' as logo,l.resume->>'laboratoire' as laboratoire,l.resume->>'createurId' as createur_id,l.resume->'publique' as publique,
+        select l.id,l.resume->>'playerPool' as player_pool,l.resume->>'nom' as nom,l.phase,l.resume->>'logo' as logo,l.resume->>'laboratoire' as laboratoire,l.resume->>'createurId' as createur_id,l.resume->'publique' as publique,
                c.club->>'nom' as club_nom,c.club->>'ovas' as ovas,c.club->>'embleme' as club_embleme
         from carriere_ligues l cross join lateral (
           select club from jsonb_array_elements(l.resume->'clubs') club
           where club->>'compteId'=${compte} limit 1) c
         where l.comptes @> array[${compte}::uuid] order by l.cree_le desc`
         : sql`
-        select l.id,l.donnees->>'nom' as nom,l.donnees->>'phase' as phase,l.donnees->>'logo' as logo,l.donnees->>'laboratoire' as laboratoire,l.donnees->>'createurId' as createur_id,l.donnees->'publique' as publique,
+        select l.id,l.donnees->>'playerPool' as player_pool,l.donnees->>'nom' as nom,l.donnees->>'phase' as phase,l.donnees->>'logo' as logo,l.donnees->>'laboratoire' as laboratoire,l.donnees->>'createurId' as createur_id,l.donnees->'publique' as publique,
                c.club->>'nom' as club_nom,c.club->>'ovas' as ovas,c.club->>'embleme' as club_embleme
         from carriere_ligues l cross join lateral (
           select club from jsonb_array_elements(l.donnees->'clubs') club
@@ -561,7 +574,7 @@ export function stockageNeon(url: string): StockageCarriere {
         where l.comptes @> array[${compte}::uuid] order by l.cree_le desc`;
       const r = await sansColonne(() => lire(true), () => lire(false));
       return r.map(x => ({
-        id: String(x.id), nom: String(x.nom ?? ''), phase: String(x.phase ?? ''),
+        id: String(x.id), nom: String(x.nom ?? ''), phase: String(x.phase ?? ''), playerPool: x.player_pool === 'women' ? 'women' : 'men',
         logo: x.logo == null ? undefined : String(x.logo),
         clubNom: String(x.club_nom ?? ''), ovas: Number(x.ovas ?? 0),
         clubEmbleme: x.club_embleme == null ? undefined : String(x.club_embleme),

@@ -49,6 +49,8 @@ export interface InfoCarteSpeciale {
   retraite?: boolean;
 }
 export interface CarteCarriere {
+  gender?: 'male' | 'female'; countryId?: string; clubId?: string; competitionId?: string;
+  dataConfidence?: number; datasetVersion?: string; retiree?: boolean;
   id: string; sourceId: string; nom: string; poste: PosteId; famille: FamillePoste;
   /** Postes réellement occupés, d'après les compositions recensées. */
   postesSecondaires?: PosteId[];
@@ -230,6 +232,8 @@ export interface HistoireCarriere {
 }
 /** État exclusivement serveur. Écriture atomique avec comparaison de version en base. */
 export interface EtatCarriereEnLigne {
+  playerPool?: 'men' | 'women' | 'mixed';
+  migrationsFfr?: { version: string; carteId: string; owner: string | null; compensation: number; le: string }[];
   catalogueRevision?: number;
   /** Réglage global Kiri recopié dans la ligue pour que la boutique puisse l'afficher. */
   rotationPacks?: boolean;
@@ -273,6 +277,7 @@ export interface VueCarriereEnLigne extends Omit<EtatCarriereEnLigne, 'graine' |
   speciales?: ResumeSpeciauxLigue;
 }
 export interface CreationCarriere {
+  playerPool?: 'men' | 'women';
   id: string; nom: string; code: string; compteId: string; pseudo: string; clubNom: string;
   rythme: number; maxClubs: number; embleme?: string;
   logo?: string; tropheeId?: string; playoffs?: boolean; dotationOvas?: number;

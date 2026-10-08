@@ -23,18 +23,18 @@ export interface JoueurFfr {
 const cache = new Map<string, JoueurFfr[]>();
 const structures = new Map(Object.values(CLUBS_AMATEURS).flat().map(c => [c.nom, c.structureId]));
 
-/** Tous les licenciés de l'export sont disponibles, même sans poste ni portrait. */
+/** Les emplacements retirés restent vides pour préserver les indices des sauvegardes. */
 export function joueursFfrDuClub(club: string): readonly JoueurFfr[] {
   const connus = cache.get(club); if (connus) return connus;
   const supplement = PHOTOS_FFR_SUPPLEMENTAIRES[structures.get(club) ?? ''] ?? {};
-  const liste: JoueurFfr[] = (EFFECTIFS_AMATEURS[club] ?? '').split('~').filter(Boolean).map((entree, indexSource) => {
+  const liste: JoueurFfr[] = (EFFECTIFS_AMATEURS[club] ?? '').split('~').map((entree, indexSource) => {
     const [nom, famille, numeros = '', identifiant = ''] = entree.split('|');
     const postes = numeros.split(',').filter(Boolean).map(n => POSTES_NUMEROS[Number(n) - 1]).filter(Boolean);
     const ffrId = identifiant ? Number(identifiant) : undefined;
     return { nom, indexSource, famille: famille === '' ? null : POSTES_AMATEURS[Number(famille)] ?? null,
       poste: postes[0], postesSecondaires: postes.slice(1), ffrId,
       photo: PHOTOS_DETOUREES_PAR_CLUB[club]?.[normaliserNomFfr(nom)] ?? (ffrId ? PHOTOS_DETOUREES_PAR_ID[ffrId] ?? PHOTOS_FFR_PAR_ID[ffrId] : undefined) ?? supplement[normaliserNomFfr(nom)] };
-  });
+  }).filter(j => j.nom.trim().length > 0);
   // Les sept portraits nominatifs de Palavas absents de l'export complètent
   // son effectif. Aucun poste ni identifiant FFR ne leur est attribué ici.
   const noms = new Set(liste.map(j => normaliserNomFfr(j.nom)));

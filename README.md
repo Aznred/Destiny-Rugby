@@ -2022,3 +2022,8 @@ npm run verify:bagarre        # 44 contrôles : la bagarre attend son ordre, tie
 **Pas essayé sur un iPhone ni un iPad** : causes lues dans le code et mesurées dans un navigateur d'ordinateur. Le gain de
 place dans Safari est déduit du code de son moteur, pas mesuré. Mesuré mais pas corrigé : au lancement, le catalogue des
 78 000 joueurs bloque la page 3,6 secondes sur ordinateur (bien plus sur téléphone).
+
+
+## Intégration FFR 2026_10_FFR_FULL
+
+Base privée de 470 742 profils, retrait des identités jeunesse, agrégats de formation et bêta féminine réservée au compte Kiri par autorisation serveur. Voir [serveur/FFR-INTEGRATION.md](serveur/FFR-INTEGRATION.md) pour les seuils, snapshots, commandes et limites de validation.

@@ -1,4 +1,6 @@
 import { catalogueAdmin } from './atelierCatalogue.js';
+import { carteSeniorAutorisee, sourceRetireeFfr } from './eligibiliteJoueurs.js';
+import { migrerCartesJeunesse } from './migrationJeunesse.js';
 import { BAREME_CLUBS, pointsDuMatch } from '../bareme.js';
 import { statistiquesCarte } from './statistiquesCarte.js';
 import { rareteCarriere } from './catalogueCarriere.js';
@@ -449,6 +451,7 @@ function ajouterClub(etat: EtatCarriereEnLigne, compteId: string, pseudo: string
   // ⚠️ L'unicité par ligue commence ICI, pas au premier pack : deux amis
   // inscrits le même jour ne peuvent pas recevoir le même licencié.
   const cartes = dotationBronzeCarriere(etat.id, id, graine, new Set(etat.doublonsAutorises ? [] : etat.cartes.map(c => c.sourceId)), etat.saison);
+  exiger(etat.playerPool !== 'women' || cartes.length === 30, 'Approuvez assez de joueuses seniors à tous les postes dans Base joueurs pour constituer un effectif de 30 cartes.');
   if (etat.doublonsAutorises) cartes.forEach((carte, i) => { carte.id = idNouvelExemplaire(etat, etat.cartes.length + i); });
   exiger(cartes.length === 30, 'Le vivier de départ est épuisé pour cette ligue.');
   const club: ClubCarriere = { id, compteId, pseudo: pseudo.trim(), nom: nom.trim(), ovas: 0, composition: compositionManagerParDefaut(cartes.map(coequipierDepuisCarte)), strategie: copier(STRATEGIE_EN_LIGNE_DEFAUT), rejointLe: dateServeur(maintenant), embleme: emblemeValide(embleme) ? embleme : undefined };
@@ -466,6 +469,7 @@ export function creerCarriere(config: CreationCarriere, maintenant: number, grai
     'Choisissez au moins un pack pour les distributions quotidiennes.');
   texte(graine, 200);
   const etat: EtatCarriereEnLigne = { schema: 1, id: config.id, nom: config.nom.trim(), code: config.code, createurId: config.compteId, creeLe: dateServeur(maintenant), version: 1, saison: 1, phase: 'salon', rythme: config.rythme, maxClubs: config.maxClubs, graine,
+    playerPool: config.playerPool ?? 'men',
     rotationPacks: catalogueAdmin().rotationPacks === true,
     // ⚠️ LE VIVIER NE SE COPIE PAS DANS LA LIGUE. Le catalogue mondial compte
     // 78 083 joueurs, soit 26 Mo de JSON : les recopier ici, ce serait réécrire
@@ -1406,6 +1410,7 @@ function reprendre(etat: EtatCarriereEnLigne, maintenant: number): EtatCarriereE
     club.strategie = strategieValide(club.strategie);
   }
   actualiserCartesCatalogue(nouveau.cartes);
+  migrerCartesJeunesse(nouveau, maintenant);
   nouveau.catalogueRevision = catalogueAdmin().revision;
   nouveau.rotationPacks = catalogueAdmin().rotationPacks === true;
   for (const club of nouveau.clubs) ajusterComposition(nouveau, club, maintenant);
@@ -1931,6 +1936,7 @@ export function operationMarcheCarriere(etat: EtatCarriereEnLigne, op: Operation
   };
   switch (op.type) {
     case 'reserver': {
+      exiger(!sourceRetireeFfr(op.carte.sourceId) && !sourceRetireeFfr(op.carte.speciale?.base ?? op.carte.sourceId), 'Cette carte est indisponible.');
       identifiant(op.compteId); identifiant(op.ref); entier(op.montant, 1);
       exiger(nouveau.publique, 'Le marché commun est réservé aux divisions publiques.');
       exiger(!nouveau.publique.finLe || maintenant < Date.parse(nouveau.publique.finLe), 'Cette saison publique est terminée. Retrouve ta nouvelle division dans le portail.');
@@ -1952,6 +1958,7 @@ export function operationMarcheCarriere(etat: EtatCarriereEnLigne, op: Operation
       return rendre(true);
     }
     case 'livrer': {
+      exiger(carteSeniorAutorisee(op.carte, nouveau.playerPool ?? 'men'), 'Cette carte est indisponible.');
       const club = nouveau.clubs.find(c => c.id === op.clubId);
       const reserve = club?.reservesMarche?.find(r => r.ref === op.ref);
       // Pas de réserve : la carte est déjà arrivée (ou l'acheteur n'a jamais payé) — on ne livre pas deux fois.
@@ -2000,13 +2007,13 @@ export function operationMarcheCarriere(etat: EtatCarriereEnLigne, op: Operation
  * Un écran d'avant ne le demande pas et reçoit tout, comme avant.
  */
 function construireVueCarriere(etat: EtatCarriereEnLigne, club?: ClubCarriere, leger = false): VueCarriereEnLigne {
-  const { graine: _secret, clubs: _clubs, cartes: _cartes, rencontres: _rencontres, objectifs: _objectifs, transactions: _transactions, echanges: _echanges, ...publics } = etat;
+  const { graine: _secret, migrationsFfr: _migrationsFfr, clubs: _clubs, cartes: _cartes, rencontres: _rencontres, objectifs: _objectifs, transactions: _transactions, echanges: _echanges, ...publics } = etat;
   return copier({ ...publics, packsActifs: packsActifsLigue(etat), monClubId: club?.id ?? '', observateur: club ? undefined : true,
     competitions: etat.competitions.map(c => c.format === 'poules' && c.poules
       ? { ...c, classementsPoules: c.poules.map(poule => classementCompetition(etat, c.id, poule, c.journeesRegulieres)) }
       : c),
     clubs: etat.clubs.map(c => { const { compteId: _compte, composition, strategie, compositionsSauvegardees, packsGratuits, packsGratuitsProgrammes: _programmes, dernierLotPacksGratuits, buteurManuel: _buteurManuel, ...reste } = c; return c.id === club?.id ? { ...reste, composition, strategie, compositionsSauvegardees, packsGratuits, dernierLotPacksGratuits } : reste; }),
-    cartes: etat.cartes.filter(c => c.proprietaire !== null),
+    cartes: etat.cartes.filter(c => c.proprietaire !== null && !c.retiree && carteSeniorAutorisee(c, etat.playerPool ?? 'men')),
     rencontres: etat.rencontres.map(r => { const { match, ...reste } = r; return match ? { ...reste, match: leger && match.termine ? resumeMatchEnLigne(match) : vueMatchEnLigne(match, club?.id ?? '') } : reste; }),
     objectifs: club ? etat.objectifs.filter(o => o.clubId === club.id) : [],
     transactions: club ? etat.transactions.filter(t => t.clubId === club.id) : [],

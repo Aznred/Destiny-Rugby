@@ -23,7 +23,7 @@ for (const id of ['standard', 'grand', 'premium', 'rugbyChampionship']) {
   assert.ok(modelePackParNom(PACKS_CARRIERE.find(pack => pack.id === id)!).includes('/m3d/packs/'), `Le pack ${id} ne doit pas afficher le logo d'une autre compétition.`);
 }
 assert.equal(new Set(PACKS_CARRIERE.map(pack => pack.id)).size, PACKS_CARRIERE.length, 'Chaque pack doit avoir un identifiant unique.');
-assert.ok(catalogue.length >= 78_000, 'Le catalogue mondial complet doit etre disponible hors ligne.');
+assert.ok(catalogue.length >= 60_000, 'Le catalogue senior conserve plus de 60 000 cartes après retrait des jeunes.');
 assert.deepEqual([...IDS_PACKS_SOLO_GRATUITS], ['bronze', 'standard', 'or']);
 for (const id of IDS_PACKS_SOLO_GRATUITS) {
   const pack = PACKS_CARRIERE.find(candidat => candidat.id === id);

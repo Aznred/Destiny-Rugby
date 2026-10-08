@@ -1,4 +1,8 @@
 import { creerPaiement, diagnosticErreurStripe, journalErreurStripe } from './paiementsStripe.js';
+import { contexteFfr, serviceFfr } from './ffr/contexte.js';
+import { cartesJeunesseARetirer } from '../src/lib/ligue/migrationJeunesse.js';
+import { VERSION_PROTECTION_FFR } from '../src/data/protectionFfr.generated.js';
+import type { SourceCarte } from '../src/lib/ligue/catalogueCarriere.js';
 import { contexteAtelier, enregistrerAtelier, vueAtelier, vueDonneesClubs } from './atelierAdmin.js';
 import { lotImport, vueImports, vueSpeciales } from './atelierSpeciales.js';
 import { catalogueSpecial, specialesPubliques } from '../src/lib/ligue/catalogueSpecial.js';
@@ -18,8 +22,8 @@ import { DELAI_PRESENCE } from '../src/lib/ligue/matchCarriere.js';
 import type { CompteStocke, LigueStockee, PresenceMatchStockee, ResumeDivisionPublique, SalonAmicalStocke, StockageCarriere } from './carriereStockage.js';
 import { OAuth2Client } from 'google-auth-library';
 import { appliquerModificationsBoutiqueCompte, validerEtatBoutiqueCompte, validerModificationsBoutiqueCompte } from '../src/lib/boutiqueCompte.js';
-import { catalogueBaseCarriere, MEZE_RUGBY_EMBLEME } from '../src/lib/ligue/catalogueCarriere.js';
-import { cleCarteSolo } from '../src/lib/collectionSolo.js';
+import { catalogueBaseCarriere, catalogueMondialCarriere, MEZE_RUGBY_EMBLEME } from '../src/lib/ligue/catalogueCarriere.js';
+import { cleCarteSolo, cleSoloRetireeFfr } from '../src/lib/collectionSolo.js';
 import { cartesEngagees, doublonsLibres, lotCartesSolo, type EvenementEchangeSolo, type SuiviEchangesSolo } from '../src/lib/echangesSolo.js';
 import { PACK_ICONES_KIRI } from '../src/lib/packsPrivesSolo.js';
 import { packsPrivesSolo, tirerPackIconesKiri } from './packsPrivesSolo.js';
@@ -58,13 +62,15 @@ const texte = (x: unknown, min: number, max: number, nom: string): string => {
   return x.trim();
 };
 const idValide = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
-let clesCartesSolo: Set<string> | undefined;
+let clesCartesSolo = new Set<string>();
+let sourcesCartesSolo: readonly SourceCarte[] | undefined;
 /**
  * Les cartes qu'on peut s'échanger en Collection solo : le catalogue de base,
  * plus les cartes spéciales publiées un jour (leurs exemplaires existent).
  */
 const cartesEchangeables = () => {
-  clesCartesSolo ??= new Set(catalogueBaseCarriere().map(c => cleCarteSolo(c.sourceId)));
+  const sources = catalogueBaseCarriere();
+  if (sources !== sourcesCartesSolo) { sourcesCartesSolo = sources; clesCartesSolo = new Set(sources.map(c => cleCarteSolo(c.sourceId))); }
   const speciales = specialesPubliques().definitions;
   if (!speciales.length) return clesCartesSolo;
   return new Set([...clesCartesSolo, ...speciales.map(d => cleCarteSolo(d.id))]);
@@ -179,10 +185,16 @@ function allegerDirect(rencontre: { match?: unknown }, annonce: string | null): 
 }
 
 /** Aucune empreinte, graine ou identité privée ne part dans la vue. */
-const publicCompte = (c: CompteStocke) => ({ id: c.id, pseudo: c.pseudo, administrateur: c.identifiant === 'kiri' });
+const publicCompte = (c: CompteStocke) => ({ id: c.id, pseudo: c.pseudo, administrateur: c.identifiant === 'kiri', featureFlags: { womensRugby: contexteFfr.getStore()?.authorized === true } });
 const comptesEtat = (e: EtatCarriereEnLigne) => e.clubs.map(c => c.compteId);
 
 export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer?: (etat: EtatCarriereEnLigne) => Promise<void>) {
+  const ffr = serviceFfr(stockage.joueurs);
+  const poolsLigues = new Map<string,string>();
+  const autoriserPool = (pool?: string) => {
+    const contexte = contexteFfr.getStore();
+    if ((pool === 'women' || pool === 'mixed') && contexte?.request && !contexte.authorized) throw new ErreurHttp(404, 'Ligue introuvable.');
+  };
   /** Mes propositions reçues et envoyées. `null` si le stockage ne sait pas (ou échoue) : l'écran garde sa liste. */
   const suiviEchanges = async (compte: string): Promise<SuiviEchangesSolo | null> => {
     try { return await stockage.echangesSolo?.suivi?.(compte) ?? null; } catch { return null; }
@@ -221,7 +233,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         if (config.revision !== catalogueCache.revision) catalogueCache = config;
         catalogueLuLe = maintenant;
       }
-      try { return await contexteAtelier.run(catalogueCache, operation); }
+      try { return await contexteAtelier.run(catalogueCache, () => ffr.avecPool('men', operation)); }
       catch (erreur) { if (!(erreur instanceof CatalogueDepasse) || essai > 0) throw erreur; }
     }
   }
@@ -441,10 +453,12 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
     return vue;
   }
   async function vueCompte(etat: EtatCarriereEnLigne, compteId: string, leger = false) {
-    return completerVuePublique(vueCarriere(etat, compteId, leger));
+    autoriserPool(etat.playerPool);
+    return ffr.avecPool(etat.playerPool ?? 'men', () => completerVuePublique(vueCarriere(etat, compteId, leger)));
   }
   async function lireLigue(id: string, connue?: { version: number; comptes: string[]; echeance: number | null }) {
     const ligne = await lireLigueBrute(id, connue);
+    if (ligne) autoriserPool(ligne.etat.playerPool);
     // Tout ce qui lit une ligue peut avoir à faire avancer ses matchs : une instance froide reprend ici leur moteur.
     if (ligne) await reprisesMatch.charger(id, ligne.etat).catch(() => 0);
     return ligne;
@@ -535,7 +549,11 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
       if (verifierRecu && (controle ? controle.dejaTraitee : await stockage.dejaTraitee(id, compte, requete))) return ligne.etat;
       const maintenant = Date.now();
       const presence = await avecPresences(ligne.etat, maintenant, fraicheurPresences);
-      const suivant = operation(presence.etat, maintenant, randomBytes(24).toString('hex'));
+      if(cartesJeunesseARetirer(presence.etat).length){
+        if(!stockage.snapshotFfr)throw new ErreurHttp(503,'Snapshot de migration FFR indisponible.');
+        await stockage.snapshotFfr(ligne,VERSION_PROTECTION_FFR);
+      }
+      const suivant = await ffr.avecPool(presence.etat.playerPool ?? 'men', () => operation(presence.etat, maintenant, randomBytes(24).toString('hex')));
       // Une présence extérieure sert au calcul de la décision, puis disparaît
       // du gros agrégat. Sa petite ligne dédiée reste la seule source durable.
       const durable = presence.externes ? sansPresences(suivant) : suivant;
@@ -754,6 +772,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
       if (req.method !== 'GET' && req.method !== 'POST') throw new ErreurHttp(405, 'Méthode non autorisée.');
       protegerOrigine(req);
       const url = new URL(req.url ?? '/api/carriere', 'http://localhost');
+      const maintenant = Date.now();
       if (url.searchParams.get('horloge') === '1') {
         const secret = process.env.CRON_SECRET;
         if (!secret || entete(req, 'authorization') !== `Bearer ${secret}`) throw new ErreurHttp(401, 'Connexion requise.');
@@ -766,13 +785,16 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
       if (req.method === 'GET' && url.searchParams.get('catalogueSolo') === '1') {
         const config = catalogueAdmin();
         const connue = Number(url.searchParams.get('revision'));
+        const contexteCatalogue = contexteFfr.getStore();
+        const revisionFfr = contexteCatalogue?.revisionFfr ?? '';
+        const actifs = new Set(catalogueMondialCarriere(config).map(c=>c.sourceId));
         // Le gros catalogue de base est déjà dans le jeu. Les éditions et
         // ajouts de joueurs de la base en ligne traversent le réseau — et les cartes
         // spéciales PUBLIÉES, avec leurs événements (pack Halloween compris) :
         // jamais un brouillon ni une carte sans image.
-        return res.status(200).json(connue === config.revision
-          ? { revision: config.revision }
-          : { revision: config.revision, joueurs: config.joueurs, ajouts: config.ajouts ?? {}, speciales: specialesPubliques(config),
+        return res.status(200).json(connue === config.revision && url.searchParams.get('revisionFfr') === revisionFfr
+          ? { revision: config.revision, revisionFfr }
+          : { revision: config.revision, revisionFfr, ffr: (contexteCatalogue?.joueurs ?? []).filter(c=>c.gender!=='female' && !c.retiree), joueurs: Object.fromEntries(Object.entries(config.joueurs).filter(([id])=>actifs.has(id))), ajouts: Object.fromEntries(Object.entries(config.ajouts ?? {}).filter(([,c])=>actifs.has(c.sourceId))), speciales: specialesPubliques(config),
               // Les cosmétiques du Labo : SEULS les publiés quittent le serveur, dans la même réponse (aucune requête de plus).
               clubs: config.clubs ?? {}, rivalitesHistoriques: config.rivalitesHistoriques ?? [],
               boutique: Object.values(config.boutique ?? {}).filter(a => a.publie) });
@@ -853,7 +875,6 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         if (definition?.imageReady && (definition.published || definition.publieeLe)) return await servirImageSpeciale(true);
       }
 
-      const maintenant = Date.now();
       const corps = req.method === 'POST' ? objet(typeof req.body === 'string' ? JSON.parse(req.body) : req.body) : {};
       // Le Labo envoie des images de cartes (350 Ko) et des lots d'import.
       const tailleMax = corps.action === 'sauvegarderBoutique' ? 4_000_000 : corps.action === 'atelier' ? 1_000_000 : 24_000;
@@ -910,6 +931,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         await stockage.ouvrirSession(empreinteJeton(jeton), compte.id, maintenant + DUREE_SESSION);
         sessionsChaudes.set(empreinteJeton(jeton), { compte, jusqua: maintenant + 60_000 });
         cookie(req, res, jeton);
+        if(contexteFfr.getStore())contexteFfr.getStore()!.authorized=await ffr.acces(compte.id);
         return res.status(200).json({ compte: publicCompte(compte) });
       }
       if (action === 'inscription' || action === 'connexion') {
@@ -937,6 +959,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         await stockage.ouvrirSession(empreinteJeton(jeton), compte.id, maintenant + DUREE_SESSION);
         sessionsChaudes.set(empreinteJeton(jeton), { compte, jusqua: maintenant + 60_000 });
         cookie(req, res, jeton);
+        if(contexteFfr.getStore())contexteFfr.getStore()!.authorized=await ffr.acces(compte.id);
         return res.status(200).json({ compte: publicCompte(compte) });
       }
       const jeton = lireJeton(req);
@@ -951,6 +974,25 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         sessionsChaudes.set(empreinteSession, { compte, jusqua: maintenant + 60_000, toucheLe: toucher ? maintenant : sessionChaude!.toucheLe });
       }
       if (!compte) throw new ErreurHttp(401, 'Connectez-vous pour retrouver vos ligues.');
+      const contexte = contexteFfr.getStore();
+      if (contexte) contexte.authorized = await ffr.acces(compte.id);
+      const cibleLigue = typeof corps.ligue === 'string' ? corps.ligue : url.searchParams.get('ligue');
+      if (cibleLigue && idValide(cibleLigue)) {
+        let pool = poolsLigues.get(cibleLigue);
+        if (!pool) { pool = await stockage.poolLigue?.(cibleLigue) ?? 'men'; poolsLigues.set(cibleLigue,pool); if(poolsLigues.size>1024)poolsLigues.delete(poolsLigues.keys().next().value!); }
+        autoriserPool(pool);
+      }
+      if (url.searchParams.has('baseJoueurs') || action === 'baseJoueurs') {
+        if (!contexte?.authorized) throw new ErreurHttp(404, 'Page introuvable.');
+        if (!stockage.joueurs) throw new ErreurHttp(503, 'Import FFR non préparé.');
+        res.setHeader('Cache-Control','private, no-store');
+        if(req.method==='GET')return res.status(200).json(url.searchParams.has('rapport')?await stockage.joueurs.rapport():await stockage.joueurs.rechercher(url.searchParams));
+        const decision=corps.decision;
+        if(!['APPROVE','REJECT','EDIT'].includes(String(decision))||!Number.isInteger(corps.revision))throw new ErreurHttp(400,'Décision invalide.');
+        try { await stockage.joueurs.decider(texte(corps.id,3,100,'Profil'),Number(corps.revision),decision as 'APPROVE'|'REJECT'|'EDIT',compte.id,corps.edit ? objet(corps.edit) : undefined); }
+        catch(e){throw new ErreurHttp(409,(e as Error).message);}
+        ffr.invalidate();return res.status(200).json({ok:true});
+      }
       if (req.method === 'GET' && url.searchParams.has('packsPrivesSolo')) {
         return res.status(200).json({ packs: packsPrivesSolo(compte.identifiant, catalogueSpecial(), maintenant) });
       }
@@ -1020,6 +1062,8 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
           if (stockage.modifierBoutique) boutique = await stockage.modifierBoutique(compte.id, modifications);
           else {
             const avant = await stockage.boutique(compte.id);
+            if (Object.keys(avant?.collectionSolo?.quantites ?? {}).some(cleSoloRetireeFfr))
+              throw new ErreurHttp(409, 'La compensation de ta collection est en cours. Réessaie dans un instant.');
             const apres = avant && validerEtatBoutiqueCompte(appliquerModificationsBoutiqueCompte(avant, modifications));
             boutique = apres ? await stockage.sauvegarderBoutique(compte.id, apres) : undefined;
           }
@@ -1028,6 +1072,9 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         }
         const boutique = validerEtatBoutiqueCompte(corps.boutique);
         if (!boutique) throw new ErreurHttp(400, 'Sauvegarde de boutique invalide.');
+        const avant = await stockage.boutique(compte.id);
+        if (Object.keys(avant?.collectionSolo?.quantites ?? {}).some(cleSoloRetireeFfr))
+          throw new ErreurHttp(409, 'La compensation de ta collection est en cours. Réessaie dans un instant.');
         const enregistree = await stockage.sauvegarderBoutique(compte.id, boutique);
         const visible = (coffre: typeof boutique) => ({
           ovas: coffre.ovas, achatsOvas: coffre.achatsOvas ?? 0, collectionSolo: coffre.collectionSolo,
@@ -1070,6 +1117,15 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
           } else if (action === 'accepterOffreSolo') {
             const proposition = corps.proposition == null ? undefined : texte(corps.proposition, 36, 36, 'Proposition');
             if (proposition && !idValide(proposition)) throw new Error('Proposition invalide.');
+            {
+              if (!marche.lire) throw new ErreurHttp(503, 'La vérification des cartes échangées est indisponible.');
+              const offre = await marche.lire(id, compte.id);
+              if (!offre) throw new ErreurHttp(409, 'Offre indisponible.');
+              const retour = proposition ? offre.propositions.find(p => p.id === proposition)?.cartes : offre.souhaitees;
+              if (!retour) throw new ErreurHttp(409, 'Proposition indisponible.');
+              lotCartesSolo(offre.offertes, cartesEchangeables());
+              lotCartesSolo(retour, cartesEchangeables(), true);
+            }
             try { await marche.accepter(id, compte.id, proposition); }
             catch (erreur) {
               // Le joueur n'a plus les cartes promises : sa proposition est morte, on la retire au lieu de la
@@ -1288,13 +1344,13 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         if (!id) {
           const publicCourant = await assurerDivisionsPubliques(maintenant);
           const ligues = (await assurerLaboratoireKiri(compte, maintenant))
-            .filter(l => !l.publique || l.publique.cycle === publicCourant.cycle);
+            .filter(l => (!l.publique || l.publique.cycle === publicCourant.cycle) && (l.playerPool !== 'women' || contexte?.authorized));
           // ⚠️ LE RÉSUMÉ ARRIVE DÉJÀ TAILLÉ. `stockage.ligues` rendait l'état
           // complet de chaque ligue pour qu'on en extraie ces sept champs ici :
           // 400 Ko traversaient le réseau par ligue et par ouverture d'écran.
           // C'est Postgres qui les extrait maintenant.
           return res.status(200).json({ compte: publicCompte(compte), ligues: ligues.map(l => ({
-            id: l.id, nom: l.nom, etat: l.phase, clubNom: l.clubNom, ovas: l.ovas,
+            id: l.id, nom: l.nom, etat: l.phase, clubNom: l.clubNom, ovas: l.ovas, playerPool: l.playerPool,
             clubEmbleme: l.clubEmbleme, logo: l.logo, laboratoire: l.laboratoire,
             createur: l.createurId === compte.id && !l.publique, publique: l.publique,
           })) });
@@ -1304,7 +1360,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
           const ligne = await lireLigue(id);
           if (!ligne || !ligne.comptes.includes(compte.id)) throw new ErreurHttp(404, 'Ligue introuvable.');
           const { collectionCarriere } = await import('../src/lib/ligue/collectionCarriere.js');
-          return res.status(200).json(collectionCarriere(ligne.etat, compte.id, url.searchParams, maintenant));
+          return res.status(200).json(await ffr.avecPool(ligne.etat.playerPool ?? 'men', () => collectionCarriere(ligne.etat, compte.id, url.searchParams, maintenant)));
         }
         // Le marché commun vu de cette division : un petit document, relu seulement quand sa révision a changé.
         if (url.searchParams.get('marche') === '1') {
@@ -1424,6 +1480,9 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         return res.status(200).json(observateur ? await completerVuePublique(vueCarriereObservateur(e, leger)) : await vueCompte(e, compte.id, leger));
       }
       if (action === 'creer') {
+        if(corps.playerPool !== undefined && !['men','women'].includes(String(corps.playerPool)))throw new ErreurHttp(400,'Pool de joueurs invalide.');
+        const playerPool = corps.playerPool === 'women' ? 'women' : 'men';
+        autoriserPool(playerPool);
         // ⚠️ COMPTER, C'EST COMPTER. Ce plafond lisait la liste entière — donc,
         // avant, l'état complet de vingt ligues — pour en prendre la longueur.
         if (await stockage.nombreLigues(compte.id) >= 20) throw new ErreurHttp(400, 'Vous participez déjà à 20 ligues.');
@@ -1432,7 +1491,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         for (let essai = 0; essai < 3; essai++) {
           const id = randomUUID();
           const code = `DR-${randomBytes(5).toString('hex').toUpperCase()}`;
-          const e = creerCarriere({ id, code, compteId: compte.id, pseudo: compte.pseudo,
+          const e = await ffr.avecPool(playerPool, () => creerCarriere({ id, code, compteId: compte.id, pseudo: compte.pseudo, playerPool,
             nom: texte(corps.nom, 3, 40, 'Nom de ligue'), clubNom: texte(corps.clubNom, 3, 40, 'Nom du club'),
             rythme: Number(corps.rythme), maxClubs: Number(corps.maxClubs),
             embleme: typeof corps.embleme === 'string' ? corps.embleme : undefined,
@@ -1441,8 +1500,8 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
             packsActifs: Array.isArray(corps.packsActifs) ? corps.packsActifs : undefined,
             packsGratuitsParJour: typeof corps.packsGratuitsParJour === 'number' ? corps.packsGratuitsParJour : undefined,
             doublonsAutorises: corps.doublonsAutorises === true,
-            cartesSpeciales: corps.cartesSpeciales === true,
-          }, maintenant, randomBytes(24).toString('hex'));
+            cartesSpeciales: playerPool === 'men' && corps.cartesSpeciales === true,
+          }, maintenant, randomBytes(24).toString('hex')));
           if (await stockage.creerLigue({ id, code, etat: e, comptes: comptesEtat(e), version: 0 })) return res.status(201).json(await vueCompte(e, compte.id));
         }
         throw new ErreurHttp(409, 'Création en cours. Réessayez.');
@@ -1453,6 +1512,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
           texte(corps.clubNom, 3, 40, 'Nom du club'), typeof corps.embleme === 'string' ? corps.embleme : undefined, maintenant));
         const ligne = await stockage.ligueParCode(code);
         if (!ligne) throw new ErreurHttp(404, 'Code de ligue introuvable.');
+        autoriserPool(ligne.etat.playerPool);
         // ⚠️ UN LIEN D'INVITATION SE CLIQUE DEUX FOIS. On le range dans une
         // boucle de messages, on y revient le lendemain, on le rouvre depuis
         // l'historique du navigateur. La deuxième fois, la règle d'adhésion
@@ -1580,7 +1640,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
     const atelier = /[?&]atelier\b/.test(req.url ?? '')
       || Boolean(req.body && typeof req.body === 'object' && (req.body as { action?: unknown }).action === 'atelier')
       || (typeof req.body === 'string' && req.body.includes('"atelier"'));
-    try { return await avecAtelier(() => handler(req,res), atelier); }
+    try { return await contexteFfr.run({request:true,pool:'men',joueurs:[]}, () => avecAtelier(() => handler(req,res), atelier)); }
     catch { return res.status(503).json({erreur:'Le catalogue est momentanément indisponible. Réessaie dans un instant.'}); }
   }, avancerLigues: () => avecAtelier(avancerLigues), actualiserLigue: (id: string) => avecAtelier(async () => {
     // Le réveil lit l'en-tête et les présences d'un seul trait, et les confie à

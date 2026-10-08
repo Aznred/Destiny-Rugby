@@ -38,7 +38,7 @@ const uuid = (prefixe: string, n: number) => `${prefixe}0000000-0000-4000-8000-$
 // ═══ 1. Les règles du document commun ═══════════════════════════════════════
 {
   const partie = (ligue: number, club: number): PartieMarche => ({ ligueId: uuid('a', ligue), clubId: `club-${ligue}-${club}`, pseudo: `P${ligue}${club}`, nom: `Club ${ligue}.${club}`, division: ligue });
-  const carte = { id: 'c1', sourceId: 's1', nom: 'Joueur Un', proprietaire: 'club-1-1', verrou: 'v', favori: true } as unknown as CarteCarriere;
+  const carte = { id: 'c1', sourceId: 's1', nom: 'Joueur Un', age: 25, origine: 'professionnel', proprietaire: 'club-1-1', verrou: 'v', favori: true } as unknown as CarteCarriere;
   const annonce = (id: string, type: 'directe' | 'enchere', prix = 500): AnnoncePartagee => ({ id, vendeur: partie(1, 1), carte, type, prix,
     publieLe: new Date(T0).toISOString(), expireLe: new Date(T0 + HEURE).toISOString(), etat: 'ouverte' });
   const m = marcheVide(1);

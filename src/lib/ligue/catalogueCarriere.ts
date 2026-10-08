@@ -1,4 +1,5 @@
 import { statistiquesCarte } from './statistiquesCarte.js';
+import { filtrerCatalogueFfr, poolFfrCourant } from './eligibiliteJoueurs.js';
 export { statistiquesCarte } from './statistiquesCarte.js';
 import { catalogueAdmin, type CatalogueAdmin } from './atelierCatalogue.js';
 import { JOUEURS_NEW_MAJ } from '../../data/photosNewMaj.js';
@@ -274,6 +275,9 @@ function sourceDepuisAjout(a: AjoutJoueur): SourceCarte {
 }
 
 export function catalogueMondialCarriere(config: CatalogueAdmin = catalogueAdmin()): readonly SourceCarte[] {
+  return filtrerCatalogueFfr(catalogueAvantProtection(config));
+}
+function catalogueAvantProtection(config: CatalogueAdmin): readonly SourceCarte[] {
   const ajouts = Object.values(config.ajouts ?? {}).filter(a => POSTE_PAR_ID[a.poste]);
   if (!Object.keys(config.joueurs).length && !ajouts.length) return catalogueBaseCarriere();
   const connu = cataloguesAdmin.get(config); if (connu) return connu;
@@ -316,12 +320,28 @@ export function catalogueMondialCarriere(config: CatalogueAdmin = catalogueAdmin
 }
 export function packsCatalogueAdmin(): PackCarriere[] {
   const editions = catalogueAdmin().packs;
+  if(poolFfrCourant()==='women'){
+    const pool=catalogueMondialCarriere();
+    const models=PACKS_CARRIERE.filter(p=>['general','poste'].includes(p.famille??''));
+    const championships=[...new Set(pool.map(c=>c.championnat))].sort();
+    for(const championnat of championships)models.push({id:`womens:${normaliser(championnat)}`,nom:championnat,prix:700,cartes:3,famille:'monde',filtre:{championnats:[championnat]},probabilites:{...MIXTE}});
+    return models.flatMap(p=>{
+      const candidates=pool.filter(c=>!p.filtre||carteDansPack(c,p.filtre));if(!candidates.length)return [];
+      const probabilites={...p.probabilites};
+      for(const r of RARETES_CARRIERE)if(!candidates.some(c=>c.rarete===r))probabilites[r]=0;
+      let sum=Object.values(probabilites).reduce((a,b)=>a+b,0);
+      if(!sum){for(const c of candidates)probabilites[c.rarete]++;sum=candidates.length;}
+      for(const r of RARETES_CARRIERE)probabilites[r]=probabilites[r]/sum*100;
+      const garantie=p.garantie&&candidates.some(c=>bandesGaranties(p.garantie!).includes(c.rarete))?p.garantie:undefined;
+      return [{...p,nom:`${p.nom} · Féminin`,probabilites,garantie,promesse:`${p.cartes} cartes seniors féminines${garantie?` · ${garantie} garantie`:''}. Bêta interne.`}];
+    });
+  }
   return [...PACKS_CARRIERE.map(p => editions[p.id] ?? p), ...Object.values(editions).filter(p => !PACKS_CARRIERE.some(b => b.id === p.id))];
 }
 
 /** Les identités viennent des effectifs réels. Les notes FFR sont estimées dans le jeu. */
 export function catalogueBaseCarriere(): readonly SourceCarte[] {
-  if (catalogue) return catalogue;
+  if (catalogue) return filtrerCatalogueFfr(catalogue);
   const joueurs = new Map<string, SourceCarte>();
   const clubs = new Map(COMPETITIONS.flatMap(c => c.clubs.map(club => [club.nom, c] as const)));
   const ajouter = (brut: SourceCarte) => {
@@ -389,7 +409,7 @@ export function catalogueBaseCarriere(): readonly SourceCarte[] {
   const homonymes = new Set(Object.values(IDENTITES_JOUEURS_MONDIAUX).filter(i => i.distinct).map(i => i.sourceId));
   catalogue = [...joueurs.values()].map(j => ({ ...j, photo: homonymes.has(j.sourceId) ? j.photo : photoDetoureeCatalogue(j.nom, j.clubReel) ?? j.photo }))
     .sort((a, b) => a.sourceId < b.sourceId ? -1 : 1);
-  return catalogue;
+  return filtrerCatalogueFfr(catalogue);
 }
 
 /**
@@ -635,6 +655,7 @@ export function dotationBronzeCarriere(
     // sans pilier — donc sans composition légale. On élargit alors à la bande
     // Bronze entière plutôt que de rendre une liste incomplète.
     source ??= tirerDuRayon(catalogueParRarete().bronze.filter((c) => c.famille === place.famille), retenus, rng);
+    if(!source&&poolFfrCourant()==='women')source=tirerDuRayon(catalogueMondialCarriere().filter(c=>c.famille===place.famille),retenus,rng);
     if (!source) return;
     retenus.add(source.sourceId);
     cartes.push({

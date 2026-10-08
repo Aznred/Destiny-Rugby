@@ -12,6 +12,7 @@
 // l'améliorer ne se verrait nulle part.
 
 import { POSTES } from '../data/rugby.js';
+import { academieFfr, posteAcademieFfr } from './academieFfr.js';
 import { competitionDuClub, NOTE_PAR_NIVEAU } from '../data/clubs.js';
 import { forceEffectif, plafondPepite } from './effectif.js';
 import { nomAleatoirePourNation } from './nomsJoueurs.js';
@@ -21,6 +22,7 @@ import {
 } from './installations.js';
 import type { Coequipier } from './effectif.js';
 import type { JeuneForme } from '../types.js';
+import { courbeDeveloppement } from './jeunes.js';
 
 /**
  * La promotion d'une saison.
@@ -37,7 +39,8 @@ export function promotionDuCentre(
 ): JeuneForme[] {
   if (niveau <= 0) return [];
   const n = Math.min(niveau, NIVEAU_INSTALLATION_MAX);
-  const combien = PROMOTION_PAR_NIVEAU[n] + (Math.random() < CHANCE_UN_DE_PLUS[n] ? 1 : 0);
+  const academy=academieFfr(club);
+  const combien = PROMOTION_PAR_NIVEAU[n] + (Math.random() < CHANCE_UN_DE_PLUS[n] ? 1 : 0) + (academy && Math.random()<academy.rating/200 ? 1 : 0);
   if (combien <= 0) return [];
 
   const niveauClub = competitionDuClub(club)?.niveau ?? 8;
@@ -59,9 +62,9 @@ export function promotionDuCentre(
     // Sans ce retard, le centre ferait monter la force du club dès la première
     // promotion, et l'intérêt d'un espoir serait de jouer tout de suite —
     // c'est-à-dire l'inverse de ce qu'est un centre de formation.
-    const note = Math.max(28, Math.round(reference - 9 + Math.random() * 7));
+    const note = Math.max(28, Math.round(reference - 9 + Math.random() * 7 + (academy ? (academy.rating-50)*.04*academy.confidence : 0)));
 
-    const pepite = Math.random() < CHANCE_PEPITE_CENTRE[n];
+    const pepite = Math.random() < Math.min(.3,CHANCE_PEPITE_CENTRE[n]+(academy?.rating??0)/4000);
     const ordinaire = note + 2 + Math.floor(Math.random() * 6) + BONUS_POTENTIEL_CENTRE[n];
     // ⚠️ MÊME PLAFOND QUE LE MONDE (`plafondPepite`) : un centre ne doit pas
     // pouvoir sortir, en Fédérale 2, un joueur meilleur que n'importe qui en
@@ -72,7 +75,7 @@ export function promotionDuCentre(
       : ordinaire;
     const potentiel = Math.max(note, Math.min(plafondPepite(niveauClub), brut));
 
-    const poste = POSTES[Math.floor(Math.random() * POSTES.length)].id;
+    const poste = academy ? posteAcademieFfr(club,Math.random) : POSTES[Math.floor(Math.random() * POSTES.length)].id;
     sortie.push({
       id: `${club}-centre-${saison}-${i}-${Math.floor(Math.random() * 1e6)}`,
       club,
@@ -83,6 +86,8 @@ export function promotionDuCentre(
       age,
       note,
       potentiel,
+      developmentCurve: courbeDeveloppement(poste),
+      potentielEstime: [Math.max(note,potentiel-(6-n)),Math.min(99,potentiel+(6-n))],
     });
   }
   return sortie;

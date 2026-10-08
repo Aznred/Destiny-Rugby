@@ -1,0 +1,27 @@
+import assert from 'node:assert/strict';
+import {readFileSync,writeFileSync} from 'node:fs';
+import {neon} from '@neondatabase/serverless';
+import {joueursNeon} from '../serveur/ffr/stockageNeon.ts';
+const version=process.argv[2]??'2026_10_FFR_FULL';
+if(!/^[A-Za-z0-9_]{3,60}$/.test(version))throw new Error('Version invalide.');
+const root=`.ffr/${version}`,report=JSON.parse(readFileSync(`${root}/report.json`,'utf8'));
+const line=readFileSync('.env','utf8').split('\n').find(l=>l.trim().startsWith('DATABASE_URL='));
+const url=process.env.DATABASE_URL??line?.slice(line.indexOf('=')+1).trim().replace(/^["']|["']$/g,'');
+const sql=neon(url),storage=joueursNeon(url);
+const [dataset]=await sql`select version,sha256,status from player_datasets where status='ACTIVE'`;
+assert.equal(dataset.version,version);assert.equal(dataset.sha256,report.source_sha256);
+const [total]=await sql`select count(*)::int n,count(*) filter(where usage='YOUTH_REGEN_SOURCE')::int youth from source_players where dataset_version=${version}`;
+assert.equal(total.n,report.unique_sources);
+const flags=await sql`select c.identifiant,a.feature_womens_rugby from player_feature_access a join comptes c on c.id=a.compte where a.feature_womens_rugby`;
+assert.equal(flags.length,1);assert.equal(flags[0].identifiant,'kiri');
+const [invalid]=await sql`select count(*)::int n from game_players g where status='ACTIVE_CARD' and review='APPROVED'
+ and (data->>'senior_status'<>'senior' or coalesce((data->>'duplicate')::boolean,false) or data->>'primary_position' is null)`;
+assert.equal(invalid.n,0);
+const page=await storage.rechercher(new URLSearchParams({q:'dupont',limit:'20'}));assert.ok(page.joueurs.length<=20);
+const youth=await storage.rechercher(new URLSearchParams({filter:'youth',limit:'20'}));
+assert.ok(youth.joueurs.length);assert.ok(youth.joueurs.every(p=>p.name==='Source jeunesse — identité privée'&&p.photo===null&&p.identity_key===''&&!('raw' in p)));
+const pools=await sql`select gender,review,count(*)::int n from game_players where dataset_version=${version} group by gender,review order by gender,review`;
+const [indexes]=await sql`select count(*)::int n from pg_indexes where tablename='source_players'`;
+assert.ok(indexes.n>=6);
+const result={version,total:total.n,youth:total.youth,access:'Kiri seul',pools,indexes:indexes.n,search_page:page.joueurs.length,youth_identity_redacted:true,at:new Date().toISOString()};
+writeFileSync(`${root}/production-verification.json`,JSON.stringify(result,null,2));console.log(JSON.stringify(result,null,2));

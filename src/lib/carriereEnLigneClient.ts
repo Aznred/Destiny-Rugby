@@ -4,10 +4,11 @@ import type { VueMarchePartage } from './ligue/marchePartage';
 import type { EtatBoutiqueCompte, ModificationsBoutiqueCompte } from './boutiqueCompte.js';
 import type { DeltaEchangeSolo, LotCartesSolo, PageOffresSolo } from './echangesSolo.js';
 
-export interface CompteCarriere { id: string; pseudo: string; administrateur?: boolean }
+export interface CompteCarriere { id: string; pseudo: string; administrateur?: boolean; featureFlags?: { womensRugby: boolean } }
 export interface SessionCarriere {
   compte: CompteCarriere;
   ligues: {
+    playerPool?: 'men' | 'women' | 'mixed';
     id: string; nom: string; etat: string; clubNom: string; ovas: number;
     clubEmbleme?: string; logo?: string; laboratoire?: boolean; createur?: boolean;
     publique?: { cycle: number; division: number };
@@ -181,7 +182,7 @@ export const annulerOffreSolo = (offre: string) =>
 export const retirerPropositionSolo = (offre: string) =>
   requete<ReponseEchangeSolo>({ action: 'retirerPropositionSolo', offre });
 export const supprimerLigueCarriere = (ligue: string) => requete<{ ok: boolean }>({ action: 'supprimerLigue', ligue });
-export interface IdentiteLigue { embleme?: string; logo?: string; tropheeId?: string; playoffs?: boolean; dotationOvas?: number; packsActifs?: string[]; packsGratuitsParJour?: number; doublonsAutorises?: boolean; cartesSpeciales?: boolean }
+export interface IdentiteLigue { playerPool?: 'men' | 'women'; embleme?: string; logo?: string; tropheeId?: string; playoffs?: boolean; dotationOvas?: number; packsActifs?: string[]; packsGratuitsParJour?: number; doublonsAutorises?: boolean; cartesSpeciales?: boolean }
 export const creerLigueCarriere = (nom: string, clubNom: string, rythme: number, maxClubs: number, identite: IdentiteLigue = {}) =>
   requete<VueCarriereEnLigne>({ action: 'creer', nom, clubNom, rythme, maxClubs, ...identite });
 export const rejoindreLigueCarriere = (code: string, clubNom: string, embleme?: string) => requete<VueCarriereEnLigne>({ action: 'rejoindre', code, clubNom, embleme });

@@ -22,6 +22,7 @@
 // tomber sur la bonne pépite.
 
 import { COMPETITIONS, NOTE_PAR_NIVEAU, competitionDuClub } from '../data/clubs.js';
+import { academieFfr, posteAcademieFfr } from './academieFfr.js';
 import { distanceKm, positionDuClub, region } from '../data/geographie.js';
 import type { PositionClub } from '../data/geographie.js';
 import { effectifDuClub, noteAmateur } from './effectif.js';
@@ -72,7 +73,8 @@ export function vivierDuClub(club: string, saison: number): JeuneJoueur[] {
   const pos = positionDuClub(club);
   const r = region(pos.region);
   const noteClub = noteDuClub(club, niveau);
-  const parCohorte = jeunesParCohorte(niveau, r.poids);
+  const academy=academieFfr(club);
+  const parCohorte = jeunesParCohorte(niveau, r.poids) * (academy ? .85+academy.rating/200 : 1);
 
   const liste: JeuneJoueur[] = [];
   for (let age = AGE_MIN_JEUNE; age <= AGE_MAX_JEUNE; age++) {
@@ -86,9 +88,14 @@ export function vivierDuClub(club: string, saison: number): JeuneJoueur[] {
     const rngNombre = graine(`vivier#${club}#${cohorte}`);
     const combien = Math.floor(parCohorte) + (rngNombre() < parCohorte % 1 ? 1 : 0);
     for (let i = 0; i < combien; i++) {
-      liste.push(fabriquerJeune(
-        `${club}#${cohorte}#${i}`, club, pos.region, age, r.qualite, noteClub,
-      ));
+      const cleJeune=`${club}#${cohorte}#${i}`;
+      const rng=graine(`academy-profile:${cleJeune}`);
+      const jeune=fabriquerJeune(cleJeune, club, pos.region, age, r.qualite, noteClub,academy?posteAcademieFfr(club,rng):undefined);
+      if(academy){
+        jeune.note=Math.min(78,Math.max(12,jeune.note+Math.round((academy.rating-50)*.04*academy.confidence)));
+        jeune.potentielReel=Math.min(99,Math.max(jeune.note,jeune.potentielReel+Math.round((academy.rating-50)*.08)));
+      }
+      liste.push(jeune);
     }
   }
   cacheVivier.set(cle, liste);

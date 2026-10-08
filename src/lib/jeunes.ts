@@ -47,6 +47,8 @@ export type Personnalite =
   | 'fort_caractere' | 'perfectionniste' | 'fragile';
 
 export interface JeuneJoueur {
+  /** Courbe fictive par tranche d'âge ; absente des anciennes sauvegardes. */
+  developmentCurve?: number[];
   /** Déterministe : `club#cohorte#rang`. Il ne change jamais. */
   id: string;
   nom: string;
@@ -128,6 +130,7 @@ export function familleDe(poste: PosteId): FamillePoste {
 export function facteurDAge(poste: PosteId, age: number): number {
   return COURBE_PAR_FAMILLE[familleDe(poste)][trancheDAge(age)];
 }
+export const courbeDeveloppement = (poste: PosteId): number[] => [...COURBE_PAR_FAMILLE[familleDe(poste)]];
 
 /** L'âge où ce poste atteint son sommet — utile pour situer un espoir. */
 export function agePicDe(poste: PosteId): number {
@@ -233,6 +236,7 @@ export function fabriquerJeune(
   age: number,
   qualiteRegion: number,
   niveauClub: number,
+  posteFormation?: PosteId,
 ): JeuneJoueur {
   const rng = graine(`jeune#${cle}`);
 
@@ -240,9 +244,11 @@ export function fabriquerJeune(
   const nom = NOMS[Math.floor(rng() * NOMS.length)];
 
   const familles = Object.keys(POSTES_PAR_FAMILLE) as FamillePoste[];
-  const famille = familles[Math.floor(rng() * familles.length)];
+  const familleTiree = familles[Math.floor(rng() * familles.length)];
+  const famille = posteFormation ? familleDe(posteFormation) : familleTiree;
   const dansLaFamille = POSTES_PAR_FAMILLE[famille];
-  const poste = dansLaFamille[Math.floor(rng() * dansLaFamille.length)];
+  const posteTire = dansLaFamille[Math.floor(rng() * dansLaFamille.length)];
+  const poste = posteFormation ?? posteTire;
 
   // ── LE POTENTIEL RÉEL : une loi ORDINAIRE, plus un talent RARE ──────────
   //
@@ -329,6 +335,7 @@ export function fabriquerJeune(
 
   return {
     id: cle,
+    developmentCurve: courbeDeveloppement(poste),
     nom: `${prenom} ${nom}`,
     club,
     region,
@@ -413,7 +420,7 @@ export function progresser(
     return { note: 0, potentiel: perdu, detail };
   }
 
-  const age = facteurDAge(j.poste, j.age);
+  const age = j.developmentCurve?.[trancheDAge(j.age)] ?? facteurDAge(j.poste, j.age);
   const perso = EFFET_PERSONNALITE[j.personnalite].progression;
 
   // Chaque facteur est centré sur 1 : à 50 partout, on progresse « normalement ».

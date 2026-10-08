@@ -25,6 +25,7 @@
 // règle que `Manager.installations`, indexé par club.
 
 import { competitionDuClub } from '../data/clubs.js';
+import { academieFfr } from './academieFfr.js';
 import { distanceKm, positionDuClub } from '../data/geographie.js';
 import { graine } from './championnat.js';
 import { forceEffectif } from './effectif.js';
@@ -134,6 +135,12 @@ export function notesDeBase(club: string): NotesCentre {
     // jeunes que son centre ne mériterait pas.
     reputation: borne(socle * 0.55 + (comp ? (100 - niveau * 8.5) : 30) * 0.45 + prime * 0.8),
   };
+  const evidence=academieFfr(club);
+  if(evidence){
+    const adjustment=(evidence.rating-notes.coaching)*.25*evidence.confidence;
+    notes.coaching=borne(notes.coaching+adjustment);notes.recrutement=borne(notes.recrutement+adjustment*.6);
+    notes.reputation=borne(notes.reputation+adjustment*.4);
+  }
   cache.set(club, notes);
   return notes;
 }

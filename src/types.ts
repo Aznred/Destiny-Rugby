@@ -1056,6 +1056,8 @@ export type InstallationsClub = Record<TypeInstallation, number>;
  * annoncés sur L'Ovale, et `effectif.ts` le reçoit par registre.
  */
 export interface JeuneForme {
+  developmentCurve?: number[];
+  potentielEstime?: [number, number];
   id: string;
   club: string;
   /** La saison où il sort du centre : il n'existe pas avant. */

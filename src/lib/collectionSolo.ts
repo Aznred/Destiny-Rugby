@@ -3,6 +3,10 @@ import type { SourceCarte } from './ligue/catalogueCarriere.js';
 import { packEvenementOuvert, preparerTirageSpecial, tirerSpeciale, type CatalogueSpecial } from './ligue/cartesSpeciales.js';
 import { packAvecSkin } from './presentationPacks.js';
 import { OVAS_PAR_CREDIT, prixCredits, prixLesDeux, prixOvas, type PrixArticle } from './monnaies.js';
+import { SOURCES_FFR_RETIREES } from '../data/protectionFfr.generated.js';
+
+const CLES_JEUNES_RETIREES = new Set(SOURCES_FFR_RETIREES.map(cle => cle.replace('.', '-')));
+export const cleSoloRetireeFfr = (cle: string): boolean => CLES_JEUNES_RETIREES.has(cle);
 
 export interface EtatCollectionSolo {
   /** Nombre d'exemplaires possedes, indexe par l'empreinte stable du joueur. */
@@ -172,10 +176,10 @@ export function normaliserCollectionSolo(valeur: unknown): EtatCollectionSolo {
   const quantites: Record<string, number> = {};
   if (brut.quantites && typeof brut.quantites === 'object' && !Array.isArray(brut.quantites)) {
     for (const [cle, nombre] of Object.entries(brut.quantites as Record<string, unknown>)) {
-      if (typeof nombre === 'number' && Number.isFinite(nombre) && nombre > 0) quantites[cle] = Math.floor(nombre);
+      if (!cleSoloRetireeFfr(cle) && typeof nombre === 'number' && Number.isFinite(nombre) && nombre > 0) quantites[cle] = Math.floor(nombre);
     }
   } else if (Array.isArray(brut.possedees)) {
-    for (const cle of brut.possedees) if (typeof cle === 'string') quantites[cle] = 1;
+    for (const cle of brut.possedees) if (typeof cle === 'string' && !cleSoloRetireeFfr(cle)) quantites[cle] = 1;
   }
   const packsOuverts: Record<string, number> = {};
   if (brut.packsOuverts && typeof brut.packsOuverts === 'object' && !Array.isArray(brut.packsOuverts)) {

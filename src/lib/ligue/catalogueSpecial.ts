@@ -10,6 +10,7 @@ import { POSTE_PAR_ID } from '../../data/rugby.js';
 import type { PosteId } from '../../types.js';
 import { catalogueAdmin, type CatalogueAdmin } from './atelierCatalogue.js';
 import { catalogueMondialCarriere } from './catalogueCarriere.js';
+import { sourceRetireeFfr } from './eligibiliteJoueurs.js';
 import {
   assemblerCatalogueSpecial, carteSpecialePubliee, chanceSpecialeParCarte, EVENEMENTS_DEPART, FAMILLES_SPECIALES,
   postesDepuisNumeros, slugSpecial, type CatalogueSpecial, type DefinitionCarteSpeciale, type EvenementSpecial,
@@ -73,8 +74,11 @@ export function catalogueSpecial(config: CatalogueAdmin = catalogueAdmin()): Cat
   for (const brut of bruts.values()) {
     if (supprimees.has(brut.id!) || CHAMPS_REQUIS.some(c => brut[c] === undefined || brut[c] === '')) continue;
     if (!POSTE_PAR_ID[brut.poste as PosteId]) continue;
+    if (sourceRetireeFfr(brut.id!) || (brut.basePlayerId && sourceRetireeFfr(brut.basePlayerId)) || (Number(brut.age)>0 && Number(brut.age)<18)) continue;
     const famille = FAMILLES_SPECIALES[brut.cardType!];
     const base = brut.basePlayerId ? mondial.get(brut.basePlayerId) : undefined;
+    // Une variante ne réintroduit pas une identité jeunesse exclue.
+    if(brut.basePlayerId && !base) continue;
     const def: DefinitionCarteSpeciale = {
       packWeight: 1, published: false, canBePacked: true, canAppearInCollection: true, canAppearOnMarket: true,
       rarityAnimation: 'mythique', retraite: !brut.basePlayerId,

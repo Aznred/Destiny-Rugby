@@ -1,5 +1,5 @@
 import type { CategorieEquipement } from '../data/boutique';
-import { normaliserCollectionSolo, type EtatCollectionSolo } from './collectionSolo.js';
+import { cleSoloRetireeFfr, normaliserCollectionSolo, type EtatCollectionSolo } from './collectionSolo.js';
 
 /** Tout ce qui appartient au compte, et non a une carriere particuliere. */
 /** Quand et comment un cosmétique est entré dans l'inventaire du compte. */
@@ -144,7 +144,7 @@ export function validerModificationsBoutiqueCompte(valeur: unknown): Modificatio
     if (!compteur(c.quantites, 100_000) || !compteur(c.packsOuverts, 500)
       || !Number.isSafeInteger(c.doublons) || Number(c.doublons) < 0
       || !Number.isSafeInteger(c.revision) || Number(c.revision) < 0) return null;
-    resultat.collectionSolo = { quantites: c.quantites as Record<string, number>, packsOuverts: c.packsOuverts as Record<string, number>,
+    resultat.collectionSolo = { quantites: Object.fromEntries(Object.entries(c.quantites as Record<string, number>).filter(([cle]) => !cleSoloRetireeFfr(cle))), packsOuverts: c.packsOuverts as Record<string, number>,
       doublons: Number(c.doublons), revision: Number(c.revision) };
   }
   return resultat;
