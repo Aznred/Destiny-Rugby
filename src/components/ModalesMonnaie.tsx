@@ -1,17 +1,15 @@
-// LES FENÊTRES D'ACHAT : choix de la monnaie, solde insuffisant, confirmation, recharge de Crédits (Correctif 21)
+// LES FENÊTRES D'ACHAT : choix de la monnaie, solde insuffisant, confirmation (Correctif 21)
 //
-// Montée UNE FOIS dans `App` ; pilotée par `lib/achatUi.ts` (`demanderPaiement`, `ouvrirRechargeCredits`).
-// ⚠️ UN SOLDE INSUFFISANT N'ACHÈTE RIEN : il ouvre une fenêtre qui dit combien il manque et propose la suite. ⚠️ Le seul endroit qui
-// ouvre un paiement réel est le bouton « Payer … » de la recharge, après une confirmation qui montre la somme en euros.
+// Montée UNE FOIS dans `App` ; pilotée par `lib/achatUi.ts` (`demanderPaiement`).
+// ⚠️ UN SOLDE INSUFFISANT N'ACHÈTE RIEN : il ouvre une fenêtre qui dit combien il manque et propose la suite. ⚠️ Aucune fenêtre
+// n'ouvre de paiement réel : le jeu ne vend plus rien, les Crédits ne s'achètent plus.
 
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useEffect, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import { useGame } from '../store/useGame';
 import { useModalDialog } from '../lib/useModalDialog';
-import { abonnerAchat, aller, annulerAchat, choisirDevise, confirmerAchat, fournirSoldes, lireEtatAchat, ouvrirRechargeCredits } from '../lib/achatUi';
-import { devisesAcceptees, montantEn, OFFRES_CREDITS, type Devise, type OffreCredits } from '../lib/monnaies';
-import { acheterCreditsStripe } from '../lib/carriereEnLigneClient';
-import { BUNDLES } from '../data/boutique';
+import { abonnerAchat, aller, annulerAchat, choisirDevise, confirmerAchat, fournirSoldes, lireEtatAchat } from '../lib/achatUi';
+import { devisesAcceptees, devisesProposees, montantEn, type Devise } from '../lib/monnaies';
 import { locale, nombre, t, texteTraduit } from '../lib/i18n';
 import { PieceOvas } from './PieceOvas';
 import { PieceCredits } from './PieceCredits';
@@ -41,19 +39,6 @@ function Fenetre() {
   const { overlayRef, dialogRef } = useModalDialog(annulerAchat);
   const d = e.demande;
   const soldes = { ovas, credits };
-  // Toutes les offres que Stripe sait facturer : les recharges et les bundles (même forme : identifiant, nom, crédits, prix).
-  const [offre, setOffre] = useState<OffreCredits | null>(() => [...OFFRES_CREDITS, ...BUNDLES].find((o) => o.id === e.offreId) ?? null);
-  const [occupe, setOccupe] = useState(false);
-  const [erreur, setErreur] = useState('');
-
-  const payer = async (o: OffreCredits) => {
-    if (occupe) return;
-    setOccupe(true); setErreur('');
-    try {
-      const r = await acheterCreditsStripe(o.id, crypto.randomUUID());
-      location.assign(r.url);
-    } catch (x) { setErreur(x instanceof Error ? x.message : t('mo.paiementIndispo')); setOccupe(false); }
-  };
 
   let contenu;
   if (e.etape === 'choix' && d) {
@@ -61,7 +46,7 @@ function Fenetre() {
       <h2>{t('mo.choisir')}</h2>
       <p className="mo-sous">{texteTraduit(d.titre)}</p>
       <div className="mo-choix">
-        {devisesAcceptees(d.prix).map((dev) => {
+        {devisesProposees(d.prix, soldes).map((dev) => {
           const m = montantEn(d.prix, dev)!;
           const manque = Math.max(0, m - soldes[dev]);
           return (
@@ -77,7 +62,8 @@ function Fenetre() {
   } else if (e.etape === 'insuffisant' && d && e.devise) {
     const m = montantEn(d.prix, e.devise)!;
     const manque = Math.max(0, m - soldes[e.devise]);
-    const autre: Devise | null = e.devise === 'ovas' && devisesAcceptees(d.prix).includes('credits') ? 'credits' : null;
+    const autre: Devise | null = e.devise === 'ovas' && devisesProposees(d.prix, soldes).includes('credits') ? 'credits' : null;
+    const enOvas = devisesAcceptees(d.prix).includes('ovas') ? montantEn(d.prix, 'ovas') : null;
     contenu = e.devise === 'ovas' ? (<>
       <div className="mo-icone"><Icone d="ovas" taille={64} /></div>
       <h2>{t('mo.pasAssezOvas')}</h2>
@@ -96,7 +82,7 @@ function Fenetre() {
         <div className="mo-manque"><dt>{t('mo.quantiteManquante')}</dt><dd><Montant n={manque} d="credits" /></dd></div>
       </dl>
       <div className="mo-actions">
-        <button type="button" className="btn primaire" onClick={() => aller('recharge')}><PieceCredits taille={18} /> {t('mo.acheterCredits')}</button>
+        {enOvas !== null && <button type="button" className="btn primaire" onClick={() => choisirDevise('ovas')}><PieceOvas taille={18} /> {nombre(enOvas)} Ovas</button>}
         <button type="button" className="btn fantome" onClick={annulerAchat}>{t('mo.fermer')}</button>
       </div>
     </>);
@@ -123,32 +109,6 @@ function Fenetre() {
       <div className="mo-pub"><CartePubRecompensee /></div>
       <div className="mo-actions"><button type="button" className="btn fantome" onClick={annulerAchat}>{t('mo.fermer')}</button></div>
     </>);
-  } else if (e.etape === 'recharge') {
-    contenu = offre ? (<>
-      <div className="mo-icone"><PieceCredits taille={72} variante="achat" /></div>
-      <h2>{t('mo.payerTitre')}</h2>
-      <p>{t('mo.payerTexte', { credits: nombre(offre.credits), prix: offre.prix })}</p>
-      <p className="mo-sous">{t('mo.payerAide')}</p>
-      {erreur && <p role="alert" className="mo-erreur">{erreur}</p>}
-      <div className="mo-actions">
-        <button type="button" className="btn primaire" disabled={occupe} onClick={() => void payer(offre)}>{occupe ? t('mo.ouverture') : t('mo.payer', { prix: offre.prix })}</button>
-        <button type="button" className="btn fantome" disabled={occupe} onClick={() => { setOffre(null); setErreur(''); }}>{t('mo.retour')}</button>
-      </div>
-    </>) : (<>
-      <h2>{t('mo.rechargeTitre')}</h2>
-      <p className="mo-sous">{t('mo.rechargeAide', { solde: nombre(credits) })}</p>
-      <div className="mo-recharges">
-        {OFFRES_CREDITS.map((o) => (
-          <button key={o.id} type="button" className={`mo-recharge${o.populaire ? ' populaire' : ''}`} onClick={() => setOffre(o)}>
-            <PieceCredits taille={34} variante="boutique" />
-            <b>{nombre(o.credits)}</b>
-            {o.bonus && <small>{o.bonus}</small>}
-            <span>{o.prix}</span>
-          </button>
-        ))}
-      </div>
-      <div className="mo-actions"><button type="button" className="btn fantome" onClick={annulerAchat}>{t('mo.fermer')}</button></div>
-    </>);
   }
   return createPortal(
     <div className="overlay mo-overlay" ref={overlayRef} onClick={annulerAchat}>
@@ -160,7 +120,3 @@ function Fenetre() {
   );
 }
 
-/** Le bouton « Acheter des Crédits » : ouvre la recharge directement. */
-export function BoutonAcheterCredits({ className = 'btn primaire petit' }: { className?: string }) {
-  return <button type="button" className={className} onClick={() => ouvrirRechargeCredits()}><PieceCredits taille={16} /> {t('mo.acheterCredits')}</button>;
-}

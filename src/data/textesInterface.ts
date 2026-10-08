@@ -974,15 +974,6 @@ export const TEXTES_INTERFACE: Record<string, Traduction> = {
     "pt": "Verificar novamente",
     "ja": "再確認"
   },
-  "ui.707bf51a6afa": {
-    "fr": "Paiement sécurisé par Stripe. Le contenu est ajouté au compte après confirmation du paiement.",
-    "en": "Secure payment via Stripe. Content is added to the account after payment confirmation.",
-    "es": "Pago seguro con Stripe. El contenido se añade a la cuenta después de la confirmación del pago.",
-    "it": "Pagamento sicuro tramite Stripe. Il contenuto viene aggiunto all'account dopo la conferma del pagamento.",
-    "de": "Sichere Zahlung über Stripe. Der Inhalt wird nach Zahlungseingang dem Konto hinzugefügt.",
-    "pt": "Pagamento seguro através do Stripe. O conteúdo é adicionado à conta após confirmação do pagamento.",
-    "ja": "Stripeによる安全な支払い。支払い確認後、コンテンツがアカウントに追加されます。"
-  },
   "ui.9a53354ffff4": {
     "fr": "Le plus choisi",
     "en": "Most chosen",

@@ -1,8 +1,17 @@
 import { classifierFfr } from './classification.js';
 import type { ProfilFfr } from './classification.js';
 export function editionProfil(p: ProfilFfr, edit: Record<string, unknown> = {}): ProfilFfr {
-  // Identity, sex, age and category cannot be changed through the publication editor.
+  // Identity, sex and category cannot be changed through the publication editor.
+  // Age can be corrected: it overrides raw.age and clears birth_date so classifierFfr uses the explicit value.
   const raw = { ...p.raw };
+  if (edit.age !== undefined) {
+    if (edit.age === null || edit.age === '') { raw.age = undefined; raw.birth_date = undefined; }
+    else {
+      const n = Number(edit.age);
+      if (!Number.isInteger(n) || n < 15 || n > 55) throw new Error('Âge invalide (entre 15 et 55).');
+      raw.age = n; raw.birth_date = undefined;
+    }
+  }
   for (const [field, max] of [['club',150],['competition',180],['position',40]] as const) {
     if (edit[field] !== undefined) {
       if (typeof edit[field] !== 'string' || !edit[field].trim() || edit[field].length>max) throw new Error('Champ invalide.');

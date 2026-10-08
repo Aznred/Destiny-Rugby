@@ -17,7 +17,7 @@ import { useBoutiqueLabo } from '../lib/boutiqueLabo';
 import { useModalDialog } from '../lib/useModalDialog';
 import { abonnerPerso, changerOngletPerso, fermerPersonnalisation, lireEtatPerso, viserDansLaBoutique, type OngletPerso } from '../lib/personnalisationUi';
 import { EQUIPEMENTS, SKINS, estEnVente, prixArticle, prixSkin, rubriqueDe } from '../data/boutique';
-import { devisesAcceptees, montantEn } from '../lib/monnaies';
+import { devisesProposees, montantEn } from '../lib/monnaies';
 import { apparenceDepuisMatch, apparencePourApercu, apparenceValide } from '../lib/apparenceJoueur';
 import { ApercuJoueur3D } from './ApercuJoueur3D';
 import { EditeurApparence } from './EditeurApparence';
@@ -180,6 +180,7 @@ function VideBoutique({ rubrique }: { rubrique: string }) {
 
 // ── À débloquer : ce qui n'est pas (encore) à soi ────────────────────────────────────────────────
 function OngletDebloquer() {
+  const credits = useGame((s) => s.credits);
   const equipements = useGame((s) => s.equipements);
   const inventaire = useGame((s) => s.inventaire);
   const setEcran = useGame((s) => s.setEcran);
@@ -197,7 +198,7 @@ function OngletDebloquer() {
               <span className="perso-cadenas" aria-hidden><Icone nom="verrou" taille={16} /></span>
               <MiniatureArticle a={a} /><b>{texteTraduit(a.nom)}</b><PastilleRarete rarete={a.rarete} />
               <small className="perso-prix">
-                {a.recompense ? texteTraduit(a.recompense) : a.parPub ? t('pub.gratuitPub') : devisesAcceptees(prix).map((d) => <span key={d} className="mo-montant"><IconeMonnaie d={d} taille={14} /> {nombre(montantEn(prix, d)!)}</span>)}
+                {a.recompense ? texteTraduit(a.recompense) : a.parPub ? t('pub.gratuitPub') : devisesProposees(prix, { ovas: 0, credits }).map((d) => <span key={d} className="mo-montant"><IconeMonnaie d={d} taille={14} /> {nombre(montantEn(prix, d)!)}</span>)}
               </small>
               <button type="button" className="btn fantome petit" onClick={() => aller(rubriqueDe(a), a.id)}>{t('perso.voirBoutique')}</button>
             </div>
@@ -209,7 +210,7 @@ function OngletDebloquer() {
             <div key={s.id} className="perso-carte verrouille">
               <span className="perso-cadenas" aria-hidden><Icone nom="verrou" taille={16} /></span>
               <span className="pastille-couleur" style={{ background: `linear-gradient(135deg, ${s.corps}, ${s.bande})` }} /><b>{texteTraduit(s.nom)}</b>
-              <small className="perso-prix">{devisesAcceptees(prix).map((d) => <span key={d} className="mo-montant"><IconeMonnaie d={d} taille={14} /> {nombre(montantEn(prix, d)!)}</span>)}</small>
+              <small className="perso-prix">{devisesProposees(prix, { ovas: 0, credits }).map((d) => <span key={d} className="mo-montant"><IconeMonnaie d={d} taille={14} /> {nombre(montantEn(prix, d)!)}</span>)}</small>
               <button type="button" className="btn fantome petit" onClick={() => aller('ballons', s.id)}>{t('perso.voirBoutique')}</button>
             </div>
           );

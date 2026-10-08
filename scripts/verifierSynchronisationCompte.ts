@@ -92,7 +92,7 @@ try {
   assert.equal(ecritures, 5, 'La collection volumineuse ne provoque pas de boucle après son accusé.');
   assert.equal(coffre.collectionSolo.quantites['joueur:1-abcdefgh'], 2, 'Les cartes non envoyées sont conservées.');
 
-  // Un crédit Stripe arrivant pendant un POST doit s'ajouter au gain local.
+  // Un crédit du serveur arrivant pendant un POST doit s'ajouter au gain local.
   useGame.setState(s => ({ coins: s.coins + 1 }));
   await attendreEcritures(6);
   const montantEnvoye = coffre.ovas;

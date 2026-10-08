@@ -192,8 +192,7 @@ moyen honnête de réserver un nom à quelqu'un.
    figée sur son dernier score.
 
 Les deux se règleront d'un coup le jour où le jeu aura des comptes : c'est la
-même brique que celle décrite dans `serveur/PAIEMENTS.md`, et pour la même
-raison.
+même brique.
 
 ---
 

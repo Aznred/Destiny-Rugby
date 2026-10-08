@@ -36,7 +36,7 @@ export function AtelierKiri() {
   const sauver=async(operation:'pack'|'joueur')=>{
     if(!donnees)return;setOccupe(true);setErreur('');setMessage('');
     try {
-      const retour=await requete(q,{action:'atelier',operation,revision:(operation==='pack'?revisionPack:revisionJoueur)??donnees.revision,...(operation==='pack'?{pack}:{sourceId:joueur?.sourceId,joueur:{note:joueur?.note,potentiel:joueur?.potentiel,photo:joueur?.photo,nation:joueur?.nation,clubReel:joueur?.clubReel,poste:joueur?.poste,postesSecondaires:joueur?.postesSecondaires??[]}})});
+      const retour=await requete(q,{action:'atelier',operation,revision:(operation==='pack'?revisionPack:revisionJoueur)??donnees.revision,...(operation==='pack'?{pack}:{sourceId:joueur?.sourceId,joueur:{note:joueur?.note,potentiel:joueur?.potentiel,age:joueur?.age,photo:joueur?.photo,nation:joueur?.nation,clubReel:joueur?.clubReel,poste:joueur?.poste,postesSecondaires:joueur?.postesSecondaires??[]}})});
       if(operation==='pack')setRevisionPack(retour.revision);else setRevisionJoueur(retour.revision);
       setDonnees(d=>d?{...d,revision:retour.revision}:d);setActualisation(n=>n+1);
       setMessage(t("ui.615a7b4e50c5"));
@@ -142,6 +142,15 @@ export function AtelierKiri() {
                         max={99}
                         value={joueur.potentiel}
                         onChange={(e) => setJoueur({ ...joueur, potentiel: Number(e.target.value) })}
+                      />
+                    </label>
+                    <label>Âge<input
+                        required
+                        type="number"
+                        min={16}
+                        max={50}
+                        value={joueur.age}
+                        onChange={(e) => setJoueur({ ...joueur, age: Number(e.target.value) })}
                       />
                     </label>
                   </div>

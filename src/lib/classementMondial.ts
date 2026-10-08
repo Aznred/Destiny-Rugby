@@ -116,7 +116,7 @@ export interface FicheCarriere {
    *
    * ⚠️ ELLE N'IDENTIFIE PAS UNE PERSONNE, mais une INSTALLATION du jeu : elle
    * est tirée au hasard une fois et rangée dans la sauvegarde. Le jeu n'a aucun
-   * compte utilisateur (voir `serveur/PAIEMENTS.md`), donc il n'y a rien de
+   * compte utilisateur, donc il n'y a rien de
    * plus stable à quoi se raccrocher. Conséquences assumées : deux appareils
    * font deux lignes, et une sauvegarde effacée repart sur une nouvelle ligne.
    *

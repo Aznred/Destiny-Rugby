@@ -1,5 +1,8 @@
 # 💶 Gagner de l'argent avec Destiny Rugby
 
+> ⚠️ **Périmé depuis le 8 octobre 2026.** Le jeu ne vend plus rien contre de l'argent réel : Stripe, les recharges et les
+> bundles ont été retirés. Ce document est gardé comme archive d'idées, pas comme description du jeu.
+
 Ce document répond à une demande précise : « donne des idées pour pouvoir faire
 de l'argent avec le jeu ». Il dit **ce qui est déjà branché**, **ce qu'il reste
 à faire pour encaisser**, et **ce qu'il ne faut surtout pas faire** — parce que

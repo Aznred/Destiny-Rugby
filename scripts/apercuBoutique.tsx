@@ -1,5 +1,4 @@
 // La boutique (Correctif 21) SANS toucher à la sauvegarde. /scripts/apercuBoutique.html?ovas=300&credits=80&langue=fr
-// Le paiement Stripe n'existe pas en aperçu : le bouton « Payer » échouera proprement (aucun achat réel n'est possible ici).
 import { createRoot } from 'react-dom/client';
 import '../src/index.css';
 import '../src/App.css';

@@ -243,6 +243,7 @@ export async function enregistrerAtelier(stockage: StockageAtelier, corps: Recor
     const edition: EditionJoueur = {
       note: entier(j.note, 20, 99),
       potentiel: entier(j.potentiel, 20, 99),
+      ...(j.age !== undefined ? { age: entier(j.age, 16, 50) } : {}),
       photo: validerPhoto(j.photo),
       nation,
       clubReel: club.clubReel,

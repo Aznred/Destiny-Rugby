@@ -19,7 +19,6 @@ import type { OffreSolo } from '../src/lib/echangesSolo.js';
 import { modifierCollectionSolo, possedeDoublons } from '../src/lib/echangesSolo.js';
 
 interface BaseLocale {
-  achatsStripe?: Record<string, string>;
   atelier?: CatalogueAdmin;
   imagesSpeciales?: Record<string, ImageSpeciale>;
   push?: BasePush;
@@ -55,7 +54,6 @@ export function stockageFichier(fichier: string): StockageCarriere {
   base.push ??= { abonnements: [], envois: {} };
   base.boutiques ??= {};
   base.offresSolo ??= [];
-  base.achatsStripe ??= {};
   base.salonsAmicaux ??= [];
   base.marches ??= {};
   base.usage ??= { lignes: [], compteurs: [] };
@@ -234,22 +232,6 @@ export function stockageFichier(fichier: string): StockageCarriere {
       sauver();
     },
     async fermerSession(e) { delete base.sessions[e]; sauver(); },
-    async achatCredite(session, compte) { return base.achatsStripe![session] === compte; },
-    async crediterAchat(session, compte, recompenses) {
-      if (base.achatsStripe![session]) return;
-      const boutique = base.boutiques![compte];
-      if (!boutique) throw new Error('Boutique introuvable.');
-      const reunir = (a: string[] | undefined, b: string[]) => [...new Set([...(a ?? []), ...b])];
-      boutique.credits = (boutique.credits ?? 0) + recompenses.credits;
-      boutique.achatsCredits = (boutique.achatsCredits ?? 0) + recompenses.credits;
-      boutique.inventaire = reunir(boutique.inventaire, recompenses.inventaire);
-      boutique.equipements = reunir(boutique.equipements, recompenses.equipements);
-      boutique.traitsDebloques = reunir(boutique.traitsDebloques, recompenses.traitsDebloques);
-      boutique.achatsInventaire = reunir(boutique.achatsInventaire, recompenses.inventaire);
-      boutique.achatsEquipements = reunir(boutique.achatsEquipements, recompenses.equipements);
-      boutique.achatsTraits = reunir(boutique.achatsTraits, recompenses.traitsDebloques);
-      base.achatsStripe![session] = compte; sauver();
-    },
     async boutique(compte) { return base.boutiques?.[compte] ? copie(base.boutiques[compte]) : null; },
     async ajouterPackSolo(compte, pack, cartes) {
       const boutique = base.boutiques![compte];

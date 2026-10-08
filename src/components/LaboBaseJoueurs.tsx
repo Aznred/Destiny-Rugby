@@ -24,7 +24,7 @@ export function LaboBaseJoueurs(){
         .then(p=>{setPage(p);setError('');}).catch(e=>{if(!abort.signal.aborted)setError(e.message);});
     },250);return()=>{clearTimeout(timer);abort.abort();};
   },[q,gender,filter,after,revision]);
-  const choose=(p:Profile)=>{setSelected(p);setEdit({position:p.primary_position??'',club:p.club??'',competition:p.competition??'',overall:p.overall,potential:p.potential,photo:p.photo??''});};
+  const choose=(p:Profile)=>{setSelected(p);setEdit({position:p.primary_position??'',club:p.club??'',competition:p.competition??'',overall:p.overall,potential:p.potential,age:p.age??'',photo:p.photo??''});};
   const decide=async(decision:'APPROVE'|'REJECT'|'EDIT')=>{
     if(!selected)return;setBusy(true);setError('');
     try{
@@ -37,7 +37,7 @@ export function LaboBaseJoueurs(){
   let preview:CarteCarriere|null=null;
   if(selected?.senior_status==='senior'&&edit.position&&POSTE_PAR_ID[String(edit.position) as CarteCarriere['poste']]&&Number(edit.overall)>0){
     const poste=String(edit.position) as CarteCarriere['poste'],famille=POSTE_PAR_ID[poste].famille,note=Number(edit.overall);
-    preview={id:'preview',sourceId:selected.id,nom:selected.name,poste,famille,postesSecondaires:selected.secondary_positions,note,potentiel:Number(edit.potential??note),age:selected.age??25,
+    preview={id:'preview',sourceId:selected.id,nom:selected.name,poste,famille,postesSecondaires:selected.secondary_positions,note,potentiel:Number(edit.potential??note),age:Number(edit.age)||selected.age||25,
       nation:selected.countryId==='FR'?'France':selected.countryId,clubReel:String(edit.club??''),championnat:String(edit.competition??''),pays:selected.countryId,
       photo:typeof edit.photo==='string'?edit.photo:undefined,origine:'ffr',rarete:rareteCarriere(note),statistiques:statistiquesCarte(note,famille,selected.id),
       proprietaire:null,fatigue:0,matchs:0,essais:0,clubs:[],gender:selected.gender==='female'?'female':'male'};
@@ -56,7 +56,7 @@ export function LaboBaseJoueurs(){
       {selected.usage==='YOUTH_REGEN_SOURCE'?<p>Cette source alimente uniquement les statistiques de formation. Son identité et sa photo ne sont pas utilisées dans les regens.</p>:<fieldset disabled={busy}>
         <label>Poste<select value={String(edit.position??'')} onChange={e=>setEdit(v=>({...v,position:e.target.value}))}><option value="">À vérifier</option>{POSTES.map(p=><option key={p.id} value={p.id}>{p.nom}</option>)}</select></label>
         {(['club','competition','photo'] as const).map(key=><label key={key}>{key==='club'?'Club':key==='photo'?'Photo autorisée':'Compétition'}<input value={String(edit[key]??'')} onChange={e=>setEdit(v=>({...v,[key]:e.target.value}))}/></label>)}
-        {(['overall','potential'] as const).map(key=><label key={key}>{key==='overall'?'GEN':'POT'}<input type="number" min={1} max={99} value={edit[key]===null?'':String(edit[key]??'')} onChange={e=>setEdit(v=>({...v,[key]:e.target.value?Number(e.target.value):null}))}/></label>)}
+        {(['overall','potential','age'] as const).map(key=><label key={key}>{key==='overall'?'GEN':key==='potential'?'POT':'Âge'}<input type="number" min={key==='age'?15:1} max={99} value={edit[key]===null?'':String(edit[key]??'')} onChange={e=>setEdit(v=>({...v,[key]:e.target.value?Number(e.target.value):null}))}/></label>)}
         {selected.duplicate&&<label><input type="checkbox" checked={edit.duplicateResolution==='DISTINCT'} onChange={e=>setEdit(v=>({...v,duplicateResolution:e.target.checked?'DISTINCT':undefined}))}/>Identité distincte vérifiée</label>}
         {edit.duplicateResolution==='DISTINCT'&&<label>Preuves<input minLength={12} value={String(edit.duplicateEvidence??'')} onChange={e=>setEdit(v=>({...v,duplicateEvidence:e.target.value}))}/></label>}
         <button onClick={()=>void decide('EDIT')}>Enregistrer</button><button disabled={selected.card_status!=='ACTIVE_CARD'||selected.duplicate} onClick={()=>void decide('APPROVE')}>Approuver</button><button onClick={()=>void decide('REJECT')}>Rejeter</button>

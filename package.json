@@ -130,7 +130,6 @@
     "verify:mobile-carriere": "vite-node scripts/verifierCorrectifsMobile.ts",
     "verify:traductions": "vite-node scripts/verifierTraductions.ts",
     "audit:traductions": "vite-node scripts/auditerTraductions.ts",
-    "verify:paiements": "vite-node scripts/verifierPaiementsStripe.ts",
     "mesure:endurance": "vite-node scripts/mesurerEndurance.ts",
     "verify:conquete": "vite-node scripts/verifierConquete.ts",
     "verify:animations": "vite-node scripts/verifierAnimations30.ts",
@@ -153,7 +152,6 @@
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-youtube": "^10.1.0",
-    "stripe": "^22.6.2",
     "three": "0.182.0",
     "web-push": "^3.6.7",
     "zustand": "^5.0.14"

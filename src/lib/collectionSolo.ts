@@ -2,7 +2,7 @@ import type { PackCarriere, RareteCarriere } from './ligue/typesCarriere.js';
 import type { SourceCarte } from './ligue/catalogueCarriere.js';
 import { packEvenementOuvert, preparerTirageSpecial, tirerSpeciale, type CatalogueSpecial } from './ligue/cartesSpeciales.js';
 import { packAvecSkin } from './presentationPacks.js';
-import { OVAS_PAR_CREDIT, prixCredits, prixLesDeux, prixOvas, type PrixArticle } from './monnaies.js';
+import { OVAS_PAR_CREDIT, prixLesDeux, prixOvas, type PrixArticle } from './monnaies.js';
 import { SOURCES_FFR_RETIREES } from '../data/protectionFfr.generated.js';
 
 const CLES_JEUNES_RETIREES = new Set(SOURCES_FFR_RETIREES.map(cle => cle.replace('.', '-')));
@@ -108,7 +108,7 @@ export function prixPackSoloArticle(pack: Pick<PackCarriere, 'id' | 'prix' | 'mo
   const mode = pack.monnaie ?? 'OVAS_OR_CREDITS';
   const credits = pack.prixCredits ?? Math.max(1, Math.round(pack.prix / OVAS_PAR_CREDIT));
   if (mode === 'OVAS') return prixOvas(pack.prix);
-  if (mode === 'CREDITS') return prixCredits(credits);
+  // Un pack réglé « Crédits seulement » dans le Labo s'ouvre aussi en Ovas : plus rien n'exige la monnaie payante.
   return prixLesDeux(pack.prix, credits);
 }
 

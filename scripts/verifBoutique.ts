@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { useGame } from '../src/store/useGame';
 import { EQUIPEMENTS, EQUIPEMENT_PAR_ID, RUBRIQUES, SKINS, prixArticle, prixSkin, estEnVente, rubriqueDe, enregistrerArticlesLabo } from '../src/data/boutique';
 import { KITS_BOUTIQUE } from '../src/data/kitsBoutique';
-import { devisesAcceptees, manque, montantEn, prixValide, prixCredits, prixLesDeux, prixOvas, devisePreferee, estGratuit } from '../src/lib/monnaies';
+import { devisesAcceptees, devisesProposees, manque, montantEn, prixValide, prixCredits, prixLesDeux, prixOvas, devisePreferee, estGratuit } from '../src/lib/monnaies';
 import { kitDeMonEquipe, maillotDepuisKit } from '../src/lib/personnalisationMatch';
 import { appliquerModificationsBoutiqueCompte, differencesBoutiqueCompte, validerEtatBoutiqueCompte, validerModificationsBoutiqueCompte, type EtatBoutiqueCompte } from '../src/lib/boutiqueCompte';
 import { validerArticleLabo } from '../serveur/atelierAdmin';
@@ -19,7 +19,11 @@ const remise = (p: Partial<ReturnType<typeof etat>> = {}) => useGame.setState({ 
 
 // ── 1. Les prix : trois modes, jamais de monnaie absente ─────────────────────────────────────────
 egal(devisesAcceptees(prixOvas(10)), ['ovas'], 'OVAS seulement');
-egal(devisesAcceptees(prixCredits(10)), ['credits'], 'CREDITS seulement');
+egal(devisesAcceptees(prixCredits(10)), ['ovas', 'credits'], 'un ancien prix « Crédits seulement » s’achète aussi en Ovas');
+ok(montantEn(prixCredits(10), 'ovas') === 50, 'son prix en Ovas se déduit au taux de 5');
+ok(prixValide({ mode: 'CREDITS', credits: 10 })?.ovas === 50, 'un article du Labo réglé en Crédits seulement reste achetable en Ovas');
+egal(devisesProposees(prixLesDeux(100), { ovas: 0, credits: 0 }), ['ovas'], 'sans Crédits, la boutique ne propose que les Ovas');
+egal(devisesProposees(prixLesDeux(100), { ovas: 0, credits: 3 }), ['ovas', 'credits'], 'un solde de Crédits restant reste dépensable');
 egal(devisesAcceptees(prixLesDeux(100)), ['ovas', 'credits'], 'les deux, Ovas d’abord');
 ok(montantEn(prixLesDeux(100), 'credits') === 20, 'le prix en Crédits se déduit au taux de 5 Ovas');
 ok(montantEn(prixOvas(10), 'credits') === null, 'une monnaie non acceptée n’a pas de montant');
@@ -33,7 +37,7 @@ ok(prixValide({ mode: 'OVAS_OR_CREDITS', ovas: 5, credits: 1 }) !== null, 'prix 
 // ── 2. Le catalogue ──────────────────────────────────────────────────────────────────────────────
 ok(EQUIPEMENTS.every((a) => devisesAcceptees(prixArticle(a)).length > 0), 'tout article a une monnaie');
 ok(SKINS.every((s) => devisesAcceptees(prixSkin(s)).length > 0), 'tout ballon a une monnaie');
-ok(EQUIPEMENTS.some((a) => prixArticle(a).mode === 'OVAS' && a.prix > 0) && EQUIPEMENTS.some((a) => prixArticle(a).mode === 'CREDITS') && EQUIPEMENTS.some((a) => prixArticle(a).mode === 'OVAS_OR_CREDITS'), 'les trois familles de prix existent');
+ok(EQUIPEMENTS.every((a) => devisesAcceptees(prixArticle(a)).includes('ovas')) && SKINS.every((s) => devisesAcceptees(prixSkin(s)).includes('ovas')), 'plus aucun article n’exige des Crédits : tout s’achète en Ovas');
 ok(!EQUIPEMENTS.some((a) => (a.categorie as string) === 'stade') && RUBRIQUES.every((r) => !['stades', 'evenement'].includes(r.id)), 'ni stades ni événements dans la boutique');
 ok(KITS_BOUTIQUE.length >= 8 && KITS_BOUTIQUE.every((k) => EQUIPEMENT_PAR_ID[k.id]?.glb === '/m3d/maillot.glb'), 'les nouveaux kits utilisent le modèle 3D du maillot du jeu, jamais un nouveau maillage');
 ok(EQUIPEMENTS.filter((a) => a.categorie === 'maillot').every((a) => a.kit && a.glb.endsWith('.glb')), 'chaque maillot porte un kit ET son modèle 3D');
@@ -44,7 +48,7 @@ ok(!estEnVente(EQUIPEMENT_PAR_ID['maillot-vannes']), 'un article par pub n’est
 // ── 3. Acheter ───────────────────────────────────────────────────────────────────────────────────
 remise({ coins: 50, credits: 10 });
 let r = etat().acheterCosmetique('crampons-or', 'ovas');
-ok(!r.ok && r.raison === 'devise', 'des crampons en Crédits seulement ne s’achètent pas en Ovas');
+ok(!r.ok && r.raison === 'solde' && r.devise === 'ovas', 'les anciens crampons « Crédits seulement » s’achètent désormais en Ovas (ici : solde insuffisant)');
 r = etat().acheterCosmetique('crampons-or', 'credits');
 ok(!r.ok && r.raison === 'solde' && r.manque === 58, 'Crédits insuffisants : il manque la bonne quantité (68 − 10)');
 ok(etat().credits === 10 && etat().coins === 50 && etat().equipements.length === 0, 'un achat refusé ne débite rien');
@@ -126,20 +130,18 @@ fournirSoldes(() => soldes);
 async function attendre<T>(p: Promise<T>, f: () => void): Promise<T> { await new Promise((r) => setTimeout(r, 20)); f(); return p; }
 soldes = { ovas: 500, credits: 0 };
 ok((await demanderPaiement({ titre: 'x', prix: prixOvas(100) })) === 'ovas' && lireEtatAchat().etape === null, 'assez d’Ovas : aucune fenêtre');
-soldes = { ovas: 10, credits: 0 };
+soldes = { ovas: 10, credits: 5 };
 let p = demanderPaiement({ titre: 'Pack', prix: prixLesDeux(100) });
 await new Promise((r) => setTimeout(r, 20));
 ok(lireEtatAchat().etape === 'choix', 'deux monnaies : le joueur CHOISIT');
 choisirDevise('ovas');
 ok(lireEtatAchat().etape === 'insuffisant' && lireEtatAchat().devise === 'ovas', 'Ovas insuffisants : une vraie fenêtre, pas un message');
 choisirDevise('credits');
-ok(lireEtatAchat().etape === 'insuffisant' && lireEtatAchat().devise === 'credits', 'Crédits insuffisants aussi (proposera la recharge)');
-aller('recharge');
-ok(lireEtatAchat().etape === 'recharge', 'la recharge s’ouvre directement, sans changer de menu');
+ok(lireEtatAchat().etape === 'insuffisant' && lireEtatAchat().devise === 'credits', 'Crédits insuffisants aussi (aucune recharge : le jeu ne vend rien)');
 annulerAchat();
 ok((await p) === null && lireEtatAchat().etape === null, 'renoncer ne débite et n’achète rien');
 soldes = { ovas: 0, credits: 100 };
-p = demanderPaiement({ titre: 'Stade', prix: prixCredits(40) });
+p = demanderPaiement({ titre: 'Stade', prix: prixCredits(40), devise: 'credits' });
 await new Promise((r) => setTimeout(r, 20));
 ok(lireEtatAchat().etape === 'confirmation', 'dépenser des Crédits demande TOUJOURS une confirmation');
 soldes = { ovas: 0, credits: 10 };
@@ -147,13 +149,13 @@ confirmerAchat();
 ok(lireEtatAchat().etape === 'insuffisant', 'si le solde a baissé pendant la fenêtre, on ne confirme pas');
 annulerAchat(); await p;
 soldes = { ovas: 0, credits: 100 };
-p = demanderPaiement({ titre: 'Stade', prix: prixCredits(40) });
+p = demanderPaiement({ titre: 'Stade', prix: prixCredits(40), devise: 'credits' });
 ok((await attendre(p, () => confirmerAchat())) === 'credits', 'confirmé : on rend la monnaie à débiter');
 
 // ── 9. Les packs de la collection solo ───────────────────────────────────────────────────────────
 ok(devisesAcceptees(prixPackSoloArticle({ id: 'top14', prix: 210, monnaie: undefined, prixCredits: undefined })).join() === 'ovas,credits', 'un pack payant accepte les deux monnaies par défaut');
 ok(montantEn(prixPackSoloArticle({ id: 'top14', prix: 210 }), 'credits') === 42, 'prix en Crédits déduit : 210 Ovas → 42');
-ok(montantEn(prixPackSoloArticle({ id: 'x', prix: 100, monnaie: 'CREDITS', prixCredits: 33 }), 'credits') === 33 && montantEn(prixPackSoloArticle({ id: 'x', prix: 100, monnaie: 'CREDITS', prixCredits: 33 }), 'ovas') === null, 'un pack d’événement peut exiger des Crédits seulement (réglé dans le Labo)');
+ok(montantEn(prixPackSoloArticle({ id: 'x', prix: 100, monnaie: 'CREDITS', prixCredits: 33 }), 'credits') === 33 && montantEn(prixPackSoloArticle({ id: 'x', prix: 100, monnaie: 'CREDITS', prixCredits: 33 }), 'ovas') === 100, 'un pack réglé « Crédits seulement » dans le Labo s’ouvre aussi en Ovas');
 remise({ coins: 100, credits: 50 });
 const tirage = (e: ReturnType<typeof etatCollectionSoloVide>) => ({ etat: { ...e, doublons: e.doublons + 1 }, indices: [0], nouvelles: 1 });
 ok(etat().acheterPackCollectionSolo(30, tirage as never, 'credits') !== null && etat().credits === 20 && etat().coins === 100, 'un pack payé en Crédits ne touche pas aux Ovas');

@@ -20,7 +20,7 @@
 //
 // ⚠️ Le chiffre exact est MESURÉ, pas estimé :
 //   npx vite-node scripts/verifEconomie.ts
-import { devisesAcceptees, prixCredits, prixLesDeux, prixOvas, prixValide, type PrixArticle } from '../lib/monnaies';
+import { devisesAcceptees, prixLesDeux, prixOvas, prixValide, type PrixArticle } from '../lib/monnaies';
 import { KITS_BOUTIQUE, KITS_EXISTANTS, type KitDef } from './kitsBoutique';
 
 export interface SkinBallon {
@@ -284,58 +284,22 @@ export const CATEGORIES_EQUIPEMENT: { id: CategorieEquipement; cle: string; emoj
 // des ballons — du cosmétique, et rien qui touche à la progression.
 // Ne pas les réintroduire sans relancer `npx vite-node scripts/verifDifficulte.ts`.
 
-// ═══ LES RECHARGES SONT DES RECHARGES DE CRÉDITS (Correctif 21) ═══════════════════════════════════════
-// Plus aucune offre n'achète d'Ovas avec de l'argent réel : l'argent achète des CRÉDITS, la monnaie premium (voir
-// `lib/monnaies.ts`). Les mêmes identifiants, quantités et montants vivent côté serveur dans `serveur/paiementsStripe.ts` :
-// le serveur reste l'autorité au moment de facturer et de créditer le compte.
-export interface PackCredits {
-  id: string;
-  nom: string;
-  credits: number;
-  prix: string;
-  bonus?: string;
-  populaire?: boolean;
-  ballons?: string[];
-  equipements?: string[];
-  traits?: string[];
-}
-
-export { OFFRES_CREDITS as PACKS } from '../lib/monnaies';
-
-/** Produits séparés des recharges : leur prix paie un contenu précis, plus un complément de Crédits. */
-export const BUNDLES: PackCredits[] = [
-  { id: 'b1', nom: 'Vestiaire', credits: 200, prix: '4,99 €', ballons: ['tricolore'], equipements: ['crampons-cuir', 'maillot-bleu'] },
-  { id: 'b2', nom: 'Archétypes', credits: 500, prix: '9,99 €', traits: ['roc', 'cerveau', 'discipline', 'chouchou', 'cadre', 'zen'] },
-  { id: 'b3', nom: 'Club', credits: 1000, prix: '19,99 €', populaire: true, ballons: ['ocean', 'or'], equipements: ['maillot-toulousain', 'crampons-dupont', 'casque-or'], traits: ['precoce', 'tete_brulee', 'cadre', 'cerveau'] },
-  {
-    id: 'b4', nom: 'Légende', credits: 3000, prix: '49,99 €',
-    ballons: ['tricolore', 'cuir', 'ocean', 'or'],
-    equipements: ['crampons-or', 'crampons-dupont', 'maillot-legende', 'casque-or', 'maillot-toulousain'],
-    traits: ['roc', 'cerveau', 'discipline', 'chouchou', 'tete_brulee', 'cadre', 'precoce', 'vieux_lion', 'electron', 'muraille', 'zen', 'increvable'],
-  },
-];
-
 // ═══ LES PRIX PAR MONNAIE ═════════════════════════════════════════════════════════════════════════
-// Trois familles, et elles se lisent d'un coup d'œil dans la boutique :
-//   • OVAS SEULEMENT   : l'entrée de gamme, accessible en jouant, sans jamais toucher d'argent réel ;
-//   • LES DEUX         : au choix — des Ovas gagnés, ou des Crédits pour aller plus vite ;
-//   • CRÉDITS SEULEMENT: les pièces premium (or, légendes).
+// ⚠️ PLUS RIEN NE SE VEND CONTRE DE L'ARGENT RÉEL : tout article en vente a un prix en Ovas. Les Crédits déjà acquis
+// restent dépensables sur les articles qui les acceptaient.
 // Les articles « par pub » restent gratuits (`prix: 0`), et un article `recompense` n'est jamais en vente.
 const OVAS_SEULEMENT = new Set(['crampons-cuir', 'casque', 'maillot-bleu', 'sac', 'bouclier']);
-const CREDITS_SEULEMENT = new Set(['crampons-or', 'casque-or', 'maillot-legende']);
 
 /** Le prix d'un article, par monnaie. */
 export function prixArticle(a: ArticleEquipement): PrixArticle {
   if (a.prixDef) return a.prixDef;
   if (a.parPub || a.prix === 0 || OVAS_SEULEMENT.has(a.id)) return prixOvas(a.prix);
-  if (CREDITS_SEULEMENT.has(a.id)) return prixCredits(Math.max(1, Math.round(a.prix / 5)));
   return prixLesDeux(a.prix);
 }
 
 /** Le prix d'un ballon. */
 export function prixSkin(s: SkinBallon): PrixArticle {
   if (s.prix === 0 || s.id === 'tricolore') return prixOvas(s.prix);
-  if (s.id === 'or') return prixCredits(Math.max(1, Math.round(s.prix / 5)));
   return prixLesDeux(s.prix);
 }
 

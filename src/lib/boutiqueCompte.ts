@@ -17,7 +17,7 @@ export interface EtatBoutiqueCompte {
   achatsCredits?: number;
   /** Date et source de chaque cosmétique possédé (la liste des identifiants reste `equipements`, `inventaire`). */
   cosmetiquesMeta?: Record<string, MetaCosmetique>;
-  /** Récompenses Stripe conservées même si une ancienne sauvegarde locale revient. */
+  /** Récompenses créditées par le serveur (anciens achats) conservées même si une ancienne sauvegarde locale revient. */
   achatsInventaire?: string[];
   achatsEquipements?: string[];
   achatsTraits?: string[];

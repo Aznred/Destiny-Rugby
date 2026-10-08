@@ -6,6 +6,7 @@ import type { PackCarriere } from './typesCarriere.js';
 export interface EditionJoueur {
   note: number;
   potentiel: number;
+  age?: number;
   photo?: string;
   nation?: string;
   clubReel?: string;

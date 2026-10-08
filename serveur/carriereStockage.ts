@@ -18,17 +18,6 @@ export interface CompteStocke {
   creeLe?: string; vuLe?: string;
 }
 
-/**
- * Ce qu'un paiement Stripe crédite. ⚠️ Depuis le Correctif 21 l'argent réel achète des CRÉDITS, plus des Ovas. La colonne historique
- * `achats_stripe.ovas` garde le montant crédité (Ovas avant le Correctif 21, Crédits ensuite) : elle ne sert qu'à l'idempotence
- * d'une session, et aucune migration n'est nécessaire.
- */
-export interface RecompensesAchat {
-  credits: number;
-  inventaire: string[];
-  equipements: string[];
-  traitsDebloques: string[];
-}
 export interface LigueStockee { id: string; code: string; version: number; comptes: string[]; etat: EtatCarriereEnLigne; echeance?: number | null }
 export interface ResumeDivisionPublique { id: string; code: string; division: number; comptes: string[]; nombreClubs: number; phase: string; finLe?: string }
 export interface PresenceMatchStockee { match: string; compte: string; vu: number }
@@ -88,8 +77,6 @@ export interface StockageCarriere {
   session(empreinte: string, maintenant: number, toucher?: boolean): Promise<CompteStocke | null>;
   ouvrirSession(empreinte: string, compte: string, expiration: number): Promise<void>;
   fermerSession(empreinte: string): Promise<void>;
-  achatCredite?(session: string, compte: string): Promise<boolean>;
-  crediterAchat?(session: string, compte: string, recompenses: RecompensesAchat): Promise<void>;
   boutique(compte: string): Promise<EtatBoutiqueCompte | null>;
   /** Ajoute un pack tiré par le serveur sans écraser un échange ou une autre ouverture. */
   ajouterPackSolo?(compte: string, pack: string, cartes: Record<string, number>): Promise<EtatBoutiqueCompte | null>;
@@ -440,28 +427,6 @@ export function stockageNeon(url: string): StockageCarriere {
       ) update comptes set vu_le=now() where id=${compte}`;
     },
     async fermerSession(empreinte) { await sql`delete from sessions where empreinte=${empreinte}`; },
-    async achatCredite(session, compte) {
-      const lignes = await sql`select 1 from achats_stripe where session=${session} and compte=${compte}`;
-      return lignes.length > 0;
-    },
-    async crediterAchat(session, compte, recompenses) {
-      const inventaire = JSON.stringify(recompenses.inventaire);
-      const equipements = JSON.stringify(recompenses.equipements);
-      const traits = JSON.stringify(recompenses.traitsDebloques);
-      await sql`with achat as (
-        insert into achats_stripe(session,compte,ovas) values (${session},${compte},${recompenses.credits})
-        on conflict (session) do nothing returning ovas
-      ) update compte_boutique set donnees = donnees || jsonb_build_object(
-        'credits', coalesce((donnees->>'credits')::bigint,0) + (select ovas from achat),
-        'achatsCredits', coalesce((donnees->>'achatsCredits')::bigint,0) + (select ovas from achat),
-        'inventaire', to_jsonb(array(select distinct valeur from jsonb_array_elements_text(coalesce(donnees->'inventaire','[]'::jsonb) || ${inventaire}::jsonb) as elements(valeur))),
-        'equipements', to_jsonb(array(select distinct valeur from jsonb_array_elements_text(coalesce(donnees->'equipements','[]'::jsonb) || ${equipements}::jsonb) as elements(valeur))),
-        'traitsDebloques', to_jsonb(array(select distinct valeur from jsonb_array_elements_text(coalesce(donnees->'traitsDebloques','[]'::jsonb) || ${traits}::jsonb) as elements(valeur))),
-        'achatsInventaire', to_jsonb(array(select distinct valeur from jsonb_array_elements_text(coalesce(donnees->'achatsInventaire','[]'::jsonb) || ${inventaire}::jsonb) as elements(valeur))),
-        'achatsEquipements', to_jsonb(array(select distinct valeur from jsonb_array_elements_text(coalesce(donnees->'achatsEquipements','[]'::jsonb) || ${equipements}::jsonb) as elements(valeur))),
-        'achatsTraits', to_jsonb(array(select distinct valeur from jsonb_array_elements_text(coalesce(donnees->'achatsTraits','[]'::jsonb) || ${traits}::jsonb) as elements(valeur)))
-      ), modifie_le=now() where compte=${compte} and exists(select 1 from achat)`;
-    },
     async boutique(compte) {
       const r = await sql`select donnees from compte_boutique where compte=${compte}`;
       return (r[0]?.donnees as EtatBoutiqueCompte | undefined) ?? null;

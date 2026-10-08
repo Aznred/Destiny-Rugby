@@ -1,4 +1,3 @@
-import { creerPaiement, diagnosticErreurStripe, journalErreurStripe } from './paiementsStripe.js';
 import { contexteFfr, serviceFfr } from './ffr/contexte.js';
 import { cartesJeunesseARetirer } from '../src/lib/ligue/migrationJeunesse.js';
 import { VERSION_PROTECTION_FFR } from '../src/data/protectionFfr.generated.js';
@@ -1140,21 +1139,6 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
       if (action === 'deconnexion') {
         await stockage.fermerSession(empreinteSession); sessionsChaudes.delete(empreinteSession); cookie(req, res, '', true);
         return res.status(200).json({ ok: true });
-      }
-      if (action === 'paiementOvas') {
-        try { return res.status(200).json(await creerPaiement(compte.id, corps.pack, corps.tentative, stockage)); }
-        catch (e) {
-          const diagnostic = diagnosticErreurStripe(e);
-          if (diagnostic) {
-            journalErreurStripe(e);
-            throw new ErreurHttp(diagnostic.statut, diagnostic.message);
-          }
-          throw new ErreurHttp(400, e instanceof Error ? e.message : 'La création du paiement a échoué.');
-        }
-      }
-      if (url.searchParams.has('paiementEtat')) {
-        const boutique = await stockage.boutique(compte.id);
-        return res.status(200).json({ achatsOvas: boutique?.achatsOvas ?? 0, achatsCredits: boutique?.achatsCredits ?? 0, credite: await stockage.achatCredite?.(url.searchParams.get('session') ?? '', compte.id) ?? false });
       }
       if (action === 'sauvegarderBoutique') {
         if ('modifications' in corps) {

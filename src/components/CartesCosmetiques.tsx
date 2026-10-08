@@ -1,9 +1,10 @@
 // LES PIÈCES COMMUNES DE LA BOUTIQUE ET DE LA PERSONNALISATION (Correctif 21)
 //   PastilleRarete — commun / rare / épique / légendaire ;
-//   PrixBoutons   — « 260 Ovas » et/ou « 52 Crédits » : une icône par monnaie, un bouton par monnaie acceptée.
+//   PrixBoutons   — « 260 Ovas » (et « 52 Crédits » pour qui en a encore) : une icône par monnaie, un bouton par monnaie proposée.
 //   MiniatureArticle — la vignette 3D d'un article, quelle que soit sa catégorie.
 
-import { devisesAcceptees, montantEn, type Devise, type PrixArticle } from '../lib/monnaies';
+import { devisesProposees, montantEn, type Devise, type PrixArticle } from '../lib/monnaies';
+import { useGame } from '../store/useGame';
 import type { ArticleEquipement } from '../data/boutique';
 import { nombre, t } from '../lib/i18n';
 import { PieceOvas } from './PieceOvas';
@@ -24,7 +25,9 @@ export const IconeMonnaie = ({ d, taille = 16 }: { d: Devise; taille?: number })
  * (`demanderPaiement`) — griser sans rien dire laisserait le joueur sans sortie.
  */
 export function PrixBoutons({ prix, onAcheter, petit = true }: { prix: PrixArticle; onAcheter: (d: Devise) => void; petit?: boolean }) {
-  const acceptees = devisesAcceptees(prix);
+  // Les Crédits ne s'obtiennent plus : leur bouton n'apparaît que pour qui en a encore.
+  const credits = useGame((s) => s.credits);
+  const acceptees = devisesProposees(prix, { ovas: 0, credits });
   return (
     <div className="prix-boutons">
       {acceptees.map((d) => (

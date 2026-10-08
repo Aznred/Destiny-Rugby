@@ -5,17 +5,16 @@
 //
 //   1. une seule monnaie acceptée, ou monnaie déjà choisie → on l'utilise ; deux monnaies → le joueur CHOISIT ;
 //   2. solde insuffisant → une vraie fenêtre : « Pas assez d'Ovas, il te manque N » (Utiliser des Crédits / Obtenir des Ovas),
-//      ou « Crédits insuffisants » (solde, prix, manque, Acheter des Crédits) ;
-//   3. dépenser des Crédits demande TOUJOURS une confirmation claire ; des Ovas, non (c'est la monnaie du jeu) ;
-//   4. acheter des Crédits ouvre la recharge, qui renvoie à la page de paiement de Stripe — jamais sans un clic du joueur.
+//      ou « Crédits insuffisants » (solde, prix, manque, Payer en Ovas) ;
+//   3. dépenser des Crédits demande TOUJOURS une confirmation claire ; des Ovas, non (c'est la monnaie du jeu).
 //
-// ⚠️ RIEN NE S'ACHÈTE TOUT SEUL : un solde insuffisant ouvre une fenêtre, jamais un paiement.
+// ⚠️ AUCUN ARGENT RÉEL : le jeu ne vend plus rien. Les Crédits ne s'achètent plus ; un solde restant se dépense, c'est tout.
 // Le module n'importe pas React : l'état se lit par `useSyncExternalStore` dans `components/ModalesMonnaie.tsx`.
 
 import type { Devise, PrixArticle } from './monnaies';
-import { devisesAcceptees, montantEn } from './monnaies';
+import { devisesProposees, montantEn } from './monnaies';
 
-export type EtapeAchat = 'choix' | 'insuffisant' | 'confirmation' | 'obtenirOvas' | 'recharge';
+export type EtapeAchat = 'choix' | 'insuffisant' | 'confirmation' | 'obtenirOvas';
 
 export interface DemandeAchat {
   /** Ce qu'on achète, tel qu'on l'écrit dans les fenêtres (« Pack Espoirs », « Stade Destiny »). */
@@ -29,13 +28,9 @@ export interface EtatModaleAchat {
   etape: EtapeAchat | null;
   demande: DemandeAchat | null;
   devise: Devise | null;
-  /** La recharge ouverte seule (« Acheter des Crédits »), sans achat en attente. */
-  rechargeSeule: boolean;
-  /** L'offre à confirmer d'emblée (clic sur une carte de la boutique de Crédits). */
-  offreId?: string;
 }
 
-const VIDE: EtatModaleAchat = { etape: null, demande: null, devise: null, rechargeSeule: false };
+const VIDE: EtatModaleAchat = { etape: null, demande: null, devise: null };
 let etat: EtatModaleAchat = VIDE;
 let resolution: ((devise: Devise | null) => void) | null = null;
 let soldesLus: () => { ovas: number; credits: number } = () => ({ ovas: 0, credits: 0 });
@@ -77,7 +72,7 @@ export function confirmerAchat(): void {
   terminer(etat.devise);
 }
 
-export function aller(etape: EtapeAchat): void { if (etat.etape || etat.rechargeSeule) poser({ ...etat, etape }); }
+export function aller(etape: EtapeAchat): void { if (etat.etape) poser({ ...etat, etape }); }
 export function annulerAchat(): void { terminer(null); }
 
 /**
@@ -86,7 +81,8 @@ export function annulerAchat(): void { terminer(null); }
  */
 export async function demanderPaiement(demande: DemandeAchat): Promise<Devise | null> {
   while (etat.etape) await new Promise((r) => setTimeout(r, 120));
-  const acceptees = devisesAcceptees(demande.prix);
+  // Les Crédits ne s'obtiennent plus : on ne les propose qu'à qui en a encore.
+  const acceptees = devisesProposees(demande.prix, soldesLus());
   if (acceptees.length === 0) return null;
   const devise = demande.devise && acceptees.includes(demande.devise) ? demande.devise : acceptees.length === 1 ? acceptees[0] : null;
   // Chemin rapide : des Ovas en quantité suffisante, monnaie déjà connue — aucune fenêtre.
@@ -95,13 +91,7 @@ export async function demanderPaiement(demande: DemandeAchat): Promise<Devise | 
   if (devise && (montantEn(demande.prix, devise) ?? 1) === 0) return devise;
   return new Promise<Devise | null>((resolve) => {
     resolution = resolve;
-    poser({ etape: 'choix', demande, devise, rechargeSeule: false });
+    poser({ etape: 'choix', demande, devise });
     if (devise) choisirDevise(devise);
   });
-}
-
-/** « Acheter des Crédits » : ouvre la recharge directement, sans achat en attente. */
-export function ouvrirRechargeCredits(offreId?: string): void {
-  if (etat.etape) return;
-  poser({ etape: 'recharge', demande: null, devise: null, rechargeSeule: true, offreId });
 }

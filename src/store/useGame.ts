@@ -771,7 +771,7 @@ interface GameState {
   coins: number;
   achatsOvas: number;
   /**
-   * LES CRÉDITS (Correctif 21), la monnaie premium. ⚠️ Le client ne fait que les DÉPENSER : seul le serveur en crédite (paiement Stripe
+   * LES CRÉDITS (Correctif 21), l'ancienne monnaie premium : ils ne s'achètent plus (plus aucune vente payante). ⚠️ Le client ne fait que les DÉPENSER (ancien paiement
    * signé), et `achatsCredits` retient ce qui a été payé pour qu'une ancienne sauvegarde locale ne l'efface jamais.
    */
   credits: number;

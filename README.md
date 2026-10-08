@@ -1777,9 +1777,7 @@ fondations vers le confort) est dans **[ROADMAP.md](ROADMAP.md)**.
   retraite** ; le bouton d'envoi reste là pour une carrière en cours. Le principe
   tient en une phrase — *le navigateur envoie les faits d'une carrière, le
   serveur RECALCULE le score et n'écrit que lui*.
-- **Monétisation** : brancher la régie publicitaire et le paiement des packs
-  d'Ovas — les pistes, les ordres de grandeur et les pièges sont dans
-  [MONETISATION.md](MONETISATION.md).
+- **Monétisation** : aucune vente payante (Stripe retiré). [MONETISATION.md](MONETISATION.md) n'est plus qu'une archive.
 - Matchs simulés tour par tour avec adversaires générés.
 - Logo FFR officiel en PNG sur le ballon (aujourd'hui : coq tracé en code).
 
@@ -1861,9 +1859,9 @@ La retransmission française utilise F5-TTS sur l'ordinateur via un service loca
 
 ### Correctif 21 — boutique, monnaies et maillots d'équipe
 
-- **Ovas et Crédits** : les Ovas se gagnent en jouant et ne s'achètent plus avec de l'argent réel ; les **Crédits** (jeton octogonal bleu) sont la monnaie premium, achetée par Stripe. Chaque article déclare son prix : Ovas seulement, Crédits seulement, ou au choix.
-- **Fenêtres d'achat claires** : choix de la monnaie, « Pas assez d'Ovas » (utiliser des Crédits / obtenir des Ovas), « Crédits insuffisants » (solde, prix, manque, recharge en un clic), confirmation avant toute dépense de Crédits. Aucun achat n'est jamais lancé tout seul. La roue des packs est inchangée, avec les deux prix.
-- **Boutique** (Packs, Crédits, Maillots, Joueur) et **Personnalisation** : on n'équipe que ce qu'on possède ; le reste est « À débloquer », avec son prix.
+- **Tout est gratuit** : le jeu ne vend plus rien contre de l'argent réel (Stripe retiré). Tout s'achète en **Ovas**, gagnés en jouant. Les Crédits ne s'obtiennent plus ; un solde restant reste dépensable.
+- **Fenêtres d'achat claires** : « Pas assez d'Ovas » dit combien il manque et comment en gagner. Aucun achat n'est jamais lancé tout seul. La roue des packs est inchangée.
+- **Boutique** (Packs, Maillots, Joueur) et **Personnalisation** : on n'équipe que ce qu'on possède ; le reste est « À débloquer », avec son prix.
 - **Maillots d'équipe** : un kit habille toute l'équipe (domicile et extérieur) sur le même modèle 3D de maillot, repeint ; maillots, casques et crampons se voient sur leurs modèles 3D, ou sur le joueur.
 - **Labo** : onglet Boutique pour créer des cosmétiques (prix par monnaie, rareté, dates, publié) et monnaie réglable par pack.
 

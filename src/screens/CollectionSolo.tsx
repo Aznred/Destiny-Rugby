@@ -262,7 +262,8 @@ export function CollectionSolo() {
         }}
         etiquettePrix={categoriePacks === 'gratuits' ? undefined : (pack) => {
           const p = prixPackSoloArticle(pack);
-          const o = montantEn(p, 'ovas'), c = montantEn(p, 'credits');
+          // Les Crédits ne s'obtiennent plus : leur prix ne s'affiche que pour qui en a encore.
+          const o = montantEn(p, 'ovas'), c = credits > 0 || montantEn(p, 'ovas') === null ? montantEn(p, 'credits') : null;
           return [o !== null ? nombre(o) + ' Ovas' : '', c !== null ? nombre(c) + ' ' + t('mo.credits') : ''].filter(Boolean).join(' · ');
         }}
         paiementAlternatif={categoriePacks === 'gratuits' ? <button type="button" className="btn fantome petit solo-pub-desactivee" disabled title={t('solo.adTitle')}><Icone nom="video" taille={15} /> {t('solo.adDisabled')}</button> : undefined}

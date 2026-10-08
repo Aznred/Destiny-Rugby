@@ -103,7 +103,7 @@ export function activerSynchronisationBoutiqueCompte(): () => void {
           appliquerCollectionSoloDistante(reponse.boutique.collectionSolo);
         }
         if (reponse.boutique) {
-          // Une correction Stripe est reconnue une fois ; les modifications
+          // Une correction du serveur est reconnue une fois ; les modifications
           // locales arrivées pendant le POST restent en attente.
           const distante = reponse.boutique;
           const actuelle = instantane();
@@ -118,7 +118,7 @@ export function activerSynchronisationBoutiqueCompte(): () => void {
           // Ajouter la correction aux gains/dépenses apparus entre-temps,
           // sinon la prochaine écriture annulerait le crédit de l'achat.
           changements.coins = actuelle.ovas + distante.ovas - cible.etat.ovas;
-          // Même correction pour les Crédits : un achat Stripe confirmé entre-temps s'ajoute aux dépenses locales, il ne les écrase pas.
+          // Même correction pour les Crédits : un crédit du serveur arrivé entre-temps s'ajoute aux dépenses locales, il ne les écrase pas.
           changements.credits = (actuelle.credits ?? 0) + (distante.credits ?? 0) - (cible.etat.credits ?? 0);
           for (const cle of ['inventaire', 'equipements', 'traitsDebloques'] as const) {
             const acquisitions = distante[cle].filter(id => !cible.etat[cle].includes(id));

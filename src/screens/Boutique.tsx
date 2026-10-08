@@ -1,36 +1,33 @@
 // LA BOUTIQUE (refonte du Correctif 21)
 //
-// Deux monnaies, jamais confondues, et toujours visibles ensemble :
-//   OVAS    — la monnaie de GAMEPLAY (matchs, objectifs, saisons, événements) : elle ne s'achète plus avec de l'argent réel ;
-//   CRÉDITS — la monnaie PREMIUM, la seule qui s'achète (Stripe).
+// ⚠️ RIEN NE SE VEND CONTRE DE L'ARGENT RÉEL. Tout s'achète en OVAS, la monnaie de gameplay (matchs, objectifs, saisons, événements).
+// Les Crédits ne s'achètent plus ; un solde restant reste dépensable.
 //
-// Quatre rayons : Packs (la roue d'origine, dans la collection) · Crédits · Maillots · Joueur.
+// Trois rayons : Packs (la roue d'origine, dans la collection) · Maillots · Joueur.
 // ⚠️ LA BOUTIQUE MONTRE CE QUI S'ACHÈTE ; LA PERSONNALISATION CE QUI SE POSSÈDE (`components/Personnalisation.tsx`). Un article possédé
 // porte ici la mention « Possédé » et un renvoi vers la personnalisation — jamais un bouton « Équiper ».
 // ⚠️ UN SOLDE INSUFFISANT N'ACHÈTE RIEN ET NE GRISE RIEN : un clic ouvre la fenêtre qui dit combien il manque (`lib/achatUi.ts`).
 
 import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
-import { etatPaiementsStripe } from '../lib/carriereEnLigneClient';
 import { motion } from 'framer-motion';
 import { useGame } from '../store/useGame';
 import {
-  BUNDLES, EQUIPEMENTS, EQUIPEMENT_PAR_ID, RUBRIQUES, SKINS, SKIN_PAR_ID, estEnVente, prixArticle, prixSkin, rubriqueDe,
+  EQUIPEMENTS, EQUIPEMENT_PAR_ID, RUBRIQUES, SKINS, SKIN_PAR_ID, estEnVente, prixArticle, prixSkin, rubriqueDe,
   type ArticleEquipement, type RubriqueBoutique,
 } from '../data/boutique';
 import { TRAITS_A_DEBLOQUER, descriptionTrait, nomTrait } from '../data/traits';
-import { locale, nombre, t, tn, texteTraduit } from '../lib/i18n';
+import { nombre, t, texteTraduit } from '../lib/i18n';
 import { CartePubRecompensee, BoutonDeblocageParPub } from '../components/Pub';
 import { ApercuJoueur3D } from '../components/ApercuJoueur3D';
 import { MiniatureArticle, PastilleRarete, PrixBoutons } from '../components/CartesCosmetiques';
 import { SoldesMonnaies } from '../components/SoldesMonnaies';
-import { PieceCredits } from '../components/PieceCredits';
 import { PieceOvas } from '../components/PieceOvas';
 import { Icone } from '../components/Icone';
-import { demanderPaiement, ouvrirRechargeCredits } from '../lib/achatUi';
+import { demanderPaiement } from '../lib/achatUi';
 import { useBoutiqueLabo } from '../lib/boutiqueLabo';
 import { ouvrirPersonnalisation, prendreCibleBoutique, type OngletPerso } from '../lib/personnalisationUi';
 import { apparencePourApercu, equipementPourScene } from '../lib/apparenceJoueur';
-import { OFFRES_CREDITS, prixOvas, type Devise, type PrixArticle } from '../lib/monnaies';
+import { prixOvas, type Devise, type PrixArticle } from '../lib/monnaies';
 import { POSTE_PAR_ID } from '../data/rugby';
 import './Boutique.css';
 
@@ -41,9 +38,9 @@ const Apercu3D = lazy(() => import('../components/Hero3D').then((m) => ({ defaul
 const Vignette = lazy(() => import('../components/VignetteBallon').then((m) => ({ default: m.VignetteBallon })));
 const Objet3D = lazy(() => import('../components/ModeleObjet').then((m) => ({ default: m.ApercuObjet })));
 
-type Rayon = 'credits' | RubriqueBoutique;
+type Rayon = RubriqueBoutique;
 const RAYONS: { id: Rayon | 'packs'; cle: string }[] = [
-  { id: 'packs', cle: 'bo.rub.packs' }, { id: 'credits', cle: 'bo.rub.credits' },
+  { id: 'packs', cle: 'bo.rub.packs' },
   ...RUBRIQUES.filter((r) => r.id !== 'ballons'),
 ];
 /** Ce qu'on regarde dans le grand aperçu. */
@@ -56,8 +53,6 @@ export function Boutique() {
   const [surJoueur, setSurJoueur] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
   const [vu, setVu] = useState<Vu | null>(null);
-  const [paiement, setPaiement] = useState('');
-  const [verification, setVerification] = useState(0);
   const joueur = useGame((s) => s.joueur);
   const manager = useGame((s) => s.manager);
   const coins = useGame((s) => s.coins);
@@ -80,33 +75,6 @@ export function Boutique() {
     setRayon(cible.rubrique as Rayon);
     if (cible.id) setVu(SKIN_PAR_ID[cible.id] ? { type: 'ballon', id: cible.id } : { type: 'article', id: cible.id });
   }, []);
-
-  // Le retour du paiement Stripe : seul le webhook signé crédite le compte, le retour navigateur ne crédite rien.
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    if (params.get('paiement') === 'annule') { setPaiement(t('bo.paiementAnnule')); return; }
-    const session = params.get('session_id');
-    if (params.get('paiement') !== 'retour' || !session) return;
-    let actif = true; let timer: ReturnType<typeof setTimeout>; let essais = 0;
-    setRayon('credits');
-    setPaiement(t('bo.paiementConfirmation'));
-    const verifier = async () => {
-      try {
-        const resultat = await etatPaiementsStripe(session);
-        if (!actif) return;
-        if (resultat.credite) {
-          window.dispatchEvent(new Event('destiny-compte-connecte'));
-          setPaiement(t('bo.paiementOk'));
-          history.replaceState(null, '', location.pathname + location.hash);
-          return;
-        }
-        if (++essais < 40) timer = setTimeout(() => void verifier(), 3000);
-        else setPaiement(t('bo.paiementLong'));
-      } catch (e) { if (actif) setPaiement(e instanceof Error ? e.message : t('mo.paiementIndispo')); }
-    };
-    void verifier();
-    return () => { actif = false; clearTimeout(timer); };
-  }, [verification]);
 
   const possede = (a: ArticleEquipement) => equipements.includes(a.id);
 
@@ -178,7 +146,7 @@ export function Boutique() {
     else vue = <Suspense fallback={<div className="hero-canvas-skel" />}><Objet3D url={articleVu.glb} teinte={articleVu.teinte} emoji={articleVu.emoji} /></Suspense>;
     return { vue, titre: texteTraduit(articleVu.nom), detail: texteTraduit(articleVu.detail), fiche: null as null | ArticleEquipement };
   };
-  const a = rayon !== 'credits' ? apercu() : null;
+  const a = apercu();
 
   return (
     <motion.section className="boutique" initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
@@ -191,66 +159,20 @@ export function Boutique() {
       </div>
 
       {flash && <div className="flash-boutique" role="status">{flash}</div>}
-      {paiement && <p role="status" className="bo-paiement">{paiement} {new URLSearchParams(location.search).has('session_id') && <button className="btn fantome petit" onClick={() => setVerification((v) => v + 1)}>{t('bo.reverifier')}</button>}</p>}
 
       <div className="bo-rayons" role="tablist" aria-label={t('bo.rayons')}>
         {RAYONS.map((r) => (
           <button key={r.id} type="button" role="tab" aria-selected={rayon === r.id} className={rayon === r.id ? 'actif' : undefined}
             // « Packs » ouvre la roue d'origine (collection) : la boutique de packs garde son affichage, avec ses deux monnaies.
             onClick={() => (r.id === 'packs' ? setEcran('collectionSolo') : setRayon(r.id))} data-tuto={`bo-rayon-${r.id}`}>
-            {r.id === 'credits' && <PieceCredits taille={16} />}{t(r.cle)}
+            {t(r.cle)}
           </button>
         ))}
         <button type="button" className="bo-perso" onClick={() => ouvrirPersonnalisation('joueur')}><Icone nom="reglages" taille={16} /> {t('bo.mesCosmetiques')}</button>
       </div>
 
-      {/* ═══ CRÉDITS ═══════════════════════════════════════════════════════════════════════════════ */}
-      {rayon === 'credits' && (
-        <section>
-          <p className="bo-intro">{t('bo.creditsIntro')}</p>
-          <div className="grille-boutique grille-recharges">
-            {OFFRES_CREDITS.map((p) => (
-              <button key={p.id} type="button" className={`carte article pack recharge-credits${p.populaire ? ' populaire' : ''}`} onClick={() => ouvrirRechargeCredits(p.id)}>
-                {p.populaire && <div className="pack-populaire">{t('bo.populaire')}</div>}
-                <PieceCredits taille={58} variante="boutique" />
-                <div className="pack-nom">{texteTraduit(p.nom)}</div>
-                <div className="pack-ovas">{p.credits.toLocaleString(locale())} {t('mo.credits')}</div>
-                {p.bonus && <div className="pack-bonus">{t('bo.bonus', { v0: p.bonus })}</div>}
-                <span className="btn fantome petit">{p.prix}</span>
-              </button>
-            ))}
-          </div>
-          <h2 className="bo-sous-titre">{t('bo.bundles')}</h2>
-          <p className="bo-intro">{t('bo.bundlesAide')}</p>
-          <div className="grille-boutique grille-bundles">
-            {BUNDLES.map((p) => {
-              const cosmetiques = [...(p.ballons ?? []).map((id) => texteTraduit(SKIN_PAR_ID[id]?.nom ?? id)), ...(p.equipements ?? []).map((id) => texteTraduit(EQUIPEMENT_PAR_ID[id]?.nom ?? id))];
-              const traits = (p.traits ?? []).map((id) => nomTrait(id));
-              const detail = [...cosmetiques, ...traits].join(' · ');
-              return (
-                <button key={p.id} type="button" className={`carte article pack bundle${p.populaire ? ' populaire' : ''}`} onClick={() => ouvrirRechargeCredits(p.id)}>
-                  {p.populaire && <div className="pack-populaire">{t('bo.populaire')}</div>}
-                  <PieceCredits taille={52} variante="boutique" />
-                  <div className="pack-nom">{texteTraduit(p.nom)}</div>
-                  <div className="pack-ovas">{t('bo.pluscredits', { n: p.credits.toLocaleString(locale()) })}</div>
-                  {(cosmetiques.length > 0 || traits.length > 0) && (
-                    <div className="pack-contenu" title={detail}>
-                      {cosmetiques.length > 0 && <span><Icone nom="cadeau" taille={14} /> {tn('bo.nbCosmetiques', cosmetiques.length, { n: cosmetiques.length })}</span>}
-                      {traits.length > 0 && <span><Icone nom="joueur" taille={14} /> {tn('bo.nbArchetypes', traits.length, { n: traits.length })}</span>}
-                      <small>{detail}</small>
-                    </div>
-                  )}
-                  <span className="btn fantome petit">{p.prix}</span>
-                </button>
-              );
-            })}
-          </div>
-        </section>
-      )}
-
       {/* ═══ MAILLOTS · JOUEUR · STADES · ÉVÉNEMENT : une colonne d'aperçu et la grille ═══════════ */}
-      {rayon !== 'credits' && (
-        <div className="bo-deux">
+      <div className="bo-deux">
           <aside className="bo-apercu carte" aria-label={t('bo.apercu')}>
             <div className="bo-apercu-cadre">
               {a ? a.vue : <div className="bo-apercu-vide">{t('bo.apercuVide')}</div>}
@@ -336,8 +258,7 @@ export function Boutique() {
               </div>
             )}
           </div>
-        </div>
-      )}
+      </div>
       <span hidden>{coins}</span>
     </motion.section>
   );

@@ -53,6 +53,8 @@ Ce ne sont pas des suggestions. Elles ont toutes été demandées explicitement.
   barème local (`jugementLocal`) pour trancher une réponse écrite.
 - **Monétisation cosmétique uniquement.** Ovas, boutique, skins. Rien qui
   vende de la performance.
+- **Rien ne se vend contre de l'argent réel.** Stripe a été retiré ; tout
+  s'achète en Ovas gagnés en jouant.
 
 ---
 
@@ -1328,6 +1330,7 @@ en une phrase → faire faire l'action → passer à la suivante**, sur les VRAI
 
 ### La boutique, les deux monnaies et les maillots d'équipe (Correctif 21)
 
+- ⚠️ **PLUS AUCUNE VENTE PAYANTE (8 octobre 2026, sur demande).** Stripe est retiré du site : `serveur/paiementsStripe.ts`, `api/stripe-webhook.ts`, les actions `paiementOvas` / `paiementEtat`, la dépendance `stripe`, le rayon « Crédits », les recharges et les bundles n'existent plus. Les Crédits ne s'obtiennent plus ; un solde déjà acquis reste dépensable et synchronisé, mais **plus aucun article ne l'exige** : `prixCredits()` et `prixValide` (mode `CREDITS`) rendent un prix AUSSI en Ovas (taux `OVAS_PAR_CREDIT`), et l'écran ne propose les Crédits qu'à qui en a encore (`devisesProposees`). La table `achats_stripe` reste en base, plus rien ne la lit. Ne pas rebrancher de paiement sans demande.
 - **Deux monnaies** (`lib/monnaies.ts`) : **Ovas** = gameplay (matchs, objectifs, saisons, événements, pub quotidienne), qui ne s'achètent PLUS avec de l'argent réel ; **Crédits** = premium, la seule monnaie achetée (Stripe). Un prix déclare sa monnaie : `OVAS`, `CREDITS` ou `OVAS_OR_CREDITS` (`PrixArticle`) ; le prix en Crédits se déduit au taux `OVAS_PAR_CREDIT` = 5 (1 € = 100 Crédits, ≈ 505 Ovas avant le correctif). ⚠️ Les prix en Ovas n'ont PAS été multipliés : les gains d'Ovas n'ont pas bougé (« ne pas ré-augmenter les gains sans demande »), les exemples chiffrés de la demande (15 000 Ovas…) n'auraient aucun sens à l'échelle actuelle.
 - **Une seule porte d'achat** (`lib/achatUi.ts`, `components/ModalesMonnaie.tsx`, montée dans `App`) : `demanderPaiement` conduit jusqu'à une monnaie suffisante — choix entre les deux, « Pas assez d'Ovas » (Utiliser des Crédits / Obtenir des Ovas), « Crédits insuffisants » (solde, prix, manque, Acheter des Crédits → recharge directe), CONFIRMATION de toute dépense de Crédits — et rend la monnaie à débiter. ⚠️ Un solde insuffisant n'achète rien et ne grise rien. Le jeton de Crédits (`PieceCredits`, 4 variantes ; fichiers `public/icons/credit_icon*.svg` par `scripts/genererIconeCredit.tsx`) est octogonal, acier et bleu-violet : il ne se confond jamais avec la pièce d'Ovas.
 - **Inventaire cosmétique** : `equipements` / `inventaire` (identifiants possédés, déjà synchronisés au compte) + `cosmetiquesMeta` (date, source). `acheterCosmetique(id, devise)` rend la raison d'un refus (`solde` avec `manque`, `devise`, `possede`, `indisponible`) ; `octroyerCosmetique` offre une récompense (le titre d'équipe donne le kit « Champion en titre », `lib/recompensesCosmetiques.ts`). ⚠️ **Seul ce qui est possédé s'équipe** (`basculerEquipement`, et le serveur refuse un équipement non possédé). Crédits : `credits` + `achatsCredits` suivent EXACTEMENT la mécanique des Ovas (SQL Neon, fichier, delta, Stripe).
@@ -1335,7 +1338,7 @@ en une phrase → faire faire l'action → passer à la suivante**, sur les VRAI
 - **Maillots = kits d'équipe** (`data/kitsBoutique.ts`) : `equipementActif.maillot` (domicile) et `maillotExt` habillent TOUTE l'équipe du joueur (`lib/personnalisationMatch.ts`, lu à l'entrée du match). ⚠️ **Le maillot reste le maillot du jeu** : mêmes maillage, rig et animations, seuls couleurs/motif/short/chaussettes (ou atlas fourni, `jerseyTexture`) changent via `habillage.js`. Les maillots, casques et crampons se voient sur LEUR modèle 3D (icônes rendues hors écran, comme avant) ; un bouton « Sur mon joueur » les essaie sur le joueur 3D (`creerApercuJoueur`). Si les couleurs se confondent, `departagerTenues` bascule le visiteur.
 - **Labo → onglet Boutique** (`components/LaboBoutique.tsx`, `validerArticleLabo`) : nom, catégorie, prix par monnaie, rareté, dates, publié ON/OFF, kit (couleurs, motif, atlas). Les articles publiés arrivent avec le catalogue solo (`?catalogueSolo=1`, aucune requête de plus) ; les packs ont `monnaie` et `prixCredits` réglables.
 - ⚠️ **Retirés à la demande** : stades de la boutique et événements (Halloween, Noël) de la boutique. Les sources du lecteur sont revenues à l'état d'avant (`analyse-rn26/sauvegarde-avant-correctif-21/` ; `correctif_21_kits.cjs` + `correctif_21_apercu.cjs` réappliquent seulement les kits).
-- Bancs : `npm run verify:boutique` (82 contrôles), `verify:paiements` (Crédits, jamais d'Ovas), `verifierSynchronisationCompte.ts`. ⚠️ Le SQL Neon des Crédits n'a pas pu être essayé sur la vraie base (seul le stockage fichier l'est) : même recette que les Ovas, mais à vérifier en test Stripe avant la production.
+- Bancs : `npm run verify:boutique` (82 contrôles), `verifierSynchronisationCompte.ts`. ⚠️ Le SQL Neon des Crédits n'a pas pu être essayé sur la vraie base (seul le stockage fichier l'est) : même recette que les Ovas, mais à vérifier en test Stripe avant la production.
 
 ### Le joueur, du HUD à l'apparence (Correctif 20 — carrière solo, 3D, mobile)
 
@@ -2550,7 +2553,7 @@ match** — ne pas s'en servir pour retoucher la difficulté tant qu'ils n'ont p
   `serveur/VERCEL.md`.
 - **Bundle** : `useGame` 115 Ko gzip, textes 155 Ko, fournisseur Three.js
   263 Ko (partagé et paresseux). Le build signale des morceaux > 1 000 Ko.
-- **Paiements** : voir `serveur/PAIEMENTS.md` (Stripe vend des CRÉDITS depuis le Correctif 21, plus d'Ovas ; webhook et SQL Neon des Crédits à essayer en test Stripe).
+- **Paiements** : il n'y en a plus (Stripe retiré, voir la section de la boutique).
 
 
 ## Intégration FFR 2026_10_FFR_FULL

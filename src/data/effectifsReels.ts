@@ -1908,7 +1908,7 @@ const BRUT: Record<string, string[]> = {
     'Killian TAOFIFENUA|0|26|71|71|16',
     'Paul GADÉA|6|25|62|63|16',
     'Etienne HERJEAN|3|34|61|61|16',
-    'Maxime GIANET|8|26|61|62|16',
+    'Maxime GIANET|8|32|61|62|16',
     'Pablo PATILLA|6|24|60|63|16',
     'Mathys BARKA|6|25|59|63|16',
     'Romain MANCHIA|2|35|57|57|16',
