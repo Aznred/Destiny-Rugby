@@ -121,6 +121,11 @@ export interface Pion {
   sprintMax: number;
   /** Barre vide : plus de sprint avant d'avoir regagné `seuilRelance`. */
   essoufle?: boolean;
+  /**
+   * Niveau 6 : ce que la fatigue fait à ses gestes (0 frais, 1 entamé, 2 épuisé), relu à chaque pas par `animations.ts`.
+   * La scène en tire sa posture ; le film d'un match de ligue le transporte, faute de quoi l'écran ne saurait pas qui est cuit.
+   */
+  fatigue?: 0 | 1 | 2;
   battu: number;        // secondes pendant lesquelles il est hors du coup
   /**
    * ⚠️ HORS-JEU SUR COUP DE PIED : il était DEVANT le botteur au moment du

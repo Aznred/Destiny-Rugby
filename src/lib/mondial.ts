@@ -68,8 +68,10 @@ function duelNation(
   tour: MatchFinal['tour'], libelle: string,
 ): MatchFinal {
   const joue = resultatJoue(cle);
-  if (joue && joue.scoreD !== joue.scoreE) return { ...joue, tour, libelle,
-    vainqueur: joue.scoreD > joue.scoreE ? a : b, perdant: joue.scoreD > joue.scoreE ? b : a };
+  if (joue && (joue.scoreD !== joue.scoreE || joue.vainqueurDesigne)) {
+    const victoireD = joue.vainqueurDesigne ? joue.vainqueurDesigne === 'D' : joue.scoreD > joue.scoreE;
+    return { ...joue, tour, libelle, vainqueur: victoireD ? a : b, perdant: victoireD ? b : a };
+  }
   const rng = graine(cle);
   // Terrain neutre : une Coupe du monde se joue chez un hôte, pas chez l'un des
   // deux. Aucun avantage au « receveur », qui n'en est pas un.

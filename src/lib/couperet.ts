@@ -16,11 +16,11 @@
 // ⚠️ LE TYPE DE COMPÉTITION N'EMPÊCHE JAMAIS LA SIMULATION : rien ici ne s'exécute avant la sirène.
 
 import { graine } from './championnat.js';
-import { matchRules, type KnockoutRules } from './competitionRules.js';
+import { competitionDuCouperet, matchRules, type KnockoutRules } from './competitionRules.js';
 
 /** La rencontre est-elle à élimination directe ? Sa clé le dit (préfixes posés par `afficheDuClub`). */
 export function estMatchCouperet(cle: string): boolean {
-  return /^(phase|coupe|acces|tournoi)#/.test(cle);
+  return competitionDuCouperet(cle) !== null;
 }
 
 /**

@@ -11,7 +11,8 @@ import { affichesToutesRondes } from './calendrier.js';
 import { horairesChampionnat } from './horaires.js';
 import { graine as hasard, tirerPondere } from './aleatoire.js';
 import { packsCatalogueAdmin, bandesGaranties, carteDepuisSource, catalogueMondialCarriere, coequipierDepuisCarte, dotationBronzeCarriere, emblemeValide, logoCompetitionValide, nomTrophee, PACKS_CARRIERE, RARETES_CARRIERE, rayonDePack, tirerDuRayon, tropheeValide, vivierRestant } from './catalogueCarriere.js';
-import { actualiserCahierMatchEnLigne, avancerMatchEnLigne, commanderMatchEnLigne, conclureMatchEnLigne, creerMatchEnLigne, DUREE_REELLE, forceFeuille, MARGE_AUTORITE, STRATEGIE_EN_LIGNE_DEFAUT, strategieValide, resumeMatchEnLigne, vueMatchEnLigne } from './matchCarriere.js';
+import { actualiserCahierMatchEnLigne, avancerMatchEnLigne, commanderMatchEnLigne, conclureMatchEnLigne, creerMatchEnLigne, DUREE_REELLE, dureeMatchEnLigne, forceFeuille, MARGE_AUTORITE, STRATEGIE_EN_LIGNE_DEFAUT, strategieValide, resumeMatchEnLigne, vueMatchEnLigne } from './matchCarriere.js';
+import { onlineRules } from '../competitionRules.js';
 import type { RepereChrono } from './filmDirect.js';
 import type { CarteCarriere, ClubCarriere, CommandeCarriere, CompetitionCarriere, CreationCarriere, EtatCarriereEnLigne, LigneClassementCarriere, ObjectifCarriere, PackCarriere, RencontreCarriere, TransactionCarriere, VueCarriereEnLigne } from './typesCarriere.js';
 import { LOT_VENTE_RAPIDE_MAX, valeurVenteRapide } from './venteRapideCarriere.js';
@@ -1182,7 +1183,10 @@ function lancerRencontre(etat: EtatCarriereEnLigne, r: RencontreCarriere, mainte
     // le total d'équipe va (voir `erreurDeLiaison` dans `moteur/moteur.ts`).
     return { clubId: id, nom: club.nom, effectif: cartes.map(c => ({ ...coequipierDepuisCarte(c), note: Math.max(20, Math.min(99, c.note + collectif(c)) - Math.round(c.fatigue * .12)) })), composition: club.composition, strategie: club.strategie, collectif: equipeCollectif.total };
   };
-  r.match = creerMatchEnLigne({ id: r.id, domicile: equipe(r.domicile), exterieur: equipe(r.exterieur), debut: maintenant, graine: Math.floor(hasard(`${graine}:${r.id}`)() * 2 ** 31) });
+  r.match = creerMatchEnLigne({ id: r.id, domicile: equipe(r.domicile), exterieur: equipe(r.exterieur), debut: maintenant,
+    graine: Math.floor(hasard(`${graine}:${r.id}`)() * 2 ** 31),
+    ...(estMatchElimination(etat, r) ? { departage: onlineRules(etat).knockout.drawResolution } : {}),
+  });
 }
 
 function enregistrerResultat(etat: EtatCarriereEnLigne, r: RencontreCarriere, maintenant: number, graine: string) {
@@ -1191,7 +1195,13 @@ function enregistrerResultat(etat: EtatCarriereEnLigne, r: RencontreCarriere, ma
   r.resultat = { pointsD: m.score.domicile, pointsE: m.score.exterieur, essaisD: m.essais.domicile, essaisE: m.essais.exterieur, penalitesD: m.penalites.domicile, penalitesE: m.penalites.exterieur, joueLe: dateServeur(maintenant), origine: m.debut >= Date.parse(r.ferme) ? 'absence' : 'direct' };
 
   if (estMatchElimination(etat, r)) {
-    if (r.resultat.pointsD === r.resultat.pointsE) {
+    if (m.issue) {
+      r.resultat.vainqueurId = m.issue.vainqueur === 'domicile' ? r.domicile : r.exterieur;
+      r.vainqueurId = r.resultat.vainqueurId;
+      r.resultat.ap = true;
+      if (m.prolongations) r.resultat.prolongations = { pointsD: m.prolongations.domicile, pointsE: m.prolongations.exterieur };
+      if (m.issue.tirs) { r.resultat.tab = true; r.resultat.tirsAuBut = { tirsD: m.issue.tirs[0], tirsE: m.issue.tirs[1] }; }
+    } else if (r.resultat.pointsD === r.resultat.pointsE) {
       const forceD = forceFeuille(r.match.equipes?.domicile.feuille ?? []);
       const forceE = forceFeuille(r.match.equipes?.exterieur.feuille ?? []);
       resoudreEgaliteElimination(r, `${graine}:elimination:${r.id}`, forceD || 50, forceE || 50);
@@ -1359,7 +1369,7 @@ function avancerInterne(etat: EtatCarriereEnLigne, maintenant: number, graine: s
     } else if (r.match) {
       // Un direct lancé puis abandonné se termine tout seul : on ne laisse pas
       // une rencontre ouverte au-delà de sa durée réelle plus une heure.
-      r.match = r.match.debut + DUREE_REELLE + HEURE < maintenant
+      r.match = r.match.debut + dureeMatchEnLigne(r.match) + HEURE < maintenant
         ? conclureMatchEnLigne(r.match)
         : avancerMatchEnLigne(r.match, maintenant);
     }

@@ -175,7 +175,10 @@ export function creerPanneaux(){
  * elles prennent la couleur du club qui reçoit, avec son écusson.
  */
 export function creerAbords(source,teinte,ecusson){
-  const c=toile(2048),ctx=c.getContext('2d');ctx.drawImage(source,0,0);
+  // ⚠️ L'atlas est étiré à la taille de la toile : celui des stades de club ne fait que 1 024 px (comme celui de
+  // l'enceinte internationale en mode léger). Posé tel quel, il n'en couvrait qu'un quart, et les conteneurs des
+  // abords lisaient une autre zone de l'atlas (glacières, mains, ballons). Les zones repeintes plus bas tombent juste.
+  const c=toile(2048),ctx=c.getContext('2d');ctx.drawImage(source,0,0,2048,2048);
   const fond=rgb(teinte),sombre=melange(fond,[0,0,0],.22);
   const g=ctx.createLinearGradient(0,767,0,1014);g.addColorStop(0,css(fond));g.addColorStop(.5,css(sombre));g.addColorStop(.5,css(fond));g.addColorStop(1,css(sombre));
   // Le haut du bloc : blanc franc pour les poteaux et les fanions, sans les ombres peintes d'origine.
@@ -227,6 +230,43 @@ export function nettoyerStade(source){
   ctx.fillStyle=g;ctx.fillRect(925*k,893*k,133*k,314*k);
   ctx.save();ctx.translate(990*k,1050*k);ctx.rotate(Math.PI/2);ctx.textAlign='center';ctx.textBaseline='middle';
   ctx.fillStyle='#f4f6ff';ctx.font=`400 ${Math.round(54*k)}px ${TITRE}`;ctx.fillText('DESTINY RUGBY',0,2*k,290*k);ctx.restore();
+  return c;
+}
+
+/**
+ * L'écran géant des stades de club (Correctif 31). Son atlas d'origine — deux colonnes, quatre rangées — portait le
+ * logo du jeu d'origine dans chaque case de gauche et une annonce en anglais dans chaque case de droite ; le décor
+ * n'en lit que la première. Les huit cases deviennent les nôtres : quelle que soit celle qu'un stade montre, la
+ * marque d'origine n'y est plus.
+ * ⚠️ Teintes plus claires que celles des panneaux : sous l'éclairage de la scène, leur vert sombre sortait noir.
+ */
+const ECRANS=[
+  {...RECLAMES[0],fond:['#0c3324','#1d6646'],encre:'#fdf3c8',accent:'#f2c14a'},
+  {...RECLAMES[1],fond:['#111118','#2a2a36']},
+];
+/** Une réclame au format d'un écran (deux fois plus large que haut) : le titre, un filet, la suite dessous. */
+function affiche(ctx,r,x,y,l,h){
+  // Même teinte en haut et en bas : la case voisine ne se devine pas au bord de l'écran.
+  const g=ctx.createLinearGradient(0,y,0,y+h);g.addColorStop(0,r.fond[0]);g.addColorStop(.5,r.fond[1]);g.addColorStop(1,r.fond[0]);ctx.fillStyle=g;ctx.fillRect(x,y,l,h);
+  ctx.save();ctx.beginPath();ctx.rect(x,y,l,h);ctx.clip();
+  const cx=x+l/2,police=t=>t+'px '+TITRE;
+  // Le ballon en filigrane derrière le titre.
+  ctx.strokeStyle=r.accent;ctx.globalAlpha=.3;ctx.lineWidth=h*.018;ctx.beginPath();ctx.ellipse(cx,y+h*.5,l*.465,h*.43,0,0,Math.PI*2);ctx.stroke();ctx.globalAlpha=1;
+  ctx.textAlign='center';ctx.textBaseline='middle';
+  let t=h*.46;ctx.font=police(t);while(ctx.measureText(r.titre).width>l*.84&&t>12){t-=2;ctx.font=police(t);}
+  const yt=y+h*.43;
+  if(r.double){ctx.fillStyle=r.double;ctx.fillText(r.titre,cx+t*.04,yt+t*.04);ctx.fillStyle=r.accent;ctx.fillText(r.titre,cx-t*.04,yt-t*.02);}
+  ctx.fillStyle=r.encre;ctx.fillText(r.titre,cx,yt);
+  ctx.fillStyle=r.accent;ctx.fillRect(cx-l*.1,y+h*.665,l*.2,Math.max(2,h*.014));
+  ctx.font='700 '+h*.12+'px '+FORTE;ctx.fillStyle=r.encre;ctx.globalAlpha=.94;ctx.fillText(r.suite,cx,y+h*.79);
+  ctx.restore();
+}
+export function creerEcranGeant(taille=1024){
+  const c=toile(taille),ctx=c.getContext('2d'),l=taille/2,h=taille/4;
+  for(let j=0;j<4;j++)for(let i=0;i<2;i++)affiche(ctx,ECRANS[i],i*l,j*h,l,h);
+  // La trame des diodes : de près on lit un écran, de loin elle se fond dans l'image.
+  ctx.fillStyle='rgba(0,0,0,.13)';const pas=taille/256;
+  for(let a=0;a<taille;a+=pas){ctx.fillRect(a,0,1,taille);ctx.fillRect(0,a,taille,1);}
   return c;
 }
 

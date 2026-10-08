@@ -237,7 +237,7 @@ export interface EtatCarriereEnLigne {
   /** Espace de développement privé, créé et commandé uniquement par le compte kiri. */
   laboratoire?: true;
   /** Championnat public ouvert, renouvelé par cycles de trente jours. */
-  publique?: { cycle: number; division: number; barrage?: string; finLe?: string };
+  publique?: { cycle: number; division: number; barrage?: string; finLe?: string; derniereDivision?: boolean };
   version: number; saison: number; phase: 'salon' | 'saison' | 'intersaison';
   rythme: number; maxClubs: number; graine: string; debutSaison?: string;
   /** L'identité de la ligue : son logo, son trophée, sa phase finale. */

@@ -12,6 +12,7 @@
 import { jalon } from './finMatch';
 import { geometrieMelee, TEMPS_MELEE, RITUEL_TIR } from './moteur/moteur';
 import { porteurPourAffichage } from './moteur/dynamique';
+import { signalArbitre } from './moteur/animations';
 import type { EtatMatch } from './moteur/etat';
 import { positionVol } from './moteur/trajectoire';
 import { apparenceJoueurMatch, maillotDeSecours, type ApparenceMatch, type MaillotMatch } from './moteur/apparenceMatch';
@@ -151,6 +152,8 @@ const OUTILS_3D = {
   porteurPourAffichage: (e: EtatMatch | { porteurAffiche: string | null }) => (
     'porteurAffiche' in e ? e.porteurAffiche ?? undefined : porteurPourAffichage(e)),
   positionVol, geometrieMelee, TEMPS_MELEE, RITUEL_TIR,
+  // Correctif 30 : le geste de l'arbitre correspond à la décision — lue sur l'état, en carrière comme dans un direct.
+  signalArbitre,
 };
 
 const CLE_PREFERENCE = 'destiny-rugby:match-3d';

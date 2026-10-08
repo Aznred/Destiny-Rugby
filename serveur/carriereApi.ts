@@ -419,6 +419,30 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
     lireEtat: async (ligue) => (await lireLigue(ligue))?.etat ?? null,
     refus: (statut, message) => new ErreurHttp(statut, message),
   });
+  // La limite appartient au cycle public entier, elle ne se déduit pas d'une ligue isolée.
+  const limitesPubliques = new Map<number, { expire: number; derniere: Promise<number> }>();
+  async function derniereDivisionPublique(cycle: number): Promise<number | undefined> {
+    if (!stockage.resumesDivisionsPubliques) return undefined;
+    let limite = limitesPubliques.get(cycle);
+    if (!limite || limite.expire <= Date.now()) {
+      const derniere = stockage.resumesDivisionsPubliques(cycle).then(l => Math.max(0, ...l.map(d => d.division)));
+      limite = { expire: Date.now() + 5000, derniere };
+      limitesPubliques.set(cycle, limite);
+      if (limitesPubliques.size > 4) limitesPubliques.delete(limitesPubliques.keys().next().value!);
+      derniere.catch(() => limitesPubliques.delete(cycle));
+    }
+    return limite.derniere;
+  }
+  async function completerVuePublique(vue: ReturnType<typeof vueCarriere>) {
+    if (vue.publique) {
+      const derniere = await derniereDivisionPublique(vue.publique.cycle);
+      if (derniere !== undefined) vue.publique.derniereDivision = vue.publique.division === derniere;
+    }
+    return vue;
+  }
+  async function vueCompte(etat: EtatCarriereEnLigne, compteId: string, leger = false) {
+    return completerVuePublique(vueCarriere(etat, compteId, leger));
+  }
   async function lireLigue(id: string, connue?: { version: number; comptes: string[]; echeance: number | null }) {
     const ligne = await lireLigueBrute(id, connue);
     // Tout ce qui lit une ligue peut avoir à faire avancer ses matchs : une instance froide reprend ici leur moteur.
@@ -698,14 +722,14 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
     for (let tentative = 0; tentative < 5; tentative++) {
       const etatPublic = await assurerDivisionsPubliques(maintenant);
       const deja = etatPublic.divisions.find(l => l.comptes.includes(compte.id));
-      if (deja) return vueCarriere((await appliquer(deja.id, compte.id, `lecture-publique-${Math.floor(maintenant / 2000)}`,
+      if (deja) return await vueCompte((await appliquer(deja.id, compte.id, `lecture-publique-${Math.floor(maintenant / 2000)}`,
         (e, n, g) => actualiserCarriere(e, n, g), false, false)), compte.id);
       const ouverte = etatPublic.divisions.find(l => l.nombreClubs < 16);
       if (ouverte) {
         try {
           const etat = await appliquer(ouverte.id, compte.id, `adhesion-publique-${compte.id}`,
             (e, n, g) => agirCarriere(e, compte.id, { type: 'rejoindre', pseudo: compte.pseudo, clubNom, embleme }, n, g), true);
-          return vueCarriere(etat, compte.id);
+          return await vueCompte(etat, compte.id);
         } catch (erreur) {
           if (tentative === 4) throw erreur;
           continue;
@@ -716,7 +740,10 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
       const code = `DR-PUBLIC-C${etatPublic.cycle}-D${division}`;
       const etat = creerDivisionPublique({ id, code, compteId: compte.id, pseudo: compte.pseudo, clubNom, embleme },
         etatPublic.cycle, division, maintenant, randomBytes(24).toString('hex'));
-      if (await stockage.creerLigue({ id, code, etat, comptes: comptesEtat(etat), version: 0 })) return vueCarriere(etat, compte.id);
+      if (await stockage.creerLigue({ id, code, etat, comptes: comptesEtat(etat), version: 0 })) {
+        limitesPubliques.delete(etatPublic.cycle);
+        return await vueCompte(etat, compte.id);
+      }
     }
     throw new ErreurHttp(409, 'Inscription en cours. Réessaie dans un instant.');
   }
@@ -1356,7 +1383,13 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
           const envoyee = chrono && enCours ? { id: rencontre.id, match: rencontre.match } : rencontre;
           return res.status(200).json({ id: e.id, version: e.version, rencontre: envoyee, ...allege, ...(present ? { presence: true } : {}) });
         }
-        if (Number.isInteger(connue) && connue > 0) {
+        const cycleAnnonce = Number(url.searchParams.get('cycle'));
+        const divisionAnnoncee = Number(url.searchParams.get('division'));
+        const limitePublique = Number.isSafeInteger(cycleAnnonce) && cycleAnnonce > 0
+          ? await derniereDivisionPublique(cycleAnnonce) : undefined;
+        const contextePublicInchange = limitePublique === undefined
+          || (url.searchParams.get('derniere') === '1') === (divisionAnnoncee === limitePublique);
+        if (Number.isInteger(connue) && connue > 0 && contextePublicInchange) {
           // Kiri peut observer une ligue sans en devenir membre. Le sondage SQL
           // normal confond volontairement « non-membre » et « ligue absente » ;
           // l'administrateur passe donc par l'en-tête, toujours sans charger le
@@ -1388,7 +1421,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         const e = await appliquer(id, observateur ? 'horloge' : compte.id, `lecture-${Math.floor(maintenant / 2000)}-catalogue-${catalogueAdmin().revision}`, (e, n, g) => actualiserCarriere(e, n, g), false, false, enteteConnue ?? autorisationKiri);
         // `leger=1` : l'écran demandera le détail d'un match terminé à son ouverture (`VueMatchEnLigne.resume`).
         const leger = url.searchParams.get('leger') === '1';
-        return res.status(200).json(observateur ? vueCarriereObservateur(e, leger) : vueCarriere(e, compte.id, leger));
+        return res.status(200).json(observateur ? await completerVuePublique(vueCarriereObservateur(e, leger)) : await vueCompte(e, compte.id, leger));
       }
       if (action === 'creer') {
         // ⚠️ COMPTER, C'EST COMPTER. Ce plafond lisait la liste entière — donc,
@@ -1410,7 +1443,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
             doublonsAutorises: corps.doublonsAutorises === true,
             cartesSpeciales: corps.cartesSpeciales === true,
           }, maintenant, randomBytes(24).toString('hex'));
-          if (await stockage.creerLigue({ id, code, etat: e, comptes: comptesEtat(e), version: 0 })) return res.status(201).json(vueCarriere(e, compte.id));
+          if (await stockage.creerLigue({ id, code, etat: e, comptes: comptesEtat(e), version: 0 })) return res.status(201).json(await vueCompte(e, compte.id));
         }
         throw new ErreurHttp(409, 'Création en cours. Réessayez.');
       }
@@ -1428,11 +1461,11 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         // Membre déjà inscrit : on ouvre la ligue, c'est tout ce qu'il demande.
         if (ligne.comptes.includes(compte.id)) {
           const e = await appliquer(ligne.id, compte.id, `lecture-${Math.floor(maintenant / 2000)}-catalogue-${catalogueAdmin().revision}`, (e, n, g) => actualiserCarriere(e, n, g));
-          return res.status(200).json(vueCarriere(e, compte.id));
+          return res.status(200).json(await vueCompte(e, compte.id));
         }
         const e = await appliquer(ligne.id, compte.id, `adhesion-${compte.id}`, (e, n, g) => agirCarriere(e, compte.id,
           { type: 'rejoindre', pseudo: compte.pseudo, clubNom: texte(corps.clubNom, 3, 40, 'Nom du club'), embleme: corps.embleme as string | undefined }, n, g), true);
-        return res.status(200).json(vueCarriere(e, compte.id));
+        return res.status(200).json(await vueCompte(e, compte.id));
       }
       if (action === 'rejoindreDivisionPublique') {
         return res.status(200).json(await rejoindreDivisionPublique(compte,
@@ -1462,7 +1495,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
               throw new ErreurHttp(400, 'Ce direct n’est pas disponible.');
             }
             if (await stockage.marquerPresence(id, matchId, compte.id, maintenant)) {
-              return res.status(200).json(vueCarriere(ligne.etat, compte.id));
+              return res.status(200).json(await vueCompte(ligne.etat, compte.id));
             }
           }
         }
@@ -1476,11 +1509,11 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         const versionEcran = corps.delta === true && Number.isSafeInteger(corps.v) ? Number(corps.v) : null;
         // Même allègement que la lecture (`leger=1`) : le delta se calcule entre deux vues de la forme que l'écran tient.
         const leger = corps.leger === true;
-        const repondre = (avant: EtatCarriereEnLigne | undefined, apres: EtatCarriereEnLigne) => {
+        const repondre = async (avant: EtatCarriereEnLigne | undefined, apres: EtatCarriereEnLigne) => {
           if (versionEcran !== null && avant && avant.version === versionEcran && apres.version >= avant.version) {
-            return res.status(200).json({ delta: differenceVue(vueCarriere(avant, compte.id, leger), vueCarriere(apres, compte.id, leger)) });
+            return res.status(200).json({ delta: differenceVue(await vueCompte(avant, compte.id, leger), await vueCompte(apres, compte.id, leger)) });
           }
-          return res.status(200).json(vueCarriere(apres, compte.id, leger));
+          return res.status(200).json(await vueCompte(apres, compte.id, leger));
         };
         // ⚠️ `partagee` NE SE LIT JAMAIS D'UN CLIENT : c'est le serveur qui décide qu'une annonce part sur le marché commun.
         if (commande.type === 'vendre') delete commande.partagee;
@@ -1488,7 +1521,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
           const ligne = await lireLigue(id);
           if (ligne?.etat.publique && ligne.comptes.includes(compte.id)) {
             const traite = await marcheCommun.traiter(ligne.etat, compte, commande, requete);
-            if (traite) return repondre(ligne.etat, traite);
+            if (traite) return await repondre(ligne.etat, traite);
           }
         }
         let avantCommande: EtatCarriereEnLigne | undefined;
@@ -1496,7 +1529,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
           avantCommande = e;
           return agirCarriere(e, compte.id, commande as unknown as CommandeCarriere, n, g, compte.identifiant === 'kiri');
         });
-        return repondre(avantCommande, e);
+        return await repondre(avantCommande, e);
       }
       if (action === 'presence') {
         const id = texte(corps.ligue, 36, 36, 'Ligue');

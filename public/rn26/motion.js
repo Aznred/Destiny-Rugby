@@ -1,7 +1,11 @@
 import * as THREE from '/rn26/vendor/three/build/three.module.js';
 
 // Courbes d'origine, axes/limites de l'Avatar et conversion de repère Unity → glTF.
-export async function loadMotions(catalogueFile='catalogue-demo.json') {
+// Correctif 30 — LES BANQUES : chaque clip du catalogue appartient à une banque (`banque`, « common » par défaut), servie dans
+// son propre fichier. `options.banques` : celles qu'on attend avant de rendre la main (toutes si absent) ; les autres se
+// chargent par `charger(banque)`, qui remplit `clips` au fur et à mesure. Un clip absent n'est pas une erreur : la scène joue
+// son repli tant que sa banque n'est pas arrivée.
+export async function loadMotions(catalogueFile='catalogue-demo.json',options={}) {
   const [rigs,catalogue]=await Promise.all([
     fetch('/rn26/motions/avatars.json').then(r=>r.json()),
     fetch('/rn26/motions/'+catalogueFile).then(r=>r.json())
@@ -10,7 +14,7 @@ export async function loadMotions(catalogueFile='catalogue-demo.json') {
   const buffers=new Map();
   const buffer=file=>{if(!buffers.has(file))buffers.set(file,fetch('/rn26/motions/'+file).then(r=>{if(!r.ok)throw new Error(file+' : '+r.status);return r.arrayBuffer();}));return buffers.get(file);};
   for(const [key,rig] of Object.entries(rigs))rig.key=key;
-  await Promise.all(catalogue.map(async meta=>{
+  const lire=async meta=>{
     if(clips[meta.name])return;
     if(/^poses-v/.test(meta.format||'')){
       const poses=Object.fromEntries(await Promise.all(Object.entries(meta.poseFiles).map(async([key,p])=>[key,{stride:p.stride,values:new Float32Array(await buffer(p.file),p.byteOffset||0,p.byteLength?p.byteLength/4:undefined)}])));
@@ -18,8 +22,23 @@ export async function loadMotions(catalogueFile='catalogue-demo.json') {
     }
     const values=new Float32Array(await fetch('/rn26/motions/'+meta.file).then(r=>r.arrayBuffer()));
     clips[meta.name]={...meta,values,index:Object.fromEntries(meta.attributes.map((a,i)=>[a,i]))};
-  }));
-  return {rigs,clips};
+  };
+  const parBanque=new Map();
+  for(const meta of catalogue){const b=meta.banque||'common';if(!parBanque.has(b))parBanque.set(b,[]);parBanque.get(b).push(meta);}
+  const attentes=new Map(),chargees=new Set(),octets={};
+  /** Charge une banque (une seule fois) ; rend faux si elle n'existe pas ou n'a pas pu arriver — on pourra la redemander. */
+  const charger=banque=>{
+    const liste=parBanque.get(banque);
+    if(!liste)return Promise.resolve(false);
+    if(!attentes.has(banque))attentes.set(banque,Promise.all(liste.map(lire)).then(()=>{
+      chargees.add(banque);
+      octets[banque]=liste.reduce((n,meta)=>n+Object.values(meta.poseFiles||{}).reduce((k,p)=>k+(p.byteLength||0),0),0);
+      return true;
+    }).catch(erreur=>{attentes.delete(banque);console.warn('Banque d’animations « '+banque+' » :',erreur);return false;}));
+    return attentes.get(banque);
+  };
+  await Promise.all((options.banques||[...parBanque.keys()]).map(charger));
+  return {rigs,clips,charger,chargees,octets,banques:[...parBanque.keys()]};
 }
 const Q=a=>new THREE.Quaternion(...a);
 /** Os animés par un geste du haut du corps : la course continue dessous. */

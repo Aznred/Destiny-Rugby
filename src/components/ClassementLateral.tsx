@@ -205,7 +205,7 @@ export function ClassementLateral({ joueur }: { joueur: Joueur }) {
               {vue.nations
                 ? <LogoEquipe nom={l.club} taille={16} />
                 : club ? <Blason club={club} taille={16} /> : <span />}
-              <span className="cl-lat-nom">{l.club}</span>
+              <span className="cl-lat-nom">{zone && <span className="cl-lat-statut" aria-label={t(PRESENTATION_STATUT[zone].cle)}>{PRESENTATION_STATUT[zone].symbole}</span>}{l.club}</span>
               <span className="cl-lat-j">{l.joues}</span>
               <span className="cl-lat-pts">{l.points}</span>
             </div>

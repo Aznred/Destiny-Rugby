@@ -619,7 +619,7 @@ export function CarriereEnLigne() {
           }
           return;
         }
-        const suivante = await chargerLigueCarriere(ligueId, controleur.signal, connue);
+        const suivante = await chargerLigueCarriere(ligueId, controleur.signal, connue, derniereVue.current?.publique);
         echecs = 0;
         if (suivante === INCHANGE) { inchanges++; }
         else if (actif && version === versionRequete.current) {
@@ -673,8 +673,9 @@ export function CarriereEnLigne() {
   };
   // Les clubs se synchronisent déjà par la version de la ligue. Ce contrôle
   // léger redirige aussi automatiquement vers la nouvelle division mensuelle.
+  const cyclePublic = vue?.publique?.cycle;
   useEffect(() => {
-    if (!ligueId || !vue?.publique) return;
+    if (!ligueId || !cyclePublic) return;
     let actif = true;
     const verifierDivision = async () => {
       if (document.hidden) return;
@@ -692,7 +693,7 @@ export function CarriereEnLigne() {
     const surVisibilite = () => { if (!document.hidden) void verifierDivision(); };
     document.addEventListener('visibilitychange', surVisibilite);
     return () => { actif = false; window.clearInterval(intervalle); document.removeEventListener('visibilitychange', surVisibilite); };
-  }, [ligueId, vue?.publique?.cycle]);
+  }, [ligueId, cyclePublic]);
   const agir: Agir = async commande => {
     if (!ligueId || occupe || vue?.observateur) return;
     setOccupe(true); setErreur(''); versionRequete.current++;
@@ -1246,7 +1247,7 @@ function Rencontre({ vue, rencontre: r, occupe, suivre, grande = false }: { vue:
 
 /** Le chronomètre du stade, en minutes et secondes de jeu. */
 const chrono = (minutes: number) => {
-  const total = Math.max(0, Math.min(80 * 60, Math.round(minutes * 60)));
+  const total = Math.max(0, Math.round(minutes * 60));
   return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
 };
 
@@ -1403,8 +1404,8 @@ function Direct({ vue, rencontre: r, agir, occupe, fermer }: { vue: VueCarriereE
   // Une décision en attente gèle le chrono du serveur : l'écran le gèle aussi,
   // sinon il continuerait de courir pendant qu'on réfléchit.
   const gele = m.gele ?? Boolean(m.decision);
-  const minuteVive = m.termine ? 80
-    : Math.min(80, ancre.current.horloge + (gele ? 0 : (Date.now() - ancre.current.recu) / 60_000));
+  const minuteVive = m.termine ? m.horloge
+    : ancre.current.horloge + (gele ? 0 : (Date.now() - ancre.current.recu) / 60_000);
   const resteDecision = m.decision
     ? Math.max(0, Math.min(26, Math.ceil((m.decision.jusqua - Date.now()) / 1000)))
     : 0;

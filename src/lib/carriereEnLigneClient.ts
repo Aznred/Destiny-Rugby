@@ -107,10 +107,10 @@ export const chargerAdministrationCarriere = (signal?: AbortSignal) =>
  * changé. Sans `version`, on reçoit la vue complète comme avant — c'est le
  * cas du tout premier chargement, qui n'a rien à comparer.
  */
-export const chargerLigueCarriere = (id: string, signal?: AbortSignal, version?: number) =>
+export const chargerLigueCarriere = (id: string, signal?: AbortSignal, version?: number, publique?: VueCarriereEnLigne['publique']) =>
   requete<VueCarriereEnLigne>(undefined, undefined, signal,
     // `leger=1` : les matchs terminés arrivent en résumé ; leur détail se demande à l'ouverture (`chargerDirectCarriere`).
-    `?ligue=${encodeURIComponent(id)}&leger=1${version ? `&v=${version}` : ''}`);
+    `?ligue=${encodeURIComponent(id)}&leger=1${version ? `&v=${version}` : ''}${publique ? `&cycle=${publique.cycle}&division=${publique.division}&derniere=${publique.derniereDivision === true ? 1 : 0}` : ''}`);
 /**
  * L'écran annonce le dernier pas de la chronologie qu'il connaît : le serveur
  * ne renvoie alors que la suite, à la place du relevé du terrain.

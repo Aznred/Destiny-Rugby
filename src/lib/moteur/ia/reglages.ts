@@ -19,7 +19,9 @@
  * et l'IA par poste n'y est pas étalonnée (mesuré : 11,6 essais par match).
  * La remettre à 1 suffit à revenir au moteur d'origine.
  */
-export const IA_MATCH_DE_CARRIERE = 5;
+// Niveau 6 (Correctif 30) : le jeu physique — bibliothèque d'animations contextuelles, grattages et contre-rucks en
+// séquences, combinaisons de touche, plaquages dangereux jugés à leur gravité, altercations (`moteur/animations.ts`).
+export const IA_MATCH_DE_CARRIERE = 6;
 
 export const REGLAGES_IA = {
   // ── Le duel porteur / plaqueur (`avantageDuPorteur`) ──────────────────────

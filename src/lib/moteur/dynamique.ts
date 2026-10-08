@@ -59,6 +59,12 @@ export function avancerArbitre(e: EtatMatch, dt: number): void {
     x: borner(e.ballon.x + v.x * .6 - sens(e.possession) * 7, 2, LONGUEUR - 2),
     y: borner(e.ballon.y + v.y * .5 + (e.ballon.y > AXE ? -8 : 8), 3, LARGEUR - 3),
   };
+  // Correctif 30 : une altercation — il y va, pour séparer (à un mètre et demi du point chaud, sur le côté).
+  const alt = e.altercation;
+  if (alt && e.sim < alt.fin) {
+    cible.x = borner(alt.lieu.x - sens(e.possession) * 1.2, 2, LONGUEUR - 2);
+    cible.y = borner(alt.lieu.y + (alt.lieu.y > AXE ? -1.5 : 1.5), 3, LARGEUR - 3);
+  }
   // Répulsion des regroupements : le referee contourne les joueurs.
   for (const p of e.pions) {
     if (!p.surLeTerrain) continue;

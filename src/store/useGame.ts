@@ -3819,6 +3819,13 @@ export const useGame = create<GameState>()(
       creerManager: ({ nom, nation, club, age, libre, depuis }) => {
         const fiche = clubParNom(club);
         if (!fiche) return;
+        // Une nouvelle carrière repart de la pyramide d'origine, avant toute lecture du club et de ses objectifs.
+        setMouvementsClubs({});
+        setArriveesClubs({});
+        oublierResultats();
+        setContexteJoueur('', 0);
+        setTransfertsSociaux([]);
+        setApportsDuCentre([], {});
         const comp = competitionDuClub(club);
         const prestige = depuis ? prestigeDepuisJoueur(depuis) : PRESTIGE_DEBUT;
         // Plus de joueur incarné : le monde reprend tous ses joueurs avant qu'on lise un effectif.
@@ -3900,6 +3907,7 @@ export const useGame = create<GameState>()(
         manager.avancee = creerEtatCarriereAvancee(manager, effectifDuClub(club, 1));
         set((s) => ({
           manager,
+          mouvementsClubs: {}, arriveesClubs: {},
           joueur: null,
           reconversionManager: null,
           ecran: 'manager',
@@ -6655,13 +6663,11 @@ export const useGame = create<GameState>()(
           j = ajouterMatchInternational(j, s.essais, s.points ?? s.essais * 5 + s.butsReussis * 2, inter.role === 'titulaire');
           if (contexte) {
             const domicile = inter.match.match.domicile === inter.camp!.nation;
-            const match = { ...inter.match.match,
-              scoreD: domicile ? contexte.scorePour : contexte.scoreContre,
-              scoreE: domicile ? contexte.scoreContre : contexte.scorePour,
-            };
-            if (inter.match.competition.id === 'coupeDuMonde' && inter.match.journee > 3 && match.scoreD === match.scoreE) {
-              if (graine(inter.match.cle + '#prolongation')() < 0.5) match.scoreD += 3; else match.scoreE += 3;
-            }
+            const match = resultatDeLaRencontre(
+              inter.match.cle, inter.camp!.nation,
+              domicile ? inter.match.match.exterieur : inter.match.match.domicile, domicile,
+              contexte.scorePour, contexte.scoreContre, contexte.essaisPour ?? 0, contexte.essaisContre ?? 0,
+            );
             const p = parcoursInternational(j);
             j = { ...j, international: { ...p, resultats: { ...p.resultats, [inter.match.cle]: match } } };
             enregistrerResultatJoue(inter.match.cle, match);

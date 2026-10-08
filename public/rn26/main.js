@@ -8,7 +8,7 @@ import * as moteur from './moteur-destiny.js';
 // Dans le jeu, les écrans de match montent `scene.js` et lui donnent LEUR état.
 // Ici, la page crée un France – Angleterre et le fait avancer toute seule.
 const $=s=>document.querySelector(s);
-const outils={porteurPourAffichage:moteur.porteurPourAffichage,positionVol:moteur.positionVol,geometrieMelee:moteur.geometrieMelee,TEMPS_MELEE:moteur.TEMPS_MELEE,RITUEL_TIR:moteur.RITUEL_TIR,preparerChenille:moteur.preparerChenille};
+const outils={signalArbitre:moteur.signalArbitre,porteurPourAffichage:moteur.porteurPourAffichage,positionVol:moteur.positionVol,geometrieMelee:moteur.geometrieMelee,TEMPS_MELEE:moteur.TEMPS_MELEE,RITUEL_TIR:moteur.RITUEL_TIR,preparerChenille:moteur.preparerChenille};
 let EQUIPES=[
   {nom:'France',maillot:{principal:'#0a2459',secondaire:'#1b3d9e',accent:'#ffffff',short:'#f1f1ee',chaussettes:'#d00000',motif:'epaules'}},
   {nom:'Angleterre',maillot:{principal:'#f2f4f3',secondaire:'#dfe5e8',accent:'#c8102e',short:'#f2f4f3',chaussettes:'#0b1f44',motif:'uni'}},

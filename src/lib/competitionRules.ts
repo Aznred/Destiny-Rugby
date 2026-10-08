@@ -134,6 +134,7 @@ const TABLE: Record<string, CompetitionRules> = Object.fromEntries([
   // Ligue en ligne
   regles('ligueEnLigne', { qualified: 0, playoffs: 'auto' }, COUPERET_TIRS),
   regles('divisionPublique', { qualified: 0, playoffs: 'auto', promotion: 1, ...UN_PLUS_ACCES }, COUPERET_TIRS),
+  regles('coupeDuMonde', { qualified: 2, playoffs: 0 }, COUPERET_TIRS),
 ].map((r) => [r.competition, r]));
 
 const PAR_DEFAUT = regles('*', {}, COUPERET_TIRS);
@@ -147,7 +148,7 @@ export function rulesFor(competition: string | undefined | null): CompetitionRul
  * Le règlement d'une ligue en ligne : privée (phase finale facultative) ou division publique (montée, barrage,
  * relégation). La première division publique n'a personne au-dessus d'elle : pas de montée.
  */
-export function onlineRules(ligue: { publique?: { division: number } | null; playoffs?: boolean }): CompetitionRules {
+export function onlineRules(ligue: { publique?: { division: number; derniereDivision?: boolean } | null; playoffs?: boolean }): CompetitionRules {
   const base = rulesFor(ligue.publique ? 'divisionPublique' : 'ligueEnLigne');
   return {
     ...base,
@@ -155,6 +156,7 @@ export function onlineRules(ligue: { publique?: { division: number } | null; pla
       ...base.standings,
       playoffs: ligue.playoffs ? 'auto' : 0,
       promotion: ligue.publique && ligue.publique.division > 1 ? base.standings.promotion : 0,
+      ...(ligue.publique?.derniereDivision ? { directRelegation: 0, accessMatchPositions: [] } : {}),
     },
   };
 }
@@ -244,6 +246,7 @@ export function poolStatuses(rules: CompetitionRules, taille: number): Standings
  * `tournoi#division#…`, `acces#haut#bas#…`, `coupe#id#…`). `null` : ce n'est pas un match à élimination.
  */
 export function competitionDuCouperet(cle: string): string | null {
+  if (/^mondial#[^#]+#(huitieme|quart|demie|finale|petiteFinale)#/.test(cle)) return 'coupeDuMonde';
   const m = /^(phase|finale|coupe|acces|tournoi)#([^#]+)/.exec(cle);
   return m ? m[2] : null;
 }

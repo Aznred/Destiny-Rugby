@@ -84,6 +84,7 @@ import {
   cadrerFilm, extraireChrono, extraireFilm, filmer, PAS_FILM, poidsFilm, type ChronoDirect, type FilmDirect, type RepereChrono,
 } from './filmDirect.js';
 import { marqueurDepuisEtat, ventPourLeTir, type MarqueurTV, type VentTV } from '../statsTV.js';
+import type { DrawResolution } from '../competitionRules.js';
 
 /** Les deux camps, nommés comme la rencontre les nomme. */
 export type CoteEnLigne = 'domicile' | 'exterieur';
@@ -493,6 +494,8 @@ export interface FeuilleGelee {
 }
 
 export interface ParametresCreationMatch {
+  /** Règlement gelé au coup d'envoi ; absent en championnat et en poule. */
+  departage?: DrawResolution;
   id: string;
   domicile: EquipeMatchEnLigne;
   exterieur: EquipeMatchEnLigne;
@@ -505,6 +508,11 @@ export interface ParametresCreationMatch {
 export type Paire = Record<CoteEnLigne, number>;
 
 export interface EtatMatchEnLigne {
+  departage?: DrawResolution;
+  /** Issue décidée par le terrain, conservée après l'archivage des équipes. */
+  issue?: { vainqueur: CoteEnLigne; critere: 'prolongation' | 'essais' | 'tirsAuBut'; tirs?: [number, number] };
+  prolongations?: Paire;
+  periode?: number;
   id: string;
   cle: string;
   /** Coup d'envoi réel (ms). `enregistrerResultat` s'en sert pour l'origine. */
@@ -557,7 +565,9 @@ export interface EtatMatchEnLigne {
  * ceux déjà créés gardent les leurs.
  */
 // Règles 5 (Correctif 24) : les conquêtes lisibles du solo (touche, ruck, mêlée, maul : IA de niveau 4) et le jeu vivant (niveau 5).
-export const REGLES_MATCH_EN_LIGNE = 5;
+// Règles 7 (Correctif 30) : le jeu physique du solo (IA de niveau 6) — animations contextuelles, grattages et contre-rucks
+// en séquences, combinaisons de touche, plaquages dangereux jugés à leur gravité, altercations.
+export const REGLES_MATCH_EN_LIGNE = 7;
 /**
  * Défense resserrée des règles 2 : la cadence détaillée marque davantage, ce
  * réglage ramène le nombre d'essais à celui des matchs de ligue d'avant
@@ -570,10 +580,13 @@ export const RESSERREMENT_REGLES_2 = 1;
  * déjà commencés : la porter par un nouveau niveau, donc une nouvelle règle.
  */
 // Règles 4 : le porteur lit ce qu'il a devant lui (`moteur/ia/vision.ts`, IA de niveau 3).
-export const iaDesRegles = (regles: number | undefined): number | undefined => ((regles ?? 1) >= 5 ? 5 : (regles ?? 1) >= 4 ? 3 : (regles ?? 1) >= 3 ? 2 : undefined);
+export const iaDesRegles = (regles: number | undefined): number | undefined => ((regles ?? 1) >= 7 ? 6 : (regles ?? 1) >= 5 ? 5 : (regles ?? 1) >= 4 ? 3 : (regles ?? 1) >= 3 ? 2 : undefined);
 
 /** Ce que le client reçoit : jamais la graine, jamais le plan d'en face. */
 export interface VueMatchEnLigne {
+  issue?: EtatMatchEnLigne['issue'];
+  prolongations?: Paire;
+  periode?: number;
   moments?: import('./momentsForts.js').MomentFort[];
   gele?: boolean;
   id: string;
@@ -630,6 +643,11 @@ export const DELAI_DECISION = 26_000;
 export const DELAI_PRESENCE = 45_000;
 /** Un match lancé puis oublié se termine tout seul au bout de ce délai. */
 export const DUREE_REELLE = 80 * MS_PAR_MINUTE;
+/** La clôture de secours laisse le moteur jouer les périodes prévues par CETTE rencontre. */
+export function dureeMatchEnLigne(etat: Pick<EtatMatchEnLigne, 'departage'>): number {
+  const prolongation = etat.departage?.extraTime;
+  return DUREE_REELLE + (prolongation ? prolongation.periodes * prolongation.minutes * MS_PAR_MINUTE : 0);
+}
 
 /**
  * ═══ LA MARGE D'AUTORITÉ (Correctif 24) ══════════════════════════════════════
@@ -674,7 +692,7 @@ export function simOrdre(etat: Pick<EtatMatchEnLigne, 'debut'>, maintenant: numb
  * n'ont pas la milliseconde exacte.
  */
 export function minuteCible(etat: EtatMatchEnLigne, maintenant: number): number {
-  return Math.max(etat.horloge, Math.min(80, simCible(etat, maintenant) / 60));
+  return Math.max(etat.horloge, Math.min(dureeMatchEnLigne(etat) / MS_PAR_MINUTE, simCible(etat, maintenant) / 60));
 }
 
 /**
@@ -684,7 +702,7 @@ export function minuteCible(etat: EtatMatchEnLigne, maintenant: number): number 
  * s'arrêter sur `e.minute` revient à ne jamais s'arrêter ailleurs qu'au début
  * d'une minute, donc à jouer le direct par bonds de soixante secondes.
  */
-const minuteExacte = (e: EtatMatch): number => Math.min(80, e.t / 60);
+const minuteExacte = (e: EtatMatch): number => e.departage ? e.t / 60 : Math.min(80, e.t / 60);
 
 export function presenceActive(etat: EtatMatchEnLigne, cote: CoteEnLigne, maintenant: number): boolean {
   const vu = etat.presence[cote];
@@ -842,7 +860,7 @@ const CACHE_MAX = 512;
 const CACHE_OCTETS_MAX = 256 * 1024 * 1024;
 let cacheOctets = 0;
 /** Le coup d'envoi fait partie de la clé : le laboratoire relance un match sous le même identifiant. */
-const cleCache = (etat: EtatMatchEnLigne) => `${etat.cle}@${etat.debut}`;
+const cleCache = (etat: EtatMatchEnLigne) => `${etat.cle}@${etat.debut}@${etat.regles ?? 1}`;
 
 function supprimerCache(cle: string): void {
   cacheOctets -= CACHE.get(cle)?.octets ?? 0;
@@ -974,6 +992,10 @@ function monter(etat: EtatMatchEnLigne): EntreeCacheMoteur {
       // chaque arrêt utilise sa durée directe, courte mais lisible.
       tempsReel: true,
       scoreSurTerrain: true,
+      reglesSirene: (etat.regles ?? 1) >= 6 ? 'transformation' : 'historique',
+      ...((etat.regles ?? 1) >= 6 && etat.departage?.extraTime ? {
+        departage: { ...etat.departage.extraTime, criteres: etat.departage.thenCompetitionSpecificTiebreak },
+      } : {}),
       // Règles 2 : voir `EtatMatchEnLigne.regles`.
       cadenceDetaillee: regles2, placementJoue: regles2,
       resserrement: regles2 ? RESSERREMENT_REGLES_2 : undefined,
@@ -1278,7 +1300,7 @@ function extraireFil(e: EtatMatch): LigneFil[] {
     lignes.push({
       id: `evenement-${index}`, seconde: c.seconde ?? c.minute * 60,
       score: { domicile: c.scoreA, exterieur: c.scoreB },
-      minute: Math.min(80, Math.round(c.minute)), texte: c.texte, type: c.type,
+      minute: Math.round(c.minute), texte: c.texte, type: c.type,
       cote: c.cote === 'A' ? 'domicile' : c.cote === 'B' ? 'exterieur' : undefined,
       points: c.points || undefined,
     });
@@ -1540,7 +1562,12 @@ function relever(etat: EtatMatchEnLigne, e: EtatMatch): void {
 /** Le coup de sifflet final : on relève tout, puis on archive. */
 function clore(etat: EtatMatchEnLigne, e: EtatMatch): void {
   relever(etat, e);
-  etat.horloge = 80;
+  etat.horloge = e.departage ? e.t / 60 : 80;
+  etat.periode = e.periode;
+  if (e.issue) etat.issue = { ...e.issue, vainqueur: MOTEUR_VERS_COTE[e.issue.vainqueur] };
+  if (e.scoreReglementaire) etat.prolongations = {
+    domicile: e.scoreA - e.scoreReglementaire[0], exterieur: e.scoreB - e.scoreReglementaire[1],
+  };
   etat.termine = true;
   etat.feuille = extraireFeuille(e);
   delete etat.decision;
@@ -1567,6 +1594,7 @@ export function creerMatchEnLigne(p: ParametresCreationMatch): EtatMatchEnLigne 
   const cle = `${p.id}#${p.graine >>> 0}`;
   return {
     id: p.id, cle, debut: p.debut, gel: 0, horloge: 0, regles: REGLES_MATCH_EN_LIGNE,
+    ...(p.departage ? { departage: structuredClone(p.departage) } : {}),
     cibles: cibleDeScore(
       forceFeuille(equipes.domicile.feuille), forceFeuille(equipes.exterieur.feuille), cle,
       equipes.domicile.collectif ?? 50, equipes.exterieur.collectif ?? 50,
@@ -1628,7 +1656,7 @@ export function avancerMatchEnLigne(etat: EtatMatchEnLigne, maintenant: number, 
     const veille = veilleAuJournal(suivant.journal, cote);
     if (present === veille.actif || (!present && ordre - veille.sim < 75)) continue;
     suivant.journal.push({
-      sim: ordre, horloge: Math.min(80, suivant.horloge + MARGE_AUTORITE / 60), cote, commande: { type: 'veille', actif: present },
+      sim: ordre, horloge: suivant.horloge + MARGE_AUTORITE / 60, cote, commande: { type: 'veille', actif: present },
     });
   }
 
@@ -1730,7 +1758,7 @@ export function commanderMatchEnLigne(
   // La base reste celle du coup d'envoi. La remplacer ici appliquerait les
   // nouvelles combinaisons dans le passé lors d'une reconstruction à froid.
   const evenement: EvenementMatchEnLigne = {
-    sim: simOrdre(avance, maintenant), horloge: Math.min(80, avance.horloge + MARGE_AUTORITE / 60), cote, commande,
+    sim: simOrdre(avance, maintenant), horloge: avance.horloge + MARGE_AUTORITE / 60, cote, commande,
   };
   return { ...avance, journal: [...avance.journal, evenement] };
 }
@@ -1845,7 +1873,7 @@ function mesOrdres(etat: EtatMatchEnLigne, monCote: CoteEnLigne): LigneFil[] {
     if (ev.cote !== monCote || ev.commande.type === 'presence' || ev.commande.type === 'veille') continue;
     const ordre: OrdreFil = ev.commande.type === 'strategie' ? 'consignes'
       : ev.commande.type === 'remplacement' ? 'remplacement' : ev.commande.choix;
-    const ligne: LigneFil = { minute: Math.min(80, Math.round(ev.horloge)), texte: '', type: 'ordre', cote: monCote, ordre };
+    const ligne: LigneFil = { minute: Math.round(ev.horloge), texte: '', type: 'ordre', cote: monCote, ordre };
     if (ev.auto) ligne.auto = true;
     lignes.push(ligne);
   }
@@ -1858,6 +1886,7 @@ export function resumeMatchEnLigne(etat: EtatMatchEnLigne): VueMatchEnLigne {
     id: etat.id, instance: etat.debut, minute: Math.floor(etat.horloge), horloge: r2(etat.horloge), termine: etat.termine,
     score: etat.score, essais: etat.essais, penalites: etat.penalites, fil: [], stats: etat.stats,
     remplacementsFaits: 0, surLeTerrain: [], surLeBanc: [], resume: true,
+    issue: etat.issue, prolongations: etat.prolongations, periode: etat.periode,
   };
 }
 
@@ -1874,6 +1903,7 @@ export function vueMatchEnLigne(
     score: etat.score, essais: etat.essais, penalites: etat.penalites,
     fil: etat.fil, stats: etat.stats, feuille: etat.feuille,
     moments: momentsDepuisFil(etat.id, etat.fil), gele: Boolean(etat.decision),
+    issue: etat.issue, prolongations: etat.prolongations, periode: etat.periode,
     remplacementsFaits: 0, surLeTerrain: [], surLeBanc: [],
   };
   if (etat.termine) {

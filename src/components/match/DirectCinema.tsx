@@ -163,7 +163,7 @@ export function DirectCinema({
             return { ...mq, club, photo: portraits ? portraits[mq.nom] ?? null : undefined, stat: phraseDuMarqueur(mq, club, contexteTV) };
           })() : null}
           bulle={bulleTenue.current.phrase} vent={terrain?.ventTV ?? null}
-          periode={terrain?.periode ?? (secondeCourante >= 2400 ? 2 : 1)} phase={terrain?.phase} termine={m.termine && filmFini}
+          periode={terrain?.periode ?? m.periode ?? (secondeCourante >= 2400 ? 2 : 1)} phase={terrain?.phase} termine={m.termine && filmFini}
           equipes={[
             { nom: domicile, ...couleursEquipeTV(couleurs.domicile, couleurs.maillots?.domicile.secondaire), logo: emblemes?.domicile, score: score.domicile, essais: essaisVus.domicile },
             { nom: exterieur, ...couleursEquipeTV(couleurs.exterieur, couleurs.maillots?.exterieur.secondaire), logo: emblemes?.exterieur, score: score.exterieur, essais: essaisVus.exterieur },

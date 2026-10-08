@@ -1936,6 +1936,59 @@ La retransmission française utilise F5-TTS sur l'ordinateur via un service loca
 - Classement : une vraie vue téléphone (position, équipe, MJ, différence, points ; détail en touchant l'équipe), zones colorées et légende calculées par le règlement.
 - Banc : `npm run verify:reglements`. Aperçu : `/scripts/apercuClassement.html`.
 
+## Correctif 30 — animations contextuelles et jeu physique (08/10/2026)
+
+Les matchs en trois dimensions (carrière joueur, carrière entraîneur, collection solo) et les matchs de ligue créés à partir de
+maintenant ne rejouent plus toujours les mêmes gestes. Le moteur LIT chaque situation — angle, vitesses, rapport de force et de
+poids, équilibre, fatigue, poste, ligne d'essai — et choisit le geste ; la scène le joue. Rien n'est tiré au sort : la même
+situation donne la même image, sur tous les écrans d'un direct.
+
+- **22 plaquages aboutis** (aux jambes, au bassin, haut, de côté, par-derrière, offensif, à deux, porteur tenu debout ou soulevé
+  et emmené, qui gagne encore un mètre, défenseur qui glisse, épaule contre épaule, sauvetage devant la ligne…), **13 manqués**
+  (plongé trop tôt, passé dans le dos, pris à contre-pied, une jambe seulement, rebondi, raffûté, percuté…), **12 crochets** — dont le
+  crochet raté, où le défenseur reste devant —, **6 raffuts** (la main se pose vraiment sur le défenseur), **5 percussions**.
+- **Ruck** : cinq grattages (rapide, contesté, récompensé d'une pénalité, perdu, trop tardif) où l'on voit le gratteur se baisser,
+  prendre appui et mettre les mains sur le ballon ; huit déblayages ; contre-rucks à un, à deux ou en groupe, qui font reculer le
+  regroupement avant que le ballon ne change de camp.
+- **Touches** : 26 combinaisons — faux saut, double faux saut, sauteur qui change de bloc, changement de cible, maul, faux maul,
+  maul dont le ballon ressort, peeling, et des lancements préparés pour la ligne (9 → 10, premier centre lancé, croisée, côté fermé).
+- **Plaquages dangereux** : joueur soulevé, charge sans les bras, plaquage haut, plaquage en retard — des FAUTES, jugées à leur
+  gravité (pénalité, jaune, rouge) si l'arbitre les a vues. **Altercations** rares et brèves, en trois niveaux, après un geste
+  dangereux, un gros plaquage ou des fautes répétées ; l'arbitre sanctionne celui qui l'a déclenchée.
+- **Arbitre** : son geste correspond à la décision. ⚠️ Les « gestes de faute » des joueurs étaient en réalité les signaux de
+  l'arbitre du jeu d'origine : chaque faute a maintenant le geste de celui qui la commet.
+- **Passes, réceptions, jeu au pied, essais** : 9 passes, 7 réceptions, coups de pied posés, en course ou sous pression, contre
+  visible, 9 façons de marquer, 5 célébrations selon le score et la minute.
+- **Chargement** : 382 animations (267 avant) rangées en neuf banques ; le match démarre avec la moitié du poids d'avant
+  (5,1 Mo par morphologie au lieu de 10,5), le reste arrive pendant qu'on joue. Loin du ballon, les poses sont recalculées moins souvent.
+
+Mesuré sur 216 matchs de carrière (niveau 5 → niveau 6) : 37,1 → 37,6 points, 5,2 → 5,3 essais, 6,4 → 6,2 pénalités,
+0,77 → 0,62 jaune, 0,05 → 0,08 rouge. Après douze matchs, le banc a vu 143 séquences différentes (65 après le premier).
+Rare : un joueur soulevé tous les 24 matchs, une altercation dans un match sur onze (un sur quatre quand le match est tendu).
+
+```bash
+npm run verify:animations -- 12    # la bibliothèque : chaque variante a son animation, matchs contrôlés à chaque pas
+npm run mesure:animations -- 216   # plaquages dangereux, altercations, grattages : ce qui doit rester rare
+```
+
+**Pas fait** : la règle de l'avantage (l'arbitre ne l'annonce donc pas) ; la plupart des variantes n'ont pas été regardées une
+par une à l'image ; rien n'a été essayé sur un téléphone ni dans un vrai direct de ligue ; pas de tutoriel ni de commentaire parlé
+pour les altercations ; la vue de haut ne montre pas ces variantes.
+
+## Correctif 31 — l'écran géant des stades de club (08/10/2026)
+
+Derrière l'en-but des stades de campagne et de village, l'écran géant affichait encore le logo du jeu dont viennent les décors.
+Il porte maintenant Destiny Rugby, comme les panneaux, le ballon et le couloir du Stade de France ; s'il ne peut pas être peint,
+il reste éteint. Au passage, les conteneurs posés autour des petits stades ont retrouvé leur tôle (ils affichaient un morceau
+d'une autre texture).
+
+```bash
+node verifier_marques_decors.cjs   # depuis ../analyse-rn26 : aucune marque d'origine n'est lue par un morceau de décor non repeint
+```
+
+**Pas fait** : rien n'a été regardé sur un téléphone ; les fichiers de décor contiennent toujours les textures d'origine
+(repeintes au chargement) ; les silhouettes blanches du bord de touche des stades de club sont un défaut d'avant, non corrigé.
+
 ## Correctif 32 — sortie de match, stockage plein, bagarre, onglets de l'entraîneur (08/10/2026)
 
 Trois retours de jeu : sur iPad et iPhone 15 le retour à la carrière après un match restait figé (il fallait relancer le

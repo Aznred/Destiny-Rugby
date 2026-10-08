@@ -28,3 +28,5 @@ export function creerApercuDestiny(cle = 'rn26-destiny-26', cadenceDetaillee = t
 export { avancer, porteurPourAffichage, geometrieMelee, TEMPS_MELEE, RITUEL_TIR };
 export { preparerChenille, designerRelayeur } from './regroupements';
 export { positionVol, passageAuxPoteaux, tirPasseEntreLesPoteaux } from './trajectoire';
+// Correctif 30 : le signal de l'arbitre se lit sur l'état, par la même fonction que le moteur.
+export { signalArbitre } from './animations';

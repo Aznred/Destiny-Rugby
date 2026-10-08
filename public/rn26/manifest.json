@@ -1,9 +1,9 @@
 {
   "players": 30,
   "officials": 3,
-  "uniqueAnimations": 267,
+  "uniqueAnimations": 382,
   "hairMeshes": 40,
-  "animationBundles": 2,
+  "animationBundles": 18,
   "ai": "Destiny Rugby — moteur.ts, tactique.ts, dynamique.ts et règles existantes",
   "assets": "Stade France, joueurs, ballon, tee, kits, coiffures et courbes RN26",
   "officialAppearance": "Même modèle humanoïde RN26, tenue turquoise adaptée",

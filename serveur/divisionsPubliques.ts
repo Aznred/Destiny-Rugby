@@ -51,11 +51,11 @@ export function planifierDivisionsPubliques(ligues: readonly LigueStockee[], cyc
       if (hHaut && hBas) {
         const nombre = createHash('sha256').update(`destiny-barrage:${cycle}:${haut.division}:${avantDernier}:${finaliste}`).digest();
         const rencontre = conclureMatchEnLigne(creerMatchEnLigne({ id: `barrage:${cycle}:${haut.division}`,
-          domicile: equipeBarrage(hHaut), exterieur: equipeBarrage(hBas), debut: 0, graine: nombre.readUInt32BE(0) }));
+          domicile: equipeBarrage(hHaut), exterieur: equipeBarrage(hBas), debut: 0, graine: nombre.readUInt32BE(0),
+          departage: rulesFor('divisionPublique').knockout.drawResolution }));
         const scoreHaut = rencontre.score.domicile;
-        let scoreBas = rencontre.score.exterieur;
-        if (scoreHaut === scoreBas) scoreBas += 3;
-        const gagneBas = scoreBas > scoreHaut;
+        const scoreBas = rencontre.score.exterieur;
+        const gagneBas = rencontre.issue ? rencontre.issue.vainqueur === 'exterieur' : scoreBas > scoreHaut;
         barrages.set(haut.division, `Barrage D${haut.division}/D${bas.division} : ${hHaut.club.nom} ${scoreHaut}–${scoreBas} ${hBas.club.nom} · ${gagneBas ? hBas.club.nom + ' monte' : hHaut.club.nom + ' se maintient'}`);
         if (gagneBas) echanger(haut, avantDernier, bas, finaliste);
       }

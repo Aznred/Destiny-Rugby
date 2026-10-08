@@ -234,12 +234,13 @@ export interface Irregularite {
  * ⚠️ ET ELLE VAUT POUR LES TRENTE PIONS, pas seulement pour le joueur. C'est ce
  * qui permet à l'équipe d'en face d'être à l'origine de l'altercation.
  */
-export function irregularite(e: EtatMatch, plaqueur: Pion): Irregularite | null {
+export function irregularite(e: EtatMatch, plaqueur: Pion, facteur = 1): Irregularite | null {
   // Un plaqueur discipliné et frais ne monte pas haut. Un joueur à bout de
   // souffle dans un match tendu, si.
   const fatigue = 1 - plaqueur.endurance / 100;
   const base = e.niveau === 'amateur' ? 0.011 : 0.006;
-  const p = base * (0.5 + fatigue) * (0.6 + e.tension / 70) * (1.4 - plaqueur.discipline / 150);
+  // `facteur` (niveau 6) : le contact lui-même s'y prête — voir `risqueDeGesteDangereux`. Le tirage, lui, reste le même.
+  const p = base * (0.5 + fatigue) * (0.6 + e.tension / 70) * (1.4 - plaqueur.discipline / 150) * facteur;
   if (e.rng() >= p) return null;
   // Deux tiers de plaquages hauts, un tiers de plaquages en retard.
   // Le plaquage cathédrale est un geste exceptionnel et dangereux (1,5 % au lieu de 15 %).

@@ -560,7 +560,7 @@ export function MatchLive({
         niveau: niveauDuMatch(joueur, selection), controle: true,
         // ⚠️ MATCH COUPERET : LE NUL N'EXISTE PAS (Correctif 29). Le règlement de la compétition dit ce qui se joue à
         // égalité à la sirène — prolongations, puis sa procédure. Une journée de championnat ou de poule n'en reçoit pas.
-        ...(selection ? {} : { departage: departageDuMatch(cle) }),
+        departage: departageDuMatch(cle),
         cadenceDetaillee: cadenceInitiale.current,
         // Le placement se joue : personne n'est installé d'un coup, la phase attend ses joueurs.
         placementJoue: cadenceInitiale.current,
@@ -1432,14 +1432,14 @@ export function MatchLive({
     if (!e.fini || !monPion) return null;
     const s = statsPourLaNote(monPion, e.direct?.stats);
     return { note: noterMatch(monPion.poste, s), detail: detailNote(monPion.poste, s) };
-  }, [e.fini, monPion]);
+  }, [e.fini, monPion, e.direct?.stats]);
 
   // ⚠️ UN MATCH COUPERET A TOUJOURS UN VAINQUEUR (`lib/couperet.ts`). Le moteur joue ses quatre-vingts minutes comme
   // pour n'importe quel match ; à égalité, la prolongation est tranchée par la même fonction que celle du store —
   // l'écran de fin annonce donc le score qui entre VRAIMENT dans le tableau (il affichait « 17-17 », le tableau « 20-17 »).
   // Calcul direct (quelques comparaisons) : `e` est le même objet du coup d'envoi à la sirène, une mémoïsation ne le verrait pas changer.
   const prolongation = (() => {
-    if (!e.fini || selection) return null;
+    if (!e.fini) return null;
     // La prolongation a été JOUÉE : on annonce ce que le terrain a décidé.
     if (e.issue) {
       const club = e.issue.vainqueur === 'A' ? e.clubA : e.clubB;

@@ -3,6 +3,7 @@ import type { Pion } from './entites.js';
 import { declencherChute, jouerGeste } from './dynamique.js';
 import { borner, distance, sens, LARGEUR, LIGNE_A, LIGNE_B, type Vec } from './terrain.js';
 import { iaParPoste } from './ia/lecture.js';
+import { jeuPhysique, lireDeblayage } from './animations.js';
 import { profilDe } from './ia/postes.js';
 
 export interface OrganisationRuck {
@@ -184,6 +185,31 @@ function choregraphierLeDuel(e: EtatMatch): void {
     const g = actif(d.acteurId);
     if (!g) return;
     poser(g, { x: e.ballon.x + s * 0.3, y: e.ballon.y }, avantContact ? 1.12 : 1);
+    if (d.temps) {
+      // ═══ NIVEAU 6 : LES CINQ GRATTAGES ════════════════════════════════════════════════════════════════════════════
+      // Le gratteur se baisse, prend appui, met les mains sur le ballon (`appui`) ; il lutte (`lutte`) ; puis vient la fin :
+      // il se relève ballon en main (rapide, contesté), l'arbitre siffle pour lui (pénalité) ou contre lui (tardif), ou le
+      // soutien le déloge (perdu). Les soutiens désignés courent vraiment sur lui — rien n'est déplacé d'un coup.
+      const lutte = d.contact + d.temps.appui, fin = lutte + d.temps.lutte, o = e.ruck!.organisation!;
+      const delogeurs = (d.nettoyeursIds ?? []).map(actif).filter((p): p is Pion => !!p);
+      delogeurs.forEach((p, i) => {
+        // Ils arrivent par l'axe, épaule sur le gratteur : un de chaque côté de son buste.
+        poser(p, { x: g.pos.x - s * 0.62, y: g.pos.y + (i ? 0.34 : -0.34) }, e.sim < lutte ? 1.15 : 1);
+        if (e.sim >= lutte - 0.1 && distance(p.pos, g.pos) < 1.15 && !o.contacts.includes('gratte:' + p.id)) {
+          o.contacts.push('gratte:' + p.id);
+          jouerGeste(e, p, 'clearout_drive', Math.max(0.9, fin - e.sim + 0.5), d.sequence === 'perdu' ? 'deloge' : 'bute');
+        }
+      });
+      if ((d.sequence === 'rapide' || d.sequence === 'conteste') && e.sim >= fin && !d.balle) d.balle = d.acteurId;
+      if (d.sequence === 'perdu' && e.sim >= fin && !d.deloge) {
+        // Délogé : il est repoussé de son côté du ruck et perd ses appuis. Le ballon, lui, n'a pas bougé.
+        d.deloge = true;
+        const force = 2.4 + delogeurs.reduce((n, p) => n + Math.max(0, p.puissance - g.puissance) / 40, 0);
+        g.vitesse.x += s * force; g.vitesse.y += (g.pos.y >= e.ballon.y ? 0.6 : -0.6);
+        declencherChute(g, { x: s * force, y: g.pos.y >= e.ballon.y ? 0.7 : -0.7 }, 1.35);
+      }
+      return;
+    }
     // Debout, ballon en main : la séquence du grattage est allée jusqu'à son terme.
     if (e.sim >= d.contact + 0.57 + 1.07 && !d.balle) d.balle = d.acteurId;
     return;
@@ -268,6 +294,22 @@ export function animerRegroupement(e: EtatMatch, dt: number): void {
     const relative = Math.hypot(a.vitesse.x - b.vitesse.x, a.vitesse.y - b.vitesse.y);
     const dx = b.pos.x - a.pos.x, dy = b.pos.y - a.pos.y, d = Math.max(.1, Math.hypot(dx, dy));
     const force = borner(1.5 + relative * .35 + (a.puissance - b.puissance) / 60, 1, 3.8);
+    if (jeuPhysique(e)) {
+      // ═══ NIVEAU 6 : HUIT DÉBLAYAGES ═══════════════════════════════════════════════════════════════════════════════
+      // Puissance, vitesse d'arrivée, angle, poids, fatigue : le nettoyeur passe sous l'épaule, pousse droit, arrive de
+      // travers ou s'y met à deux ; en face on résiste, on recule, ou on perd l'équilibre. Ce que la variante dit, la
+      // physique le fait : celui qui résiste recule moins et renvoie le nettoyeur, celui qui est déséquilibré tombe.
+      const aDeux = o.contacts.some((c) => c.endsWith(':' + b.id) && !c.startsWith(a.id + ':'));
+      const lu = lireDeblayage(a, b, relative, sens(a.cote), aDeux);
+      jouerGeste(e, a, 'clearout_drive', 1.25, lu.variante); o.animations[a.id] = e.sim + 1.25;
+      jouerGeste(e, b, 'contact_brace', 1.25, lu.variante); o.animations[b.id] = e.sim + 1.25;
+      const recul = lu.variante === 'resiste' ? .45 : lu.variante === 'repousse' ? 1.25 : lu.variante === 'desequilibre' ? 1.4 : 1;
+      b.vitesse.x += dx / d * force * recul; b.vitesse.y += dy / d * force * recul;
+      a.vitesse.x -= dx / d * force * (lu.variante === 'resiste' ? .6 : .25); a.vitesse.y -= dy / d * force * (lu.variante === 'resiste' ? .6 : .25);
+      if (lu.chute) declencherChute(b, { x: dx / d * force, y: dy / d * force }, 1.65);
+      (e.ruck!.deblayages ??= []).push({ de: a.id, sur: b.id, variante: lu.variante, t: e.sim });
+      continue;
+    }
     jouerGeste(e, a, 'clearout_drive', 1.25); o.animations[a.id] = e.sim + 1.25;
     jouerGeste(e, b, 'contact_brace', 1.25); o.animations[b.id] = e.sim + 1.25;
     b.vitesse.x += dx / d * force; b.vitesse.y += dy / d * force;

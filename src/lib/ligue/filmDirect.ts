@@ -186,6 +186,9 @@ const SCALAIRES = [
   'phasesDepuisArret', 'ligneAvantage', 'metresGagnesPhase', 'ballonLent', 'ouvert', 'periode', 'sirene', 'placementJoue',
   // Le vent (trois nombres fixés au coup d'envoi) et le changement de côté : l'écran en déduit tout le reste.
   'ventDirection', 'ventForce', 'ventGraine', 'cotesInverses',
+  'prolongation',
+  // Correctif 30 : le niveau du moteur — la scène y lit si le jeu physique (postures, bibliothèque d'animations) est celui de ce match.
+  'ia',
 ] as const;
 /**
  * ⚠️ LES OBJETS DONT L'IDENTITÉ COMPTE. L'affichage reconnaît un nouveau ruck,
@@ -197,6 +200,10 @@ const SCALAIRES = [
 const IDENTITES = [
   'vol', 'ruck', 'conquete', 'tir', 'aplatissage', 'sifflet', 'grosImpact', 'maul', 'penalite',
   'piedPrepare', 'echappee', 'tmo', 'dernierReplayEssai', 'indicationJeu',
+  // Correctif 30 (règles 7) : l'altercation en cours — qui pousse qui, à quel niveau, jusqu'à quand. Le reste du jeu physique
+  // (variante de plaquage, séquence de grattage, combinaison de touche, style d'essai) voyage DANS `ruck`, `conquete`, `tir`
+  // et `aplatissage`, et dans la variante des gestes : rien d'autre à transporter.
+  'altercation',
 ] as const;
 /** Ceux dont le décompte (`restant`) part en date de fin : une valeur fixe ne se renvoie pas à chaque pas. */
 const A_ECHEANCE = new Set<string>(['sifflet', 'grosImpact', 'echappee', 'tmo', 'dernierReplayEssai']);
@@ -323,6 +330,8 @@ function photographier(e: EtatMatch, camera: Camera): PhotoFilm {
   for (const p of e.pions) {
     const j: Objet = { role: p.role, numero: p.numero, poste: p.poste };
     if (p.numeroMaillot !== undefined) j.numeroMaillot = p.numeroMaillot;
+    // Ce que la fatigue fait à ses gestes (0, 1, 2) : il ne change que quelques fois par match, la différence ne coûte rien.
+    if (p.fatigue) j.f = p.fatigue;
     if (p.surLeTerrain) { j.t = 1; sur.push(p.id); q.push(cm(p.pos.x), cm(p.pos.y)); }
     if (p.sanction > 0) j.s = p.sanction > 3600 ? 2 : 1;
     if (p.remplace) j.remplace = true;
@@ -734,6 +743,8 @@ export interface PionFilm {
   corps?: { age: number; debut: number; duree: number; direction: number; intensite: number; appuis?: number[]; bras?: number[] };
   vitesseMax: number; puissance: number; tailleCm?: number; poidsKg?: number;
   remplace?: boolean; blesse?: boolean;
+  /** Ce que la fatigue fait à ses gestes (0 frais, 1 entamé, 2 épuisé) : voir `moteur/animations.ts`. */
+  fatigue?: 0 | 1 | 2;
   apparence: Pick<ApparenceMatch, 'peau' | 'cheveux' | 'coiffure' | 'barbe'>;
   stats: Record<string, number>;
 }
@@ -1131,7 +1142,7 @@ export class LecteurFilm {
       if (u >= 1 || u < 0) this.fondu = null;
       else poids = (1 - u) * (1 - u) * (1 + 2 * u);
     }
-    e.sim = sim; e.t = q[0] / 100; e.minute = Math.min(80, Math.floor(e.t / 60)); e.minuteur = q[1] / 100;
+    e.sim = sim; e.t = q[0] / 100; e.minute = Math.floor(e.t / 60); e.minuteur = q[1] / 100;
     e.ballon.x = q[2] / 100 + (this.fondu ? this.fondu.ballon.x * poids : 0);
     e.ballon.y = q[3] / 100 + (this.fondu ? this.fondu.ballon.y * poids : 0);
     const a = e.arbitre, ax = q[5] / 100, ay = q[6] / 100;
@@ -1196,6 +1207,7 @@ export class LecteurFilm {
     p.role = j.role as Role;
     p.numero = j.numero as number;
     p.numeroMaillot = j.numeroMaillot as number | undefined;
+    p.fatigue = (j.f as 0 | 1 | 2 | undefined) ?? 0;
     const etait = p.surLeTerrain;
     p.surLeTerrain = j.t === 1;
     if (etait !== p.surLeTerrain) this.precedentes.delete(id);

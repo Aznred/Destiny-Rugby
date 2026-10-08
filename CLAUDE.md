@@ -554,7 +554,8 @@ que l'affichage lise exactement la version du moteur qui joue.
   d'en-but et le changement de côté. Un match en cours au moment
   d'une mise en ligne garde donc son moteur — et son score. Remettre
   `REGLES_MATCH_EN_LIGNE` à 1 suffit à revenir en arrière pour les suivants.
-  **Depuis : règles 4 = lecture locale (IA 3), règles 5 = jeu vivant (IA 5, Correctifs 24-25, celles des matchs créés aujourd'hui).**
+  **Depuis : règles 4 = lecture locale (IA 3), règles 5 = jeu vivant (IA 5, Correctifs 24-25), règles 6 = transformation après la
+  sirène et prolongations jouées (Correctif 29), règles 7 = jeu physique (IA 6, Correctif 30 — celles des matchs créés aujourd'hui).**
   ⚠️ Toute retouche du moteur détaillé change la rejoue des matchs en règles 2
   DÉJÀ COMMENCÉS : la passer sous une règle 3, ou la mettre en ligne quand aucun
   match ne se joue.
@@ -582,9 +583,13 @@ que l'affichage lise exactement la version du moteur qui joue.
 - ⚠️ **AUCUNE MARQUE DE L'ÉDITEUR D'ORIGINE NE RESTE À L'IMAGE.** Le maillot
   (zone `MARQUES` de `habillage.js`, trop courte : le nom restait lisible sur
   chaque poitrine), le ballon (`creerBallon`), le panneau bleu du stade
-  (`nettoyerStade`), la banderole des abords et les réclames portent Destiny
-  Rugby, le TikTok du jeu ou des annonceurs inventés. Tout nouveau décor se
-  relit texture par texture avant d'être livré.
+  (`nettoyerStade`), l'écran géant des stades de campagne et de village
+  (`creerEcranGeant`, Correctif 31), la banderole des abords et les réclames
+  portent Destiny Rugby, le TikTok du jeu ou des annonceurs inventés. Tout
+  nouveau décor se relit texture par texture avant d'être livré : le banc
+  `node verifier_marques_decors.cjs` (depuis `../analyse-rn26`) échoue sur une
+  texture qu'il ne connaît pas, et sur une marque lue par un morceau que la
+  scène ne repeint pas.
 - **Coiffures et barbes** : ce sont des cartes de mèches découpées par
   transparence. ⚠️ Exportées sans leur masque, les vingt-trois coupes
   ressemblaient toutes à un bloc de cheveux longs. `exporter_masques_coiffures.py`
@@ -751,7 +756,8 @@ en 3D et l'aperçu de l'accueil la demandent ; le serveur des ligues, non.
   risqué. ⚠️ À forces égales le duel rendait une touche sur trois à
   l'adversaire : l'équipe qui lance garde l'avantage de l'annonce (16 lancers
   proprement gagnés sur 39 → 21 sur 28).
-- **Fautes visibles** : chaque motif sifflé a son geste (`GESTES_DE_FAUTE`,
+- **Fautes visibles** : ⚠️ voir le Correctif 30 — les clips employés ici étaient les SIGNAUX DE L'ARBITRE ; chaque faute a
+  maintenant le geste du joueur, et l'arbitre le signal de sa décision. Chaque motif sifflé a son geste (`GESTES_DE_FAUTE`,
   joué par `siffler`), avec une `variante` quand un même clip sert deux
   situations. Coup de poing et bousculade n'existent pas dans les animations
   récupérées : la scène les construit. Un plaquage manqué laisse le défenseur
@@ -1180,7 +1186,9 @@ l'aperçu et réinstalle le lecteur ; `node installer_apercu.mjs` (depuis
 `../analyse-rn26`) réinstalle le lecteur seul. Bancs du lecteur, depuis
 `../analyse-rn26` : `node verifier_poses.mjs`, `node verifier_realisme.mjs`,
 `node verifier_destiny.mjs` (trois matchs complets, puis un en cadence normale),
-`node verifier_duels.mjs` (chaque lecture du contact trouve son animation).
+`node verifier_duels.mjs` (chaque lecture du contact trouve son animation),
+`node verifier_marques_decors.cjs` (aucune marque de l'éditeur d'origine n'est
+lue par un morceau de décor que la scène ne repeint pas).
 Détail et limites : `../analyse-rn26/SIMULATION.md`.
 
 ---
@@ -1337,7 +1345,7 @@ en une phrase → faire faire l'action → passer à la suivante**, sur les VRAI
 Demande : « si la possession change, le joueur doit pouvoir comprendre pourquoi rien qu'en regardant la scène » (jamais
 *possession A → variable → ballon chez le 9 de B*), un vrai gameplay pour les avants (mêlée, maul, touche, grattage), un plaquage
 qu'on peut rater, de grosses percussions, une endurance enfin vivable et une caméra à 360°.
-⚠️ **TOUT EST DERRIÈRE `EtatMatch.ia` ≥ 4** (`conqueteLisible(e)` dans `moteur/conquete.ts`). Depuis le Correctif 24 la carrière joue au niveau 5
+⚠️ **TOUT EST DERRIÈRE `EtatMatch.ia` ≥ 4** (`conqueteLisible(e)` dans `moteur/conquete.ts`). Depuis le Correctif 24 la carrière joue au niveau 5 (6 depuis le Correctif 30 : jeu physique)
 (`IA_MATCH_DE_CARRIERE`) et la ligue en ligne aussi (règles 5, avec son film et son étalonnage en temps réel — voir la section des Correctifs 24
 et 25). Empreinte du moteur à l'IA 3 : `IA_EMPREINTE=3 npx vite-node scripts/empreinteMoteur.ts 6` → `6aca6be7` (`94f2ae2e` avant la correction
 des effectifs du Correctif 24 ; le moteur, lui, n'a pas bougé).
@@ -1735,6 +1743,142 @@ Toute retouche du lecteur se fait dans `../analyse-rn26/apercu/match/` (par un `
 - Aperçu sans sauvegarde : `/scripts/apercuClassement.html`. Banc : `npm run verify:reglements` (~6 min : 40 matchs
   détaillés pour la sirène, 36 prolongations).
 
+### Les animations contextuelles et le jeu physique (Correctif 30 — carrière 3D et ligue)
+
+Demande : « on revoit trop souvent les mêmes crochets, plaquages, rucks et touches. Une vraie bibliothèque d'animations
+contextuelles, choisies selon la vitesse, l'angle, la puissance, le poste, la fatigue et la situation. Aucun choix purement
+aléatoire. La variété ne doit pas être cosmétique : chaque animation doit correspondre à ce qui vient réellement de se
+produire dans la simulation. »
+
+⚠️ **TOUT EST DERRIÈRE `EtatMatch.ia` ≥ 6** (`jeuPhysique(e)` dans `moteur/animations.ts`). Carrière : `IA_MATCH_DE_CARRIERE` = 6.
+Ligue : **règles 7** (`REGLES_MATCH_EN_LIGNE`, `iaDesRegles` → 6) pour les matchs créés désormais ; un match en cours garde ses
+règles. Vérifié : le niveau 5 rejoue à l'identique avec et sans le correctif (`IA_EMPREINTE=5 npx vite-node
+scripts/empreinteMoteur.ts 6` → `7c3b3a4d` dans les deux cas ; niveau 6 : `90b6ea8a`).
+
+- **Le principe : le moteur LIT, écrit une VARIANTE, la scène la joue.** `moteur/animations.ts` — fonctions PURES, sans tirage —
+  prolonge `duels.ts` : du même contact (angle, vitesses, rapport de force et de poids, équilibre, fatigue, bras qui tient le
+  ballon, ligne d'essai, second plaqueur : `lireContexte`), il tire le geste. La variante voyage DANS L'ÉTAT
+  (`ruck.plaquage.variante`, la `variante` d'un geste, `ruck.duel.sequence`, `conquete.jeu`, `aplatissage.style`,
+  `tir.celebration`) : la scène n'a qu'à la lire, et le film d'un direct n'a rien de plus à transporter (seuls `altercation`,
+  le niveau `ia` et la fatigue de geste `f` par joueur ont été ajoutés aux photos). ⚠️ **LA VARIANTE NE DÉCIDE DE RIEN** : le TYPE
+  de `lirePlaquage` commande toujours la physique ; la variante reste dans sa famille (un plaquage dominant ne joue jamais un
+  porteur qui gagne des mètres, un défenseur resté debout n'est jamais couché — le banc le tient).
+- **La bibliothèque** : 22 plaquages aboutis (dont à deux, in extremis devant la ligne, épaule contre épaule, soulevé-porté,
+  ballon protégé, défenseur qui glisse), 13 manqués (plongé trop tôt, passé dans le dos, contre-pied, une jambe — le porteur
+  trébuche —, battu à la course, à genoux, percuté, assis, rebondi, resté planté, bras tendu, raffûté), 12 crochets (dont le
+  crochet RATÉ, posé par le moteur quand le défenseur est resté devant : `requalifierGeste`), 6 raffuts, 5 percussions,
+  8 déblayages, 5 grattages, 3 contre-rucks, 9 passes, 7 réceptions, 9 essais, 5 célébrations, 26 combinaisons de touche.
+- **Le grattage en cinq séquences** (`ruck.duel.sequence`, durées dans `duel.temps`) : `rapide` (porteur isolé AU PLAQUAGE :
+  `ruck.isole`), `conteste` (les soutiens tentent de le déloger, il tient), `penalite` (« ballon gardé au sol » : il tient malgré
+  le déblayage, puis l'arbitre siffle), `perdu` (délogé par le soutien — `choregraphierLeDuel` le repousse vraiment),
+  `tardif` (ruck formé, il plonge quand même : pénalité). ⚠️ **`perdu` EST RARE EXPRÈS** : montré à chaque ballon ralenti, il
+  ajoutait onze séquences et quarante secondes de ruck par match (30 points par match au lieu de 37). Il faut un flanker déjà sur
+  le ballon (1,4 m) dans un ruck nettement dominé (`equilibre` > 16) : 3,7 par match (mesuré sur 216 matchs ; rapide 0,5, contesté 0,8, pénalité 1,2, tardif 0,6).
+- **Déblayages** (`lireDeblayage`, dans `animerRegroupement`) : épaule basse, poussée droite, de côté, à deux, accroché ; en face on
+  résiste (il recule moins, le nettoyeur est renvoyé), on est repoussé, ou déséquilibré (il tombe). La scène N'ANCRE PERSONNE
+  pendant un déblayage : le recul décidé par le moteur se voit. **Contre-ruck** : mené par ceux qui sont vraiment là
+  (`contreursPresents` : un, deux, ou le groupe) ; à la fin le premier ramasse le ballon gagné, ou tous sont refoulés.
+- **Plaquage dangereux** (`plaquageDangereux`, `lirePlaquageDangereux`) : l'irrégularité est tirée comme avant (`irregularite`,
+  avec un `facteur` quand le contact s'y prête : `risqueDeGesteDangereux`) ; ce qu'elle EST se lit sur le contact — joueur
+  soulevé (il faut un net ascendant de force ET de poids : un ailier ne soulève pas un deuxième ligne), charge sans les bras,
+  plaquage haut, en retard. La GRAVITÉ (1, 2, 3) vient du danger réel — maîtrise de la chute (technique, discipline, fatigue du
+  plaqueur), violence de l'impact — et c'est elle que l'arbitre applique (`siffler(…, 'aucun' | 'jaune' | 'rouge')`), s'il l'a VU
+  (`visibiliteFaute`). C'est une FAUTE, jamais un geste à rechercher.
+- **Altercations** (`moteur/altercations.ts`, `EtatMatch.altercation`) : rares, brèves, non graphiques — personne ne frappe,
+  personne ne se blesse. ⚠️ Elles ne naissent QU'À UN COUP DE SIFFLET (le jeu est déjà arrêté, la pénalité attend), et jamais du
+  générateur du match : l'envie se MESURE (`envieDAltercation` : cause, température, gravité, fautes récentes, discipline) et se
+  compare à un seuil lu sur un tirage À PART (`tirageAPart`, graine du vent + instant + joueurs). Causes : geste dangereux,
+  rancune d'un gros plaquage (`e.grief`, 35 s), fautes répétées, match tendu. Trois niveaux (`niveauAltercation`) : on se pousse
+  et on se parle ; on se saisit par les maillots et deux joueurs viennent séparer ; regroupement général, l'arbitre et ses juges
+  de touche séparent. Le jeu sait qui l'a DÉCLENCHÉE (`declencheurId`) et c'est lui que l'arbitre sanctionne
+  (`jugerAltercation`) : rappel, dix mètres pour ou contre la pénalité qui attendait, jaune, rouge. Au plus deux par match.
+  ⚠️ Ne pas confondre avec `bagarre.ts`, qui raconte ce qui arrive au joueur INCARNÉ (chambrage, ordres, commission).
+- **Touches** (`moteur/touches.ts`, `annoncerLeJeuDeTouche`) : 26 combinaisons au lieu de 11, un seul tirage au prorata —
+  faux saut, DOUBLE faux saut (`conquete.feintes`), sauteur qui vient d'un autre bloc et n'entre à sa place qu'au dernier
+  moment (`conquete.glissement`, il y COURT), changement de cible, maul dont le ballon ressort ou qu'on contourne
+  (`maul.suite`), et les lancements annoncés pour la ligne (`conquete.suite` → `lancerLaSuiteDeTouche`, posé quand le 9 a le
+  ballon, avec les structures du jeu courant) : 9 → 10, premier centre lancé derrière l'ouvreur en leurre, centre servi derrière
+  un coureur, croisée, le 9 dans le couloir. Chaque feinte aide le duel aérien et complique le lancer. Contres :
+  `IssueTouche.cause` — saut mal minuté (`lout_jump_miss`), ballon effleuré, ballon retombé entre les deux alignements.
+- **Passes, réceptions, pied, essais** : la passe et sa réception se lisent sur le vol (`poserVol` : longueur, hauteur,
+  pression, ballon qui arrive derrière la course) ; le coup de pied est posé, tapé en course ou arraché sous la pression ; un
+  contre se VOIT (bras levés, le ballon repart des mains du contreur, plus haut, et le botteur encaisse le contact —
+  `contactDuContre`) ; neuf façons de marquer (`choisirEssai` décide aussi s'il plonge ou s'il pose) ; la fête dépend du score
+  et de la minute (`choisirCelebration` : d'un seul coéquipier à toute l'équipe), et ceux qui encaissent accusent le coup.
+- ⚠️ **LES « GESTES DE FAUTE » ÉTAIENT LES SIGNAUX DE L'ARBITRE.** `high_tackle`, `not_releasing_ball`, `not_rolling_away`,
+  `collapsing_ruck_or_maul`, `not_releasing_player`… sont, dans l'APK, des clips debout et sur place (vérifié sur leurs
+  courbes) : les signaux officiels. Le joueur fautif les mimait. Désormais le fautif joue SON geste (`FAUTES30` de la scène ;
+  `GESTES_DE_FAUTE_6` ajoute la mêlée fautive, la charge, le joueur soulevé) et l'arbitre le signal de SA décision
+  (`signalArbitre(e)`, remis à la scène dans `outils` : pénalité, plaquage haut, ballon gardé, plaqueur non roulé, hors-jeu,
+  hors de ses appuis, écroulement, en-avant, passe en avant, mêlée, maul injouable, essai, vidéo, cartons, rappel, séparation).
+  ⚠️ PAS de geste « avantage » : le moteur ne joue pas la règle de l'avantage, l'arbitre ne l'annonce donc jamais.
+- **Poste et fatigue** : `profilAnimation` (lourd, troisième ligne, demi, centre, arrière) et `niveauFatigue` (0, 1, 2 — endurance
+  ET souffle du moment, écrit sur `Pion.fatigue` à chaque pas) entrent dans les choix (crochet lourd, percussion du pilier,
+  troisième ligne qui plaque-roule-se relève, défenseur cuit qui glisse ou tombe à genoux) et dans la posture de la scène
+  (buste plus bas, relevé plus lent) — sans rien mettre au ralenti.
+- **Scène** (hors git : `../analyse-rn26/apercu/match/animations.mjs`, `correctif_30_{chaine,scene}.cjs`) : la table variante →
+  suite de clips, les gestes construits par cinématique inverse (main du raffut POSÉE sur le défenseur, mains du gratteur sur
+  le ballon, maillot agrippé, bras de celui qui sépare, ballon brandi, écran de la vidéo), les **banques** — 382 clips (267
+  avant) en neuf fichiers par morphologie ; seul `common` (5,1 Mo au lieu de 10,5) est attendu avant le coup d'envoi, le reste
+  arrive en tâche de fond ou quand sa phase commence, et une suite dont la banque manque joue son repli —, et les **niveaux de
+  détail** (loin du ballon et de la caméra, la pose n'est recalculée qu'une image sur deux ou trois ; place et cap suivent
+  toujours le moteur). Détail : `../analyse-rn26/SIMULATION.md`.
+- **Mesuré** (`npm run mesure:rugby -- 216 carriere3d 5` puis `6`) : IA 5 → IA 6, 216 matchs chacun : 37,1 → 37,6 points, 5,2 → 5,3
+  essais (dans le bruit : l'écart type est de deux essais), pénalités 6,4 → 6,2, jaunes 0,77 → 0,62, rouges 0,05 → 0,08, rucks
+  36,8 → 35,3, durée 15,0 min des deux côtés. Ce qui est RARE (`npm run mesure:animations -- 216`) : un joueur soulevé tous les
+  24 matchs, une charge sans les bras tous les 54, une altercation dans un match sur onze (niveau 1 : 12, niveau 2 : 8, niveau 3 :
+  aucun, sur 216 matchs) — un sur quatre quand la température ne descend pas sous 30, plus d'un sur deux au-dessus de 55 (c'est
+  là seulement qu'on voit le regroupement général : 0,15 par match).
+- **Ligue en ligne (règles 7)** : le résultat reste celui de la simulation unique du serveur ; chaque écran reconstruit la même
+  animation depuis l'état filmé — aucun trafic de plus qu'un champ (`altercation`), le niveau `ia` et la fatigue de geste. Mesuré
+  en temps réel (`npm run mesure:rugby -- 36 ligue 5` puis `6`) : 66,8 → 62,9 points, 8,4 → 8,2 essais, 32,1 → 32,2 pénalités,
+  2,25 jaunes des deux côtés, 0,25 → 0,33 rouge, 81,1 → 81,6 min (36 matchs : dans le bruit). `verify:film-direct` et
+  `verify:chronologie` passent en règles 7. ⚠️ Mise en ligne quand aucun match ne se joue, comme toujours ; revenir en arrière =
+  remettre `REGLES_MATCH_EN_LIGNE` à 6.
+- **Bancs** : `npm run verify:animations -- 12` (sélecteurs purs et atteignables, familles, chaque variante a sa suite et chaque
+  clip existe, matchs entiers contrôlés à chaque pas, deux rejoues identiques, variété : 65 séquences différentes après un match,
+  143 après douze) ; `npm run mesure:animations` ; `scripts/sonderAnimations30.ts` (ce que valent les grandeurs lues, pour régler
+  un seuil sur ce que le moteur produit vraiment).
+- ⚠️ **Pièges** : (1) un match d'IA reste FROID (température 0 à 11) — tout seuil réglé « à 35 » ne se déclenche jamais, il faut
+  mesurer ; (2) une passe ne monte jamais à plus de 1,1 m au-dessus des mains : une « réception haute » se règle sur 0,85 ;
+  (3) à l'instant où le ruck se dénoue les soutiens sont toujours arrivés — « seul sur le ballon » se lit au plaquage ;
+  (4) `public/rn26/` est PRODUIT : l'installateur écrasait la retouche du vendor three (LUT), il la repose maintenant lui-même.
+- **Pas fait / pas vu** : la règle de l'avantage (donc son geste) ; la plupart des variantes n'ont pas été REGARDÉES une par une
+  (cinq séquences vues à l'image, voir `SIMULATION.md`) ; rien n'a été essayé sur un téléphone (banques à la demande, niveaux de
+  détail) ni dans un vrai direct de ligue (le film transporte l'état, vérifié au banc seulement) ; le joueur incarné n'a pas de
+  commandes nouvelles (ses crochets et raffuts prennent les variantes, c'est tout) ; pas de tutoriel ; les commentateurs ne
+  disent rien des altercations ; la vue de haut (2D) ne montre aucune de ces variantes.
+
+### L'écran géant et les conteneurs des stades de club (Correctif 31 — décors 3D)
+
+- **Ce qui restait à l'image** : l'écran géant derrière l'en-but — un en campagne (`stade-club-1.glb`), deux au village
+  (`stade-club-2.glb`) ; maillage `STADIUM_NORTH_TV_02_SCREEN (1)`, matériau `screen` — lit la première case d'un atlas de
+  512 px : quatre rangées « logo du jeu d'origine | TRY! / CONVERSION! / GOAL! / PENALTY! ». Aucun habillage ne connaissait
+  ce matériau. Les stades moyen, grand et international n'ont pas d'écran.
+- **Corrigé** (hors git : `../analyse-rn26/correctif_31_ecran_stade.cjs`, sauvegarde `sauvegarde-avant-correctif-31/`, puis
+  `node installer_apercu.mjs`) : `creerEcranGeant` (`habillage.js`) repeint les HUIT cases — Destiny Rugby à gauche, le TikTok
+  du jeu à droite — et `chargerStade` (`scene.js`) pose la toile (1 024 px, 512 en mode léger).
+  ⚠️ **SI LA TOILE NE PEUT PAS ÊTRE PEINTE, L'ÉCRAN RESTE ÉTEINT** (texture retirée) : il ne retombe jamais sur l'image
+  d'origine. Ses teintes sont plus claires que celles des panneaux : sous l'éclairage de la scène leur vert sombre sortait noir.
+- **Trouvé en relisant les textures** : `creerAbords` posait l'atlas des abords tel quel sur sa toile de 2 048 px. Celui des
+  stades de club n'en fait que 1 024 : il n'en couvrait qu'un quart, et les conteneurs (39 en campagne, 28 au village, 24 au
+  stade moyen) affichaient glacières, mains et ballons étalés sur leurs flancs. L'atlas est maintenant étiré à sa toile.
+- **La relecture se rejoue** : `node verifier_marques_decors.cjs` (depuis `../analyse-rn26` ; `--sortir <dossier>` écrit les
+  textures pour les regarder). Dix-huit textures distinctes dans les cinq décors, six portent une marque : l'écran (repeint),
+  les panneaux (repeints), les deux atlas des abords (protections de poteaux : repeintes ; banderole verticale et ballons du
+  bord de touche : lus par aucun morceau), l'atlas du Stade de France (couloir des joueurs : repeint) et celui de sa verrière
+  (adresse de l'éditeur : lue par aucun morceau).
+  ⚠️ **UNE MARQUE PEUT DORMIR DANS UN ATLAS.** Le banc échoue le jour où un décor la lit, ou quand une texture lui est inconnue.
+- **Vu à l'image** (toile envoyée à un petit serveur local, panneau navigateur caché) : l'écran de campagne de près et depuis
+  le terrain, les deux écrans du village, le mode léger, les conteneurs avant et après, poteaux et protections, le couloir du
+  Stade de France, les stades moyen et grand. Capture : `verification-c31-ecran-stade.jpg`.
+- **Pas fait / pas vu** : rien n'a été regardé sur un téléphone ni dans un vrai match de carrière (la page d'aperçu ne charge
+  pas la police Anton : le titre y sort en Arial Black ; essayé à part avec Anton). Les fichiers `.glb` livrés contiennent
+  TOUJOURS les textures d'origine — elles sont repeintes au chargement, pas retirées des fichiers. Les silhouettes blanches du
+  bord de touche des stades de club (ramasseurs, photographes) sont un défaut d'avant, pas une marque : `exporter_stades.py`
+  donne un émissif à tout matériau dont le nom contient « light », donc à `surround_objects_vertexlit_2021_lightswitching`.
+  La page d'aperçu `/rn26/index.html` écrit encore « RN26 » (pastille « MODÈLES RN26 », légende de sa capture).
+
 ### La sortie d'un match ne peut plus rester figée — stockage plein, bagarre, onglets qui défilent (Correctif 32)
 
 Signalé le 8 octobre 2026 : « sur iPad et iPhone 15, au moment de revenir sur l'écran d'accueil de la carrière ça crashe,
@@ -2081,6 +2225,8 @@ npm run verify:vue-legere         # vue légère : détail d'un match terminé �
 npm run audit:joueurs             # audit des données joueurs, lecture seule : photographie, comparaison, ligues, base (voir serveur/AUDIT-JOUEURS.md)
 npm run verify:usage              # statistiques d'utilisation : relevés bornés, sommes, rétention, lecture réservée à Kiri (65 contrôles)
 npm run verify:tournoi-final      # tournoi final des divisions à poules jouable, clés du tableau, départage (97 contrôles, ~55 s)
+npm run verify:animations -- 12   # bibliothèque d'animations contextuelles : sélecteurs purs, chaque variante a sa suite, matchs contrôlés à chaque pas (Correctif 30, ~5 min)
+npm run mesure:animations -- 216  # ce que le jeu physique produit de rare : plaquages dangereux, altercations, grattages par séquence
 npm run verify:fin-match          # finalisation par étapes, une écriture, scène par tranches, dix matchs de suite (111 contrôles)
 npm run verify:sortie-match       # sortie de match bornée, stockage plein sans erreur, JSON étroit, fil de la fin de match (85 contrôles, ~12 s)
 npm run verify:bagarre            # une bagarre attend son ordre, tient le match (contrôle direct compris) et se résout toujours (44 contrôles, ~45 s)

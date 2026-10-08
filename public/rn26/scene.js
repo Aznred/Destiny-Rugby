@@ -8,9 +8,11 @@ import { DestinyMatch,xyz,clamp,TICK } from './destiny.mjs';
 import { armChain } from './liaisons.js';
 import { appearance,souhaitDepuisCarte,tirage,prepareBody,groundBody,grip,trackBall,bindLift,findHairMesh,fitToHead,fitBeard,raiseTorso,COIFFURES,BARBES } from './corps.js';
 import { prepareGaits,locomotion } from './allures.js';
-import { tenueDepuisImage,creerTenue,numeroter,creerPanneaux,creerAbords,creerPublic,creerEtiquette,creerBallon,nettoyerStade,chargerImage,texture,departagerTenues,nomCourt,luminance,hexa,MAILLOT_DEFAUT } from './habillage.js';
+import { tenueDepuisImage,creerTenue,numeroter,creerPanneaux,creerAbords,creerPublic,creerEtiquette,creerBallon,nettoyerStade,creerEcranGeant,chargerImage,texture,departagerTenues,nomCourt,luminance,hexa,MAILLOT_DEFAUT } from './habillage.js';
 import { creerSons } from './sons.js';
 import { creerTelevision } from './television.js';
+// Correctif 30 : les banques d'animations (ordre de chargement, banque d'une phase) et les signaux de l'arbitre.
+import { ARBITRE,BANQUE_DE_LA_PHASE,ORDRE_DE_CHARGEMENT } from './animations.mjs';
 import { protegerRessources,planLiberation,ressourcesLocales } from './ressources.mjs';
 
 // ---------------------------------------------------------------------------
@@ -139,7 +141,8 @@ function charger(){
   ressources??=(async()=>{
     const loader=new GLTFLoader(),image=nom=>chargerImage(RACINE_DECOR+nom);
     const [motions,forward,back,ball,hair,tee,kit]=await Promise.all([
-      loadMotions('catalogue-match-poses.json'),loader.loadAsync(RACINE_MODELES+'player_male_forward_LOD2.glb'),loader.loadAsync(RACINE_MODELES+'player_male_back_LOD2.glb'),
+      // Correctif 30 : seule la banque commune est attendue (4,7 Mo par morphologie au lieu de 11) ; le reste arrive ensuite.
+      loadMotions('catalogue-match-poses.json',{banques:['common']}),loader.loadAsync(RACINE_MODELES+'player_male_forward_LOD2.glb'),loader.loadAsync(RACINE_MODELES+'player_male_back_LOD2.glb'),
       loader.loadAsync(RACINE_DECOR+'ballon.glb'),loader.loadAsync(RACINE_DECOR+'coiffures.glb'),
       loader.loadAsync(RACINE_DECOR+'tee.glb'),image('kit_france_home.png'),
     ]);
@@ -254,6 +257,14 @@ function chargerStade(nom,leger=false){
         for(const n of ['stadedefrance','stadedefrance_alpha'])if(materiaux[n]?.map?.image===origine.stadedefrance.image){materiaux[n].map=propre;origine[n]=propre;}
       }
     }catch(e){console.warn('Marquage Destiny Rugby :',e);}
+    // ⚠️ L'ÉCRAN GÉANT NE MONTRE JAMAIS SA TEXTURE D'ORIGINE (Correctif 31) : elle porte le logo du jeu d'origine
+    // (stades de campagne et de village). Si la toile ne peut pas être peinte, il reste éteint plutôt que de l'afficher.
+    if(materiaux.screen){
+      const ecran=materiaux.screen,avant=ecran.map;
+      try{ecran.map=peintComme(creerEcranGeant(leger?512:1024),avant);origine.screen=ecran.map;}
+      catch(e){console.warn('Écran géant :',e);ecran.map=null;ecran.color.set('#0c3324');delete origine.screen;}
+      if(avant&&avant!==ecran.map){avant.dispose();avant.image?.close?.();}
+    }
     if(leger)allegerDecor(decor,materiaux,origine);
     figerDecor(decor);
     protegerRessources([decor],Object.values(origine));
@@ -401,6 +412,18 @@ export async function creerScene3D(conteneur,options={}){
   const nettoyagesEchec=[];
   try{
   const {motions,gaits}=r;
+  // ── Correctif 30 : LES BANQUES D'ANIMATIONS ────────────────────────────────
+  // Le match s'affiche avec la banque commune. Les autres arrivent en tâche de fond, dans l'ordre où un match en a besoin
+  // (contacts, regroupements, lignes arrière, mêlées, touches…), l'une après l'autre pour ne pas disputer le réseau au stade.
+  // Sur téléphone les célébrations (4 Mo) attendent le premier essai. Une phase qui commence réclame la sienne si elle manque
+  // encore ; en attendant, `destiny.mjs` joue le geste de repli de la banque commune — jamais une pose vide.
+  const banquesDemandees=new Set();
+  const demanderBanque=b=>{if(!b||!motions.charger||motions.chargees.has(b)||banquesDemandees.has(b))return;banquesDemandees.add(b);motions.charger(b);};
+  if(motions.charger&&!motions.suite){
+    const ordre=ORDRE_DE_CHARGEMENT.filter(b=>motions.banques.includes(b)&&!(leger&&b==='celebrations'));
+    motions.suite=(async()=>{for(const b of ordre)await motions.charger(b);})();
+  }
+  let posesFaites=0,posesEvitees=0;
   await chargerEquipementsDe(options.apparences);
   const scene=new THREE.Scene();
   sceneEnCours=scene;
@@ -820,7 +843,93 @@ export async function creerScene3D(conteneur,options={}){
   // cinématique inverse sur les bras et inclinaison du buste : deux directs
   // brefs vers la tête, ou les deux mains qui repoussent la poitrine.
   const gestesConstruits=[],cloche=(t,centre,largeur)=>Math.exp(-(((t-centre)/largeur)**2));
+  // ── Correctif 30 : les gestes construits de la bibliothèque ───────────────
+  // Rien de tout cela n'existe dans l'APK : la main du raffut qui se POSE sur le défenseur, les mains du gratteur sur le
+  // ballon, les bras qui se referment trop haut, le maillot qu'on agrippe, les bras écartés de celui qui sépare, le ballon
+  // brandi, l'arbitre qui dessine l'écran. Cinématique inverse des bras, par-dessus le geste en cours.
+  const osVise=new THREE.Vector3(),aPortee=(a,point,portee=.74)=>{
+    const ep=a.model.getObjectByName('CC_Base_Spine02');if(!ep)return point;
+    ep.getWorldPosition(osVise);tmp3.copy(point).sub(osVise);const n=tmp3.length();
+    // Un bras ne s'allonge pas : au-delà de sa portée, la main s'arrête sur la droite épaule → cible.
+    if(n>portee)point.copy(osVise).addScaledVector(tmp3,portee/n);return point;
+  };
+  function construire30(a,proc){
+    const fx=-Math.sin(a.heading),fz=-Math.cos(a.heading),dx=-fz,dz=fx;
+    const buste=a.model.getObjectByName('CC_Base_Spine02');if(!buste)return false;
+    if(proc.type==='mainsBallon'){
+      // Le gratteur : il prend appui, pose les deux mains sur le ballon, puis le tire à lui.
+      const pose=smooth(clamp(proc.t/Math.max(.15,proc.appui*.8),0,1)),tire=proc.tire?smooth(clamp((proc.t-proc.appui)/Math.max(.2,proc.fin-proc.appui),0,1)):0;
+      const w=pose*(1-smooth(clamp((proc.t-proc.fin)/.25,0,1)));if(w<.02)return true;
+      gripR.copy(ballMesh.position);gripR.y=Math.max(gripR.y,.15)+tire*.17;gripR.x-=fx*tire*.13;gripR.z-=fz*tire*.13;
+      gripL.copy(gripR);gripR.x+=dx*.11;gripR.z+=dz*.11;gripL.x-=dx*.11;gripL.z-=dz*.11;
+      grip(a,aPortee(a,gripR,.82),'right',w);grip(a,aPortee(a,gripL,.82),'left',w);a.group.updateMatrixWorld(true);return true;
+    }
+    if(proc.type==='mainsVers'){
+      const w=clamp(proc.poids,0,1);if(w<.02)return true;
+      gripR.set(proc.point.x,proc.point.y,proc.point.z);gripL.copy(gripR);gripR.x+=dx*.1;gripR.z+=dz*.1;gripL.x-=dx*.1;gripL.z-=dz*.1;
+      grip(a,aPortee(a,gripR),'right',w);grip(a,aPortee(a,gripL),'left',w);a.group.updateMatrixWorld(true);return true;
+    }
+    if(proc.type==='ballonLeve'){
+      const u=clamp(proc.t/proc.duree,0,1),g=smooth(u/.2)*smooth((1-u)/.25);if(g<.02)return true;
+      buste.getWorldPosition(gripR);gripR.x+=dx*.2+fx*.08;gripR.z+=dz*.2+fz*.08;gripR.y+=.7;raiseTorso(a,.06*g,0);
+      grip(a,gripR,'right',g);a.group.updateMatrixWorld(true);return true;
+    }
+    if(proc.type==='ecran'||proc.type==='separer'||proc.type==='ecarter'){
+      const u=clamp(proc.t/Math.max(.4,proc.duree),0,1),g=smooth(u/.15)*smooth((1-u)/.2);if(g<.02)return true;
+      buste.getWorldPosition(gripR);gripL.copy(gripR);
+      if(proc.type==='ecran'){
+        // L'arbitre demande la vidéo : les deux mains dessinent un rectangle devant lui, du haut vers le bas, deux fois.
+        const k=(proc.t%1.7)/1.7,large=k<.3?k/.3:k<.7?1:1-(k-.7)/.3,haut=k<.3?1:k<.7?1-(k-.3)/.4*2:-1;
+        const ex=.3*large,ey=.14+.17*haut;
+        gripR.x+=dx*ex+fx*.38;gripR.z+=dz*ex+fz*.38;gripR.y+=ey;gripL.x+=-dx*ex+fx*.38;gripL.z+=-dz*ex+fz*.38;gripL.y+=ey;
+      }else{
+        // Celui qui sépare : les bras écartés, une paume vers chacun des deux hommes.
+        const e2=proc.type==='separer'?.66:.6;
+        gripR.x+=dx*e2+fx*.14;gripR.z+=dz*e2+fz*.14;gripL.x+=-dx*e2+fx*.14;gripL.z+=-dz*e2+fz*.14;gripR.y-=.02;gripL.y-=.02;
+      }
+      grip(a,gripR,'right',g);grip(a,gripL,'left',g);a.group.updateMatrixWorld(true);return true;
+    }
+    if(!['raffut','brasHaut','saisir','parler'].includes(proc.type))return false;
+    const cible=proc.cible&&actors.get(proc.cible);if(!cible)return true;
+    const u=clamp(proc.t/Math.max(.3,proc.duree),0,1);
+    const corps=cible.model.getObjectByName('CC_Base_Spine02');if(!corps)return true;
+    if(proc.type==='raffut'){
+      const g=smooth(u/.18)*smooth((1-u)/.3)*(proc.poids??1);if(g<.02)return true;
+      if(proc.os==='epaule'){
+        // L'épaule du défenseur la plus proche du porteur.
+        buste.getWorldPosition(osVise);let mieux=Infinity;
+        for(const nom of ['CC_Base_L_Clavicle','CC_Base_R_Clavicle']){const os=cible.model.getObjectByName(nom);if(!os)continue;os.getWorldPosition(tmp);const dd=tmp.distanceToSquared(osVise);if(dd<mieux){mieux=dd;gripR.copy(tmp);}}
+        if(mieux===Infinity)corps.getWorldPosition(gripR);
+      }else{corps.getWorldPosition(gripR);gripR.y+=.05;}
+      raiseTorso(a,-.05*g,(proc.cote<0?1:-1)*.12*g);
+      grip(a,aPortee(a,gripR,.78),proc.cote<0?'left':'right',Math.min(1,g*1.1));
+    }else if(proc.type==='brasHaut'){
+      // Plaquage haut : les deux bras se referment à hauteur des épaules de la victime.
+      const g=smooth(u/.2)*smooth((1-u)/.3);if(g<.02)return true;
+      const cou=cible.model.getObjectByName('CC_Base_NeckTwist01')||corps;cou.getWorldPosition(gripR);gripR.y-=.07;gripL.copy(gripR);
+      gripR.x+=dx*.15;gripR.z+=dz*.15;gripL.x-=dx*.15;gripL.z-=dz*.15;
+      grip(a,aPortee(a,gripR,.8),'right',g);grip(a,aPortee(a,gripL,.8),'left',g);
+    }else if(proc.type==='saisir'){
+      // Par le maillot : les deux mains à la poitrine de l'autre, et ça tire — sans coup, sans chute.
+      const g=smooth(u/.1)*smooth((1-u)/.18);if(g<.02)return true;
+      const secoue=.035*Math.sin(proc.t*8.5+(proc.reponse?1.6:0));
+      corps.getWorldPosition(gripR);gripR.y+=.12+secoue;gripL.copy(gripR);
+      gripR.x+=dx*.12;gripR.z+=dz*.12;gripL.x-=dx*.12;gripL.z-=dz*.12;
+      raiseTorso(a,-.1*g,.07*Math.sin(proc.t*4.3)*g);
+      grip(a,aPortee(a,gripR,.7),'right',g);grip(a,aPortee(a,gripL,.7),'left',g);
+    }else{
+      // On se parle : un doigt pointé vers la poitrine de l'autre — ou, pour celui qui répond, les deux mains ouvertes.
+      const g=smooth(u/.2)*smooth((1-u)/.25)*(.78+.22*Math.sin(proc.t*7));if(g<.02)return true;
+      if(proc.reponse){
+        buste.getWorldPosition(gripR);gripL.copy(gripR);
+        gripR.x+=dx*.4+fx*.28;gripR.z+=dz*.4+fz*.28;gripL.x+=-dx*.4+fx*.28;gripL.z+=-dz*.4+fz*.28;gripR.y-=.22;gripL.y-=.22;
+        grip(a,gripR,'right',g);grip(a,gripL,'left',g);
+      }else{corps.getWorldPosition(gripR);gripR.y+=.1;grip(a,aPortee(a,gripR,.6),'right',g);}
+    }
+    a.group.updateMatrixWorld(true);return true;
+  }
   function construire(a,proc){
+    if(construire30(a,proc))return;
     if(['appel','mainsLevees','pointer','parDessus'].includes(proc.type)){
       // Bras levé pour réclamer le ballon, mains levées du joueur sifflé hors-jeu,
       // bras tendu du demi de mêlée qui annonce son côté, équilibre d'un petit
@@ -901,6 +1010,8 @@ export async function creerScene3D(conteneur,options={}){
     const alpha=snap||still?1:match.alpha();
     match.slots=match.formation(offset);
     const ball=match.ball,e=match.e,open=['jeuCourant','ballonEnLAir','ballonLibre'].includes(e.phase);
+    // La phase en cours réclame sa banque si elle n'est pas encore arrivée (un écran qui rejoint un direct en pleine mêlée).
+    demanderBanque(BANQUE_DE_LA_PHASE[e.phase]);
     vus.clear();
     for(const p of match.players){
       const a=actorFor(p);vus.add(p.id);
@@ -944,7 +1055,22 @@ export async function creerScene3D(conteneur,options={}){
       const osComplets=a.pose.bones;
       a.osComplets??=osComplets;
       if(distant){a.osLointains??=osComplets.filter(b=>!/Thumb|Index|Ring|Mid|Pinky|Eye|Jaw/.test(b.name));a.pose.bones=a.osLointains;}
-      const played=posePlayer(a,m,{x:p.vx,z:p.vz},simDt,still);
+      // ── Correctif 30 : NIVEAUX DE DÉTAIL DES ANIMATIONS ──────────────────────
+      // Une interaction près du ballon se pose à chaque image, en entier. Un joueur qui ne fait que courir ou attendre loin
+      // de l'action n'est reposé qu'une image sur deux (au-delà de 40 m de la caméra) ou sur trois (au-delà de 70 m) : sa place
+      // et son cap suivent toujours le moteur, seule la pose de ses os attend — le temps sauté est rendu à la pose suivante.
+      // Un geste, un fondu, un ballon porté, une attente vivante : pose complète, toujours.
+      const dCam=camera.position.distanceToSquared(base);
+      const simple=options.animationsEconomes!==false&&!snap&&!still&&m.loco&&!m.upper&&!m.carry&&!m.proc&&!m.vivant&&a.key==='loco'&&a.fade>=1&&Math.hypot(base.x-ball.x,base.z-ball.z)>(leger?10:14);
+      const saut=!simple?1:dCam>(leger?2500:4900)?3:dCam>(leger?900:1600)?2:1;
+      a.lodTour=((a.lodTour|0)+1)%saut;
+      if(saut>1&&a.lodTour){
+        a.pose.bones=osComplets;a.lodDt=(a.lodDt||0)+simDt;posesEvitees++;
+        if(a.anchorBlend>0){a.anchorBlend=0;match.physics.unpin(p.id);}
+        a.group.position.copy(base);a.shown.copy(base);continue;
+      }
+      const dtPose=simDt+(a.lodDt||0);a.lodDt=0;posesFaites++;
+      const played=posePlayer(a,m,{x:p.vx,z:p.vz},dtPose,still);
       a.pose.bones=osComplets;
       placePlayer(a,p,m,played,base,simDt,still);
       a.shown.copy(a.group.position);
@@ -994,7 +1120,15 @@ export async function creerScene3D(conteneur,options={}){
         else{const k=1-Math.exp(-(simDt||0)*9);st.x+=(pos.x-st.x)*k;st.z+=(pos.z-st.z)*k;}
         st.vx=ref.vitesse.y;st.vz=ref.vitesse.x;
         const card=match.card&&visualTime-match.card.start<5.8,age=visualTime-(match.card?.start||0);
-        const sifflet=match.whistle&&visualTime-match.whistle.start<2.4?match.whistle:null;
+        const sifflet=match.whistle&&visualTime-match.whistle.start<5.4?match.whistle:null;
+        // Correctif 30 — LE GESTE CORRESPOND À LA DÉCISION. Le moteur dit laquelle (`signalArbitre`, lu sur l'état que tout
+        // écran possède) ; la bibliothèque dit quel signal de l'APK la porte. Ces signaux étaient joués… par le joueur fautif.
+        const signal=match.outils.signalArbitre?.(e)??null,S=signal?ARBITRE[signal]:null;
+        let construit=null;
+        if(S?.construit==='ecran'&&e.tmo)construit={type:'ecran',t:visualTime-(st.tmoDepuis??=visualTime),duree:1e6};else st.tmoDepuis=undefined;
+        const alt=e.altercation&&visualTime<e.altercation.fin?e.altercation:null;
+        if(alt){const lieu=xyz(alt.lieu);heading=Math.atan2(lieu.x-st.x,lieu.z-st.z)+Math.PI;if(Math.hypot(lieu.x-st.x,lieu.z-st.z)<4.5&&alt.niveau>=2)construit={type:'separer',t:visualTime-alt.debut,duree:alt.fin-alt.debut};}
+        st.construit=construit;
         const m=e.conquete?.melee;
         // Avertissement : il appelle le capitaine d'un geste et lui parle, tourné vers lui.
         const appel=match.whistle?.avertissement&&e.phase==='penalite'&&clips.RefereeCallOverPlayer01_001?visualTime-match.whistle.start-1.2:-1;
@@ -1005,15 +1139,24 @@ export async function creerScene3D(conteneur,options={}){
           if(cap)heading=Math.atan2(cap.group.position.x-st.x,cap.group.position.z-st.z)+Math.PI;
         }
         else if(tir?.etape==='celebration'&&visualTime-tir.etapeDepuis<2)upper={name:'try',time:visualTime-tir.etapeDepuis};
-        else if(sifflet){
-          const t=visualTime-sifflet.start;
-          upper=t<1?{name:'whistle',time:t*1.6}:{name:/enAvant|passeAvant/.test(sifflet.cle)?'knock_on':/hors-jeu/.test(e.penalite?.motif||'')&&clips.indicate_offside_low?'indicate_offside_low':'penalty',time:t-1};
-        }else if(m&&m.etape==='placement'&&visualTime-match.phaseStart<1.9)upper={name:'forming_a_scrum',time:visualTime-match.phaseStart};
+        else if(sifflet&&!construit){
+          const t=visualTime-sifflet.start,nom=S?.clip&&!S.plein&&clips[S.clip]?S.clip:null,apres=S?.apres&&clips[S.apres]?S.apres:null;
+          // Le coup de sifflet, le bras de la pénalité, puis le signal de la faute : ballon gardé, plaquage haut, hors-jeu…
+          if(t<1)upper={name:'whistle',time:t*1.6};
+          else if(apres&&t<2.05)upper={name:apres,time:t-1};
+          else if(nom){const tt=(t-(apres?2.05:1))*(S.cadence||1);if(tt<clips[nom].duration)upper={name:nom,time:tt};}
+          else if(t<2.4)upper={name:/enAvant|passeAvant/.test(sifflet.cle)?'knock_on':/hors-jeu/.test(e.penalite?.motif||'')&&clips.indicate_offside_low?'indicate_offside_low':'penalty',time:t-1};
+        }else if(m&&m.etape==='placement'&&signal==='maul-injouable'&&clips.unplayable_maul&&visualTime-match.phaseStart<2.7)upper={name:'unplayable_maul',time:visualTime-match.phaseStart};
+        else if(m&&m.etape==='placement'&&visualTime-match.phaseStart<1.9)upper={name:'forming_a_scrum',time:visualTime-match.phaseStart};
         a.card.visible=!!card&&age>3.5&&age<4.5;
         if(a.card.visible){a.rightHand.getWorldPosition(a.card.position);a.card.material.color.set(match.card.red?'#e32622':'#ffe229');a.card.quaternion.copy(a.group.quaternion);a.card.position.y+=.065;}
       }else{
         // Arbitre de touche : il court le long de sa ligne, à hauteur du ballon.
         const side=i===1?-1:1;let tx=side*TOUCHE_X,tz,vmax=6.2,zone=1.1;
+        // Correctif 30 : regroupement général — les juges de touche entrent sur la pelouse aider l'arbitre à séparer.
+        const melee=e.altercation&&e.altercation.niveau===3&&visualTime<e.altercation.fin?xyz(e.altercation.lieu):null;
+        if(melee){tx=melee.x+side*2.6;tz=melee.z;vmax=7;zone=.6;}
+        else
         if(tir&&(tir.etape==='pose'||tir.etape==='vise'||tir.etape==='pret'||tir.etape==='elan'||tir.volLance)){
           // Tir au but : les deux juges vont se placer derrière les poteaux.
           const goal=tir.buteur.cote==='A'?1:-1;tx=side*3.6;tz=goal*51.7;vmax=6.5;zone=.3;
@@ -1023,6 +1166,7 @@ export async function creerScene3D(conteneur,options={}){
           if(!['jeuCourant','ballonLibre'].includes(e.phase)){vmax=3.4;zone=1.6;}
         }
         tz=clamp(tz,-57,57);
+        st.construit=melee&&Math.hypot(tx-st.x,tz-st.z)<1.6?{type:'separer',t:visualTime-e.altercation.debut,duree:e.altercation.fin-e.altercation.debut}:null;
         if(snap){st.x=tx;st.z=tz;st.vx=st.vz=0;}
         else if(simDt>0){
           const dx=tx-st.x,dz=tz-st.z,d=Math.hypot(dx,dz);
@@ -1047,6 +1191,7 @@ export async function creerScene3D(conteneur,options={}){
       const m={loco:!full,name:full?.name,time:full?.time||0,loop:false,idle:'light_idle',upper:upper?{...upper,weight:1}:null};
       posePlayer(a,m,{x:st.vx,z:st.vz},simDt,false);
       groundBody(a,simDt||.016);
+      if(st.construit)construire30(a,st.construit);
       if(a.flag){
         // Le drapeau prolonge l'avant-bras : bras le long du corps il pointe vers
         // le sol, bras levé il se dresse au-dessus de la tête.
@@ -1165,8 +1310,16 @@ export async function creerScene3D(conteneur,options={}){
       if(motion?.attache==='sol'){
         // Ramassé au pied du ruck : le ballon reste au sol sous les mains jusqu'au geste.
         hands(holder,t);t.y=SOL;key='sol:relais';
-      }else{hands(holder,t,motion?.carry==='bras');key='main:'+match.carrier;heading=holder.heading;orientation='main';}
+      }else{
+        hands(holder,t,motion?.carry==='bras');key='main:'+match.carrier;heading=holder.heading;orientation='main';
+        // Correctif 30 — la réception mal assurée : le ballon danse une fraction de seconde au-dessus des mains avant d'être maîtrisé.
+        const j=match.jongle,u=j&&j.id===match.carrier?(visualTime-j.arrivee)/j.duree:-1;
+        if(u>0&&u<1){t.y+=Math.sin(Math.PI*u)*.24;t.x-=Math.sin(holder.heading)*.11*Math.sin(Math.PI*u);t.z-=Math.cos(holder.heading)*.11*Math.sin(Math.PI*u);st.spin+=simDt*8;orientation='sol';}
+      }
     }else if(e.ballonLibre){key='libre';orientation='libre';}
+    // Correctif 30 — le marqueur ramasse le ballon qu'il vient d'aplatir et le brandit, puis le repose : le buteur viendra le chercher là.
+    const feteur=tir?.etape==='celebration'&&tir.marqueurId?actors.get(tir.marqueurId):null,tenu=feteur?.motion?.ballon;
+    if(tenu&&tenu>.02){feteur.rightHand.getWorldPosition(handA);handA.y+=.09;t.lerp(handA,clamp(tenu,0,1));if(tenu>.5){key='leve';heading=feteur.heading;orientation='main';}}
     // Jamais de saut : un changement de support se fait en un court trajet visible.
     if(key!==st.key){
       const vol=key.startsWith('vol')||st.key.startsWith('vol');
@@ -1533,13 +1686,15 @@ export async function creerScene3D(conteneur,options={}){
     get match(){return match;},
     get ips(){return ips;},
     /** Le profileur : coût du rendu et écart entre deux images (ms, sur les 240 dernières), compteurs de three.js. */
-    mesures(){const i=renderer.info;return{images:nCouts,rendu:resumerCouts(couts),cpu:resumerCouts(coutsCpu),gpu:nGpu?resumerCouts(coutsGpu,nGpu):undefined,ecart:resumerCouts(ecarts),ips,appels:i.render.calls,triangles:i.render.triangles,geometries:i.memory.geometries,textures:i.memory.textures,definition:renderer.getPixelRatio(),largeur,hauteur,leger,elagues,cadence:cible===Infinity?0:cible,pas,definitionDeDepart,moyenneMatch:tempsTotal>0?imagesTotales/tempsTotal:0,dureeMesuree:tempsTotal};},
+    mesures(){const i=renderer.info;return{banques:[...(motions.chargees||[])],octetsAnimations:Object.values(motions.octets||{}).reduce((n,x)=>n+x,0),poses:{faites:posesFaites,evitees:posesEvitees},images:nCouts,rendu:resumerCouts(couts),cpu:resumerCouts(coutsCpu),gpu:nGpu?resumerCouts(coutsGpu,nGpu):undefined,ecart:resumerCouts(ecarts),ips,appels:i.render.calls,triangles:i.render.triangles,geometries:i.memory.geometries,textures:i.memory.textures,definition:renderer.getPixelRatio(),largeur,hauteur,leger,elagues,cadence:cible===Infinity?0:cible,pas,definitionDeDepart,moyenneMatch:tempsTotal>0?imagesTotales/tempsTotal:0,dureeMesuree:tempsTotal};},
     mesurerGpu(actif){if(!actif){arreterGpu();return;}extensionGpu??=contexteGpu.getExtension('EXT_disjoint_timer_query_webgl2');mesureGpu=!!extensionGpu;},
     get definition(){return definition;},
     interne:{actors,officials,camera,scene,renderer,motions,THREE,rig,ballState,tenues,tele,unirSquelettes,souderLesPieces,stadesEnCache:()=>decors.size},
     /** Branche un état de match. `direct` : état déjà interpolé (relevés du direct en ligne). */
     brancher(etat,{direct=false}={}){
       match=etat instanceof DestinyMatch?etat:new DestinyMatch({etat,outils:options.outils,direct});
+      // Correctif 30 : le match sait quels clips sont arrivés — une variante dont la banque manque encore joue son repli.
+      match.dispo=nom=>!!motions.clips[nom];
       for(const a of actors.values()){a.group.visible=false;a.vivait=false;a.anchorBlend=0;}
       snap=true;ballState.key='';return match;
     },

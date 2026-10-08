@@ -9224,6 +9224,7 @@ select:focus {
 [data-statut='ELIMINATED'] { --zone: var(--zone-ELIMINATED); }
 .cl-lat-ligne[data-statut] { box-shadow: inset 3px 0 0 var(--zone); }
 .cl-lat-ligne[data-statut] .cl-lat-pos { color: var(--zone); }
+.cl-lat-statut { margin-right: .35rem; color: var(--zone); font-size: .65rem; font-weight: 800; }
 .cl-lat-ligne[data-statut][data-moi] { box-shadow: inset 3px 0 0 var(--zone), inset 5px 0 0 var(--or-500); }
 .arbre-note { display: flex; flex-wrap: wrap; gap: 0.3rem; padding: 0.25rem 0.5rem 0.35rem; font-size: 0.66rem; color: var(--brume); border-top: 1px dashed var(--bordure); }
 .arbre-note .reverse { color: var(--zone-CHALLENGE_CUP); font-weight: 600; }

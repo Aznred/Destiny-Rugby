@@ -405,6 +405,11 @@ export interface IssueTouche {
   point?: Vec;
   /** Instant de la décision. */
   decideeA: number;
+  /**
+   * Niveau 6 — pourquoi le ballon n'est pas dans les mains du sauteur : `timing` (il est monté trop tôt ou trop tard),
+   * `effleure` (l'adversaire le touche sans le contrôler), `entre-deux` (il retombe entre les deux alignements).
+   */
+  cause?: 'timing' | 'effleure' | 'entre-deux';
 }
 
 /** Animation et appel annoncés pendant une phase de conquête. */
@@ -449,6 +454,21 @@ export interface ConqueteAnimee {
   ballonAuSol?: Vec;
   /** Ce que le saut va donner, décidé avant lui (niveau 4). */
   issue?: IssueTouche;
+  /**
+   * LA COMBINAISON ANNONCÉE (Correctif 30, niveau 6) : son nom dans la bibliothèque de `touches.ts`, et tout ce que la scène
+   * doit montrer AVANT le lancer — les blocs qui feintent (dans l'ordre), le sauteur qui change de bloc et les lifteurs qui
+   * l'accompagnent — puis ce que l'équipe en fait une fois le ballon gagné.
+   */
+  jeu?: string;
+  /** Les sauteurs qui montent pour de faux, dans l'ordre : un faux saut, ou deux. */
+  feintes?: string[];
+  /**
+   * Le vrai sauteur vient d'ailleurs : il attend en `de`, à hauteur d'un autre bloc et en retrait de l'alignement, et n'entre
+   * à sa place (`vers`) qu'une fois la formation avancée de `jusqua`. Il y COURT — sa place reste vide en attendant.
+   */
+  glissement?: { de: Vec; vers: Vec; jusqua: number };
+  /** Ce qui suit la prise de balle : voir `SuiteDeTouche`. */
+  suite?: import('./touches').SuiteDeTouche;
 }
 
 /** Ballon vivant après un rebond : personne ne le possède encore. */
@@ -501,6 +521,19 @@ export interface DuelRuck {
   balle?: string;
   /** Le joueur humain a minuté son geste (Correctif 23) : de 0 (raté) à 1 (parfait). */
   timing?: number;
+  /**
+   * LE GRATTAGE QU'ON VOIT (Correctif 30, niveau 6) : rapide, contesté, récompensé d'une pénalité, perdu (nettoyé par le
+   * soutien) ou trop tardif. Les trois temps de la séquence après le contact — prise d'appui et mains sur le ballon, lutte,
+   * conclusion — sont écrits ici pour que la scène et le moteur comptent les mêmes.
+   */
+  sequence?: import('./animations').SequenceGrattage;
+  temps?: { appui: number; lutte: number; fin: number };
+  /** Les soutiens qui viennent déloger le gratteur (au plus deux) : la scène les fait percuter, le moteur les y envoie. */
+  nettoyeursIds?: string[];
+  /** Un contre-ruck à un, à deux, ou collectif. Son issue (stoppé, ballon récupéré) reste dans `issue`. */
+  variante?: import('./animations').VarianteContreRuck;
+  /** Le gratteur a été délogé par le soutien (séquence « perdu ») : le moteur l'a repoussé, une seule fois. */
+  deloge?: boolean;
 }
 
 /** Contexte du duel au sol, conservé entre le plaquage et la sortie. */
@@ -516,8 +549,42 @@ export interface RuckEnCours {
   debut?: number;
   /** Ruck éclair (IA par poste) : collision gagnée, soutiens déjà là — le ballon sort avant que la défense se relève. */
   eclair?: boolean;
-  /** Comment le plaquage s'est fait (cadence détaillée) : voir `duels.ts`. */
-  plaquage?: { type: import('./duels').TypePlaquage; angle: import('./duels').AnglePlaquage };
+  /**
+   * Comment le plaquage s'est fait (cadence détaillée) : voir `duels.ts`. Niveau 6 : la `variante` jouée (une des vingt-deux
+   * de `animations.ts`), le côté d'où venait le plaqueur vu du porteur (−1 gauche, 1 droite) et le second plaqueur.
+   */
+  plaquage?: {
+    type: import('./duels').TypePlaquage; angle: import('./duels').AnglePlaquage;
+    variante?: import('./animations').VariantePlaquage; cote?: -1 | 0 | 1; secondId?: string;
+  };
+  /** Niveau 6 : le porteur a été plaqué sans aucun soutien à moins de quatre mètres et demi — celui qui gratte y arrive le premier. */
+  isole?: boolean;
+  /** Les déblayages de ce ruck, tels qu'ils se sont joués (niveau 6) : qui a nettoyé qui, comment, et quand. */
+  deblayages?: { de: string; sur: string; variante: import('./animations').VarianteDeblayage; t: number }[];
+}
+
+/**
+ * L'ALTERCATION (Correctif 30, niveau 6) : rare, brève, jamais un combat. Elle suit un coup de sifflet — geste dangereux,
+ * gros plaquage, fautes répétées, match tendu — et se joue pendant l'arrêt : on se pousse (1), on se saisit par les maillots
+ * (2), ou les deux équipes se regroupent et les arbitres séparent (3). Le jeu sait qui l'a déclenchée, et c'est lui que
+ * l'arbitre sanctionne.
+ */
+export interface Altercation {
+  niveau: import('./animations').NiveauAltercation;
+  cause: import('./animations').CauseAltercation;
+  lieu: Vec;
+  debut: number;
+  fin: number;
+  /** Celui qui est venu chercher l'autre, et celui qu'il est venu chercher. */
+  declencheurId: string;
+  cibleId: string;
+  /** Ceux qui s'en mêlent, dans l'ordre où ils arrivent (les deux premiers sont le déclencheur et sa cible). */
+  participants: string[];
+  /** Ceux qui viennent séparer sans s'en mêler. */
+  separateurs: string[];
+  sanction: import('./animations').SanctionAltercation;
+  /** La sanction a été prononcée (une seule fois, à la fin). */
+  jugee?: boolean;
 }
 
 /** Bref temps de contrôle du ballon dans l'en-but avant validation de l'essai. */
@@ -525,6 +592,8 @@ export interface Aplatissage {
   marqueur: Pion;
   origine: 'jeu' | 'maul';
   lieu: Vec;
+  /** Comment il marque (niveau 6) : plongeon, en force, glissade, posé, en coin, sous les poteaux… */
+  style?: import('./animations').StyleEssai;
 }
 
 // LE LANCEMENT DE JEU : la combinaison décidée pour la phase qui commence.
@@ -690,7 +759,13 @@ export interface EtatMatch {
    */
   avantage?: number;
   /** Le ballon porté en cours : qui a capté le lancer, et depuis quand. */
-  maul?: { receveurId: string; debut: number; /** Mètres gagnés par le maul depuis son début (Correctif 23). */ avance?: number } | null;
+  maul?: {
+    receveurId: string; debut: number; /** Mètres gagnés par le maul depuis son début (Correctif 23). */ avance?: number;
+    /** Niveau 6 : ce maul n'est qu'un temps de la combinaison — à `suiteA`, le ballon ressort pour le 9, ou le joueur du fond se détache. */
+    suite?: 'maul-sortie' | 'maul-peel'; suiteA?: number;
+  } | null;
+  /** Niveau 6 : le lancement annoncé avec la touche, à jouer dès que le demi de mêlée a le ballon en main. */
+  suiteDeTouche?: { suite: import('./touches').SuiteDeTouche; neufId: string; jusqua: number } | null;
   /**
    * La cellule d'avants de la phase (cadence détaillée) : le porteur — ou
    * l'avant qui va recevoir — et les deux coéquipiers qui se lient à lui.
@@ -734,6 +809,9 @@ export interface EtatMatch {
    * résultat, un bonus ou la différence de points. Baissé quand le tir est résolu.
    */
   transformationDue?: boolean;
+  reglesSirene?: 'historique' | 'transformation';
+  /** Score à la fin du temps réglementaire, avant toute période supplémentaire. */
+  scoreReglementaire?: [number, number];
   /**
    * UN VAINQUEUR EST OBLIGATOIRE (match couperet) : le règlement du départage, figé à la création depuis
    * `competitionRules.ts`. Absent : le match peut finir sur un nul.
@@ -920,6 +998,10 @@ export interface EtatMatch {
     celebrationJusqua?: number;
     /** Coéquipiers qui viennent entourer le marqueur. */
     feteurs?: string[];
+    /** La fête selon le match (niveau 6) : sobre quand on est mené de loin, toute l'équipe sur un essai décisif. */
+    celebration?: import('./animations').StyleCelebration;
+    /** Comment l'essai a été marqué : repris de l'aplatissage, pour que la scène enchaîne. */
+    essai?: import('./animations').StyleEssai;
   } | null;
   penalite: {
     pour: Cote; lieu: Vec; motif: string;
@@ -1080,6 +1162,12 @@ export interface EtatMatch {
   bagarre: Bagarre | null;
   /** Altercation sifflée : ceux qui viennent séparer, et jusqu'à quand (cadence détaillée). */
   attroupement?: { lieu: Vec; jusqua: number; ids: string[]; arrives: string[] } | null;
+  /** L'altercation en cours (niveau 6) : voir `Altercation`. */
+  altercation?: Altercation | null;
+  /** La rancune laissée par un gros plaquage (niveau 6) : qui l'a porté, sur qui, et jusqu'à quand on s'en souvient. */
+  grief?: { surId: string; pourId: string; jusqua: number };
+  /** Combien d'altercations ce match a déjà connues, et quand la dernière a fini (niveau 6). */
+  altercations?: { n: number; derniere: number };
   /** Les bulles de dialogue visibles en ce moment sur le terrain. */
   bulles: Bulle[];
   /**
@@ -1118,7 +1206,7 @@ export function ajouterCommentaire(
   points = 0, moi = false,
 ): void {
   e.commentaires.push({
-    seconde: Math.min(4800, Math.floor(e.t)),
+    seconde: e.prolongation ? Math.floor(e.t) : Math.min(4800, Math.floor(e.t)),
     minute: Math.min(e.prolongation ? 200 : 80, Math.floor(e.t / 60)), texte, type, cote, points,
     scoreA: e.scoreA, scoreB: e.scoreB, moi,
   });
