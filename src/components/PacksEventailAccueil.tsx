@@ -3,7 +3,7 @@ import { Canvas } from '@react-three/fiber';
 import { useGLTF } from '@react-three/drei';
 import { Box3, Group, Vector3 } from 'three';
 import type { RareteCarriere } from '../lib/ligue/typesCarriere';
-import { modelePack, PALIERS_PACK } from '../lib/presentationPacks';
+import { modelePack, PALIERS_RARETE } from '../lib/presentationPacks';
 
 const PLACES = [
   { x: -2.45, y: -.26, z: -.72, r: -.34 },
@@ -40,9 +40,9 @@ export function PacksEventailAccueil() {
     <directionalLight position={[3, 5, 6]} intensity={4} color="#fff2d0" />
     <directionalLight position={[-4, 1, 3]} intensity={2.4} color="#9bdcff" />
     <Suspense fallback={null}>
-      {PALIERS_PACK.map((rarete, index) => <Pochette key={rarete} rarete={rarete} index={index} />)}
+      {PALIERS_RARETE.map((rarete, index) => <Pochette key={rarete} rarete={rarete} index={index} />)}
     </Suspense>
   </Canvas>;
 }
 
-for (const rarete of PALIERS_PACK) useGLTF.preload(modelePack(rarete));
+for (const rarete of PALIERS_RARETE) useGLTF.preload(modelePack(rarete));

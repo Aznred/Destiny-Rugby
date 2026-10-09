@@ -7,7 +7,7 @@
 //     82 et 92 avec COL 10, toutes en « image manquante » ;
 //   • rien ne sort avant l'image et la publication, rien dans une ligue qui
 //     ne les autorise pas — et une telle ligue tire EXACTEMENT comme avant ;
-//   • la rareté : ICONS proches des Mythiques, Halloween entre bleue et Mythique ;
+//   • la rareté : ICONS plus rares que Spécial, plus rare que Mythique ;
 //   • le pack Halloween : dans la boutique de packs spéciaux de la Collection
 //     solo (jamais en ligue), garanti, puis disparu le 1er décembre ; ses
 //     cartes sortent aussi des packs ordinaires des ligues, jusqu'à la même date ;
@@ -86,11 +86,11 @@ egal([dupontHalloween.club, dupontHalloween.league], ['Stade Toulousain', 'Top 1
 // ── 2. Les chances ─────────────────────────────────────────────────────────
 const evIcons = EVENEMENTS_DEPART.find(e => e.id === 'icons')!, evHalloween = EVENEMENTS_DEPART.find(e => e.id === 'halloween-2026')!;
 for (const pack of PACKS_CARRIERE) {
-  const { elite, star } = pack.probabilites;
+  const { star } = pack.probabilites;
   const h = chanceSpecialeParCarte(pack, evHalloween), i = chanceSpecialeParCarte(pack, evIcons);
-  if (star > 0 && elite > star) ok(h > star && h < elite, `${pack.nom} : Halloween entre bleue (${elite}) et Mythique (${star}) — ${h.toFixed(3)}`);
+  if (star > 0) ok(i < h && h < star, `${pack.nom} : ICON plus rare que Spécial, plus rare que Mythique`);
   if (star === 0) ok(h === 0 && i === 0, `${pack.nom} : pas de Mythique, pas de carte spéciale`);
-  ok(i <= star && i >= star * .5, `${pack.nom} : ICON proche de la Mythique`);
+  ok(i <= star * .1, `${pack.nom} : ICON au sommet des raretés`);
 }
 
 // ── Les catalogues de test ─────────────────────────────────────────────────
@@ -128,17 +128,24 @@ contexteAtelier.run(PUBLIEE, () => {
 
   // ── 5. Les fréquences, mesurées dans une ligue À DOUBLONS ───────────────
   // (sinon les 23 Halloween s'épuisent et l'on mesure la taille du lot, pas la chance).
-  for (const [packId, fois] of [['premium', 1500], ['elite', 800]] as const) {
+  for (const [packId, fois] of [['standard', 400], ['elite', 800]] as const) {
     const e = ouvrir(ligue(true, `frequences-${packId}`, true), packId, fois);
     const tirees = e.cartes.filter(c => e.transactions.some(t => t.nature === 'pack' && t.cartes.includes(c.id)));
     const nbIcons = tirees.filter(c => c.speciale?.type === 'icon').length, nbHalloween = tirees.filter(c => c.speciale?.type === 'halloween').length;
     const nbMythiques = tirees.filter(c => !c.speciale && c.rarete === 'star').length, nbBleues = tirees.filter(c => !c.speciale && c.rarete === 'elite').length;
     console.log(`  ${tirees.length} cartes ${packId} : ${nbIcons} ICONS, ${nbHalloween} Halloween, ${nbMythiques} Mythiques, ${nbBleues} bleues`);
-    ok(nbHalloween > 0 && nbHalloween < nbBleues, `${packId} : Halloween plus rare qu’une bleue`);
-    ok(nbHalloween > nbMythiques, `${packId} : Halloween plus fréquente qu’une Mythique`);
-    ok(nbIcons > 0 && nbIcons <= nbMythiques * 1.6 + 3 && nbIcons >= nbMythiques * .3, `${packId} : ICONS proches des Mythiques`);
+    ok(nbHalloween < nbBleues, `${packId} : Halloween plus rare qu’une bleue`);
+    ok(nbHalloween <= nbMythiques + 5, `${packId} : Spécial plus rare que Mythique, avec marge d’échantillonnage`);
+    ok(nbIcons <= nbMythiques * .3 + 5, `${packId} : ICON plus rare que Mythique`);
   }
-  const ouverte = ouvrir(ligue(true), 'elite', 300);
+  // Les contrôles d'identité et de marché ont besoin de cartes présentes, sans dépendre des taux rares.
+  const initiale = ligue(true, 'verification-speciales-ouverte');
+  initiale.packs.find(p => p.id === 'elite')!.speciales = { icons:100 };
+  const avecIcons = ouvrir(initiale, 'elite', 1);
+  avecIcons.packs.find(p => p.id === 'elite')!.speciales = { 'halloween-2026':100 };
+  const avecDeuxFamilles = ouvrir(avecIcons, 'elite', 1);
+  delete avecDeuxFamilles.packs.find(p => p.id === 'elite')!.speciales;
+  const ouverte = ouvrir(avecDeuxFamilles, 'elite', 25);
   const tirees = ouverte.cartes.filter(c => ouverte.transactions.some(t => t.nature === 'pack' && t.cartes.includes(c.id)));
   const halloweenCarte = tirees.find(c => c.speciale?.type === 'halloween')!;
   egal(halloweenCarte.speciale?.collectif, 10, 'la carte distribuée garde son COL 10');
@@ -153,7 +160,9 @@ contexteAtelier.run(PUBLIEE, () => {
   ok(!avancerCarriere(ancienneAvecPack, PENDANT, 'nettoyage').packs.some(p => p.evenement), 'un pack d’événement resté dans une ligue en est retiré');
   // Le 1er décembre : plus aucune Halloween ne sort des packs de ligue ; les cartes restent.
   const decembre = avancerCarriere(ouverte, APRES, 'decembre');
-  const apres = ouvrir(decembre, 'elite', 150, APRES);
+  const controleDates = structuredClone(decembre);
+  controleDates.packs.find(p => p.id === 'elite')!.speciales = { icons:100, 'halloween-2026':100 };
+  const apres = ouvrir(controleDates, 'elite', 1, APRES);
   egal(speciales(apres).filter(c => c.speciale?.type === 'halloween').length, speciales(decembre).filter(c => c.speciale?.type === 'halloween').length, 'après l’événement : plus aucune Halloween ne sort');
   ok(speciales(apres).length > speciales(decembre).length && speciales(apres).some(c => c.speciale?.type === 'icon'), 'ICONS toute l’année');
   egal(speciales(decembre).length, speciales(ouverte).length, 'les Halloween obtenues restent dans les clubs');
@@ -186,6 +195,8 @@ contexteAtelier.run(PUBLIEE, () => {
   let speciauxGratuits = 0;
   for (let n = 0; n < 200; n++) speciauxGratuits += ouvrirPackSolo(packCollectionSolo(PACKS_CARRIERE.find(p => p.id === 'or')!), catalogueSolo, etatCollectionSoloVide()).indices.filter(i => catalogueSolo[i].speciale).length;
   egal(speciauxGratuits, 0, 'les cartes spéciales n’entrent jamais dans les bandes ordinaires');
+  const gratuitAutorise = ouvrirPackSolo({ ...packCollectionSolo(PACKS_CARRIERE.find(p => p.id === 'or')!), speciales:{icons:100} }, catalogueSolo, etatCollectionSoloVide(), undefined, { speciales:solo, maintenant:PENDANT });
+  ok(gratuitAutorise.indices.some(i => catalogueSolo[i].speciale?.type === 'icon'), 'un pack gratuit accepte les spéciales via le tirage autorisé');
 
   // ── 7. Interrupteur global ICONS ───────────────────────────────────────────
   const sansIcons = contexteAtelier.run(configPubliee(() => true, { speciales: { evenements: { icons: { actif: false } } } }), () => ouvrir(ligue(true), 'elite', 200));
@@ -312,7 +323,7 @@ try {
   const lot = await appel(idKiri, '/api/carriere?atelier=1&section=imports&lot=mlr-championship-npc');
   egal(lot.statut, 200, 'lot MLR · Championship · NPC analysé');
   ok(lot.donnees.analyses.length > 900, 'près de mille joueurs dans le lot');
-  egal(lot.donnees.compteurs.nouveau, 0, 'aucun nom du lot absent');
+  egal(lot.donnees.analyses.filter((a: any) => a.ligne.age >= 18 && a.verdict === 'nouveau').length, 0, 'aucun senior du lot absent ; les mineurs restent hors catalogue');
   ok(lot.donnees.analyses.filter((a: any) => a.ligne.fichesSource > 1).every((a: any) => a.verdict === 'present'), 'tous les homonymes source sont intégrés');
   const andrew = lot.donnees.analyses.find((a: any) => a.ligne.nom === 'Andrew SMITH' && a.ligne.club === 'Waikato');
   ok(andrew?.verdict === 'present', 'Andrew Smith (Waikato) existe séparément du joueur du Munster');

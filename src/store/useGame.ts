@@ -7779,6 +7779,13 @@ export const useGame = create<GameState>()(
       // La pyramide (qui joue dans quelle division) vit dans un registre de
       // module : au retour d'une sauvegarde, il faut la lui rendre.
       onRehydrateStorage: () => (etat) => {
+        // L'ancienne FPC unique devient deux divisions ; les carrières des provinces du Championship les suivent.
+        if (MONDE_FEMININ && etat) for (const carriere of [etat.joueur, etat.manager]) {
+          if (carriere?.division === 'f-fpc' && !etat.mouvementsClubs?.[carriere.club] && competitionDuClub(carriere.club)?.id === 'f-fpc2') {
+            carriere.division = 'f-fpc2';
+            if (carriere.contrat && 'division' in carriere.contrat) carriere.contrat.division = 'f-fpc2';
+          }
+        }
         // ⚠️ LE JOUEUR INCARNÉ EST UN REGISTRE DE MODULE, comme la pyramide : après un rechargement, son double doit
         // être écarté du monde AVANT qu'un effectif ne soit lu — sinon deux Dupont jusqu'à la prochaine création.
         setJoueurIncarne(etat?.joueur?.origine ? etat.joueur.nom : null);
@@ -8144,7 +8151,7 @@ function resoudreTrophees(
     ? j.international.rassemblements.some((r) => r.saison === saisonEcoulee && r.competition === 'coupeDuMonde' && r.retenu)
     : selectionne)) {
     const mondial = competitionDeSaNation(nation, saisonEcoulee, 'automne');
-    const trophee = mondial && TROPHEE_PAR_INTERNATIONAL[mondial.id];
+    const trophee = mondial && (MONDE_FEMININ && mondial.id === 'coupeDuMonde' ? 'f-monde' : TROPHEE_PAR_INTERNATIONAL[mondial.id]);
     if (trophee && vainqueurInternational(mondial.id, saisonEcoulee) === nation) {
       trophees.push(trophee);
     }

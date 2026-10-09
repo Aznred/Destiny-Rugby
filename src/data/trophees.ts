@@ -524,6 +524,20 @@ export const TROPHEES: Record<string, Trophee> = {
     desc: 'Champion du monde des moins de 20 ans, premier grand titre d’une carrière en devenir.',
     ovas: 5,
   },
+  'f-pwr': { id: 'f-pwr', nom: "Premiership Women's Rugby", modele: '/m3d/f-pwr.glb', couleur: '#e7c05b', desc: 'Championne de Premiership Women’s Rugby.', ovas: 5 },
+  'f-aupiki': { id: 'f-aupiki', nom: 'Super Rugby Aupiki', modele: '/m3d/f-aupiki.glb', couleur: '#47c8e0', desc: 'Vainqueur de la finale du Super Rugby Aupiki.', ovas: 5 },
+  'f-superw': { id: 'f-superw', nom: 'Super Rugby Women’s', modele: '/m3d/f-superw.glb', couleur: '#dcba51', desc: 'Championne du Super Rugby Women’s.', ovas: 4 },
+  'f-elite1': { id: 'f-elite1', nom: 'Élite 1 Féminine', modele: '/m3d/f-elite.glb', couleur: '#64b8e7', desc: 'Championne de France Élite 1 Féminine.', ovas: 5 },
+  'f-elite2': { id: 'f-elite2', nom: 'Élite 2 Féminine', modele: '/m3d/f-elite.glb', couleur: '#b6c8de', desc: 'Championne de France Élite 2 Féminine.', ovas: 4 },
+  'f-fpc': { id: 'f-fpc', nom: 'Farah Palmer Cup · Premiership', modele: '/m3d/f-fpc.glb', couleur: '#d4b45a', desc: 'Premiership Cup : demi-finales puis finale entre les quatre premières provinces.', ovas: 4 },
+  'f-fpc2': { id: 'f-fpc2', nom: 'Farah Palmer Cup · Championship', modele: '/m3d/f-fpc2.glb', couleur: '#b4cfdf', desc: 'Championship Cup : demi-finales puis finale entre les quatre premières provinces.', ovas: 3 },
+  jjStewart: { id: 'jjStewart', nom: 'JJ Stewart Trophy', modele: '/m3d/jjStewart.glb', couleur: '#c7a557', desc: 'Trophée de défi de la Farah Palmer Cup, défendu à domicile pendant la saison régulière. Tenant réel 2026 : Manawatū Cyclones.', ovas: 3 },
+  'f-celtic': { id: 'f-celtic', nom: 'Celtic Challenge', modele: '/m3d/f-celtic.glb', couleur: '#41c1a4', desc: 'Championne du Celtic Challenge.', ovas: 4 },
+  'f-seriea': { id: 'f-seriea', nom: 'Serie A Élite Femminile', modele: '/m3d/f-seriea.glb', couleur: '#77b494', desc: 'Championne d’Italie de rugby féminin.', ovas: 3 },
+  'f-liga': { id: 'f-liga', nom: 'Liga Iberdrola', modele: '/m3d/f-liga.glb', couleur: '#dca567', desc: 'Championne d’Espagne de rugby féminin.', ovas: 3 },
+  'f-ail': { id: 'f-ail', nom: 'All-Ireland League féminine · 1A', modele: '/m3d/f-ail.glb', couleur: '#8bbf7b', desc: 'Championne de la division 1A de l’All-Ireland League féminine.', ovas: 3 },
+  'f-ail2': { id: 'f-ail2', nom: 'All-Ireland League féminine · 1B', modele: '/m3d/f-ail.glb', couleur: '#a8c797', desc: 'Championne de la division 1B de l’All-Ireland League féminine.', ovas: 2 },
+  'f-monde': { id: 'f-monde', nom: 'Coupe du monde féminine', modele: '/m3d/f-monde.glb', couleur: '#ecb24c', desc: 'Championne du monde de rugby féminin.', ovas: 8 },
 };
 
 // Trophée national décerné selon la division du club. Les clés sont les ids de
@@ -531,6 +545,8 @@ export const TROPHEES: Record<string, Trophee> = {
 // les championnats du monde ont désormais leur trophée, prêts à servir dès que
 // l'étranger deviendra jouable.
 export const TROPHEE_PAR_DIVISION: Record<string, string> = {
+  'f-pwr': 'f-pwr', 'f-aupiki': 'f-aupiki', 'f-superw': 'f-superw', 'f-elite1': 'f-elite1', 'f-elite2': 'f-elite2',
+  'f-fpc': 'f-fpc', 'f-fpc2': 'f-fpc2', 'f-celtic': 'f-celtic', 'f-seriea': 'f-seriea', 'f-liga': 'f-liga', 'f-ail': 'f-ail', 'f-ail2': 'f-ail2',
   top14: 'brennus',
   prod2: 'prod2',
   nationale: 'nationale',

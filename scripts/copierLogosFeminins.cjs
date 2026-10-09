@@ -34,8 +34,13 @@ const joueuses = JSON.parse(fs.readFileSync(path.join(source, 'joueuses.json'), 
     await sharp(fichier, fichier.endsWith('.svg') ? { density: 300 } : {}).trim().resize(256, 256, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } }).png({ compressionLevel: 9 }).toFile(sortie);
     table[j.club] = `/logos/feminines/${j.ligue}/${j.club_id}.png`;
   }
+  // Le générateur a aussi documenté les unions FPC, clubs irlandais, italiens et espagnols.
+  const monde = fs.readFileSync(path.resolve(__dirname, '../src/data/mondeFeminin.generated.ts'), 'utf8');
+  const championnats = JSON.parse(monde.match(/export const CHAMPIONNATS_FEMININS: ChampionnatFeminin\[\] = ([\s\S]*?);\s*const POSTES/)[1]);
+  for (const championnat of championnats) for (const club of championnat.clubs) if (club.logo) table[club.nom] = club.logo;
+  table['Northland Kauri'] = table['Northland Women'];
   const lignes = Object.entries(table).sort(([a], [b]) => a.localeCompare(b, 'fr')).map(([nom, logo]) => `  ${JSON.stringify(nom)}: ${JSON.stringify(logo)},`);
   fs.writeFileSync(path.resolve(__dirname, '../src/data/logosFeminins.generated.ts'),
     `// GÉNÉRÉ par scripts/copierLogosFeminins.cjs — ne pas éditer à la main.\n// L'écusson d'un club féminin, par le nom exact que porte la carte de la joueuse.\nexport const LOGOS_CLUBS_FEMININS: Record<string, string> = {\n${lignes.join('\n')}\n};\n`);
-  console.log(`${lignes.length} écussons copiés ; sans logo : ${[...manquants].join(', ') || 'aucun'}`);
+  console.log(`${lignes.length} écussons copiés ; sans logo : ${[...manquants].filter(nom => !table[nom]).join(', ') || 'aucun'}`);
 })().catch(erreur => { console.error(erreur); process.exitCode = 1; });

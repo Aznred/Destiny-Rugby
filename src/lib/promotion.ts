@@ -45,6 +45,7 @@ const PYRAMIDES: string[][] = [
   // Rugby féminin (`data/mondeFeminin.generated.ts`) : la France et l'Irlande ont deux étages, le reste est fermé.
   ['f-elite1', 'f-elite2'],
   ['f-ail', 'f-ail2'],
+  ['f-fpc', 'f-fpc2'],
 ];
 
 export function pyramideDe(divisionId: string): string[] | null {

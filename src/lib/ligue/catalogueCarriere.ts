@@ -19,6 +19,7 @@ import { definirPortraitsDuMonde } from '../avatars.js';
 import { LOGO_COMPETITION } from '../../data/logosCompetitions.js';
 import { LOGO_COMPETITION_NOUVEAU } from '../../data/nouvellesLigues.js';
 import { TROPHEES } from '../../data/trophees.js';
+import { packPropose } from '../presentationPacks.js';
 import { posteDepuisFamille, POSTE_PAR_ID } from '../../data/rugby.js';
 import type { FamillePoste, PosteId } from '../../types.js';
 import type { Coequipier } from '../effectif.js';
@@ -61,11 +62,11 @@ const NATIONS_EUROPE_EMERGENTE = ['Géorgie', 'Portugal', 'Roumanie', 'Espagne']
 /** Le tirage courant, celui de la plupart des packs thématiques. */
 const MIXTE = { bronze: 48, argent: 37, or: 14, elite: .95, star: .05 };
 
-export const PACKS_CARRIERE: PackCarriere[] = [
+const DEFINITIONS_PACKS: PackCarriere[] = [
   // ── Le volume ────────────────────────────────────────────────────────────
   { id: 'bronze', nom: 'Bronze', prix: 250, cartes: 3, famille: 'general',
     promesse: 'De la profondeur, pas cher. De quoi faire tourner un effectif.',
-    probabilites: { bronze: 90, argent: 9.5, or: .5, elite: 0, star: 0 } },
+    probabilites: { bronze: 89.94, argent: 9.5, or: .5, elite: .05, star: .01 } },
   { id: 'standard', nom: 'Argent', prix: 700, cartes: 3, famille: 'general',
     promesse: 'Le pack de tous les jours. Une chance sur sept de toucher de l’Or.',
     probabilites: MIXTE },
@@ -225,6 +226,7 @@ export const PACKS_CARRIERE: PackCarriere[] = [
     probabilites: { bronze: 20, argent: 42, or: 35, elite: 2.7, star: .3 } },
 ];
 
+export const PACKS_CARRIERE: PackCarriere[] = DEFINITIONS_PACKS.filter(packPropose);
 const PACKS_PERMANENTS = ['bronze', 'standard', 'or'] as const;
 /** Sélections éditoriales datées en heure de Paris. Elles prennent le pas sur la rotation normale. */
 const PACKS_MIS_EN_AVANT_PAR_JOUR: Readonly<Record<string, readonly string[]>> = {
@@ -321,13 +323,19 @@ function catalogueAvantProtection(config: CatalogueAdmin): readonly SourceCarte[
   });
   cataloguesAdmin.set(config, resultat); return resultat;
 }
+/** Les anciens packs Bronze officiels doivent aussi pouvoir atteindre les sept paliers. */
+export function actualiserAncienPackBronze(pack: PackCarriere): PackCarriere {
+  const p = pack.probabilites;
+  return pack.id === 'bronze' && p.argent === 9.5 && p.or === .5 && p.elite === 0
+    && ((p.bronze === 90 && p.star === 0) || (p.bronze === 89.99 && p.star === .01))
+    ? { ...pack, probabilites: { ...PACKS_CARRIERE.find(p => p.id === 'bronze')!.probabilites } } : pack;
+}
 export function packsCatalogueAdmin(): PackCarriere[] {
   const editions = catalogueAdmin().packs;
   if(poolFfrCourant()==='women'){
     const pool=catalogueMondialCarriere();
     const models=PACKS_CARRIERE.filter(p=>['general','poste'].includes(p.famille??''));
-    const championships=[...new Set(pool.map(c=>c.championnat))].sort();
-    for(const championnat of championships)models.push({id:`womens:${normaliser(championnat)}`,nom:championnat,prix:700,cartes:3,famille:'monde',filtre:{championnats:[championnat]},probabilites:{...MIXTE}});
+    models.push(...packsChampionnatsFeminins(pool));
     return models.flatMap(p=>{
       const candidates=pool.filter(c=>!p.filtre||carteDansPack(c,p.filtre));if(!candidates.length)return [];
       const probabilites={...p.probabilites};
@@ -339,7 +347,7 @@ export function packsCatalogueAdmin(): PackCarriere[] {
       return [{...p,nom:`${p.nom} · Féminin`,probabilites,garantie,promesse:`${p.cartes} cartes seniors féminines${garantie?` · ${garantie} garantie`:''}.`}];
     });
   }
-  const packs = [...PACKS_CARRIERE.map(p => editions[p.id] ?? p), ...Object.values(editions).filter(p => !PACKS_CARRIERE.some(b => b.id === p.id))];
+  const packs = [...PACKS_CARRIERE.map(p => editions[p.id] ?? p), ...Object.values(editions).filter(p => !PACKS_CARRIERE.some(b => b.id === p.id))].filter(packPropose).map(actualiserAncienPackBronze);
   return poolFfrCourant() === 'mixed' ? [...packs, ...packsChampionnatsFeminins()] : packs;
 }
 
@@ -351,14 +359,16 @@ export function packsCatalogueAdmin(): PackCarriere[] {
 export function packsChampionnatsFeminins(catalogue: readonly SourceCarte[] = catalogueMondialCarriere()): PackCarriere[] {
   const joueuses = catalogue.filter(c => c.gender === 'female' && !c.speciale);
   return [...new Set(joueuses.map(c => c.championnat))].sort().flatMap(championnat => {
-    const candidates = joueuses.filter(c => c.championnat === championnat);
+    if (championnat === 'Élite 2 Féminine') return [];
+    const championnats = championnat === 'Élite 1 Féminine' ? [championnat, 'Élite 2 Féminine'] : [championnat];
+    const candidates = joueuses.filter(c => championnats.includes(c.championnat));
     const probabilites = { ...MIXTE };
     for (const rarete of RARETES_CARRIERE) if (!candidates.some(c => c.rarete === rarete)) probabilites[rarete] = 0;
     const somme = Object.values(probabilites).reduce((a, b) => a + b, 0);
     if (!somme) return [];
     for (const rarete of RARETES_CARRIERE) probabilites[rarete] = probabilites[rarete] / somme * 100;
-    return [{ id: `womens:${normaliser(championnat)}`, nom: championnat, prix: 700, cartes: 3, famille: 'monde' as const,
-      filtre: { championnats: [championnat] }, probabilites, promesse: `3 joueuses de ${championnat}.` }];
+    return [{ id: `womens:${normaliser(championnat)}`, nom: championnats.length > 1 ? 'Élite 1 et 2 Féminines' : championnat, prix: 700, cartes: 3, famille: 'monde' as const,
+      filtre: { championnats }, probabilites, promesse: championnats.length > 1 ? '3 joueuses des Élites françaises. La pochette passe d’Élite 2 à Élite 1 si une joueuse d’Élite 1 est tirée.' : `3 joueuses de ${championnat}.` }];
   });
 }
 

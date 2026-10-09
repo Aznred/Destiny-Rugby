@@ -141,7 +141,8 @@
     "verify:remplacements": "vite-node scripts/verifierRemplacementsPoste.ts",
     "verify:packs-test": "vite-node scripts/verifierPacksTest.ts",
     "verify:demandes-image": "vite-node scripts/verifierDemandesImage.ts",
-    "verify:monde-feminin": "vite-node scripts/verifierMondeFeminin.ts"
+    "verify:monde-feminin": "vite-node scripts/verifierMondeFeminin.ts",
+    "verify:packs-femmes": "vite-node scripts/verifierPacksFemmes.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

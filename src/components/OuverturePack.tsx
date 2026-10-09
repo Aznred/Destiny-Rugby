@@ -3,7 +3,7 @@ import type { CSSProperties, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import type { CarteCarriere, RareteCarriere } from '../lib/ligue/typesCarriere';
 import { creerSonsPacks } from '../lib/sonsPacks';
-import { PALIERS_PACK, rangPack } from '../lib/presentationPacks';
+import { PALIERS_PACK, rangPack, modeleElite1 } from '../lib/presentationPacks';
 import { t } from '../lib/i18n';
 import { signaler } from '../lib/tutoriel/guide';
 import './OuverturePack.css';
@@ -15,8 +15,8 @@ import './OuverturePack.css';
 // — quand on arrive ici, le morceau est déjà là.
 const Pack3D = lazy(() => import('./Pack3D'));
 
-const COULEURS = ['#d59a64', '#d7e6f2', '#ffd15b', '#54e4ff', '#ff4057'];
-export default function OuverturePack({ cartes, pack, modele, garantie, apparenceInitiale, ordreImpose, onFermer, rendreCarte }: {
+const COULEURS = ['#d59a64', '#d7e6f2', '#ffd15b', '#54e4ff', '#ff4057', '#ad75ff', '#fff0b3'];
+export default function OuverturePack({ cartes, pack, modele, garantie, apparenceInitiale, evolutionElite, ordreImpose, onFermer, rendreCarte }: {
   /**
    * ⚠️ `null` VEUT DIRE « LE SERVEUR N'A PAS ENCORE RÉPONDU », et c'est un état
    * normal, pas une erreur. La pochette s'affiche AVANT que les cartes soient
@@ -27,6 +27,8 @@ export default function OuverturePack({ cartes, pack, modele, garantie, apparenc
    */
   cartes: CarteCarriere[] | null; pack: string; modele?: string; garantie?: RareteCarriere;
   apparenceInitiale?: RareteCarriere; onFermer: () => void; rendreCarte: (carte: CarteCarriere) => ReactNode;
+  /** Pochette Élite 2, puis Élite 1 uniquement si le tirage contient une joueuse de cette division. */
+  evolutionElite?: boolean;
   /**
    * Pack de test (Correctif 33) : `cartes` arrive DANS L'ORDRE DE RÉVÉLATION voulu (la première se retourne d'abord,
    * la dernière est la tête d'affiche). Sans lui, les cartes sont rangées par niveau et la meilleure clôt le pack.
@@ -43,11 +45,13 @@ export default function OuverturePack({ cartes, pack, modele, garantie, apparenc
     : [...cartes].sort((a,b) => rangPack(b)-rangPack(a) || b.note-a.note), [cartes, ordreImpose]);
   // Les skins dédiés gardent leur visuel. Les pochettes génériques partent de
   // leur couleur en boutique, puis le joueur révèle chaque palier du tirage.
-  const rangInitial = Math.max(0, PALIERS_PACK.indexOf(apparenceInitiale ?? garantie ?? 'bronze'));
+  const rangInitial = evolutionElite ? 0 : Math.max(0, PALIERS_PACK.indexOf(apparenceInitiale ?? garantie ?? 'bronze'));
   const [rang, setRang] = useState(rangInitial);
-  const meilleurRang = Math.min(PALIERS_PACK.length - 1, cartes?.reduce((meilleur, carte) => Math.max(meilleur, rangPack(carte)), rangInitial) ?? rangInitial);
-  const prochainPalier = !modele && pret && rang < meilleurRang;
-  const attenteTirage = !modele && !pret;
+  const meilleurRang = evolutionElite ? (cartes?.some(c => c.gender === 'female' && c.championnat === 'Élite 1 Féminine') ? 1 : 0)
+    : Math.min(PALIERS_PACK.length - 1, cartes?.reduce((meilleur, carte) => Math.max(meilleur, rangPack(carte)), rangInitial) ?? rangInitial);
+  const prochainPalier = (!modele || evolutionElite) && pret && rang < meilleurRang;
+  const attenteTirage = !pret;
+  const modeleAffiche = evolutionElite && rang > 0 ? modeleElite1 : modele;
   // Le libellé ne doit pas annoncer une amélioration avant de toucher le pack.
   const libelleAction = attenteTirage ? t('online.pack.waitCards') : t('online.pack.openNow');
   const [phase, setPhase] = useState<'attente'|'charge'|'evolution'|'ouverture'|'cartes'>('attente');
@@ -62,7 +66,7 @@ export default function OuverturePack({ cartes, pack, modele, garantie, apparenc
   const principale = useRef<HTMLButtonElement>(null);
   const cartesRefs = useRef<(HTMLDivElement | null)[]>([]);
   const toutes = pret && revelees >= ordre.length;
-  const rarete = PALIERS_PACK[rang];
+  const rarete = evolutionElite ? 'elite' : PALIERS_PACK[rang];
   // La famille de la meilleure carte spéciale colore l'éclat d'ouverture.
   // ⚠️ SEULEMENT À L'OUVERTURE : avant, la pochette ne dit que son palier, sinon
   // la lueur orange trahirait la Halloween avant même qu'on touche le pack.
@@ -162,14 +166,14 @@ export default function OuverturePack({ cartes, pack, modele, garantie, apparenc
     if (!dialogue.current?.contains(document.activeElement)) (principale.current ?? dialogue.current)?.focus();
     return () => window.removeEventListener('keydown', clavier);
   }, [phase, toutes, ordre.length, onFermer, muet, sons, pret]);
-  return createPortal(<div ref={dialogue} tabIndex={-1} className={`pack-show phase-${phase} palier-${rarete}${eclatSpecial}${calme ? ' calme' : ''}${instant ? ' instant' : ''}`} style={{ '--pack-color': eclatSpecial ? (speciale === 'halloween' ? '#ff8a1c' : '#e8c46a') : COULEURS[rang] } as CSSProperties} role="dialog" aria-modal="true" aria-labelledby="pack-show-title" onKeyDown={e => {
+  return createPortal(<div ref={dialogue} tabIndex={-1} className={`pack-show phase-${phase} palier-${rarete}${eclatSpecial}${calme ? ' calme' : ''}${instant ? ' instant' : ''}`} style={{ '--pack-color': eclatSpecial ? (speciale === 'halloween' ? '#ff8a1c' : '#e8c46a') : evolutionElite ? COULEURS[rang ? 2 : 3] : COULEURS[rang] } as CSSProperties} role="dialog" aria-modal="true" aria-labelledby="pack-show-title" onKeyDown={e => {
     if (e.key === 'Tab') { const elements = Array.from(dialogue.current?.querySelectorAll<HTMLElement>('button:not(:disabled), [tabindex="0"]') ?? []); const premier = elements[0], dernier = elements[elements.length-1]; if (e.shiftKey && document.activeElement === premier) { e.preventDefault(); dernier?.focus(); } else if (!e.shiftKey && document.activeElement === dernier) { e.preventDefault(); premier?.focus(); } }
   }}><main className="pack-show-main cel-panneau">
     <div className="pack-show-heading"><p className="eyebrow">{t("ui.4dfd1ccc8b22", { v0: pack, v1: cartes ? ` · ${t('online.shop.cards',{n:cartes.length})}` : '' })}</p><h2 id="pack-show-title" key={phase} aria-live="polite">{phase === 'cartes' ? t('online.pack.recruits') : pack}</h2></div>
     {phase !== 'cartes' ? <><div className="pack-show-stage">
       <div className="pack-show-beams" aria-hidden="true"/><div className="pack-show-orbit" aria-hidden="true"/>
       <div className="pack-show-particles" key={rang} aria-hidden="true">{Array.from({length:28}, (_,i) => <i key={i} style={{'--x':`${i*37%100}%`, '--delay':`${i%9*-.35}s`, '--duration':`${2+i%4}s`, '--drift':`${(i%2?1:-1)*(20+i*3)}px`} as CSSProperties}/>)}</div>
-      <div className="pack-show-model"><Suspense fallback={null}><Pack3D rarete={rarete} rareteSuivante={prochainPalier ? PALIERS_PACK[rang + 1] : undefined} modele={modele} ouvert={phase === 'ouverture'} calme={calme} transition={phase}/></Suspense></div>
+      <div className="pack-show-model"><Suspense fallback={null}><Pack3D rarete={rarete} rareteSuivante={prochainPalier && !evolutionElite ? PALIERS_PACK[rang + 1] : undefined} modele={modeleAffiche} modeleSuivant={prochainPalier && evolutionElite ? modeleElite1 : undefined} ouvert={phase === 'ouverture'} calme={calme} transition={phase}/></Suspense></div>
       {phase === 'attente' && <button ref={principale} type="button" className="pack-show-touch" data-tuto="pack-ouvrir" onClick={avancerPack} disabled={attenteTirage} aria-label={libelleAction} />}
       {(phase === 'charge' || phase === 'evolution') && <div className="pack-show-upgrade" aria-hidden="true"><i/><i/><span/></div>}
       {phase === 'ouverture' && <div className="pack-show-flash" aria-hidden="true"/>}

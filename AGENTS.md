@@ -282,11 +282,11 @@ privé dans la vue de ligue. Banc : `npm run verify:combinaisons`.
 
 **Cartes spéciales** (`ligue/cartesSpeciales.ts`, graine `data/cartesSpeciales.ts`) :
 Influenceurs (`influencer`, Correctif 32) : famille désactivée par défaut, sans graine nominative,
-design violet/rouge LIVE, rang de révélation 5 (pochette ordinaire bornée à 4). GEN 60–99,
+design violet/rouge LIVE, rang de révélation 5 (Spécial ; ICON est au rang 6). GEN 60–99,
 `display_name` / identité réelle, rareté, stats, description, niveau, club et nation facultatifs.
 Labo → Cartes spéciales → Influenceurs ; brouillon à la création. `allowedPackIds` absent =
 tous les packs éligibles, vide = aucun ; poids nul exclu. Pack Créateurs 200 Ovas / dix cartes /
-une garantie, absent si aucun candidat. Taux ordinaire par défaut 0,2 × Mythique. Permissions
+une garantie, absent si aucun candidat. Taux ordinaire par défaut 0,25 × Mythique. Permissions
 `market_allowed` / `trade_allowed` revérifiées lors des échanges et à l’acceptation. Sans club,
 `sansClub` = nation / neutre / creator ; les valeurs vides restent vides. Le catalogue public
 masque les cartes inactives ou pas encore sorties ; les exemplaires du compte authentifié
@@ -297,13 +297,13 @@ graine, même révision que l'Atelier) ; images dans `carriere_cartes_speciales_
 servies par `/api/carriere?imageSpeciale=<id>&v=<n>` (privées tant que jamais publiées).
 ⚠️ **Rien ne sort sans image ni publication** (`statutCarteSpeciale`) ; une ligue sans
 `cartesSpeciales` ne consomme AUCUN tirage de plus (`preparerTirageSpecial` → null).
-Chance par carte : ICONS ≈ Mythique, Halloween = √(Élite × Mythique) ; la carte garantie
+Chance par carte plafonnée : ICONS = 0,1 × Mythique, chaque famille Spécial ≤ 0,25 × Mythique ; la carte garantie
 d'un pack les tire au prorata des bandes autorisées (`tirerSpeciale`, option `base`).
 ⚠️ **Le pack Halloween se vend dans la boutique de packs spéciaux de la Collection
 solo, PAS en ligue** (`packsEvenementSolo`, prix en Ovas du compte, pochette 3D
 `MODELES_PACKS_EVENEMENT`) ; `completerPacks` retire tout pack d'événement d'une ligue.
 Ses cartes sortent aussi des packs ordinaires des ligues qui les autorisent, et des
-packs solo payants (jamais des gratuits). Le catalogue solo reçoit les seules cartes
+packs solo, gratuits compris. Le catalogue solo reçoit les seules cartes
 publiées (`specialesPubliques`, avec `/api/carriere?catalogueSolo=1`), ajoutées en FIN
 de tableau et hors des bandes de rareté. `cartesSpeciales.ts` reste LÉGER (le store
 l'importe via `collectionSolo.ts`) ; la graine et la fusion avec le Labo sont dans
@@ -2570,6 +2570,30 @@ match** — ne pas s'en servir pour retoucher la difficulté tant qu'ils n'ont p
   263 Ko (partagé et paresseux). Le build signale des morceaux > 1 000 Ko.
 - **Paiements** : il n'y en a plus (Stripe retiré, voir la section de la boutique).
 
+
+## Packs et trophées féminins (9 octobre 2026)
+
+Les boutiques n'affichent que les packs possédant une pochette dédiée, sauf Bronze, Argent, Or et Élite garantie
+(`packPropose`, partagé serveur/client). Les anciens packs gratuits retirés sont convertis vers un pack disponible.
+Les divisions publiques restent limitées aux trois packs ordinaires et activent les cartes spéciales publiées.
+Paliers d'ouverture : Bronze → Argent → Or → Élite/bleue → Mythique → Spécial → ICON. Ne pas rabattre une ICON
+sur Mythique ; `PalierPack` est distinct de `RareteCarriere`. Les taux anciens du Labo sont plafonnés pour préserver
+cet ordre. Le Bronze officiel existant reçoit la faible chance Élite/Mythique nécessaire aux sept paliers.
+Le pack Élite français réunit Élite 1 et 2 : pochette Élite 2 au départ, Élite 1 uniquement si le tirage en contient.
+Octobre Rose : octobre uniquement, 150 Ovas, dix cartes dont au moins une de l'événement, collection solo comme
+Halloween ; ses cartes peuvent aussi sortir des packs ordinaires en ligne. Rien ne sort avant publication et image.
+La révision du catalogue solo porte `:packs-femmes-v2` pour rafraîchir les événements et taux déjà mis en cache.
+Les 26 nouveaux modèles sont optimisés par `scripts/optimiserPacksFemmes.mjs` (ne pas copier les GLB bruts).
+Le catalogue contient 1 803 joueuses seniors réelles ; compléments FER, IRFU et North Harbour documentés dans
+`sources/competitions/feminines/effectifs-complementaires.json`, générés via `scripts/collecterEffectifsFemmes.py`
+puis `scripts/genMondeFeminin.cjs`. Les notes restent estimées dans le jeu. Les 84 clubs ont leur écusson dans
+`logosFeminins.generated.ts` (plus un alias Northland Kauri), produit par `scripts/copierLogosFeminins.cjs`.
+FPC : `f-fpc` Premiership et `f-fpc2` Championship, six clubs par division, cinq journées sans retour,
+quatre qualifiés, une promotion/relégation ; anciennes carrières réaffectées selon le club. Les douze titres et
+le Mondial féminin utilisent les modèles fournis. JJ Stewart est enregistré dans le catalogue des trophées.
+Bancs : `npm run verify:packs-femmes`, `verify:cartes-femmes`, `verify:monde-feminin`,
+`verify:collection-solo`, `verify:cartes-speciales` ; `scripts/verifierPacksFemmesUI.cjs` pour les sept
+paliers, les dix nouvelles pochettes et le passage conditionnel Élite 2 → Élite 1 sur ordinateur/mobile.
 
 ## Intégration FFR 2026_10_FFR_FULL
 

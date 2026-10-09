@@ -16,7 +16,7 @@ import { nomPackCarriere } from '../lib/presentationPacks';
 import { carteSpecialeVisibleCollection, preparerTirageSpecial, nomFamilleSpeciale } from '../lib/ligue/cartesSpeciales';
 import { Citrouille, EmblemeIcon, EmblemeInfluenceur } from '../components/EmblemesSpeciaux';
 import { nombre, t } from '../lib/i18n';
-import { apparencePack, modelePackParNom, packAvecSkin } from '../lib/presentationPacks';
+import { apparencePack, modelePackParNom, packAvecSkin, evolutionEliteFrancaise } from '../lib/presentationPacks';
 import { chargerPacksPrivesSolo, ouvrirPackPriveSolo } from '../lib/carriereEnLigneClient';
 import type { PackInterneBoutique } from '../lib/packsInternes';
 import { appliquerCollectionSoloDistante, attendreBoutiqueSoloEnregistree } from '../lib/synchronisationBoutiqueCompte';
@@ -61,9 +61,9 @@ export function CollectionSolo() {
   /** Ce que chaque pack payant peut donner en cartes spéciales, par carte. */
   const chancesSpeciales = (packId: string) => {
     const pack = packsRoue.find(p => p.id === packId);
-    if (!pack || !speciales || idsPacksGratuits.has(pack.id)) return [];
+    if (!pack || !speciales) return [];
     return (preparerTirageSpecial(pack, true, instant, new Set(), speciales)?.lots ?? [])
-      .map(lot => ({ nom: nomFamilleSpeciale(speciales.evenementParId.get(lot.evenement)!.cardType), chance: Math.round(lot.chance * 1000) / 1000 }))
+      .map(lot => ({ nom: nomFamilleSpeciale(speciales.evenementParId.get(lot.evenement)!.cardType), chance: lot.chance }))
       .filter(c => c.chance > 0);
   };
   const [typeCartes, setTypeCartes] = useState<'' | 'normal' | 'icon' | 'halloween' | 'influencer'>('');
@@ -161,10 +161,8 @@ export function CollectionSolo() {
       const prixArt = prixPackSoloArticle(pack);
       const devise: Devise = gratuitPack ? 'ovas' : choixDevise.current;
       const prix = montantEn(prixArt, devise) ?? pack.prix;
-      // Les packs gratuits ordinaires conservent leur tirage sans carte spéciale.
-      const avecSpeciales = !idsPacksGratuits.has(pack.id);
       const resultat = acheterPack(prix, precedent => ouvrirPackSolo(pack, catalogueActuel, precedent, undefined,
-        avecSpeciales ? { speciales: catalogueSpecialSolo(), maintenant: Date.now() } : {}), devise);
+        { speciales: catalogueSpecialSolo(), maintenant: Date.now() }), devise);
       if (!resultat) {
         const solde = devise === 'ovas' ? coins : credits;
         setBilan(solde < prix ? t(devise === 'ovas' ? 'solo.missingOvas' : 'solo.missingCredits', { n: nombre(prix - solde) }) : t('solo.noPlayerInPack'));
@@ -298,6 +296,7 @@ export function CollectionSolo() {
       // Le titre de la fenêtre écrit déjà « Pack … » : un pack de test nommé « Pack Test » ne le dit pas deux fois.
       pack={ouverture.ordreImpose ? ouverture.pack.nom.replace(/^pack\s+/i, '') || ouverture.pack.nom : ouverture.pack.nom}
       modele={packAvecSkin(ouverture.pack) ? modelePackParNom(ouverture.pack) : undefined}
+      evolutionElite={evolutionEliteFrancaise(ouverture.pack)}
       garantie={ouverture.pack.garantie}
       // Un pack de test part du bronze : la pochette monte palier par palier jusqu'à sa meilleure carte, comme un vrai tirage.
       apparenceInitiale={ouverture.ordreImpose ? 'bronze' : apparencePack(ouverture.pack)}

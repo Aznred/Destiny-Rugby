@@ -1,0 +1,2777 @@
+{
+  "Rugby Majadahonda": {
+    "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf",
+    "collecte": "2026-10-09",
+    "joueuses": [
+      {
+        "nom": "Eva AGUIRRE",
+        "positionSource": "Centro",
+        "ligne": "arriere",
+        "dateNaissance": "1995-01-22",
+        "age": 31,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Cayetana ÁLVAREZ",
+        "positionSource": "Tercera",
+        "ligne": "avant",
+        "dateNaissance": "2006-09-28",
+        "age": 20,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Cecilia ALIAÑO",
+        "positionSource": "Centro",
+        "ligne": "arriere",
+        "dateNaissance": "2005-03-15",
+        "age": 21,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Chloe ARROYO",
+        "positionSource": "Utility Back",
+        "ligne": "arriere",
+        "dateNaissance": "2008-04-27",
+        "age": 18,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Mónica ARIAS",
+        "positionSource": "Pilier",
+        "ligne": "avant",
+        "dateNaissance": "1996-11-30",
+        "age": 29,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Patricia ALEXANDRE",
+        "positionSource": "Tercera",
+        "ligne": "avant",
+        "dateNaissance": "1994-02-22",
+        "age": 32,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Ruth ARROYO",
+        "positionSource": "Tercera",
+        "ligne": "avant",
+        "dateNaissance": "1998-07-21",
+        "age": 28,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Angélica BARRA",
+        "positionSource": "Tercera",
+        "ligne": "avant",
+        "dateNaissance": "2005-01-09",
+        "age": 21,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Lucía CALVO",
+        "positionSource": "Segunda",
+        "ligne": "avant",
+        "dateNaissance": "1999-09-13",
+        "age": 27,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Alba CASTELLANO",
+        "positionSource": "Segunda",
+        "ligne": "avant",
+        "dateNaissance": "1994-07-20",
+        "age": 32,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Luisiana CONTRERAS",
+        "positionSource": "Centro",
+        "ligne": "arriere",
+        "dateNaissance": "2003-05-09",
+        "age": 23,
+        "nation": "Argentine",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Ela DRISCOLL DEL VALLE",
+        "positionSource": "Centro",
+        "ligne": "arriere",
+        "dateNaissance": "2003-09-04",
+        "age": 23,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Lucía DÍAZ",
+        "positionSource": "Medio",
+        "ligne": "arriere",
+        "dateNaissance": "1998-02-04",
+        "age": 28,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Marina DÍAZ",
+        "positionSource": "Medio",
+        "ligne": "arriere",
+        "dateNaissance": "2004-10-31",
+        "age": 21,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Marta ESTELLÉS",
+        "positionSource": "Primera",
+        "ligne": "avant",
+        "dateNaissance": "2004-01-02",
+        "age": 22,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Carmen FERNÁNDEZ",
+        "positionSource": "Segunda",
+        "ligne": "avant",
+        "dateNaissance": "2006-06-22",
+        "age": 20,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Lorena FRUTOS",
+        "positionSource": "Utility Forward",
+        "ligne": "avant",
+        "dateNaissance": "1997-07-29",
+        "age": 29,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Marta FERRANDIZ",
+        "positionSource": "Primera",
+        "ligne": "avant",
+        "dateNaissance": "1992-03-17",
+        "age": 34,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Marta FERSNO",
+        "positionSource": "Centro",
+        "ligne": "arriere",
+        "dateNaissance": "2003-11-19",
+        "age": 22,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Alicia GUÍO",
+        "positionSource": "Terceera",
+        "ligne": "avant",
+        "dateNaissance": "2001-04-26",
+        "age": 25,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Denisse GORTÁZAR",
+        "positionSource": "Utility Back",
+        "ligne": "arriere",
+        "dateNaissance": "2001-11-17",
+        "age": 24,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Isabelle GRISÉ",
+        "positionSource": "Utility Back",
+        "ligne": "arriere",
+        "dateNaissance": "2002-02-22",
+        "age": 24,
+        "nation": "Canada",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Nieves GONZÁLEZ",
+        "positionSource": "Segunda",
+        "ligne": "avant",
+        "dateNaissance": "2007-01-25",
+        "age": 19,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Vico GORROCHATEGUI",
+        "positionSource": "tercera",
+        "ligne": "avant",
+        "dateNaissance": "1994-05-16",
+        "age": 32,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Bárbara HARDISSON",
+        "positionSource": "Segunda",
+        "ligne": "avant",
+        "dateNaissance": "1998-11-12",
+        "age": 27,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Anna JANER",
+        "positionSource": "Pilier",
+        "ligne": "avant",
+        "dateNaissance": "2002-05-19",
+        "age": 24,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "María MARÍN",
+        "positionSource": "Centro",
+        "ligne": "arriere",
+        "dateNaissance": "1997-12-17",
+        "age": 28,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Inés MARTÍN",
+        "positionSource": "Primera",
+        "ligne": "avant",
+        "dateNaissance": "2007-08-01",
+        "age": 19,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Blanca MIRANDA",
+        "positionSource": "Medio",
+        "ligne": "arriere",
+        "dateNaissance": "2007-10-10",
+        "age": 18,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Ana MALO DE MOLINA",
+        "positionSource": "Primera",
+        "ligne": "avant",
+        "dateNaissance": "2001-03-01",
+        "age": 25,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Abril MARTÍN",
+        "positionSource": "Primera",
+        "ligne": "avant",
+        "dateNaissance": "1999-03-25",
+        "age": 27,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Idaira MORALES",
+        "positionSource": "Apertura",
+        "ligne": "arriere",
+        "dateNaissance": "1992-09-20",
+        "age": 34,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Valentina MALDONADO",
+        "positionSource": "Pilier",
+        "ligne": "avant",
+        "dateNaissance": "2001-09-04",
+        "age": 25,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Alejandra PRIETO",
+        "positionSource": "Talona",
+        "ligne": "avant",
+        "dateNaissance": "2007-01-19",
+        "age": 19,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Claudia PÉREZ",
+        "positionSource": "Centro",
+        "ligne": "arriere",
+        "dateNaissance": "2004-06-29",
+        "age": 22,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Luisa PÉREZ",
+        "positionSource": "Utility",
+        "ligne": "arriere",
+        "dateNaissance": "2003-01-04",
+        "age": 23,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Xaantal PÉREZ",
+        "positionSource": "Ala",
+        "ligne": "arriere",
+        "dateNaissance": "2005-04-18",
+        "age": 21,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Marta PRO",
+        "positionSource": "Medio",
+        "ligne": "arriere",
+        "dateNaissance": "2002-08-29",
+        "age": 24,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Celia PALUMBO",
+        "positionSource": "Tercera",
+        "ligne": "avant",
+        "dateNaissance": "1999-06-03",
+        "age": 27,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Irene QUERO",
+        "positionSource": "Segunda",
+        "ligne": "avant",
+        "dateNaissance": "2007-04-20",
+        "age": 19,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Rocío RODERA",
+        "positionSource": "Tercera",
+        "ligne": "avant",
+        "dateNaissance": "2002-09-21",
+        "age": 24,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Pilar SORIA",
+        "positionSource": "Primera",
+        "ligne": "avant",
+        "dateNaissance": "2000-03-20",
+        "age": 26,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Elena TEJEDA",
+        "positionSource": "Segunda",
+        "ligne": "avant",
+        "dateNaissance": "2003-07-11",
+        "age": 23,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Melissa TRIPODI",
+        "positionSource": "Segunda",
+        "ligne": "avant",
+        "dateNaissance": "2001-05-16",
+        "age": 25,
+        "nation": "Italie",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Rocío TENORIO",
+        "positionSource": "Pilier",
+        "ligne": "avant",
+        "dateNaissance": "2006-07-18",
+        "age": 20,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Claudia ZAHONERO",
+        "positionSource": "Utility Back",
+        "ligne": "arriere",
+        "dateNaissance": "2000-08-21",
+        "age": 26,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      }
+    ]
+  },
+  "El Salvador": {
+    "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf",
+    "collecte": "2026-10-09",
+    "joueuses": [
+      {
+        "nom": "Irene ALONSO",
+        "positionSource": "3ª línea",
+        "ligne": "avant",
+        "dateNaissance": "1997-07-05",
+        "age": 29,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Alba ALPÍN",
+        "positionSource": "Medio melé",
+        "ligne": "arriere",
+        "dateNaissance": "2002-09-17",
+        "age": 24,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Inés ANTOLÍNEZ",
+        "positionSource": "1ª línea",
+        "ligne": "avant",
+        "dateNaissance": "1997-01-16",
+        "age": 29,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Saray AVILÉS",
+        "positionSource": "Ala",
+        "ligne": "arriere",
+        "dateNaissance": "2004-06-18",
+        "age": 22,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Sidorella BRACIC",
+        "positionSource": "Pilier",
+        "ligne": "avant",
+        "dateNaissance": "1993-06-12",
+        "age": 33,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Belén CASTELLANO",
+        "positionSource": "2ª/3ª Línea",
+        "ligne": "avant",
+        "dateNaissance": "1999-12-20",
+        "age": 26,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Elisa CASTRO",
+        "positionSource": "Apertura/ Centro",
+        "ligne": "arriere",
+        "dateNaissance": "1997-03-15",
+        "age": 29,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Claudia DE LA LOMA",
+        "positionSource": "Centro",
+        "ligne": "arriere",
+        "dateNaissance": "2006-05-28",
+        "age": 20,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Ángela DLEZ MARTÍN",
+        "positionSource": "Centro",
+        "ligne": "arriere",
+        "dateNaissance": "2007-10-31",
+        "age": 18,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Belsay ESCUDERO",
+        "positionSource": "2ª/3ª línea",
+        "ligne": "avant",
+        "dateNaissance": "2001-08-19",
+        "age": 25,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Kiara ESPÓSITO",
+        "positionSource": "Utility Back",
+        "ligne": "arriere",
+        "dateNaissance": "2003-08-19",
+        "age": 23,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Amaia FABO Centro/",
+        "positionSource": "3ª línea",
+        "ligne": "avant",
+        "dateNaissance": "2001-08-16",
+        "age": 25,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Nerea GARCIA",
+        "positionSource": "Flanker",
+        "ligne": "avant",
+        "dateNaissance": "1996-11-17",
+        "age": 29,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Ángela LORENZO",
+        "positionSource": "2ª/3ª Línea",
+        "ligne": "avant",
+        "dateNaissance": "2007-10-31",
+        "age": 18,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "María del CarmenMARTOS",
+        "positionSource": "1ª línea",
+        "ligne": "avant",
+        "dateNaissance": "1992-03-12",
+        "age": 34,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "María MIGUEL",
+        "positionSource": "1ª/ 3ª línea",
+        "ligne": "avant",
+        "dateNaissance": "2003-07-25",
+        "age": 23,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Tecla MASOKO",
+        "positionSource": "Ala",
+        "ligne": "arriere",
+        "dateNaissance": "2000-05-20",
+        "age": 26,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Carla MÉNDEZ",
+        "positionSource": "Primera",
+        "ligne": "avant",
+        "dateNaissance": "2003-07-04",
+        "age": 23,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Carmen MIRANDA",
+        "positionSource": "Centro",
+        "ligne": "arriere",
+        "dateNaissance": "2005-06-07",
+        "age": 21,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "María MIGUEL",
+        "positionSource": "Centro",
+        "ligne": "arriere",
+        "dateNaissance": "2005-06-07",
+        "age": 21,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Julia NAVARRO",
+        "positionSource": "1ª/3ª Línea",
+        "ligne": "avant",
+        "dateNaissance": "1994-12-22",
+        "age": 31,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Natalia PÉREZ",
+        "positionSource": "2ª/3ª Línea",
+        "ligne": "avant",
+        "dateNaissance": "2006-09-28",
+        "age": 20,
+        "nation": "Bolivie",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Beatriz RIVERA",
+        "positionSource": "2ª/ 3ª línea",
+        "ligne": "avant",
+        "dateNaissance": "2002-06-26",
+        "age": 24,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Isabel SIERRA",
+        "positionSource": "3ª Línea",
+        "ligne": "avant",
+        "dateNaissance": "1991-08-18",
+        "age": 35,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Matilda TOCA",
+        "positionSource": "Medio Melé",
+        "ligne": "arriere",
+        "dateNaissance": "2007-01-13",
+        "age": 19,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Jimena TORRES",
+        "positionSource": "2ª Línea",
+        "ligne": "avant",
+        "dateNaissance": "2005-10-11",
+        "age": 20,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Andrea VEGA",
+        "positionSource": "Delantera/Centro",
+        "ligne": "arriere",
+        "dateNaissance": "2005-06-07",
+        "age": 21,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Bingbing VERGARA",
+        "positionSource": "Medio Melé",
+        "ligne": "arriere",
+        "dateNaissance": "2005-04-19",
+        "age": 21,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Carla VILLEGAS",
+        "positionSource": "Apertura",
+        "ligne": "arriere",
+        "dateNaissance": "2006-06-05",
+        "age": 20,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Brianna WALLACE",
+        "positionSource": "Segunda Línea",
+        "ligne": "avant",
+        "dateNaissance": "2003-10-01",
+        "age": 23,
+        "nation": "Nouvelle-Zélande",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      }
+    ]
+  },
+  "Sevilla Cocos": {
+    "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf",
+    "collecte": "2026-10-09",
+    "joueuses": [
+      {
+        "nom": "Carolina Fernanda ALFARO",
+        "positionSource": "Centro",
+        "ligne": "arriere",
+        "dateNaissance": "1990-05-10",
+        "age": 36,
+        "nation": "Chili",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Maider ARESTI",
+        "positionSource": "Medio",
+        "ligne": "arriere",
+        "dateNaissance": "2003-07-24",
+        "age": 23,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Araceli BAENA",
+        "positionSource": "1ª línea",
+        "ligne": "avant",
+        "dateNaissance": "2002-12-06",
+        "age": 23,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Cristina CABAS",
+        "positionSource": "Zaguero",
+        "ligne": "arriere",
+        "dateNaissance": "1989-10-10",
+        "age": 36,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Ana  CARAVACA",
+        "positionSource": "Ala",
+        "ligne": "arriere",
+        "dateNaissance": "2003-01-05",
+        "age": 23,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Marta CARMONA",
+        "positionSource": "Ala",
+        "ligne": "arriere",
+        "dateNaissance": "1993-07-16",
+        "age": 33,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Julia CASTRO",
+        "positionSource": "Medio melé",
+        "ligne": "arriere",
+        "dateNaissance": "1999-11-08",
+        "age": 26,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Nicole Francesca CERULLI",
+        "positionSource": "Ala",
+        "ligne": "arriere",
+        "dateNaissance": "1997-11-30",
+        "age": 28,
+        "nation": "États-Unis",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Lea DUCHER",
+        "positionSource": "Centro",
+        "ligne": "arriere",
+        "dateNaissance": "2002-04-29",
+        "age": 24,
+        "nation": "France",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Maria ESTEPA",
+        "positionSource": "3ª línea",
+        "ligne": "avant",
+        "dateNaissance": "2004-05-07",
+        "age": 22,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Mª del Carmen FERNÁNDEZ",
+        "positionSource": "2ª línea",
+        "ligne": "avant",
+        "dateNaissance": "1989-05-16",
+        "age": 37,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Carmen FERNÁNDEZ",
+        "positionSource": "2ª Línea",
+        "ligne": "avant",
+        "dateNaissance": "1995-12-06",
+        "age": 30,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Duna GÓMEZ",
+        "positionSource": "Medio melé",
+        "ligne": "arriere",
+        "dateNaissance": "2003-12-06",
+        "age": 22,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Irene GONZÁLEZ",
+        "positionSource": "2ª Línea",
+        "ligne": "avant",
+        "dateNaissance": "1993-04-02",
+        "age": 33,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Paula GUEVARA",
+        "positionSource": "Centro",
+        "ligne": "arriere",
+        "dateNaissance": "2005-08-20",
+        "age": 21,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Irene LEÓN",
+        "positionSource": "Apertura",
+        "ligne": "arriere",
+        "dateNaissance": "2005-10-18",
+        "age": 20,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Marina LODOÑO",
+        "positionSource": "1ª/2ª Línea",
+        "ligne": "avant",
+        "dateNaissance": "2001-04-26",
+        "age": 25,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Concha MORENO",
+        "positionSource": "1ª/2ª Línea",
+        "ligne": "avant",
+        "dateNaissance": "2006-09-18",
+        "age": 20,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Laura  MUÑIZ",
+        "positionSource": "3ª línea",
+        "ligne": "avant",
+        "dateNaissance": "2004-06-07",
+        "age": 22,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Marta NÚÑEZ",
+        "positionSource": "2ª Línea",
+        "ligne": "avant",
+        "dateNaissance": "2004-09-23",
+        "age": 22,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Ana  PERALTA",
+        "positionSource": "2ª/3ª línea",
+        "ligne": "avant",
+        "dateNaissance": "2003-06-25",
+        "age": 23,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Miriam ROIG",
+        "positionSource": "1ª Línea",
+        "ligne": "avant",
+        "dateNaissance": "2001-05-22",
+        "age": 25,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Claudia SANCHEZ",
+        "positionSource": "Ala",
+        "ligne": "arriere",
+        "dateNaissance": "2002-05-30",
+        "age": 24,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Kassandra SYLLA",
+        "positionSource": "3ª línea",
+        "ligne": "avant",
+        "dateNaissance": "1998-12-13",
+        "age": 27,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      },
+      {
+        "nom": "Valle VIÑAS",
+        "positionSource": "3ª Línea",
+        "ligne": "avant",
+        "dateNaissance": "1999-04-21",
+        "age": 27,
+        "nation": "Espagne",
+        "saisonSource": "2024-2025",
+        "source": "https://ferugby.es/wp-content/uploads/2024/10/Guia-Liga-Iberdrola-24-25.pdf"
+      }
+    ]
+  },
+  "UL Bohemian RFC": {
+    "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/",
+    "collecte": "2026-10-09",
+    "joueuses": [
+      {
+        "nom": "Aoife Corey",
+        "poste": "arriere",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Clara Barrett",
+        "poste": "ailier_droit",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Éabha Nic Dhonnacha",
+        "poste": "deuxieme_centre",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Stephanie Nunan",
+        "poste": "premier_centre",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Holly O'Dwyer",
+        "poste": "ailier_gauche",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Kate Flannery",
+        "poste": "demi_ouverture",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Abbie Salter-Townshend",
+        "poste": "demi_melee",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Ciara O'Dwyer",
+        "poste": "pilier_gauche",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Lily Brady",
+        "poste": "talonneur",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Ciara McLoughlin",
+        "poste": "pilier_droit",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Clodagh O'Halloran",
+        "poste": "deuxieme_ligne_g",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Claire Bennett",
+        "poste": "deuxieme_ligne_d",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Rachel Allen",
+        "poste": "troisieme_aile_g",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Caoimhe Murphy",
+        "poste": "troisieme_aile_d",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Chloe Pearse",
+        "poste": "numero_8",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Niamh Corless",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Marea Walshe-Heke",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Mary Maher",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Ava O'Malley",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Becca Bradshaw",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Anaïs Jubin",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Abaigael Connon",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Nina Mathastein",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Chloe Pearse",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Alana McInerney",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Aoife Corey",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Éabha Nic Dhonnacha",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Aoibhe O'Flynn",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Lily Brady",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Beth Buttimer",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Caitríona Finn",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Kate Flannery",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Clara Barrett",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Eilís Cahill",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Ciara McLoughlin",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Claire Bennett",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Emma Dunican",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Sinéad Hogg",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Lucia Linn",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Clodagh O'Halloran",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Rachel Allen",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Gráinne Burke",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Louise Carter",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Jane Clohessy",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Anaïs Jubin",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Ciara O'Dwyer",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Ava O'Malley",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Becca O'Shea",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Abbie Salter-Townshend",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Beth Buttimer",
+        "saisonSource": "2026",
+        "source": "https://www.irishrugby.ie/2026/03/18/bemand-names-ireland-squad-for-2026-guinness-womens-six-nations"
+      },
+      {
+        "nom": "Eilís Cahill",
+        "saisonSource": "2026",
+        "source": "https://www.irishrugby.ie/2026/03/18/bemand-names-ireland-squad-for-2026-guinness-womens-six-nations"
+      },
+      {
+        "nom": "Jane Clohessy",
+        "saisonSource": "2026",
+        "source": "https://www.irishrugby.ie/2026/03/18/bemand-names-ireland-squad-for-2026-guinness-womens-six-nations"
+      },
+      {
+        "nom": ": Alana McInerney",
+        "saisonSource": "2026",
+        "source": "https://www.irishrugby.ie/2026/03/18/bemand-names-ireland-squad-for-2026-guinness-womens-six-nations"
+      },
+      {
+        "nom": "Caitríona Finn",
+        "saisonSource": "2026",
+        "source": "https://www.irishrugby.ie/2026/03/18/bemand-names-ireland-squad-for-2026-guinness-womens-six-nations"
+      }
+    ]
+  },
+  "Old Belvedere RFC": {
+    "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/",
+    "collecte": "2026-10-09",
+    "joueuses": [
+      {
+        "nom": "Amy Larn",
+        "poste": "arriere",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Clare Gorman",
+        "poste": "ailier_droit",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Kerry Browne",
+        "poste": "deuxieme_centre",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Brooke Gilroy",
+        "poste": "premier_centre",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Laura Carty",
+        "poste": "ailier_gauche",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Hazel Simmons",
+        "poste": "demi_ouverture",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Jade Gaffney",
+        "poste": "demi_melee",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Hannah Rapley",
+        "poste": "pilier_gauche",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Jess Keating",
+        "poste": "talonneur",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Eilis Doyle",
+        "poste": "pilier_droit",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Grace Tutty",
+        "poste": "deuxieme_ligne_g",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Orlaith McAuliffe",
+        "poste": "deuxieme_ligne_d",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Emma Kelly",
+        "poste": "troisieme_aile_g",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Emily Byrne",
+        "poste": "troisieme_aile_d",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Éadaoin Murtagh",
+        "poste": "numero_8",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Áine Rutley",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Hannah Wilson",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Ava Nolan",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Amy Bond",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Juliet Condron",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Amy McGuire",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Julie Nolan",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Leah Nealon",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Robyn O'Connor",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Lisa Callan",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Katie Corrigan",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Hannah Clarke",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Emily Byrne",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Naoise Smyth",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Katie Whelan",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Brooke Gilroy",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Ivana Kiripati",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Amy Larn",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Ellie O'Sullivan Sexton",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Kate Ballance",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Eilis Doyle",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Sinéad Farrell",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Alisha Flynn",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Emma Kelly",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Katie Layde",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Orlaith McAuliffe",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Leah Nealon",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Julie Nolan",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Julia O'Connor",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Lesley Ring",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Hazel Simmons",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Ruth Campbell",
+        "saisonSource": "2026",
+        "source": "https://www.irishrugby.ie/2026/03/18/bemand-names-ireland-squad-for-2026-guinness-womens-six-nations"
+      },
+      {
+        "nom": "Linda Djougang",
+        "saisonSource": "2026",
+        "source": "https://www.irishrugby.ie/2026/03/18/bemand-names-ireland-squad-for-2026-guinness-womens-six-nations"
+      },
+      {
+        "nom": "Erin King",
+        "saisonSource": "2026",
+        "source": "https://www.irishrugby.ie/2026/03/18/bemand-names-ireland-squad-for-2026-guinness-womens-six-nations"
+      },
+      {
+        "nom": "Fiona Tuite",
+        "saisonSource": "2026",
+        "source": "https://www.irishrugby.ie/2026/03/18/bemand-names-ireland-squad-for-2026-guinness-womens-six-nations"
+      },
+      {
+        "nom": "Aoife Dalton",
+        "saisonSource": "2026",
+        "source": "https://www.irishrugby.ie/2026/03/18/bemand-names-ireland-squad-for-2026-guinness-womens-six-nations"
+      },
+      {
+        "nom": "Dannah O’Brien",
+        "saisonSource": "2026",
+        "source": "https://www.irishrugby.ie/2026/03/18/bemand-names-ireland-squad-for-2026-guinness-womens-six-nations"
+      },
+      {
+        "nom": "Robyn O’Connor",
+        "saisonSource": "2026",
+        "source": "https://www.irishrugby.ie/2026/03/18/bemand-names-ireland-squad-for-2026-guinness-womens-six-nations"
+      }
+    ]
+  },
+  "Blackrock College RFC": {
+    "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/",
+    "collecte": "2026-10-09",
+    "joueuses": [
+      {
+        "nom": "Méabh Deely",
+        "poste": "arriere",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Andi Murphy",
+        "poste": "ailier_droit",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Ella Durkan",
+        "poste": "deuxieme_centre",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Catherine Martin",
+        "poste": "premier_centre",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Maggie Boylan",
+        "poste": "ailier_gauche",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Abby Moyles",
+        "poste": "demi_ouverture",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Lauren Farrell McCabe",
+        "poste": "demi_melee",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Aoife Moore",
+        "poste": "pilier_gauche",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Sam Brackett",
+        "poste": "talonneur",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Christy Haney",
+        "poste": "pilier_droit",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Clíodhna Ní Chonchobhair",
+        "poste": "deuxieme_ligne_g",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Kate Jordan",
+        "poste": "deuxieme_ligne_d",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Nikki Gibson",
+        "poste": "troisieme_aile_g",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Carrie O'Keeffe",
+        "poste": "troisieme_aile_d",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Maeve Óg O'Leary",
+        "poste": "numero_8",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Ann-Marie Rooney",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Megan Brodie",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Ava Fannin",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Molly Fitzpatrick",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Sarah Moody",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Lisa Mullen",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Cara Martin",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Sarah Farley",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Maggie Boylan",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Maeve Óg O'Leary",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Nikki Gibson",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Sam Brackett",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Andi Murphy",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Méabh Deely",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Hannah O'Connor",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Sarah Farley",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Lauren Farrell McCabe",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Cara Martin",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Sarah Moody",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Abby Moyles",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Clíodhna Ní Chonchobhair",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Trinity Todd",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Natasja Behan",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Megan Burns",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Regan Casey",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Ella Durkan",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Ava Fannin",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Molly Fitzpatrick",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Catherine Martin",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Aoibheann Reilly",
+        "saisonSource": "2026",
+        "source": "https://www.irishrugby.ie/2026/03/18/bemand-names-ireland-squad-for-2026-guinness-womens-six-nations"
+      },
+      {
+        "nom": "Béibhinn Parsons",
+        "saisonSource": "2026",
+        "source": "https://www.irishrugby.ie/2026/03/18/bemand-names-ireland-squad-for-2026-guinness-womens-six-nations"
+      },
+      {
+        "nom": "Emily Lane",
+        "saisonSource": "2026",
+        "source": "https://www.irishrugby.ie/2026/03/18/bemand-names-ireland-squad-for-2026-guinness-womens-six-nations"
+      },
+      {
+        "nom": "Enya Breen",
+        "saisonSource": "2026",
+        "source": "https://www.irishrugby.ie/2026/03/18/bemand-names-ireland-squad-for-2026-guinness-womens-six-nations"
+      }
+    ]
+  },
+  "Railway Union RFC": {
+    "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/",
+    "collecte": "2026-10-09",
+    "joueuses": [
+      {
+        "nom": "Leah Tarpey",
+        "poste": "arriere",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Rhiann Heery",
+        "poste": "ailier_droit",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Aimee Clarke",
+        "poste": "deuxieme_centre",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Heidi Lyons",
+        "poste": "premier_centre",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Sarah O'Donnell",
+        "poste": "ailier_gauche",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Hannah Scanlan",
+        "poste": "demi_ouverture",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Chloé Ponthus",
+        "poste": "demi_melee",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Evelyn Donnelly",
+        "poste": "pilier_gauche",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Méabh Keegan",
+        "poste": "talonneur",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Megan Collis",
+        "poste": "pilier_droit",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Keelin Brady",
+        "poste": "deuxieme_ligne_g",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Aoife McDermott",
+        "poste": "deuxieme_ligne_d",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Miyu Kojima",
+        "poste": "troisieme_aile_g",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Hannah Johnston",
+        "poste": "troisieme_aile_d",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Mira Broeks",
+        "poste": "numero_8",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Caoimhe O'Sullivan Roche",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Siobhán McCarthy",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Alanna Fusciardi Wallace",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Emma Fabby",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Grace Jackson",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Ailsa Hughes",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Nikki Caughey",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Sarah Munnelly",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/04/10/energiaail-womens-division-semi-final-previews/"
+      },
+      {
+        "nom": "Heidi Lyons",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Claire Boles",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Chloé Ponthus",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Niamh Byrne",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Ava Usanova",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Aimee Clarke",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Ailsa Hughes",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Sarah Munnelly",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Megan Collis",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Emily Gavin",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Hannah Scanlan",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Leah Tarpey",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Molly Boyne",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Miyu Kojima",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Aoife McDermott",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Sarah O'Donnell",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Laura Sheehan",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Mira Broeks",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Nikki Caughey",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Poppy Garvey",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Rhiann Heery",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Hannah Johnston",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Méabh Keegan",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Siobhán McCarthy",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Anna McGann",
+        "saisonSource": "2026",
+        "source": "https://www.irishrugby.ie/2026/03/18/bemand-names-ireland-squad-for-2026-guinness-womens-six-nations"
+      },
+      {
+        "nom": "Eve Higgins",
+        "saisonSource": "2026",
+        "source": "https://www.irishrugby.ie/2026/03/18/bemand-names-ireland-squad-for-2026-guinness-womens-six-nations"
+      },
+      {
+        "nom": "Stacey Flood",
+        "saisonSource": "2026",
+        "source": "https://www.irishrugby.ie/2026/03/18/bemand-names-ireland-squad-for-2026-guinness-womens-six-nations"
+      }
+    ]
+  },
+  "Galwegians RFC": {
+    "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts",
+    "collecte": "2026-10-09",
+    "joueuses": [
+      {
+        "nom": "Emily Foley",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Niamh Murphy",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Jemima Adams Verling",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Kila Curran Coleman",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Dolores Hughes",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Síofra Hession",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Sinéad O'Brien",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Mollie Starr",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Ella Burns",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Sophie Cullen",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Gemma Faulkner",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Catherine Fleming",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Jemma Lees",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Sarah McCormick",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Gráinne Moran",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Jemima Adams Verling",
+        "saisonSource": "2026",
+        "source": "https://www.irishrugby.ie/2026/03/18/bemand-names-ireland-squad-for-2026-guinness-womens-six-nations"
+      },
+      {
+        "nom": "Ailish Quinn",
+        "saisonSource": "2026",
+        "source": "https://www.irishrugby.ie/2026/03/18/bemand-names-ireland-squad-for-2026-guinness-womens-six-nations"
+      }
+    ]
+  },
+  "Ennis RFC": {
+    "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts",
+    "collecte": "2026-10-09",
+    "joueuses": [
+      {
+        "nom": "Caoilfhionn Conway Morrissey",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Aoibhín Donnelly",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Aoibheann Hahessy",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Saher Hamdan",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Lyndsay Clarke",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Patricia Coote",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Ciara Coughlan",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Micaela Glynn",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Megan O'Connor",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      }
+    ]
+  },
+  "Wicklow RFC": {
+    "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts",
+    "collecte": "2026-10-09",
+    "joueuses": [
+      {
+        "nom": "Vicky Elmes Kinlan",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Faye O'Neill",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Jamie Church",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Clara Dunne",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Rachel Griffey",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Sophie Murphy",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Roisin Stone",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Rebecca Brennan",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Robyn Johnston",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Erin McConnell",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Ciara Short",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Usha Daly O'Toole",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Eimear Douglas",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Jennifer Madden",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Caoimhe Molloy",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Ciara O'Leary",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Róisín Ridge",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Nicola Schmidt",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Lorraine Voorbach",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Vicky Elmes Kinlan",
+        "saisonSource": "2026",
+        "source": "https://www.irishrugby.ie/2026/03/18/bemand-names-ireland-squad-for-2026-guinness-womens-six-nations"
+      }
+    ]
+  },
+  "Ballincollig RFC": {
+    "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts",
+    "collecte": "2026-10-09",
+    "joueuses": [
+      {
+        "nom": "Eve Prendergast",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Grace Kingston",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Aoife Madigan",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Brighid Twohig",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Alex Good",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Awatere McLean-Wanoa",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Kate O'Sullivan",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Emma Connolly",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Niamh Crotty",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Emeila Deane",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Aoife Fleming",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Ciara Fleming",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Vicki Good",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Amelia Green",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Olivia Hay Mulvihill",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Aoibheann McGrath",
+        "saisonSource": "2026",
+        "source": "https://www.irishrugby.ie/2026/03/18/bemand-names-ireland-squad-for-2026-guinness-womens-six-nations"
+      }
+    ]
+  },
+  "Tullow RFC": {
+    "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts",
+    "collecte": "2026-10-09",
+    "joueuses": [
+      {
+        "nom": "Chloe Farrell",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Destiny Moses",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Alex O'Brien",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Angela Viciano",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Emma Carroll",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Orla Hanlon",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Grace Kelly",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Nicola Kilcoyne",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Katie Ann O'Neill",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Roisin O'Toole",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      }
+    ]
+  },
+  "Cooke RFC": {
+    "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts",
+    "collecte": "2026-10-09",
+    "joueuses": [
+      {
+        "nom": "Shola Iluyemi",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Ilse van Staden",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Sophie Barrett",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Maebh Clenaghan",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Katie Gilmour",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Megan Simpson",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Paige Smyth",
+        "saisonSource": "2025-2026",
+        "source": "https://www.irishrugby.ie/2026/01/13/nic-dhonnacha-and-pearse-kick-off-2026-at-top-of-energiaail-scoring-charts"
+      },
+      {
+        "nom": "Sophie Barrett",
+        "saisonSource": "2026",
+        "source": "https://www.irishrugby.ie/2026/03/18/bemand-names-ireland-squad-for-2026-guinness-womens-six-nations"
+      },
+      {
+        "nom": "Sadhbh McGrath",
+        "saisonSource": "2026",
+        "source": "https://www.irishrugby.ie/2026/03/18/bemand-names-ireland-squad-for-2026-guinness-womens-six-nations"
+      }
+    ]
+  },
+  "Enniskillen RFC": {
+    "source": "https://www.irishrugby.ie/2026/03/18/bemand-names-ireland-squad-for-2026-guinness-womens-six-nations",
+    "collecte": "2026-10-09",
+    "joueuses": [
+      {
+        "nom": "Sophie Barrett",
+        "saisonSource": "2026",
+        "source": "https://www.irishrugby.ie/2026/03/18/bemand-names-ireland-squad-for-2026-guinness-womens-six-nations"
+      }
+    ]
+  },
+  "North Harbour Hibiscus": {
+    "source": "https://www.harbourrugby.co.nz/newsarticle/169002?newsfeedId=1691366",
+    "collecte": "2026-10-09",
+    "joueuses": [
+      {
+        "nom": "Lottie Collis",
+        "ligne": "avant",
+        "saisonSource": "2026",
+        "source": "https://www.harbourrugby.co.nz/newsarticle/169002?newsfeedId=1691366"
+      },
+      {
+        "nom": "Mari-Lyn Connelly",
+        "ligne": "avant",
+        "saisonSource": "2026",
+        "source": "https://www.harbourrugby.co.nz/newsarticle/169002?newsfeedId=1691366"
+      },
+      {
+        "nom": "Izzy East",
+        "ligne": "avant",
+        "saisonSource": "2026",
+        "source": "https://www.harbourrugby.co.nz/newsarticle/169002?newsfeedId=1691366"
+      },
+      {
+        "nom": "Manaakitia Gray-Hohepa",
+        "ligne": "avant",
+        "saisonSource": "2026",
+        "source": "https://www.harbourrugby.co.nz/newsarticle/169002?newsfeedId=1691366"
+      },
+      {
+        "nom": "Ella Norwood",
+        "ligne": "avant",
+        "saisonSource": "2026",
+        "source": "https://www.harbourrugby.co.nz/newsarticle/169002?newsfeedId=1691366"
+      },
+      {
+        "nom": "Rialani Onesemo-Tuilaepa",
+        "ligne": "avant",
+        "saisonSource": "2026",
+        "source": "https://www.harbourrugby.co.nz/newsarticle/169002?newsfeedId=1691366"
+      },
+      {
+        "nom": "Pita Roberts",
+        "ligne": "avant",
+        "saisonSource": "2026",
+        "source": "https://www.harbourrugby.co.nz/newsarticle/169002?newsfeedId=1691366"
+      },
+      {
+        "nom": "Oceane de Reuck-Donelley",
+        "ligne": "avant",
+        "saisonSource": "2026",
+        "source": "https://www.harbourrugby.co.nz/newsarticle/169002?newsfeedId=1691366"
+      },
+      {
+        "nom": "Trinity Rika",
+        "ligne": "avant",
+        "saisonSource": "2026",
+        "source": "https://www.harbourrugby.co.nz/newsarticle/169002?newsfeedId=1691366"
+      },
+      {
+        "nom": "Sene Sio",
+        "ligne": "avant",
+        "saisonSource": "2026",
+        "source": "https://www.harbourrugby.co.nz/newsarticle/169002?newsfeedId=1691366"
+      },
+      {
+        "nom": "Sophie Sykes",
+        "ligne": "avant",
+        "saisonSource": "2026",
+        "source": "https://www.harbourrugby.co.nz/newsarticle/169002?newsfeedId=1691366"
+      },
+      {
+        "nom": "Salote Lolohea",
+        "ligne": "avant",
+        "saisonSource": "2026",
+        "source": "https://www.harbourrugby.co.nz/newsarticle/169002?newsfeedId=1691366"
+      },
+      {
+        "nom": "Madisson Mata’afā",
+        "ligne": "avant",
+        "saisonSource": "2026",
+        "source": "https://www.harbourrugby.co.nz/newsarticle/169002?newsfeedId=1691366"
+      },
+      {
+        "nom": "Ema Lavema’au",
+        "ligne": "avant",
+        "saisonSource": "2026",
+        "source": "https://www.harbourrugby.co.nz/newsarticle/169002?newsfeedId=1691366"
+      },
+      {
+        "nom": "Aaliyah Nelson",
+        "ligne": "avant",
+        "saisonSource": "2026",
+        "source": "https://www.harbourrugby.co.nz/newsarticle/169002?newsfeedId=1691366"
+      },
+      {
+        "nom": "Francesca Waiariki",
+        "ligne": "avant",
+        "saisonSource": "2026",
+        "source": "https://www.harbourrugby.co.nz/newsarticle/169002?newsfeedId=1691366"
+      },
+      {
+        "nom": "Hailey Beale",
+        "ligne": "arriere",
+        "saisonSource": "2026",
+        "source": "https://www.harbourrugby.co.nz/newsarticle/169002?newsfeedId=1691366"
+      },
+      {
+        "nom": "Hadley Deed",
+        "ligne": "arriere",
+        "saisonSource": "2026",
+        "source": "https://www.harbourrugby.co.nz/newsarticle/169002?newsfeedId=1691366"
+      },
+      {
+        "nom": "Maia Gorst",
+        "ligne": "arriere",
+        "saisonSource": "2026",
+        "source": "https://www.harbourrugby.co.nz/newsarticle/169002?newsfeedId=1691366"
+      },
+      {
+        "nom": "Atlanta Hetariki",
+        "ligne": "arriere",
+        "saisonSource": "2026",
+        "source": "https://www.harbourrugby.co.nz/newsarticle/169002?newsfeedId=1691366"
+      },
+      {
+        "nom": "Ella Henderson",
+        "ligne": "arriere",
+        "saisonSource": "2026",
+        "source": "https://www.harbourrugby.co.nz/newsarticle/169002?newsfeedId=1691366"
+      },
+      {
+        "nom": "Ava-Lee Jericevich",
+        "ligne": "arriere",
+        "saisonSource": "2026",
+        "source": "https://www.harbourrugby.co.nz/newsarticle/169002?newsfeedId=1691366"
+      },
+      {
+        "nom": "Keira Labuschagne",
+        "ligne": "arriere",
+        "saisonSource": "2026",
+        "source": "https://www.harbourrugby.co.nz/newsarticle/169002?newsfeedId=1691366"
+      },
+      {
+        "nom": "Bella Narbey",
+        "ligne": "arriere",
+        "saisonSource": "2026",
+        "source": "https://www.harbourrugby.co.nz/newsarticle/169002?newsfeedId=1691366"
+      },
+      {
+        "nom": "Kiana Pohe-Bright",
+        "ligne": "arriere",
+        "saisonSource": "2026",
+        "source": "https://www.harbourrugby.co.nz/newsarticle/169002?newsfeedId=1691366"
+      },
+      {
+        "nom": "Ashlee Partelow",
+        "ligne": "arriere",
+        "saisonSource": "2026",
+        "source": "https://www.harbourrugby.co.nz/newsarticle/169002?newsfeedId=1691366"
+      },
+      {
+        "nom": "Paris Robertson",
+        "ligne": "arriere",
+        "saisonSource": "2026",
+        "source": "https://www.harbourrugby.co.nz/newsarticle/169002?newsfeedId=1691366"
+      },
+      {
+        "nom": "Brooklyn Te Mana",
+        "ligne": "arriere",
+        "saisonSource": "2026",
+        "source": "https://www.harbourrugby.co.nz/newsarticle/169002?newsfeedId=1691366"
+      },
+      {
+        "nom": "Louisa Tubailagi",
+        "ligne": "arriere",
+        "saisonSource": "2026",
+        "source": "https://www.harbourrugby.co.nz/newsarticle/169002?newsfeedId=1691366"
+      },
+      {
+        "nom": "Holly Williams",
+        "ligne": "arriere",
+        "saisonSource": "2026",
+        "source": "https://www.harbourrugby.co.nz/newsarticle/169002?newsfeedId=1691366"
+      }
+    ]
+  }
+}

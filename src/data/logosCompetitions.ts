@@ -12,6 +12,7 @@ export const LOGO_COMPETITION: Record<string, string> = {
   'f-elite2': '/logos-competitions/f-elite2.png',
   'f-ail': '/logos-competitions/f-ail.png',
   'f-ail2': '/logos-competitions/f-ail2.png',
+  'f-fpc2': '/logos-competitions/f-fpc.png',
   top14: '/logos-competitions/top14.webp',
   prod2: '/logos-competitions/prod2.webp',
   nationale: '/logos-competitions/nationale.png',

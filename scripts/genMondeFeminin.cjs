@@ -10,7 +10,7 @@
 // ⚠️ UN EFFECTIF RÉEL NE SUFFIT PAS TOUJOURS À JOUER : il faut deux joueuses par poste. Les places manquantes sont
 // comblées par des joueuses GÉNÉRÉES (marquées `generee`), au nom tiré des prénoms et des noms de la même nation, notées
 // sous le niveau du club. Elles ne remplacent jamais une joueuse réelle.
-// Onze championnats jouables ; la Farah Palmer Cup réunit les douze provinces dans une ligue selon le format demandé.
+// Douze championnats jouables ; la Farah Palmer Cup 2026 comporte deux divisions de six.
 const fs = require('node:fs');
 const path = require('node:path');
 const sharp = require('sharp');
@@ -41,10 +41,11 @@ const CHAMPIONNATS = [
       'AC Bobigny 93', 'RC Toulon Provence Méditerranée', 'Stade Rochelais'] },
   { id: 'f-superw', nom: "Super Rugby Women's", pays: 'Australie', drapeau: 'au', niveau: 87, allerRetour: false, journees: 5, qualifies: 4,
     clubs: ['NSW Waratahs Women', 'Queensland Reds Women', 'ACT Brumbies Women', 'Western Force Women', 'Fijian Drua Women'] },
-  // Farah Palmer Cup : les douze provinces dans une seule ligue (demande du 9 octobre), dans l'ordre du classement fourni.
-  { id: 'f-fpc', nom: 'Farah Palmer Cup', pays: 'Nouvelle-Zélande', drapeau: 'nz', niveau: 85, allerRetour: false, journees: 11, qualifies: 4,
-    clubs: ['Canterbury Women', 'Wellington Pride', 'Northland Women', 'Auckland Storm', 'Otago Spirit', 'Waikato Women',
-      'Manawatū Cyclones', "Hawke's Bay Tui", 'Counties Manukau Heat', 'North Harbour Hibiscus', 'Tasman Women', 'Bay of Plenty Volcanix'] },
+  // NZ Rugby, règlement 2026 : aller simple dans chaque division, demi-finales et finale.
+  { id: 'f-fpc', nom: 'Farah Palmer Cup Premiership', pays: 'Nouvelle-Zélande', drapeau: 'nz', niveau: 85, allerRetour: false, journees: 5, qualifies: 4, descente: 1, vers: 'f-fpc2',
+    clubs: ['Auckland Storm', 'Bay of Plenty Volcanix', 'Canterbury Women', 'Counties Manukau Heat', 'Manawatū Cyclones', 'Waikato Women'] },
+  { id: 'f-fpc2', nom: 'Farah Palmer Cup Championship', pays: 'Nouvelle-Zélande', drapeau: 'nz', niveau: 76, allerRetour: false, journees: 5, qualifies: 4, montee: 1, vers: 'f-fpc',
+    clubs: ["Hawke's Bay Tui", 'North Harbour Hibiscus', 'Northland Women', 'Otago Spirit', 'Tasman Women', 'Wellington Pride'] },
   { id: 'f-celtic', nom: 'Celtic Challenge', pays: 'Irlande · Écosse · Pays de Galles', drapeau: 'gb-sct', niveau: 82, allerRetour: true, journees: 10, qualifies: 4,
     clubs: ['Glasgow Warriors Women', 'Edinburgh Rugby Women', 'Wolfhounds', 'Clovers', 'Gwalia Lightning', 'Brython Thunder'] },
   { id: 'f-seriea', nom: 'Serie A Élite Femminile', pays: 'Italie', drapeau: 'it', niveau: 76, allerRetour: true, journees: 14, qualifies: 4, descente: 1,
@@ -82,7 +83,13 @@ const NOMS_SERIE_A = { 'ARREDISSIMA VILLORBA RUGBY': 'Villorba Rugby', 'BENETTON
   'CUS TORINO ASD': 'CUS Torino', 'FORUM IULII RUGBY F.C.ASD': 'Forum Iulii Rugby', 'UNIONE RUGBY CAPITOLINA ASD': 'Unione Rugby Capitolina',
   'VALSUGANA RUGBY PADOVA ASD': 'Valsugana Rugby Padova', 'VOLVERA RUGBY ASD': 'Volvera Rugby' };
 const extraParClub = new Map(Object.entries(extra).flatMap(([ligue, clubs]) => clubs.map(c => [NOMS_SERIE_A[c.nom] ?? c.nom, { ...c, ligue }])));
+const complement = JSON.parse(fs.readFileSync(path.join(racine, 'sources/competitions/feminines/effectifs-complementaires.json'), 'utf8'));
+for (const [nom, info] of Object.entries(complement)) {
+  const existant = extraParClub.get(nom) ?? {};
+  extraParClub.set(nom, { ...existant, joueuses: [...(existant.joueuses ?? []), ...info.joueuses] });
+}
 const cleNom = nom => nom.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z]+/g, ' ').trim().split(' ').sort().join(' ');
+const cartesParNom = new Map([...cartes].sort((a, b) => a.note - b.note).map(c => [cleNom(c.nom), c]));
 const AVANTS = [0, 1, 2, 3, 4, 5, 6, 7], ARRIERES = [8, 9, 10, 11, 12, 13, 14];
 /** L'écusson d'un club connu par le seul site de sa compétition : converti une fois vers public/logos/feminines. */
 async function logoExtra(club) {
@@ -140,7 +147,7 @@ async function couleurs(nom) {
     // Une liste ancienne ne ramène pas une joueuse dans un club quitté : seules ces doubles inscriptions sont admises.
     for (const autre of affiliations(c.club_selection)) {
       const paire = [club && championnatDuClub.get(club).id, championnatDuClub.get(autre).id];
-      const doubleInscription = paire.includes('f-aupiki') && paire.includes('f-fpc')
+      const doubleInscription = paire.includes('f-aupiki') && paire.some(id => id === 'f-fpc' || id === 'f-fpc2')
         || paire.includes('f-celtic') && paire.some(id => id === 'f-ail' || id === 'f-ail2');
       if (!club || doubleInscription) rattaches.add(autre);
     }
@@ -189,11 +196,13 @@ async function couleurs(nom) {
       const deja = new Set(effectif.map(j => cleNom(j.nom)));
       for (const j of connu?.joueuses ?? []) {
         if (effectif.length >= 38 || deja.has(cleNom(j.nom))) continue;
+        const fiche = cartesParNom.get(cleNom(j.nom));
+        if (fiche?.age < 18) continue;
         deja.add(cleNom(j.nom)); pris.add(j.nom);
         const choix = j.ligne === 'avant' ? AVANTS : j.ligne === 'arriere' ? ARRIERES : [...AVANTS, ...ARRIERES];
-        const poste = POSTES[[...choix].sort((a, b) => effectif.filter(x => x.poste === POSTES[a]).length - effectif.filter(x => x.poste === POSTES[b]).length || a - b)[0]];
-        const age = Math.min(42, Math.max(17, j.age ?? 19 + Math.floor(rng() * 12))), note = Math.max(40, Math.min(88, Math.round(plancher + 1 - rng() * 6)));
-        effectif.push({ nom: j.nom, poste, age, note, potentiel: Math.min(95, note + (age < 23 ? 4 + Math.floor(rng() * 5) : age < 27 ? 2 : 0)), nation, photo: '', generee: false, estimee: true });
+        const poste = j.poste ?? fiche?.poste ?? POSTES[[...choix].sort((a, b) => effectif.filter(x => x.poste === POSTES[a]).length - effectif.filter(x => x.poste === POSTES[b]).length || a - b)[0]];
+        const age = Math.min(42, Math.max(17, j.age ?? fiche?.age ?? 19 + Math.floor(rng() * 12))), note = fiche?.note ?? Math.max(40, Math.min(88, Math.round(plancher + 1 - rng() * 6)));
+        effectif.push({ nom: j.nom, poste, age, note, potentiel: fiche?.potentiel ?? Math.min(95, note + (age < 23 ? 4 + Math.floor(rng() * 5) : age < 27 ? 2 : 0)), nation: j.nation ?? fiche?.nation ?? nation, photo: fiche?.photo_jeu ?? '', generee: false, estimee: !fiche });
       }
       for (const poste of POSTES) {
         while (effectif.filter(j => j.poste === poste).length < 2) {

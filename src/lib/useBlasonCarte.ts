@@ -4,6 +4,8 @@ import { clubParNom } from '../data/clubs';
 import { cleClub } from './cleClub';
 import { LOGOS_CLUBS_FEMININS } from '../data/logosFeminins.generated';
 const cle = (nom: string) => nom.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+const logosFeminins = new Map(Object.entries(LOGOS_CLUBS_FEMININS).map(([nom, logo]) => [cle(nom), logo]));
+export const blasonCarteFeminine = (club: string) => logosFeminins.get(cle(club));
 
 /**
  * ⚠️ LA LNR RENOMME SES CLUBS, ET LA CARTE PERD SON ÉCUSSON. Le blason se
@@ -60,7 +62,7 @@ let demande: Promise<Map<string, string>> | undefined;
  * ci-dessus donnait à « Gloucester-Hartpury » l'écusson de Gloucester Rugby, et rien à « Loughborough Lightning ».
  */
 export function useBlasonCarte(club: string, explicite?: string, feminin = false) {
-  const desFilles = feminin ? LOGOS_CLUBS_FEMININS[club] : undefined;
+  const desFilles = feminin ? blasonCarteFeminine(club) : undefined;
   const [table, setTable] = useState(logos);
   useEffect(() => {
     if (explicite || desFilles || logos) { if (logos) setTable(logos); return; }

@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import { catalogueBaseCarriere, packsBoutiqueDuJour, PACKS_CARRIERE, RARETES_CARRIERE, rayonDePack } from '../src/lib/ligue/catalogueCarriere';
 import { TEXTES_EN_LIGNE } from '../src/data/textesEnLigne';
 
-const ids = ['nationale', 'federales', 'premiership', 'urc', 'superRugby', 'leagueOne', 'sixNations',
-  'rugbyChampionship', 'franceXV', 'springboks', 'allBlacks', 'wallabies', 'pumas', 'nationsCeltes', 'europeEmergente'];
+const ids = ['premiership', 'urc', 'leagueOne', 'sixNations',
+  'franceXV', 'springboks', 'allBlacks', 'wallabies', 'pumas', 'nationsCeltes', 'europeEmergente'];
 const catalogue = catalogueBaseCarriere();
 assert.equal(new Set(PACKS_CARRIERE.map(pack => pack.id)).size, PACKS_CARRIERE.length, 'Chaque pack doit avoir un identifiant unique.');
 for (const id of ids) {

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { catalogueBaseCarriere, PACKS_CARRIERE } from '../src/lib/ligue/catalogueCarriere';
 import { cleCarteSolo, etatCollectionSoloVide, IDS_PACKS_SOLO_GRATUITS, normaliserCollectionSolo, ouvrirPackSolo, packCollectionSolo, packsCollectionSolo, prixPackSolo } from '../src/lib/collectionSolo';
-import { apparencePack, IDS_PACKS_AVEC_SKIN, modelePackParNom } from '../src/lib/presentationPacks';
+import { apparencePack, packPropose, modelePackParNom } from '../src/lib/presentationPacks';
 import { clubsProfessionnelsAmicaux, composerEquipeClubProfessionnel, convertirEnCoequipiers } from '../src/lib/amicalCollection';
 import { creerMatch } from '../src/lib/moteur/moteur';
 import {
@@ -10,16 +10,16 @@ import {
 } from '../src/lib/moteur/arcade';
 
 const catalogue = catalogueBaseCarriere();
-assert.ok(PACKS_CARRIERE.length >= 30, 'Le catalogue complet des packs doit rester disponible pour la ligue.');
+assert.ok(PACKS_CARRIERE.length >= 19 && PACKS_CARRIERE.every(packPropose), 'Uniquement les packs avec texture et les quatre exceptions.');
 const packsSolo = packsCollectionSolo(PACKS_CARRIERE);
-assert.deepEqual(packsSolo.map(pack => pack.id), PACKS_CARRIERE.filter(pack => IDS_PACKS_AVEC_SKIN.includes(pack.id as typeof IDS_PACKS_AVEC_SKIN[number]) || IDS_PACKS_SOLO_GRATUITS.includes(pack.id as typeof IDS_PACKS_SOLO_GRATUITS[number])).map(pack => pack.id), 'La collection solo propose les packs illustrés et les trois packs gratuits.');
-assert.ok(packsSolo.filter(pack => !IDS_PACKS_SOLO_GRATUITS.includes(pack.id as typeof IDS_PACKS_SOLO_GRATUITS[number])).every(pack => modelePackParNom(pack).includes('/packs-speciaux/')), 'Chaque pack payant solo doit afficher sa propre pochette.');
+assert.deepEqual(packsSolo.map(pack => pack.id), PACKS_CARRIERE.filter(pack => packPropose(pack)).map(pack => pack.id), 'La collection solo propose les packs illustrés et les trois packs gratuits.');
+assert.ok(packsSolo.filter(pack => !IDS_PACKS_SOLO_GRATUITS.includes(pack.id as typeof IDS_PACKS_SOLO_GRATUITS[number]) && pack.id!=='elite').every(pack => modelePackParNom(pack).includes('/packs-speciaux/')), 'Chaque pack payant solo doit afficher sa propre pochette.');
 assert.deepEqual(packsSolo.filter(pack => IDS_PACKS_SOLO_GRATUITS.includes(pack.id as typeof IDS_PACKS_SOLO_GRATUITS[number])).map(pack => pack.id), ['bronze', 'standard', 'or'], 'Bronze, Argent et Or restent gratuits dans la roue solo.');
 assert.ok(IDS_PACKS_SOLO_GRATUITS.every(id => modelePackParNom(PACKS_CARRIERE.find(pack => pack.id === id)!).includes('/m3d/packs/')), 'Les trois packs gratuits utilisent leur visuel de rareté.');
 for (const id of ['prod2', 'premiership', 'leagueOne', 'urc', 'sixNations']) {
   assert.equal(modelePackParNom(PACKS_CARRIERE.find(pack => pack.id === id)!), `/m3d/packs-speciaux/${id}.glb`, `Le pack ${id} affiche sa pochette correspondante.`);
 }
-for (const id of ['standard', 'grand', 'premium', 'rugbyChampionship']) {
+for (const id of ['standard', 'elite']) {
   assert.ok(modelePackParNom(PACKS_CARRIERE.find(pack => pack.id === id)!).includes('/m3d/packs/'), `Le pack ${id} ne doit pas afficher le logo d'une autre compétition.`);
 }
 assert.equal(new Set(PACKS_CARRIERE.map(pack => pack.id)).size, PACKS_CARRIERE.length, 'Chaque pack doit avoir un identifiant unique.');

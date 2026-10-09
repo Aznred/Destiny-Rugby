@@ -1,7 +1,7 @@
 import type { PackCarriere, RareteCarriere } from './ligue/typesCarriere.js';
 import type { SourceCarte } from './ligue/catalogueCarriere.js';
 import { packEvenementOuvert, preparerTirageSpecial, tirerSpeciale, type CatalogueSpecial } from './ligue/cartesSpeciales.js';
-import { packAvecSkin } from './presentationPacks.js';
+import { packPropose } from './presentationPacks.js';
 import { OVAS_PAR_CREDIT, prixLesDeux, prixOvas, type PrixArticle } from './monnaies.js';
 import { SOURCES_FFR_RETIREES } from '../data/protectionFfr.generated.js';
 
@@ -140,7 +140,7 @@ export function packCollectionSolo(pack: PackCarriere): PackCarriere {
 }
 
 export function packsCollectionSolo(packs: readonly PackCarriere[]): PackCarriere[] {
-  return packs.filter(pack => packAvecSkin(pack.id) || PACKS_SOLO_GRATUITS.has(pack.id) || pack.id.startsWith('womens:')).map(packCollectionSolo);
+  return packs.filter(packPropose).map(packCollectionSolo);
 }
 
 /**
@@ -154,7 +154,7 @@ export function packsEvenementSolo(speciales: CatalogueSpecial | null, maintenan
     ...structuredClone(ev.pack!),
     evenement: { id: ev.id, type: ev.cardType, actif: ev.actif, ...(ev.availableFrom ? { du: ev.availableFrom } : {}), ...(ev.availableUntil ? { au: ev.availableUntil } : {}),
       cartes: preparerTirageSpecial(ev.pack!, true, maintenant, new Set(), speciales)?.lots.find(l => l.evenement === ev.id)?.candidats.length ?? 0 },
-  })).filter(pack => packEvenementOuvert(pack, true, maintenant));
+  })).filter(pack => packPropose(pack) && packEvenementOuvert(pack, true, maintenant));
 }
 
 /** Une empreinte stable sur 64 bits : la collection survit aux reordonnancements du catalogue. */

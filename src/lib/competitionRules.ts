@@ -137,7 +137,8 @@ const TABLE: Record<string, CompetitionRules> = Object.fromEntries([
   regles('f-aupiki', { qualified: 2, playoffs: 0 }),
   regles('f-superw', { qualified: 4, playoffs: 0 }),
   regles('f-celtic', { qualified: 4, playoffs: 0 }),
-  regles('f-fpc', { qualified: 4, playoffs: 0 }),
+  regles('f-fpc', { qualified: 4, playoffs: 0, directRelegation: 1 }),
+  regles('f-fpc2', { qualified: 4, playoffs: 0, promotion: 1 }),
   // Élite 1 : la dernière descend en Élite 2. Élite 2 : la championne monte, la dernière descend en Fédérale 1.
   regles('f-elite1', { qualified: 4, playoffs: 0, directRelegation: 1 }),
   regles('f-elite2', { qualified: 4, playoffs: 0, promotion: 1, directRelegation: 1 }),

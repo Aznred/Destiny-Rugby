@@ -77,7 +77,7 @@ export function creerSonsPacks() {
       });
       note(180, .02, .39, .035, 'triangle', 0, 680);
       cliquet(.44, 1.4); note(110, .44, .18, .12, 'sine', 0, 65);
-      const ton = 523.25 * 2 ** ([0, 2, 4, 7, 12][rang] / 12);
+      const ton = 523.25 * 2 ** ([0, 2, 4, 7, 12, 14, 19][Math.max(0, Math.min(6, rang))] / 12);
       [1, 1.25, 1.5, 2].forEach((ratio, i) => cloche(ton * ratio, .44 + i * .08, .068, (i - 1.5) * .2));
       cloche(ton * 3, .83, .025, .45);
     },

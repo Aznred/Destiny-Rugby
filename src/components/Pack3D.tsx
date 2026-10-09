@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { useGLTF } from '@react-three/drei';
 import { Box3, Group, Vector3 } from 'three';
-import type { RareteCarriere } from '../lib/ligue/typesCarriere';
+import type { PalierPack } from '../lib/presentationPacks';
 import { modelePack } from '../lib/presentationPacks';
 
 class Repli3D extends Component<{ children: ReactNode }, { erreur: boolean }> {
@@ -17,8 +17,9 @@ function Modele({ url, calme, transition }: { url: string; calme: boolean; trans
   const gl = useThree(state => state.gl);
   useEffect(() => {
     gl.domElement.dataset.ready = 'true';
-    return () => { delete gl.domElement.dataset.ready; };
-  }, [gl, scene]);
+    gl.domElement.dataset.modele = url;
+    return () => { delete gl.domElement.dataset.ready; delete gl.domElement.dataset.modele; };
+  }, [gl, scene, url]);
   const ref = useRef<Group>(null);
   const debut = useRef(0);
   useEffect(() => { debut.current = performance.now(); }, [transition]);
@@ -69,7 +70,7 @@ function Modele({ url, calme, transition }: { url: string; calme: boolean; trans
 
 // ⚠️ Le préchargement des pochettes NE VIT PAS ICI : il partirait avec le
 // module 3D qu'il est justement censé devancer. Voir `lib/prechargementPacks.ts`.
-export default function Pack3D({ rarete, rareteSuivante, modele, ouvert, calme, transition }: { rarete: RareteCarriere; rareteSuivante?: RareteCarriere; modele?: string; ouvert: boolean; calme: boolean; transition: string }) {
+export default function Pack3D({ rarete, rareteSuivante, modele, modeleSuivant, ouvert, calme, transition }: { rarete: PalierPack; rareteSuivante?: PalierPack; modele?: string; modeleSuivant?: string; ouvert: boolean; calme: boolean; transition: string }) {
   const [deplie, setDeplie] = useState(false);
   useEffect(() => {
     if (!ouvert) { setDeplie(false); return; }
@@ -82,6 +83,7 @@ export default function Pack3D({ rarete, rareteSuivante, modele, ouvert, calme, 
   useEffect(() => {
     if (rareteSuivante && !modele) useGLTF.preload(modelePack(rareteSuivante));
   }, [rareteSuivante, modele]);
+  useEffect(() => { if (modeleSuivant) useGLTF.preload(modeleSuivant); }, [modeleSuivant]);
   return <Repli3D><Canvas camera={{ position: [0, 0, 5.5], fov: 43 }} dpr={[1, 1.5]} frameloop={calme ? 'demand' : 'always'} gl={{ alpha: true, antialias: true }}>
     <ambientLight intensity={1.8} />
     <directionalLight position={[3, 4, 5]} intensity={3.5} />

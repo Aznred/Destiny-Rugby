@@ -1,4 +1,5 @@
 import { catalogueAdmin } from './atelierCatalogue.js';
+import { packPropose } from '../presentationPacks.js';
 import { carteSeniorAutorisee, poolFfrCourant, sourceRetireeFfr } from './eligibiliteJoueurs.js';
 import { migrerCartesJeunesse } from './migrationJeunesse.js';
 import { BAREME_CLUBS, pointsDuMatch } from '../bareme.js';
@@ -12,7 +13,7 @@ import { compositionManagerParDefaut, EFFECTIF_MINIMUM, POSTES_BANC_MANAGER, POS
 import { affichesToutesRondes } from './calendrier.js';
 import { horairesChampionnat } from './horaires.js';
 import { graine as hasard, tirerPondere } from './aleatoire.js';
-import { packsCatalogueAdmin, bandesGaranties, carteDepuisSource, catalogueMondialCarriere, coequipierDepuisCarte, dotationBronzeCarriere, emblemeValide, logoCompetitionValide, nomTrophee, PACKS_CARRIERE, RARETES_CARRIERE, rayonDePack, tirerDuRayon, tropheeValide, vivierRestant } from './catalogueCarriere.js';
+import { actualiserAncienPackBronze, packsCatalogueAdmin, bandesGaranties, carteDepuisSource, catalogueMondialCarriere, coequipierDepuisCarte, dotationBronzeCarriere, emblemeValide, logoCompetitionValide, nomTrophee, PACKS_CARRIERE, RARETES_CARRIERE, rayonDePack, tirerDuRayon, tropheeValide, vivierRestant } from './catalogueCarriere.js';
 import { actualiserCahierMatchEnLigne, avancerMatchEnLigne, commanderMatchEnLigne, conclureMatchEnLigne, creerMatchEnLigne, DUREE_REELLE, dureeMatchEnLigne, forceFeuille, MARGE_AUTORITE, STRATEGIE_EN_LIGNE_DEFAUT, strategieValide, resumeMatchEnLigne, vueMatchEnLigne } from './matchCarriere.js';
 import { onlineRules } from '../competitionRules.js';
 import type { RepereChrono } from './filmDirect.js';
@@ -508,7 +509,7 @@ export function creerDivisionPublique(config: Pick<CreationCarriere, 'id' | 'cod
   herites: { club: ClubCarriere; cartes: CarteCarriere[] }[] = []): EtatCarriereEnLigne {
   const etat = creerCarriere({ ...config, nom: `Destiny Rugby · Division ${division}`, rythme: 7, maxClubs: 16,
     dotationOvas: 5000, packsGratuitsParJour: 0, doublonsAutorises: true, playerPool: 'mixed',
-    packsActifs: [...PACKS_DIVISION_PUBLIQUE], playoffs: false }, maintenant, graine);
+    packsActifs: [...PACKS_DIVISION_PUBLIQUE], cartesSpeciales: true, playoffs: false }, maintenant, graine);
   etat.publique = { cycle, division };
   if (herites.length) {
     // ⚠️ LE MARCHÉ D'UN CYCLE SE FERME AVEC LUI. Une carte restée en vente repart déverrouillée (son annonce est restée
@@ -553,6 +554,7 @@ export function creerLaboratoireCarriere(config: Pick<CreationCarriere, 'id' | '
 }
 
 function ouvrirPack(etat: EtatCarriereEnLigne, club: ClubCarriere, packId: string, maintenant: number, graine: string, gratuit = false) {
+  exiger(!etat.publique || PACKS_DIVISION_PUBLIQUE.includes(packId as typeof PACKS_DIVISION_PUBLIQUE[number]), 'Ce pack est désactivé dans cette ligue.');
   const pack = etat.packs.find(p => p.id === packId); exiger(pack, 'Pack inconnu.');
   // ⚠️ UN PACK D'ÉVÉNEMENT (HALLOWEEN…) NE SE VEND PAS EN LIGUE : il est dans la
   // boutique de packs spéciaux de la Collection solo. Ses cartes, elles, peuvent
@@ -1348,7 +1350,8 @@ function expirerMarche(etat: EtatCarriereEnLigne, maintenant: number) {
  * fait l'économie — restent ceux de la ligue.
  */
 function completerPacks(etat: EtatCarriereEnLigne) {
-  if (etat.publique) etat.playerPool = 'mixed';
+  const anciensPacks = new Map(etat.packs.map(p => [p.id, p]));
+  if (etat.publique) { etat.playerPool = 'mixed'; etat.cartesSpeciales = true; }
   // Les packs d'événement vivent dans la boutique de packs spéciaux de la
   // Collection solo, jamais dans l'état d'une ligue.
   if (etat.packs.some(p => p.evenement)) etat.packs = etat.packs.filter(p => !p.evenement);
@@ -1358,7 +1361,7 @@ function completerPacks(etat: EtatCarriereEnLigne) {
   }
   // Ligue mixte : les packs par championnat féminin, tenus à jour avec le catalogue des joueuses ; une ligue redevenue
   // masculine les perd.
-  if (etat.playerPool === 'mixed') {
+  if (etat.playerPool === 'mixed' || etat.playerPool === 'women') {
     const feminins = packsChampionnatsFeminins();
     etat.packs = [...etat.packs.filter(p => !p.id.startsWith('womens:')), ...feminins.map(copier)];
   } else if ((etat.playerPool ?? 'men') === 'men' && etat.packs.some(p => p.id.startsWith('womens:'))) etat.packs = etat.packs.filter(p => !p.id.startsWith('womens:'));
@@ -1378,6 +1381,17 @@ function completerPacks(etat: EtatCarriereEnLigne) {
     existant.famille = modele.famille;
     existant.garantie = modele.garantie;
     existant.filtre = copier(modele.filtre);
+  }
+  etat.packs = etat.packs.filter(packPropose).map(actualiserAncienPackBronze);
+  // Conserver les packs déjà offerts quand leur ancienne pochette est retirée.
+  const disponibles = new Set(etat.packs.map(p => p.id));
+  const remplacer = (id: string) => etat.publique && !(PACKS_DIVISION_PUBLIQUE as readonly string[]).includes(id) ? 'standard' : disponibles.has(id) ? id
+    : id === 'womens:elite 2 feminine' && disponibles.has('womens:elite 1 feminine') ? 'womens:elite 1 feminine'
+    : anciensPacks.get(id)?.garantie === 'elite' ? 'elite'
+    : anciensPacks.get(id)?.garantie === 'or' ? 'or' : 'standard';
+  for (const club of etat.clubs) {
+    for (const attribution of club.packsGratuits ?? []) attribution.packId = remplacer(attribution.packId);
+    for (const [jour, ids] of Object.entries(club.packsGratuitsProgrammes ?? {})) club.packsGratuitsProgrammes![jour] = ids.map(remplacer);
   }
 }
 

@@ -14,6 +14,7 @@ import { BAREME_CLUBS, pointsDuMatch, type Bareme } from './bareme.js';
 import { clubsDeDivision } from './divisions.js';
 import { CALENDRIER, NB_JOURNEES, type Semaine, type TypeSemaine } from '../data/calendrier.js';
 import { clubParNom } from '../data/clubs.js';
+import { CHAMPIONNATS_FEMININS } from '../data/mondeFeminin.generated.js';
 
 export interface MatchChampionnat {
   domicile: string;
@@ -302,6 +303,12 @@ export function calendrier(clubs: string[], cle?: string): [string, string][][] 
   return [...aller, ...retour];
 }
 
+/** Les championnats féminins en aller simple n'ajoutent pas un retour fictif. */
+export function calendrierCompetition(divisionId: string, clubs: string[], cle?: string): [string, string][][] {
+  const grille = calendrier(clubs, cle);
+  return CHAMPIONNATS_FEMININS.find(c => c.id === divisionId)?.allerRetour === false ? grille.slice(0, grille.length / 2) : grille;
+}
+
 // ⚠️ TOUS LES SCORES NE SONT PAS POSSIBLES AU RUGBY. On marque par 3 (pénalité,
 // drop), 5 (essai) ou 7 (essai transformé) : 1, 2 et 4 n'existent pas. Le
 // moteur en produisait pourtant, et le match en direct ne pouvait alors pas
@@ -396,7 +403,7 @@ export function championnatEnDirect(
   // PARTOUT (`matchDeLaSemaine`, `affichesDeLaJournee`, la simulation de fond).
   // Deux clés différentes, et le panneau de carrière annoncerait un adversaire
   // que le tableau des résultats ne connaît pas.
-  const grille = calendrier(poule, `${divisionId}#${saison}`);
+  const grille = calendrierCompetition(divisionId, poule, `${divisionId}#${saison}`);
   const total = grille.length;
   const jusqua = Math.max(0, Math.min(total, journeesJouees));
 
@@ -412,7 +419,7 @@ export function championnatEnDirect(
 
 // Nombre total de journées du championnat où évolue ce club (aller-retour).
 export function nombreJournees(divisionId: string, clubJoueur: string, numeroPoule?: number): number {
-  return calendrier(pouleDe(divisionId, clubJoueur, numeroPoule)).length;
+  return calendrierCompetition(divisionId, pouleDe(divisionId, clubJoueur, numeroPoule)).length;
 }
 
 // TOUTES LES AFFICHES DE L'ANNÉE, jouées ou à venir. C'est ce qui permet de
@@ -432,7 +439,7 @@ export function affichesDeLaJournee(
   journeesJouees: number, bonusJoueur = 0, numeroPoule?: number,
 ): AfficheCalendrier[] {
   const poule = pouleDe(divisionId, clubJoueur, numeroPoule);
-  const grille = calendrier(poule, `${divisionId}#${saison}`);
+  const grille = calendrierCompetition(divisionId, poule, `${divisionId}#${saison}`);
   const affiches = grille[journee - 1];
   if (!affiches) return [];
   const jouee = journee <= journeesJouees;

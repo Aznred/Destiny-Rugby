@@ -14,9 +14,9 @@ let controles = 0, echecs = 0;
 const ok = (condition: unknown, quoi: string) => { controles++; if (!condition) { echecs++; console.error('ÉCHEC :', quoi); } };
 const POSTES = Object.keys(POSTE_PAR_ID);
 
-ok(CHAMPIONNATS_FEMININS.length === 11, 'onze championnats déclarés (l’All-Ireland League en deux divisions)');
+ok(CHAMPIONNATS_FEMININS.length === 12, 'douze championnats déclarés (All-Ireland League et Farah Palmer Cup en deux divisions)');
 const jouables = championnatsJouables();
-ok(jouables.length === 11, `les onze championnats sont jouables (${jouables.length})`);
+ok(jouables.length === 12, `les douze championnats sont jouables (${jouables.length})`);
 ok(new Set(CHAMPIONNATS_FEMININS.map(c => c.id)).size === CHAMPIONNATS_FEMININS.length, 'identifiants uniques');
 ok(pyramideFrancaise().map(c => c.id).join() === 'f-elite1,f-elite2', 'pyramide française : Élite 1 puis Élite 2');
 ok(pyramideFrancaise().every(c => c.clubs.length === 10), 'deux divisions françaises de dix clubs');
@@ -60,7 +60,7 @@ ok(places('f-aupiki').s.slice(0, 2).every(x => x !== 'SAFE') && places('f-aupiki
 ok(places('f-elite1').s.at(-1) === 'DIRECT_RELEGATION' && compte(places('f-elite1').s, 'DIRECT_RELEGATION') === 1, 'Élite 1 : la dernière descend, elle seule');
 ok(places('f-elite2').s.at(-1) === 'DIRECT_RELEGATION', 'Élite 2 : la dernière descend');
 ok(compte(places('f-pwr').s, 'DIRECT_RELEGATION') === 0 && compte(places('f-superw').s, 'DIRECT_RELEGATION') === 0 && compte(places('f-celtic').s, 'DIRECT_RELEGATION') === 0, 'PWR, Super Rugby Women’s, Celtic Challenge : aucune descente');
-ok(matchsParClub(places('f-pwr').c) === 16 && matchsParClub(places('f-aupiki').c) === 6 && matchsParClub(places('f-superw').c) === 4 && matchsParClub(places('f-celtic').c) === 10 && matchsParClub(places('f-fpc').c) === 11 && matchsParClub(places('f-ail').c) === 10, 'matchs par club : PWR 16, Aupiki 6, Super Rugby Women’s 4, Celtic 10, Farah Palmer Cup 11, All-Ireland League 10');
+ok(matchsParClub(places('f-pwr').c) === 16 && matchsParClub(places('f-aupiki').c) === 6 && matchsParClub(places('f-superw').c) === 4 && matchsParClub(places('f-celtic').c) === 10 && matchsParClub(places('f-fpc').c) === 5 && matchsParClub(places('f-fpc2').c) === 5 && matchsParClub(places('f-ail').c) === 10, 'matchs par club : PWR 16, Aupiki 6, Super Rugby Women’s 4, Celtic 10, FPC 5 par division, All-Ireland League 10');
 
 // La traduction vers les types du jeu.
 const competitions = competitionsFeminines();

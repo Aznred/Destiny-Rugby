@@ -53,8 +53,7 @@ export interface DefinitionCarteSpeciale {
   /** La carte ordinaire du même joueur, s'il joue encore (`reel:antoine dupont`). */
   basePlayerId?: string;
   /**
-   * Une carte du rugby féminin : elle ne sort que dans une ligue féminine (ou mixte), jamais dans les
-   * packs ordinaires ni dans la Collection solo, qui restent masculins.
+   * Identifie une carte du rugby féminin pour sa présentation et ses écussons.
    */
   gender?: 'female';
   /**
@@ -131,9 +130,9 @@ export interface EvenementSpecial {
   availableUntil?: string;
   /**
    * Comment la chance par carte se déduit d'un pack ordinaire :
-   * `mythique` — comme une carte Mythique (ICONS) ;
-   * `entreBleueEtMythique` — moyenne géométrique Élite × Mythique, donc
-   * toujours plus rare qu'une bleue et plus fréquente qu'une Mythique.
+   * `mythique` — la bande Mythique sert de référence ;
+   * `entreBleueEtMythique` — ancien réglage conservé pour lire le Labo.
+   * Dans les deux cas, le plafond actuel garde Spécial et ICON au-dessus de Mythique.
    */
   repere: 'mythique' | 'entreBleueEtMythique';
   /** Multiplicateur réglable dans le Labo. 0 coupe l'événement des packs ordinaires. */
@@ -199,24 +198,28 @@ export const PACK_HALLOWEEN: PackCarriere = {
   probabilites: { bronze: 10, argent: 40, or: 44, elite: 5.4, star: .6 },
   speciales: { 'halloween-2026': 10 }, garantieSpeciale: 'halloween-2026',
 };
+export const PACK_OCTOBRE_ROSE: PackCarriere = {
+  id: 'evenement-octobre-rose-2026', nom: 'Octobre Rose', prix: 150, cartes: 10, famille: 'general',
+  promesse: 'Dix cartes, dont au moins une Octobre Rose. Disponible pendant octobre.',
+  probabilites: { bronze: 10, argent: 40, or: 44, elite: 5.4, star: .6 },
+  speciales: { 'octobre-rose-2026': 10 }, garantieSpeciale: 'octobre-rose-2026',
+};
 
 export const EVENEMENTS_DEPART: readonly EvenementSpecial[] = [
-  { id: 'influencers', cardType: 'influencer', nom: 'Influenceurs', actif: false, repere: 'mythique', tauxPacksNormaux: .2,
+  { id: 'influencers', cardType: 'influencer', nom: 'Influenceurs', actif: false, repere: 'mythique', tauxPacksNormaux: .25,
     pack: { id: 'evenement-influencers', nom: 'Créateurs', prix: 200, cartes: 10, famille: 'general',
       promesse: 'Dix cartes, dont une carte Influenceur garantie.',
       probabilites: { bronze: 10, argent: 40, or: 44, elite: 5.4, star: .6 }, speciales: { influencers: 1 }, garantieSpeciale: 'influencers' } },
-  { id: 'icons', cardType: 'icon', nom: 'ICONS', actif: true, repere: 'mythique', tauxPacksNormaux: .8 },
+  { id: 'icons', cardType: 'icon', nom: 'ICONS', actif: true, repere: 'mythique', tauxPacksNormaux: .1 },
   // « De maintenant jusqu'à fin novembre » : du 5 octobre 2026 à 0 h au
   // 1er décembre 2026 à 0 h, heure de Paris.
   { id: 'halloween-2026', cardType: 'halloween', nom: 'Halloween 2026', actif: true,
     availableFrom: '2026-10-04T22:00:00.000Z', availableUntil: '2026-11-30T23:00:00.000Z',
-    repere: 'entreBleueEtMythique', tauxPacksNormaux: 1, pack: PACK_HALLOWEEN },
-  // Octobre Rose : tout le mois d'octobre 2026, heure de Paris. ⚠️ PAS DE PACK DÉDIÉ : un pack d'événement se
-  // vend dans la Collection solo, qui reste masculine. Les cartes sortent des packs ordinaires des ligues
-  // féminines qui autorisent les cartes spéciales, à la même chance par carte qu'une Halloween.
+    repere: 'mythique', tauxPacksNormaux: .25, pack: PACK_HALLOWEEN },
+  // Octobre Rose : tout octobre, avec sa pochette et la même garantie que Halloween.
   { id: 'octobre-rose-2026', cardType: 'octobre-rose', nom: 'Octobre Rose 2026', actif: true,
     availableFrom: '2026-09-30T22:00:00.000Z', availableUntil: '2026-10-31T23:00:00.000Z',
-    repere: 'entreBleueEtMythique', tauxPacksNormaux: 1 },
+    repere: 'mythique', tauxPacksNormaux: .25, pack: PACK_OCTOBRE_ROSE },
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -360,17 +363,18 @@ const borner = (n: number, min: number, max: number) => Math.max(min, Math.min(m
 /**
  * La chance, en %, qu'UNE carte de ce pack soit une carte de cet événement.
  *
- * ⚠️ ELLE SUIT LA QUALITÉ DU PACK, PAS UN TAUX FIXE. Un pack Bronze n'a pas de
- * Mythique : il n'a donc ni ICON ni Halloween. Un pack Élite garantie en a dix
- * fois plus qu'un pack Argent. ICONS se calent sur la Mythique ; Halloween sur
- * la moyenne géométrique Élite × Mythique — mesurée toujours entre les deux.
+ * Elle suit la qualité du pack : au maximum 10 % du taux Mythique pour ICON,
+ * 25 % pour chaque famille Spécial. Un taux explicite et les garanties des
+ * packs dédiés restent prioritaires.
  */
 export function chanceSpecialeParCarte(pack: Pick<PackCarriere, 'probabilites' | 'speciales'>, ev: Pick<EvenementSpecial, 'id' | 'repere' | 'tauxPacksNormaux'>): number {
   const imposee = pack.speciales?.[ev.id];
   if (typeof imposee === 'number' && Number.isFinite(imposee)) return borner(imposee, 0, 100);
   const elite = Math.max(0, pack.probabilites.elite || 0), star = Math.max(0, pack.probabilites.star || 0);
   const repere = ev.repere === 'mythique' ? star : Math.sqrt(elite * star);
-  return borner(repere * Math.max(0, ev.tauxPacksNormaux), 0, 50);
+  // Les anciens réglages du Labo ne doivent pas inverser les nouveaux paliers.
+  // Les packs dédiés gardent leur taux explicite et leur garantie.
+  return borner(Math.min(repere * Math.max(0, ev.tauxPacksNormaux), star * (ev.id === 'icons' ? .1 : .25)), 0, 50);
 }
 
 export interface TirageSpecial {
@@ -415,9 +419,8 @@ export function preparerTirageSpecial(
  * - `base` + `accepte` : la carte GARANTIE d'un pack ordinaire (« Élite
  *   garantie »). ⚠️ Elle ne tire plus sur 100 mais sur les seules bandes
  *   autorisées : la Mythique y pèse dix fois plus que d'habitude. Les cartes
- *   spéciales qui satisfont la garantie y entrent AU MÊME PRORATA, sans quoi un
- *   pack garanti sortirait plus de Mythiques que de Halloween — l'inverse de la
- *   règle « entre la bleue et la Mythique ».
+ *   spéciales qui satisfont la garantie y entrent AU MÊME PRORATA pour
+ *   conserver l'ordre Mythique, Spécial, ICON.
  */
 export function tirerSpeciale(
   tirage: TirageSpecial | null, rng: () => number,

@@ -97,10 +97,10 @@ try {
     egal(tirage.indices.length, 10, 'Dix cartes dans le pack Créateurs');
     ok(tirage.indices.some(n => catalogue[n].sourceId === id), 'Une carte Influenceur garantie');
   }
-  const premium = PACKS_CARRIERE.find(p => p.id === 'premium')!;
+  const ordinaire = PACKS_CARRIERE.find(p => p.id === 'standard')!;
   egal((await edition(id, { allowedPackIds: ['evenement-influencers'] })).statut, 200, 'Choix des packs');
   cat = catalogueSpecial(await db.atelier!.lire());
-  egal(preparerTirageSpecial(premium, true, maintenant, new Set(), cat), null, 'Pack non autorisé exclu');
+  egal(preparerTirageSpecial(ordinaire, true, maintenant, new Set(), cat), null, 'Pack non autorisé exclu');
   ok(preparerTirageSpecial(pack, true, maintenant, new Set(), cat), 'Pack choisi autorisé');
   egal((await edition(id, { allowedPackIds: [] })).statut, 200, 'Aucun pack autorisé');
   egal(packsEvenementSolo(catalogueSpecial(await db.atelier!.lire()), maintenant).length, 0, 'Pas de pack vendu avec une garantie impossible');
@@ -178,6 +178,7 @@ try {
     egal(collection.total, 1, 'Collection ligue : exemplaire conservé après désactivation');
     const comp = { ...ligue.clubs[0].composition, titulaires: [...ligue.clubs[0].composition.titulaires] };
     comp.titulaires[9] = distribuee.id;
+    comp.capitaineId = comp.titulaires[0]; comp.buteurId = distribuee.id;
     const composee = agirCarriere(ligue, kiri, { type: 'composition', composition: comp }, maintenant, 'composition');
     ok(composee.clubs[0].composition.titulaires.includes(distribuee.id), 'Influenceur utilisable en composition après désactivation');
   });

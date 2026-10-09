@@ -809,7 +809,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         }
         const connue = Number(url.searchParams.get('revision'));
         const contexteCatalogue = contexteFfr.getStore();
-        const revisionFfr = `${contexteCatalogue?.revisionFfr ?? ''}:cartes-femmes-v1`;
+        const revisionFfr = `${contexteCatalogue?.revisionFfr ?? ''}:cartes-femmes-v1:packs-femmes-v2`;
         const actifs = new Set(catalogueMondialCarriere(config).map(c=>c.sourceId));
         // Le gros catalogue de base est déjà dans le jeu. Les éditions et
         // ajouts de joueurs de la base en ligne traversent le réseau — et les cartes
