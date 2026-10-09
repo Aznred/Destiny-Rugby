@@ -1,5 +1,5 @@
 import { PHOTOS_NEW_MAJ } from '../data/photosNewMaj.js';
-import { cleJoueurImage } from './demandesImage';
+import { cleJoueurImage } from './demandesImage.js';
 import { photoJoueurFfr } from './joueursFfr.js';
 // LES PHOTOS DE PROFIL DE L’OVALE
 // Portraits officiels locaux en priorité ; portrait stable du catalogue sinon.
