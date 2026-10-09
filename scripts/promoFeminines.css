@@ -1,0 +1,97 @@
+/* Les promos TikTok du rugby féminin — pensées pour 540 × 960 (filmées en double définition). */
+html, body, #root { height: 100%; margin: 0; overflow: hidden; background: #050d09; }
+.pf { position: relative; width: 100vw; height: 100vh; overflow: hidden; color: var(--craie); font-family: var(--police-forte);
+  background: radial-gradient(120% 70% at 50% 0%, #17402a 0%, #0a1d13 46%, #050d09 100%); }
+.pf::after { content: ''; position: absolute; inset: 0; pointer-events: none; opacity: .5;
+  background: repeating-linear-gradient(90deg, transparent 0 53px, #ffffff05 53px 54px), radial-gradient(90% 60% at 50% 110%, #000c, transparent 70%); }
+.pf-octobre-rose { background: radial-gradient(120% 70% at 50% 0%, #5a1f45 0%, #2a0d21 48%, #0d050b 100%); }
+
+.pf-plan { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; opacity: 0; text-align: center; }
+.pf-joue .pf-plan { animation: pf-plan var(--duree) linear var(--depart) both; }
+@keyframes pf-plan { 0% { opacity: 0; } 5% { opacity: 1; } 93% { opacity: 1; } 100% { opacity: 0; } }
+/* Le dernier plan reste à l'écran : la vidéo se coupe dessus. */
+.pf-joue .pf-a4, .pf-joue .pf-r5 { animation-name: pf-plan-fin; }
+@keyframes pf-plan-fin { 0% { opacity: 0; } 10% { opacity: 1; } 100% { opacity: 1; } }
+
+.pf-surtitre { margin: 0 0 14px; font-size: 15px; letter-spacing: .34em; text-transform: uppercase; color: var(--or); }
+.pf h1, .pf h2 { margin: 0; font-family: var(--police-titre); font-weight: 400; text-transform: uppercase; line-height: .92; letter-spacing: .01em; }
+.pf h1 { font-size: 118px; }
+.pf h1 span { display: block; opacity: 0; }
+.pf-joue h1 span { animation: pf-monte .7s cubic-bezier(.2, .9, .2, 1) calc(var(--depart) + .05s) both; }
+.pf-joue h1 span + span { animation-delay: calc(var(--depart) + .35s); color: var(--or); }
+.pf h2 { font-size: 96px; }
+.pf-sous { margin: 22px 26px 0; font-size: 19px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--craie-dim); opacity: 0; }
+.pf-joue .pf-sous { animation: pf-monte .6s ease-out calc(var(--depart) + 1s) both; }
+.pf-adresse { margin: 34px 0 0; padding: 12px 26px; border: 1px solid var(--bordure-forte); border-radius: 999px; font-size: 22px; font-weight: 800; letter-spacing: .08em; color: var(--or); opacity: 0; }
+.pf-joue .pf-adresse { animation: pf-monte .6s ease-out calc(var(--depart) + 1.1s) both; }
+@keyframes pf-monte { from { opacity: 0; transform: translateY(34px); } to { opacity: 1; transform: none; } }
+
+.pf-carte { width: 150px; flex: none; }
+.pf-carte > * { width: 100%; }
+
+/* ── Arrivée ─────────────────────────────────────────────────────────────── */
+.pf-a1 { --depart: 0s; --duree: 2.7s; }
+.pf-a2 { --depart: 2.6s; --duree: 5.8s; }
+.pf-a3 { --depart: 8.3s; --duree: 5.7s; }
+.pf-a4 { --depart: 13.9s; --duree: 3.3s; }
+
+.pf-mur { position: absolute; inset: -40px -30px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; transform: rotate(-7deg) scale(1.16); }
+.pf-colonne { display: flex; flex-direction: column; gap: 16px; align-items: center; }
+.pf-colonne .pf-carte { width: 176px; }
+.pf-joue .pf-colonne-0 { animation: pf-defile-haut 16s linear 2.4s both; }
+.pf-joue .pf-colonne-1 { animation: pf-defile-bas 16s linear 2.4s both; }
+.pf-joue .pf-colonne-2 { animation: pf-defile-haut 13s linear 2.4s both; }
+@keyframes pf-defile-haut { from { transform: translateY(0); } to { transform: translateY(-46%); } }
+@keyframes pf-defile-bas { from { transform: translateY(-46%); } to { transform: translateY(0); } }
+.pf-voile { position: absolute; inset: 0; background: linear-gradient(180deg, #050d09ee 0%, #050d0955 26%, #050d0933 52%, #050d09f2 84%); }
+.pf-compte { position: relative; margin-top: 330px; display: flex; flex-direction: column; align-items: center; opacity: 0; }
+.pf-joue .pf-compte { animation: pf-monte .7s ease-out calc(var(--depart) + .9s) both; }
+.pf-compte b { font-family: var(--police-titre); font-weight: 400; font-size: 150px; line-height: .9; color: var(--or); text-shadow: 0 6px 30px #000; }
+.pf-compte span { font-size: 26px; font-weight: 800; letter-spacing: .3em; text-transform: uppercase; text-shadow: 0 2px 14px #000; }
+.pf-ligues { position: relative; list-style: none; margin: 20px 0 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; max-width: 470px; }
+.pf-ligues li { padding: 8px 14px; border-radius: 999px; background: #0b2016e6; border: 1px solid var(--bordure-forte); font-size: 14px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; opacity: 0; }
+.pf-joue .pf-ligues li { animation: pf-monte .5s ease-out both; }
+.pf-joue .pf-ligues li:nth-child(1) { animation-delay: calc(var(--depart) + 1.7s); }
+.pf-joue .pf-ligues li:nth-child(2) { animation-delay: calc(var(--depart) + 2.0s); }
+.pf-joue .pf-ligues li:nth-child(3) { animation-delay: calc(var(--depart) + 2.3s); }
+.pf-joue .pf-ligues li:nth-child(4) { animation-delay: calc(var(--depart) + 2.6s); }
+.pf-joue .pf-ligues li:nth-child(5) { animation-delay: calc(var(--depart) + 2.9s); }
+
+.pf-vedette { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; opacity: 0; }
+.pf-vedette .pf-carte { width: 340px; filter: drop-shadow(0 26px 50px #000c); }
+.pf-vedette p { margin: 26px 0 0; display: flex; flex-direction: column; align-items: center; font-family: var(--police-titre); font-size: 44px; text-transform: uppercase; line-height: 1; }
+.pf-vedette p b { font-weight: 400; font-size: 30px; color: var(--or); letter-spacing: .1em; margin-bottom: 6px; }
+.pf-vedette p i { margin-top: 10px; font: 700 15px var(--police-forte); font-style: normal; letter-spacing: .22em; color: var(--craie-dim); }
+.pf-joue .pf-vedette { animation: pf-vedette 1.9s cubic-bezier(.2, .8, .2, 1) both; }
+.pf-joue .pf-vedette-0 { animation-delay: calc(var(--depart) + .1s); }
+.pf-joue .pf-vedette-1 { animation-delay: calc(var(--depart) + 1.9s); }
+.pf-joue .pf-vedette-2 { animation-delay: calc(var(--depart) + 3.7s); }
+@keyframes pf-vedette { 0% { opacity: 0; transform: scale(1.5) rotate(-5deg); } 14% { opacity: 1; transform: scale(1) rotate(0); } 86% { opacity: 1; transform: scale(1.04); } 100% { opacity: 0; transform: scale(.9) translateY(-40px); } }
+
+/* ── Octobre Rose ────────────────────────────────────────────────────────── */
+.pf-octobre-rose .pf-surtitre, .pf-octobre-rose .pf-adresse { color: #ff9cc4; border-color: #ff7fb266; }
+.pf-octobre-rose h1 span + span, .pf-octobre-rose h2 { color: #ff7fb2; }
+.pf-r1 { --depart: 0s; --duree: 2.9s; }
+.pf-r2 { --depart: 2.8s; --duree: 6.6s; }
+.pf-r3 { --depart: 9.3s; --duree: 3.6s; }
+.pf-r4 { --depart: 12.8s; --duree: 3.9s; }
+.pf-r5 { --depart: 16.6s; --duree: 3s; }
+.pf-ruban { position: absolute; top: 96px; opacity: 0; filter: drop-shadow(0 0 40px #ff5c9d88); }
+.pf-joue .pf-ruban { animation: pf-ruban 1s cubic-bezier(.2, .9, .2, 1) var(--depart) both; }
+@keyframes pf-ruban { from { opacity: 0; transform: translateY(-80px) rotate(-18deg) scale(.6); } to { opacity: 1; transform: none; } }
+.pf-r1 h1 { margin-top: 250px; font-size: 104px; }
+.pf-grille { display: flex; flex-wrap: wrap; gap: 9px 8px; justify-content: center; width: 524px; perspective: 900px; }
+.pf-grille .pf-carte { width: 124px; }
+.pf-grille-banc { width: 520px; gap: 12px; }
+.pf-grille-banc .pf-carte { width: 160px; }
+.pf-retourne { opacity: 0; }
+.pf-joue .pf-retourne { animation: pf-retourne .55s cubic-bezier(.2, .8, .2, 1) both; }
+@keyframes pf-retourne { 0% { opacity: 0; transform: rotateY(92deg) scale(.7); } 60% { opacity: 1; transform: rotateY(-8deg) scale(1.06); } 100% { opacity: 1; transform: none; } }
+.pf-eventail { position: relative; width: 100%; height: 440px; }
+.pf-eventail .pf-carte { position: absolute; left: 50%; top: 0; width: 236px; margin-left: -118px; opacity: 0; filter: drop-shadow(0 22px 40px #000c); }
+.pf-joue .pf-eventail .pf-carte { animation: pf-eventail .8s cubic-bezier(.2, .8, .2, 1) both; }
+.pf-joue .pf-eventail-0 { --angle: 0deg; --dx: 0px; z-index: 3; animation-delay: calc(var(--depart) + .2s); }
+.pf-joue .pf-eventail-1 { --angle: -11deg; --dx: -112px; z-index: 2; animation-delay: calc(var(--depart) + .5s); }
+.pf-joue .pf-eventail-2 { --angle: 11deg; --dx: 112px; z-index: 2; animation-delay: calc(var(--depart) + .8s); }
+@keyframes pf-eventail { from { opacity: 0; transform: translateY(120px) scale(.7); } to { opacity: 1; transform: translateX(var(--dx)) rotate(var(--angle)); } }
+.pf-r5 h2 { margin-top: 18px; font-size: 84px; }

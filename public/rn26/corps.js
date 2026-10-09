@@ -147,8 +147,10 @@ export function fitBeard(source,headMesh,key,marge=.002){
   }
   p.needsUpdate=true;geometry.computeVertexNormals();geometry.computeBoundingSphere();ajustes.set(cle,geometry);protegerRessources([],[geometry]);return geometry;
 }
+// La tête pour laquelle les coiffures de l'APK sont modelées (arrière masculin) : sommet, milieu en profondeur, largeur.
+const TETE_REFERENCE={sommet:1.843,milieu:.0395,largeur:.2};
 export function fitToHead(source,headMesh,key,marge=.006){
-  const cle=key+':'+source.name+':'+marge;
+  const cle=key+':'+headMesh.name+':'+source.name+':'+marge;
   if(ajustes.has(cle))return ajustes.get(cle);
   const tete=headMesh.geometry.attributes.position,box=new THREE.Box3().setFromBufferAttribute(tete);
   const centre=new THREE.Vector3(0,box.max.y-.118,(box.min.z+box.max.z)/2+.012);
@@ -162,6 +164,13 @@ export function fitToHead(source,headMesh,key,marge=.006){
   }
   const rayon=(u,v)=>{let m=0;for(let dv=-1;dv<=1;dv++)for(let du=-1;du<=1;du++){const vv=v+dv;if(vv<0||vv>=V)continue;m=Math.max(m,carte[vv*U+(u+du+U)%U]);}return m;};
   const geometry=source.geometry.clone(),p=geometry.attributes.position;
+  // ⚠️ REPOUSSER NE SUFFIT PAS : sur une tête plus basse que la référence (les joueuses, onze centimètres), la coiffure
+  // restait à sa hauteur d'origine, au-dessus du crâne. On la ramène d'abord à l'échelle et à la place de CETTE tête.
+  const ecartTete=box.max.y-TETE_REFERENCE.sommet;
+  if(Math.abs(ecartTete)>.02){
+    const e=Math.min(1.08,Math.max(.86,(box.max.x-box.min.x)/TETE_REFERENCE.largeur)),ry=TETE_REFERENCE.sommet-.118,rz=TETE_REFERENCE.milieu+.012;
+    for(let i=0;i<p.count;i++)p.setXYZ(i,p.getX(i)*e,centre.y+(p.getY(i)-ry)*e,centre.z+(p.getZ(i)-rz)*e);
+  }
   for(let i=0;i<p.count;i++){
     const dx=p.getX(i)-centre.x,dy=p.getY(i)-centre.y,dz=p.getZ(i)-centre.z,[u,v,r]=cellule(dx,dy,dz),crane=rayon(u,v);
     if(!crane||r>=crane+marge)continue;

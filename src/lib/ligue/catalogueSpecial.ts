@@ -5,7 +5,7 @@
 // (`CatalogueAdmin.speciales`) et le catalogue mondial pour résoudre le club
 // d'un joueur actif. Serveur et écrans de ligue seulement.
 
-import { HALLOWEEN_DEPART, ICONS_DEPART } from '../../data/cartesSpeciales.js';
+import { HALLOWEEN_DEPART, ICONS_DEPART, OCTOBRE_ROSE_DEPART } from '../../data/cartesSpeciales.js';
 import { POSTE_PAR_ID } from '../../data/rugby.js';
 import type { PosteId } from '../../types.js';
 import { catalogueAdmin, type CatalogueAdmin } from './atelierCatalogue.js';
@@ -20,10 +20,10 @@ import type { CarteCarriere, PackCarriere } from './typesCarriere.js';
 export * from './cartesSpeciales.js';
 
 let graineCache: DefinitionCarteSpeciale[] | undefined;
-/** Les 100 ICONS et les 23 Halloween de départ, toutes en « image manquante ». */
+/** Les 100 ICONS et les 23 Halloween de départ, en « image manquante » ; les 23 Octobre Rose, avec leur portrait. */
 export function definitionsDepart(): readonly DefinitionCarteSpeciale[] {
   if (graineCache) return graineCache;
-  const icon = FAMILLES_SPECIALES.icon, halloween = FAMILLES_SPECIALES.halloween;
+  const icon = FAMILLES_SPECIALES.icon, halloween = FAMILLES_SPECIALES.halloween, rose = FAMILLES_SPECIALES['octobre-rose'];
   const commun = { packWeight: 1, published: false, imageReady: false, canBePacked: true, canAppearInCollection: true,
     canAppearOnMarket: true, rarityAnimation: 'mythique' as const };
   graineCache = [
@@ -41,6 +41,15 @@ export function definitionsDepart(): readonly DefinitionCarteSpeciale[] {
       club: base ? '' : halloween.clubDefaut, league: base ? '' : halloween.ligueDefaut,
       specialLogo: halloween.specialLogo, retraite: !base, age: base ? 0 : 30,
       lot: role === 'titulaire' ? 'Équipe Halloween · XV de départ' : 'Équipe Halloween · Banc',
+    })),
+    ...OCTOBRE_ROSE_DEPART.map(([nom, numeros, nation, overall, role, club, league, age, identiteId]): DefinitionCarteSpeciale => ({
+      ...commun, id: `octobre-rose-2026:${slugSpecial(nom)}`, cardType: 'octobre-rose', specialEventId: rose.evenementDefaut,
+      gender: 'female', identiteId, nom, ...postesDepuisNumeros(numeros), overall, collectif: rose.collectifDefaut,
+      // Le portrait officiel de la Coupe du monde 2025, livré avec le jeu (`scripts/copierPortraitsOctobreRose.ts`) :
+      // la carte est « prête », il ne lui manque que la publication dans le Labo.
+      image: `/photos/octobre-rose/${slugSpecial(nom)}.webp`, imageReady: true,
+      designId: rose.designId, nation, club, league, specialLogo: rose.specialLogo, retraite: false, age,
+      lot: role === 'titulaire' ? 'Équipe Octobre Rose · XV de départ' : 'Équipe Octobre Rose · Banc',
     })),
   ];
   return graineCache;
@@ -81,7 +90,7 @@ export function catalogueSpecial(config: CatalogueAdmin = catalogueAdmin()): Cat
     if(brut.basePlayerId && !base) continue;
     const def: DefinitionCarteSpeciale = {
       packWeight: 1, published: false, canBePacked: true, canAppearInCollection: true, canAppearOnMarket: true,
-      rarityAnimation: 'mythique', retraite: !brut.basePlayerId,
+      rarityAnimation: 'mythique', retraite: !brut.basePlayerId && !brut.identiteId,
       designId: famille?.designId ?? `special-${brut.cardType}`, specialLogo: famille?.specialLogo ?? 'etoile',
       ...brut,
       nation: brut.nation ?? '',
@@ -109,6 +118,7 @@ export function specialesPubliques(config: CatalogueAdmin = catalogueAdmin(), ma
   return {
     definitions: cat.definitions.filter(d => d.cardType === 'influencer'
       ? carteSpecialeVisibleCollection(d, cat, maintenant) || (possedees.has(d.id) && d.imageReady && Boolean(d.published || d.publieeLe))
+      // Les cartes spéciales féminines (Octobre Rose) y sont aussi : elles se tirent dans tous les packs.
       : d.imageReady && !d.brouillon && (d.published || Boolean(d.publieeLe))),
     evenements: cat.evenements.map(ev => structuredClone(ev)),
   };

@@ -62,6 +62,19 @@ export function EmblemeInfluenceur({ taille = 24, className }: { taille?: number
   </svg>;
 }
 
+/** Le ruban rose des cartes Octobre Rose : une boucle de soie, deux pans croisés. */
+export function RubanRose({ taille = 24, className }: { taille?: number; className?: string }) {
+  const id = useId().replaceAll(':', '');
+  return <svg className={className} width={taille} height={taille} viewBox="0 0 48 48" aria-hidden="true">
+    <defs>
+      <linearGradient id={`${id}-soie`} x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#ffd3e4" /><stop offset=".5" stopColor="#ff7fb2" /><stop offset="1" stopColor="#c2356f" /></linearGradient>
+    </defs>
+    <path d="M29 20 L38.6 40.4 L32.4 38.6 L30 44 L20.6 24 Z" fill="#c2356f" />
+    <path d="M24 4 C14.8 4 11.4 12 15.6 18.8 L19 24 L9.4 40.4 L15.6 38.6 L18 44 L32.4 18.8 C36.6 12 33.2 4 24 4 Z M24 10.2 C28 10.2 29.2 13.4 27.4 16.4 L24 21.6 L20.6 16.4 C18.8 13.4 20 10.2 24 10.2 Z" fill={`url(#${id}-soie)`} fillRule="evenodd" />
+    <path d="M17.4 9.4 C20.2 6.6 27.8 6.6 30.6 9.4" fill="none" stroke="#fff0f6" strokeWidth="1.3" strokeLinecap="round" opacity=".6" />
+  </svg>;
+}
+
 export function EmblemeSpecial({ logo, taille, className }: { logo: string; taille?: number; className?: string }) {
-  return logo === 'creator' ? <EmblemeInfluenceur taille={taille} className={className} /> : logo === 'citrouille' ? <Citrouille taille={taille} className={className} /> : <EmblemeIcon taille={taille} className={className} />;
+  return logo === 'creator' ? <EmblemeInfluenceur taille={taille} className={className} /> : logo === 'citrouille' ? <Citrouille taille={taille} className={className} /> : logo === 'ruban' ? <RubanRose taille={taille} className={className} /> : <EmblemeIcon taille={taille} className={className} />;
 }

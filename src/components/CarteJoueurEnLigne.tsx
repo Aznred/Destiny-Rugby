@@ -6,6 +6,7 @@ import { nomPoste, POSTE_PAR_ID } from '../data/rugby';
 import { photoReelle } from '../lib/avatars';
 import { formatTempsBlessure, formatTempsBlessureDetaille } from '../lib/carteJoueur';
 import { Drapeau } from './Drapeau';
+import { choixImage } from '../lib/avatars';
 import { useBlasonCarte } from '../lib/useBlasonCarte';
 import { EcussonClub } from './EcussonClub';
 import { Blason } from './Blason';
@@ -36,6 +37,8 @@ const SILHOUETTE = 'M120 7 C107 23 83 21 65 29 L15 47 L15 282 Q15 314 57 326 Q10
  * revendique personne, et il ne sert que quand on n'a vraiment rien.
  */
 const SANS_PHOTO = '/photos/silhouette.webp';
+/** La même silhouette grise, pour une joueuse : une carte féminine sans portrait ne montre pas un homme. */
+const SANS_PHOTO_FEMME = '/photos/silhouette-femme.webp';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // LES CARTES SPÉCIALES
@@ -119,6 +122,41 @@ function ArtHalloween({ id }: { id: string }) {
   </svg>;
 }
 
+/** Les rubans semés dans le fond d'une carte Octobre Rose : x, y, taille, angle. */
+const RUBANS_FOND: readonly [number, number, number, number][] = [
+  [14, 26, 30, -14], [180, 16, 22, 12], [198, 112, 32, 8], [22, 146, 24, 16], [152, 166, 20, -10],
+  [72, 90, 16, 22], [204, 194, 18, -18], [100, 18, 14, 6],
+];
+
+// Octobre Rose : ni une Mythique rosie ni une Halloween repeinte. Un satin
+// prune profond, des rubans en filigrane, un grand ruban de soie qui descend de
+// l'épaule droite, un filet rose poudré qui luit. Même géométrie que les autres.
+function ArtOctobreRose({ id }: { id: string }) {
+  return <svg className="dr-player-art" viewBox="0 0 240 360" aria-hidden="true">
+    <defs>
+      <linearGradient id={`${id}-satin`} x1="0" y1="0" x2=".5" y2="1"><stop stopColor="#5a1f45" /><stop offset=".45" stopColor="#35102a" /><stop offset="1" stopColor="#170613" /></linearGradient>
+      <linearGradient id={`${id}-rose`} x1="0" y1="0" x2="1" y2="1"><stop stopColor="#ffe1ee" /><stop offset=".36" stopColor="#ff7fb2" /><stop offset=".72" stopColor="#c2356f" /><stop offset="1" stopColor="#ff9cc4" /></linearGradient>
+      <radialGradient id={`${id}-lueur`} cx="50%" cy="20%" r="60%"><stop stopColor="#ff7fb2" stopOpacity=".3" /><stop offset="1" stopColor="#ff7fb2" stopOpacity="0" /></radialGradient>
+      <filter id={`${id}-halo`} x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur stdDeviation="3.2" /></filter>
+      <symbol id={`${id}-ruban`} viewBox="0 0 20 20"><path d="M10 1.6 C6.2 1.6 4.6 4.6 6 7.4 L12.6 18.4 L15.2 14.4 L9 4.8 C8.8 4.2 9.3 3.8 10 3.8 C10.7 3.8 11.2 4.2 11 4.8 L4.8 14.4 L7.4 18.4 L14 7.4 C15.4 4.6 13.8 1.6 10 1.6 Z" /></symbol>
+      <clipPath id={`${id}-clip`}><path d={SILHOUETTE} /></clipPath>
+    </defs>
+    <path d={SILHOUETTE} fill={`url(#${id}-satin)`} />
+    <g clipPath={`url(#${id}-clip)`}>
+      <rect width="240" height="360" fill={`url(#${id}-lueur)`} />
+      {RUBANS_FOND.map(([x, y, taille, angle], i) => <use key={i} href={`#${id}-ruban`} x={x} y={y} width={taille} height={taille}
+        transform={`rotate(${angle} ${x + taille / 2} ${y + taille / 2})`} fill="#ffb3d1" opacity={i % 3 === 0 ? .17 : .1} />)}
+      <path d="M252 -8 C206 40 176 96 150 150 C134 184 120 200 96 214 L112 220 C140 206 158 186 176 152 C200 104 226 60 262 26 Z" fill={`url(#${id}-rose)`} opacity=".2" />
+      <path d="M8 213 Q120 238 232 213 L240 365 H0Z" fill="#12050f" opacity=".94" />
+      <path d="M8 213 Q120 238 232 213" stroke={`url(#${id}-rose)`} strokeWidth="2.2" fill="none" />
+      <path d="M44 276 H196" stroke="#ff7fb2" strokeWidth=".7" opacity=".5" />
+    </g>
+    <path d={SILHOUETTE} fill="none" stroke="#ff5c9d" strokeWidth="6" opacity=".5" filter={`url(#${id}-halo)`} />
+    <path d={SILHOUETTE} fill="none" stroke={`url(#${id}-rose)`} strokeWidth="3.4" />
+    <path d={SILHOUETTE} transform="translate(8 11) scale(.933 .94)" stroke="#ff9cc4" strokeWidth=".9" fill="none" opacity=".5" />
+  </svg>;
+}
+
 function ArtInfluenceur({ id }: { id: string }) {
   return <svg className="dr-player-art" viewBox="0 0 240 360" aria-hidden="true">
     <defs>
@@ -149,17 +187,19 @@ export function CarteJoueurEnLigne({ carte, proprietaire, logoClub, onClick, com
 }) {
   const id = useId().replaceAll(':', '');
   const [photosRatees, setPhotosRatees] = useState<Set<string>>(() => new Set());
-  const blason = useBlasonCarte(carte.clubReel, logoClub);
+  const blason = useBlasonCarte(carte.clubReel, logoClub, carte.gender === 'female');
   const competition = logoChampionnat(carte.championnat);
   // ⚠️ UNE CARTE SPÉCIALE N'EMPRUNTE JAMAIS LE PORTRAIT ORDINAIRE DU JOUEUR :
   // une Halloween de Dupont avec sa photo de club ne serait qu'un faux.
   const photoIndexee = carte.speciale ? undefined : photoReelle(carte.nom, carte.clubReel);
   // Les cartes déjà distribuées peuvent conserver une ancienne URL. Si elle
   // échoue, on retente le portrait actuellement indexé avant le repli neutre.
-  const photo = [carte.photo, photoIndexee].find((candidate) => candidate && !photosRatees.has(candidate));
+  // « Mon image » : un portrait retiré à la demande du joueur ne s'affiche plus ; celui qu'il a proposé passe devant.
+  const choix = choixImage(carte.nom);
+  const photo = choix === null ? undefined : [choix, carte.photo, photoIndexee].find((candidate) => candidate && !photosRatees.has(candidate));
   const [clair, couleur, sombre, bord] = PALETTES[carte.rarete];
   const speciale = carte.speciale;
-  const design = speciale?.type === 'influencer' ? 'influencer' : speciale?.type === 'halloween' ? 'halloween' : speciale ? 'icon' : null;
+  const design = speciale?.type === 'influencer' ? 'influencer' : speciale?.type === 'halloween' ? 'halloween' : speciale?.type === 'octobre-rose' ? 'octobre-rose' : speciale ? 'icon' : null;
   const stats = Object.entries(carte.statistiques).slice(0, 6);
   const Balise = onClick ? 'button' : 'div';
   const poste = nomPoste(carte.poste).replace(/\s*\(\d+\)\s*$/, '');
@@ -168,7 +208,7 @@ export function CarteJoueurEnLigne({ carte, proprietaire, logoClub, onClick, com
     .map((p) => ({ numero: POSTE_PAR_ID[p]?.numero, nom: nomPoste(p).replace(/\s*\(\d+\)\s*$/, '') }))
     .filter((p) => p.numero !== undefined);
   return <Balise type={onClick ? 'button' : undefined} className={`cel-carte dr-player ${carte.rarete}${design ? ` speciale design-${design}` : ''}${compacte ? ' compacte' : ''}${etatCollection ? ` collection-${etatCollection}` : ''}`} onClick={onClick}>
-    {design === 'influencer' ? <ArtInfluenceur id={id} /> : design === 'icon' ? <ArtIcon id={id} /> : design === 'halloween' ? <ArtHalloween id={id} /> : <svg className="dr-player-art" viewBox="0 0 240 360" aria-hidden="true">
+    {design === 'influencer' ? <ArtInfluenceur id={id} /> : design === 'icon' ? <ArtIcon id={id} /> : design === 'halloween' ? <ArtHalloween id={id} /> : design === 'octobre-rose' ? <ArtOctobreRose id={id} /> : <svg className="dr-player-art" viewBox="0 0 240 360" aria-hidden="true">
       <defs>
         <linearGradient id={`${id}-metal`} x1="0" y1="0" x2="1" y2="1"><stop stopColor={clair} /><stop offset=".38" stopColor={couleur} /><stop offset=".78" stopColor={sombre} /><stop offset="1" stopColor={couleur} /></linearGradient>
         <clipPath id={`${id}-clip`}><path d={SILHOUETTE} /></clipPath>
@@ -194,7 +234,7 @@ export function CarteJoueurEnLigne({ carte, proprietaire, logoClub, onClick, com
       // lieu (ICON, citrouille). Un joueur actif garde l'écusson de son club.
       speciale ? <>{!speciale.retraite && blason && <EcussonClub logo={blason} nom={carte.clubReel} taille={25} />}<span className="dr-player-embleme" title={nomFamilleSpeciale(speciale.type)}><EmblemeSpecial logo={speciale.logo} /></span></>
       : <>{blason ? <EcussonClub logo={blason} nom={carte.clubReel} taille={25} /> : <span className="dr-player-blason-fallback"><Blason club={clubParNom(carte.clubReel) ?? { nom: carte.clubReel, c1: '#0a2a6b', c2: '#c1121f' }} taille={25} /></span>}{competition && <img className="dr-player-compet" src={competition} alt="" title={carte.championnat} loading="lazy" decoding="async" draggable={false} />}</>}</span>
-    <span className="dr-player-photo">{photo ? <img draggable={false} src={photo} alt="" loading="lazy" onError={() => setPhotosRatees((ratees) => new Set(ratees).add(photo))} /> : <img draggable={false} src={SANS_PHOTO} alt={t('online.card.defaultPortrait')} />}</span>
+    <span className="dr-player-photo">{photo ? <img draggable={false} src={photo} alt="" loading="lazy" onError={() => setPhotosRatees((ratees) => new Set(ratees).add(photo))} /> : <img draggable={false} src={carte.gender === 'female' ? SANS_PHOTO_FEMME : SANS_PHOTO} alt={t('online.card.defaultPortrait')} />}</span>
     <span className="dr-player-identity"><strong>{carte.nom}</strong><small>{speciale?.retraite ? carte.nation : carte.clubReel || (speciale?.type === 'influencer' ? 'Creator / Influencer' : '')}</small></span>
     <span className="dr-player-stats">{stats.map(([cle, valeur]) => <span key={cle}><b>{valeur}</b><small>{cle}</small></span>)}</span>
     {speciale

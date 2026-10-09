@@ -200,13 +200,28 @@ button.cel-carte.dr-player:hover { box-shadow: none; filter: drop-shadow(0 9px 1
 .dr-player.design-halloween .dr-player-famille i { color: #d8d8de; text-shadow: none; }
 .dr-player.design-halloween .dr-player-photo img { filter: drop-shadow(0 0 6px #ff7a0040); }
 
+/* Octobre Rose : satin prune, filet rose poudré. */
+.cel-carte.dr-player.design-octobre-rose { color: #ffe6f0; filter: drop-shadow(0 7px 12px #000a) drop-shadow(0 0 6px #ff5c9d55); }
+.dr-player.design-octobre-rose .dr-player-rating { color: #ffc9de; text-shadow: 0 1px 6px #000c; }
+.dr-player.design-octobre-rose .dr-player-rating > b { color: #ff8fbc; text-shadow: 0 0 10px #ff5c9d66, 0 2px 3px #000; }
+.dr-player.design-octobre-rose .dr-player-rating > em > small { background: #ff7fb222; border-color: #ff7fb266; }
+.dr-player.design-octobre-rose .dr-player-identity strong { color: #fff0f6; text-shadow: 0 0 8px #ff5c9d44; }
+.dr-player.design-octobre-rose .dr-player-identity small { color: #d9c3cf; }
+.dr-player.design-octobre-rose .dr-player-stats b { color: #ffa3c8; }
+.dr-player.design-octobre-rose .dr-player-stats small { color: #c9b3bf; }
+.dr-player.design-octobre-rose .dr-player-famille { color: #ff7fb2; text-shadow: 0 0 8px #ff5c9d66; }
+.dr-player.design-octobre-rose .dr-player-famille i { color: #e6d6de; text-shadow: none; }
+.dr-player.design-octobre-rose .dr-player-photo img { filter: drop-shadow(0 0 6px #ff5c9d40); }
+
 /* Dans la collection, une carte spéciale encore libre reste sombre sans perdre sa matière. */
 .cel-carte.dr-player.speciale.collection-inconnue { filter: grayscale(.85) brightness(.7) drop-shadow(0 6px 7px #0008); }
 @media (prefers-reduced-motion: no-preference) {
   .cel-carte.dr-player.design-icon.collection-decouverte, .pack-show-card.visible .dr-player.design-icon { animation: icon-reflet 5.5s ease-in-out infinite; }
   .cel-carte.dr-player.design-halloween.collection-decouverte, .pack-show-card.visible .dr-player.design-halloween { animation: halloween-lueur 3.2s ease-in-out infinite; }
+  .cel-carte.dr-player.design-octobre-rose.collection-decouverte, .pack-show-card.visible .dr-player.design-octobre-rose { animation: octobre-rose-lueur 3.6s ease-in-out infinite; }
 }
 @keyframes icon-reflet { 50% { filter: drop-shadow(0 8px 12px #0009) drop-shadow(0 0 7px #f0cc6e99); } }
+@keyframes octobre-rose-lueur { 50% { filter: drop-shadow(0 8px 12px #000a) drop-shadow(0 0 12px #ff5c9daa); } }
 @keyframes halloween-lueur { 50% { filter: drop-shadow(0 8px 12px #000a) drop-shadow(0 0 12px #ff7a00aa); } }
 
 .cel-carte.dr-player.design-influencer { color: #f6eaff; filter: drop-shadow(0 8px 12px #000a) drop-shadow(0 0 8px #9146ff66); }

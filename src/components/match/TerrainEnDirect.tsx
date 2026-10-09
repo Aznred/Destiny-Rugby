@@ -139,6 +139,10 @@ interface Props {
   chrono?: ChronoDirect;
   /** Identifiant du match : le sondage y retrouve le dernier pas connu du film. */
   matchId?: string;
+  /** Ligue féminine : la scène 3D charge les modèles de joueuses. */
+  genre?: 'femme';
+  /** Ligue mixte : les noms des joueuses (modèle féminin pour elles seulement). */
+  joueuses?: string[];
   /** Appelé quelques fois par seconde avec ce que l'écran montre réellement. */
   surAffiche?: (affiche: AfficheDirect) => void;
   nomDomicile: string;
@@ -217,7 +221,7 @@ function tracerTrajectoires(vol: NonNullable<TerrainDirect['vol']>) {
   return { vol: pointsVol.join(' '), ombre: pointsOmbre.join(' '), anticipe: cheminAnticipe };
 }
 
-function TerrainEnDirect({ terrain = TERRAIN_VIDE, film, chrono, matchId, surAffiche, nomDomicile, nomExterieur, couleurs, emblemes, monCote, carton, modeDemo, pause, vitesseDemo, identite, scoreMatch, stade }: Props) {
+function TerrainEnDirect({ terrain = TERRAIN_VIDE, film, chrono, matchId, surAffiche, nomDomicile, nomExterieur, couleurs, emblemes, monCote, carton, modeDemo, pause, vitesseDemo, identite, scoreMatch, stade, genre, joueuses }: Props) {
   // Le ballon du direct est celui qu'on a équipé en boutique : chacun voit le sien.
   const skinActif = useGame((s) => s.skinActif);
   const scoreCourant = useRef(scoreMatch);
@@ -623,9 +627,11 @@ function TerrainEnDirect({ terrain = TERRAIN_VIDE, film, chrono, matchId, surAff
     television: { ralentis: preferencesTele().ralentis },
     habillage: { nom: identite?.nom, logo: logoTV(identite?.logo) },
     stade,
+    genre,
+    joueuses,
     ballon: skinActif,
     textes: { ralenti: t('ml.ralenti') },
-  }), [nomDomicile, nomExterieur, maillots, emblemes?.domicile, emblemes?.exterieur, identite?.nom, identite?.logo, stade, skinActif]);
+  }), [nomDomicile, nomExterieur, maillots, emblemes?.domicile, emblemes?.exterieur, identite?.nom, identite?.logo, stade, genre, joueuses, skinActif]);
   const brancherScene = useCallback((s: Scene3D | null) => {
     scene3D.current = s;
     if (!s) return;

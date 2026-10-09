@@ -9,7 +9,7 @@ import { statistiquesCarte } from '../lib/ligue/statistiquesCarte';
 import { nomPoste, POSTES, POSTE_PAR_ID } from '../data/rugby';
 import type { PosteId } from '../types';
 import { CarteJoueurEnLigne } from './CarteJoueurEnLigne';
-import { Citrouille, EmblemeIcon, EmblemeInfluenceur } from './EmblemesSpeciaux';
+import { Citrouille, EmblemeIcon, EmblemeInfluenceur, RubanRose } from './EmblemesSpeciaux';
 import { Selecteur } from './Selecteur';
 import { Confirmation } from './Confirmation';
 import { Drapeau } from './Drapeau';
@@ -73,7 +73,7 @@ function carteApercu(d: CarteLabo, image?: string): CarteCarriere {
     proprietaire: null, fatigue: 0, matchs: 0, essais: 0, clubs: [], speciale: infoSpeciale(d) };
 }
 
-const EmblemeType = ({ type, taille = 18 }: { type: string; taille?: number }) => (type === 'influencer' ? <EmblemeInfluenceur taille={taille} /> : type === 'halloween' ? <Citrouille taille={taille} /> : <EmblemeIcon taille={taille} />);
+const EmblemeType = ({ type, taille = 18 }: { type: string; taille?: number }) => (type === 'influencer' ? <EmblemeInfluenceur taille={taille} /> : type === 'halloween' ? <Citrouille taille={taille} /> : type === 'octobre-rose' ? <RubanRose taille={taille} /> : <EmblemeIcon taille={taille} />);
 
 export function LaboCartesSpeciales() {
   const [vue, setVue] = useState<VueLabo | null>(null);
@@ -292,7 +292,7 @@ function EditeurEvenement({ ev, occupe, operer }: { ev: EvenementLabo; occupe: b
   const [e, setE] = useState(ev);
   useEffect(() => setE(ev), [ev]);
   const pack = e.pack;
-  const familleNom = e.cardType === 'influencer' ? 'Influenceurs' : e.cardType === 'icon' ? 'ICONS' : 'Halloween';
+  const familleNom = e.cardType === 'influencer' ? 'Influenceurs' : e.cardType === 'icon' ? 'ICONS' : e.cardType === 'octobre-rose' ? 'Octobre Rose' : 'Halloween';
   const total = pack ? Object.values(pack.probabilites).reduce((a, b) => a + b, 0) : 100;
   const enregistrer = () => operer('evenementSpecial', { id: e.id, evenement: {
     nom: e.nom, availableFrom: e.availableFrom ?? '', availableUntil: e.availableUntil ?? '', tauxPacksNormaux: e.tauxPacksNormaux, repere: e.repere,
@@ -381,7 +381,7 @@ function ImportCartes({ occupe, operer }: { occupe: boolean; operer: Operer }) {
     return brut.split(/\r?\n/).map(l => l.trim()).filter(l => l && !/^famille\s*;/i.test(l)).map(l => {
       const [famille, nom, postes, nation, gen, col, club, ligue, poids, evenement] = l.split(';').map(x => x.trim());
       const { poste, postesSecondaires } = postesDepuisNumeros(postes || '10');
-      return { cardType: famille.toLowerCase().startsWith('influ') ? 'influencer' : famille.toLowerCase().startsWith('h') ? 'halloween' : 'icon', nom, poste, postesSecondaires, nation, overall: Number(gen),
+      return { cardType: famille.toLowerCase().startsWith('influ') ? 'influencer' : famille.toLowerCase().startsWith('h') ? 'halloween' : famille.toLowerCase().startsWith('o') ? 'octobre-rose' : 'icon', nom, poste, postesSecondaires, nation, overall: Number(gen),
         ...(col ? { collectif: Number(col) } : {}), ...(club ? { club } : {}), ...(ligue ? { league: ligue } : {}), ...(poids ? { packWeight: Number(poids) } : {}),
         ...(evenement ? { specialEventId: evenement } : {}) };
     });

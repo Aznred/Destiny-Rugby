@@ -8,8 +8,7 @@ import { SELECTIONS_SENIOR, SELECTIONS_U20, type Selection } from '../data/selec
 import { Drapeau } from '../components/Drapeau';
 import { aDrapeau, nomNationTraduit } from '../lib/nations';
 import { LogoCompet } from '../components/LogoCompet';
-import { NOTE_CLUB_REEL } from '../data/effectifsReels';
-import { NOTE_CLUB_NOUVEAU } from '../data/nouvellesLigues';
+import { NOTE_CLUB_REEL, NOTE_CLUB_NOUVEAU } from '../data/sourcesDuMonde';
 import { noteAmateur } from '../lib/effectif';
 import { Blason, LogoEquipe } from '../components/Blason';
 import { FicheClub } from '../components/FicheClub';

@@ -72,6 +72,10 @@ export interface OptionsScene3D {
   apparences?: Record<string, Pick<ApparenceMatch, 'peau' | 'cheveux' | 'coiffure' | 'barbe' | 'coupeId' | 'barbeId' | 'couleurBarbe' | 'morpho' | 'equipement'>>;
   /** Le pion du joueur, cerclé sur la pelouse. */
   moi?: string;
+  /** Ligue féminine : les modèles de joueuses de la scène (corps, coiffures, pas de barbe). Absent : les joueurs. */
+  genre?: 'femme';
+  /** Ligue mixte : les noms des joueuses du match. Elles prennent le modèle féminin, les autres le masculin. */
+  joueuses?: string[];
   /** La caméra reste entre son pion et le ballon. */
   suivreMoi?: boolean | number;
   /** Téléphone ou tablette : textures et définition réduites. */
@@ -239,6 +243,7 @@ export function appareilLeger(): boolean {
 
 /** Le joueur seul (création, personnalisation, profil) : voir `creerApercuJoueur` dans `public/rn26/scene.js`. */
 export interface OptionsApercuJoueur {
+  genre?: 'femme';
   /** Apparence du match (`surchargeDeMatch`) : peau, cheveux, coupeId, barbeId, morpho, equipement… */
   apparence?: Record<string, unknown>;
   /** Couleurs du maillot porté. */

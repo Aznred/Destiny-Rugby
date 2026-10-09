@@ -1,0 +1,54 @@
+/* La section « Mon image » des réglages, et la file des demandes du Labo. */
+.reglages-image-note { margin: 0.5rem 0 0; padding: 0.7rem 0.8rem; border: 1px solid var(--bordure); border-radius: var(--rayon-sm); background: rgba(255, 255, 255, 0.03); color: var(--craie-dim); font-size: 0.88rem; line-height: 1.45; }
+.reglages-image-choix { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin: 0.6rem 0; }
+.reglages-image-choix button { min-height: 44px; padding: 0.6rem 0.7rem; border: 1px solid var(--bordure); border-radius: var(--rayon-sm); background: rgba(255, 255, 255, 0.03); color: var(--craie-dim); font: inherit; font-weight: 700; font-size: 0.88rem; cursor: pointer; }
+.reglages-image-choix button.actif { border-color: var(--or-500); color: var(--craie); background: rgba(232, 178, 58, 0.1); }
+.reglages-image-choix button:focus-visible { outline: 2px solid var(--or-400); outline-offset: 2px; }
+.reglages-image-champs { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+.reglages-image label { display: grid; gap: 0.3rem; }
+/* Les champs imbriqués dans une rangée ne reçoivent pas l'habillage de `.champ > input` : on le leur redonne. */
+.reglages-image-champs label, .reglages-image-message { font-weight: 700; font-size: 0.92rem; }
+.reglages-image-champs input { width: 100%; min-height: 46px; padding: 0.7rem 1rem; border: 1px solid var(--bordure); border-radius: var(--rayon-sm); background: rgba(4, 13, 9, 0.6); color: var(--craie); font: inherit; font-weight: 400; }
+.reglages-image-champs input:focus-visible, .reglages-image textarea:focus-visible { outline: 2px solid var(--or-400); outline-offset: 1px; }
+.reglages-image-message { margin-top: 0.6rem; }
+.reglages-image textarea { resize: vertical; min-height: 3.2rem; }
+.reglages-image-photo { display: flex; align-items: center; gap: 0.9rem; margin-top: 0.7rem; }
+.reglages-image-photo img { width: 84px; height: 108px; object-fit: contain; border: 1px solid var(--bordure); border-radius: var(--rayon-sm); background: rgba(0, 0, 0, 0.25); flex: none; }
+.reglages-image-photo > div { display: grid; gap: 0.4rem; justify-items: start; }
+.reglages-image-photo small { color: var(--craie-dim); font-size: 0.8rem; line-height: 1.4; }
+.reglages-image-erreur { color: #ff9a8a; font-size: 0.86rem; margin: 0.6rem 0 0; }
+.reglages-image-succes { color: var(--or-400); font-size: 0.86rem; margin: 0.6rem 0 0; }
+.reglages-image > .btn.primaire { margin-top: 0.8rem; }
+.reglages-image-liste { margin-top: 1rem; }
+.reglages-image-liste h4 { margin: 0 0 0.4rem; font-size: 0.8rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--craie-dim); }
+.reglages-image-liste ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.35rem; }
+.reglages-image-liste li { display: flex; align-items: center; justify-content: space-between; gap: 0.8rem; padding: 0.55rem 0.7rem; border: 1px solid var(--bordure); border-radius: var(--rayon-sm); }
+.reglages-image-liste li span { display: grid; gap: 0.1rem; font-size: 0.82rem; color: var(--craie-dim); min-width: 0; }
+.reglages-image-liste li b { color: var(--craie); font-size: 0.9rem; overflow-wrap: anywhere; }
+.reglages-image-statut { font-style: normal; font-weight: 800; font-size: 0.74rem; letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap; color: var(--craie-dim); }
+.reglages-image-statut.acceptee { color: #8fd6a4; }
+.reglages-image-statut.refusee { color: #ff9a8a; }
+@media (max-width: 560px) {
+  .reglages-image-champs, .reglages-image-choix { grid-template-columns: 1fr; }
+}
+
+/* ── Labo : la file des demandes ─────────────────────────────────────────── */
+.labo-demandes { display: grid; gap: 0.7rem; }
+.labo-demandes-filtres { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.labo-demandes-filtres button { min-height: 40px; padding: 0.4rem 0.8rem; border: 1px solid var(--bordure); border-radius: 999px; background: none; color: var(--craie-dim); font: inherit; font-weight: 700; font-size: 0.82rem; cursor: pointer; }
+.labo-demandes-filtres button.actif { border-color: var(--or-500); color: var(--craie); }
+.labo-demande { display: grid; grid-template-columns: auto 1fr auto; gap: 0.9rem; align-items: center; padding: 0.8rem; border: 1px solid var(--bordure); border-radius: var(--rayon-sm); background: rgba(255, 255, 255, 0.025); }
+.labo-demande-portraits { display: flex; gap: 0.5rem; }
+.labo-demande-portraits figure { margin: 0; display: grid; gap: 0.2rem; justify-items: center; }
+.labo-demande-portraits img, .labo-demande-portraits .vide { width: 76px; height: 98px; object-fit: contain; border: 1px solid var(--bordure); border-radius: var(--rayon-sm); background: rgba(0, 0, 0, 0.3); }
+.labo-demande-portraits figcaption { font-size: 0.68rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--craie-dim); }
+.labo-demande-texte { display: grid; gap: 0.2rem; min-width: 0; }
+.labo-demande-texte b { font-size: 1rem; overflow-wrap: anywhere; }
+.labo-demande-texte small { color: var(--craie-dim); font-size: 0.82rem; overflow-wrap: anywhere; }
+.labo-demande-texte p { margin: 0.2rem 0 0; font-size: 0.86rem; line-height: 1.4; overflow-wrap: anywhere; }
+.labo-demande-actions { display: grid; gap: 0.4rem; justify-items: stretch; }
+.labo-demande-actions .btn { min-height: 40px; padding: 0.45rem 0.9rem; font-size: 0.84rem; justify-content: center; }
+@media (max-width: 700px) {
+  .labo-demande { grid-template-columns: 1fr; }
+  .labo-demande-actions { grid-template-columns: 1fr 1fr; }
+}

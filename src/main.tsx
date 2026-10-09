@@ -33,6 +33,10 @@ async function demarrer() {
   )
 }
 
+// « Mon image » : la liste des portraits retirés ou remplacés à la demande des joueurs, lue une fois, au repos.
+const lireImagesJoueurs = () => { void import('./lib/imagesJoueurs').then(m => m.chargerImagesJoueurs()).catch(() => {}) }
+if ('requestIdleCallback' in window) requestIdleCallback(lireImagesJoueurs, { timeout: 6000 }); else setTimeout(lireImagesJoueurs, 2500)
+
 void demarrer().catch((erreur) => {
   if (moduleObsolete(erreur) && rechargerPourModuleObsolete()) return
   throw erreur

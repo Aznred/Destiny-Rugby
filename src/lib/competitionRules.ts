@@ -131,6 +131,22 @@ const TABLE: Record<string, CompetitionRules> = Object.fromEntries([
   }),
   regles('challengeCup', { qualified: 4, playoffs: 0 }, COUPERET_ESSAIS, { qualified: [1, 2, 3, 4] }),
   regles('premCup', { qualified: 4, playoffs: 0 }, COUPERET_ESSAIS, { qualified: [1, 2, 3, 4] }),
+  // Rugby féminin (formats 2026-2027 ; identifiants de `data/mondeFeminin.generated.ts`). Quatre demi-finalistes partout, sauf
+  // l'Aupiki (les deux premières jouent la finale). Franchises et provinces : ni montée ni descente.
+  regles('f-pwr', { qualified: 4, playoffs: 0 }),
+  regles('f-aupiki', { qualified: 2, playoffs: 0 }),
+  regles('f-superw', { qualified: 4, playoffs: 0 }),
+  regles('f-celtic', { qualified: 4, playoffs: 0 }),
+  regles('f-fpc', { qualified: 4, playoffs: 0 }),
+  // Élite 1 : la dernière descend en Élite 2. Élite 2 : la championne monte, la dernière descend en Fédérale 1.
+  regles('f-elite1', { qualified: 4, playoffs: 0, directRelegation: 1 }),
+  regles('f-elite2', { qualified: 4, playoffs: 0, promotion: 1, directRelegation: 1 }),
+  regles('f-seriea', { qualified: 4, playoffs: 0, directRelegation: 1 }),
+  regles('f-liga', { qualified: 4, playoffs: 0, directRelegation: 1 }),
+  // All-Ireland League : la dernière de 1A joue un barrage contre la première de 1B.
+  regles('f-ail', { qualified: 4, playoffs: 0, accessMatchPositions: [1] }),
+  // 1B : la première dispute le barrage de montée, la dernière un barrage contre un club des ligues provinciales.
+  regles('f-ail2', { qualified: 1, playoffs: 0, accessMatchPositions: [1] }),
   // Ligue en ligne
   regles('ligueEnLigne', { qualified: 0, playoffs: 'auto' }, COUPERET_TIRS),
   regles('divisionPublique', { qualified: 0, playoffs: 'auto', promotion: 1, ...UN_PLUS_ACCES }, COUPERET_TIRS),

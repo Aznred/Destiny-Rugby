@@ -48,7 +48,12 @@ function geler<T>(valeur: T): T {
 
 // Ce que le jeu enverrait au serveur du classement : un faux `fetch` qui compte.
 let envois = 0;
-(globalThis as { fetch?: unknown }).fetch = async () => { envois++; return { ok: false, status: 500, json: async () => ({}), text: async () => '' }; };
+(globalThis as { fetch?: unknown }).fetch = async (cible: RequestInfo | URL) => {
+  const url = typeof cible === 'string' ? cible : cible instanceof URL ? cible.href : cible.url;
+  // Les sauvegardes de carrière peuvent aussi appeler fetch : ce banc compte seulement les envois au classement.
+  if (url.includes('/api/classement')) envois++;
+  return { ok: false, status: 500, json: async () => ({}), text: async () => '' };
+};
 const laisserPartir = () => new Promise((r) => setTimeout(r, 20));
 
 const catalogue = catalogueMondialCarriere();
@@ -73,7 +78,7 @@ console.log('— Le drapeau du classement —');
 console.log('— Qui peut-on incarner ? —');
 const index = indexerJoueursExistants(catalogue);
 {
-  verifier(index.length > 70_000, `la quasi-totalité du catalogue est incarnable (${index.length} sur ${catalogue.length})`);
+  verifier(catalogue.length > 0 && index.length >= catalogue.length * .9, `la quasi-totalité du catalogue actif est incarnable (${index.length} sur ${catalogue.length})`);
   verifier(index.every((e) => !e.carte.speciale), 'aucune carte spéciale n\'est proposée par défaut');
   verifier(index.every((e) => e.carte.age >= AGE_MIN_EXISTANT && e.carte.age <= AGE_MAX_EXISTANT), 'tous ont un âge de carrière possible');
   verifier(index.every((e, i) => i === 0 || index[i - 1].carte.note >= e.carte.note), 'triés par GEN décroissante');

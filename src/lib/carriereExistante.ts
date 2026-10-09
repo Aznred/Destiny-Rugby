@@ -29,6 +29,7 @@ import { clubParNom, competitionDuClub } from '../data/clubs';
 import { attributsDe } from './carteJoueur';
 import { noteDuClub } from './effectif';
 import { graine } from './championnat';
+import { MONDE_FEMININ } from './mondeActif';
 import { pseudoDe } from './social';
 import { scoreDeLaFiche } from './classementMondial';
 import { responsabilitesVides, evaluerResponsabilites } from './responsabilites';
@@ -66,6 +67,7 @@ export interface OptionsSelection {
 
 /** Le club de la carte, tel que le monde le connaît : sans lui, la carrière n'a ni division ni calendrier. */
 function clubDuMonde(carte: SourceCarte): { club: string; division: string; championnat: string } | null {
+  if ((carte.gender === 'female') !== MONDE_FEMININ) return null;
   const nom = clubParNom(carte.clubReel)?.nom ?? carte.clubReel;
   const competition = competitionDuClub(nom);
   return competition ? { club: nom, division: competition.id, championnat: competition.nom } : null;
@@ -104,6 +106,7 @@ export function indexerJoueursExistants(catalogue: readonly SourceCarte[], optio
   const clubs = new Map<string, ReturnType<typeof clubDuMonde>>();
   const sortie: EntreeRecherche[] = [];
   for (const carte of catalogue) {
+    if ((carte.gender === 'female') !== MONDE_FEMININ) continue;
     if (carte.speciale && !(options.legendes && carte.speciale.retraite)) continue;
     if (!POSTE_PAR_ID[carte.poste] || carte.age < AGE_MIN_EXISTANT || carte.age > AGE_MAX_EXISTANT) continue;
     let monde = clubs.get(carte.clubReel);
@@ -262,6 +265,7 @@ export function joueurDepuisCarte(carte: SourceCarte): FicheExistante {
   // Sa place dans le groupe décide de la confiance du staff : le titulaire indiscutable de son club l'est aussi à l'écran.
   const confianceCoach = Math.max(35, Math.min(85, Math.round(50 + (gen - noteDuClub(monde.club)) * 1.2)));
   const joueur: Joueur = {
+    ...(MONDE_FEMININ ? { genre: 'F' as const } : {}),
     nom: carte.nom,
     poste: carte.poste,
     postesSecondaires: (carte.postesSecondaires ?? []).filter((p): p is PosteId => p !== carte.poste && !!POSTE_PAR_ID[p]),

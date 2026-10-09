@@ -1,5 +1,32 @@
 import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
+import { createRequire } from 'node:module'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+
+// Vite dev renvoie sinon l'application à /wiki/ au lieu du document public.
+function pagesDuWiki(): Plugin {
+  return {
+    name: 'destiny-pages-wiki',
+    apply: 'serve',
+    configureServer(serveur) {
+      const charger = createRequire(import.meta.url);
+      const { PAGES } = charger('./scripts/contenuPages.cjs') as { PAGES: { slug: string }[] };
+      const chemins = new Set([...PAGES.map(p => `/${p.slug}/`), '/journal/']);
+      serveur.middlewares.use((req, res, suite) => {
+        const chemin = req.url?.split('?')[0];
+        if (!chemin || !chemins.has(chemin) || !['GET', 'HEAD'].includes(req.method ?? 'GET')) return suite();
+        const fichier = resolve(serveur.config.root, 'public', chemin.slice(1), 'index.html');
+        try {
+          const html = readFileSync(fichier);
+          res.setHeader('Content-Type', 'text/html; charset=utf-8');
+          res.setHeader('Cache-Control', 'no-cache');
+          res.end(req.method === 'HEAD' ? undefined : html);
+        } catch { suite(); }
+      });
+    },
+  };
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // LA CARRIÈRE EN LIGNE EN DÉVELOPPEMENT
@@ -69,7 +96,7 @@ let stockage: unknown;
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), carriereEnDeveloppement()],
+  plugins: [react(), pagesDuWiki(), carriereEnDeveloppement()],
   server: {
     fs: {
       // Conserver les exclusions par défaut de Vite 8 et protéger les snapshots

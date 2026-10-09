@@ -25,7 +25,7 @@ import { contexteAtelier } from '../serveur/atelierAdmin';
 import { CATALOGUE_ADMIN_VIDE, type CatalogueAdmin } from '../src/lib/ligue/atelierCatalogue';
 import { PACKS_CARRIERE } from '../src/lib/ligue/catalogueCarriere';
 import {
-  assemblerCatalogueSpecial, catalogueSpecial, chanceSpecialeParCarte, definitionsDepart, specialesPubliques, statutCarteSpeciale, EVENEMENTS_DEPART,
+  assemblerCatalogueSpecial, catalogueSpecial, chanceSpecialeParCarte, definitionsDepart, identiteJoueur, preparerTirageSpecial, specialesPubliques, statutCarteSpeciale, EVENEMENTS_DEPART,
 } from '../src/lib/ligue/catalogueSpecial';
 import { catalogueBaseCarriere } from '../src/lib/ligue/catalogueCarriere';
 import { etatCollectionSoloVide, ouvrirPackSolo, packCollectionSolo, packsEvenementSolo } from '../src/lib/collectionSolo';
@@ -46,13 +46,34 @@ const graine = definitionsDepart();
 const icons = graine.filter(d => d.cardType === 'icon'), halloween = graine.filter(d => d.cardType === 'halloween');
 egal(icons.length, 100, '100 ICONS au départ');
 egal(halloween.length, 23, 'une équipe Halloween de 23');
+// Octobre Rose : 23 joueuses en activité, toutes féminines, chacune liée à sa carte ordinaire.
+const octobreRose = graine.filter(d => d.cardType === 'octobre-rose');
+egal(octobreRose.length, 23, 'une équipe Octobre Rose de 23');
+ok(octobreRose.every(d => d.gender === 'female' && d.identiteId && !d.retraite && !d.published && d.imageReady && d.image?.startsWith('/photos/octobre-rose/')), 'Octobre Rose : féminines, liées à leur carte, portrait livré, non publiées');
+ok(octobreRose.every(d => d.overall >= 84 && d.overall <= 96 && d.club && d.league), 'Octobre Rose : GEN de 84 à 96, club et championnat renseignés');
+egal(new Set(octobreRose.map(d => d.identiteId)).size, 23, 'Octobre Rose : 23 joueuses différentes');
+{
+  // Octobre Rose sort dans TOUS les packs — ligue masculine, féminine ou mixte — et seulement en octobre.
+  const publiees = octobreRose.map(d => ({ ...d, published: true, imageReady: true, image: '/photos/essai.webp' }));
+  const cat = assemblerCatalogueSpecial(publiees, EVENEMENTS_DEPART);
+  const pack = PACKS_CARRIERE.find(x => (x.probabilites.star ?? 0) > 0)!;
+  egal(preparerTirageSpecial(pack, true, PENDANT, new Set(), cat)?.lots[0].candidats.length, 23, 'Octobre Rose : tirables aussi dans une ligue masculine');
+  const chezLesFemmes = preparerTirageSpecial(pack, true, PENDANT, new Set(), cat, 'women');
+  egal(chezLesFemmes?.lots.length, 1, 'Octobre Rose : un lot dans une ligue féminine');
+  egal(chezLesFemmes!.lots[0].candidats.length, 23, 'Octobre Rose : les 23 cartes y sont tirables');
+  ok(chezLesFemmes!.lots[0].candidats.every(c => c.gender === 'female' && c.speciale?.type === 'octobre-rose' && c.speciale.base), 'Octobre Rose : cartes féminines, identité de base posée');
+  egal(preparerTirageSpecial(pack, true, PENDANT, new Set(), cat, 'mixed')?.lots[0].candidats.length, 23, 'Octobre Rose : tirables en ligue mixte');
+  egal(preparerTirageSpecial(pack, true, APRES, new Set(), cat, 'women'), null, 'Octobre Rose : plus rien après octobre');
+  const kildunne = chezLesFemmes!.lots[0].candidats.find(c => c.nom === 'Ellie KILDUNNE')!;
+  egal(identiteJoueur({ sourceId: kildunne.sourceId, nom: kildunne.nom, speciale: kildunne.speciale }), 'feminine:pwr-bristol-bears-ellie-kildunne', 'Octobre Rose : même identité que la carte ordinaire');
+}
 egal(new Set(graine.map(d => d.id)).size, graine.length, 'identifiants uniques');
 ok(icons.some(d => d.nom === 'Fabien Galthié'), 'Fabien Galthié est une ICON');
 egal(Math.max(...icons.map(d => d.overall)), 97, 'les ICONS montent jusqu’à 97');
 ok(icons.every(d => d.retraite && !d.basePlayerId), 'une ICON est toujours un retraité');
 ok(halloween.every(d => d.overall >= 82 && d.overall <= 92 && d.collectif === 10), 'Halloween : GEN 82-92 et COL 10');
 ok(halloween.some(d => d.basePlayerId) && halloween.some(d => d.retraite), 'Halloween : actifs ET retraités');
-ok(graine.every(d => statutCarteSpeciale(d) === 'image_missing' && !d.published), 'aucune carte publiée sans image');
+ok(graine.every(d => statutCarteSpeciale(d) === (d.cardType === 'octobre-rose' ? 'ready' : 'image_missing') && !d.published), 'aucune carte publiée ; seules les Octobre Rose ont déjà leur image');
 for (const nation of ['France', 'Nouvelle-Zélande', 'Afrique du Sud', 'Angleterre', 'Pays de Galles', 'Irlande', 'Australie', 'Argentine']) {
   ok(icons.some(d => d.nation === nation), `ICONS : ${nation} représentée`);
 }
@@ -250,8 +271,8 @@ try {
   egal((await appel(idAutre, '/api/carriere?atelier=1&section=speciales')).statut, 404, 'Labo : réservé à Kiri');
   const vue = await appel(idKiri, '/api/carriere?atelier=1&section=speciales');
   egal(vue.statut, 200, 'Labo : vue des cartes spéciales');
-  egal(vue.donnees.cartes.length, 123, 'Labo : 123 cartes listées');
-  ok(vue.donnees.cartes.every((c: any) => c.statut === 'image_missing'), 'Labo : statuts lus');
+  egal(vue.donnees.cartes.length, 146, 'Labo : 146 cartes listées (100 ICONS, 23 Halloween, 23 Octobre Rose)');
+  ok(vue.donnees.cartes.every((c: any) => c.statut === (c.cardType === 'octobre-rose' ? 'ready' : 'image_missing')), 'Labo : statuts lus');
   const ecrire = (operation: string, extra: Record<string, unknown>, compte = idKiri) =>
     db.atelier!.lire().then(c => appel(compte, '/api/carriere?atelier=1', { action: 'atelier', operation, revision: c.revision, ...extra }));
   egal((await ecrire('carteSpeciale', { id: 'halloween-2026:jonah-lomu', carte: { overall: 95 } })).statut, 400, 'Halloween : GEN 95 refusé (82-92)');

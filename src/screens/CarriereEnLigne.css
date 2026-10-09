@@ -2502,3 +2502,10 @@ button.cel-carte:hover { transform: translateY(-3px); box-shadow: var(--ombre-3)
 .cel-reglage-speciales:not(.active) .cel-reglage-speciales-emblemes { filter: grayscale(1); opacity: .55; }
 .cel-bascule-speciales b::before { content: ''; display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; background: linear-gradient(135deg, #f0cc6e 50%, #ff8a1c 50%); vertical-align: middle; }
 @media (max-width: 700px) { .cel-reglage-speciales { grid-template-columns: 1fr; } .cel-reglage-speciales .cel-actions { justify-content: flex-start; } }
+
+/* Le type de ligue à la création : mixte (par défaut), joueuses seulement, joueurs seulement. */
+.cel-pool-choix { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.4rem; }
+.cel-pool-choix button { min-height: 44px; padding: 0.5rem 0.4rem; border: 1px solid var(--bordure); border-radius: var(--rayon-sm); background: rgba(255, 255, 255, 0.03); color: var(--craie-dim); font: inherit; font-weight: 700; font-size: 0.86rem; cursor: pointer; }
+.cel-pool-choix button.actif { border-color: var(--or-500); color: var(--craie); background: rgba(232, 178, 58, 0.1); }
+.cel-pool-choix button:focus-visible { outline: 2px solid var(--or-400); outline-offset: 2px; }
+.cel-pool small { color: var(--craie-dim); font-size: 0.8rem; line-height: 1.4; }

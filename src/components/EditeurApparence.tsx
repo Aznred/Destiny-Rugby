@@ -6,6 +6,7 @@
 
 import { useMemo, useState } from 'react';
 import { ApercuJoueur3D } from './ApercuJoueur3D';
+import { MONDE_FEMININ } from '../lib/mondeActif';
 import { t } from '../lib/i18n';
 import { nomPoste, POSTE_PAR_ID } from '../data/rugby';
 import { EQUIPEMENT_PAR_ID, EQUIPEMENTS } from '../data/boutique';
@@ -58,7 +59,7 @@ export function EditeurApparence({
   const [cadrage, setCadrage] = useState<'corps' | 'visage'>('corps');
   const avant = (POSTE_PAR_ID[poste]?.numero ?? 15) <= 8;
   const resolue = useMemo(
-    () => apparencePourApercu(nom || 'Joueur', poste, apparence, equipementActif),
+    () => apparencePourApercu(nom || 'Joueur', poste, MONDE_FEMININ ? { ...apparence, barbe: '', couleurBarbe: undefined } : apparence, equipementActif),
     [nom, poste, apparence, equipementActif],
   );
   const maj = (changement: Partial<ApparenceJoueur>) => onChange({ ...apparence, ...changement });
@@ -123,7 +124,7 @@ export function EditeurApparence({
               </div>
             </fieldset>
 
-            <fieldset>
+            {!MONDE_FEMININ && <fieldset>
               <legend>{t('ap.barbe')}</legend>
               <div className="edap-choix">
                 <button type="button" className={apparence.barbe === '' ? 'actif' : undefined} onClick={() => maj({ barbe: '' })}>{t('ap.aucune')}</button>
@@ -133,9 +134,9 @@ export function EditeurApparence({
                   </button>
                 ))}
               </div>
-            </fieldset>
+            </fieldset>}
 
-            {apparence.barbe !== '' && (
+            {!MONDE_FEMININ && apparence.barbe !== '' && (
               <fieldset>
                 <legend>{t('ap.couleurBarbe')}</legend>
                 <div className="edap-pastilles">

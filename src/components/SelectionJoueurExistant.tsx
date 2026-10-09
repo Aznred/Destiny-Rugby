@@ -20,6 +20,7 @@ import { nomNationTraduit } from '../lib/nations';
 import { useModalDialog } from '../lib/useModalDialog';
 import { nombre, t } from '../lib/i18n';
 import type { PosteId } from '../types';
+import { MONDE_FEMININ } from '../lib/mondeActif';
 import './SelectionJoueurExistant.css';
 
 /** Combien de cartes d'un coup : 78 000 joueurs ne se montent jamais d'un seul rendu. */
@@ -109,8 +110,8 @@ export function SelectionJoueurExistant({ onChoisir, erreur }: {
 
   return (
     <div className="sje">
-      <h2 className="sje-titre">{t('cr.existant.titre')}</h2>
-      <p className="sje-chapo">{t('cr.existant.chapo')}</p>
+      <h2 className="sje-titre">{t(MONDE_FEMININ ? 'cr.genre.choisir' : 'cr.existant.titre')}</h2>
+      <p className="sje-chapo">{t(MONDE_FEMININ ? 'cr.genre.recherche' : 'cr.existant.chapo')}</p>
 
       <div className="sje-filtres carte">
         <label className="sje-recherche">
@@ -170,7 +171,7 @@ export function SelectionJoueurExistant({ onChoisir, erreur }: {
       ) : (
         <>
           <div className="sje-resume">
-            <span role="status">{resultats.length === 1 ? t('cr.existant.resultat1') : t('cr.existant.resultats', { n: nombre(resultats.length) })}</span>
+            <span role="status">{resultats.length === 1 ? t(MONDE_FEMININ ? 'cr.genre.resultat1' : 'cr.existant.resultat1') : t(MONDE_FEMININ ? 'cr.genre.resultats' : 'cr.existant.resultats', { n: nombre(resultats.length) })}</span>
             {filtresActifs && (
               <button type="button" className="btn fantome" onClick={() => { setFiltres(FILTRES_VIDES); setLots(1); }}>
                 {t('cr.existant.reinitialiser')}

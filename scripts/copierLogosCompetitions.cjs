@@ -16,6 +16,9 @@ const DEST = path.join(RACINE, 'public', 'logos-competitions');
 // id de compétition (COMPETITIONS, COUPES_EUROPE, COMPETITIONS_NATIONS, ou id
 // de trophée) → nom du fichier fourni.
 const CORRESPONDANCE = {
+  'f-pwr': 'f-pwr.png', 'f-aupiki': 'f-aupiki.png', 'f-elite1': 'f-elite1.png', 'f-superw': 'f-superw.png',
+  'f-fpc': 'f-fpc.png', 'f-celtic': 'f-celtic.png', 'f-seriea': 'f-seriea.png', 'f-liga': 'f-liga.png',
+  'f-elite2': 'f-elite2.png', 'f-ail': 'f-ail.png', 'f-ail2': 'f-ail2.png',
   // France
   top14: 'Top_14.svg.webp',
   prod2: 'ProD2_logo_2012.svg.webp',

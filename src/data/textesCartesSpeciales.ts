@@ -9,6 +9,7 @@ export const TEXTES_CARTES_SPECIALES: Record<string, Traduction> = {
   'special.influencers': { fr: 'Influenceurs', en: 'Influencers', es: 'Influencers', it: 'Influencer', de: 'Influencer', pt: 'Influenciadores', ja: 'インフルエンサー' },
   'special.legend': { fr: 'Légende', en: 'Legend', es: 'Leyenda', it: 'Leggenda', de: 'Legende', pt: 'Lenda', ja: 'レジェンド' },
   'special.icons': { fr: 'ICONS', en: 'ICONS', es: 'ICONS', it: 'ICONS', de: 'ICONS', pt: 'ICONS', ja: 'ICONS' },
+  'special.octobreRose': { fr: 'OCTOBRE ROSE', en: 'PINK OCTOBER', es: 'OCTUBRE ROSA', it: 'OTTOBRE ROSA', de: 'PINKTOBER', pt: 'OUTUBRO ROSA', ja: 'ピンクオクトーバー' },
   'special.halloween': { fr: 'HALLOWEEN', en: 'HALLOWEEN', es: 'HALLOWEEN', it: 'HALLOWEEN', de: 'HALLOWEEN', pt: 'HALLOWEEN', ja: 'HALLOWEEN' },
   'special.filter.label': { fr: 'Type de carte', en: 'Card type', es: 'Tipo de carta', it: 'Tipo di carta', de: 'Kartentyp', pt: 'Tipo de carta', ja: 'カードの種類' },
   'special.filter.players': { fr: 'Joueurs', en: 'Players', es: 'Jugadores', it: 'Giocatori', de: 'Spieler', pt: 'Jogadores', ja: '選手' },

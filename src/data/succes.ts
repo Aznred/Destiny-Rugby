@@ -480,6 +480,7 @@ const TITRES_NATIONAUX = new Set([...TITRES_FRANCE, ...TITRES_MONDE]);
 const DIVISIONS_FRANCE = new Set([
   'top14', 'prod2', 'nationale', 'nationale2',
   'fed1', 'fed2', 'fed3', 'reg1', 'reg2', 'reg3',
+  'f-elite1', 'f-elite2',
 ]);
 
 export const SUCCES_PAR_ID: Record<string, Succes> = Object.fromEntries(

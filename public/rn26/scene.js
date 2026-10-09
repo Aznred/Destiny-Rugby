@@ -134,15 +134,18 @@ function appliquerMorpho(model,m){
     if(cuisse&&m.jambes&&m.jambes!==1)cuisse.scale.multiplyScalar(m.jambes);
   }
 }
-let ressources=null;
+const ressources={};
+/** Une joueuse : pas de barbe ; cheveux longs, mi-longs, bouclés ou courts (la carte garde la main si elle sait). */
+const souhaitFemme=(index,w)=>({barbe:'',familleBarbe:'',famille:w.famille&&w.famille!=='chauve'&&w.famille!=='ras'?w.famille:(t=>t<.5?'long':t<.72?'miLong':t<.9?'boucle':'court')(tirage(index,12))});
 const peintComme=(canvas,avant)=>{const t=texture(canvas,null);if(avant){t.wrapS=avant.wrapS;t.wrapT=avant.wrapT;t.repeat.copy(avant.repeat);t.offset.copy(avant.offset);t.flipY=avant.flipY;}return t;};
 /** Joueurs, ballon, coiffures, équipement et mouvements : chargés une fois, partagés par tous les matchs de la session. */
-function charger(){
-  ressources??=(async()=>{
+function charger(genre){
+  const femme=genre==='femme',cle=femme?'femme':'homme',sexe=femme?'female':'male';
+  ressources[cle]??=(async()=>{
     const loader=new GLTFLoader(),image=nom=>chargerImage(RACINE_DECOR+nom);
     const [motions,forward,back,ball,hair,tee,kit]=await Promise.all([
       // Correctif 30 : seule la banque commune est attendue (4,7 Mo par morphologie au lieu de 11) ; le reste arrive ensuite.
-      loadMotions('catalogue-match-poses.json',{banques:['common']}),loader.loadAsync(RACINE_MODELES+'player_male_forward_LOD2.glb'),loader.loadAsync(RACINE_MODELES+'player_male_back_LOD2.glb'),
+      loadMotions('catalogue-match-poses.json',{banques:['common']}),loader.loadAsync(RACINE_MODELES+'player_'+sexe+'_forward_LOD2.glb'),loader.loadAsync(RACINE_MODELES+'player_'+sexe+'_back_LOD2.glb'),
       loader.loadAsync(RACINE_DECOR+'ballon.glb'),loader.loadAsync(RACINE_DECOR+'coiffures.glb'),
       loader.loadAsync(RACINE_DECOR+'tee.glb'),image('kit_france_home.png'),
     ]);
@@ -155,10 +158,19 @@ function charger(){
       await document.fonts?.load?.('40px Anton').catch(()=>{});
       ball.scene.traverse(o=>{if(o.isMesh&&o.material?.map&&/ball/i.test(o.material.name)&&!/shadow/i.test(o.material.name))o.material.map=peintComme(creerBallon(512),o.material.map);});
     }catch(e){console.warn('Marquage Destiny Rugby :',e);}
+    if(femme){
+      // Les cils sont une carte de transparence exportée sans son masque : un bandeau plein sur les yeux. L'avant n'a
+      // pas d'atlas de corps dans l'APK : ses yeux prennent le matériau de ceux de l'arrière (même dépliage).
+      let yeux=null;back.scene.traverse(o=>{if(o.isSkinnedMesh&&/eyes_/.test(o.name))yeux=o.material;});
+      for(const modele of [forward.scene,back.scene]){
+        const cils=[];modele.traverse(o=>{if(/eyelash/.test(o.name))cils.push(o);else if(yeux&&o.isSkinnedMesh&&/eyes_/.test(o.name)&&!o.material.map)o.material=yeux;});
+        for(const o of cils){o.geometry?.dispose?.();o.parent?.remove(o);}
+      }
+    }
     protegerRessources([forward.scene,back.scene,hair.scene,ball.scene,tee.scene]);
-    return {motions,gaits,forward:forward.scene,back:back.scene,hair:hair.scene,ball:ball.scene,tee:tee.scene,kit};
+    return {motions,gaits,forward:forward.scene,back:back.scene,hair:hair.scene,ball:ball.scene,tee:tee.scene,kit,femme};
   })();
-  return ressources;
+  return ressources[cle];
 }
 // ── LE STADE DÉPEND DU NIVEAU DU CLUB QUI REÇOIT ────────────────────────────
 // Du terrain de campagne (une tribune, des clôtures, des arbres) à l'enceinte
@@ -396,10 +408,10 @@ export async function creerScene3D(conteneur,options={}){
   const leger=ios||!!options.leger;
   // ⚠️ SUR TÉLÉPHONE, UN CHARGEMENT APRÈS L'AUTRE : décoder le stade, les joueurs et
   // les mouvements en même temps fait un pic de mémoire que le match ne redemandera jamais.
-  let r,stade;
-  if(leger){r=await charger();stade=await chargerStade(options.stade,true);}
+  let r,stade,rFemmes=null;
+  if(leger){r=await charger(options.genre);stade=await chargerStade(options.stade,true);}
   else {
-    const charges=await Promise.allSettled([charger(),chargerStade(options.stade)]);
+    const charges=await Promise.allSettled([charger(options.genre),chargerStade(options.stade)]);
     if(charges[1].status==='fulfilled')stade=charges[1].value;
     if(charges.some(c=>c.status==='rejected')){
       stade?.restituer();libererStades();
@@ -539,9 +551,11 @@ export async function creerScene3D(conteneur,options={}){
   const qa=new THREE.Quaternion();
 
   function shadow(){const m=new THREE.Mesh(new THREE.CircleGeometry(.42,18),new THREE.MeshBasicMaterial({color:'#172319',transparent:true,opacity:.24,depthWrite:false}));m.rotation.x=-Math.PI/2;m.position.y=.015;return m;}
+  const joueuses=new Set(options.joueuses||[]);
+  if(joueuses.size&&!r.femme)rFemmes=await charger('femme').catch(()=>null);
   const dress=(model,kind,look)=>habiller(r,model,kind,look);
-  function buildActor(template,kind,kit,index,number,ref=false,wish={}){
-    const model=clone(template),group=new THREE.Group(),look=appearance(index,wish,kind==='male_forward'&&!ref);model.updateMatrixWorld(true);
+  function buildActor(template,kind,kit,index,number,ref=false,wish={},femme=r.femme){
+    const model=clone(template),group=new THREE.Group(),look=appearance(index,femme?{...wish,...souhaitFemme(index,wish)}:wish,kind==='male_forward'&&!ref);model.updateMatrixWorld(true);
     const bounds=new THREE.Box3().setFromObject(model,true);model.position.y=-bounds.min.y;
     if(look.morpho){appliquerMorpho(model,look.morpho);model.updateMatrixWorld(true);const apres=new THREE.Box3().setFromObject(model,true);model.position.y-=apres.min.y;}
     model.traverse(o=>{if(!o.isSkinnedMesh)return;o.frustumCulled=false;
@@ -592,7 +606,8 @@ export async function creerScene3D(conteneur,options={}){
       const index=p.source.nom?graine(p.source.nom)+p.team*31:p.shirt+p.team*31;
       const voulu=souhait(p);
       // Un joueur du jeu porte ce qu'il a équipé (et rien d'autre) ; les autres suivent le tirage de leur équipe.
-      a=buildActor(p.number<=8?r.forward:r.back,kind,kit,index,p.shirt,false,{...voulu,accessoire:voulu.equipe?(voulu.casque?'casque':''):porteCasque(p)?'casque':tirage(index,7)>.93?'bandeau':''});
+      const R=rFemmes&&joueuses.has(p.source.nom)?rFemmes:r;
+      a=buildActor(p.number<=8?R.forward:R.back,kind,kit,index,p.shirt,false,{...voulu,accessoire:voulu.equipe?(voulu.casque?'casque':''):porteCasque(p)?'casque':tirage(index,7)>.93?'bandeau':''},!!R.femme);
       a.nom=nomCourt(p.source.nom||'');actors.set(p.id,a);
     }
     return a;
@@ -1849,7 +1864,7 @@ export { DestinyMatch,TICK };
 // reconstruit à chaque changement (peau, coupe, barbe, morphologie, casque, crampons, maillot).
 // ⚠️ MÊME CODE QUE LE MATCH (`habiller`, `appliquerMorpho`, `appearance`) : ce qu'on voit ici EST ce qu'on verra sur le terrain.
 export async function creerApercuJoueur(conteneur,options={}){
-  const r=await charger();
+  const r=await charger(options.genre);
   const {motions}=r;
   const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true,powerPreference:'default'});
   renderer.setPixelRatio(Math.min(globalThis.devicePixelRatio||1,options.leger?1.5:2));

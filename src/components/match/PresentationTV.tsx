@@ -1,4 +1,5 @@
 import { useState, type MutableRefObject } from 'react';
+import { MONDE_FEMININ } from '../../lib/mondeActif';
 import { Icone } from '../Icone';
 import { t } from '../../lib/i18n';
 import { photoReelle } from '../../lib/avatars';
@@ -22,7 +23,7 @@ import './PresentationTV.css';
 // imposé : ralentis, avant-match et son se coupent d'un bouton, et le choix est
 // retenu d'un match à l'autre.
 
-const portrait = (nom: string, club?: string) => photoReelle(nom, club) ?? '/photos/silhouette.webp';
+const portrait = (nom: string, club?: string) => photoReelle(nom, club) ?? (MONDE_FEMININ ? '/photos/silhouette-femme.webp' : '/photos/silhouette.webp');
 /** « Antoine DUPONT » → « DUPONT » : ce qu'on lit sur un bandeau de télévision. */
 const nomCourt = (nom: string) => {
   const mots = nom.trim().split(/\s+/);

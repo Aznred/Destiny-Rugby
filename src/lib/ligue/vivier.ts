@@ -30,7 +30,7 @@
 // pas d'un pouce.
 
 import type { FamillePoste } from '../../types.js';
-import { EFFECTIFS_REELS } from '../../data/effectifsReels.js';
+import { EFFECTIFS_REELS } from '../../data/sourcesDuMonde.js';
 import type { CarteJoueur, IdCarte } from './types.js';
 import { rareteDeLaNote } from './rarete.js';
 import { graine, melanger } from './aleatoire.js';

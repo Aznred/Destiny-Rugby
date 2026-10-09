@@ -1,4 +1,6 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
+import { MONDE, passerAuMonde, retourApresChangementDeMonde } from './lib/mondeActif';
+import { demanderLeModeDeCreation } from './lib/tutoriel/intentions';
 import { ModalesMonnaie } from './components/ModalesMonnaie';
 import { AlerteStockage } from './components/AlerteStockage';
 import { Personnalisation } from './components/Personnalisation';
@@ -154,6 +156,23 @@ export default function App() {
   // sans passer par `setEcran` (création, retraite, ouverture des messages…).
   useEffect(() => { pageVue(ecran); }, [ecran]);
 
+  // ═══ QUEL MONDE POUR CET ÉCRAN (`lib/mondeActif.ts`) ═══════════════════════
+  // Le jeu ne charge qu'un monde à la fois. Une carrière de JOUEUSE se joue dans le monde féminin ; la ligue en ligne, la
+  // Collection, la boutique et le mode entraîneur ont besoin du monde masculin (leur catalogue de cartes est recalculé
+  // ici à partir des mêmes listes, et doit rester celui du serveur). L'accueil, le classement, le Panthéon et la
+  // création s'accommodent des deux : ils ne forcent rien. Changer de monde recharge la page, puis rouvre l'écran voulu.
+  const genreJoueur = useGame((s) => s.joueur?.genre);
+  const ecranSolo = ['carriere', 'profil', 'effectif', 'tableau', 'social', 'championnats', 'finCarriere'].includes(ecran);
+  const ecranMasculin = ['carriereEnLigne', 'collectionSolo', 'boutique', 'manager', 'creationManager'].includes(ecran);
+  const mondeVoulu = ecranSolo ? (genreJoueur === 'F' && !(managerActif && !joueur) ? 'F' : 'H') : ecranMasculin ? 'H' : null;
+  useEffect(() => {
+    const retour = retourApresChangementDeMonde();
+    if (retour) { if (retour === 'creation') demanderLeModeDeCreation('joueur'); setEcran(retour as typeof ecran); }
+  }, [setEcran]);
+  useEffect(() => {
+    if (mondeVoulu && mondeVoulu !== MONDE) passerAuMonde(mondeVoulu, ecran);
+  }, [ecran, mondeVoulu]);
+
   // Garde-fou : pas d'écran carrière/profil sans joueur, et aucune porte
   // indirecte vers une fonctionnalité qui serait remise en chantier.
   useEffect(() => {
@@ -169,6 +188,9 @@ export default function App() {
       setEcran('accueil');
     }
   }, [ecran, joueur, managerActif, managerVisible, setEcran]);
+
+  // Ne jamais monter un effectif ou une carrière avec les clubs de l'autre monde, même pendant le rechargement.
+  if (mondeVoulu && mondeVoulu !== MONDE) return <EcranEnRoute />;
 
   return (
     <div key={langue} className="racine" data-ecran={ecran}>

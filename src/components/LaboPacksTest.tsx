@@ -21,7 +21,7 @@ import { Confirmation } from './Confirmation';
 import { Icone } from './Icone';
 import './LaboPacksTest.css';
 
-const NOMS_TYPE: Record<string, string> = { normale: 'Normale', feminine: 'Féminine · bêta', icon: 'ICON', halloween: 'Halloween', influencer: 'Influenceur' };
+const NOMS_TYPE: Record<string, string> = { normale: 'Normale', feminine: 'Féminine · bêta', icon: 'ICON', halloween: 'Halloween', 'octobre-rose': 'Octobre Rose', influencer: 'Influenceur' };
 const NOMS_RARETE: Record<string, string> = { bronze: 'Bronze', argent: 'Argent', or: 'Or', elite: 'Élite', star: 'Rouge' };
 const NOMS_STATUT: Record<string, string> = { draft: 'brouillon', image_missing: 'sans image', ready: 'prête, non publiée', published: 'publiée' };
 const nomType = (type: string) => NOMS_TYPE[type] ?? type;

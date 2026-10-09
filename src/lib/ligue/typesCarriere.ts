@@ -281,7 +281,7 @@ export interface VueCarriereEnLigne extends Omit<EtatCarriereEnLigne, 'graine' |
   speciales?: ResumeSpeciauxLigue;
 }
 export interface CreationCarriere {
-  playerPool?: 'men' | 'women';
+  playerPool?: 'men' | 'women' | 'mixed';
   id: string; nom: string; code: string; compteId: string; pseudo: string; clubNom: string;
   rythme: number; maxClubs: number; embleme?: string;
   logo?: string; tropheeId?: string; playoffs?: boolean; dotationOvas?: number;
@@ -297,6 +297,7 @@ export type CommandeCarriere =
   | { type: 'demarrerSaison' }
   | { type: 'modifierRythme'; rythme: number }
   | { type: 'reglerCartesSpeciales'; active: boolean }
+  | { type: 'reglerPool'; pool: 'men' | 'women' | 'mixed' }
   | { type: 'composition'; composition: CompositionManager }
   | { type: 'sauvegarderComposition'; nom: string; composition: CompositionManager }
   | { type: 'supprimerComposition'; id: string }

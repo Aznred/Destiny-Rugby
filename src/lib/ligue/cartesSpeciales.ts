@@ -34,7 +34,7 @@ import type { CarteCarriere, InfoCarteSpeciale, PackCarriere } from './typesCarr
 // ═══════════════════════════════════════════════════════════════════════════
 
 /** Ouvert : une nouvelle famille n'a besoin que de son entrée dans `FAMILLES_SPECIALES`. */
-export type TypeCarteSpeciale = 'icon' | 'halloween' | 'influencer' | (string & {});
+export type TypeCarteSpeciale = 'icon' | 'halloween' | 'influencer' | 'octobre-rose' | (string & {});
 export type CardType = 'normal' | TypeCarteSpeciale;
 export type StatutCarteSpeciale = 'draft' | 'image_missing' | 'ready' | 'published';
 export const STATUTS_CARTE_SPECIALE: readonly StatutCarteSpeciale[] = ['draft', 'image_missing', 'ready', 'published'];
@@ -52,6 +52,17 @@ export interface DefinitionCarteSpeciale {
   specialEventId: string;
   /** La carte ordinaire du même joueur, s'il joue encore (`reel:antoine dupont`). */
   basePlayerId?: string;
+  /**
+   * Une carte du rugby féminin : elle ne sort que dans une ligue féminine (ou mixte), jamais dans les
+   * packs ordinaires ni dans la Collection solo, qui restent masculins.
+   */
+  gender?: 'female';
+  /**
+   * L'identifiant de la carte ordinaire de la joueuse quand elle ne vient pas du catalogue mondial (les
+   * joueuses vivent dans la base privée des profils). Sert à `identiteJoueur` : pas deux fois la même sur
+   * une feuille de match. Contrairement à `basePlayerId`, rien n'est résolu depuis le catalogue.
+   */
+  identiteId?: string;
   nom: string;
   display_name?: string;
   real_name?: string;
@@ -165,6 +176,10 @@ export const FAMILLES_SPECIALES: Readonly<Record<string, FamilleSpeciale>> = {
     type: 'halloween', nom: 'HALLOWEEN', designId: 'halloween-citrouilles', specialLogo: 'citrouille', evenementDefaut: 'halloween-2026',
     collectifDefaut: 10, overallMin: 82, overallMax: 92, retraitesSeulement: false, clubDefaut: 'Halloween', ligueDefaut: 'Halloween',
   },
+  'octobre-rose': {
+    type: 'octobre-rose', nom: 'OCTOBRE ROSE', designId: 'octobre-rose-ruban', specialLogo: 'ruban', evenementDefaut: 'octobre-rose-2026',
+    collectifDefaut: 10, overallMin: 84, overallMax: 96, retraitesSeulement: false, clubDefaut: 'Octobre Rose', ligueDefaut: 'Octobre Rose',
+  },
   influencer: {
     type: 'influencer', nom: 'INFLUENCEUR', designId: 'influencer-live', specialLogo: 'creator', evenementDefaut: 'influencers',
     overallMin: 60, overallMax: 99, retraitesSeulement: false, clubDefaut: '', ligueDefaut: '',
@@ -196,6 +211,12 @@ export const EVENEMENTS_DEPART: readonly EvenementSpecial[] = [
   { id: 'halloween-2026', cardType: 'halloween', nom: 'Halloween 2026', actif: true,
     availableFrom: '2026-10-04T22:00:00.000Z', availableUntil: '2026-11-30T23:00:00.000Z',
     repere: 'entreBleueEtMythique', tauxPacksNormaux: 1, pack: PACK_HALLOWEEN },
+  // Octobre Rose : tout le mois d'octobre 2026, heure de Paris. ⚠️ PAS DE PACK DÉDIÉ : un pack d'événement se
+  // vend dans la Collection solo, qui reste masculine. Les cartes sortent des packs ordinaires des ligues
+  // féminines qui autorisent les cartes spéciales, à la même chance par carte qu'une Halloween.
+  { id: 'octobre-rose-2026', cardType: 'octobre-rose', nom: 'Octobre Rose 2026', actif: true,
+    availableFrom: '2026-09-30T22:00:00.000Z', availableUntil: '2026-10-31T23:00:00.000Z',
+    repere: 'entreBleueEtMythique', tauxPacksNormaux: 1 },
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -234,7 +255,7 @@ export function infoSpeciale(def: DefinitionCarteSpeciale): InfoCarteSpeciale {
     ...(def.cardType === 'influencer' ? { sansClub: def.sansClub ?? 'nation', market_allowed: def.market_allowed ?? def.canAppearOnMarket,
       trade_allowed: def.trade_allowed ?? true, description: def.description } : {}),
     ...(def.collectif !== undefined ? { collectif: def.collectif } : {}),
-    ...(def.basePlayerId ? { base: def.basePlayerId } : {}),
+    ...(def.basePlayerId || def.identiteId ? { base: def.basePlayerId ?? def.identiteId } : {}),
     ...(def.retraite ? { retraite: true } : {}),
   };
 }
@@ -248,6 +269,7 @@ function sourceSpeciale(def: DefinitionCarteSpeciale, base: SourceCarte | undefi
     championnat: def.league, pays: base?.pays ?? 'Légendes', photo: def.image, origine: 'professionnel',
     rarete: def.rarity ?? rareteCarriere(def.overall), statistiques: { ...statistiquesCarte(def.overall, famille, def.id), ...def.statistiques },
     speciale: infoSpeciale(def),
+    ...(def.gender === 'female' ? { gender: 'female' as const } : {}),
   };
 }
 
@@ -363,6 +385,8 @@ export interface TirageSpecial {
 export function preparerTirageSpecial(
   pack: PackCarriere, ligueAutorise: boolean | undefined, maintenant: number, pris: ReadonlySet<string>,
   cat: CatalogueSpecial,
+  /** Le vivier de la ligue. ⚠️ Il ne filtre plus rien (9 octobre 2026) : une carte spéciale sort dans TOUS les packs, Octobre Rose comprise. */
+  _pool: 'men' | 'women' | 'mixed' = 'men',
 ): TirageSpecial | null {
   if (!ligueAutorise) return null;
   const lots: TirageSpecial['lots'] = [];

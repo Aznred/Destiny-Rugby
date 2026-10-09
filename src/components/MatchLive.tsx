@@ -103,6 +103,7 @@ import { situationInternationale } from '../lib/rassemblements';
 // ⚠️ `createPortal(document.body)` obligatoire : le `backdrop-filter` des
 // `.carte` crée un bloc conteneur qui piège les `position: fixed`.
 
+import { MONDE_FEMININ } from '../lib/mondeActif';
 import { Icone } from './Icone';
 import { IconeEmoji, TexteIcones } from './TexteIcones';
 import { Selecteur } from './Selecteur';
@@ -1720,6 +1721,8 @@ export function MatchLive({
   }, [titre, selection, e.clubA, habillage]);
   const options3D = useMemo<OptionsScene3D>(() => ({
     tenuesDepartagees: true,
+    // Monde féminin : les modèles de joueuses de la scène.
+    ...(MONDE_FEMININ ? { genre: 'femme' as const } : {}),
     equipes: [
       { nom: e.clubA, maillot: tenues.domicile, blason: ecussonPourToile(clubA?.logo ?? urlLogoEquipe(e.clubA)) },
       { nom: e.clubB, maillot: tenues.exterieur, blason: ecussonPourToile(clubB?.logo ?? urlLogoEquipe(e.clubB)) },

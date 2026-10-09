@@ -1,4 +1,5 @@
 import { lazy, Suspense, useMemo, useState } from 'react';
+import { MONDE, passerAuMonde } from '../lib/mondeActif';
 import { LIMITES } from '../lib/classementMondial';
 import { t } from '../lib/i18n';
 import { motion } from 'framer-motion';
@@ -115,13 +116,13 @@ function ChoixDeDepart({ onCreer, onExistant }: { onCreer: () => void; onExistan
       <div className="cr-modes-grille">
         <button type="button" className="cr-mode" onClick={onCreer} data-tuto="cr-origine-creer">
           <span className="cr-mode-ico"><Icone nom="signature" taille={30} /></span>
-          <b>{t('cr.origine.creer')}</b>
+          <b>{t(MONDE === 'F' ? 'cr.genre.creer' : 'cr.origine.creer')}</b>
           <span className="cr-mode-desc">{t('cr.origine.creerTexte')}</span>
           <em className="cr-mode-suite">{t('cr.origine.creerBadge')}</em>
         </button>
         <button type="button" className="cr-mode" onClick={onExistant} data-tuto="cr-origine-existant">
           <span className="cr-mode-ico"><Icone nom="profil" taille={30} /></span>
-          <b>{t('cr.origine.existant')}</b>
+          <b>{t(MONDE === 'F' ? 'cr.genre.existant' : 'cr.origine.existant')}</b>
           <span className="cr-mode-desc">{t('cr.origine.existantTexte')}</span>
           <em className="cr-mode-suite">{t('cr.origine.existantBadge')}</em>
         </button>
@@ -272,7 +273,7 @@ export function Creation() {
       <div className="eyebrow">{t('cr.eyebrow')}</div>
       {/* « Crée ton joueur » ne vaut que pour le formulaire : avant le choix du départ, ou en cherchant un joueur
           existant, le titre dirait le contraire de ce qu'on fait. */}
-      <h1>{!mode ? t('cr.titreChoix') : depart === 'creer' ? t('cr.titre') : t('cr.titreDepart')}</h1>
+      <h1>{!mode ? t('cr.titreChoix') : depart === 'creer' ? t(MONDE === 'F' ? 'cr.genre.titre' : 'cr.titre') : t(MONDE === 'F' ? 'cr.genre.titreDepart' : 'cr.titreDepart')}</h1>
       {(!mode || depart === 'creer') ? (
         <p style={{ color: 'var(--craie-dim)', margin: '0.6rem 0 2rem', maxWidth: '60ch' }}>
           {!mode ? t('cr.chapoChoix') : t('cr.chapo')}
@@ -291,6 +292,16 @@ export function Creation() {
 
       {mode === 'joueur' && depart === null && (
         <div className="carte" style={{ padding: '1.6rem' }}>
+          {/* ⚠️ JOUEUR OU JOUEUSE : c'est choisir un MONDE (clubs, championnats, effectifs). Le jeu n'en charge qu'un à la
+              fois : passer à l'autre recharge la page et revient ici (`lib/mondeActif.ts`). */}
+          <div className="creation-genre" role="radiogroup" aria-label={t('cr.genre.label')}>
+            <span>{t('cr.genre.label')}</span>
+            {(['H', 'F'] as const).map(g => (
+              <button key={g} type="button" role="radio" aria-checked={MONDE === g} className={MONDE === g ? 'actif' : ''}
+                onClick={() => { if (MONDE !== g) passerAuMonde(g, 'creation'); }}>{t(g === 'F' ? 'cr.genre.joueuse' : 'cr.genre.joueur')}</button>
+            ))}
+            <small>{t(MONDE === 'F' ? 'cr.genre.aideF' : 'cr.genre.aideH')}</small>
+          </div>
           <ChoixDeDepart onCreer={() => setDepart('creer')} onExistant={() => { setDepart('existant'); setAvertissementVu(false); setRefus(false); }} />
         </div>
       )}
@@ -311,11 +322,11 @@ export function Creation() {
       <div className="carte" style={{ padding: '1.6rem' }} data-tuto="cr-formulaire">
         <div className="grille-2">
           <div className="champ" data-tuto="cr-nom">
-            <label htmlFor="nom">{t('cr.nom')}</label>
+            <label htmlFor="nom">{t(MONDE === 'F' ? 'cr.genre.nom' : 'cr.nom')}</label>
             <input
               id="nom"
               type="text"
-              placeholder={t('cr.nomExemple')}
+              placeholder={t(MONDE === 'F' ? 'cr.genre.nomExemple' : 'cr.nomExemple')}
               value={nom}
               onChange={(e) => setNom(e.target.value)}
               maxLength={40}

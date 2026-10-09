@@ -40,7 +40,10 @@ interface BaseLocale {
   permissionsSemees?: boolean;
   packsInternes?: (PackInterne & { compte: string })[];
   journalPacksInternes?: (LigneJournalPackInterne & { compte: string })[];
+  /** « Mon image » : la même table que la base, en mémoire. */
+  demandesImage?: (DemandeImage & { compte: string })[];
 }
+import { DEMANDES_EN_ATTENTE_MAX, type DemandeImage } from '../src/lib/demandesImage.js';
 export function stockageFichier(fichier: string): StockageCarriere {
   mkdirSync(dirname(fichier), { recursive: true });
   const base: BaseLocale = existsSync(fichier) ? JSON.parse(readFileSync(fichier, 'utf8')) : {
@@ -117,6 +120,38 @@ export function stockageFichier(fichier: string): StockageCarriere {
       async journal(compte, limite) {
         return base.journalPacksInternes!.filter(l => l.compte === compte).slice(-Math.max(1, Math.min(200, limite))).reverse()
           .map(({ compte: _compte, ...ligne }) => copie(ligne));
+      },
+    },
+    demandesImage: {
+      async creer(compte, id, s) {
+        base.demandesImage ??= [];
+        if (base.demandesImage.filter(d => d.compte === compte && d.statut === 'attente').length >= DEMANDES_EN_ATTENTE_MAX) return false;
+        base.demandesImage.push({ id, compte, type: s.type, joueur: s.joueur, club: s.club, message: s.message, statut: 'attente',
+          creeLe: new Date().toISOString(), ...(s.image ? { image: s.image } : {}) });
+        sauver();
+        return true;
+      },
+      async miennes(compte) {
+        return (base.demandesImage ?? []).filter(d => d.compte === compte).sort((a, b) => b.creeLe.localeCompare(a.creeLe)).slice(0, 30)
+          .map(({ compte: _compte, image: _image, ...d }) => copie(d));
+      },
+      async toutes(limite) {
+        return [...(base.demandesImage ?? [])].sort((a, b) => Number(b.statut === 'attente') - Number(a.statut === 'attente') || b.creeLe.localeCompare(a.creeLe))
+          .slice(0, limite).map(({ compte, image: _image, ...d }) => copie({ ...d, pseudo: base.comptes.find(c => c.id === compte)?.pseudo }));
+      },
+      async image(id, accepteeSeulement) {
+        const d = (base.demandesImage ?? []).find(x => x.id === id && x.type === 'ajout' && (!accepteeSeulement || x.statut === 'acceptee'));
+        return d?.image ?? null;
+      },
+      async decider(id, statut) {
+        const d = (base.demandesImage ?? []).find(x => x.id === id);
+        if (!d) return null;
+        d.statut = statut; d.decideLe = new Date().toISOString(); sauver();
+        const { compte: _compte, image: _image, ...publique } = d;
+        return copie(publique);
+      },
+      async acceptees() {
+        return (base.demandesImage ?? []).filter(d => d.statut === 'acceptee').map(d => ({ id: d.id, type: d.type, joueur: d.joueur, decideLe: d.decideLe }));
       },
     },
     joueurs: joueursLocaux(undefined, () => base.comptes.find(c => c.identifiant === 'kiri')?.id),

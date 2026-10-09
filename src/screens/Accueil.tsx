@@ -36,7 +36,7 @@ const PAGES_CONTENU = [
   { slug: 'guide', ico: 'livre' as const, titre: 'accueil.lien.guide', desc: 'accueil.lien.guideDesc' },
   { slug: 'pyramide', ico: 'stade' as const, titre: 'accueil.lien.pyramide', desc: 'accueil.lien.pyramideDesc' },
   { slug: 'moteur', ico: 'reglages' as const, titre: 'accueil.lien.moteur', desc: 'accueil.lien.moteurDesc' },
-  { slug: 'journal', ico: 'journal' as const, titre: 'accueil.lien.journal', desc: 'accueil.lien.journalDesc' },
+  { slug: 'mises-a-jour', ico: 'journal' as const, titre: 'accueil.lien.journal', desc: 'accueil.lien.journalDesc' },
 ];
 
 const apparait = {

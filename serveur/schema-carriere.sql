@@ -172,6 +172,27 @@ create table if not exists compte_permissions (
 insert into compte_permissions (compte, permission)
   select id, 'CAN_CREATE_CUSTOM_PACKS' from comptes where identifiant = 'kiri'
   on conflict (compte, permission) do nothing;
+-- « Mon image » : une joueuse ou un joueur demande le retrait de son portrait, ou propose le sien. Rien ne s'applique
+-- avant la décision du compte interne. Le portrait proposé (data URL, 600 px) n'est lu que pour le détail d'une demande
+-- et pour servir un portrait accepté.
+create table if not exists demandes_image (
+  id uuid primary key,
+  compte uuid not null references comptes(id) on delete cascade,
+  type text not null check (type in ('retrait', 'ajout')),
+  joueur text not null,
+  cle text not null,
+  club text not null default '',
+  message text not null default '',
+  image text,
+  statut text not null default 'attente' check (statut in ('attente', 'acceptee', 'refusee')),
+  cree_le timestamptz not null default now(),
+  decide_le timestamptz,
+  decide_par text
+);
+create index if not exists demandes_image_statut_idx on demandes_image (statut, cree_le);
+create index if not exists demandes_image_compte_idx on demandes_image (compte, cree_le);
+alter table demandes_image enable row level security;
+
 -- Un pack de test : une liste de cartes imposées, dans l'ordre de révélation. Lisible par son seul auteur ; il n'entre
 -- ni dans le catalogue des packs, ni dans une probabilité.
 create table if not exists packs_internes (

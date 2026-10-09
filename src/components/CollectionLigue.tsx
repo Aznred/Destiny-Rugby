@@ -3,7 +3,7 @@ import { chargerCollectionCarriere, chargerEmblemesCarriere } from '../lib/carri
 import type { PageCollection, VueCarriereEnLigne } from '../lib/ligue/typesCarriere';
 import { NOMS_PACK } from '../lib/presentationPacks';
 import { CarteJoueurEnLigne } from './CarteJoueurEnLigne';
-import { Citrouille, EmblemeIcon, EmblemeInfluenceur } from './EmblemesSpeciaux';
+import { Citrouille, EmblemeIcon, EmblemeInfluenceur, RubanRose } from './EmblemesSpeciaux';
 import { EcussonClub } from './EcussonClub';
 import { locale, nombre, t } from '../lib/i18n';
 import './CollectionLigue.css';
@@ -55,10 +55,10 @@ export function CollectionLigue({ vue }: { vue: VueCarriereEnLigne }) {
         ailleurs, les cartes spéciales n'existent pas du tout. */}
     {vue.cartesSpeciales && <div className="cel-collection-types" role="group" aria-label={t('special.filter.label')}>
       {([['', t('online.collection.all'), null], ['normal', t('special.filter.players'), null],
-        ['icon', t('special.icons'), <EmblemeIcon key="i" taille={20} />], ['halloween', t('special.halloween'), <Citrouille key="h" taille={20} />], ['influencer', t('special.influencers'), <EmblemeInfluenceur key="c" taille={20} />]] as const).map(([valeur, libelle, embleme]) =>
-        valeur === 'influencer' && !donnees?.speciales?.influencer ? null :
+        ['icon', t('special.icons'), <EmblemeIcon key="i" taille={20} />], ['halloween', t('special.halloween'), <Citrouille key="h" taille={20} />], ['octobre-rose', t('special.octobreRose'), <RubanRose key="r" taille={20} />], ['influencer', t('special.influencers'), <EmblemeInfluenceur key="c" taille={20} />]] as const).map(([valeur, libelle, embleme]) =>
+        (valeur === 'influencer' || valeur === 'octobre-rose') && !donnees?.speciales?.[valeur] ? null :
         <button key={valeur} type="button" className={`cel-collection-type type-${valeur || 'tout'}${filtres.type === valeur ? ' actif' : ''}`} aria-pressed={filtres.type === valeur} onClick={() => changer('type', valeur)}>
-          {embleme}<span>{libelle}</span>{(valeur === 'icon' || valeur === 'halloween' || valeur === 'influencer') && donnees?.speciales && <b>{nombre(donnees.speciales[valeur] ?? 0)}</b>}
+          {embleme}<span>{libelle}</span>{(valeur === 'icon' || valeur === 'halloween' || valeur === 'octobre-rose' || valeur === 'influencer') && donnees?.speciales && <b>{nombre(donnees.speciales[valeur] ?? 0)}</b>}
         </button>)}
     </div>}
     <div className="cel-panneau cel-collection-filters">

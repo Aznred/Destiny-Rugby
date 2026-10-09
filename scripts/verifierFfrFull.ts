@@ -82,15 +82,37 @@ await storage.sauvegarderBoutique(guestId,coffreAvant);
 assert.equal((await request('guest-token','/api/carriere',{action:'sauvegarderBoutique',boutique:{...coffreAvant,collectionSolo:normaliserCollectionSolo(coffreAvant.collectionSolo)}})).status,409);
 assert.equal((await storage.boutique(guestId))?.collectionSolo.quantites[cleRetiree],7,'Les exemplaires restent disponibles pour leur compensation avant la migration.');
 assert.equal((await request('guest-token','/api/carriere?baseJoueurs=1&gender=female')).status,404);
-assert.equal((await request('guest-token','/api/carriere',{action:'creer',playerPool:'women',nom:'Women',clubNom:'Club',rythme:1,maxClubs:2})).status,404);
+// 9 octobre 2026 : les ligues féminines et mixtes sont ouvertes à tous les comptes (`POOLS_FEMININS_OUVERTS`). Seule la
+// Base joueurs du Labo reste réservée à l'autorisation serveur.
+const invitee=await request('guest-token','/api/carriere',{action:'creer',playerPool:'women',nom:'Women',clubNom:'Club',rythme:1,maxClubs:2});assert.equal(invitee.status,201,JSON.stringify(invitee.data));
+assert.ok(invitee.data.cartes.every((c:any)=>c.gender==='female'),'Une ligue féminine ne distribue que des joueuses, quel que soit le compte.');
+const mixte=await request('guest-token','/api/carriere',{action:'creer',nom:'Mixte',clubNom:'Club mixte',rythme:1,maxClubs:2});assert.equal(mixte.status,201,JSON.stringify(mixte.data));
+assert.equal(mixte.data.playerPool,'mixed','Sans précision, une ligue est mixte.');
+// Ligue mixte : un pack par championnat féminin ; le créateur referme la ligue sur les joueurs (aucune joueuse distribuée), puis la rouvre.
+assert.ok(mixte.data.packs.some((p:any)=>p.id.startsWith('womens:')),'Une ligue mixte propose les packs de championnat féminin.');
+const commander=(jeton:string,ligue:string,commande:object)=>request(jeton,'/api/carriere',{action:'commande',ligue,requeteId:randomUUID(),commande});
+// La dotation d'une ligue mixte peut contenir des joueuses : la refermer sur les joueurs n'est permis que s'il n'y en a aucune.
+const aDesJoueuses=mixte.data.cartes.some((c:any)=>c.gender==='female');
+const fermee=await commander('guest-token',mixte.data.id,{type:'reglerPool',pool:'men'});
+if(aDesJoueuses)assert.notEqual(fermee.status,200,'Une ligue dont un club a des joueuses ne se referme pas sur les joueurs.');
+else{
+  assert.equal(fermee.data.playerPool,'men');assert.ok(!fermee.data.packs.some((p:any)=>p.id.startsWith('womens:')),'Une ligue masculine n’a plus de pack féminin.');
+  const rouverte=await commander('guest-token',mixte.data.id,{type:'reglerPool',pool:'mixed'});assert.equal(rouverte.data.playerPool,'mixed');
+  assert.ok(rouverte.data.packs.some((p:any)=>p.id.startsWith('womens:')));
+}
+// Une ligue féminine dont les clubs ont des joueuses ne se referme pas sur les joueurs, mais s'ouvre au mixte.
+assert.notEqual((await commander('guest-token',invitee.data.id,{type:'reglerPool',pool:'men'})).status,200);
+assert.equal((await commander('guest-token',invitee.data.id,{type:'reglerPool',pool:'mixed'})).data.playerPool,'mixed');
+assert.notEqual((await commander('kiri-token',mixte.data.id,{type:'reglerPool',pool:'men'})).status,200,'Seul le créateur règle le genre de sa ligue.');
 assert.equal((await request('kiri-token','/api/carriere?baseJoueurs=1')).status,200);
 const publicCatalogue=await request('guest-token','/api/carriere?catalogueSolo=1');assert.equal(publicCatalogue.status,200);
 assert.ok(publicCatalogue.data.ffr.every((c:any)=>c.gender!=='female'));
 const created=await request('kiri-token','/api/carriere',{action:'creer',playerPool:'women',nom:'Women test',clubNom:'Club test',rythme:1,maxClubs:2});assert.equal(created.status,201,JSON.stringify(created.data));
 assert.ok(created.data.cartes.every((c:any)=>c.gender==='female'));const leagueId=created.data.id,code=created.data.code;
-assert.equal((await request('guest-token',`/api/carriere?ligue=${leagueId}&v=1`)).status,404);
-assert.equal((await request('guest-token','/api/carriere',{action:'rejoindre',code,clubNom:'Hacker club'})).status,404);
-assert.equal((await request('guest-token','/api/carriere',{action:'commande',ligue:leagueId,requeteId:randomUUID(),commande:{type:'ouvrirPack',packId:'bronze'}})).status,404);
+// Sans y être inscrit, on ne lit ni ne joue dans la ligue d'un autre ; avec son code, on la rejoint comme n'importe quelle ligue.
+assert.notEqual((await request('guest-token',`/api/carriere?ligue=${leagueId}&v=1`)).status,200);
+assert.notEqual((await request('guest-token','/api/carriere',{action:'commande',ligue:leagueId,requeteId:randomUUID(),commande:{type:'ouvrirPack',packId:'bronze'}})).status,200);
+const rejointe=await request('guest-token','/api/carriere',{action:'rejoindre',code,clubNom:'Club invite'});assert.ok(rejointe.status===200||rejointe.status===201,JSON.stringify(rejointe.data));
 const opened=await request('kiri-token','/api/carriere',{action:'commande',ligue:leagueId,requeteId:randomUUID(),commande:{type:'ouvrirPack',packId:'bronze'}});assert.equal(opened.status,200,JSON.stringify(opened.data));
 assert.ok(opened.data.cartes.every((c:any)=>c.gender==='female'));
 // No role or flag is inferred from a display name, even when the guest calls itself Kiri.

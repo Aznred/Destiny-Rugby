@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { MONDE_FEMININ } from '../../lib/mondeActif';
 import { photoReelle } from '../../lib/avatars';
 import { t } from '../../lib/i18n';
 import { Icone } from '../Icone';
@@ -18,7 +19,7 @@ function nomDuPoste(numero: number): string | undefined {
   const poste = POSTES.find(v => v.numero === numero);
   return poste ? nomPoste(poste.id).replace(/\s*\(\d+\)\s*$/, '') : undefined;
 }
-const SANS_PHOTO = '/photos/silhouette.webp';
+const SANS_PHOTO = MONDE_FEMININ ? '/photos/silhouette-femme.webp' : '/photos/silhouette.webp';
 /**
  * ⚠️ SANS PHOTO, LA SILHOUETTE GRISE DES CARTES — jamais un autre visage. Le
  * portrait vient d'abord de la carte du joueur quand l'hôte la connaît ; une
@@ -70,7 +71,8 @@ function usePalette(identite: IdentiteTV) {
 }
 
 export function LogoLigueTV({ identite }: { identite: IdentiteTV }) {
-  return <span className="btv-logo"><img key={identite.logo} src={logoTV(identite.logo)} alt={identite.nom || 'Destiny Rugby'}
+  const logo = logoTV(identite.logo);
+  return <span className={`btv-logo${logo.startsWith('/logos-competitions/f-') ? ' btv-logo-feminin' : ''}`}><img key={identite.logo} src={logo} alt={identite.nom || 'Destiny Rugby'}
     onError={e => { if (!e.currentTarget.src.endsWith('/favicon.svg')) e.currentTarget.src = '/favicon.svg'; }} /></span>;
 }
 function EcussonTV({ equipe }: { equipe: EquipeTV }) {

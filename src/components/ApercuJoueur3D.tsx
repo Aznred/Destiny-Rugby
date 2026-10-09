@@ -15,6 +15,7 @@ import { t } from '../lib/i18n';
 import { maillotDepuisKit } from '../lib/personnalisationMatch';
 import type { KitDef } from '../data/kitsBoutique';
 import './ApercuJoueur3D.css';
+import { MONDE_FEMININ } from '../lib/mondeActif';
 
 export type CoteApercu = 'face' | 'profil' | 'dos';
 
@@ -47,7 +48,7 @@ export function ApercuJoueur3D({
     const secours = maillotDeSecours(c?.c1 ?? '#15317e', club ?? 'joueur');
     return { principal: c?.c1 ?? '#15317e', secondaire: c?.c2 ?? '#f4f4ef', short: secours.short, chaussettes: secours.chaussettes };
   })();
-  const options: OptionsApercuJoueur = { apparence: apparence as Record<string, unknown>, maillot, avant, cadrage, leger: appareilLeger() };
+  const options: OptionsApercuJoueur = { apparence: apparence as Record<string, unknown>, maillot, avant, cadrage, leger: appareilLeger(), ...(MONDE_FEMININ ? { genre: 'femme' } : {}) };
   dernier.current = options;
   const signature = JSON.stringify([apparence, maillot, avant]);
 

@@ -1,4 +1,5 @@
-import { CLUBS_AMATEURS, EFFECTIFS_AMATEURS, POSTES_AMATEURS } from '../data/amateurs.js';
+import { CLUBS_AMATEURS, POSTES_AMATEURS } from '../data/amateurs.js';
+import { EFFECTIFS_AMATEURS } from '../data/sourcesDuMonde.js';
 import { PHOTOS_FFR_PAR_ID, PHOTOS_FFR_SUPPLEMENTAIRES } from '../data/photosFfr.js';
 import { PHOTOS_DETOUREES_PAR_CLUB, PHOTOS_DETOUREES_PAR_ID, JOUEURS_DETOURES_SUPPLEMENTAIRES } from '../data/photosDetourees.js';
 import type { FamillePoste, PosteId } from '../types.js';

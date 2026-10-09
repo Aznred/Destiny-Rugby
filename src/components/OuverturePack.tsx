@@ -67,7 +67,7 @@ export default function OuverturePack({ cartes, pack, modele, garantie, apparenc
   // ⚠️ SEULEMENT À L'OUVERTURE : avant, la pochette ne dit que son palier, sinon
   // la lueur orange trahirait la Halloween avant même qu'on touche le pack.
   const speciale = ordre.find(c => c.speciale)?.speciale?.type;
-  const eclatSpecial = speciale && (phase === 'ouverture' || phase === 'cartes') ? ` speciale-${speciale === 'influencer' ? 'influencer' : speciale === 'halloween' ? 'halloween' : 'icon'}` : '';
+  const eclatSpecial = speciale && (phase === 'ouverture' || phase === 'cartes') ? ` speciale-${speciale === 'influencer' ? 'influencer' : speciale === 'halloween' ? 'halloween' : speciale === 'octobre-rose' ? 'octobre-rose' : 'icon'}` : '';
   // La première carte spéciale tirée a droit à son explication (file du tutoriel : jamais par-dessus un autre).
   useEffect(() => { if (speciale) signaler('context.carteSpeciale'); }, [speciale]);
   useEffect(() => {

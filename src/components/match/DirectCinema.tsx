@@ -31,7 +31,13 @@ export function DirectCinema({
   contexteTV,
   panneauDecision,
   stade,
+  genre,
+  joueuses,
 }: {
+  /** Ligue mixte : les noms des joueuses du match. */
+  joueuses?: string[];
+  /** Ligue féminine : modèles de joueuses dans la scène 3D. */
+  genre?: 'femme';
   /** Le décor 3D : il grandit avec le niveau du club qui reçoit. */
   stade?: Stade3D;
   /** Les choix d'une pénalité à trancher : posés SUR l'image, donc visibles aussi en plein écran. */
@@ -182,6 +188,8 @@ export function DirectCinema({
             scoreMatch={m.score}
             identite={identite}
             stade={stade}
+            genre={genre}
+            joueuses={joueuses}
             nomDomicile={domicile}
             nomExterieur={exterieur}
             couleurs={couleurs}

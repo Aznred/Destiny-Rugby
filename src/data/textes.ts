@@ -30,6 +30,7 @@ import { TEXTES_SOLO_AMICAL } from './textesSoloEtAmical.js';
 import { TEXTES_INTERFACE } from './textesInterface.js';
 import { TEXTES_INTERFACE_CORRECTIONS } from './textesInterfaceCorrections.js';
 import { TEXTES_CARTES_SPECIALES } from './textesCartesSpeciales.js';
+import { TEXTES_IMAGE } from './textesImage.js';
 import { TEXTES_CONTROLE_DIRECT } from './textesControleDirect.js';
 import { TEXTES_TUTORIEL_JOUEUR_20 } from './textesTutorielJoueur20.js';
 import { TEXTES_RESPONSABILITES } from './textesResponsabilites.js';
@@ -84,6 +85,7 @@ const ECRIT_A_LA_MAIN: Record<string, Traduction> = {
   ...TEXTES_SOLO_AMICAL,
   ...TEXTES_INTERFACE,
   ...TEXTES_CARTES_SPECIALES,
+  ...TEXTES_IMAGE,
   ...TEXTES_CONTROLE_DIRECT,
   ...TEXTES_TUTORIEL_JOUEUR_20,
   ...TEXTES_RESPONSABILITES,

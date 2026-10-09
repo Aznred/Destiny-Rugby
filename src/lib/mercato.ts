@@ -15,7 +15,7 @@
 // il faudrait rejouer toutes les saisons à chaque affichage.
 
 import type { FamillePoste } from '../types.js';
-import { MERCATO_REEL } from '../data/mercato.js';
+import { MERCATO_REEL } from '../data/sourcesDuMonde.js';
 import { POSTES_AMATEURS } from '../data/amateurs.js';
 
 export interface RecrueReelle {

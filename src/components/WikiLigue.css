@@ -1,17 +1,22 @@
-.wiki-ligue { display: grid; gap: 1rem; }
-.wiki-ligue-hero { display: flex; align-items: center; justify-content: space-between; gap: 1.2rem; padding: 1.5rem; background: radial-gradient(circle at 85% 20%, #d8ac3c20, transparent 34%), linear-gradient(135deg, #10281e, #08140f); }
-.wiki-ligue-hero h2 { margin: .25rem 0 .45rem; font-family: var(--police-titre); font-size: clamp(1.8rem, 4vw, 3rem); text-transform: uppercase; }
-.wiki-ligue-hero p, .wiki-ligue-carte p, .wiki-ligue-note p { margin: 0; color: var(--craie-dim); line-height: 1.55; }
-.wiki-ligue-hero .btn { flex: 0 0 auto; display: inline-flex; align-items: center; gap: .55rem; text-decoration: none; }
-.wiki-ligue-grille { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
-.wiki-ligue-carte { position: relative; padding: 1.25rem; overflow: hidden; }
-.wiki-ligue-carte::after { content: ''; position: absolute; width: 110px; height: 110px; right: -48px; top: -48px; border-radius: 50%; background: #dcb74512; }
-.wiki-ligue-icone { width: 45px; height: 45px; display: grid; place-items: center; border: 1px solid #e6bd5250; border-radius: 12px; background: #dcb74513; color: var(--or-400); }
-.wiki-ligue-carte h3 { margin: .85rem 0 .45rem; }
-.wiki-ligue-carte ul { margin: .85rem 0 0; padding-left: 1.1rem; color: var(--brume); font-size: .86rem; line-height: 1.65; }
-.wiki-ligue-carte li::marker { color: var(--or-400); }
-.wiki-ligue-note { display: flex; align-items: flex-start; gap: .8rem; padding: 1rem 1.2rem; border-color: #dcb7453b; }
-.wiki-ligue-note > svg { flex: 0 0 auto; color: var(--or-400); }
-.wiki-ligue-note b { display: block; margin-bottom: .25rem; }
-@media (max-width: 900px) { .wiki-ligue-grille { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 620px) { .wiki-ligue-hero { align-items: flex-start; flex-direction: column; } .wiki-ligue-grille { grid-template-columns: 1fr; } }
+.wiki-ligue { display:grid; gap:1.5rem; }
+.wiki-ligue-hero { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); align-items:center; gap:1.6rem; padding:1.5rem; background:#102019; border-radius:5px; }
+.wiki-ligue-capture { width:100%; height:auto; display:block; border:1px solid #ffffff20; }
+.wiki-ligue-intro { min-width:0; }
+.wiki-ligue-hero h2 { margin:.5rem 0 .8rem; font-family:var(--police-titre); font-size:clamp(1.8rem,3vw,2.8rem); line-height:1.05; text-transform:uppercase; }
+.wiki-ligue-hero p,.wiki-ligue-carte p,.wiki-ligue-note p { margin:0; color:var(--craie-dim); line-height:1.65; }
+.wiki-ligue-hero .btn { display:inline-flex; gap:.55rem; align-items:center; margin-top:1.3rem; text-decoration:none; }
+.wiki-ligue-maj { display:block; width:fit-content; margin-top:1rem; font-size:.8rem; color:var(--or-400); text-decoration:none; }
+.wiki-ligue-maj span { margin-left:.65rem; }
+.wiki-ligue-grille { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:0 1.6rem; }
+.wiki-ligue-carte { position:relative; padding:1.4rem 0; border:0; border-top:1px solid #ffffff25; border-radius:0; background:transparent; }
+.wiki-ligue-icone { display:inline-flex; color:var(--or-400); }
+.wiki-ligue-numero { position:absolute; top:1.4rem; right:0; color:var(--brume); font-size:.7rem; font-variant-numeric:tabular-nums; }
+.wiki-ligue-carte h3 { margin:.65rem 0 .6rem; font-size:1.1rem; }
+.wiki-ligue-carte p { font-size:.9rem; }
+.wiki-ligue-carte ul { margin:1rem 0 0; padding-left:1.1rem; color:var(--brume); font-size:.82rem; line-height:1.75; }
+.wiki-ligue-carte li::marker { color:var(--or-400); }
+.wiki-ligue-note { display:flex; align-items:flex-start; gap:.9rem; padding:1.2rem; border-radius:4px; border-color:#dcb7453b; }
+.wiki-ligue-note>svg { flex:0 0 auto; color:var(--or-400); }
+.wiki-ligue-note b { display:block; margin-bottom:.4rem; }
+@media (max-width:1000px) { .wiki-ligue-grille { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media (max-width:700px) { .wiki-ligue-hero { grid-template-columns:1fr; padding:1rem; gap:1.2rem; } .wiki-ligue-grille { grid-template-columns:1fr; gap:0; } }

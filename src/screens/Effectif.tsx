@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { useGame, noteGlobale } from '../store/useGame';
 import { effectifDuClub, noteDuClub, forceEffectif, estEspoir, estDeclinant } from '../lib/effectif';
 import { blessuresParJoueur } from '../lib/carriereAvancee';
-import { EFFECTIFS_REELS } from '../data/effectifsReels';
+import { EFFECTIFS_REELS } from '../data/sourcesDuMonde';
 import { POSTES, nomPoste } from '../data/rugby';
 import { t, texteTraduit } from '../lib/i18n';
 import { clubParNom } from '../data/clubs';

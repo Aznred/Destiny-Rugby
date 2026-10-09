@@ -2332,6 +2332,7 @@ npm run verify:fin-match          # finalisation par étapes, une écriture, sc�
 npm run verify:sortie-match       # sortie de match bornée, stockage plein sans erreur, JSON étroit, fil de la fin de match (85 contrôles, ~12 s)
 npm run verify:bagarre            # une bagarre attend son ordre, tient le match (contrôle direct compris) et se résout toujours (44 contrôles, ~45 s)
 npm run verify:propositions-collection # propositions de cartes : reçues, envoyées, refus, retrait, aucune duplication (83 contrôles)
+npm run verify:demandes-image    # « Mon image » : saisie, décision, liste publique, application aux portraits (29 contrôles)
 
 npx vite-node scripts/verif.ts    # banc général : divisions, effectifs, 8 saisons
 ```
@@ -2643,6 +2644,118 @@ match** — ne pas s'en servir pour retoucher la difficulté tant qu'ils n'ont p
   263 Ko (partagé et paresseux). Le build signale des morceaux > 1 000 Ko.
 - **Paiements** : il n'y en a plus (Stripe retiré, voir la section de la boutique).
 
+
+## Rugby féminin : joueuses, notes, Octobre Rose (9 octobre 2026)
+
+Tout ce qui suit est PRÉPARÉ, rien n'est déployé ni importé en base. ⚠️ Depuis le 9 octobre les ligues féminines et mixtes ne
+sont plus une bêta du compte Kiri : voir « Ligues mixtes » plus bas (`POOLS_FEMININS_OUVERTS`).
+
+- **Les données vivent hors du dépôt**, dans `../Objectif Ffr` (voir son `README.md`) : `scrape_feminines.py` lit les effectifs
+  sur les sites officiels des clubs (PWR, Élite 1, Élite 2, Super Rugby Women's) et les seize sélections de la Coupe du monde 2025,
+  `detourer_feminines.py` détoure les portraits, `noter_feminines.py` pose les notes. ⚠️ La FFR ne publie aucune photo de joueuse.
+- **Les notes ne sont pas saisies, elles sont classées** : chaque joueuse reçoit une force (ligue, club, sélection et capes, temps
+  de jeu, âge, courte liste d'étoiles), puis le classement est plaqué sur l'échelle du Top 14 du jeu (679 cartes : moyenne 74,6,
+  médiane 77, deux cartes à 95). 1 676 cartes le 9 octobre : PWR 78,9 de moyenne, Aupiki 77,6, Celtic
+  Challenge 76,7, Super Rugby Women's 76,6, Élite 1 76,2, Serie A Élite 66,4, Élite 2 58,0. La force de départ d'un championnat
+  vient de son niveau estimé sur 100 (`NIVEAU` dans `noter_feminines.py` : PWR 95, Aupiki 92, Élite 1 89, Super Rugby Women's 87,
+  Celtic 82, Serie A 76, Élite 2 69) : 62 − (95 − niveau) × 0,65.
+- **`curated_overall` / `curated_potential`** (`serveur/ffr/classification.ts`) : la note de ce classement fait autorité sur la note,
+  jamais sur l'éligibilité (club, poste, saison, identité restent exigés). ⚠️ Ce ne sont pas `overall` / `potential`, les notes brutes
+  du collecteur, que rien ne lit. L'import se fait par la voie habituelle, sous une NOUVELLE version :
+  `npm run data:ffr-full -- "../Objectif Ffr/exports/feminines/import_cartes_feminines.json" <version>`, puis validation dans
+  Labo → Base joueurs. Vérifié avant l'ajout du Super Rugby Women's : 1 427 profils sur 1 428 sortaient en `ACTIVE_CARD` (pas revérifié sur les 1 522).
+- **Portraits** : `public/photos/feminines/<ligue>/<club>/` (1 348 WebP détourés, 600 px, 58 Mo), écrits par
+  `noter_feminines.py --photos`. **Silhouette** : `public/photos/silhouette-femme.webp`, affichée par `CarteJoueurEnLigne` quand
+  `carte.gender === 'female'` (le bandeau télé et la présentation d'avant-match gardent la silhouette commune).
+- **Octobre Rose** (`cardType: 'octobre-rose'`, événement `octobre-rose-2026`, du 1er au 31 octobre, heure de Paris) : 23 cartes dans la
+  graine (`OCTOBRE_ROSE_DEPART`), GEN = note de la carte ordinaire + 2, borné à 96. Dessin `ArtOctobreRose` (satin prune, rubans,
+  filet rose), emblème `RubanRose`. ⚠️ **CE QUI SUIT N'EST PLUS VRAI, voir « Octobre Rose partout » plus bas** — ~~une carte féminine ne sort que dans une ligue féminine~~ : `DefinitionCarteSpeciale.gender`,
+  et `preparerTirageSpecial(…, pool)` écarte les cartes de l'autre genre (ICONS et Halloween ne sortent donc plus dans une ligue
+  féminine). Elles ne sont pas dans le catalogue public de la Collection solo. `identiteId` lie la carte spéciale à la carte
+  ordinaire de la joueuse (pas deux fois la même sur une feuille) sans passer par le catalogue mondial. Pas de pack dédié.
+  ⚠️ Comme toute carte spéciale, aucune ne sort sans image envoyée et publication dans le Labo.
+  Aperçu : `/scripts/apercuOctobreRose.html`. Banc : `npm run verify:cartes-speciales` (146 cartes ; ses contrôles Octobre Rose
+  passent, il échoue plus loin sur « aucun nom du lot absent », déjà en échec avant ce chantier).
+- **Super Rugby Women's** (ligue `superw`, ajoutée le 9 octobre) : Waratahs, Reds, Brumbies, Western Force (sites Rugby
+  Australia : une fiche JSON par joueuse, `adaptateur_rugby_au`) et Fijian Drua (`adaptateur_drua`). 158 joueuses, 136 cartes
+  (moyenne 74,3, de 61 à 84). Les Reds ne publient pas les postes : ils viennent de la page Wikipédia de l'équipe quand elle
+  les donne (14 sur 32). Portraits dans `public/photos/feminines/superw/`.
+- **Les joueuses en 3D** (`genre: 'femme'`, `OptionsScene3D`) : la scène charge `player_female_forward` / `player_female_back`
+  de l'APK (même squelette `CC_Base_*` que les hommes, donc les mêmes animations ; les `kind` restent `male_*`, ils ne nomment
+  que le jeu d'animations). Pas de barbe, cheveux longs, mi-longs, bouclés ou courts. ⚠️ Les coiffures sont modelées pour le
+  crâne masculin, onze centimètres plus haut : `fitToHead` les recale d'abord sur la tête qui les porte (sinon elles flottent
+  au-dessus). Sources hors git : `../analyse-rn26/correctif_34_femmes.cjs`. Le direct d'une ligue féminine le demande
+  (`vue.playerPool === 'women'` → `DirectCinema` → `TerrainEnDirect`) ; aperçu : `/rn26/index.html?genre=femme`.
+  ⚠️ Pas regardé dans un vrai direct de ligue ; le terrain vu de haut et la carrière solo ne changent pas.
+- **Octobre Rose partout** (9 octobre, sur demande) : une carte SPÉCIALE sort dans tous les packs, quelle que soit la ligue
+  (`preparerTirageSpecial` ne filtre plus par genre ; `carteSeniorAutorisee` laisse passer toute carte `speciale` ; elles sont
+  aussi dans le catalogue public de la Collection solo). Leurs 23 portraits sont livrés avec le jeu
+  (`public/photos/octobre-rose/`, portraits officiels de la Coupe du monde 2025, `scripts/copierPortraitsOctobreRose.ts`) : la
+  graine les déclare `imageReady`, il ne leur manque que la PUBLICATION dans le Labo.
+- **Ligues mixtes** (`playerPool` : `mixed` par défaut à la création, `women`, `men`) : trois boutons dans le formulaire de
+  création, et le créateur peut changer en cours de ligue (commande `reglerPool`, panneau « Joueuses et joueurs » du bureau).
+  ⚠️ On ne referme pas une ligue sur un genre quand un club possède déjà une carte ordinaire de l'autre : elle reste mixte.
+  Une ligue mixte reçoit un pack par championnat féminin (`packsChampionnatsFeminins`, identifiants `womens:…`, actifs sans
+  passer par `packsActifs`). `POOLS_FEMININS_OUVERTS` (`serveur/carriereApi.ts`) : `false` rend la bêta d'avant. Les ligues
+  existantes restent `men` tant que leur créateur ne change rien. En 3D, une ligue mixte passe à la scène les noms des joueuses
+  (`OptionsScene3D.joueuses`) : elles prennent le modèle féminin, les autres le masculin. Banc : `npm run verify:ffr-full`.
+  ⚠️ Tant qu'aucune joueuse n'est importée ET approuvée en base, une ligue mixte ne contient que des joueurs, et une ligue
+  « Joueuses » refuse de se créer (pas assez de cartes).
+- **Écussons des clubs féminins** : `node scripts/copierLogosFeminins.cjs` → `public/logos/feminines/` et
+  `src/data/logosFeminins.generated.ts` (37 clubs). ⚠️ Une carte de joueuse lit CETTE table d'abord, par le nom exact de son club
+  (`useBlasonCarte(club, logo, feminin)`) : le filet par ressemblance donnait à « Gloucester-Hartpury » l'écusson de Gloucester
+  Rugby et rien à « Loughborough Lightning ». Les pages d'aperçu chargent `flag-icons` (sans elle, pas de drapeau).
+- **Aupiki, Celtic Challenge, Serie A Élite** : Blues, Matatū, Chiefs Manawa, Hurricanes Poua ; Edinburgh, Glasgow ; Benetton,
+  Villorba (`LIGUES_ETRANGERES` dans `scrape_feminines.py`). Non couverts : Capitolina (aucun effectif en ligne), Valsugana
+  (effectif chargé par script), Gwalia Lightning (galerie d'un photographe qui vend ses tirages : non aspirée), l'effectif
+  de l'Irlande (sélection, déjà couverte par la Coupe du monde). Edinburgh ne dit que « avants / arrières » : pas de carte sans
+  sélection.
+- **« Mon image »** (`lib/demandesImage.ts`, `serveur/demandesImageStockage.ts`, `ReglagesImage.tsx`, `LaboDemandesImage.tsx`) :
+  dans les Réglages, une joueuse ou un joueur demande le RETRAIT de son portrait ou PROPOSE le sien (600 px, redimensionné par
+  l'écran) ; rien ne s'applique avant la décision du compte interne (Labo → « Demandes d'image », accepter / refuser / remettre
+  en attente, réservé à l'identifiant serveur `kiri`). Accepté : la liste publique `?imagesJoueurs=1` (une lecture par visite,
+  cinq minutes de cache) remplit le registre `definirChoixImages` de `avatars.ts`, que lisent `photoReelle` et les cartes.
+  Table `demandes_image` (`npm run base:appliquer`) ; sans elle la fonction est fermée, pas cassée. Banc :
+  `npm run verify:demandes-image` (29 contrôles). ⚠️ SQL Neon non essayé sur la vraie base ; l'onglet du Labo n'a pas été vu
+  à l'écran (pas de compte interne en local).
+- **Mentions et contact** : `contact@destiny-rugby.fr` partout (`scripts/contenuPages.cjs`, `contenuAdditionnel.cjs`, puis
+  `node scripts/genPages.cjs`). Les mentions légales ont trois sections de plus : vocation du projet (gratuit, base
+  encyclopédique du rugby mondial), sources des données et crédits (logos et portraits propriété de leurs détenteurs),
+  droit à l'image et retrait de contenu.
+- **Consommation de la base (mesurée le 9 octobre)** : `node --env-file=.env scripts/diagnostiquerTailleBase.mjs` (lecture
+  seule). 1 332 Mo dont **1 173 pour `source_players`** (les 470 742 profils FFR : 919 Mo de lignes, 250 Mo d'index dont
+  quatre jamais utilisés) ; les statistiques d'utilisation ne pèsent que 8 Mo. Le transfert venait de `serviceFfr.avecPool` :
+  toutes les trente secondes et par instance, il retéléchargeait le catalogue entier (330 Ko) pour comparer sa révision —
+  9 042 lectures en un jour. Il lit d'abord `revisionCatalogue()` (quelques octets) et `catalogue` ne renvoie plus le champ
+  `raw`. ⚠️ Le stockage n'a PAS été réduit : `raw` (la moitié de chaque profil) est encore lu par `validation.ts` et
+  `jeunesCarriere.ts`.
+- **Carrière solo féminine — première pierre, PAS ENCORE JOUABLE** : `node scripts/genMondeFeminin.cjs` →
+  `src/data/mondeFeminin.generated.ts` : onze championnats avec leur format 2026-2027, dont dix « jouables » (PWR, Aupiki,
+  Élite 1, Super Rugby Women's, Farah Palmer Cup en deux divisions de six, Celtic Challenge, Serie A Élite, Liga Iberdrola,
+  Élite 2) ; 69 clubs, 1 386 joueuses réelles, 1 052 générées pour avoir deux joueuses par poste. Trois sortes de joueuses :
+  réelle et notée (carte), réelle au POSTE ESTIMÉ (`posteEstime` : le site de la compétition ne publie que son nom — Gwalia,
+  Brython, Getxo), générée (`generee`). `../Objectif Ffr/scrape_championnats.py` lit les sites des COMPÉTITIONS
+  (celticrugbycomp.com, isquad.es, centre de matchs de federugby.it) → `championnats_extra.json` ; ⚠️ il ne prend aucun
+  portrait (les photos de la fiche d'équipe espagnole sont des photos de licence). `src/lib/mondeFeminin.ts` traduit vers
+  `Competition` / `Club` ; règlements dans `competitionRules.ts` (entrées `f-…`). Un club sans effectif connu reçoit le
+  niveau de son championnat (0,8 × niveau + 9, plus son rang quand on le connaît).
+  Banc : `npm run verify:monde-feminin` (789 contrôles). Aperçu : `/scripts/apercuMondeFeminin.html`.
+  ⚠️ **LES DEUX MONDES PARTAGENT DES NOMS DE CLUBS** (« Stade Toulousain », « Racing 92 ») et tout le jeu retrouve un club
+  par son nom (`clubParNom`, `effectifDuClub`, 80 usages) : ne PAS ajouter ces championnats à `COMPETITIONS`. Le
+  branchement proposé (pas encore validé) : choisir le monde au lancement d'une carrière, pas les additionner — et garder
+  le catalogue de la ligue en ligne sur le monde masculin, qu'il recalcule côté navigateur à partir des mêmes données.
+  Manquent : les clubs de l'All-Ireland League (la page de la fédération ne les liste pas), Fédérale 1 et 2 féminines,
+  quatre clubs d'Élite 2, les effectifs de la Farah Palmer Cup, de la Liga (sauf Getxo) et de cinq clubs de Serie A.
+  ⚠️ La répartition Premiership / Championship de la Farah Palmer Cup est SUPPOSÉE (les six premières du classement fourni).
+- **Vidéos TikTok** : `scripts/promoFeminines.html` (deux promos jouées avec les vraies cartes), `filmerFemininesTikTok.cjs`
+  (Chrome piloté), `monterFemininesTikTok.cjs` → `trailer/tiktok-feminines/`. ⚠️ **LES MATCHS SE FILMENT IMAGE PAR IMAGE**
+  (`/rn26/index.html?banc=1` : un pas de 1/60 s, dessiné puis photographié), jamais en temps réel : le flux d'images tombait
+  à dix-sept par seconde et saccadait au plaquage. Deux passes sur la même graine : relever les temps forts dans l'état du
+  moteur (essai, plaquage dominant, défenseur assis, percée), puis ne dessiner que leurs fenêtres. `GENRE=homme` filme les
+  joueurs ; le montage alterne un clip des joueuses et un clip des joueurs.
+- **Pas fait** : l'import en base (ni locale ni production), la validation des profils, l'envoi des images Octobre Rose dans le Labo,
+  le terrain vu de haut n'a pas de joueuses (la 3D en a, voir plus haut) ; Blagnac, Lille et Nancy n'ont pas de portraits ; `verify:influenceurs`
+  échoue sur une règle de composition sans rapport.
 
 ## Intégration FFR 2026_10_FFR_FULL
 

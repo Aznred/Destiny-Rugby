@@ -29,6 +29,8 @@
 import { EFFECTIFS_REELS } from '../data/effectifsReels.js';
 import { CLUBS_NOUVEAUX, effectifNouveau } from '../data/nouvellesLigues.js';
 import { NATIONS_PAR_ZONE } from '../data/rugby.js';
+import { MONDE_FEMININ } from './mondeActif.js';
+import { CLUBS_FEMININS, effectifFeminin } from '../data/mondeFeminin.generated.js';
 
 /**
  * Combien de prénoms on cherche avant de s'arrêter.
@@ -110,6 +112,15 @@ function collecter(accepte: (nation: string) => boolean): Vivier {
     prenoms.add(d.prenom);
     noms.add(d.nom);
   };
+
+  // Monde féminin : les noms sont ceux des joueuses, jamais ceux des effectifs masculins.
+  if (MONDE_FEMININ) {
+    for (const club of CLUBS_FEMININS) {
+      for (const j of effectifFeminin(club) ?? []) if (!j.generee) ajouter(j.nation, j.nom);
+      if (prenoms.size >= CIBLE && noms.size >= CIBLE) break;
+    }
+    return { prenoms: [...prenoms], noms: [...noms] };
+  }
 
   // ⚠️ LES EFFECTIFS RÉELS D'ABORD. Ils sont déjà décodés en objets, alors que
   // `effectifNouveau` décode à la demande et met en cache : commencer par eux

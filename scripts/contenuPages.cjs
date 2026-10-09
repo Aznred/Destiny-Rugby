@@ -4,7 +4,7 @@
 // des métadonnées et du plan du site ; ici, il n'y a que ce qu'on lit. On peut
 // donc corriger une phrase sans toucher au rendu, et l'inverse.
 //
-// ⚠️ CHAQUE CHIFFRE SORT DU CODE OU D'UNE MESURE. « 655 clubs », « 44 semaines »,
+// ⚠️ CHAQUE CHIFFRE SORT DU CODE OU D'UNE MESURE. « 655 clubs », « 53 repères »,
 // « 0,15 s de pas de simulation », « 88 % de plaquages réussis » : tout est
 // vérifiable dans `src/data/`, `src/lib/moteur/` ou dans la sortie des scripts
 // `scripts/verif*.ts`. Si un réglage change dans le jeu, il doit changer ici.
@@ -15,8 +15,8 @@ const SITE = {
   nom: 'Destiny Rugby',
   origine: 'https://www.destiny-rugby.fr',
   auteur: 'Colin Gomez',
-  contact: 'destiny.rugby.fr@gmail.com',
-  modificationAccueil: '2026-09-13',
+  contact: 'contact@destiny-rugby.fr',
+  modificationAccueil: '2026-10-09',
 };
 
 const PAGES = [
@@ -104,7 +104,7 @@ const PAGES = [
       { h2: 'La boucle complète en un regard', id: 'boucle-en-ligne' },
       { parcours: [
         { titre: 'Rejoindre', texte: 'Crée un compte, ouvre une ligue ou utilise le code reçu d’un ami.' },
-        { titre: 'Bâtir', texte: 'Pars avec trente joueurs Bronze, ouvre des packs et travaille ton collectif.' },
+        { titre: 'Bâtir', texte: 'Pars avec trente licenciés de Régionale 3, ouvre des packs et travaille ton collectif.' },
         { titre: 'Jouer', texte: 'Compose un groupe de vingt-trois et suis les rencontres en direct.' },
         { titre: 'Durer', texte: 'Négocie sur le marché, dispute les compétitions et construis l’histoire du club.' },
       ] },
@@ -199,7 +199,7 @@ const PAGES = [
         { titre: 'Faire sa saison', texte: 'Le temps de jeu et les statistiques produisent une vraie note de saison.' },
         { titre: 'Choisir la suite', texte: 'Prolonger, signer ailleurs, viser une sélection ou préparer la retraite.' },
       ] },
-      'Une saison dure **44 semaines**, d’août à juin. Toutes les dates intermédiaires sont jouées, même quand tu avances directement jusqu’à un rendez-vous plus lointain : le championnat, la fatigue, les blessures et les statistiques ne sont jamais sautés.',
+      'Le calendrier annuel compte **53 repères hebdomadaires**, de juillet à la clôture de juin. Chaque avance suit les dates du jeu : préparation, championnat, coupes, sélections et récupération. La fatigue, les blessures et les statistiques accompagnent ce calendrier.',
 
       { h2: '1. Créer son joueur', id: 'creation-joueur' },
       'Tu peux commencer entre **16 et 30 ans**. Commencer jeune donne plus de saisons pour atteindre le potentiel ; commencer plus tard crée une carrière courte, déjà sous pression. Le choix de la nation ouvre ensuite les sélections U20 puis seniors quand ton niveau le permet.',
@@ -216,7 +216,7 @@ const PAGES = [
       { h3: 'Le club fixe la difficulté immédiate' },
       'Les **655 clubs français** et les dix divisions, de la Régionale 3 au Top 14, sont disponibles au départ. Dans un petit club, tu joues davantage mais les infrastructures et la visibilité sont modestes. Dans un grand club, la concurrence à ton poste peut te garder hors du groupe. La force de l’effectif, pas le prestige du nom, décide de ton temps de jeu.',
       { h3: 'Deux traits, pour toute la carrière' },
-      'Tu choisis deux traits de caractère parmi douze. Chaque avantage possède une contrepartie : **Guerrier** aide la note et le capitanat mais augmente le risque et la gravité des blessures ; **Bourreau de travail** accélère la progression mais coûte dans les grands rendez-vous ; **Ambitieux** attire davantage d’offres mais fragilise le moral et le vestiaire. Ils ne pourront pas être remplacés ensuite.',
+      'Tu choisis deux traits de caractère parmi ceux disponibles sur ton compte. Chaque avantage possède une contrepartie : **Guerrier** aide la note et le capitanat mais augmente le risque et la gravité des blessures ; **Bourreau de travail** accélère la progression mais coûte dans les grands rendez-vous ; **Ambitieux** attire davantage d’offres mais fragilise le moral et le vestiaire. Ils ne pourront pas être remplacés ensuite. Certains traits supplémentaires peuvent être débloqués en Ovas : cela ouvre des choix, sans ajouter un troisième trait.',
       { encadre: 'Bon réflexe : ouvre l’effectif dès la création. Compare ta note aux joueurs du même poste. C’est la façon la plus sûre de savoir si tu seras titulaire, remplaçant ou hors groupe.' },
 
       { h2: '2. Lire l’écran Carrière', id: 'ecran-carriere' },
@@ -421,7 +421,7 @@ const PAGES = [
     slug: 'guide',
     court: 'Guide express',
     titre: 'Guide de Destiny Rugby : mener une carrière de rugbyman',
-    description: 'Comment jouer : créer son joueur, traverser une saison de 44 semaines, jouer ses matchs, négocier ses contrats et raccrocher au bon moment.',
+    description: 'Comment jouer : créer son joueur, préparer sa saison, jouer ses matchs, négocier ses contrats et raccrocher au bon moment.',
     chapo: 'Destiny Rugby est un jeu de rôle de carrière : tu incarnes **un seul rugbyman**, de son premier match en Régionale 3 jusqu\'à sa retraite. Pas de gestion d\'effectif, pas de budget à équilibrer, tu ne contrôles qu\'un homme, et tout le reste t\'arrive.',
     blocs: [
       { h2: 'Créer son joueur', id: 'creation' },
@@ -435,7 +435,7 @@ const PAGES = [
       { encadre: 'Ta générale de départ se situe entre 30 et 40. C\'est volontairement bas : la progression est le cœur du jeu, et la moitié des carrières plafonnent autour de 58. Atteindre 80 arrive à peu près une fois sur huit, et dépasser 85 une fois sur trente.' },
 
       { h2: 'La semaine, l\'unité de temps du jeu', id: 'semaine' },
-      'Une saison fait **44 semaines**, d\'août à juin : 23 journées de championnat, 8 dates de coupe d\'Europe, 8 fenêtres internationales, 3 semaines de phase finale et la trêve. Chaque semaine, il se passe quatre choses.',
+      'La saison suit **53 repères hebdomadaires**, de juillet à juin. Les rencontres dépendent du championnat, des coupes et des sélections ; toutes les semaines ne comportent pas un match. Chaque semaine peut combiner quatre éléments.',
       { liste: [
         '**Un match, s\'il y en a un.** Tu le joues, ou tu le regardes se jouer.',
         '**Une séance d\'entraînement** sur le secteur que tu as choisi. Elle tourne en permanence : tu ne cliques pas chaque semaine, tu changes de secteur quand tu veux.',
@@ -594,56 +594,10 @@ const PAGES = [
     ],
   },
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  {
-    slug: 'journal',
-    court: 'Journal',
-    titre: 'Journal de développement : ce qui a été corrigé, et pourquoi',
-    description: 'Les grands chantiers du jeu, les bugs trouvés en mesurant plutôt qu\'en regardant, et les décisions de conception qui ont été renversées.',
-    chapo: 'Ce journal ne liste pas des fonctionnalités : il raconte des **erreurs mesurées**. La plupart des corrections décrites ici viennent d\'un chiffre qui ne collait pas, pas d\'un défaut visible à l\'écran.',
-    blocs: [
-      { h2: 'Le moteur de match a été réécrit de zéro', id: 'moteur' },
-      'La première version produisait des scores de **248-207**, 64 essais par match, aucune mêlée ni touche, 530 tentatives de 50/22, et seuls quatre joueurs touchaient le ballon. Il n\'en reste rien.',
-      'Ce qui l\'a remplacée tient en trois idées : un déplacement à inertie (chaque joueur a un vecteur vitesse), une chaîne de passes décidée à chaque libération de ballon, et une défense en deux rideaux qui ne se rue pas toute entière sur le porteur.',
 
-      { h2: 'Le classement était réellement impossible à atteindre', id: 'difficulte' },
-      'L\'étalonnage de la progression a été mesuré sur cent carrières de douze saisons. Le premier réglage donnait une générale médiane de 42 et un **maximum de 76** : personne n\'atteignait jamais 80, et il tombait 0,02 titre par carrière. Ce n\'était pas exigeant, c\'était fermé.',
-      { tableau: [
-        ['', 'Avant', 'Après'],
-        ['Générale médiane', '42', '58 à 63'],
-        ['90ᵉ centile', '-', '80'],
-        ['Maximum', '76', '85 à 90'],
-        ['Carrières ≥ 80', '0 / 100', '10 à 15 / 100'],
-      ] },
-      'Le levier corrigé ne profite qu\'aux joueurs qui ont **de la marge à rattraper** entre leur niveau et leur potentiel. Un joueur né sans potentiel ne perce toujours pas : il n\'a rien à combler.',
-
-      { h2: 'La forme ne remontait jamais', id: 'forme' },
-      'Signalé en jeu : « impossible de récupérer de la forme, à la moitié de la saison on est à zéro ». Le bilan d\'une semaine de match était **structurellement négatif**, environ -10 par semaine de match, contre +6 les week-ends sans match. Sur trente semaines de match, le joueur touchait le fond avant Noël et n\'en ressortait plus.',
-      'La correction n\'est pas un bonus fixe : c\'est une **convergence** vers une condition de base qui dépend de l\'endurance et de l\'âge. Un bonus fixe a le défaut inverse, trop petit il ne change rien, trop grand tout le monde reste à 100 et la forme ne veut plus rien dire.',
-
-      { h2: 'Un test au vert devant un écran cassé', id: 'armoire' },
-      'L\'armoire à trophées en 3D affichait « aucun chevauchement » pendant que des trophées se superposaient à l\'écran. Trois causes se cumulaient, et aucune n\'était visible à la relecture : l\'échelle d\'une pièce ne regardait que sa hauteur (un bouclier mis à hauteur de buste fait deux fois la largeur de sa case), le décalage aléatoire était calculé en part de case plutôt qu\'en espace réellement libre, et **la rotation des pièces n\'était comptée nulle part**, une pièce pivotée de 30° occupe au sol jusqu\'à moitié plus de largeur.',
-      { encadre: 'La leçon a été appliquée ailleurs : on ne mesure plus jamais un compteur en lisant le texte affiché. « Plaquage haut » figurait déjà comme habillage aléatoire de n\'importe quelle pénalité, le compter dans les phrases donnait 5,75 gestes illégaux par match au lieu de 1,25.' },
-
-      { h2: 'Une règle de conception renversée', id: 'bagarres' },
-      'Le système de bagarres posait au départ : « on ne déclenche jamais une bagarre au hasard, elle est toujours la suite d\'un geste du joueur ». Intention louable, résultat en jeu : **rien n\'arrivait jamais** si l\'on ne cliquait pas sur « chambrer », et l\'équipe adverse était un décor poli.',
-      'Le match s\'échauffe maintenant tout seul, deux adversaires proches se cherchent, la température monte, et un plaquage haut peut échapper à n\'importe lequel des trente joueurs, d\'autant plus qu\'il est fatigué. Mais le principe de fond tient : une friction adverse ne coûte rien au joueur tant qu\'il n\'y répond pas. C\'est l\'autre qui prend la pénalité.',
-
-      { h2: 'Les scripts de mesure eux-mêmes peuvent mentir', id: 'mesure' },
-      'C\'est le piège le plus coûteux du projet, et il s\'est produit deux fois. Après la suppression du mode « saison rapide », les scripts d\'étalonnage enchaînaient des fins de saison sans jamais jouer les semaines : chaque saison se terminait avec zéro match et zéro essai, et la mesure annonçait une générale médiane de 40 là où le jeu réel en produisait 63.',
-      'Un banc d\'essai faux est pire qu\'une absence de banc d\'essai : on corrige le jeu pour compenser un test cassé. La règle retenue : quand un chiffre surprend, on vérifie d\'abord l\'instrument.',
-
-      { h2: 'Ce qui ne bouge jamais', id: 'invariants' },
-      { liste: [
-        '**Le score du match est celui de la ligue.** Vérifié à chaque modification du moteur.',
-        '**Le déterminisme.** Deux parties identiques donnent le même match, à la minute près. Rien ne vit dans une variable de module : deux matchs simulés en parallèle se la partageraient.',
-        '**Le jeu reste entier sans intelligence artificielle.** Situations, scénarios et jugement des réponses ont tous un équivalent écrit à l\'avance.',
-        '**Ce qui s\'achète est cosmétique.** Aucun objet de la boutique ne touche à un attribut, à la forme ou au potentiel.',
-      ] },
-    ],
-  },
 ];
 
 const { PAGES_ADDITIONNELLES } = require('./contenuAdditionnel.cjs');
 
-module.exports = { PAGES: [...PAGES, ...PAGES_ADDITIONNELLES], SITE };
+const { actualiserPages } = require('./contenuWiki.cjs');
+module.exports = { PAGES: actualiserPages([...PAGES, ...PAGES_ADDITIONNELLES]), SITE };

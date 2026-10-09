@@ -1,4 +1,5 @@
 import { PHOTOS_NEW_MAJ } from '../data/photosNewMaj.js';
+import { cleJoueurImage } from './demandesImage';
 import { photoJoueurFfr } from './joueursFfr.js';
 // LES PHOTOS DE PROFIL DE L’OVALE
 // Portraits officiels locaux en priorité ; portrait stable du catalogue sinon.
@@ -247,10 +248,42 @@ export function definirPortraitsDeCartes(portraits: ReadonlyMap<string, string>)
   memoire.clear();
 }
 
+/**
+ * « MON IMAGE » : ce qu'une joueuse ou un joueur a demandé pour son portrait, une fois la demande acceptée (voir
+ * `lib/demandesImage.ts`). Retiré : plus aucun portrait, où que ce soit (la carte garde la silhouette). Remplacé : le
+ * portrait qu'il a proposé passe devant tous les autres. Registre de module, rempli par `imagesJoueurs.ts`.
+ */
+const portraitsRetires = new Set<string>();
+const portraitsChoisis = new Map<string, string>();
+export function definirChoixImages(retirees: readonly string[], ajoutees: Readonly<Record<string, string>>): void {
+  portraitsRetires.clear(); portraitsChoisis.clear();
+  for (const cle of retirees) portraitsRetires.add(cle);
+  for (const [cle, image] of Object.entries(ajoutees)) portraitsChoisis.set(cle, image);
+  memoire.clear();
+}
+/** `null` : le joueur a fait retirer son portrait. Une adresse : celui qu'il a choisi. `undefined` : il n'a rien demandé. */
+export function choixImage(nom: string): string | null | undefined {
+  if (!portraitsRetires.size && !portraitsChoisis.size) return undefined;
+  const cle = cleJoueurImage(nom);
+  return portraitsRetires.has(cle) ? null : portraitsChoisis.get(cle);
+}
+
+/**
+ * LES PORTRAITS DU MONDE FÉMININ : quand il est chargé (`lib/mondeActif.ts`), une joueuse n'a QUE le portrait de sa fiche.
+ * Les index masculins (LNR, FFR, dossier `public/photos`) ne sont pas consultés : une homonyme n'hérite pas d'un visage.
+ */
+let portraitsDuMonde: Map<string, string> | null = null;
+export function definirPortraitsDuMonde(portraits: ReadonlyMap<string, string>): void {
+  portraitsDuMonde = new Map(portraits);
+  memoire.clear();
+}
+
 export function photoReelle(nom: string, club?: string): string | undefined {
   const cleMemo = `${club ?? ''}|${nom}`;
   if (memoire.has(cleMemo)) return memoire.get(cleMemo);
-  const trouvee = photoJoueurFfr(nom, club) ?? chercherPhoto(nom) ?? portraitsDeCartes.get(normaliserNom(nom));
+  const choix = choixImage(nom);
+  const trouvee = choix === null ? undefined : choix ?? (portraitsDuMonde ? portraitsDuMonde.get(nom)
+    : photoJoueurFfr(nom, club) ?? chercherPhoto(nom) ?? portraitsDeCartes.get(normaliserNom(nom)));
   memoire.set(cleMemo, trouvee);
   return trouvee;
 }

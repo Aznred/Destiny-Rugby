@@ -1,0 +1,79 @@
+[
+  {
+    "id": "f-pwr",
+    "url": "https://www.thepwr.com/logo.svg",
+    "reference": "https://www.thepwr.com/",
+    "fichier": "sources/competitions/feminines/logos/f-pwr.svg",
+    "collecte": "2026-10-09"
+  },
+  {
+    "id": "f-elite1",
+    "url": "https://api-web.monclubhouse.ffr.fr/assets/ea454b79-c1b9-4ac3-ad31-c0a742938515?format=png&width=512",
+    "reference": "https://monclubhouse.ffr.fr/nationales/elite-1-feminine/qualification-50150",
+    "fichier": "sources/competitions/feminines/logos/f-elite1.png",
+    "collecte": "2026-10-09"
+  },
+  {
+    "id": "f-elite2",
+    "url": "https://api-web.monclubhouse.ffr.fr/assets/dff11de5-ff0b-4a0e-8be9-efad6c24b5f3?format=png&width=512",
+    "reference": "https://monclubhouse.ffr.fr/nationales/elite-2-feminine/phase-finale-48900",
+    "fichier": "sources/competitions/feminines/logos/f-elite2.png",
+    "collecte": "2026-10-09"
+  },
+  {
+    "id": "f-celtic",
+    "url": "https://celticrugbycomp.com/wp-content/uploads/2024/01/WRU-3939-Celtic-Challenge-Logo_LS-REV.png",
+    "reference": "https://celticrugbycomp.com/",
+    "fichier": "sources/competitions/feminines/logos/f-celtic.png",
+    "collecte": "2026-10-09"
+  },
+  {
+    "id": "f-aupiki",
+    "url": "https://upload.wikimedia.org/wikipedia/en/f/f1/Super_Rugby_Aupiki.png",
+    "reference": "https://en.wikipedia.org/wiki/Super_Rugby_Aupiki",
+    "fichier": "sources/competitions/feminines/logos/f-aupiki.png",
+    "collecte": "2026-10-09"
+  },
+  {
+    "id": "f-superw",
+    "url": "https://upload.wikimedia.org/wikipedia/en/e/e6/Super_W_logo_2018.png",
+    "reference": "https://en.wikipedia.org/wiki/Super_Rugby_Women%27s",
+    "fichier": "sources/competitions/feminines/logos/f-superw.png",
+    "collecte": "2026-10-09"
+  },
+  {
+    "id": "f-fpc",
+    "url": "https://upload.wikimedia.org/wikipedia/en/d/d6/Farah_Palmer_Cup.svg",
+    "reference": "https://en.wikipedia.org/wiki/Farah_Palmer_Cup",
+    "fichier": "sources/competitions/feminines/logos/f-fpc.svg",
+    "collecte": "2026-10-09"
+  },
+  {
+    "id": "f-seriea",
+    "url": "https://upload.wikimedia.org/wikipedia/commons/c/cc/FIR_Women%27s_Serie_A_Elite_2023.png",
+    "reference": "https://commons.wikimedia.org/wiki/File:FIR_Women%27s_Serie_A_Elite_2023.png",
+    "fichier": "sources/competitions/feminines/logos/f-seriea.png",
+    "collecte": "2026-10-09"
+  },
+  {
+    "id": "f-liga",
+    "url": "https://ferugby.es/wp-content/uploads/2024/02/AF_Iberdrola_Rugby_RGB_POS.png",
+    "reference": "https://ferugby.es/wp-json/wp/v2/media?search=logo%20iberdrola&per_page=100",
+    "fichier": "sources/competitions/feminines/logos/f-liga.png",
+    "collecte": "2026-10-09"
+  },
+  {
+    "id": "f-ail",
+    "url": "/logos-competitions/irlandeAIL.png",
+    "reference": "https://www.irishrugby.ie/league/fixtures-results/1271",
+    "fichier": "sources/competitions/feminines/logos/f-ail.png",
+    "collecte": "2026-10-09"
+  },
+  {
+    "id": "f-ail2",
+    "url": "/logos-competitions/irlandeAIL.png",
+    "reference": "https://www.irishrugby.ie/league/fixtures-results/1271",
+    "fichier": "sources/competitions/feminines/logos/f-ail2.png",
+    "collecte": "2026-10-09"
+  }
+]

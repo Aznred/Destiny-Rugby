@@ -13,6 +13,12 @@ export interface SourceFfr {
   position_confidence?: number; identity_confidence?: number; club_strength?: number;
   promoted?: boolean; senior_appearances?: number; performance?: number;
   minutes?: number; observed_progression?: number; pro_squad?: boolean;
+  /**
+   * Note et potentiel posés par un classement à part (`noter_feminines.py` : joueuses d'Élite 1 et de
+   * Premiership Women's Rugby, dont la fédération ne relève pas les matchs). ⚠️ Ce ne sont PAS `overall` /
+   * `potential`, les notes brutes du collecteur, que rien ne lit : sans ces deux champs la note reste calculée.
+   */
+  curated_overall?: number; curated_potential?: number;
 }
 export interface ProfilFfr {
   id: string; name: string; identity_key: string; gender: 'male' | 'female' | 'unknown';
@@ -44,6 +50,9 @@ export function niveauFfr(competition?: string, gender = 'male'): number | null 
   const feminine = gender === 'female';
   if (/\b(top 14)\b/.test(c)) return 78;
   if (/\b(pro d2)\b/.test(c)) return 68;
+  if (/premiership women|pwr/.test(c) && feminine) return 78;
+  // Championnats étrangers et sélections : seules des internationales y ont une carte, toujours notée à part.
+  if (/farah palmer|super rugby women|super rugby aupiki|all ireland league|celtic challenge|serie a elite|liga iberdrola|women s elite rugby|women s premier division|championnat canadien feminin|championnat du japon feminin|selections nationales feminines/.test(c) && feminine) return 72;
   if (/elite.*1|premiere division elite/.test(c) && feminine) return 74;
   if (/elite.*2|deuxieme division elite/.test(c) && feminine) return 63;
   if (/crabos/.test(c)) return 52;
@@ -84,10 +93,11 @@ export function classifierFfr(raw: SourceFfr, reference = '2026-10-08'): ProfilF
   if (level === null) reasons.push('UNKNOWN_COMPETITION_LEVEL');
   if (identity_confidence < .85) reasons.push('LOW_IDENTITY_CONFIDENCE');
   if (gender === 'unknown') reasons.push('UNKNOWN_GENDER');
-  if (matches < 3) reasons.push('INSUFFICIENT_MATCHES');
+  const curated = Number.isFinite(raw.curated_overall) && raw.curated_overall! >= 1 && raw.curated_overall! <= 99;
+  if (matches < 3 && !curated) reasons.push('INSUFFICIENT_MATCHES');
   if (espoir && !youth) reasons.push('ESPOIR_REQUIRES_SENIOR_EVIDENCE');
   const data_confidence = Math.round(born(identity_confidence * .25 + position_confidence * .2 + (level !== null ? .15 : 0)
-    + Math.min(15, matches) / 15 * .2 + (starts !== null ? .1 : 0) + (recent ? .1 : 0)) * 100) / 100;
+    + Math.min(15, curated ? 15 : matches) / 15 * .2 + (starts !== null ? .1 : 0) + (recent ? .1 : 0)) * 100) / 100;
   // Division sets the prior, appearances, starts, position-adjusted performance,
   // club evidence and trajectory set bounded corrections. Missing evidence stays null.
   let overall: number | null = null;
@@ -99,10 +109,16 @@ export function classifierFfr(raw: SourceFfr, reference = '2026-10-08'): ProfilF
       + performance + born(raw.club_strength ?? 0, -2, 2) + born(raw.performance ?? 0, -2, 2), 1, 99));
     potential = Math.round(born(overall + (youth ? 8 : age !== null && age < 23 ? 4 : 0) + (raw.promoted ? 2 : 0), overall, 99));
   }
+  if (curated && level !== null) {
+    // Le classement à part fait autorité sur la note, jamais sur l'éligibilité : club, poste, saison et
+    // identité restent exigés plus bas.
+    overall = Math.round(raw.curated_overall!);
+    potential = Math.round(born(Number.isFinite(raw.curated_potential) ? raw.curated_potential! : overall, overall, 99));
+  }
   const usage: UsageFfr = youth ? 'YOUTH_REGEN_SOURCE' : senior && gender !== 'unknown'
     ? gender === 'female' ? 'FEMALE_SENIOR_CARD' : 'MALE_SENIOR_CARD'
     : !name ? 'IGNORE' : 'NEEDS_REVIEW';
-  const eligible = senior && gender !== 'unknown' && recent && matches >= 3 && !!raw.club && !!raw.competition && overall !== null
+  const eligible = senior && gender !== 'unknown' && recent && (matches >= 3 || curated) && !!raw.club && !!raw.competition && overall !== null
     && identity_confidence >= .85 && position_confidence >= .65 && data_confidence >= .65;
   const identifiantSource = raw.ffr_id ? `ffr_${raw.ffr_id}` : /^ffr[_-]\d+$/i.test(raw.player_id ?? '')
     ? `ffr_${raw.player_id!.replace(/^ffr[_-]/i, '').replace(/^0+(?=\d)/, '')}` : raw.player_id ?? `unresolved:${normaliserFfr(name)}`;

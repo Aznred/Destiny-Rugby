@@ -1,14 +1,15 @@
 import type { FamillePoste, JeuneForme, Joueur, PosteId, TransfertAnnonce } from '../types.js';
 import { POSTE_PAR_ID, posteDepuisFamille } from '../data/rugby.js';
 import { COMPETITIONS, clubParNom, competitionDuClub, NOTE_PAR_NIVEAU } from '../data/clubs.js';
-import { EFFECTIFS_REELS, NOTE_CLUB_REEL } from '../data/effectifsReels.js';
-import { EFFECTIFS_AMATEURS } from '../data/amateurs.js';
+// ⚠️ Tables du MONDE CHARGÉ (`data/sourcesDuMonde.ts`) : vides dans le monde féminin, où un club peut porter le nom d'un club masculin.
+import { EFFECTIFS_REELS, NOTE_CLUB_REEL, EFFECTIFS_AMATEURS } from '../data/sourcesDuMonde.js';
 import { joueursFfrDuClub } from './joueursFfr.js';
 import { recalibrerNoteFfr, echelleFfrDuClub, bornerNoteInitialeFfr } from './echelleNotesFfr.js';
 import {
   effectifNouveau, NOTE_CLUB_NOUVEAU, type JoueurNouveau,
-} from '../data/nouvellesLigues.js';
+} from '../data/sourcesDuMonde.js';
 import { mercatoReel, type RecrueReelle } from './mercato.js';
+import { MONDE_FEMININ } from './mondeActif.js';
 import { generationDuClub } from './generations.js';
 import { noteJoueurRevalorisee, postesJoueurReel } from './evaluationJoueurReel.js';
 import { joueursCatalogueDuClub, sourceCatalogueEffectifs } from './catalogueEffectifs.js';
@@ -90,7 +91,16 @@ const PART_FRANCAIS: Record<number, number> = {
   0: 0.5, 1: 0.55, 2: 0.65, 3: 0.75, 4: 0.82, 5: 0.88, 6: 0.93, 7: 0.96,
 };
 
-const PRENOMS = [
+// Monde féminin : les joueuses générées en cours de carrière (successions, renforts) portent des prénoms féminins.
+// ⚠️ MÊME LONGUEUR que la liste masculine (39) : le tirage `rng()` consomme le même nombre de valeurs, l'ordre figé des tirages ne bouge pas.
+const PRENOMS_FEMININS = [
+  'Léa', 'Manon', 'Camille', 'Chloé', 'Emma', 'Inès', 'Jade', 'Louise',
+  'Lucie', 'Zoé', 'Clara', 'Sarah', 'Pauline', 'Marine', 'Romane', 'Margaux',
+  'Mathilde', 'Julie', 'Anaïs', 'Laura', 'Océane', 'Élise', 'Justine', 'Morgane',
+  'Maëlle', 'Alexia', 'Charlotte', 'Agathe', 'Fanny', 'Juliette', 'Coralie',
+  'Lola', 'Yaël', 'Ambre', 'Nina', 'Gaëlle', 'Maïlys', 'Itsaso', 'Maialen',
+];
+const PRENOMS = MONDE_FEMININ ? PRENOMS_FEMININS : [
   'Léo', 'Hugo', 'Gabriel', 'Louis', 'Arthur', 'Jules', 'Adam', 'Maël',
   'Lucas', 'Noah', 'Liam', 'Sacha', 'Paul', 'Antoine', 'Baptiste', 'Romain',
   'Thibault', 'Mathis', 'Enzo', 'Théo', 'Nathan', 'Tom', 'Clément', 'Quentin',

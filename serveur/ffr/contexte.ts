@@ -30,6 +30,13 @@ export function serviceFfr(storage?: StockageJoueurs){
       let cached=pools.get(pool);
       if(storage&&(!cached||Date.now()-cached.at>=30000)){
         try{
+          // ⚠️ D'ABORD LA RÉVISION, EN QUELQUES OCTETS. Le catalogue entier n'est relu que si elle a changé (une décision
+          // dans Labo → Base joueurs, un nouvel import) ; sinon le cache est simplement prolongé.
+          const legere=cached&&storage.revisionCatalogue?await storage.revisionCatalogue():null;
+          if(legere&&cached&&cached.revision===legere.version+':'+legere.revision+(pool==='mixed'?':'+legere.revision:'')){
+            cached.at=Date.now();
+            return contexteFfr.run({...contexteFfr.getStore(),pool,joueurs:cached.joueurs,revisionFfr:cached.revision},op);
+          }
           const result=await storage.catalogue(pool==='women'?'female':'male');
           if(pool==='mixed') { const feminine=await storage.catalogue('female'); result.joueurs=[...result.joueurs,...feminine.joueurs]; result.revision+=':'+feminine.revision; }
           const revision=result.version+':'+result.revision;

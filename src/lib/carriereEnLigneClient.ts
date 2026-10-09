@@ -201,7 +201,7 @@ export const annulerOffreSolo = (offre: string) =>
 export const retirerPropositionSolo = (offre: string) =>
   requete<ReponseEchangeSolo>({ action: 'retirerPropositionSolo', offre });
 export const supprimerLigueCarriere = (ligue: string) => requete<{ ok: boolean }>({ action: 'supprimerLigue', ligue });
-export interface IdentiteLigue { playerPool?: 'men' | 'women'; embleme?: string; logo?: string; tropheeId?: string; playoffs?: boolean; dotationOvas?: number; packsActifs?: string[]; packsGratuitsParJour?: number; doublonsAutorises?: boolean; cartesSpeciales?: boolean }
+export interface IdentiteLigue { playerPool?: 'men' | 'women' | 'mixed'; embleme?: string; logo?: string; tropheeId?: string; playoffs?: boolean; dotationOvas?: number; packsActifs?: string[]; packsGratuitsParJour?: number; doublonsAutorises?: boolean; cartesSpeciales?: boolean }
 export const creerLigueCarriere = (nom: string, clubNom: string, rythme: number, maxClubs: number, identite: IdentiteLigue = {}) =>
   requete<VueCarriereEnLigne>({ action: 'creer', nom, clubNom, rythme, maxClubs, ...identite });
 export const rejoindreLigueCarriere = (code: string, clubNom: string, embleme?: string) => requete<VueCarriereEnLigne>({ action: 'rejoindre', code, clubNom, embleme });

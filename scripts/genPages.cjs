@@ -31,7 +31,7 @@
 // ni de React, ni de JavaScript, ni même de CSS externe pour être lues.
 //
 // Elles vivent dans `public/`, que Vite recopie tel quel : `/wiki/` et ses deux
-// dossiers carrière, `/guide/`, `/pyramide/`, `/moteur/`, `/journal/`. Le jeu,
+// dossiers carrière, `/guide/`, `/pyramide/`, `/moteur/`, `/mises-a-jour/`. Le jeu,
 // lui, reste l'application d'une seule page à la racine.
 //
 // ⚠️ LE CONTENU DOIT RESTER VRAI. Du remplissage tombe sous exactement la même
@@ -91,10 +91,16 @@ function bloc(b) {
   if (typeof b === 'string') return `      <p>${riche(b)}</p>`;
   if (b.h2) return `      <h2 id="${b.id}">${echapper(b.h2)}</h2>`;
   if (b.h3) return `      <h3>${echapper(b.h3)}</h3>`;
+  if (b.accueilWiki) return `<div class="depart-wiki"><span>PREMIÈRE VISITE ?</span><a href="/guide/">Commencer une carrière <span aria-hidden="true">↗</span></a><a href="/wiki/collection/">Comprendre les packs <span aria-hidden="true">↗</span></a><a href="/mises-a-jour/">Voir les nouveautés <span aria-hidden="true">↗</span></a></div>`;
+  if (b.rechercheWiki) return `<section class="recherche-wiki" aria-label="Trouver un guide"><label for="recherche-guide">Rechercher un sujet</label><input id="recherche-guide" type="search" placeholder="Match, fatigue, transfert, packs…" autocomplete="off" aria-controls="resultats-guides" /><p id="nombre-guides" class="resultat-compte" role="status" aria-live="polite"></p><div id="resultats-guides" class="guides-liste">${PAGES.filter(p => !p.legal && p.slug !== 'wiki' && p.slug !== 'mises-a-jour').map(p => `<a class="guide-lien" href="/${p.slug}/" data-recherche="${echapper([p.titre, p.description, ...p.blocs.flatMap(b => typeof b === 'string' ? [b] : [b.h2 || '', b.h3 || '', ...(b.liste || [])])].join(' '))}"><span><strong>${echapper(p.court)}</strong><small>${echapper(p.description)}</small></span><span aria-hidden="true">↗</span></a>`).join('')}</div><p id="aucun-guide" hidden>Aucun guide trouvé. Essaie « match », « contrat » ou « collection ».</p></section>`;
+  if (b.maj) {
+    const m = b.maj;
+    return `<section class="note-maj"><div class="note-meta"><span class="statut-maj${m.statut === 'Bêta privée' ? ' beta' : ''}">${echapper(m.statut)}</span>${m.date ? `<time datetime="${echapper(m.date)}">${echapper(dateLisible(m.date))}</time>` : ''}</div><h3>${echapper(m.titre)}</h3>${m.groupes.map(g => `<div class="maj-groupe"><h4>${echapper(g.type)}</h4><ul>${g.points.map(p => `<li>${riche(p)}</li>`).join('')}</ul></div>`).join('')}</section>`;
+  }
   if (b.image) {
     return [
       '      <figure class="figure-wiki">',
-      `        <img src="${echapper(b.image)}" alt="${echapper(b.alt || '')}" width="1672" height="941" loading="${b.prioritaire ? 'eager' : 'lazy'}"${b.prioritaire ? ' fetchpriority="high"' : ''} />`,
+      `        <img src="${echapper(b.image)}" alt="${echapper(b.alt || '')}" width="${b.largeur || 1600}" height="${b.hauteur || 1000}" loading="${b.prioritaire ? 'eager' : 'lazy'}"${b.prioritaire ? ' fetchpriority="high"' : ''} />`,
       b.legende ? `        <figcaption>${riche(b.legende)}</figcaption>` : '',
       '      </figure>',
     ].filter(Boolean).join('\n');
@@ -117,8 +123,7 @@ function bloc(b) {
       '      <div class="wiki-choix">',
       ...b.cartesWiki.map((carte) => [
         `        <a class="wiki-carte" href="${echapper(carte.href)}">`,
-        `          <img src="${echapper(carte.image)}" alt="" width="1672" height="941" loading="lazy" />`,
-        '          <span class="wiki-carte-voile"></span>',
+        `          <img src="${echapper(carte.image)}" alt="" width="1600" height="1000" loading="lazy" />`,
         '          <span class="wiki-carte-contenu">',
         `            <small>${echapper(carte.surtitre)}</small>`,
         `            <strong>${echapper(carte.titre)}</strong>`,
@@ -228,7 +233,7 @@ function scriptAdsense() {
 function sommaire(page) {
   if (page.sansSommaire) return '';
   const titres = page.blocs.filter((b) => b && b.h2);
-  if (titres.length < 3) return '';
+  if (titres.length < 2) return '';
   return [
     '      <nav class="sommaire" aria-label="Sommaire">',
     '        <p class="sommaire-titre">Sur cette page</p>',
@@ -257,6 +262,13 @@ function rendre(page, toutes) {
     .filter((slug) => slug !== page.slug)
     .map((slug) => toutes.find((p) => p.slug === slug))
     .filter(Boolean);
+  const navigation = [
+    ['Parcours', ['wiki/carriere-joueur', 'wiki/carriere-entraineur', 'wiki/ligue-en-ligne', 'wiki/collection']],
+    ['Le jeu au quotidien', ['guide', 'postes-rugby', 'saison-rugby', 'moteur', 'transferts-contrats', 'blessures-recuperation', 'pyramide']],
+    ['Actualités', ['mises-a-jour']],
+  ];
+  const barre = `<aside class="barre-guide"><nav aria-label="Tous les guides"><details open><summary>Tous les guides <span aria-hidden="true">⌄</span></summary><div class="barre-contenu"><a class="retour-wiki" href="/wiki/"${page.slug === 'wiki' ? ' aria-current="page"' : ''}>Accueil du wiki</a>${navigation.map(([titre, slugs]) => `<p class="nav-groupe">${titre}</p>${slugs.map(slug => toutes.find(p => p.slug === slug)).filter(Boolean).map(p => `<a href="/${p.slug}/"${p.slug === page.slug ? ' aria-current="page"' : ''}>${echapper(p.court)}</a>`).join('')}`).join('')}<a class="barre-rechercher" href="/wiki/#guides">Rechercher un guide <span aria-hidden="true">↗</span></a></div></details></nav></aside>`;
+  const lecture = Math.max(1, Math.ceil(JSON.stringify(page.blocs).split(/\s+/).length / 220));
 
   return `<!doctype html>
 <html lang="fr">
@@ -277,6 +289,7 @@ ${gtmTete()}
   <meta name="twitter:card" content="summary_large_image" />
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="/contenu.css" />
+  <script src="/wiki.js" defer></script>
   <script type="application/ld+json">
 ${JSON.stringify({
     '@context': 'https://schema.org',
@@ -295,20 +308,29 @@ ${JSON.stringify({
 ${page.noAds ? '' : scriptAdsense()}</head>
 <body class="${echapper(page.classe || '')}">
 ${gtmCorps()}
+  <a class="aller-contenu" href="#contenu">Aller au contenu</a>
   <header class="entete">
-    <a class="marque" href="/">🏉 ${echapper(SITE.nom)}</a>
+    <a class="marque" href="/"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><ellipse cx="12" cy="12" rx="5" ry="10" transform="rotate(40 12 12)"/><path d="m9 15 6-6m-5 2 3 3m-1-5 3 3"/></svg><span>Destiny <b>Rugby</b><small>LE WIKI</small></span></a>
     <nav aria-label="Pages du guide">
-${editoriales.map((p) => `      <a href="/${p.slug}/"${p.slug === page.slug ? ' aria-current="page"' : ''}>${echapper(p.court)}</a>`).join('\n')}
+${['wiki', 'moteur', 'wiki/collection', 'mises-a-jour'].map(slug => toutes.find(p => p.slug === slug)).filter(Boolean).map((p) => `      <a href="/${p.slug}/"${p.slug === page.slug || p.slug === 'wiki' && page.slug.startsWith('wiki/') && page.slug !== 'wiki/collection' ? ' aria-current="page"' : ''}>${echapper(p.court)}</a>`).join('\n')}
     </nav>
     <a class="jouer" href="/">Jouer</a>
   </header>
 
-  <main>
+  <main id="contenu" class="${page.legal ? 'mise-en-page-legale' : 'mise-en-page-guide'}">
+    ${page.legal ? '' : barre}
+    <div class="lecture-guide">
     <article>
       <p class="fil"><a href="/">Accueil</a>${page.slug.startsWith('wiki/') ? ' › <a href="/wiki/">Wiki</a>' : ''} › ${echapper(page.court)}</p>
+      <header class="titre-article${page.slug === 'wiki' ? ' accueil-article' : ''}">
+      <div>
+      ${page.legal ? '' : `<p class="surtitre">${page.slug === 'wiki' ? 'DESTINY RUGBY / GUIDE DE JEU' : page.slug === 'mises-a-jour' ? 'NOUVEAUTÉS / CORRECTIFS / À VENIR' : 'LE WIKI / ' + echapper(page.court.toUpperCase())}</p>`}
       <h1>${echapper(page.titre)}</h1>
-      ${page.legal ? '' : `<p class="signature">Par ${echapper(SITE.auteur)} · Mis à jour le ${echapper(dateLisible(page.modifiee || SITE.modificationAccueil))}</p>`}
       <p class="chapo">${riche(page.chapo)}</p>
+      ${page.legal ? '' : `<p class="signature">Mis à jour le <time datetime="${echapper(page.modifiee || SITE.modificationAccueil)}">${echapper(dateLisible(page.modifiee || SITE.modificationAccueil))}</time>${page.slug === 'wiki' || page.slug === 'mises-a-jour' ? '' : ` <span>· ${lecture} min de lecture</span>`}</p>`}
+      </div>
+      ${page.slug === 'wiki' ? '<figure class="couverture-wiki"><img src="/images/wiki/match.webp" alt="Un match de Destiny Rugby en 3D" width="1600" height="1000" fetchpriority="high" /><figcaption>Sur le terrain, dans Destiny Rugby.</figcaption></figure>' : ''}
+      </header>
 ${imagePrioritaire ? bloc(imagePrioritaire) : ''}
 ${sommaire(page)}
 ${corps}
@@ -320,6 +342,8 @@ ${corps}
 ${autres.map((p) => `        <li><a href="/${p.slug}/"><strong>${echapper(p.titre)}</strong><span>${echapper(p.description)}</span></a></li>`).join('\n')}
       </ul>
     </nav>` : ''}
+    <a class="haut-page" href="#contenu">Revenir en haut <span aria-hidden="true">↑</span></a>
+    </div>
   </main>
 
   <footer class="pied">
@@ -340,6 +364,10 @@ for (const page of PAGES) {
   fs.writeFileSync(path.join(dossier, 'index.html'), rendre(page, PAGES), 'utf8');
   ecrites++;
 }
+
+// Ancienne adresse publique conservée pour les favoris, sans l'ancien journal.
+fs.mkdirSync(path.join(SORTIE, 'journal'), { recursive: true });
+fs.writeFileSync(path.join(SORTIE, 'journal/index.html'), `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="refresh" content="0;url=/mises-a-jour/"><meta name="robots" content="noindex, follow"><link rel="canonical" href="${SITE.origine}/mises-a-jour/"><title>Mises à jour · Destiny Rugby</title></head><body><p>Le journal est devenu le <a href="/mises-a-jour/">journal des mises à jour et correctifs</a>.</p></body></html>`);
 
 // --- Le plan du site suit ------------------------------------------------------
 // ⚠️ IL EST RÉGÉNÉRÉ ICI, pas maintenu à la main : une page ajoutée sans son

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { chargerEmblemesCarriere } from './carriereEnLigneClient';
 import { clubParNom } from '../data/clubs';
 import { cleClub } from './cleClub';
+import { LOGOS_CLUBS_FEMININS } from '../data/logosFeminins.generated';
 const cle = (nom: string) => nom.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
 /**
@@ -54,10 +55,15 @@ function blasonDuClub(table: Map<string, string>, club: string): string | undefi
 let logos: Map<string, string> | undefined;
 let demande: Promise<Map<string, string>> | undefined;
 /** Même table partagée pour chaque écran et toutes les cartes, y compris les packs. */
-export function useBlasonCarte(club: string, explicite?: string) {
+/**
+ * ⚠️ UNE CARTE DE JOUEUSE LIT D'ABORD LA TABLE DES CLUBS FÉMININS (`feminin`), par le nom exact de son club : le filet
+ * ci-dessus donnait à « Gloucester-Hartpury » l'écusson de Gloucester Rugby, et rien à « Loughborough Lightning ».
+ */
+export function useBlasonCarte(club: string, explicite?: string, feminin = false) {
+  const desFilles = feminin ? LOGOS_CLUBS_FEMININS[club] : undefined;
   const [table, setTable] = useState(logos);
   useEffect(() => {
-    if (explicite || logos) { if (logos) setTable(logos); return; }
+    if (explicite || desFilles || logos) { if (logos) setTable(logos); return; }
     let actif = true;
     demande ??= chargerEmblemesCarriere().then(r => {
       logos = new Map(r.groupes.flatMap(g => g.emblemes.map(e => [cle(e.nom), e.logo] as const)));
@@ -65,7 +71,7 @@ export function useBlasonCarte(club: string, explicite?: string) {
     }).catch(e => { demande = undefined; throw e; });
     void demande.then(t => { if (actif) setTable(t); }).catch(() => {});
     return () => { actif = false; };
-  }, [explicite]);
+  }, [explicite, desFilles]);
   const duJeu = clubParNom(club)?.logo;
-  return explicite ?? (table && blasonDuClub(table, club)) ?? duJeu;
+  return explicite ?? desFilles ?? (table && blasonDuClub(table, club)) ?? duJeu;
 }

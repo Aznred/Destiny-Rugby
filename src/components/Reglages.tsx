@@ -15,6 +15,7 @@ import { useModalDialog } from '../lib/useModalDialog';
 import { Icone } from './Icone';
 import { ReglagesControleDirect } from './ReglagesControleDirect';
 import { ReglagesTutoriel } from './tutoriel/ReglagesTutoriel';
+import { ReglagesImage } from './ReglagesImage';
 import { usePreferencesInterface } from '../store/preferencesInterface';
 
 // Les huit ambiances. `apercu` est le dégradé montré sur la pastille — il
@@ -269,6 +270,9 @@ export function Reglages({ onFermer }: Props) {
 
         {/* ⚠️ LES TUTORIELS (Correctif 18) : rejouer chaque guide, ou les désactiver tous. L'ancien bloc repliable n'expliquait que l'ancien tutoriel. */}
         <ReglagesTutoriel onFermer={fermer} />
+
+        {/* « MON IMAGE » : une joueuse ou un joueur fait retirer son portrait, ou propose le sien (décidé dans le Labo). */}
+        <ReglagesImage />
 
         <div className="note-sans-cle">
           <Icone nom="sifflet" taille={15} /> {t('reg.sansCleAide')}

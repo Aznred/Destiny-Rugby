@@ -748,12 +748,16 @@ il évolue donc dès la fenêtre internationale suivante. Vérification :
 - **Premier chargement allégé** : la feuille de style passe de **503 à 112 Ko**
   (les 250 drapeaux ne sont plus recopiés dedans en base 64), et sept écrans
   plus le moteur de match ne sont téléchargés qu'au moment où l'on s'en sert.
-- **Un wiki illustré des deux carrières** : `/wiki/` mène vers deux dossiers
-  complets, `/wiki/carriere-joueur/` et `/wiki/carriere-entraineur/`. Environ
-  **6 900 mots**, deux illustrations originales, des parcours visuels, tableaux,
-  conseils et sommaires documentent les mécaniques réelles sans charger React.
-  Les pages sont générées depuis `scripts/contenuPages.cjs`, jamais retouchées
-  directement dans `public/`.
+- **Un wiki illustré par le jeu** : `/wiki/` rassemble joueur, entraîneur,
+  ligue en ligne, collection et guides pratiques. Navigation par sujet,
+  recherche, sommaires et interface mobile ; captures réelles en WebP uniquement.
+  `/mises-a-jour/` présente nouveautés, correctifs et bêtas privées, sans annoncer
+  de date de sortie non confirmée. `/journal/` redirige vers cette nouvelle page.
+  Contenu : `scripts/contenuPages.cjs`, `contenuAdditionnel.cjs`, `contenuWiki.cjs`.
+  Régénérer avec `node scripts/genPages.cjs` ; capturer les écrans avec
+  `node scripts/capturerWiki.cjs`, vérifier desktop/mobile avec `--verifier`.
+  `WIKI_ORIGINE` choisit l’aperçu local (défaut : port 5188). Les captures sont
+  produites par des composants réels sur une carrière de démonstration sans sauvegarde.
 
 ## 📈 Mesure d'audience : un écran vaut une page vue
 
@@ -1789,6 +1793,9 @@ Fait avec 🏉 — thème artisanal, front soigné, sans rendu générique.
 ## Correctifs 11 et 12 (octobre 2026)
 
 - **Ligue en ligne — consommation.** Un match de 80 minutes regardé par ses deux managers demandait 16 680 requêtes SQL ; il en demande 1 959, et envoie cinq fois moins d'octets aux écrans. Mesure : `npm run mesure:conso-direct` ; garde-fou : `npm run verify:ecriture-direct`. Détail dans `CLAUDE.md` (« Ce qu'un direct demande à la base »).
+- **Rugby féminin (9 octobre 2026, préparé, non déployé).** 1 676 cartes de joueuses (PWR, Élite 1 et 2, Super Rugby Women's, Aupiki, Celtic Challenge, Serie A Élite, sélections), portraits détourés, écussons des clubs, modèle féminin en 3D. Une ligue en ligne est **mixte par défaut**, ou réservée aux joueuses ou aux joueurs ; son créateur peut changer en cours de route. 23 cartes Octobre Rose, tirables dans tous les packs une fois publiées dans le Labo.
+- **« Mon image ».** Dans les Réglages, une joueuse ou un joueur demande le retrait de son portrait ou propose le sien ; la demande est acceptée ou refusée dans le Labo. Contact et demandes de retrait : contact@destiny-rugby.fr (voir Mentions légales).
+- **Base de données.** `node --env-file=.env scripts/diagnostiquerTailleBase.mjs` montre ce que pèse chaque table. Le catalogue FFR n'est plus retéléchargé toutes les trente secondes (trois gigaoctets de transfert par jour évités).
 - **Ligue en ligne — règles 3.** Les nouveaux matchs jouent l'IA par poste des matchs de carrière, étalonnée pour le temps réel (`REGLES_MATCH_EN_LIGNE`).
 - **Match.** Vent (direction, force, rafales), tirs au but aux trajectoires variées (poteau compris), drops décidés par la situation, changement de côté à la mi-temps, renvoi d'en-but et mêlée à cinq, touche rapide conforme, cellules d'avants lancées avant la passe, chenille tenue jusqu'à la frappe.
 - **Habillage TV.** Bandeau du marqueur avec sa statistique, bulles d'information, vent devant un tir — sans aucune requête.

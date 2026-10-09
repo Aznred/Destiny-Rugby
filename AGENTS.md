@@ -91,6 +91,21 @@ puis à la racine. Le jeu ne lit que `public/m3d/` (**85 `.glb`, 114 Mo**).
 
 ## Architecture
 
+### Wiki et mises à jour
+
+Les pages publiques sont générées par `scripts/genPages.cjs`, depuis
+`contenuPages.cjs`, `contenuAdditionnel.cjs` et `contenuWiki.cjs` (actualisation
+du guide). Ne pas modifier directement le HTML de `public/`. Le wiki utilise
+uniquement des captures réelles du jeu en `public/images/wiki/*.webp`, jamais
+d’illustrations IA. `public/contenu.css` porte l’interface ; `public/wiki.js`
+ajoute la recherche, sans empêcher la lecture sans JavaScript. `/mises-a-jour/`
+remplace le journal de développement public ; `/journal/` conserve une redirection.
+Les notes distinguent disponible, évolutions récentes et bêta privée ; aucune
+date de sortie future ne s’invente. `JOURNAL.md` reste la documentation interne.
+Captures : `node scripts/capturerWiki.cjs` ; contrôle desktop/mobile : ajouter
+`--verifier`. Aperçus : `scripts/apercuWiki.html` (sans partie persistée).
+Le plugin `pagesDuWiki` sert les chemins publics du wiki aussi en développement.
+
 ### Le socle
 
 | Fichier | Rôle |

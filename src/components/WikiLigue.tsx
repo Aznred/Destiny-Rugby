@@ -51,17 +51,20 @@ const RUBRIQUES: Rubrique[] = [
 export function WikiLigue() {
   return <section className="wiki-ligue">
     <header className="cel-panneau wiki-ligue-hero">
-      <div>
+      <img className="wiki-ligue-capture" src="/images/wiki/ligue-en-ligne.webp" alt={t('online.wiki.sec2.title')} width="1600" height="1000" loading="lazy" />
+      <div className="wiki-ligue-intro">
         <div className="eyebrow">{t('online.wiki.officialGuide')}</div>
         <h2>{t('online.wiki.title')}</h2>
         <p>{t('online.wiki.desc')}</p>
-      </div>
       <a className="btn primaire" href="/wiki/ligue-en-ligne/" target="_blank" rel="noreferrer">
         <Icone nom="livre" taille={18} /> {t('online.wiki.readFullGuide')}
       </a>
+      <a className="wiki-ligue-maj" href="/mises-a-jour/" target="_blank" rel="noreferrer">{t('accueil.lien.journal')} <span aria-hidden="true">↗</span></a>
+      </div>
     </header>
     <div className="wiki-ligue-grille">
-      {RUBRIQUES.map(rubrique => <article className="cel-panneau wiki-ligue-carte" key={rubrique.titreCle}>
+      {RUBRIQUES.map((rubrique, index) => <article className="cel-panneau wiki-ligue-carte" key={rubrique.titreCle}>
+        <span className="wiki-ligue-numero" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
         <span className="wiki-ligue-icone"><Icone nom={rubrique.icone} taille={23} /></span>
         <h3>{t(rubrique.titreCle)}</h3>
         <p>{t(rubrique.texteCle)}</p>

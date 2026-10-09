@@ -160,3 +160,45 @@ export const HALLOWEEN_DEPART: readonly LigneHalloween[] = [
   ['Dan Carter', '10', 'Nouvelle-Zélande', 91, 'remplacant'],
   ['Cheslin Kolbe', '14/15', 'Afrique du Sud', 89, 'remplacant', 'reel:cheslin kolbe'],
 ];
+
+/**
+ * OCTOBRE ROSE 2026 — les premières cartes spéciales du rugby féminin.
+ *
+ * [nom, numéros, nation, GEN, rôle, club, championnat, âge, identifiant de la
+ * carte ordinaire de la joueuse]. Toutes jouent encore : la carte garde le club
+ * et le championnat, et l'identifiant empêche d'aligner la même joueuse deux
+ * fois (sa carte ordinaire et sa carte Octobre Rose).
+ *
+ * ⚠️ LE GEN N'EST PAS CHOISI À LA MAIN : c'est la note de la carte ordinaire
+ * (`Objectif Ffr/noter_feminines.py`, classement plaqué sur l'échelle du
+ * Top 14) plus deux points, bornée à 96. Quatorze joueuses de Premiership
+ * Women's Rugby, neuf d'Élite 1 — toutes internationales.
+ */
+export type LigneOctobreRose = readonly [string, string, string, number, 'titulaire' | 'remplacant', string, string, number, string];
+
+const PWR = 'Premiership Women\'s Rugby', ELITE_1 = 'Elite 1 Féminine';
+export const OCTOBRE_ROSE_DEPART: readonly LigneOctobreRose[] = [
+  ['Hannah BOTTERMAN', '1', 'Angleterre', 96, 'titulaire', 'Bristol Bears Women', PWR, 27, 'feminine:pwr-bristol-bears-hannah-botterman'],
+  ['Amy COKAYNE', '2', 'Angleterre', 93, 'titulaire', 'Sale Sharks Women', PWR, 30, 'feminine:pwr-sale-sharks-amy-cokayne'],
+  ['Sarah BERN', '3', 'Angleterre', 96, 'titulaire', 'Bristol Bears Women', PWR, 29, 'feminine:pwr-bristol-bears-sarah-bern'],
+  ['Manae FELEU', '4', 'France', 92, 'titulaire', 'FC Grenoble Amazones', ELITE_1, 26, 'ffr_753560'],
+  ['Madoussou FALL RACLOT', '5', 'France', 94, 'titulaire', 'Stade Bordelais', ELITE_1, 28, 'ffr_4371'],
+  ['Zoe STRATFORD', '6', 'Angleterre', 96, 'titulaire', 'Sale Sharks Women', PWR, 29, 'feminine:pwr-sale-sharks-zoe-stratford'],
+  ['Charlotte ESCUDERO', '7/8', 'France', 93, 'titulaire', 'Stade Toulousain', ELITE_1, 25, 'ffr_1338598'],
+  ['Alex MATTHEWS', '8/6', 'Angleterre', 96, 'titulaire', 'Gloucester-Hartpury', PWR, 33, 'feminine:pwr-gloucester-hartpury-alex-matthews'],
+  ['Pauline BOURDON SANSUS', '9', 'France', 94, 'titulaire', 'Stade Toulousain', ELITE_1, 30, 'ffr_493427'],
+  ['Zoe HARRISON', '10', 'Angleterre', 95, 'titulaire', 'Saracens Women', PWR, 28, 'feminine:pwr-saracens-zoe-harrison'],
+  ['Joanna GRISEZ', '11/14', 'France', 91, 'titulaire', 'Stade Bordelais', ELITE_1, 30, 'ffr_703943'],
+  ['Gabrielle VERNIER', '12', 'France', 96, 'titulaire', 'Gloucester-Hartpury', PWR, 29, 'ffr_1557294'],
+  ['Helena ROWLAND', '13/10', 'Angleterre', 93, 'titulaire', 'Loughborough Lightning', PWR, 27, 'feminine:pwr-loughborough-lightning-helena-rowland'],
+  ['Jess BREACH', '14/11', 'Angleterre', 95, 'titulaire', 'Saracens Women', PWR, 28, 'feminine:pwr-saracens-jess-breach'],
+  ['Ellie KILDUNNE', '15', 'Angleterre', 96, 'titulaire', 'Bristol Bears Women', PWR, 27, 'feminine:pwr-bristol-bears-ellie-kildunne'],
+  ['Lark ATKIN-DAVIES', '2', 'Angleterre', 92, 'remplacant', 'Bristol Bears Women', PWR, 31, 'feminine:pwr-bristol-bears-lark-atkin-davies'],
+  ['Annaelle DESHAYE', '1', 'France', 92, 'remplacant', 'Stade Bordelais', ELITE_1, 30, 'ffr_963823'],
+  ['Maud MUIR', '3/1', 'Angleterre', 95, 'remplacant', 'Gloucester-Hartpury', PWR, 25, 'feminine:pwr-gloucester-hartpury-maud-muir'],
+  ['Abbie WARD', '5/4', 'Angleterre', 94, 'remplacant', 'Bristol Bears Women', PWR, 33, 'feminine:pwr-bristol-bears-abbie-ward'],
+  ['Sophie DE GOEDE', '8/5', 'Canada', 95, 'remplacant', 'Saracens Women', PWR, 27, 'feminine:pwr-saracens-sophie-de-goede'],
+  ['Natasha HUNT', '9', 'Angleterre', 94, 'remplacant', 'Gloucester-Hartpury', PWR, 37, 'feminine:pwr-gloucester-hartpury-natasha-hunt'],
+  ['Lina QUEYROI', '10/12', 'France', 93, 'remplacant', 'Stade Toulousain', ELITE_1, 25, 'ffr_1328924'],
+  ['Morgane BOURGEOIS', '15', 'France', 89, 'remplacant', 'Stade Bordelais', ELITE_1, 23, 'ffr_1503550'],
+];

@@ -13,6 +13,9 @@ import { photoDetoureeCatalogue } from '../photosDetourees.js';
 import { recalibrerNoteFfr, echelleFfrDuClub } from '../echelleNotesFfr.js';
 import { noteJoueurRevalorisee, postesJoueurReel } from '../evaluationJoueurReel.js';
 import { COMPETITIONS } from '../../data/clubs.js';
+import { MONDE_FEMININ } from '../mondeActif.js';
+import { effectifFeminin } from '../../data/mondeFeminin.generated.js';
+import { definirPortraitsDuMonde } from '../avatars.js';
 import { LOGO_COMPETITION } from '../../data/logosCompetitions.js';
 import { LOGO_COMPETITION_NOUVEAU } from '../../data/nouvellesLigues.js';
 import { TROPHEES } from '../../data/trophees.js';
@@ -336,12 +339,52 @@ export function packsCatalogueAdmin(): PackCarriere[] {
       return [{...p,nom:`${p.nom} · Féminin`,probabilites,garantie,promesse:`${p.cartes} cartes seniors féminines${garantie?` · ${garantie} garantie`:''}. Bêta interne.`}];
     });
   }
-  return [...PACKS_CARRIERE.map(p => editions[p.id] ?? p), ...Object.values(editions).filter(p => !PACKS_CARRIERE.some(b => b.id === p.id))];
+  const packs = [...PACKS_CARRIERE.map(p => editions[p.id] ?? p), ...Object.values(editions).filter(p => !PACKS_CARRIERE.some(b => b.id === p.id))];
+  return poolFfrCourant() === 'mixed' ? [...packs, ...packsChampionnatsFeminins()] : packs;
+}
+
+/**
+ * LIGUE MIXTE : un pack par championnat féminin (« Premiership Women's Rugby », « Elite 1 Féminine »…), comme les packs
+ * de championnat des joueurs. Trois cartes de ce championnat ; les probabilités sont ramenées aux raretés qui y
+ * existent vraiment (un championnat sans carte Mythique n'en promet pas).
+ */
+export function packsChampionnatsFeminins(): PackCarriere[] {
+  const joueuses = catalogueMondialCarriere().filter(c => c.gender === 'female' && !c.speciale);
+  return [...new Set(joueuses.map(c => c.championnat))].sort().flatMap(championnat => {
+    const candidates = joueuses.filter(c => c.championnat === championnat);
+    const probabilites = { ...MIXTE };
+    for (const rarete of RARETES_CARRIERE) if (!candidates.some(c => c.rarete === rarete)) probabilites[rarete] = 0;
+    const somme = Object.values(probabilites).reduce((a, b) => a + b, 0);
+    if (!somme) return [];
+    for (const rarete of RARETES_CARRIERE) probabilites[rarete] = probabilites[rarete] / somme * 100;
+    return [{ id: `womens:${normaliser(championnat)}`, nom: championnat, prix: 700, cartes: 3, famille: 'monde' as const,
+      filtre: { championnats: [championnat] }, probabilites, promesse: `3 joueuses de ${championnat}.` }];
+  });
 }
 
 /** Les identités viennent des effectifs réels. Les notes FFR sont estimées dans le jeu. */
 export function catalogueBaseCarriere(): readonly SourceCarte[] {
   if (catalogue) return filtrerCatalogueFfr(catalogue);
+  // ═══ MONDE FÉMININ ═══ Le catalogue est celui des joueuses, club par club (`data/mondeFeminin.generated.ts`) : leurs
+  // notes sont déjà étalonnées, rien n'est recalibré ni revalorisé. ⚠️ Aucune des sources masculines n'est lue : un club
+  // féminin peut porter le nom d'un club masculin (« Stade Toulousain »), ses joueuses ne doivent pas hériter de ses joueurs.
+  if (MONDE_FEMININ) {
+    const joueuses = new Map<string, SourceCarte>(), portraits = new Map<string, string>();
+    for (const competition of COMPETITIONS) for (const club of competition.clubs) for (const j of effectifFeminin(club.nom) ?? []) {
+      // Une inscription est attachée au club. Une internationale peut jouer en franchise Aupiki ET en province FPC :
+      // dédupliquer par son seul nom supprimait ses portraits de la province et y laissait moins de 26 joueuses.
+      const famille = POSTE_PAR_ID[j.poste].famille, sourceId = `feminin:${normaliser(club.nom)}:${normaliser(j.nom)}`;
+      if (j.photo) portraits.set(j.nom, j.photo);
+      const existante = joueuses.get(sourceId);
+      if (existante && existante.note >= j.note) continue;
+      joueuses.set(sourceId, { sourceId, nom: j.nom, famille, poste: j.poste, note: j.note, potentiel: Math.max(j.note, j.potentiel), age: j.age, nation: j.nation,
+        clubReel: club.nom, championnat: competition.nom, pays: competition.pays, photo: j.photo, origine: 'professionnel', rarete: rareteCarriere(j.note),
+        statistiques: statistiquesCarte(j.note, famille, sourceId), gender: 'female' });
+    }
+    definirPortraitsDuMonde(portraits);
+    catalogue = [...joueuses.values()].sort((a, b) => a.sourceId < b.sourceId ? -1 : 1);
+    return filtrerCatalogueFfr(catalogue);
+  }
   const joueurs = new Map<string, SourceCarte>();
   const clubs = new Map(COMPETITIONS.flatMap(c => c.clubs.map(club => [club.nom, c] as const)));
   const ajouter = (brut: SourceCarte) => {

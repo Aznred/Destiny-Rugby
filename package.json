@@ -138,7 +138,9 @@
     "verify:playoffs-ligue": "vite-node scripts/verifierPlayoffsLigue.ts",
     "verify:blesses": "vite-node scripts/verifierBlessesTempsDeJeu.ts",
     "verify:remplacements": "vite-node scripts/verifierRemplacementsPoste.ts",
-    "verify:packs-test": "vite-node scripts/verifierPacksTest.ts"
+    "verify:packs-test": "vite-node scripts/verifierPacksTest.ts",
+    "verify:demandes-image": "vite-node scripts/verifierDemandesImage.ts",
+    "verify:monde-feminin": "vite-node scripts/verifierMondeFeminin.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

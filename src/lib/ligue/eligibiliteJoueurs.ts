@@ -1,5 +1,6 @@
 import { SOURCES_FFR_RETIREES } from '../../data/protectionFfr.generated.js';
 import type { SourceCarte } from './catalogueCarriere.js';
+import { MONDE_FEMININ } from '../mondeActif.js';
 const retirees = new Set(SOURCES_FFR_RETIREES);
 /** Two independent integer hashes: no youth names or licence numbers in this list. */
 export function empreinteSourceFfr(id: string): string {
@@ -10,15 +11,19 @@ export function empreinteSourceFfr(id: string): string {
 export const sourceRetireeFfr = (id: string) => retirees.has(empreinteSourceFfr(id));
 export function carteSeniorAutorisee(c: Pick<SourceCarte, 'sourceId' | 'age' | 'origine' | 'gender' | 'retiree' | 'speciale'>, pool: 'men' | 'women' | 'mixed' = 'men') {
   return !c.retiree && !sourceRetireeFfr(c.sourceId) && !sourceRetireeFfr(c.speciale?.base ?? c.sourceId) && (c.origine === 'formation' || c.age >= 18)
-    && (pool === 'mixed' || (c.gender === 'female' ? pool === 'women' : pool === 'men'));
+    // Une carte SPÉCIALE est une carte de collection : elle sort et se joue dans toutes les ligues (Octobre Rose chez
+    // les joueurs, ICONS chez les joueuses). Seules les cartes ordinaires suivent le genre de la ligue.
+    && (pool === 'mixed' || Boolean(c.speciale) || (c.gender === 'female' ? pool === 'women' : pool === 'men'));
 }
 let fournisseur: () => { pool: 'men' | 'women' | 'mixed'; joueurs: readonly SourceCarte[] } | null = () => null;
 export function fournirPoolFfr(f: typeof fournisseur) { fournisseur = f; }
-export const poolFfrCourant = () => fournisseur()?.pool ?? 'men';
+/** Sans ligue en cours : le monde chargé décide (carrière solo de joueuse → les joueuses sont admises). */
+const POOL_PAR_DEFAUT = MONDE_FEMININ ? 'mixed' as const : 'men' as const;
+export const poolFfrCourant = () => fournisseur()?.pool ?? POOL_PAR_DEFAUT;
 const caches = new WeakMap<readonly SourceCarte[], Map<string, { ajouts: readonly SourceCarte[] | undefined; resultat: readonly SourceCarte[] }>>();
 export function filtrerCatalogueFfr(base: readonly SourceCarte[]): readonly SourceCarte[] {
   const contexte = fournisseur();
-  const pool = contexte?.pool ?? 'men';
+  const pool = contexte?.pool ?? POOL_PAR_DEFAUT;
   const ajouts = contexte?.joueurs;
   const cle = `${pool}`;
   // Cache by identity of both immutable revisions, never by a mutable global flag.

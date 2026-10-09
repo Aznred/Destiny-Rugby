@@ -30,6 +30,7 @@ import {
   CARTES_MAX_PACK_INTERNE, estPackInterne, packInternePourBoutique, PACKS_INTERNES_MAX, PERMISSION_PACKS_INTERNES, PREFIXE_PACK_INTERNE,
   validerDefinitionPackInterne, type PackInterne, type PackInterneBoutique,
 } from '../src/lib/packsInternes.js';
+import { cleJoueurImage, imagesDepuisDemandes, validerDemandeImage, type ImagesJoueurs } from '../src/lib/demandesImage.js';
 import { apparencePackInterne, contenuPackInterne, detailPackInterne, rechercherCartes, resoudreCartes, universCartes } from './packsInternes.js';
 
 export interface RequeteCarriere {
@@ -195,9 +196,13 @@ const comptesEtat = (e: EtatCarriereEnLigne) => e.clubs.map(c => c.compteId);
 export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer?: (etat: EtatCarriereEnLigne) => Promise<void>) {
   const ffr = serviceFfr(stockage.joueurs);
   const poolsLigues = new Map<string,string>();
+  // ⚠️ LES JOUEUSES SONT OUVERTES À TOUTES LES LIGUES (9 octobre 2026, sur demande) : une ligue est mixte par défaut, ou
+  // réservée aux joueuses, ou aux joueurs. Remettre `POOLS_FEMININS_OUVERTS` à `false` rend la bêta d'avant : les ligues
+  // féminines et mixtes redeviennent invisibles à qui n'a pas l'autorisation serveur.
+  const POOLS_FEMININS_OUVERTS = true;
   const autoriserPool = (pool?: string) => {
     const contexte = contexteFfr.getStore();
-    if ((pool === 'women' || pool === 'mixed') && contexte?.request && !contexte.authorized) throw new ErreurHttp(404, 'Ligue introuvable.');
+    if (!POOLS_FEMININS_OUVERTS && (pool === 'women' || pool === 'mixed') && contexte?.request && !contexte.authorized) throw new ErreurHttp(404, 'Ligue introuvable.');
   };
   /** Mes propositions reçues et envoyées. `null` si le stockage ne sait pas (ou échoue) : l'écran garde sa liste. */
   const suiviEchanges = async (compte: string): Promise<SuiviEchangesSolo | null> => {
@@ -350,6 +355,8 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
   const sessionsChaudes = new Map<string, { compte: CompteStocke; jusqua: number; toucheLe: number }>();
   /** La permission des packs de test, gardée une minute pour les LECTURES seulement (voir `peutCreerDesPacks`). */
   const permissionsPacks = new Map<string, { valeur: boolean; jusqua: number }>();
+  // La liste publique des portraits retirés ou remplacés : une lecture de la base par instance et par cinq minutes au plus.
+  let imagesJoueurs: { jusqua: number; liste: ImagesJoueurs } | null = null;
   /** `comptes.vu_le` sert à repérer les comptes inactifs depuis deux semaines : dix minutes de précision suffisent. */
   const PAS_VU_LE_MS = 10 * 60_000;
   const lireSalonAmical = async (code: string): Promise<SalonAmicalServeur | null> => {
@@ -890,9 +897,34 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         if (definition?.imageReady && (definition.published || definition.publieeLe)) return await servirImageSpeciale(true);
       }
 
+      // ═══ « MON IMAGE » — lectures publiques ════════════════════════════════
+      // La liste des portraits retirés ou remplacés à la demande des joueurs, et les portraits ACCEPTÉS eux-mêmes. Sans
+      // compte : chaque écran du jeu les applique. L'adresse d'un portrait porte la révision de la liste, donc le cache long ne ment pas.
+      if (req.method === 'GET' && url.searchParams.has('imagesJoueurs')) {
+        if (!imagesJoueurs || imagesJoueurs.jusqua <= maintenant) {
+          const acceptees = stockage.demandesImage ? await stockage.demandesImage.acceptees() : [];
+          const liste = imagesDepuisDemandes(acceptees, id => `/api/carriere?imageJoueur=${id}`);
+          for (const cle of Object.keys(liste.ajoutees)) liste.ajoutees[cle] += `&v=${encodeURIComponent(liste.revision)}`;
+          imagesJoueurs = { jusqua: maintenant + 300_000, liste };
+        }
+        res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=300');
+        return res.status(200).json(imagesJoueurs.liste);
+      }
+      const imageJoueur = req.method === 'GET' ? url.searchParams.get('imageJoueur') : null;
+      if (imageJoueur) {
+        const donnees = /^[0-9a-f-]{36}$/.test(imageJoueur) ? await stockage.demandesImage?.image(imageJoueur, true) : null;
+        const morceaux = donnees ? /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/]+=*)$/.exec(donnees) : null;
+        if (!morceaux) throw new ErreurHttp(404, 'Image introuvable.');
+        if (!res.envoyer) throw new ErreurHttp(501, 'Images indisponibles sur cet hôte.');
+        res.setHeader('Content-Type', morceaux[1]);
+        res.setHeader('Cache-Control', url.searchParams.has('v') ? 'public, max-age=31536000, immutable' : 'public, max-age=300');
+        res.status(200);
+        return res.envoyer(new Uint8Array(Buffer.from(morceaux[2], 'base64')));
+      }
+
       const corps = req.method === 'POST' ? objet(typeof req.body === 'string' ? JSON.parse(req.body) : req.body) : {};
-      // Le Labo envoie des images de cartes (350 Ko) et des lots d'import.
-      const tailleMax = corps.action === 'sauvegarderBoutique' ? 4_000_000 : corps.action === 'atelier' ? 1_000_000 : 24_000;
+      // Le Labo envoie des images de cartes (350 Ko) et des lots d'import ; « Mon image », un portrait de 600 px.
+      const tailleMax = corps.action === 'sauvegarderBoutique' ? 4_000_000 : corps.action === 'atelier' ? 1_000_000 : corps.action === 'demandeImage' ? 300_000 : 24_000;
       const corpsJson = JSON.stringify(corps);
       if (corpsJson.length > tailleMax) throw new ErreurHttp(413, 'Demande trop volumineuse.');
       const action = corps.action;
@@ -1024,6 +1056,36 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
           if ((erreur as Error).message.includes('indisponible')) throw new ErreurHttp(404, (erreur as Error).message);
           throw erreur;
         }
+      }
+      // ═══ « MON IMAGE » — demandes et décisions ═════════════════════════════
+      // Un compte demande le retrait de son portrait, ou propose le sien ; RIEN ne s'applique avant la décision du compte
+      // interne (n'importe qui peut prétendre être n'importe qui). ⚠️ Décider est réservé à l'identifiant serveur `kiri`.
+      if (url.searchParams.has('demandesImage') || action === 'demandeImage' || action === 'deciderDemandeImage') {
+        const demandes = stockage.demandesImage;
+        if (!demandes) throw new ErreurHttp(503, 'Demandes indisponibles sur ce serveur.');
+        res.setHeader('Cache-Control', 'private, no-store');
+        const interne = compte.identifiant === 'kiri';
+        if (req.method === 'GET') {
+          const detail = url.searchParams.get('image');
+          if (detail) {
+            if (!interne || !/^[0-9a-f-]{36}$/.test(detail)) throw new ErreurHttp(403, 'FORBIDDEN');
+            return res.status(200).json({ image: await demandes.image(detail, false) });
+          }
+          return res.status(200).json({ miennes: await demandes.miennes(compte.id), ...(interne ? { toutes: await demandes.toutes(200) } : {}) });
+        }
+        if (action === 'demandeImage') {
+          if (!await stockage.limiter(`demande-image:${compte.id}`, 6, 3_600_000, maintenant)) throw new ErreurHttp(429, 'Trop de demandes. Réessaie plus tard.');
+          const saisie = validerDemandeImage(corps);
+          if ('erreur' in saisie) throw new ErreurHttp(400, saisie.erreur);
+          if (!await demandes.creer(compte.id, randomUUID(), saisie, cleJoueurImage(saisie.joueur))) throw new ErreurHttp(409, 'img.erreur.trop');
+          return res.status(200).json({ miennes: await demandes.miennes(compte.id) });
+        }
+        if (!interne) throw new ErreurHttp(403, 'FORBIDDEN');
+        const statut = corps.decision === 'acceptee' ? 'acceptee' : corps.decision === 'refusee' ? 'refusee' : corps.decision === 'attente' ? 'attente' : null;
+        if (!statut || typeof corps.id !== 'string' || !/^[0-9a-f-]{36}$/.test(corps.id)) throw new ErreurHttp(400, 'Décision invalide.');
+        if (!await demandes.decider(corps.id, statut, compte.identifiant)) throw new ErreurHttp(404, 'Demande introuvable.');
+        imagesJoueurs = null;
+        return res.status(200).json({ toutes: await demandes.toutes(200) });
       }
       // ═══ PACKS DE TEST (Correctif 33) ═══════════════════════════════════════
       // ⚠️ LA PERMISSION EST UNE LIGNE DE LA BASE, relue ici — jamais un pseudo, jamais un drapeau du navigateur. Sans elle,
@@ -1430,7 +1492,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         if (!id) {
           const publicCourant = await assurerDivisionsPubliques(maintenant);
           const ligues = (await assurerLaboratoireKiri(compte, maintenant))
-            .filter(l => (!l.publique || l.publique.cycle === publicCourant.cycle) && (l.playerPool !== 'women' || contexte?.authorized));
+            .filter(l => (!l.publique || l.publique.cycle === publicCourant.cycle) && (POOLS_FEMININS_OUVERTS || l.playerPool !== 'women' || contexte?.authorized));
           // ⚠️ LE RÉSUMÉ ARRIVE DÉJÀ TAILLÉ. `stockage.ligues` rendait l'état
           // complet de chaque ligue pour qu'on en extraie ces sept champs ici :
           // 400 Ko traversaient le réseau par ligue et par ouverture d'écran.
@@ -1566,8 +1628,9 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         return res.status(200).json(observateur ? await completerVuePublique(vueCarriereObservateur(e, leger)) : await vueCompte(e, compte.id, leger));
       }
       if (action === 'creer') {
-        if(corps.playerPool !== undefined && !['men','women'].includes(String(corps.playerPool)))throw new ErreurHttp(400,'Pool de joueurs invalide.');
-        const playerPool = corps.playerPool === 'women' ? 'women' : 'men';
+        if(corps.playerPool !== undefined && !['men','women','mixed'].includes(String(corps.playerPool)))throw new ErreurHttp(400,'Pool de joueurs invalide.');
+        // Mixte par défaut : joueuses et joueurs dans les mêmes packs, les mêmes équipes, le même marché.
+        const playerPool = corps.playerPool === 'women' ? 'women' : corps.playerPool === 'men' ? 'men' : 'mixed';
         autoriserPool(playerPool);
         // ⚠️ COMPTER, C'EST COMPTER. Ce plafond lisait la liste entière — donc,
         // avant, l'état complet de vingt ligues — pour en prendre la longueur.
@@ -1586,7 +1649,8 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
             packsActifs: Array.isArray(corps.packsActifs) ? corps.packsActifs : undefined,
             packsGratuitsParJour: typeof corps.packsGratuitsParJour === 'number' ? corps.packsGratuitsParJour : undefined,
             doublonsAutorises: corps.doublonsAutorises === true,
-            cartesSpeciales: playerPool === 'men' && corps.cartesSpeciales === true,
+            // Le tirage écarte lui-même les cartes de l'autre genre (`preparerTirageSpecial`) : Octobre Rose ne sort pas chez les hommes.
+            cartesSpeciales: corps.cartesSpeciales === true,
           }, maintenant, randomBytes(24).toString('hex')));
           if (await stockage.creerLigue({ id, code, etat: e, comptes: comptesEtat(e), version: 0 })) return res.status(201).json(await vueCompte(e, compte.id));
         }

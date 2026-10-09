@@ -1,9 +1,9 @@
 import { catalogueAdmin } from './atelierCatalogue.js';
-import { carteSeniorAutorisee, sourceRetireeFfr } from './eligibiliteJoueurs.js';
+import { carteSeniorAutorisee, poolFfrCourant, sourceRetireeFfr } from './eligibiliteJoueurs.js';
 import { migrerCartesJeunesse } from './migrationJeunesse.js';
 import { BAREME_CLUBS, pointsDuMatch } from '../bareme.js';
 import { statistiquesCarte } from './statistiquesCarte.js';
-import { rareteCarriere } from './catalogueCarriere.js';
+import { rareteCarriere, packsChampionnatsFeminins } from './catalogueCarriere.js';
 import { echelleFfrDuClub } from '../echelleNotesFfr.js';
 /** Règles exécutées exclusivement par le serveur ; chaque commande travaille sur une copie. */
 import { POSTE_PAR_ID } from '../../data/rugby.js';
@@ -27,8 +27,12 @@ const JOUR = 24 * HEURE;
 const SEMAINE = 7 * JOUR;
 export const PACKS_GRATUITS_PAR_JOUR = 10;
 export const PACKS_DIVISION_PUBLIQUE = ['bronze', 'standard', 'or'] as const;
+// Les packs de championnat féminin (`womens:…`) suivent les joueuses : ouverts dès que la ligue les accueille, sans
+// passer par la liste cochée à la création (qui ne connaît que les packs d'origine).
 const packsActifsLigue = (etat: EtatCarriereEnLigne): string[] | undefined =>
-  etat.publique ? [...PACKS_DIVISION_PUBLIQUE] : etat.packsActifs;
+  etat.publique ? [...PACKS_DIVISION_PUBLIQUE]
+    : etat.packsActifs && (etat.playerPool ?? 'men') !== 'men' ? [...etat.packsActifs, ...etat.packs.filter(p => p.id.startsWith('womens:')).map(p => p.id)]
+    : etat.packsActifs;
 
 /**
  * Une saison accélérée ne doit pas transformer chaque match en dette physique.
@@ -451,7 +455,7 @@ function ajouterClub(etat: EtatCarriereEnLigne, compteId: string, pseudo: string
   // ⚠️ L'unicité par ligue commence ICI, pas au premier pack : deux amis
   // inscrits le même jour ne peuvent pas recevoir le même licencié.
   const cartes = dotationBronzeCarriere(etat.id, id, graine, new Set(etat.doublonsAutorises ? [] : etat.cartes.map(c => c.sourceId)), etat.saison);
-  exiger(etat.playerPool !== 'women' || cartes.length === 30, 'Approuvez assez de joueuses seniors à tous les postes dans Base joueurs pour constituer un effectif de 30 cartes.');
+  exiger(etat.playerPool !== 'women' || cartes.length === 30, 'La ligue féminine n’a pas encore assez de joueuses à tous les postes pour constituer un effectif de 30 cartes. Choisis une ligue mixte en attendant.');
   if (etat.doublonsAutorises) cartes.forEach((carte, i) => { carte.id = idNouvelExemplaire(etat, etat.cartes.length + i); });
   exiger(cartes.length === 30, 'Le vivier de départ est épuisé pour cette ligue.');
   const club: ClubCarriere = { id, compteId, pseudo: pseudo.trim(), nom: nom.trim(), ovas: 0, composition: compositionManagerParDefaut(cartes.map(coequipierDepuisCarte)), strategie: copier(STRATEGIE_EN_LIGNE_DEFAUT), rejointLe: dateServeur(maintenant), embleme: emblemeValide(embleme) ? embleme : undefined };
@@ -580,7 +584,7 @@ function ouvrirPack(etat: EtatCarriereEnLigne, club: ClubCarriere, packId: strin
   // Les cartes spéciales passent AVANT la bande : une chance par carte, qui
   // suit la qualité du pack (`chanceSpecialeParCarte`). Sans carte spéciale
   // possible, `tirage` vaut null et l'ouverture tire exactement comme avant.
-  const tirage = preparerTirageSpecial(pack, etat.cartesSpeciales, maintenant, pris, catalogueSpecial());
+  const tirage = preparerTirageSpecial(pack, etat.cartesSpeciales, maintenant, pris, catalogueSpecial(), poolFfrCourant());
   // Un pack d'événement promet SA carte : sans elle, il ne s'ouvre pas.
   exiger(!pack.garantieSpeciale || tirage?.lots.some(l => l.evenement === pack.garantieSpeciale),
     'Toutes les cartes de cet événement sont déjà distribuées dans votre ligue. Aucun Ova débité.');
@@ -1351,6 +1355,12 @@ function completerPacks(etat: EtatCarriereEnLigne) {
     const i = etat.packs.findIndex(p => p.id === edition.id);
     if(i < 0) etat.packs.push(copier(edition)); else etat.packs[i] = copier(edition);
   }
+  // Ligue mixte : les packs par championnat féminin, tenus à jour avec le catalogue des joueuses ; une ligue redevenue
+  // masculine les perd.
+  if (etat.playerPool === 'mixed') {
+    const feminins = packsChampionnatsFeminins();
+    etat.packs = [...etat.packs.filter(p => !p.id.startsWith('womens:')), ...feminins.map(copier)];
+  } else if ((etat.playerPool ?? 'men') === 'men' && etat.packs.some(p => p.id.startsWith('womens:'))) etat.packs = etat.packs.filter(p => !p.id.startsWith('womens:'));
   const connus = new Map(etat.packs.map(p => [p.id, p]));
   for (const modele of PACKS_CARRIERE) {
     if (catalogueAdmin().packs[modele.id]) continue;
@@ -1530,6 +1540,19 @@ export function agirCarriere(etat: EtatCarriereEnLigne, compteId: string, comman
         // dirait « interdite ici » : une fois distribuées, elles restent permises.
         if (!commande.active) exiger(!nouveau.cartes.some(c => c.speciale), 'Des clubs possèdent déjà des cartes spéciales : elles restent autorisées dans cette ligue.');
         nouveau.cartesSpeciales = commande.active;
+        break;
+      }
+      case 'reglerPool': {
+        // Le créateur ouvre sa ligue à l'autre genre en cours de route (ou la referme). ⚠️ ON NE REFERME PAS SUR DES CARTES
+        // DÉJÀ DISTRIBUÉES : une joueuse dans un vestiaire ne peut pas devenir interdite — la ligue reste alors mixte.
+        exiger(!nouveau.publique && compteId === nouveau.createurId, 'Seul le créateur de la ligue peut choisir joueuses, joueurs ou mixte.');
+        exiger(commande.pool === 'men' || commande.pool === 'women' || commande.pool === 'mixed', 'Réglage invalide.');
+        if (commande.pool !== 'mixed') {
+          const autreGenre = nouveau.cartes.some(c => c.proprietaire !== null && !c.retiree && !c.speciale && (c.gender === 'female') !== (commande.pool === 'women'));
+          exiger(!autreGenre, commande.pool === 'women' ? 'Des clubs possèdent déjà des joueurs : la ligue reste mixte.' : 'Des clubs possèdent déjà des joueuses : la ligue reste mixte.');
+        }
+        nouveau.playerPool = commande.pool;
+        completerPacks(nouveau);
         break;
       }
       case 'modifierRythme': {

@@ -7,7 +7,7 @@
 
 import type { Joueur } from '../types.js';
 import { nomNation } from './nations.js';
-import { EFFECTIFS_REELS } from '../data/effectifsReels.js';
+import { EFFECTIFS_REELS } from '../data/sourcesDuMonde.js';
 import { POSTE_PAR_ID } from '../data/rugby.js';
 import { noteALAge } from './effectif.js';
 import { estJoueurIncarne, versionJoueurIncarne } from './joueurIncarne.js';

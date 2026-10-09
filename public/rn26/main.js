@@ -25,7 +25,7 @@ const BANC=new URLSearchParams(location.search).has('banc');
 const SANS=Object.fromEntries((new URLSearchParams(location.search).get('sans')||'').split(',').filter(Boolean).map(n=>[n,false]));
 async function boot(){
   $('#loading').textContent='Chargement du stade, des équipements et des mouvements…';
-  scene=await creerScene3D($('#scene'),{outils,equipes:EQUIPES,capture:true,camera:'tv',habillage:{nom:'Destiny Rugby'},stade:new URLSearchParams(location.search).get('stade')||undefined,ballon:new URLSearchParams(location.search).get('ballon')||undefined,...SANS});
+  scene=await creerScene3D($('#scene'),{outils,equipes:EQUIPES,capture:true,camera:'tv',genre:new URLSearchParams(location.search).get('genre')||undefined,habillage:{nom:'Destiny Rugby'},stade:new URLSearchParams(location.search).get('stade')||undefined,ballon:new URLSearchParams(location.search).get('ballon')||undefined,...SANS});
   majSon();
   match=scene.brancher(nouveauMatch());
   $('#loading').remove();if(!BANC)requestAnimationFrame(frame);

@@ -34,9 +34,15 @@ export function joueursNeon(url: string): StockageJoueurs {
       const [dataset]=await sql`select version,(select coalesce(max(id),0) from player_reviews where dataset_version=player_datasets.version) as revision
         from player_datasets where status='ACTIVE'`;
       if(!dataset)return {version:'',revision:'',joueurs:[]};
-      const rows=await sql`select data from game_players where dataset_version=${dataset.version} and gender=${gender}
+      // `raw` (la ligne d'origine du collecteur, la moitié du profil) ne sert qu'à l'import : il ne voyage pas.
+      const rows=await sql`select data - 'raw' as data from game_players where dataset_version=${dataset.version} and gender=${gender}
         and status='ACTIVE_CARD' and review='APPROVED' order by id limit 10000`;
       return {version:String(dataset.version),revision:String(dataset.revision),joueurs:rows.map(r=>r.data as ProfilFfr)};
+    },
+    async revisionCatalogue(){
+      const [dataset]=await sql`select version,(select coalesce(max(id),0) from player_reviews where dataset_version=player_datasets.version) as revision
+        from player_datasets where status='ACTIVE'`;
+      return dataset?{version:String(dataset.version),revision:String(dataset.revision)}:{version:'',revision:''};
     },
     async decider(id,revision,action,actor,edit){
       const [row]=await sql`select s.* from source_players s join player_datasets d on d.version=s.dataset_version

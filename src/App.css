@@ -9259,3 +9259,11 @@ select:focus {
   .alerte-stockage { grid-template-columns: auto minmax(0, 1fr); }
   .alerte-stockage .btn { grid-column: 1 / -1; justify-self: stretch; justify-content: center; }
 }
+
+/* Création : joueur ou joueuse (deux mondes). */
+.creation-genre { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 1.4rem; padding-bottom: 1.3rem; border-bottom: 1px solid var(--bordure); }
+.creation-genre > span { grid-column: 1 / -1; font-size: 0.78rem; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: var(--or-400); }
+.creation-genre button { min-height: 48px; border: 1px solid var(--bordure); border-radius: var(--rayon-sm); background: rgba(255, 255, 255, 0.03); color: var(--craie-dim); font: inherit; font-weight: 800; font-size: 0.98rem; cursor: pointer; }
+.creation-genre button.actif { border-color: var(--or-500); color: var(--craie); background: rgba(232, 178, 58, 0.1); }
+.creation-genre button:focus-visible { outline: 2px solid var(--or-400); outline-offset: 2px; }
+.creation-genre small { grid-column: 1 / -1; color: var(--craie-dim); font-size: 0.84rem; line-height: 1.45; }

@@ -135,6 +135,11 @@ export interface ResponsabilitesJoueur {
 }
 
 export interface Joueur {
+  /**
+   * Carrière de JOUEUSE : elle se joue dans le monde du rugby féminin (`lib/mondeActif.ts`). Absent : carrière masculine.
+   * ⚠️ Posé à la création, jamais modifié : c'est lui qui dit quel monde charger pour cette sauvegarde.
+   */
+  genre?: 'F';
   /** Identité aléatoire de cette sauvegarde pour les agrégats du Labo. */
   usageId?: string;
   usageDebut?: string;

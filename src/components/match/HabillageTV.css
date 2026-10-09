@@ -7,6 +7,7 @@
   display:flex; align-items:flex-start; --bloc:clamp(58px,7.4cqw,81px); }
 .btv-logo { display:grid; place-items:center; width:var(--bloc,72px); height:var(--bloc,72px); background:var(--tv-fond); flex:none; }
 .btv-logo img { width:100%; height:100%; object-fit:contain; }
+.btv-marque .btv-logo.btv-logo-feminin img { object-fit:contain; }
 /* Dans le score, le logo de la ligue tient dans un carré exact : un visuel plus haut que large est recadré. */
 .btv-marque .btv-logo { overflow:hidden; aspect-ratio:1; height:auto; }
 .btv-marque .btv-logo img { display:block; min-width:0; min-height:0; max-width:none; max-height:none; object-fit:cover; }

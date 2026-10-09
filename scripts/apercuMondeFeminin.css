@@ -1,0 +1,40 @@
+/* Aperçu du monde féminin : relecture des championnats, clubs et effectifs. */
+html, body { margin: 0; background: var(--fond, #06120c); }
+.mf { max-width: 1180px; margin: 0 auto; padding: 28px 16px 80px; color: var(--craie); font-family: var(--police-forte); }
+.mf header h1 { margin: 4px 0 8px; font-family: var(--police-titre); font-weight: 400; font-size: clamp(2.2rem, 6vw, 3.6rem); text-transform: uppercase; line-height: .95; }
+.mf header p { margin: 0; max-width: 60ch; color: var(--craie-dim); line-height: 1.5; }
+.mf-championnat { margin-top: 30px; padding: 18px; border: 1px solid var(--bordure); border-radius: var(--rayon); background: rgba(255, 255, 255, .025); }
+.mf-championnat.en-attente { opacity: .62; }
+.mf-titre { display: flex; align-items: center; gap: 12px; }
+.mf-titre .fi { font-size: 1.3rem; border-radius: 2px; flex: none; }
+.mf-titre h2 { margin: 0; flex: 1; font-family: var(--police-titre); font-weight: 400; font-size: 1.7rem; text-transform: uppercase; letter-spacing: .01em; }
+.mf-niveau { font-family: var(--police-titre); font-size: 1.7rem; color: var(--or-400); }
+.mf-niveau small { font-size: .8rem; color: var(--craie-dim); }
+.mf-format, .mf-vide { margin: 6px 0 0; color: var(--craie-dim); font-size: .9rem; }
+.mf-clubs { list-style: none; margin: 14px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 8px; align-items: start; }
+.mf-clubs > li { border: 1px solid var(--bordure); border-radius: var(--rayon-sm); overflow: hidden; background: rgba(0, 0, 0, .18); }
+.mf-clubs > li:has(.mf-effectif) { grid-column: 1 / -1; }
+.mf-clubs button { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 56px; padding: 8px 12px; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.mf-clubs button:hover { background: rgba(255, 255, 255, .04); }
+.mf-clubs button:focus-visible { outline: 2px solid var(--or-400); outline-offset: -2px; }
+.mf-couleurs { width: 8px; align-self: stretch; border-radius: 3px; flex: none; }
+.mf-sans-ecusson { width: 30px; height: 30px; border-radius: 50%; border: 1px dashed var(--bordure-forte); flex: none; }
+.mf-club { flex: 1; min-width: 0; display: grid; gap: 1px; }
+.mf-club b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mf-club small, .mf-nom small { color: var(--craie-dim); font-size: .78rem; }
+.mf-note { display: grid; justify-items: end; line-height: 1; }
+.mf-note b { font-family: var(--police-titre); font-weight: 400; font-size: 1.5rem; color: var(--or-400); }
+.mf-note small { font-size: .72rem; color: var(--craie-dim); }
+.mf-effectif { list-style: none; margin: 0; padding: 10px; display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 6px; border-top: 1px solid var(--bordure); }
+.mf-effectif li { display: flex; align-items: center; gap: 9px; padding: 5px 9px 5px 5px; border-radius: var(--rayon-sm); background: rgba(255, 255, 255, .035); }
+.mf-effectif li.generee { background: none; border: 1px dashed var(--bordure); }
+.mf-effectif img { width: 40px; height: 48px; object-fit: contain; object-position: bottom; flex: none; }
+.mf-poste { width: 22px; font-family: var(--police-titre); font-size: 1.1rem; color: var(--craie-dim); text-align: center; flex: none; }
+.mf-nom { flex: 1; min-width: 0; display: grid; }
+.mf-nom b { font-size: .9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mf-effectif .mf-note b { font-size: 1.25rem; }
+@media (max-width: 560px) {
+  .mf-championnat { padding: 14px 10px; }
+  .mf-clubs, .mf-effectif { grid-template-columns: 1fr; }
+  .mf-titre h2 { font-size: 1.3rem; }
+}

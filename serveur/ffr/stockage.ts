@@ -5,6 +5,12 @@ export interface StockageJoueurs {
   acces(compte: string): Promise<boolean>;
   rechercher(params: URLSearchParams): Promise<PageSources>;
   catalogue(gender: 'male' | 'female'): Promise<{ version: string; revision: string; joueurs: ProfilFfr[] }>;
+  /**
+   * La version et la révision du catalogue, SANS ses profils (quelques octets). ⚠️ `contexte.ts` vérifiait toutes les
+   * trente secondes, par instance, si le catalogue avait changé — en le retéléchargeant en entier pour comparer : 9 042
+   * lectures de 330 Ko en une journée, trois gigaoctets de transfert pour un catalogue qui n'avait pas bougé.
+   */
+  revisionCatalogue?(): Promise<{ version: string; revision: string }>;
   decider(id: string, revision: number, action: 'APPROVE' | 'REJECT' | 'EDIT', actor: string, edit?: Record<string, unknown>): Promise<void>;
   rapport(): Promise<unknown>;
   /** Lecture privée de l'instantané initial de carrière, distinct du catalogue de cartes. */

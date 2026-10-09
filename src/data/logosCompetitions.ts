@@ -1,6 +1,17 @@
 // ⚠️ FICHIER GÉNÉRÉ par scripts/copierLogosCompetitions.cjs — ne pas éditer.
 // id de compétition (ou de trophée) → logo officiel dans public/.
 export const LOGO_COMPETITION: Record<string, string> = {
+  'f-pwr': '/logos-competitions/f-pwr.png',
+  'f-aupiki': '/logos-competitions/f-aupiki.png',
+  'f-elite1': '/logos-competitions/f-elite1.png',
+  'f-superw': '/logos-competitions/f-superw.png',
+  'f-fpc': '/logos-competitions/f-fpc.png',
+  'f-celtic': '/logos-competitions/f-celtic.png',
+  'f-seriea': '/logos-competitions/f-seriea.png',
+  'f-liga': '/logos-competitions/f-liga.png',
+  'f-elite2': '/logos-competitions/f-elite2.png',
+  'f-ail': '/logos-competitions/f-ail.png',
+  'f-ail2': '/logos-competitions/f-ail2.png',
   top14: '/logos-competitions/top14.webp',
   prod2: '/logos-competitions/prod2.webp',
   nationale: '/logos-competitions/nationale.png',

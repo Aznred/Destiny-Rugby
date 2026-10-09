@@ -1,4 +1,7 @@
 import { create } from 'zustand';
+import { MONDE_FEMININ } from '../lib/mondeActif';
+/** La carrière en cours appartient-elle au monde que cette page a chargé ? */
+export const joueurDeCeMonde = (j: { genre?: 'F' } | null | undefined): boolean => !j || (j.genre === 'F') === MONDE_FEMININ;
 import { persist } from 'zustand/middleware';
 import { projectionMemoisee, stockageCarriereOptimise } from '../lib/persistanceNavigation';
 import type {
@@ -1618,7 +1621,12 @@ export const useGame = create<GameState>()(
           ? Math.min(LIMITES.ageMax, Math.max(LIMITES.ageDebutMin, Math.round(ageDemande)))
           : LIMITES.ageDebutMin;
         input = { ...input, poste, age };
-        const attributs = attributsDeBase(poste);
+        // ⚠️ MONDE FÉMININ : la pyramide connue s'arrête à l'Élite 2 (clubs notés de 49 à 66). Une débutante au niveau d'un
+        // licencié de Régionale 3 (36) n'y jouerait jamais une minute, et aucune division plus basse n'existe pour l'accueillir.
+        // Elle arrive donc en espoir du club : huit points sous sa moyenne, chaque attribut décalé d'autant.
+        const base = attributsDeBase(poste);
+        const ecart = MONDE_FEMININ ? Math.max(0, Math.round(noteDuClub(input.club) - 8 - noteGlobale({ attributs: base }))) : 0;
+        const attributs = ecart ? Object.fromEntries(Object.entries(base).map(([cle, v]) => [cle, Math.min(92, v + ecart)])) as unknown as typeof base : base;
         const gen = noteGlobale({ attributs });
         const salaireDepart = Math.max(0, Math.round(noteDuClub(input.club) * 60));
         // ⚠️ LE NOM SE TIRE AVANT TOUT LE RESTE, et ce n’était pas le cas :
@@ -1631,6 +1639,7 @@ export const useGame = create<GameState>()(
         // sous un identifiant technique que rien ne rattachait à lui.
         const nomChoisi = input.nom.trim() || nomAleatoirePourNation(input.nation);
         const joueur: Joueur = {
+          ...(MONDE_FEMININ ? { genre: 'F' as const } : {}),
           usageId: crypto.randomUUID(), usageDebut: new Date().toISOString().slice(0, 10),
           // ⚠️ PLUS DE « Anonyme ». Un champ laissé vide donne désormais un nom
           // tiré dans le vivier de SA nationalité (lib/nomsJoueurs.ts) : on
@@ -1641,7 +1650,7 @@ export const useGame = create<GameState>()(
           poste: input.poste,
           traits: (input.traits ?? []).slice(0, MAX_TRAITS),
           // L'apparence choisie à l'étape « Apparence » : validée à la porte, taille et carrure figées dès la création.
-          apparence: input.apparence ? { ...apparenceValide(input.apparence, input.poste), morphoFigee: true } : undefined,
+          apparence: input.apparence ? { ...apparenceValide(input.apparence, input.poste), ...(MONDE_FEMININ ? { barbe: '', couleurBarbe: undefined } : {}), morphoFigee: true } : undefined,
           nation: input.nation,
           club: input.club,
           division: input.division,
@@ -1649,7 +1658,9 @@ export const useGame = create<GameState>()(
           attributs,
           forme: 70,
           moral: 75,
-          reputation: 20,
+          // Monde féminin : une espoir d'Élite n'est pas une inconnue de Régionale 3 — sans cela sa cote (trois quarts de niveau,
+          // un quart de renom) tombait sous le dernier club de la pyramide et plus personne ne lui écrivait.
+          reputation: MONDE_FEMININ ? Math.max(20, gen - 10) : 20,
           argent: 1500,
           saison: 1,
           matchsJoues: 0,
@@ -1887,6 +1898,18 @@ export const useGame = create<GameState>()(
             // 𝕏 sur les messages ».
             get().ouvrirMessagesOvale();
             return; // la saison ne démarre pas tant qu'on n'a pas signé
+          }
+          // ⚠️ MONDE FÉMININ : LE MARCHÉ EST ÉTROIT (dix-sept clubs français, pas de divisions en dessous de l'Élite 2). Une
+          // joueuse qui tient encore sa place n'est pas mise à la porte faute d'offre : son club la prolonge d'un an. Elle
+          // n'arrête que si elle est tombée loin sous le niveau du groupe.
+          if (MONDE_FEMININ && noteGlobale(joueur) >= noteDuClub(joueur.club) - 15) {
+            set((s) => ({
+              joueur: { ...joueur, contrat: { club: joueur.club, division: joueur.division ?? divisionDuClub(joueur.club)?.id ?? 'f-elite2',
+                saisons: 1, salaire: joueur.contrat?.salaire ?? Math.round(noteDuClub(joueur.club) * 60) } },
+              journal: [...s.journal, { id: idUnique(), saison: joueur.saison, role: 'mj' as const, titre: 'Prolongation d’un an',
+                texte: `Aucun autre club ne s’est manifesté, mais ${joueur.club} compte sur toi : ton contrat est prolongé d’une saison.` }],
+            }));
+            return get().saisonSuivante();
           }
           // ⚠️ AUCUN CLUB N'EN VEUT. On ne laisse pas le joueur en suspens : le
           // rugby s'arrête là, comme pour des milliers de joueurs réels.
@@ -7796,7 +7819,10 @@ export const useGame = create<GameState>()(
         definirLangue(etat?.langue ?? langueDuNavigateur(LANGUE_DE_REPLI));
         // Les sauvegardes qui contiennent déjà un message resté sans
         // réponse sont réparées au rechargement, dans la langue de la partie.
-        if (etat?.joueur) {
+        // ⚠️ UNE CARRIÈRE N'EST RETOUCHÉE QUE DANS SON MONDE (`joueurDeCeMonde`) : une joueuse dont la page a chargé le monde
+        // masculin (elle est sur la ligue en ligne ou la Collection) a un club que ce monde ne connaît pas — ou, pire, un
+        // club homonyme. Rien ne doit alors « réparer » sa partie.
+        if (etat?.joueur && joueurDeCeMonde(etat.joueur)) {
           etat.reparerSilencesClubs();
         }
         // Fermer l'onglet sur l'épilogue ne permet pas de le contourner : au
@@ -7917,7 +7943,7 @@ useGame.subscribe((etat, avant) => {
 });
 // Figer les convocations dès l'annonce, y compris création et rechargement.
 useGame.subscribe((etat, avant) => {
-  if (etat.joueur && etat.joueur !== avant.joueur) {
+  if (etat.joueur && etat.joueur !== avant.joueur && joueurDeCeMonde(etat.joueur)) {
     const joueur = actualiserRassemblements(etat.joueur);
     if (joueur !== etat.joueur) useGame.setState({ joueur });
   }

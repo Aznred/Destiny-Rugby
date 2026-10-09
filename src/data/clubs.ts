@@ -13,6 +13,8 @@ import { COMPETITIONS_NOUVELLES } from './nouvellesLigues.js';
 import { CODE_PAR_NATION } from './nations.js';
 import { cleClub } from '../lib/cleClub.js';
 import { enrichirClub, localisationCorrigee } from '../lib/localisationClub.js';
+import { MONDE_FEMININ } from '../lib/mondeActif.js';
+import { competitionsFeminines } from '../lib/mondeFeminin.js';
 
 export type { Club, Competition };
 
@@ -494,7 +496,9 @@ const NOUVELLES: Competition[] = COMPETITIONS_NOUVELLES.map((c) => ({
 
 // Toutes les compétitions : les trois divisions professionnelles françaises et
 // les championnats du monde viennent de la base réelle, le reste est saisi ici.
-export const COMPETITIONS: Competition[] = [
+// ⚠️ UN SEUL MONDE À LA FOIS (`lib/mondeActif.ts`) : le rugby féminin REMPLACE cette liste, il ne s'y ajoute pas — les deux
+// mondes ont des clubs du même nom, et tout le jeu retrouve un club par son nom.
+export const COMPETITIONS: Competition[] = MONDE_FEMININ ? competitionsFeminines() : [
   ...COMPETITIONS_REELLES.filter((c) => c.zone === 'France').map((c) => (
     c.id === 'nationale' ? { ...c, clubs: clubsFfr('nationale', c.clubs) } : c
   )),
