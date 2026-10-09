@@ -42,9 +42,15 @@ assert.equal(publique.playerPool, 'mixed');
 const ancienne = structuredClone(publique); ancienne.playerPool = 'men'; ancienne.packs = ancienne.packs.filter(p => !p.id.startsWith('womens:'));
 const ouverte = avancerCarriere(ancienne, maintenant, 'femmes');
 assert.equal(ouverte.playerPool, 'mixed');
-assert.equal(vueCarriere(ouverte, compteId).packs.filter(p => p.id.startsWith('womens:')).length, championnats);
-const apresPack = agirCarriere(ouverte, compteId, {type:'ouvrirPack',packId:packs[0].id},maintenant,'femmes');
-assert.ok(apresPack.cartes.some(c => c.gender === 'female' && c.proprietaire === ouverte.clubs[0].id));
+assert.deepEqual(vueCarriere(ouverte, compteId).packsActifs, ['bronze', 'standard', 'or'], 'La division publique propose uniquement Bronze, Argent et Or.');
+assert.throws(() => agirCarriere(ouverte, compteId, {type:'ouvrirPack',packId:packs[0].id},maintenant,'femmes'), /désactivé/, 'Les packs féminins dédiés ne s’ouvrent pas en division publique.');
+assert.throws(() => agirCarriere(ouverte, compteId, {type:'ouvrirPack',packId:'premium'},maintenant,'femmes'), /désactivé/);
+let joueuseTiree = false;
+for (let essai = 0; essai < 100 && !joueuseTiree; essai++) {
+  const apresPack = agirCarriere(ouverte, compteId, {type:'ouvrirPack',packId:'or'},maintenant,`femmes-${essai}`);
+  joueuseTiree = apresPack.cartes.some(c => c.gender === 'female' && c.proprietaire === ouverte.clubs[0].id);
+}
+assert.ok(joueuseTiree, 'Les cartes femmes continuent de sortir du pack Or public.');
 const marche = marcheVide(1), carte = carteDepuisSource(femmes[0], ouverte.id, ouverte.clubs[0].id, 1);
 publierAnnonce(marche, {id:'femmes',carte,vendeur:{ligueId:ouverte.id,clubId:ouverte.clubs[0].id,pseudo:'Test',nom:'Club',division:1},type:'directe',prix:100,publieLe:new Date(maintenant).toISOString(),expireLe:new Date(maintenant+3600000).toISOString(),etat:'ouverte'});
 echeancesMarche(marche, maintenant);

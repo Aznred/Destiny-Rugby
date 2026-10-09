@@ -2575,8 +2575,9 @@ match** — ne pas s'en servir pour retoucher la difficulté tant qu'ils n'ont p
 
 Les cartes des joueuses réelles seniors de `mondeFeminin.generated.ts` sont disponibles dans les ligues féminines,
 mixtes et dans la collection. Les renforts `generee` restent réservés à la carrière solo. Les divisions publiques sont
-mixtes, y compris celles existantes lors de leur prochaine actualisation ; leurs packs par championnat féminin sont
-actifs. Le marché commun utilise explicitement le pool mixte. Le catalogue solo reçoit les sources FFR approuvées
+mixtes, y compris celles existantes lors de leur prochaine actualisation, et proposent uniquement Bronze, Argent et Or
+(`packsActifsLigue`) ; les cartes femmes entrent dans ces packs ordinaires. Les packs féminins dédiés restent en
+collection et ligue privée. Le marché commun utilise explicitement le pool mixte. Le catalogue solo reçoit les sources FFR approuvées
 des deux genres et ajoute les packs féminins ; les effectifs solo filtrent selon `MONDE_FEMININ` pour préserver les
 clubs homonymes. La Base joueurs du Labo conserve son autorisation interne. Banc : `npm run verify:cartes-femmes`.
 

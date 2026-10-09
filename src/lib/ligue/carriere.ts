@@ -27,10 +27,10 @@ const JOUR = 24 * HEURE;
 const SEMAINE = 7 * JOUR;
 export const PACKS_GRATUITS_PAR_JOUR = 10;
 export const PACKS_DIVISION_PUBLIQUE = ['bronze', 'standard', 'or'] as const;
-// Les packs de championnat féminin (`womens:…`) suivent les joueuses : ouverts dès que la ligue les accueille, sans
-// passer par la liste cochée à la création (qui ne connaît que les packs d'origine).
+// La division publique conserve uniquement Bronze, Argent et Or. Les packs par championnat féminin suivent les
+// joueuses dans les ligues privées, sans passer par la liste cochée à la création.
 const packsActifsLigue = (etat: EtatCarriereEnLigne): string[] | undefined =>
-  etat.publique ? [...PACKS_DIVISION_PUBLIQUE, ...etat.packs.filter(p => p.id.startsWith('womens:')).map(p => p.id)]
+  etat.publique ? [...PACKS_DIVISION_PUBLIQUE]
     : etat.packsActifs && (etat.playerPool ?? 'men') !== 'men' ? [...etat.packsActifs, ...etat.packs.filter(p => p.id.startsWith('womens:')).map(p => p.id)]
     : etat.packsActifs;
 

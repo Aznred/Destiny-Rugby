@@ -1,8 +1,9 @@
 # Destiny Rugby 🏉
 
 - **Cartes femmes en ligne et collection** : les joueuses réelles seniors des onze championnats féminins rejoignent le
-  catalogue commun, avec leurs notes et portraits. Les divisions publiques sont mixtes ; leurs packs féminins, le
-  marché commun et les échanges de collection acceptent ces cartes. Les ligues privées conservent leur choix de genre.
+  catalogue commun, avec leurs notes et portraits. Les divisions publiques sont mixtes et proposent uniquement les
+  packs Bronze, Argent et Or, qui acceptent ces cartes, comme le marché commun et les échanges de collection.
+  Les packs féminins dédiés restent dans la collection et les ligues privées, qui conservent leur choix de genre.
   Les effectifs solo restent séparés par genre, y compris pour les clubs homonymes. Contrôle : `npm run verify:cartes-femmes`.
 
 - **Habillage TV du match** : score compact incrusté en haut à gauche, blocs

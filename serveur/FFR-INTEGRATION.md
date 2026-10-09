@@ -47,8 +47,9 @@ Un nouvel import local se prépare avec `node --loader ./scripts/chargeurTypeScr
 
 Depuis le 9 octobre 2026, les joueuses réelles seniors du monde féminin généré sont communes à la collection et aux
 ligues mixtes ou féminines. Les joueuses fictives qui complètent les effectifs solo restent hors de ce catalogue.
-Les packs par championnat ayant des joueuses réelles sont disponibles dans la collection et les divisions publiques,
-désormais mixtes. Le marché commun et les échanges de collection acceptent les cartes femmes ; les clubs solo
+Les packs par championnat ayant des joueuses réelles sont disponibles dans la collection et les ligues privées.
+Les divisions publiques sont mixtes et conservent uniquement les packs Bronze, Argent et Or, où les cartes femmes
+peuvent sortir. Le marché commun et les échanges de collection acceptent les cartes femmes ; les clubs solo
 homonymes conservent des effectifs distincts par genre. Les 45 profils FFR encore en attente ne sont pas approuvés
 automatiquement par cette publication.
 
