@@ -467,7 +467,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
   }
   async function vueCompte(etat: EtatCarriereEnLigne, compteId: string, leger = false) {
     autoriserPool(etat.playerPool);
-    return ffr.avecPool(etat.playerPool ?? 'men', () => completerVuePublique(vueCarriere(etat, compteId, leger)));
+    return ffr.avecPool(etat.publique ? 'mixed' : etat.playerPool ?? 'men', () => completerVuePublique(vueCarriere(etat, compteId, leger)));
   }
   async function lireLigue(id: string, connue?: { version: number; comptes: string[]; echeance: number | null }) {
     const ligne = await lireLigueBrute(id, connue);
@@ -546,7 +546,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
       : r),
   });
   async function appliquer(id: string, compte: string, requete: string,
-    operation: (etat: EtatCarriereEnLigne, maintenant: number, graine: string) => EtatCarriereEnLigne,
+    operation: (etat: EtatCarriereEnLigne, maintenant: number, graine: string) => EtatCarriereEnLigne | Promise<EtatCarriereEnLigne>,
     autoriserInscription = false, verifierRecu = true,
     enteteConnue?: { version: number; comptes: string[]; echeance: number | null },
     fraicheurPresences = 0) {
@@ -566,7 +566,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         if(!stockage.snapshotFfr)throw new ErreurHttp(503,'Snapshot de migration FFR indisponible.');
         await stockage.snapshotFfr(ligne,VERSION_PROTECTION_FFR);
       }
-      const suivant = await ffr.avecPool(presence.etat.playerPool ?? 'men', () => operation(presence.etat, maintenant, randomBytes(24).toString('hex')));
+      const suivant = await ffr.avecPool(presence.etat.publique ? 'mixed' : presence.etat.playerPool ?? 'men', () => operation(presence.etat, maintenant, randomBytes(24).toString('hex')));
       // Une présence extérieure sert au calcul de la décision, puis disparaît
       // du gros agrégat. Sa petite ligne dédiée reste la seule source durable.
       const durable = presence.externes ? sansPresences(suivant) : suivant;
@@ -724,8 +724,8 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         const premier = plan.heritiers[0].club;
         const id = randomUUID();
         const code = `DR-PUBLIC-C${numero}-D${plan.division}`;
-        const etat = creerDivisionPublique({ id, code, compteId: premier.compteId, pseudo: premier.pseudo, clubNom: premier.nom },
-          numero, plan.division, maintenant, randomBytes(24).toString('hex'), plan.heritiers);
+        const etat = await ffr.avecPool('mixed', () => creerDivisionPublique({ id, code, compteId: premier.compteId, pseudo: premier.pseudo, clubNom: premier.nom },
+          numero, plan.division, maintenant, randomBytes(24).toString('hex'), plan.heritiers));
         if (plan.barrage) etat.publique!.barrage = plan.barrage;
         await stockage.creerLigue({ id, code, etat, comptes: comptesEtat(etat), version: 0 });
       }
@@ -769,8 +769,8 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
       const division = Math.max(0, ...etatPublic.divisions.map(l => l.division)) + 1;
       const id = randomUUID();
       const code = `DR-PUBLIC-C${etatPublic.cycle}-D${division}`;
-      const etat = creerDivisionPublique({ id, code, compteId: compte.id, pseudo: compte.pseudo, clubNom, embleme },
-        etatPublic.cycle, division, maintenant, randomBytes(24).toString('hex'));
+      const etat = await ffr.avecPool('mixed', () => creerDivisionPublique({ id, code, compteId: compte.id, pseudo: compte.pseudo, clubNom, embleme },
+        etatPublic.cycle, division, maintenant, randomBytes(24).toString('hex')));
       if (await stockage.creerLigue({ id, code, etat, comptes: comptesEtat(etat), version: 0 })) {
         limitesPubliques.delete(etatPublic.cycle);
         return await vueCompte(etat, compte.id);
@@ -796,6 +796,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         return res.status(200).json({ googleClientId: googleClientId || undefined });
       }
       if (req.method === 'GET' && url.searchParams.get('catalogueSolo') === '1') {
+        return ffr.avecPool('mixed', async () => {
         const config = catalogueAdmin();
         const influenceurs = catalogueSpecial(config).definitions.filter(d => d.cardType === 'influencer');
         const possedees = new Set<string>();
@@ -808,7 +809,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         }
         const connue = Number(url.searchParams.get('revision'));
         const contexteCatalogue = contexteFfr.getStore();
-        const revisionFfr = contexteCatalogue?.revisionFfr ?? '';
+        const revisionFfr = `${contexteCatalogue?.revisionFfr ?? ''}:cartes-femmes-v1`;
         const actifs = new Set(catalogueMondialCarriere(config).map(c=>c.sourceId));
         // Le gros catalogue de base est déjà dans le jeu. Les éditions et
         // ajouts de joueurs de la base en ligne traversent le réseau — et les cartes
@@ -816,10 +817,11 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         // jamais un brouillon ni une carte sans image.
         return res.status(200).json(connue === config.revision && url.searchParams.get('revisionFfr') === revisionFfr && !influenceurs.length
           ? { revision: config.revision, revisionFfr }
-          : { revision: config.revision, revisionFfr, ffr: (contexteCatalogue?.joueurs ?? []).filter(c=>c.gender!=='female' && !c.retiree), joueurs: Object.fromEntries(Object.entries(config.joueurs).filter(([id])=>actifs.has(id))), ajouts: Object.fromEntries(Object.entries(config.ajouts ?? {}).filter(([,c])=>actifs.has(c.sourceId))), speciales: specialesPubliques(config, maintenant, possedees),
+          : { revision: config.revision, revisionFfr, ffr: (contexteCatalogue?.joueurs ?? []).filter(c=>!c.retiree), joueurs: Object.fromEntries(Object.entries(config.joueurs).filter(([id])=>actifs.has(id))), ajouts: Object.fromEntries(Object.entries(config.ajouts ?? {}).filter(([,c])=>actifs.has(c.sourceId))), speciales: specialesPubliques(config, maintenant, possedees),
               // Les cosmétiques du Labo : SEULS les publiés quittent le serveur, dans la même réponse (aucune requête de plus).
               clubs: config.clubs ?? {}, rivalitesHistoriques: config.rivalitesHistoriques ?? [],
               boutique: Object.values(config.boutique ?? {}).filter(a => a.publie) });
+        });
       }
       // ⚠️ Les écussons se demandent à part, PAS dans la vue de la ligue :
       // 1 353 entrées, soit 80 Ko qui repartiraient toutes les deux secondes
@@ -1249,14 +1251,14 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         };
         try {
           if (action === 'creerOffreSolo') {
-            const offertes = lotCartesSolo(corps.offertes, cartesEchangeables());
-            const souhaitees = lotCartesSolo(corps.souhaitees, cartesEchangeables(), true);
+            const offertes = lotCartesSolo(corps.offertes, await ffr.avecPool('mixed', cartesEchangeables));
+            const souhaitees = lotCartesSolo(corps.souhaitees, await ffr.avecPool('mixed', cartesEchangeables), true);
             // ⚠️ Un doublon déjà promis dans une proposition en attente ne peut pas partir en plus dans une offre.
             await verifierDoublonsLibres(compte.id, offertes);
             id = randomUUID();
             await marche.creer(id, compte.id, compte.pseudo, offertes, souhaitees);
           } else if (action === 'proposerOffreSolo') {
-            const cartes = lotCartesSolo(corps.cartes, cartesEchangeables());
+            const cartes = lotCartesSolo(corps.cartes, await ffr.avecPool('mixed', cartesEchangeables));
             // ⚠️ AVANT D'ENVOYER : la carte est possédée (le stockage le revérifie), échangeable (`lotCartesSolo`),
             // et pas déjà engagée dans une autre proposition. Rien n'est transféré : elle reste chez son
             // propriétaire jusqu'à l'acceptation, où tout est revérifié dans la même transaction.
@@ -1271,8 +1273,8 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
               if (!offre) throw new ErreurHttp(409, 'Offre indisponible.');
               const retour = proposition ? offre.propositions.find(p => p.id === proposition)?.cartes : offre.souhaitees;
               if (!retour) throw new ErreurHttp(409, 'Proposition indisponible.');
-              lotCartesSolo(offre.offertes, cartesEchangeables());
-              lotCartesSolo(retour, cartesEchangeables(), true);
+              lotCartesSolo(offre.offertes, await ffr.avecPool('mixed', cartesEchangeables));
+              lotCartesSolo(retour, await ffr.avecPool('mixed', cartesEchangeables), true);
             }
             try { await marche.accepter(id, compte.id, proposition); }
             catch (erreur) {
@@ -1508,7 +1510,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
           const ligne = await lireLigue(id);
           if (!ligne || !ligne.comptes.includes(compte.id)) throw new ErreurHttp(404, 'Ligue introuvable.');
           const { collectionCarriere } = await import('../src/lib/ligue/collectionCarriere.js');
-          return res.status(200).json(await ffr.avecPool(ligne.etat.playerPool ?? 'men', () => collectionCarriere(ligne.etat, compte.id, url.searchParams, maintenant)));
+          return res.status(200).json(await ffr.avecPool(ligne.etat.publique ? 'mixed' : ligne.etat.playerPool ?? 'men', () => collectionCarriere(ligne.etat, compte.id, url.searchParams, maintenant)));
         }
         // Le marché commun vu de cette division : un petit document, relu seulement quand sa révision a changé.
         if (url.searchParams.get('marche') === '1') {
@@ -1737,6 +1739,9 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         let avantCommande: EtatCarriereEnLigne | undefined;
         const e = await appliquer(id, compte.id, requete, (e, n, g) => {
           avantCommande = e;
+          if (commande.type === 'reglerPool' && (commande.pool === 'men' || commande.pool === 'women' || commande.pool === 'mixed')) {
+            return ffr.avecPool(commande.pool, () => agirCarriere(e, compte.id, commande as unknown as CommandeCarriere, n, g, compte.identifiant === 'kiri'));
+          }
           return agirCarriere(e, compte.id, commande as unknown as CommandeCarriere, n, g, compte.identifiant === 'kiri');
         });
         return await repondre(avantCommande, e);

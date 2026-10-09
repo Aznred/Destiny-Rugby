@@ -43,15 +43,28 @@ Les identités restent dans `.ffr/`, puis dans le snapshot IndexedDB de chaque c
 
 Un nouvel import local se prépare avec `node --loader ./scripts/chargeurTypeScript.mjs scripts/importFfrFull.mjs "../Objectif Ffr/exports/joueurs.json" <nouvelle_version> --prive-seulement --activer-carriere-locale` ; `--date-reference=YYYY-MM-DD` précise une nouvelle date réelle. Une reprise refuse toute modification de l'entrée ou de sa date. `scripts/preparerJeunesCarriereFfr.mjs <version_source> <nouvelle_version> --activer-carriere-locale` permet aussi de dériver un nouveau snapshot sans réécrire la version source. L'activation locale remplace les métadonnées publiques et le pointeur privé par des écritures atomiques de fichiers. Le schéma additif `youth_career_sources` et l'envoi privé par `scripts/publierDonneesFfr.mjs` sont préparés, avec vérification du nombre de profils avant activation ; **ils n'ont pas été exécutés pour le Correctif 34 en production, et aucun déploiement de ce correctif n'a été effectué**. Validation locale : `node --loader ./scripts/chargeurTypeScript.mjs scripts/verifierPipelineJeunesFfr.ts --import` (identité jeune/senior, confidentialité, pagination complète, version figée et installation sans import historique).
 
-## Bêta féminine
+## Cartes femmes publiques et validation interne
 
-`player_feature_access` accorde `feature_womens_rugby` uniquement à l'identifiant immuable du compte Kiri, avec le rôle `INTERNAL_TESTER`. Aucun pseudo envoyé par le navigateur ne confère cet accès. Toutes les lectures, commandes et adhésions à une ligue féminine vérifient ce droit côté serveur, avant même une réponse conditionnelle 304. Les packs, recherches et marchés ordinaires restent masculins.
+Depuis le 9 octobre 2026, les joueuses réelles seniors du monde féminin généré sont communes à la collection et aux
+ligues mixtes ou féminines. Les joueuses fictives qui complètent les effectifs solo restent hors de ce catalogue.
+Les packs par championnat ayant des joueuses réelles sont disponibles dans la collection et les divisions publiques,
+désormais mixtes. Le marché commun et les échanges de collection acceptent les cartes femmes ; les clubs solo
+homonymes conservent des effectifs distincts par genre. Les 45 profils FFR encore en attente ne sont pas approuvés
+automatiquement par cette publication.
+
+`player_feature_access` accorde `feature_womens_rugby` uniquement à l'identifiant immuable du compte Kiri, avec le rôle
+`INTERNAL_TESTER`, pour la validation interne dans Base joueurs. Aucun pseudo envoyé par le navigateur ne confère cet
+accès. Les ligues féminines et mixtes sont ouvertes à tous les comptes ; les ligues privées masculines gardent leur réglage.
 
 Kiri dispose de **Labo → Base joueurs**, avec recherche serveur paginée (20 profils par page, maximum 50), filtres, édition, approbation/rejet et prévisualisation de carte. Une résolution d'homonymie exige une preuve écrite conservée dans le journal de validation. Les identités/photos jeunesse restent masquées même dans cette interface.
 
-La ligue féminine utilise le même moteur pour packs, composition, échanges, matchs et classement. Elle exige 30 joueuses approuvées couvrant toutes les familles de postes. Le premier lot de 45 profils éligibles ne comporte pas de talonneuse : la validation d'autres profils est nécessaire avant une ligue jouable. Aucun poste n'est inventé pour contourner ce manque. Aucune carrière féminine n'est ajoutée.
+La ligue féminine utilise le même moteur pour packs, composition, échanges, matchs et classement. Elle exige 30 joueuses
+seniors couvrant toutes les familles de postes. Le catalogue public féminin apporte les joueuses déjà présentes dans
+les données de carrière ; les sources privées FFR ne le complètent qu'après approbation. Aucun poste n'est inventé
+pour contourner un manque.
 
-Club, nation et compétition ont des identifiants indépendants du genre. `calculateChemistry` fonctionne pour hommes, femmes et compositions mixtes. Le pool mixte est préparé, mais sa création publique reste fermée.
+Club, nation et compétition ont des identifiants indépendants du genre. `calculateChemistry` fonctionne pour hommes,
+femmes et compositions mixtes. Les nouvelles ligues privées sont mixtes par défaut ; leur créateur peut régler le pool.
 
 ## Exécution et contrôles
 

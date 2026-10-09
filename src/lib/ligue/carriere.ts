@@ -30,7 +30,7 @@ export const PACKS_DIVISION_PUBLIQUE = ['bronze', 'standard', 'or'] as const;
 // Les packs de championnat féminin (`womens:…`) suivent les joueuses : ouverts dès que la ligue les accueille, sans
 // passer par la liste cochée à la création (qui ne connaît que les packs d'origine).
 const packsActifsLigue = (etat: EtatCarriereEnLigne): string[] | undefined =>
-  etat.publique ? [...PACKS_DIVISION_PUBLIQUE]
+  etat.publique ? [...PACKS_DIVISION_PUBLIQUE, ...etat.packs.filter(p => p.id.startsWith('womens:')).map(p => p.id)]
     : etat.packsActifs && (etat.playerPool ?? 'men') !== 'men' ? [...etat.packsActifs, ...etat.packs.filter(p => p.id.startsWith('womens:')).map(p => p.id)]
     : etat.packsActifs;
 
@@ -507,7 +507,7 @@ export function creerDivisionPublique(config: Pick<CreationCarriere, 'id' | 'cod
   cycle: number, division: number, maintenant: number, graine: string,
   herites: { club: ClubCarriere; cartes: CarteCarriere[] }[] = []): EtatCarriereEnLigne {
   const etat = creerCarriere({ ...config, nom: `Destiny Rugby · Division ${division}`, rythme: 7, maxClubs: 16,
-    dotationOvas: 5000, packsGratuitsParJour: 0, doublonsAutorises: true,
+    dotationOvas: 5000, packsGratuitsParJour: 0, doublonsAutorises: true, playerPool: 'mixed',
     packsActifs: [...PACKS_DIVISION_PUBLIQUE], playoffs: false }, maintenant, graine);
   etat.publique = { cycle, division };
   if (herites.length) {
@@ -1348,6 +1348,7 @@ function expirerMarche(etat: EtatCarriereEnLigne, maintenant: number) {
  * fait l'économie — restent ceux de la ligue.
  */
 function completerPacks(etat: EtatCarriereEnLigne) {
+  if (etat.publique) etat.playerPool = 'mixed';
   // Les packs d'événement vivent dans la boutique de packs spéciaux de la
   // Collection solo, jamais dans l'état d'une ligue.
   if (etat.packs.some(p => p.evenement)) etat.packs = etat.packs.filter(p => !p.evenement);

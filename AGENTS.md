@@ -2573,4 +2573,13 @@ match** — ne pas s'en servir pour retoucher la difficulté tant qu'ils n'ont p
 
 ## Intégration FFR 2026_10_FFR_FULL
 
-Base privée de 470 742 profils, retrait des identités jeunesse, agrégats de formation et bêta féminine réservée au compte Kiri par autorisation serveur. Voir [serveur/FFR-INTEGRATION.md](serveur/FFR-INTEGRATION.md) pour les seuils, snapshots, commandes et limites de validation.
+Les cartes des joueuses réelles seniors de `mondeFeminin.generated.ts` sont disponibles dans les ligues féminines,
+mixtes et dans la collection. Les renforts `generee` restent réservés à la carrière solo. Les divisions publiques sont
+mixtes, y compris celles existantes lors de leur prochaine actualisation ; leurs packs par championnat féminin sont
+actifs. Le marché commun utilise explicitement le pool mixte. Le catalogue solo reçoit les sources FFR approuvées
+des deux genres et ajoute les packs féminins ; les effectifs solo filtrent selon `MONDE_FEMININ` pour préserver les
+clubs homonymes. La Base joueurs du Labo conserve son autorisation interne. Banc : `npm run verify:cartes-femmes`.
+
+Base privée de 470 742 profils, retrait des identités jeunesse et agrégats de formation. La validation des sources FFR
+reste réservée à Kiri par autorisation serveur ; les cartes femmes publiées sont accessibles à tous. Voir
+[serveur/FFR-INTEGRATION.md](serveur/FFR-INTEGRATION.md) pour les seuils, snapshots, commandes et limites de validation.

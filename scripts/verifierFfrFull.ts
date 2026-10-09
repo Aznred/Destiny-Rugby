@@ -106,7 +106,7 @@ assert.equal((await commander('guest-token',invitee.data.id,{type:'reglerPool',p
 assert.notEqual((await commander('kiri-token',mixte.data.id,{type:'reglerPool',pool:'men'})).status,200,'Seul le créateur règle le genre de sa ligue.');
 assert.equal((await request('kiri-token','/api/carriere?baseJoueurs=1')).status,200);
 const publicCatalogue=await request('guest-token','/api/carriere?catalogueSolo=1');assert.equal(publicCatalogue.status,200);
-assert.ok(publicCatalogue.data.ffr.every((c:any)=>c.gender!=='female'));
+assert.ok(publicCatalogue.data.ffr.some((c:any)=>c.gender==='female'), 'La collection publique reçoit les joueuses seniors approuvées.');
 const created=await request('kiri-token','/api/carriere',{action:'creer',playerPool:'women',nom:'Women test',clubNom:'Club test',rythme:1,maxClubs:2});assert.equal(created.status,201,JSON.stringify(created.data));
 assert.ok(created.data.cartes.every((c:any)=>c.gender==='female'));const leagueId=created.data.id,code=created.data.code;
 // Sans y être inscrit, on ne lit ni ne joue dans la ligue d'un autre ; avec son code, on la rejoint comme n'importe quelle ligue.

@@ -48,8 +48,8 @@ function appliquerReponse(donnees: ReponseCatalogue): boolean {
   if (!Number.isInteger(donnees.revision) || !donnees.joueurs || typeof donnees.joueurs !== 'object') return false;
   revision = donnees.revision!;
   revisionFfr = donnees.revisionFfr ?? '';
-  const sourcesFfr = (donnees.ffr ?? []).filter(c => carteSeniorAutorisee(c));
-  fournirPoolFfr(() => ({pool:'men',joueurs:sourcesFfr}));
+  const sourcesFfr = (donnees.ffr ?? []).filter(c => carteSeniorAutorisee(c, 'mixed'));
+  fournirPoolFfr(() => ({pool:'mixed',joueurs:sourcesFfr}));
   appliquerLocalisations(donnees.clubs ?? {}, donnees.rivalitesHistoriques ?? []);
   const mondial = catalogueMondialCarriere({ revision, joueurs: donnees.joueurs, ajouts: donnees.ajouts, packs: {}, rotationPacks: false });
   fournirCatalogueEffectifs(mondial);

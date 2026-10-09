@@ -14,7 +14,7 @@ import { recalibrerNoteFfr, echelleFfrDuClub } from '../echelleNotesFfr.js';
 import { noteJoueurRevalorisee, postesJoueurReel } from '../evaluationJoueurReel.js';
 import { COMPETITIONS } from '../../data/clubs.js';
 import { MONDE_FEMININ } from '../mondeActif.js';
-import { effectifFeminin } from '../../data/mondeFeminin.generated.js';
+import { CHAMPIONNATS_FEMININS, effectifFeminin } from '../../data/mondeFeminin.generated.js';
 import { definirPortraitsDuMonde } from '../avatars.js';
 import { LOGO_COMPETITION } from '../../data/logosCompetitions.js';
 import { LOGO_COMPETITION_NOUVEAU } from '../../data/nouvellesLigues.js';
@@ -336,7 +336,7 @@ export function packsCatalogueAdmin(): PackCarriere[] {
       if(!sum){for(const c of candidates)probabilites[c.rarete]++;sum=candidates.length;}
       for(const r of RARETES_CARRIERE)probabilites[r]=probabilites[r]/sum*100;
       const garantie=p.garantie&&candidates.some(c=>bandesGaranties(p.garantie!).includes(c.rarete))?p.garantie:undefined;
-      return [{...p,nom:`${p.nom} · Féminin`,probabilites,garantie,promesse:`${p.cartes} cartes seniors féminines${garantie?` · ${garantie} garantie`:''}. Bêta interne.`}];
+      return [{...p,nom:`${p.nom} · Féminin`,probabilites,garantie,promesse:`${p.cartes} cartes seniors féminines${garantie?` · ${garantie} garantie`:''}.`}];
     });
   }
   const packs = [...PACKS_CARRIERE.map(p => editions[p.id] ?? p), ...Object.values(editions).filter(p => !PACKS_CARRIERE.some(b => b.id === p.id))];
@@ -348,8 +348,8 @@ export function packsCatalogueAdmin(): PackCarriere[] {
  * de championnat des joueurs. Trois cartes de ce championnat ; les probabilités sont ramenées aux raretés qui y
  * existent vraiment (un championnat sans carte Mythique n'en promet pas).
  */
-export function packsChampionnatsFeminins(): PackCarriere[] {
-  const joueuses = catalogueMondialCarriere().filter(c => c.gender === 'female' && !c.speciale);
+export function packsChampionnatsFeminins(catalogue: readonly SourceCarte[] = catalogueMondialCarriere()): PackCarriere[] {
+  const joueuses = catalogue.filter(c => c.gender === 'female' && !c.speciale);
   return [...new Set(joueuses.map(c => c.championnat))].sort().flatMap(championnat => {
     const candidates = joueuses.filter(c => c.championnat === championnat);
     const probabilites = { ...MIXTE };
@@ -450,7 +450,17 @@ export function catalogueBaseCarriere(): readonly SourceCarte[] {
     }
   }
   const homonymes = new Set(Object.values(IDENTITES_JOUEURS_MONDIAUX).filter(i => i.distinct).map(i => i.sourceId));
-  catalogue = [...joueurs.values()].map(j => ({ ...j, photo: homonymes.has(j.sourceId) ? j.photo : photoDetoureeCatalogue(j.nom, j.clubReel) ?? j.photo }))
+  const feminines: SourceCarte[] = [];
+  // Les joueuses réelles seniors sont communes à la collection et aux ligues. Les renforts fictifs du solo restent
+  // dans leur carrière ; leurs clubs homonymes ne passent jamais par les notes ou portraits masculins.
+  for (const competition of CHAMPIONNATS_FEMININS) for (const club of competition.clubs) for (const j of effectifFeminin(club.nom) ?? []) {
+    if (j.generee || j.age < 18) continue;
+    const famille = POSTE_PAR_ID[j.poste].famille, sourceId = `feminin:${normaliser(club.nom)}:${normaliser(j.nom)}`;
+    feminines.push({ sourceId, nom: j.nom, famille, poste: j.poste, note: j.note, potentiel: Math.max(j.note, j.potentiel),
+      age: j.age, nation: j.nation, clubReel: club.nom, championnat: competition.nom, pays: competition.pays, photo: j.photo,
+      origine: 'professionnel', rarete: rareteCarriere(j.note), statistiques: statistiquesCarte(j.note, famille, sourceId), gender: 'female' });
+  }
+  catalogue = [...[...joueurs.values()].map(j => ({ ...j, photo: homonymes.has(j.sourceId) ? j.photo : photoDetoureeCatalogue(j.nom, j.clubReel) ?? j.photo })), ...feminines]
     .sort((a, b) => a.sourceId < b.sourceId ? -1 : 1);
   return filtrerCatalogueFfr(catalogue);
 }

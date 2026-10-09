@@ -1,5 +1,6 @@
 import { catalogueMondialCarriere, type SourceCarte } from './ligue/catalogueCarriere.js';
 import { cleClub } from './cleClub.js';
+import { MONDE_FEMININ } from './mondeActif.js';
 
 let publicSolo: readonly SourceCarte[] | undefined;
 let indexSource: readonly SourceCarte[] | undefined;
@@ -14,6 +15,7 @@ export function joueursCatalogueDuClub(club: string): readonly SourceCarte[] {
     indexSource = source;
     clubs = new Map();
     for (const joueur of source) {
+      if ((joueur.gender === 'female') !== MONDE_FEMININ) continue;
       const cle = cleClub(joueur.clubReel);
       const liste = clubs.get(cle) ?? [];
       liste.push(joueur);

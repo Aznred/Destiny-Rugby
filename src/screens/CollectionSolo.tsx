@@ -4,7 +4,7 @@ import { CarteJoueurEnLigne } from '../components/CarteJoueurEnLigne';
 import OuverturePack from '../components/OuverturePack';
 import BoutiquePacks3D from '../components/BoutiquePacks3D';
 import { useGame } from '../store/useGame';
-import { carteDepuisSource, PACKS_CARRIERE } from '../lib/ligue/catalogueCarriere';
+import { carteDepuisSource, PACKS_CARRIERE, packsChampionnatsFeminins } from '../lib/ligue/catalogueCarriere';
 import type { SourceCarte } from '../lib/ligue/catalogueCarriere';
 import { catalogueSpecialSolo, synchroniserCatalogueSolo, useCatalogueSolo } from '../lib/catalogueSoloCommun';
 import type { PackCarriere, RareteCarriere } from '../lib/ligue/typesCarriere';
@@ -48,7 +48,7 @@ export function CollectionSolo() {
   // ⚠️ LE PACK HALLOWEEN EST ICI, DANS LES PACKS SPÉCIAUX, PAS DANS LES LIGUES.
   // Il apparaît en tête pendant sa fenêtre et disparaît seul à la fin du mois.
   const packsEvenement = useMemo(() => packsEvenementSolo(speciales, instant), [speciales, instant]);
-  const packsRoue = useMemo<PackCarriere[]>(() => [...packsEvenement, ...packsCollectionSolo(PACKS_CARRIERE)], [packsEvenement]);
+  const packsRoue = useMemo<PackCarriere[]>(() => [...packsEvenement, ...packsCollectionSolo([...PACKS_CARRIERE, ...packsChampionnatsFeminins(catalogue)])], [packsEvenement, catalogue]);
   const idsPacksGratuits = useMemo(() => new Set<string>(IDS_PACKS_SOLO_GRATUITS), []);
   const packsGratuits = useMemo(() => packsRoue.filter((pack) => idsPacksGratuits.has(pack.id)), [packsRoue, idsPacksGratuits]);
   const packsPayants = useMemo(() => packsRoue.filter((pack) => !idsPacksGratuits.has(pack.id)), [packsRoue, idsPacksGratuits]);

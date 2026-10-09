@@ -16,6 +16,7 @@ import path from 'node:path';
 import { creerGestionnaireCarriere } from '../serveur/carriereApi';
 import { stockageFichier } from '../serveur/carriereFichier';
 import { catalogueBaseCarriere } from '../src/lib/ligue/catalogueCarriere';
+import { serviceFfr } from '../serveur/ffr/contexte';
 import { cleCarteSolo } from '../src/lib/collectionSolo';
 import { appliquerDeltaEchange, cartesEngagees, doublonsLibres, type DeltaEchangeSolo, type PageOffresSolo } from '../src/lib/echangesSolo';
 import type { EtatBoutiqueCompte } from '../src/lib/boutiqueCompte';
@@ -56,7 +57,9 @@ async function inscrire(identifiant: string): Promise<{ cookie: string; id: stri
   return { cookie: r.cookie, id: r.corps.compte.id, pseudo: r.corps.compte.pseudo };
 }
 
-const [c1, c2, c3, c4] = catalogueBaseCarriere().slice(0, 4).map(c => cleCarteSolo(c.sourceId));
+const joueuse = await serviceFfr().avecPool('mixed', () => catalogueBaseCarriere().find(c => c.gender === 'female'));
+assert.ok(joueuse, 'Une joueuse réelle figure parmi les cartes échangées.');
+const [c1, c2, c3, c4] = [joueuse, ...catalogueBaseCarriere().slice(0, 3)].map(c => cleCarteSolo(c.sourceId));
 const coffre = (quantites: Record<string, number>, revision = 1): EtatBoutiqueCompte => ({
   ovas: 0, achatsOvas: 0, credits: 0, achatsCredits: 0, cosmetiquesMeta: {}, inventaire: [], skinActif: 'classique',
   equipements: [], equipementActif: {}, traitsDebloques: [],

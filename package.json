@@ -4,6 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "verify:cartes-femmes": "node --loader ./scripts/chargeurTypeScript.mjs scripts/verifierCartesFemmes.ts",
     "verify:influenceurs": "vite-node scripts/verifierInfluenceurs.ts",
     "verify:complement29": "vite-node scripts/verifierComplement29.ts",
     "verify:reglements": "vite-node scripts/verifierReglements.ts",

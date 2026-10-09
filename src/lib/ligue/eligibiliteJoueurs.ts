@@ -29,7 +29,7 @@ export function filtrerCatalogueFfr(base: readonly SourceCarte[]): readonly Sour
   // Cache by identity of both immutable revisions, never by a mutable global flag.
   let cache = caches.get(base); if (!cache) { cache = new Map(); caches.set(base, cache); }
   const existant = cache.get(cle); if (existant && existant.ajouts === ajouts) return existant.resultat;
-  const liste = pool === 'women' ? (ajouts ?? []) : [...base, ...(ajouts ?? [])];
+  const liste = [...base, ...(ajouts ?? [])];
   const resultat = [...new Map(liste.filter(c => carteSeniorAutorisee(c, pool)).map(c => [c.sourceId, c])).values()];
   cache.set(cle, { ajouts, resultat }); return resultat;
 }

@@ -104,7 +104,7 @@ export function creerMarcheCommun({ stockage, appliquer, lireEtat, refus }: Depe
   async function conclure(cycle: number, annonceId: string): Promise<void> {
     let a = (await lire(cycle)).marche.annonces.find((x) => x.id === annonceId);
     if (!a || a.etat !== 'reclamee' || !a.acheteur) return;
-    if (!carteSeniorAutorisee(a.carte)) return;
+    if (!carteSeniorAutorisee(a.carte, 'mixed')) return;
     if (!a.acheteur.solde) {
       const r = await etape(a.vendeur.ligueId, { type: 'solder', venteId: a.id, montant: a.acheteur.montant, acheteur: `${a.acheteur.nom} · D${a.acheteur.division}` });
       // La carte part telle qu'elle est AUJOURD'HUI chez le vendeur (ses matchs joués depuis la mise en vente comptent).
@@ -171,7 +171,7 @@ export function creerMarcheCommun({ stockage, appliquer, lireEtat, refus }: Depe
     const carte = v && etat.cartes.find((c) => c.id === v.carteId);
     const club = v && etat.clubs.find((c) => c.id === v.vendeurId);
     if (!v || !carte || !club || !etat.publique) return undefined;
-    if (!carteSeniorAutorisee(carte)) return undefined;
+    if (!carteSeniorAutorisee(carte, 'mixed')) return undefined;
     return {
       id: v.id, vendeur: { ligueId: etat.id, clubId: club.id, pseudo: club.pseudo, nom: club.nom, division: etat.publique.division },
       carte: structuredClone(carte), type: v.type, prix: v.prix, publieLe: new Date().toISOString(), expireLe: v.expireLe, etat: 'ouverte',
