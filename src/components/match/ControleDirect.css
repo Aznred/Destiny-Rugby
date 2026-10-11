@@ -838,23 +838,28 @@
 .ce-hud button {pointer-events:auto;background:#121e22e8;color:inherit;border:1px solid #d2b57950;border-radius:6px;padding:8px 10px;font:inherit;font-size:11px;cursor:pointer;min-height:36px}
 .ce-hud button:hover,.ce-hud button[aria-pressed=true] {background:#35594d;border-color:#d2b579}
 .ce-hud button:disabled {opacity:.4;cursor:default}
-.ce-joueur {display:flex;align-items:center;gap:8px;background:#111c22de;padding:6px 8px;border-left:2px solid #d2b579;border-radius:4px;font-size:12px}
+.ce-joueur {display:flex;align-items:center;gap:8px;background:#111c22ad;padding:3px 8px;border-left:2px solid #d2b579;border-radius:4px;font-size:12px;width:fit-content;max-width:100%;text-shadow:0 1px 3px #000}
 .ce-joueur b {flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .ce-numero {font-variant-numeric:tabular-nums;color:#d2b579;font-weight:800;font-size:18px}
 .ce-hud kbd {display:inline-block;font:inherit;font-size:10px;opacity:.7;margin-right:4px}
-.ce-sortie {background:#111c22eb;padding:10px;margin-top:6px;border:1px solid #d2b57960;border-radius:6px}
+.ce-sortie {background:linear-gradient(110deg,#111c22bf,#111c2280);padding:7px 9px;margin-top:5px;border-left:2px solid #d2b579;border-radius:3px;text-shadow:0 1px 3px #000}
 .ce-sortie small {display:block;font-size:11px;line-height:1.4;margin-bottom:8px;color:#ded8c9}
 .ce-combinaison {display:flex;align-items:center;gap:7px;padding:7px 5px;font-size:11px}
 .ce-combinaison kbd {font-size:11px;color:#ecd079;white-space:nowrap;opacity:1}
-.ce-combinaison[data-disponible=non] {opacity:.35}
 .ce-sortie>span {display:block;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#d2b579;margin-bottom:8px}
 .ce-sortie>div {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
 .ce-raccourcis {display:flex;gap:5px;margin-top:6px}
 .ce-options {display:flex;gap:5px;flex-wrap:wrap;background:#101b21ed;padding:8px;margin-top:4px;border-radius:6px}
 @media(max-width:700px){
-  .ce-hud {top:95px;left:8px;width:calc(100% - 76px);max-width:440px}
-  .ce-joueur {font-size:10px}.ce-hud button{padding:6px 8px;font-size:10px;min-height:44px}
-  .ce-combinaison {flex-direction:column;gap:3px;text-align:center;font-size:10px;padding:6px 2px}.ce-combinaison kbd{font-size:17px;line-height:1}
+  .ce-hud {top:95px;left:8px;width:calc(100% - 76px);max-width:390px}
+  .ce-joueur {font-size:10px;gap:5px;padding:0 6px;max-width:255px}.ce-hud button{padding:5px 7px;font-size:10px;min-height:44px}
+  .ce-hud[data-ruck=oui] .ce-joueur button{display:none}
+  .ce-hud[data-ruck=oui] .ce-joueur{height:25px;background:#111c2270}
+  .ce-sortie{padding:4px 6px;background:#111c2270;margin-top:3px}
+  .ce-sortie small,.ce-sortie>span{display:none}
+  .ce-sortie>div{gap:0 4px}
+  .ce-combinaison {gap:3px;font-size:9px;padding:4px 0;min-height:24px;line-height:1.2}.ce-combinaison kbd{font-size:12px;line-height:1;margin:0}
+  .ce-hud[data-appareil=tactile] .ce-combinaison kbd{font-size:18px}
   .ce-modes{gap:8px}.ce-modes .btn{padding:14px;min-height:140px}.ce-reglages{grid-template-columns:1fr}.ce-reglages>div{display:grid;grid-template-columns:90px 1fr;align-items:center}.ce-reglages label{margin:0}
 }
-@media(max-height:500px) and (min-width:700px){.ce-hud{top:14px;left:244px;width:calc(100% - 320px);max-width:410px}.ce-sortie{padding:6px}.ce-sortie>span{margin-bottom:4px}.ce-raccourcis{margin-top:4px}}
+@media(max-height:500px){.ce-hud{top:70px;left:8px;width:300px;max-width:calc(100% - 80px)}.ce-sortie{padding:3px 6px}.ce-sortie small,.ce-sortie>span{display:none}.ce-sortie>div{gap:0 4px}.ce-combinaison{padding:3px 0;font-size:9px;gap:3px}.ce-hud[data-ruck=oui] .ce-joueur button{display:none}.ce-hud[data-ruck=oui] .ce-joueur{height:25px}.ce-raccourcis{margin-top:3px}.ce-hud button{min-height:44px}}

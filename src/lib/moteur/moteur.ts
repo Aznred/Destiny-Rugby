@@ -22,7 +22,7 @@
 // en fond (appels de 8 s) donnent donc rigoureusement le même résultat.
 
 import { graine, scorePossible } from '../championnat.js';
-import { actualiserSelectionEquipe, cibleOptionNeuf, meilleurCoteCellule, organiserCellulesSolo, selectionnerPionEquipe } from './equipeSolo.js';
+import { actualiserSelectionEquipe, aidePlacementEquipe, choisirOptionNeuf, cibleOptionNeuf, meilleurCoteCellule, optionsNeufDisponibles, organiserCellulesSolo, selectionnerPionEquipe } from './equipeSolo.js';
 import { t as traduire } from '../i18n.js';
 import type { Coequipier } from '../effectif.js';
 import { cibleCourseCombinaison, combinaisonSituation, demarrerCombinaison, joueurCombinaison, lancerAppelsCombinaison, pointSurTerrain, preparerCombinaison } from './combinaisons.js';
@@ -728,7 +728,7 @@ function tick(e: EtatMatch): void {
     if (e.echappee.restant <= 0 || e.porteur !== e.echappee.pion) e.echappee = null;
   }
   // ⚠️ L'HORLOGE S'ARRÊTE QUAND LE JEU ATTEND LE JOUEUR (Correctif 17) : décider ne coûte pas une minute de match.
-  const dtHorloge = e.responsabilites?.attente ? 0 : dt * (e.dureeReelleArcade ? e.phase === 'miTemps' ? 0 : 4800 / e.dureeReelleArcade
+  const dtHorloge = e.responsabilites?.attente || e.controleEquipe?.sortie?.auSol ? 0 : dt * (e.dureeReelleArcade ? e.phase === 'miTemps' ? 0 : 4800 / e.dureeReelleArcade
     : e.carriereDixMinutes ? (e.cadenceDetaillee ? facteurArretDetaille(e) : horlogeCondensee(e)) : facteurHorloge(e.phase, e.tempsReel));
   e.t += dtHorloge;
   e.minute = Math.min(e.prolongation ? Math.round(finDePeriode(e, 2 + (e.departage?.periodes ?? 0)) / 60) : 80, Math.floor(e.t / 60));
@@ -1297,7 +1297,7 @@ function commandeHumaine(e: EtatMatch, p: Pion): CommandeDirecte {
     const n = Math.hypot(dx, dy) || 1;
     return { mx: dx / n, my: dy / n, sprint: true };
   }
-  return d.commande;
+  return aidePlacementEquipe(e,p);
 }
 
 /**
@@ -5784,6 +5784,10 @@ function appliquerLeDuelDuRuck(e: EtatMatch): void {
 }
 
 function phaseRuck(e: EtatMatch): void {
+  if (e.controleEquipe?.sortie?.auSol && e.possession===e.controleEquipe.cote && e.ruck) {
+    const ids=e.ruck.organisation?.attaque??[];
+    return terminerLeRuck(e,e.pions.filter(p=>ids.includes(p.id)));
+  }
   // Niveau 4 : un grattage ou un contre-ruck qui s'achève est appliqué tel qu'on l'a vu.
   if (conqueteLisible(e) && e.ruck?.duel && e.minuteur <= 0) return appliquerLeDuelDuRuck(e);
   const organisation = e.ruck?.organisation;
@@ -6091,6 +6095,24 @@ function contreursPresents(e: EtatMatch, prochesDefense: Pion[]): Pion[] {
 
 /** La sortie du ballon, une fois le duel du ruck tranché : relayeur, retards de la défense, reprise du jeu. */
 function terminerLeRuck(e: EtatMatch, nettoyeurs: Pion[]): void {
+  const controle=e.controleEquipe;
+  if (controle?.actif && controle.cote===e.possession && e.ruck) {
+    const neuf=designerRelayeur(e);
+    if (neuf) {
+      // Le duel est gagné, mais le ballon reste au sol jusqu'au choix. Le relayeur rejoint réellement sa place.
+      const sortie=controle.sortie??={neufId:neuf.id,origine:{...e.ballon},depuis:e.sim,auSol:true};
+      if (sortie.neufId!==neuf.id) { sortie.neufId=neuf.id;delete sortie.pretDepuis;delete sortie.choix; }
+      e.ruck.duel=undefined;
+      organiserCellulesSolo(e);
+      selectionnerPionEquipe(e,neuf);
+      if (distance(neuf.pos,e.ballon)>PORTEE_SORTIE) return;
+      sortie.pretDepuis??=e.sim;
+      if (sortie.choix && !['box','depart'].includes(sortie.choix) && !cibleOptionNeuf(e,sortie.choix)) delete sortie.choix;
+      // Huit secondes pleines après l'arrivée ; l'absence d'entrée ne bloque pas le match définitivement.
+      if (!sortie.choix && e.sim-sortie.pretDepuis>=8) choisirOptionNeuf(e,optionsNeufDisponibles(e)[0]??'depart');
+      if (!sortie.choix) return;
+    }
+  }
   // Les nettoyeurs.
   for (const p of nettoyeurs) if (distance2(p.pos, e.ballon) < 16) p.stats.rucksNettoyes += 1;
 
@@ -6150,7 +6172,9 @@ function terminerLeRuck(e: EtatMatch, nettoyeurs: Pion[]): void {
   }
   reprendreJeu(e, e.ballon, undefined, 3.0, plaqueAuSolId, premierAuBallon);
   if (e.controleEquipe?.actif && e.possession === e.controleEquipe.cote && e.porteur) {
-    e.controleEquipe.sortie = { neufId: e.porteur.id, origine: { ...e.origine }, depuis: e.sim };
+    const choix=e.controleEquipe.sortie;
+    e.controleEquipe.sortie = { ...choix, neufId: e.porteur.id, origine: { ...e.origine }, depuis: e.sim,auSol:false,
+      departA:e.sim+(choix?.choix==='gauche'||choix?.choix==='droite'?0.5:0) };
     selectionnerPionEquipe(e,e.porteur);
   }
 }
@@ -9708,6 +9732,7 @@ function lancementParPoste(
 function jouerSortieEquipe(e: EtatMatch): void {
   const c=e.controleEquipe, sortie=c?.sortie;
   if (!c?.actif || !sortie) return;
+  if (sortie.auSol && e.phase==='ruck' && e.possession===c.cote) return;
   if (e.phase!=='jeuCourant' || e.porteur?.id!==sortie.neufId) { delete c.sortie; return; }
   const neuf=e.porteur;
   if (!sortie.choix) {

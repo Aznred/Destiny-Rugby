@@ -4,6 +4,7 @@ import type { Pion } from './entites.js';
 import { adverse, borner, distance, LARGEUR, metresAvantLaLigne, sens, type Cote, type Vec } from './terrain.js';
 import { creerEtatDirect, majVueDirecte } from './direct.js';
 import { pionDuRole } from './responsabilites.js';
+import { designerRelayeur } from './regroupements.js';
 
 export interface ReglagesEquipe { melees: 'manuel' | 'auto'; touches: 'manuel' | 'auto'; rucks: 'manuel' | 'assiste' }
 export const REGLAGES_EQUIPE: ReglagesEquipe = { melees: 'manuel', touches: 'manuel', rucks: 'manuel' };
@@ -17,7 +18,8 @@ export interface OrganisationSolo {
 export interface ControleEquipe {
   cote: Cote; actif: boolean; reglages: ReglagesEquipe; selectionId?: string; dernierChangement: number;
   manuelJusqua: number; ordre?: OrdreEquipe;
-  sortie?: { neufId: string; origine: Vec; depuis: number; choix?: OptionNeuf; cibleId?: string; departA?: number };
+  sortie?: { neufId: string; origine: Vec; depuis: number; auSol?: boolean; pretDepuis?: number; choix?: OptionNeuf; cibleId?: string; departA?: number };
+  mouvementLe?: number;
   reserves: Record<string, { recharges: NonNullable<EtatMatch['direct']>['recharges'] }>;
 }
 const disponible = (p: Pion) => p.surLeTerrain && p.sanction <= 0 && !p.corps && p.battu <= 0;
@@ -48,7 +50,7 @@ export function selectionnerPionEquipe(e: EtatMatch, pion: Pion): boolean {
   return true;
 }
 
-/** Porteur et réception sont prioritaires ; la défense garde son joueur tant qu'un autre n'est pas nettement mieux placé. */
+/** Porteur et réception sont prioritaires ; en défense, seul un changement demandé ou une indisponibilité change le joueur. */
 export function actualiserSelectionEquipe(e: EtatMatch): Pion | undefined {
   const c = e.controleEquipe;
   if (!c?.actif || e.fini) return undefined;
@@ -70,17 +72,16 @@ export function actualiserSelectionEquipe(e: EtatMatch): Pion | undefined {
     prioritaire = joueurs.find(p => p === sauteur) ?? joueurs.filter(p => p.role === 'alignement')
       .sort((a,b)=>Math.abs(a.pos.y-(sauteur?.pos.y??e.ballon.y))-Math.abs(b.pos.y-(sauteur?.pos.y??e.ballon.y)))[0];
   }
-  if (!prioritaire && e.sim < c.manuelJusqua && actuel && !e.vol) return actuel;
   if (!prioritaire && e.porteur?.cote === c.cote && debout(e.porteur)) prioritaire = e.porteur;
   if (!prioritaire && e.vol?.type === 'passe' && e.vol.receveur?.cote === c.cote) prioritaire = e.vol.receveur;
-  if (!prioritaire && e.phase === 'ruck' && e.possession === c.cote) prioritaire = joueurs.find(p => p.id === e.organisationSolo?.neufId);
+  if (!prioritaire && e.phase === 'ruck' && e.possession === c.cote) prioritaire = designerRelayeur(e) ?? joueurs.find(p => p.id === e.organisationSolo?.neufId);
   if (!prioritaire && e.sim < c.manuelJusqua && actuel) return actuel;
+  if (!prioritaire && actuel) return actuel;
   const cible = e.vol?.vers ?? e.porteur?.pos ?? e.ballon;
   const note = (p: Pion) => distance(p.pos, cible) + (p.horsJeu ? 30 : 0) + (p.role === 'ruck' ? 15 : 0)
     + (e.porteur?.cote === adverse(c.cote) && (p.pos.x - cible.x) * sens(c.cote) > 0 ? 4 : 0);
   const meilleur = prioritaire ?? joueurs.filter(disponible).sort((a,b) => note(a) - note(b) || a.id.localeCompare(b.id))[0];
-  const conserve = !prioritaire && actuel && disponible(actuel) && (e.sim - c.dernierChangement < 0.7 || !meilleur || note(actuel) <= note(meilleur) + 3.5);
-  if (meilleur && !conserve) selectionnerPionEquipe(e, meilleur);
+  if (meilleur) selectionnerPionEquipe(e, meilleur);
   return e.pions.find(p => p.id === c.selectionId);
 }
 
@@ -108,7 +109,8 @@ export function organiserCellulesSolo(e: EtatMatch): void {
   const cote = e.possession, s = sens(cote);
   const origine = e.phase === 'ruck' ? e.ballon : e.origine;
   const cle = `${cote}:${e.compteurs.rucks}:${origine.x.toFixed(1)}:${origine.y.toFixed(1)}`;
-  const disponibles = e.pions.filter(p => p.cote === cote && disponible(p) && p.avant && p.role !== 'ruck' && p !== e.porteur);
+  const relayeur = e.phase === 'ruck' && e.controleEquipe?.actif ? designerRelayeur(e) : undefined;
+  const disponibles = e.pions.filter(p => p.cote === cote && disponible(p) && p.avant && p.role !== 'ruck' && p !== e.porteur && p !== relayeur);
   const courte = metresAvantLaLigne(origine,cote) <= 10;
   const ordre = e.controleEquipe?.cote === cote ? e.controleEquipe.ordre : undefined;
   const profondeur = courte ? 1.2 : ordre === 'occupation' ? 6 : ordre === 'serre' || ordre === 'pick' ? 3 : 4.5;
@@ -126,9 +128,14 @@ export function organiserCellulesSolo(e: EtatMatch): void {
       return { ids: reserves.splice(0,n).map(p => p.id), centre: place };
     };
     const gauche = prendre(-1), droite = prendre(1);
-    const neuf = e.pions.filter(p => p.cote===cote && disponible(p) && p.role!=='ruck' && !p.avant)
+    const neuf = relayeur ?? e.pions.filter(p => p.cote===cote && disponible(p) && p.role!=='ruck' && !p.avant)
       .sort((a,b) => (a.numero===9 ? -100 : distance(a.pos,origine)) - (b.numero===9 ? -100 : distance(b.pos,origine)))[0];
     o = e.organisationSolo = { cle,cote,origine:{...origine},gauche,droite,neufId:neuf?.id,pickId:pick?.id };
+  }
+  if (relayeur) {
+    o.neufId = relayeur.id;
+    for (const cellule of [o.gauche,o.droite]) cellule.ids=cellule.ids.filter(id=>id!==relayeur.id);
+    if (o.pickId===relayeur.id) delete o.pickId;
   }
   for (const coteCellule of ['gauche','droite'] as const) {
     const cellule = o[coteCellule];
@@ -173,16 +180,41 @@ export function organiserCellulesSolo(e: EtatMatch): void {
 export function cibleOptionNeuf(e: EtatMatch, option: OptionNeuf): Pion | undefined {
   const o = e.organisationSolo;
   const id = option==='gauche' ? o?.gauche.ids[0] : option==='droite' ? o?.droite.ids[0] : option==='pick' ? o?.pickId : undefined;
-  return option==='dix' ? e.pions.find(p=>p.cote===e.possession && p.numero===10 && disponible(p)) : e.pions.find(p=>p.id===id && debout(p));
+  const cible = option==='dix' ? e.pions.find(p=>p.cote===e.possession && p.numero===10 && disponible(p)) : e.pions.find(p=>p.id===id && disponible(p));
+  const neuf=e.pions.find(p=>p.id===e.controleEquipe?.sortie?.neufId) ?? e.porteur;
+  if (!cible || cible===neuf || cible.cote!==e.possession || cible.role==='ruck' || cible.horsJeu) return undefined;
+  // Une passe doit être réalisable depuis les mains du relayeur. Le pick vient chercher le ballon.
+  if (neuf && (distance(cible.pos,neuf.pos)>(option==='pick'?9:28) || (option!=='pick' && (cible.pos.x-neuf.pos.x)*sens(neuf.cote)>0.35))) return undefined;
+  return cible;
+}
+export function optionsNeufDisponibles(e: EtatMatch): OptionNeuf[] {
+  const sortie=e.controleEquipe?.sortie;
+  if (!sortie || sortie.choix) return [];
+  return (['dix','gauche','droite','pick','box','depart'] as const).filter(o=>o==='box'||o==='depart'||!!cibleOptionNeuf(e,o));
 }
 export function choisirOptionNeuf(e: EtatMatch, choix: OptionNeuf): boolean {
   const c = e.controleEquipe, sortie=c?.sortie;
-  if (!c?.actif || !sortie || sortie.choix || e.porteur?.id!==sortie.neufId) return false;
+  if (!c?.actif || !sortie || sortie.choix) return false;
+  if (sortie.auSol ? e.phase!=='ruck'||e.possession!==c.cote : e.porteur?.id!==sortie.neufId) return false;
   const cible = cibleOptionNeuf(e,choix);
   if (['gauche','droite','dix','pick'].includes(choix) && !cible) return false;
   sortie.choix=choix; sortie.cibleId=cible?.id; sortie.departA=e.sim+(choix==='gauche'||choix==='droite' ? 0.5 : 0);
   if ((choix==='gauche'||choix==='droite') && e.organisationSolo) e.organisationSolo.lancee={cote:choix,depuis:e.sim};
   return true;
+}
+
+/** Petit retour vers le placement conseillé lorsque le stick est relâché, loin de tout contact. */
+export function aidePlacementEquipe(e: EtatMatch, p: Pion): NonNullable<EtatMatch['direct']>['commande'] {
+  const d=e.direct!, c=e.controleEquipe, commande=d.commande;
+  if (!c?.actif) return commande;
+  if (Math.hypot(commande.mx,commande.my)>0.08 || commande.sprint) { c.mouvementLe=e.sim; return commande; }
+  if (c.mouvementLe===undefined) c.mouvementLe=e.sim;
+  if (e.sim-c.mouvementLe<0.65 || p===e.porteur || e.vol || c.sortie || !d.suggestion || e.sim-d.suggestionA>2.5
+    || !['jeuCourant','ruck'].includes(e.phase) || distance(p.pos,e.porteur?.pos??e.ballon)<8) return commande;
+  const dx=d.suggestion.x-p.pos.x, dy=d.suggestion.y-p.pos.y, dist=Math.hypot(dx,dy);
+  if (dist<2.5) return commande;
+  const force=Math.min(0.25,(dist-2.5)*0.06);
+  return {mx:dx/dist*force,my:dy/dist*force,sprint:false};
 }
 
 /** Choix tactique déterministe : espace, rideau et distance de placement comptent ensemble. */

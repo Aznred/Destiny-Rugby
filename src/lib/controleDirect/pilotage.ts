@@ -17,7 +17,7 @@
 
 import type { EtatMatch } from '../moteur/etat';
 import type { Pion } from '../moteur/entites';
-import { actualiserSelectionEquipe, changerJoueurEquipe, choisirOptionNeuf, donnerOrdreEquipe, cibleOptionNeuf, type OptionNeuf, type OrdreEquipe } from '../moteur/equipeSolo';
+import { actualiserSelectionEquipe, changerJoueurEquipe, choisirOptionNeuf, donnerOrdreEquipe, optionsNeufDisponibles, type OptionNeuf, type OrdreEquipe } from '../moteur/equipeSolo';
 import { optionNeufClavier, optionNeufManette } from './sortiesNeuf';
 import {
   activerDirect, choisirReceveur, classerCoupDePied, commanderDirect, demanderDirect, poserViseur,
@@ -320,6 +320,7 @@ export class PilotageDirect {
 
   /** La caméra réellement affichée : le choix du joueur, sauf sur les phases qui ne lui appartiennent pas. */
   cameraPour(choix: Camera3D, e: EtatMatch, maintenant = performance.now()): Camera3D {
+    if (e.controleEquipe?.actif && e.controleEquipe.selectionId && !e.fini) return 'joueur';
     if (choix !== 'joueur') return choix;
     // La touche : on voit l'alignement entier, pas le dos du lanceur.
     if (e.responsabilites?.attente?.type === 'touche') { this.enTV = true; this.tvJusqua = maintenant + 900; return 'tv'; }
@@ -367,7 +368,7 @@ export class PilotageDirect {
           this.tEntree = 0;
           this.rappels.surPrise();
           this.cameraAuto = ctx.cameraChoisie === 'tv';
-          if (this.cameraAuto) this.rappels.surCamera(e.controleEquipe ? 'equipe' : 'joueur');
+          if (this.cameraAuto) this.rappels.surCamera('joueur');
         }
         break;
       case 'entree':
@@ -835,7 +836,7 @@ export class PilotageDirect {
     const vue = e.direct!.vue;
     if (!vue.libre) return null;
     const r: ReperesScene = {};
-    if (aide && vue.suggestion && !vue.porte) { r.suggestion = vue.suggestion; r.horsPoste = vue.horsPoste; }
+    if (aide && !e.controleEquipe?.actif && vue.suggestion && !vue.porte) { r.suggestion = vue.suggestion; r.horsPoste = vue.horsPoste; }
     if (vue.porte && vue.possible.passe && !kick) {
       const passes: NonNullable<ReperesScene['passes']> = [];
       for (const cote of [-1, 1]) {
@@ -862,8 +863,8 @@ export class PilotageDirect {
     const d = e?.direct;
     const v = d?.vue;
     return {
-      equipe: e?.controleEquipe && moi ? {numero:moi.numero,nom:moi.nom,sortie:!!e.controleEquipe.sortie,
-        options:(['dix','gauche','droite','pick','box','depart'] as OptionNeuf[]).filter(o=>o==='box'||o==='depart'||!!cibleOptionNeuf(e,o)),ordre:e.controleEquipe.ordre,pied:this.piedChoisi} : null,
+      equipe: e?.controleEquipe && moi ? {numero:moi.numero,nom:moi.nom,sortie:!!e.controleEquipe.sortie && !e.controleEquipe.sortie.choix,
+        options:optionsNeufDisponibles(e),ordre:e.controleEquipe.ordre,pied:this.piedChoisi} : null,
       phase: this.phase,
       visible: this.phase === 'actif' || (this.phase === 'entree' && this.tEntree > 0.7),
       appareil: this.appareil,

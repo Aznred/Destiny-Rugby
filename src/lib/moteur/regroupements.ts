@@ -84,8 +84,9 @@ export function designerRelayeur(e: EtatMatch): Pion | undefined {
   // Un joueur qui conduit son pion n'est le relayeur que s'il est VRAIMENT au pied du ruck.
   const disponible = (p: Pion) => p.surLeTerrain && p.sanction <= 0 && !p.corps
     && p.cote === e.possession && !lies.has(p.id)
-    && (!(p.moi && e.direct?.actif) || distance(p.pos, e.ballon) <= 2.6);
+    && (e.controleEquipe?.actif || !(p.moi && e.direct?.actif) || distance(p.pos, e.ballon) <= 2.6);
   const actuel = o.relayeurId ? e.pions.find(p => p.id === o.relayeurId) : undefined;
+  if (e.controleEquipe?.actif && actuel && disponible(actuel)) return actuel;
   const neuf = e.pions.find(p => p.numero === 9 && p.cote === e.possession);
   // En cadence détaillée, le demi n'est le relayeur que s'il peut vraiment y
   // être : au-delà de neuf mètres, quelqu'un d'autre est déjà sur le ballon.
@@ -234,7 +235,8 @@ export function placerRegroupement(e: EtatMatch): void {
     const p = e.pions.find(q => q.id === id && q.surLeTerrain && q.sanction <= 0);
     if (!p) return;
     // Le pion du joueur n'est placé que s'il s'est engagé dans le regroupement.
-    if (p.moi && e.direct?.actif && !o.attaque.includes(id) && !o.defense.includes(id)) return;
+    if (p.moi && e.direct?.actif && !o.attaque.includes(id) && !o.defense.includes(id)
+      && !(e.controleEquipe?.actif && id===o.relayeurId)) return;
     p.role = 'ruck';
     p.cible = { x: borner(cible.x, LIGNE_A + .5, LIGNE_B - .5), y: borner(cible.y, 1.2, LARGEUR - 1.2) };
     e.placement![id] = { ...p.cible };

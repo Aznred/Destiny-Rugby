@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { creerApercuDestiny } from '../src/lib/moteur/passerelle3D';
 import { avancer, choisirCombinaisonTouche, DT, installerSituationCombinaison, lancerLaTouche } from '../src/lib/moteur/moteur';
 import { activerDirect, classerCoupDePied, commanderDirect, demanderDirect, majVueDirecte } from '../src/lib/moteur/direct';
-import { actualiserSelectionEquipe, changerJoueurEquipe, choisirOptionNeuf, configurerEquipeSolo, donnerOrdreEquipe, meilleurCoteCellule, organiserCellulesSolo, selectionnerPionEquipe } from '../src/lib/moteur/equipeSolo';
+import { actualiserSelectionEquipe, aidePlacementEquipe, changerJoueurEquipe, choisirOptionNeuf, configurerEquipeSolo, donnerOrdreEquipe, meilleurCoteCellule, optionsNeufDisponibles, organiserCellulesSolo, selectionnerPionEquipe } from '../src/lib/moteur/equipeSolo';
 import { creerResponsabilites, humainTientLe, pionDuRole } from '../src/lib/moteur/responsabilites';
 import { placerEquipes } from '../src/lib/moteur/tactique';
 import { distance, sens } from '../src/lib/moteur/terrain';
@@ -63,6 +63,8 @@ for(const cote of ['A','B'] as const) {
   ok(e.controleEquipe!.selectionId===courant,'Une petite variation ne fait pas sautiller la sélection en défense');
   ok(changerJoueurEquipe(e,{x:0,y:1}),'Changement manuel orienté disponible');
   const manuel=e.controleEquipe!.selectionId;actualiserSelectionEquipe(e);ok(e.controleEquipe!.selectionId===manuel,'La sélection manuelle est conservée');
+  for(let i=0;i<600;i++){e.sim+=0.05;e.porteur.pos.y=5+i%60;actualiserSelectionEquipe(e);}
+  ok(e.controleEquipe!.selectionId===manuel,'Trente secondes de déplacements adverses ne changent pas le défenseur choisi');
   const exclu=e.pions.find(p=>p.id===manuel)!;exclu.surLeTerrain=false;actualiserSelectionEquipe(e);ok(e.controleEquipe!.selectionId!==manuel,'Un sortant ne reste pas contrôlé');
 }
 {
@@ -122,13 +124,45 @@ for(const option of ['gauche','droite','dix','pick','box','depart'] as const) {
   for(const p of e.pions)if(p.cote==='B')poser(p,92,4+p.numero*4);
   e.rng=()=>0.93;
   for(let i=0;i<150 && !e.controleEquipe!.sortie;i++)avancer(e,DT);
-  ok(!!e.controleEquipe!.sortie && e.porteur?.moi,'Le vrai ruck rend le ballon au relayeur contrôlé');
+  ok(!!e.controleEquipe!.sortie?.auSol && !e.porteur,'Le vrai ruck conserve le ballon au sol pendant le choix');
   for(const p of e.pions)if(p.cote==='B')poser(p,92,4+p.numero*4);
-  const controle=e.porteur;avancer(e,0.6);ok(e.porteur===controle && !e.vol,'Aucune passe IA à la sortie du vrai ruck');
+  const controle=e.pions.find(p=>p.id===e.controleEquipe!.sortie!.neufId)!;
+  const heure=e.t;avancer(e,4);ok(!e.porteur && !e.vol && e.controleEquipe!.sortie?.auSol,'Quatre secondes de réflexion sans plaquage du relayeur');
+  ok(e.t===heure,'Le temps de réflexion ne consomme pas le chronomètre du match');
+  ok(controle.moi && distance(controle.pos,e.ballon)<3,'Le relayeur est automatiquement placé derrière le ballon');
   ok(choisirOptionNeuf(e,'droite'),'Une cellule peut être appelée après le vrai duel au sol');
   let servi=false;
   for(let i=0;i<80;i++){avancer(e,DT);if(e.vol?.type==='passe' && e.vol.auteur===controle){servi=true;break;}}
   ok(servi,'Le receveur lancé reste derrière le relayeur jusqu’au départ de la passe');
+}
+{
+  const e=creer();installerSituationCombinaison(e,'ruck',{x:61,y:35});e.rng=()=>0.93;
+  const neuf=e.pions.find(p=>p.cote==='A'&&p.numero===9)!;neuf.sanction=120;
+  for(let i=0;i<500 && !e.controleEquipe!.sortie?.pretDepuis;i++)avancer(e,DT);
+  const sortie=e.controleEquipe!.sortie!;
+  ok(!!sortie?.pretDepuis && sortie.neufId!==neuf.id,'Un remplaçant rejoint le ruck si le 9 est exclu');
+  const pret=sortie.pretDepuis!;
+  while(e.sim<pret+7.5)avancer(e,DT);
+  ok(e.controleEquipe!.sortie?.auSol && !e.porteur,'Le temps de choix commence après le placement du relayeur');
+  for(let i=0;i<150 && e.controleEquipe!.sortie?.auSol;i++)avancer(e,DT);
+  ok(!e.controleEquipe!.sortie?.auSol,'Une absence de commande ne bloque pas définitivement le ruck');
+}
+{
+  const e=creer();e.possession='A';const neuf=e.pions.find(p=>p.cote==='A'&&p.numero===9)!,dix=e.pions.find(p=>p.cote==='A'&&p.numero===10)!;
+  poser(neuf,60,35);poser(dix,65,35);e.porteur=neuf;e.controleEquipe!.sortie={neufId:neuf.id,origine:{...neuf.pos},depuis:e.sim};
+  ok(!optionsNeufDisponibles(e).includes('dix') && !choisirOptionNeuf(e,'dix'),'Une passe en avant est masquée et refusée');
+  poser(dix,55,35);dix.sanction=60;
+  ok(!optionsNeufDisponibles(e).includes('dix'),'Un joueur sanctionné ne peut pas être proposé');
+  const pilote=new PilotageDirect({surCamera:()=>{},surPause:()=>{},vibrer:()=>{},surPrise:()=>{}});
+  selectionnerPionEquipe(e,neuf);
+  for(const camera of ['tv','equipe','joueur'] as const)ok(pilote.cameraPour(camera,e)==='joueur','Le contrôle collectif garde la caméra derrière le joueur');
+  delete e.controleEquipe!.sortie;e.porteur=e.pions.find(p=>p.cote==='B'&&p.numero===10)!;poser(e.porteur,90,35);
+  const d=e.direct!;d.suggestion={x:65,y:35};d.suggestionA=e.sim;e.controleEquipe!.mouvementLe=e.sim-1;
+  commanderDirect(e,0,0,false);const aide=aidePlacementEquipe(e,neuf);
+  ok(aide.mx>0 && Math.hypot(aide.mx,aide.my)<=0.25 && !aide.sprint,'L’assistance ne fait que quelques pas à faible allure');
+  commanderDirect(e,0,1,false);ok(aidePlacementEquipe(e,neuf)===d.commande,'Le stick reprend immédiatement la priorité');
+  commanderDirect(e,0,0,false);e.controleEquipe!.mouvementLe=e.sim-1;poser(e.porteur,64,35);
+  ok(aidePlacementEquipe(e,neuf)===d.commande,'Aucune assistance de placement au contact');
 }
 {
   const e=creer();installerSituationCombinaison(e,'touche',{x:61,y:1});

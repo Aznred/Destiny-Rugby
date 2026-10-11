@@ -19,7 +19,7 @@ sql.query=async(q:string,p:unknown[]=[])=>{
   if(q.includes('from envois'))return[{heure:quota,jour:quota}];
   if(q.includes('insert into envois')){quota++;return[];}
   if(q.includes('insert into classement')) {
-    const ancien=lignes.get(p[0]);if(ancien&&ancien.score!<=Number(p[2]))return[];
+    const ancien=lignes.get(p[0]);if(ancien && ancien.score > Number(p[2]))return[];
     const ligne={id:ancien?.id??lignes.size+1,pseudo:p[1],score:p[2],nom:p[3],poste:p[4],matchs:p[10],validation:p[15]?JSON.parse(p[15] as string):undefined};
     lignes.set(p[0],ligne);return[{id:ligne.id}];
   }

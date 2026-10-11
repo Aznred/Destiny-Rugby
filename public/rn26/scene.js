@@ -1394,8 +1394,10 @@ export async function creerScene3D(conteneur,options={}){
   function cameraJoueur(real,moiA,e){
     let J=rig.joueur;
     const P=moiA.group.position,B=ballMesh.position,equipe=match.byId.get(options.moi)?.team??0;
+    const collectif=!!e.controleEquipe?.actif;
     const ax=0,az=equipe===0?1:-1;
     if(!J){J=rig.joueur={yaw:az>0?0:Math.PI,zoom:1,wB:0,vx:0,vz:0,px:P.x,pz:P.z,pos:new THREE.Vector3(),posV:new THREE.Vector3(),look:new THREE.Vector3(),lookV:new THREE.Vector3(),init:false};}
+    if(collectif&&J.id!==options.moi){J.id=options.moi;J.px=P.x;J.pz=P.z;J.vx=0;J.vz=0;J.init=false;}
     const dt=Math.max(real,.001);
     // La course lissée, vue de la caméra (positions affichées, pas celles du moteur : jamais de saut).
     const vx=(P.x-J.px)/dt,vz=(P.z-J.pz)/dt;J.px=P.x;J.pz=P.z;
@@ -1422,14 +1424,20 @@ export async function creerScene3D(conteneur,options={}){
     // Mode libre : inchangé — elle reste où il l'a mise, avec la seule aide lente au ballon franchement hors champ.
     const cap=null;
     J.age=(J.age??99)+dt;
-    if(options.orbite){J.yaw-=options.orbite;options.orbite=0;J.age=0;}
+    if(options.orbite){if(!collectif){J.yaw-=options.orbite;J.age=0;}options.orbite=0;}
     const porteurJ=match.carrier?match.byId.get(match.carrier):null;
     const moiPorte=match.carrier===options.moi;
     const amiPorte=!!porteurJ&&!moiPorte&&porteurJ.team===equipe;
     const advPorte=!!porteurJ&&porteurJ.team!==equipe;
     const volJ=match.flights.get(options.moi),passeSurMoi=!!volJ&&match.time-volJ.start<volJ.duree+.2;
     const aerienJ=!porteurJ&&ballMesh.position.y>2.2;
-    if(!J.init||snap){J.yaw=Math.atan2(ax+dvx*wV,az+dvz*wV);J.age=99;}
+    if(collectif){
+      // Le modèle regarde selon son axe -Z. La caméra suit son dos, sans partir vers un ballon éloigné.
+      const voulu=moiA.heading-Math.PI;
+      const delta=Math.atan2(Math.sin(voulu-J.yaw),Math.cos(voulu-J.yaw));
+      J.yaw=(!J.init||snap)?voulu:J.yaw+delta*(1-Math.exp(-dt*8));
+    }
+    else if(!J.init||snap){J.yaw=Math.atan2(ax+dvx*wV,az+dvz*wV);J.age=99;}
     else{
       const libre=options.cameraLibre===true;
       const ab=Math.atan2(bx,bz);
@@ -1484,12 +1492,12 @@ export async function creerScene3D(conteneur,options={}){
     const dist=11.8*J.zoom*asp*recul,haut=5.6*J.zoom*asp*recul;
     // Pas collée à son dos : un peu décalée de l'autre côté du ballon, pour qu'il reste lisible à côté du joueur.
     const droiteX=-fz,droiteZ=fx;
-    const decal=clamp(-((B.x-P.x)*droiteX+(B.z-P.z)*droiteZ)*.07,-1.4,1.4)*(1-impliquee*.7);
+    const decal=collectif?0:clamp(-((B.x-P.x)*droiteX+(B.z-P.z)*droiteZ)*.07,-1.4,1.4)*(1-impliquee*.7);
     cible_J.set(P.x-fx*dist+droiteX*decal,Math.max(2.1,haut),P.z-fz*dist+droiteZ*decal);
     cible_J.x=clamp(cible_J.x,-37,37);cible_J.z=clamp(cible_J.z,-72,72);
     // On regarde plus loin devant : l'espace et la ligne défensive comptent plus que le dos du joueur.
     // Quand un autre porte (ou que le ballon vole), le regard se pose entre l'espace devant le joueur et le ballon.
-    const poidsB=moiPorte?.1:.3,avance=(12+.7*sp)*(moiPorte?1:.8);
+    const poidsB=collectif?0:moiPorte?.1:.3,avance=(12+.7*sp)*(moiPorte?1:.8);
     const eB=Math.min(1,16/Math.max(1,db));
     viser_J.set(P.x+fx*avance+(B.x-P.x)*poidsB*eB,1.1,P.z+fz*avance+(B.z-P.z)*poidsB*eB);
     if(!J.init||snap){J.pos.copy(cible_J);J.posV.set(0,0,0);J.look.copy(viser_J);J.lookV.set(0,0,0);J.init=true;}

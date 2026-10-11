@@ -138,7 +138,7 @@ export function ControleDirect({ pilotage, surReprendre, suspendu = false }: {
       {/* Les zones tactiles : toujours posées (un portable tactile doit pouvoir passer au pouce), muettes pour la souris. */}
       {/* ⚠️ QUAND LE JEU ATTEND UNE RÉPONSE (capitaine, tir, engagement, touche), le joueur ne conduit plus : ni joystick, ni commandes. */}
       <Joystick pilotage={pilotage} prefs={prefs} sprint={sprint} actif={enJeu && !snap.pause && !occupe} />
-      <Gestes pilotage={pilotage} actif={enJeu && !snap.pause && snap.libre && !occupe} />
+      <Gestes pilotage={pilotage} actif={enJeu && !snap.pause && (snap.libre || !!snap.equipe?.sortie) && !occupe} />
       {/* La caméra à 360° (Correctif 23) : le haut de l'écran au doigt, la souris partout où rien ne se clique. */}
       <ZoneCamera pilotage={pilotage} actif={enJeu && !snap.pause && !occupe} sensibilite={prefs.sensibiliteCamera} />
       <OrbiteSouris pilotage={pilotage} actif={enJeu && !snap.pause && !occupe} sensibilite={prefs.sensibiliteCamera} racine={racine} sansGauche={prefs.souris} />
@@ -160,7 +160,7 @@ export function ControleDirect({ pilotage, surReprendre, suspendu = false }: {
         <Indications snap={snap} touches={prefs.touches} />
       )}
 
-      {snap.visible && tactile && snap.aPoste && (
+      {snap.visible && tactile && snap.aPoste && !snap.equipe && (
         <button
           type="button"
           className="cd-aide"
@@ -404,9 +404,9 @@ function Rythme({ pilotage, snap, tactile }: { pilotage: PilotageDirect; snap: S
 /** Pourquoi on ne conduit pas à cet instant, ou ce qui cloche (hors jeu, hors poste), ou l'appel en cours. */
 function Situation({ snap }: { snap: SnapPilotage }) {
   const pastilles: { cle: string; ton: 'info' | 'alerte' | 'ok'; icone?: NomIcone }[] = [];
-  if (!snap.libre && snap.raison && snap.raison !== 'banc') pastilles.push({ cle: `cd.raison.${snap.raison}`, ton: 'info' });
+  if (!snap.libre && snap.raison && snap.raison !== 'banc' && !(snap.equipe && snap.raison==='ruck')) pastilles.push({ cle: `cd.raison.${snap.raison}`, ton: 'info' });
   if (snap.libre && snap.horsJeu) pastilles.push({ cle: 'cd.horsJeu', ton: 'alerte', icone: 'alerte' });
-  if (snap.libre && snap.horsPoste && !snap.porte && !snap.horsJeu) pastilles.push({ cle: 'cd.horsPoste', ton: 'alerte', icone: 'viseur' });
+  if (snap.libre && snap.horsPoste && !snap.porte && !snap.horsJeu && !snap.equipe) pastilles.push({ cle: 'cd.horsPoste', ton: 'alerte', icone: 'viseur' });
   if (snap.libre && snap.appelActif) pastilles.push({ cle: 'cd.appelActif', ton: 'ok', icone: 'appel' });
   if (snap.indication) pastilles.push({ cle: `cd.ind.${snap.indication.cle}`, ton: snap.indication.pour ? 'ok' : 'alerte' });
   if (!pastilles.length) return null;
@@ -649,6 +649,7 @@ function Gestes({ pilotage, actif }: { pilotage: PilotageDirect; actif: boolean 
     <div
       ref={zone}
       className="cd-zone-gestes"
+      data-actif={actif?'oui':'non'}
       onPointerDown={poser}
       onPointerMove={bouger}
       onPointerUp={finir}
