@@ -895,6 +895,21 @@ export function setTransfertsSociaux(liste: TransfertAnnonce[] | undefined): voi
   cacheReference.clear();
 }
 
+/** Les joueurs réellement libérés, sans générer de nouveau contrat ni de nouvelle identité. */
+export function joueursLibresDuMarche(saison: number): (Coequipier & { ancienClub: string })[] {
+  const derniers = new Map<string, TransfertAnnonce>();
+  for (const t of TRANSFERTS_SOCIAUX.filter(t => t.saison <= saison)) derniers.set(normaliser(t.nom), t);
+  return [...derniers.values()].filter(t => t.vers === 'Sans club').map(t => {
+    const ancien = effectifBrut(t.de, t.saison - 1).find(j => j.id === t.joueurId || j.nom === t.nom);
+    return { id: t.joueurId ?? ancien?.id ?? `libre-${normaliser(t.nom)}`, nom: t.nom,
+      poste: ancien?.poste ?? posteConcret((t.poste ?? 'centre') as FamillePoste, t.nom),
+      age: (t.age ?? ancien?.age ?? 25) + saison - t.saison + 1,
+      note: t.note ?? ancien?.note ?? 50, potentiel: ancien?.potentiel ?? t.note ?? 50,
+      nation: t.nation ?? ancien?.nation ?? 'France', regen: ancien?.regen ?? false,
+      ancienClub: t.de };
+  });
+}
+
 // ---------------------------------------------------------------------------
 // CE QUE LES INSTALLATIONS DU CLUB DÉVERSENT ICI
 // Même principe que les transferts annoncés ci-dessus : le store tient la
@@ -1045,13 +1060,13 @@ function appliquerTransfertsSociaux(
       ancien
         ? {
             ...ancien,
-            id: `${nomClub}-ovale-${cle}`,
+            id: t.joueurId ?? `${nomClub}-ovale-${cle}`,
             horsGeneration: true,
             note: Math.max(20, Math.min(99, Math.round(ancien.note + bonusSource))),
             potentiel: Math.max(20, Math.min(99, Math.round(ancien.potentiel + bonusSource * 0.6))),
           }
         : {
-            id: `${nomClub}-ovale-${cle}`,
+            id: t.joueurId ?? `${nomClub}-ovale-${cle}`,
             nom: t.nom,
             poste: posteConcret((t.poste ?? 'centre') as FamillePoste, nomClub + t.nom),
             age,

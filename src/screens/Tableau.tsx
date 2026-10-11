@@ -22,6 +22,7 @@ import {
 } from '../lib/championnat';
 import { phaseFinale, type MatchFinal } from '../lib/phaseFinale';
 import { tournoiDeFinDAnnee } from '../lib/tournoi';
+import { TOURS_ELIMINATION, semaineElimination, type MatchElimination } from '../lib/bracketProgressif';
 import { coupeEnDirect, coupesDuClubALaDate } from '../lib/coupe';
 import { rulesFor, standingsStatuses, type StandingsStatus } from '../lib/competitionRules';
 import { TableauClassement } from '../components/TableauClassement';
@@ -96,12 +97,12 @@ function titreTour(tour: string): string {
 }
 // L'ordre des COLONNES de l'arbre, de gauche à droite. La petite finale se
 // place juste avant la finale : c'est là qu'elle se joue dans un tournoi.
-const ORDRE_TOURS = ['barrage', 'huitieme', 'quart', 'demie', 'petiteFinale', 'finale', 'accession'];
+const ORDRE_TOURS = ['trenteDeuxieme', 'seizieme', 'barrage', 'huitieme', 'quart', 'demie', 'petiteFinale', 'finale', 'accession'];
 const ORDRE_TOUR_FINAL: Record<string, number> = {
   barrage: 1, huitieme: 1, quart: 1, demie: 2, petiteFinale: 3, finale: 3, accession: 4,
 };
 
-function Arbre({ matchs, club }: { matchs: MatchFinal[]; club: string }) {
+export function Arbre({ matchs, club, taille }: { matchs: (MatchFinal | MatchElimination)[]; club: string; taille?: number }) {
   const tours = ORDRE_TOURS
     .map((tour) => ({ tour, matchs: matchs.filter((m) => m.tour === tour) }))
     .filter((g) => g.matchs.length);
@@ -111,22 +112,23 @@ function Arbre({ matchs, club }: { matchs: MatchFinal[]; club: string }) {
     <div className="arbre">
       {tours.map((g) => (
         <div key={g.tour} className="arbre-tour">
-          <div className="arbre-titre">{titreTour(g.tour)}</div>
+          <div className="arbre-titre">{g.matchs[0] && 'codeTour' in g.matchs[0] ? g.matchs[0].libelle.split(' : ')[0] : titreTour(g.tour)}</div>
           <div className="arbre-matchs">
             {g.matchs.map((m) => (
               <div
                 key={m.libelle}
-                className={`arbre-match${m.tour === 'finale' ? ' finale' : ''}`}
+                className={`arbre-match${m.tour === 'finale' ? ' finale' : ''}${'status' in m && m.status !== 'completed' ? ' a-venir' : ''}`}
                 data-moi={m.domicile === club || m.exterieur === club ? 'oui' : undefined}
               >
                 <div className={`arbre-equipe${m.vainqueur === m.domicile ? ' vainqueur' : ''}`}>
                   <span>{m.domicile}</span>
-                  <b>{m.scoreD}</b>
+                  <b>{m.scoreD ?? '—'}</b>
                 </div>
                 <div className={`arbre-equipe${m.vainqueur === m.exterieur ? ' vainqueur' : ''}`}>
                   <span>{m.exterieur}</span>
-                  <b>{m.scoreE}</b>
+                  <b>{m.scoreE ?? '—'}</b>
                 </div>
+                {'status' in m && <div className="arbre-note">{libelleDate(semaine(m.semaine))} · {m.status === 'completed' ? t('tb.resultats') : t('tb.aVenir')}</div>}
                 {/* Un vainqueur est obligatoire : on dit comment il a été désigné, et d'où vient un club reversé. */}
                 {(m.prolongation || m.qualifiedFrom) && (
                   <div className="arbre-note">
@@ -139,6 +141,12 @@ function Arbre({ matchs, club }: { matchs: MatchFinal[]; club: string }) {
           </div>
         </div>
       ))}
+      {taille && Object.entries(TOURS_ELIMINATION).reverse().filter(([n, info]) => Number(n) <= taille
+        && !tours.some(g => g.tour === info.tour)).map(([n, info]) => <div className="arbre-tour verrouille" key={info.code} aria-disabled="true">
+          <div className="arbre-titre">{info.libelle}</div>
+          <p>{libelleDate(semaine(semaineElimination(Number(n))))}</p>
+          <p>{t('tb.aVenir')} · {Number(n)} {t('gen.clubs')}</p>
+        </div>)}
     </div>
   );
 }
@@ -510,12 +518,8 @@ export function Tableau() {
     () => CALENDRIER.slice(0, Math.max(0, numero - 1)).filter((s) => s.type === 'phaseFinale').length,
     [numero],
   );
-  const matchsPhaseVisibles = phase?.matchs.filter(
-    (match) => ORDRE_TOUR_FINAL[match.tour] <= toursFinalsTermines,
-  ) ?? [];
-  const matchsTournoiVisibles = tournoi?.matchs.filter(
-    (match) => ORDRE_TOUR_FINAL[match.tour] <= toursFinalsTermines,
-  ) ?? [];
+  const matchsPhaseVisibles = tournoi ? [] : phase?.matchs ?? [];
+  const matchsTournoiVisibles = tournoi?.matchs ?? [];
   const toursCoupeTermines = coupe
     ? Math.max(0, passees(numero, 'coupe') - coupe.totalJournees)
     : 0;
@@ -995,7 +999,12 @@ export function Tableau() {
                 {t('tb.tournoiAide')}
                 {finaleTerminee && tournoi.champion && <> <Icone nom="trophee" taille={13} /> {t('tb.vainqueur', { club: tournoi.champion })}</>}
               </p>
-              <Arbre matchs={matchsTournoiVisibles} club={carriere.club} />
+              <p>{tournoi.matchs.filter(m => m.status === 'completed').length} {t('tb.resultats')} · {tournoi.matchs.filter(m => m.status !== 'completed').length} {t('tb.aVenir')}</p>
+              {tournoi.matchs.find(m=>m.status!=='completed') && <p><b>{t('tb.tourActuel')} :</b> {tournoi.matchs.find(m=>m.status!=='completed')!.libelle}</p>}
+              <details><summary>{t('tb.nombreQualifies', { n: tournoi.qualifies.length })}</summary>
+                <div className="grille-poules">{tournoi.qualifies.map(q => <span key={q.qualificationId}>{q.club} · {t('tb.poule', { n: q.poule + 1 })} · {q.rang}</span>)}</div>
+              </details>
+              <Arbre matchs={matchsTournoiVisibles} club={carriere.club} taille={tournoi.qualifies.length} />
             </div>
           )}
 

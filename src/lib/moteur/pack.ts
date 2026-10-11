@@ -74,6 +74,9 @@ function lifteursDe(e: EtatMatch, sauteur: Pion): Pion[] {
 }
 
 function contexteDe(e: EtatMatch, moi: Pion): Contexte | null {
+  const reg=e.controleEquipe?.reglages;
+  if (reg && ((e.phase==='melee' && reg.melees==='auto') || (e.phase==='touche' && reg.touches==='auto')
+    || (e.phase==='ruck' && reg.rucks==='assiste'))) return null;
   if (!moi.surLeTerrain || moi.sanction > 0 || moi.corps) return null;
   const poste = rolePackDe(moi.numero);
   // ── Mêlée ──────────────────────────────────────────────────────────────

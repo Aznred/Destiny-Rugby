@@ -16,9 +16,15 @@ import { appliquerModificationsBoutiqueCompte, validerEtatBoutiqueCompte, type E
 import { ajouterCartesPackSolo } from '../src/lib/packsPrivesSolo.js';
 import { CLE_COFFRE_PACKS_INTERNES, PACKS_INTERNES_MAX, PERMISSION_PACKS_INTERNES, SOURCE_ACQUISITION_INTERNE, type LigneJournalPackInterne, type PackInterne } from '../src/lib/packsInternes.js';
 import type { OffreSolo } from '../src/lib/echangesSolo.js';
+import type { RegistrePublicites } from './publicitesStockage.js';
+import { STATS_PUB_VIDES } from '../src/lib/publicitesRecompensees.js';
+import { stockageValidationLocal, type DossierClassement } from './validationClassement.js';
 import { modifierCollectionSolo, possedeDoublons } from '../src/lib/echangesSolo.js';
 
 interface BaseLocale {
+  classementsValidation?: Record<string, DossierClassement>;
+  publicites?: Record<string, RegistrePublicites>;
+  transactionsPub?: Record<string, boolean>;
   atelier?: CatalogueAdmin;
   imagesSpeciales?: Record<string, ImageSpeciale>;
   push?: BasePush;
@@ -86,6 +92,33 @@ export function stockageFichier(fichier: string): StockageCarriere {
   };
   const sansCompte = ({ compte: _compte, ...pack }: PackInterne & { compte: string }): PackInterne => copie(pack);
   return {
+    classementValidation: stockageValidationLocal(base.classementsValidation ??= {}, sauver),
+    publicites: {
+      async lire(compte) { return base.publicites?.[compte] ? copie(base.publicites[compte]) : null; },
+      async trouver(id) { return copie(Object.values(base.publicites ?? {}).flatMap(r => r.sessions).find(s => s.rewardSessionId === id) ?? null); },
+      async ecrire(compte, revision, registre, credit = 0, tid) {
+        if ((base.publicites?.[compte]?.revision ?? null) !== revision || (tid && base.transactionsPub?.[tid])) return false;
+        if (credit && !base.boutiques?.[compte]) return false;
+        if (credit < 0 || credit > 10000) throw new Error('Crédit publicitaire invalide.');
+        base.publicites ??= {}; base.transactionsPub ??= {};
+        base.publicites[compte] = copie(registre);
+        if (tid) base.transactionsPub[tid] = true;
+        if (credit) {
+          const coffre = base.boutiques![compte]; coffre.ovas += credit; coffre.achatsOvas = (coffre.achatsOvas ?? 0) + credit;
+        }
+        sauver(); return true;
+      },
+      async statistiques() {
+        const stats = STATS_PUB_VIDES();
+        for (const r of Object.values(base.publicites ?? {})) {
+          for (const k of ['requested','started','completed','failed','noFill','ovasRewarded','packsEarned'] as const) stats[k] += r.stats[k];
+          if (r.stats.completed) stats.joueurs++;
+          for (const [id,n] of Object.entries(r.stats.distribution)) stats.distribution[id] = (stats.distribution[id] ?? 0) + n;
+          for (const [id,n] of Object.entries(r.stats.distributionAttendue ?? {})) stats.distributionAttendue![id] = (stats.distributionAttendue![id] ?? 0) + n;
+        }
+        return stats;
+      },
+    },
     packsInternes: {
       async permission(compte, permission) { return base.permissions![compte]?.includes(permission) === true; },
       async lister(compte) {

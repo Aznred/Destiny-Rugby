@@ -13,6 +13,7 @@
 // Déploiement de l'autre bout : `serveur/VERCEL.md`.
 
 import type { CategorieCarriere, FicheCarriere } from './classementMondial.js';
+import type { ValidationClassement } from './validationClassement.js';
 
 /**
  * Une identité de ligne pour cette installation, tirée au hasard une fois.
@@ -75,6 +76,7 @@ export const CLASSEMENT_EN_LIGNE = ACTIF;
  * parce qu'il leur manque un champ, c'est un classement qui a l'air cassé.
  */
 export interface LigneMondiale {
+  validation?: ValidationClassement | null;
   /**
    * L'identifiant PUBLIC de la ligne, attribué par la base.
    *
@@ -122,6 +124,9 @@ export function ficheDisponible(l: LigneMondiale): boolean {
 }
 
 export interface ResultatEnvoi {
+  validation?: ValidationClassement;
+  careerId?: string;
+  verificationEnregistree?: boolean;
   ok: boolean;
   /** Le score RECALCULÉ par le serveur. Peut différer de celui du client. */
   score?: number;
@@ -269,6 +274,7 @@ export async function envoyerAuClassement(fiche: FicheCarriere): Promise<Resulta
     const r = await appeler(URL_CLASSEMENT, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
+      credentials: 'same-origin',
       body: JSON.stringify(fiche),
     });
     const data = (await r.json().catch(() => ({}))) as ResultatEnvoi & { erreur?: string };
@@ -277,9 +283,10 @@ export async function envoyerAuClassement(fiche: FicheCarriere): Promise<Resulta
         ok: false,
         erreur: data.erreur ?? `Le serveur a répondu ${r.status}`,
         anomalies: data.anomalies,
+        validation: data.validation, careerId: data.careerId,
       };
     }
-    return { ok: true, score: data.score, id: data.id };
+    return { ...data, ok: data.ok !== false };
   } catch (e) {
     const abandonne = e instanceof DOMException && e.name === 'AbortError';
     return {

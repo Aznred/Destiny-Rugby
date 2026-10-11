@@ -1596,6 +1596,10 @@ export async function creerScene3D(conteneur,options={}){
     const stade=v=>tmp3.set(v.x*inv,v.y,v.z*inv);
     let viser=rig.focus;
     if(plan==='wide')tmp.set(48,46,-9);
+    else if(plan==='equipe'){
+      const contact=e.phase==='ruck'||e.phase==='maul',haut=contact?14:21;
+      tmp.copy(rig.focus).add(tmp2.set(18,haut,-26).multiplyScalar(Math.max(.9,z)));
+    }
     else if(plan==='close')tmp.copy(rig.focus).add(tmp2.set(6.5,3.6,-8.5).multiplyScalar(Math.max(.62,z)));
     else if(plan==='aerienne')tmp.set(rig.focus.x*.35+12,34,rig.focus.z-27);
     else if(plan==='basse')tmp.set(rig.focus.x+11.5,1.3,rig.focus.z-4);

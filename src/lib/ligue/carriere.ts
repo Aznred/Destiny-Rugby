@@ -553,14 +553,14 @@ export function creerLaboratoireCarriere(config: Pick<CreationCarriere, 'id' | '
   return etat;
 }
 
-function ouvrirPack(etat: EtatCarriereEnLigne, club: ClubCarriere, packId: string, maintenant: number, graine: string, gratuit = false) {
-  exiger(!etat.publique || PACKS_DIVISION_PUBLIQUE.includes(packId as typeof PACKS_DIVISION_PUBLIQUE[number]), 'Ce pack est désactivé dans cette ligue.');
+function ouvrirPack(etat: EtatCarriereEnLigne, club: ClubCarriere, packId: string, maintenant: number, graine: string, gratuit = false, reservePub = false) {
+  exiger(reservePub || !etat.publique || PACKS_DIVISION_PUBLIQUE.includes(packId as typeof PACKS_DIVISION_PUBLIQUE[number]), 'Ce pack est désactivé dans cette ligue.');
   const pack = etat.packs.find(p => p.id === packId); exiger(pack, 'Pack inconnu.');
   // ⚠️ UN PACK D'ÉVÉNEMENT (HALLOWEEN…) NE SE VEND PAS EN LIGUE : il est dans la
   // boutique de packs spéciaux de la Collection solo. Ses cartes, elles, peuvent
   // sortir des packs ordinaires d'une ligue qui les autorise.
-  exiger(!pack.evenement, 'Ce pack se trouve dans la boutique de packs spéciaux de la Collection solo.');
-  if (etat.publique || !gratuit) {
+  exiger(reservePub || !pack.evenement, 'Ce pack se trouve dans la boutique de packs spéciaux de la Collection solo.');
+  if (!reservePub && (etat.publique || !gratuit)) {
     const actifs = packsActifsLigue(etat);
     exiger(!actifs || actifs.includes(packId), 'Ce pack est désactivé dans cette ligue.');
   }
@@ -571,7 +571,8 @@ function ouvrirPack(etat: EtatCarriereEnLigne, club: ClubCarriere, packId: strin
   // quel club de CETTE ligue — ne peut plus sortir d'un pack : c'est ce qui
   // oblige à aller parler à celui qui l'a. Il reste évidemment disponible dans
   // toutes les autres ligues.
-  const pris = new Set(etat.doublonsAutorises ? [] : etat.cartes.map(c => c.sourceId));
+  const pris = new Set(etat.doublonsAutorises ? [] : [...etat.cartes.map(c => c.sourceId),
+    ...Object.values(etat.packsPubReserves ?? {}).flatMap(r => r.cartes.map(c => c.sourceId))]);
   const rayons = RARETES_CARRIERE.map(r => rayonDePack(r, pack).filter(c => !pris.has(c.sourceId)));
   exiger(rayons.some((rayon, i) => pack.probabilites[RARETES_CARRIERE[i]] > 0 && rayon.length > 0), 'Ce pack est épuisé dans votre ligue.');
   const rng = hasard(`${graine}:${etat.version}:${club.id}`); const tirees: CarteCarriere[] = [];
@@ -634,6 +635,56 @@ function ouvrirPack(etat: EtatCarriereEnLigne, club: ClubCarriere, packId: strin
     if (objectif.type === 'packs' || (objectif.type === 'packGratuit' && gratuit)) objectif.progression++;
   }
   verserObjectifsAtteints(etat, club, maintenant);
+}
+
+/** Exclure les stocks et garanties épuisés avant de proposer une publicité. */
+export function packPublicitaireDisponible(etat: EtatCarriereEnLigne, pack: PackCarriere, maintenant: number): boolean {
+  const pris = new Set(etat.doublonsAutorises ? [] : [...etat.cartes.map(c=>c.sourceId),
+    ...Object.values(etat.packsPubReserves ?? {}).flatMap(r=>r.cartes.map(c=>c.sourceId))]);
+  const rayons = RARETES_CARRIERE.map(r=>rayonDePack(r,pack).filter(c=>!pris.has(c.sourceId)));
+  if (rayons.reduce((n,r)=>n+r.length,0)<pack.cartes || !rayons.some((r,i)=>r.length && pack.probabilites[RARETES_CARRIERE[i]]>0)) return false;
+  if (pack.garantie && !bandesGaranties(pack.garantie).some(r=>rayons[RARETES_CARRIERE.indexOf(r)].length)) return false;
+  if (pack.garantieSpeciale) {
+    const special = preparerTirageSpecial(pack,etat.cartesSpeciales,maintenant,pris,catalogueSpecial(),poolFfrCourant());
+    if (!special?.lots.some(l=>l.evenement===pack.garantieSpeciale)) return false;
+  }
+  return true;
+}
+
+/** Appelé seulement après lecture d'un droit serveur signé ; jamais par agirCarriere. */
+export function reserverPackPublicitaire(etat: EtatCarriereEnLigne, compte: string, session: string, pack: PackCarriere, maintenant: number, graine: string) {
+  if (etat.packsPubReserves?.[session]) return etat;
+  const nouveau = copier(etat), club = nouveau.clubs.find(c => c.compteId === compte);
+  exiger(club, 'Club introuvable.');
+  // Un retrait ultérieur du catalogue ne retire pas un pack déjà gagné.
+  const i = nouveau.packs.findIndex(p => p.id === pack.id);
+  const ancienne = i < 0 ? undefined : nouveau.packs[i];
+  if (i < 0) nouveau.packs.push(copier(pack)); else nouveau.packs[i] = copier(pack);
+  ouvrirPack(nouveau, club, pack.id, maintenant, graine, true, true);
+  if (ancienne) nouveau.packs[i] = ancienne;
+  const cartes = nouveau.cartes.slice(etat.cartes.length).map((c,i) => ({ ...c,id:`pub:${session}:${i}` }));
+  // Ni carte ni transaction d'ouverture visible pendant la roulette.
+  const reserve = copier(etat);
+  reserve.packsPubReserves = { ...reserve.packsPubReserves,[session]:{compte,pack:copier(pack),cartes} };
+  reserve.version = etat.version + 1;
+  return reserve;
+}
+export function ouvrirPackPublicitaire(etat: EtatCarriereEnLigne, compte: string, session: string, maintenant: number) {
+  const nouveau = copier(etat), reserve = nouveau.packsPubReserves?.[session];
+  exiger(reserve && reserve.compte === compte,'Pack Pub introuvable.');
+  const club = nouveau.clubs.find(c => c.compteId === compte); exiger(club,'Club introuvable.');
+  nouveau.cartes.push(...reserve.cartes);
+  const meilleure = [...reserve.cartes].sort((a,b) => b.note-a.note)[0];
+  journal(nouveau,club,'pack',0,reserve.cartes.map(c => c.id),`Pack Pub ${reserve.pack.nom} : ${reserve.cartes.map(c => c.nom).join(', ')}`,dateServeur(maintenant),{
+    packId:reserve.pack.id,packNom:reserve.pack.nom,packApparence:meilleure.rarete,
+    meilleureNote:meilleure.note,meilleurJoueur:meilleure.nom,meilleurPortrait:meilleure.photo,
+  });
+  for (const o of nouveau.objectifs.filter(o => o.clubId === club.id && !o.reclame)) if (o.type === 'packs' || o.type === 'packGratuit') o.progression++;
+  verserObjectifsAtteints(nouveau,club,maintenant);
+  delete nouveau.packsPubReserves![session];
+  if (!Object.keys(nouveau.packsPubReserves!).length) delete nouveau.packsPubReserves;
+  nouveau.version = etat.version + 1;
+  return nouveau;
 }
 
 function verserObjectifsAtteints(etat: EtatCarriereEnLigne, club: ClubCarriere, maintenant: number) {
@@ -2068,7 +2119,7 @@ export function operationMarcheCarriere(etat: EtatCarriereEnLigne, op: Operation
  * Un écran d'avant ne le demande pas et reçoit tout, comme avant.
  */
 function construireVueCarriere(etat: EtatCarriereEnLigne, club?: ClubCarriere, leger = false): VueCarriereEnLigne {
-  const { graine: _secret, migrationsFfr: _migrationsFfr, clubs: _clubs, cartes: _cartes, rencontres: _rencontres, objectifs: _objectifs, transactions: _transactions, echanges: _echanges, ...publics } = etat;
+  const { packsPubReserves: _packsPubReserves, graine: _secret, migrationsFfr: _migrationsFfr, clubs: _clubs, cartes: _cartes, rencontres: _rencontres, objectifs: _objectifs, transactions: _transactions, echanges: _echanges, ...publics } = etat;
   return copier({ ...publics, packsActifs: packsActifsLigue(etat), monClubId: club?.id ?? '', observateur: club ? undefined : true,
     competitions: etat.competitions.map(c => c.format === 'poules' && c.poules
       ? { ...c, classementsPoules: c.poules.map(poule => classementCompetition(etat, c.id, poule, c.journeesRegulieres)) }

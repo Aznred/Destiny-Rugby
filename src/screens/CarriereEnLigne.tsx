@@ -69,6 +69,7 @@ import { collectifCarriere, paliersCollectif, bonusCollectif, COLLECTIF_MAX } fr
 import type { Affinite, AffiniteCarte } from '../lib/ligue/collectifCarriere';
 import { ModaleMarche } from '../components/ModaleMarche';
 import { PACKS_CARRIERE, packsBoutiqueDuJour } from '../lib/ligue/catalogueCarriere';
+import { OffrePublicitaire } from '../components/PublicitesRecompensees';
 import { nomFamilleSpeciale } from '../lib/ligue/cartesSpeciales';
 import { Citrouille, EmblemeIcon } from '../components/EmblemesSpeciaux';
 import { tn, texteTraduit, locale, nombre, t } from '../lib/i18n';
@@ -1952,7 +1953,7 @@ export function Packs({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Ag
     try {
       const avant = new Set(vue.transactions.map(t => t.id));
       const suivante = await agir(commande);
-      if (!suivante) { setOuverture(null); return; }
+      if (!suivante) { setOuverture(null); if(commande.type==='ouvrirPackPub') throw new Error('Le pack reste réservé. Réessayez son ouverture.'); return; }
       const nouvelles = suivante.transactions.filter(t => !avant.has(t.id) && t.nature === 'pack' && t.clubId === vue.monClubId).flatMap(t => t.cartes);
       const cartes = suivante.cartes.filter(c => nouvelles.includes(c.id));
       setOuverture(courant => courant ? (cartes.length ? { ...courant, cartes } : null) : courant);
@@ -1976,6 +1977,8 @@ export function Packs({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Ag
       <div className="cel-portefeuille"><PieceOvas taille={26} /><strong>{montant(solde)}</strong><span>{t('online.shop.available')}</span></div>
     </section>
 
+    <OffrePublicitaire contexte="DAILY_PACK" ligue={vue.id} disabled={occupe || ouverture !== null}
+      onPack={async (rewardSessionId,pack) => { await lancerOuverture({type:'ouvrirPackPub',rewardSessionId},pack.nom,pack.id,' · Pack Pub'); }} />
     <section className="cel-packs-quotidiens" data-tuto="cel-packs-quotidiens">
       <div className="cel-packs-quotidiens-tete"><div><div className="eyebrow">{t('online.shop.dailyBoost')}</div><h3>{t('online.shop.freePacksCount', { count: packsGratuits.length })}</h3><p>{vue.phase === 'salon' ? t('online.shop.dailyLobbyHelp') : t('online.shop.dailySeasonHelp')}</p></div><strong>{t("ui.9bebe85925f3", { v0: vue.packsGratuitsParJour ?? 10 })}</strong></div>
       {packsGratuits.length ? <div className="cel-packs-gratuits-liste">{packsGratuits.slice(0, 20).map((attribution, rang) => { const pack = vue.packs.find(p => p.id === attribution.packId); return pack ? <button key={attribution.id} data-tuto={rang === 0 ? 'cel-pack-gratuit' : undefined} disabled={occupe || ouverture !== null} onPointerEnter={() => prechargerOuverturePack(pack)} onFocus={() => prechargerOuverturePack(pack)} onClick={() => { void ouvrirGratuit(attribution.id, pack.id, nomPackCarriere(pack)); }}><span className={`cel-pack-gratuit-sceau ${pack.garantie ?? 'bronze'}`}><Icone nom="cadeau" taille={17} /></span><b>{nomPackCarriere(pack)}</b><small>{t('online.shop.freePackLabel')}</small></button> : null; })}</div> : <p className="cel-note">{vue.phase === 'salon' ? t('online.shop.emptyLobby') : t('online.shop.emptySeason')}</p>}

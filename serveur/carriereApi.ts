@@ -4,7 +4,7 @@ import { VERSION_PROTECTION_FFR } from '../src/data/protectionFfr.generated.js';
 import type { SourceCarte } from '../src/lib/ligue/catalogueCarriere.js';
 import { contexteAtelier, enregistrerAtelier, vueAtelier, vueDonneesClubs } from './atelierAdmin.js';
 import { lotImport, vueImports, vueSpeciales } from './atelierSpeciales.js';
-import { catalogueSpecial, specialesPubliques } from '../src/lib/ligue/catalogueSpecial.js';
+import { catalogueSpecial, specialesPubliques, cataloguePacksPublicitaires } from '../src/lib/ligue/catalogueSpecial.js';
 import { catalogueAdmin, CATALOGUE_ADMIN_VIDE, type CatalogueAdmin } from '../src/lib/ligue/atelierCatalogue.js';
 import { createHash, randomBytes, randomUUID, scrypt, timingSafeEqual } from 'node:crypto';
 import { isDeepStrictEqual, promisify } from 'node:util';
@@ -32,6 +32,10 @@ import {
 } from '../src/lib/packsInternes.js';
 import { cleJoueurImage, imagesDepuisDemandes, validerDemandeImage, type ImagesJoueurs } from '../src/lib/demandesImage.js';
 import { apparencePackInterne, contenuPackInterne, detailPackInterne, rechercherCartes, resoudreCartes, universCartes } from './packsInternes.js';
+import { creerServicePublicites, configPublicites, packPourPublicites } from './publicitesRecompensees.js';
+import { ouvrirPackPublicitaire, reserverPackPublicitaire, packPublicitaireDisponible } from '../src/lib/ligue/carriere.js';
+import { chancesPacksPub, PUBLICITES_PAR_DEFAUT } from '../src/lib/publicitesRecompensees.js';
+import { creerServiceValidation, dossierPublic } from './validationClassement.js';
 
 export interface RequeteCarriere {
   method?: string; url?: string; body?: unknown;
@@ -786,6 +790,23 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
       protegerOrigine(req);
       const url = new URL(req.url ?? '/api/carriere', 'http://localhost');
       const maintenant = Date.now();
+      if (url.searchParams.get('applixirCallback') === '1') {
+        if (req.method !== 'GET') throw new ErreurHttp(405, 'Méthode non autorisée.');
+        if (!stockage.publicites) throw new ErreurHttp(503, 'Publicités indisponibles.');
+        try {
+          const resultat = await creerServicePublicites(stockage.publicites).callback(url.searchParams, maintenant);
+          const session = await stockage.publicites.trouver(url.searchParams.get('userId')!);
+          if (session?.rewardStatus === 'RESERVED' && session.pack && session.ligue) {
+            // Le contenu reste privé mais durable, même si le navigateur a déjà fermé.
+            await appliquer(session.ligue, session.compte, 'reserve-pub-'+session.rewardSessionId,
+              (etat,n,g) => ffr.avecPool('mixed', () => reserverPackPublicitaire(etat,session.compte,session.rewardSessionId,session.pack!,session.verifieLe ?? n,g)));
+          }
+          return res.status(200).json(resultat);
+        } catch (e) {
+          if ((e as Error).name === 'ErreurCarriere') throw new ErreurHttp(process.env.APPLIXIR_CALLBACK_SECRET ? 403 : 503, (e as Error).message);
+          throw e;
+        }
+      }
       if (url.searchParams.get('horloge') === '1') {
         const secret = process.env.CRON_SECRET;
         if (!secret || entete(req, 'authorization') !== `Bearer ${secret}`) throw new ErreurHttp(401, 'Connexion requise.');
@@ -1023,6 +1044,29 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         sessionsChaudes.set(empreinteSession, { compte, jusqua: maintenant + 60_000, toucheLe: toucher ? maintenant : sessionChaude!.toucheLe });
       }
       if (!compte) throw new ErreurHttp(401, 'Connectez-vous pour retrouver vos ligues.');
+      if (url.searchParams.has('classementValidation') || action === 'classementValidation') {
+        if (compte.identifiant !== 'kiri') throw new ErreurHttp(404, 'Page introuvable.');
+        if (!stockage.classementValidation) throw new ErreurHttp(503, 'Validation du classement indisponible.');
+        res.setHeader('Cache-Control', 'private, no-store');
+        const depot = stockage.classementValidation;
+        const page = Math.min(10000, Math.max(1, Math.floor(Number(url.searchParams.get('page') ?? corps.page) || 1)));
+        const filtre = url.searchParams.get('filtre') ?? 'ALL';
+        if (!['ALL','REJECTED','PENDING','PENDING_VALIDATION','HIGH_RISK','ELIGIBLE','LIMITED'].includes(filtre)) throw new ErreurHttp(400, 'Filtre inconnu.');
+        try {
+          if (req.method === 'GET') {
+            const [lot, bilan] = await Promise.all([depot.lister(filtre, page), depot.bilan()]);
+            return res.status(200).json({ dossiers: lot.dossiers.map(dossierPublic), total: lot.total, page, parPage: 50, bilan });
+          }
+          const service = creerServiceValidation(depot);
+          if (corps.operation === 'revalider') return res.status(200).json(await service.revalider(page));
+          if (typeof corps.careerId !== 'string' || !idValide(corps.careerId) || !Number.isInteger(corps.revision)) throw new ErreurHttp(400, 'Vérification invalide.');
+          return res.status(200).json(await service.decider(compte, corps.careerId, Number(corps.revision), String(corps.operation), String(corps.motif ?? '')));
+        } catch (e) {
+          if ((e as { code?: string }).code === '42P01') throw new ErreurHttp(503, 'Les tables de validation du classement attendent leur installation.');
+          if (e instanceof ErreurHttp) throw e;
+          throw new ErreurHttp(409, e instanceof Error ? e.message : 'Vérification impossible.');
+        }
+      }
       const contexte = contexteFfr.getStore();
       if (contexte) contexte.authorized = await ffr.acces(compte.id);
       const cibleLigue = typeof corps.ligue === 'string' ? corps.ligue : url.searchParams.get('ligue');
@@ -1187,10 +1231,48 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         if (compte.identifiant !== 'kiri') throw new ErreurHttp(404, 'Image introuvable.');
         return await servirImageSpeciale(false);
       }
+      if (url.searchParams.has('publicites') || action === 'publicites') {
+        if (!stockage.publicites) throw new ErreurHttp(503, 'Publicités indisponibles sur ce serveur.');
+        const pubs = creerServicePublicites(stockage.publicites);
+        const ligueId = typeof corps.ligue === 'string' ? corps.ligue : url.searchParams.get('ligue') ?? undefined;
+        const ligne = ligueId ? await lireLigue(ligueId) : null;
+        if (ligueId && (!ligne || !ligne.comptes.includes(compte.id))) throw new ErreurHttp(404, 'Ligue introuvable.');
+        // Catalogue publicitaire indépendant des rayons payants : Top 14 et autres skins autorisés par le Labo.
+        const packs = ligne ? await ffr.avecPool('mixed', () =>
+          cataloguePacksPublicitaires()
+            .map(packPourPublicites).filter(p => packPublicitaireDisponible(ligne.etat,p,maintenant))) : [];
+        if (req.method === 'GET') return res.status(200).json(await pubs.vue(compte.id, packs, ligueId, maintenant));
+        if (!await stockage.limiter(`pub:${compte.id}`,60,60000,maintenant)) throw new ErreurHttp(429, 'Patiente quelques instants.');
+        if (corps.operation === 'commencer') {
+          if (corps.contexte !== 'SHOP_OVAS' && corps.contexte !== 'DAILY_PACK') throw new ErreurHttp(400, 'Récompense invalide.');
+          if (corps.contexte === 'SHOP_OVAS' && !await stockage.boutique(compte.id)) throw new ErreurHttp(409, 'La synchronisation du compte est en cours.');
+          return res.status(200).json(await pubs.commencer(compte.id, corps.contexte, packs, ligueId, maintenant));
+        }
+        const id = texte(corps.rewardSessionId,36,36,'Publicité');
+        if (!idValide(id)) throw new ErreurHttp(400, 'Publicité invalide.');
+        if (corps.operation === 'evenement') return res.status(200).json({ ok: await pubs.evenement(compte.id,id,String(corps.evenement)) });
+        if (corps.operation === 'reclamer') {
+          const resultat = await pubs.reclamer(compte.id,id);
+          const r = resultat.recompense;
+          if (resultat.statut === 'RESERVED' && r.pack && r.ligue) {
+            await appliquer(r.ligue,compte.id,`reserve-pub-${id}`,
+              (etat,n,g) => ffr.avecPool('mixed', () => reserverPackPublicitaire(etat,compte.id,id,r.pack!,n,g)));
+          }
+          return res.status(200).json(resultat);
+        }
+        throw new ErreurHttp(400, 'Opération publicitaire inconnue.');
+      }
       if (url.searchParams.has('atelier') || action === 'atelier') {
         if (compte.identifiant !== 'kiri') throw new ErreurHttp(404, 'Page introuvable.');
         if (req.method === 'GET') {
           const section = url.searchParams.get('section');
+          if (section === 'publicites') {
+            if (!stockage.publicites) throw new ErreurHttp(503, 'Publicités indisponibles.');
+            const packs = await ffr.avecPool('mixed', () => cataloguePacksPublicitaires().map(packPourPublicites));
+            return res.status(200).json({ revision: catalogueAdmin().revision, config: { ...PUBLICITES_PAR_DEFAUT, ...catalogueAdmin().publicites },
+              modeEffectif: configPublicites().mode, callbackConfigure: Boolean(process.env.APPLIXIR_CALLBACK_SECRET),
+              packs, chances: chancesPacksPub(packs,maintenant), statistiques: await stockage.publicites.statistiques() });
+          }
           if (section === 'clubs') return res.status(200).json(vueDonneesClubs());
           if (section === 'speciales') return res.status(200).json(vueSpeciales(maintenant));
           if (section === 'imports') return res.status(200).json(vueImports(await lotImport(url.searchParams.get('lot') ?? '')));
@@ -1198,7 +1280,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         }
         if (!stockage.atelier) throw new ErreurHttp(503, 'Atelier indisponible sur ce serveur.');
         catalogueLuLe = -Infinity;
-        return res.status(200).json(await enregistrerAtelier(stockage.atelier, corps));
+        return res.status(200).json(await (corps.operation === 'publicitesPack' ? ffr.avecPool('mixed', () => enregistrerAtelier(stockage.atelier!, corps)) : enregistrerAtelier(stockage.atelier, corps)));
       }
       if (action === 'deconnexion') {
         await stockage.fermerSession(empreinteSession); sessionsChaudes.delete(empreinteSession); cookie(req, res, '', true);
@@ -1727,6 +1809,17 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
           }
           return res.status(200).json(await vueCompte(apres, compte.id, leger));
         };
+        if (commande.type === 'ouvrirPackPub') {
+          if (!stockage.publicites) throw new ErreurHttp(503, 'Pack Pub indisponible.');
+          const pubs = creerServicePublicites(stockage.publicites);
+          const session = await pubs.packReserve(compte.id,texte(commande.rewardSessionId,36,36,'Publicité'),id);
+          await appliquer(id,compte.id,`reserve-pub-${session.rewardSessionId}`,
+            (etat,n,g) => ffr.avecPool('mixed', () => reserverPackPublicitaire(etat,compte.id,session.rewardSessionId,session.pack!,n,g)));
+          const e = await appliquer(id,compte.id,`pack-pub-${session.rewardSessionId}`,
+            (etat,n) => ouvrirPackPublicitaire(etat,compte.id,session.rewardSessionId,n));
+          await pubs.marquerOuvert(compte.id,session.rewardSessionId);
+          return await repondre(undefined,e);
+        }
         // ⚠️ `partagee` NE SE LIT JAMAIS D'UN CLIENT : c'est le serveur qui décide qu'une annonce part sur le marché commun.
         if (commande.type === 'vendre') delete commande.partagee;
         if (typeof commande.type === 'string' && ['vendre', 'acheter', 'encherir', 'annulerVente'].includes(commande.type)) {

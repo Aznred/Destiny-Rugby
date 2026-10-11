@@ -11,7 +11,7 @@ import type {
 } from '../types.js';
 import { COMPETITIONS } from '../data/clubs.js';
 import { competitionEffective } from './divisions.js';
-import { effectifDuClub, forceMoyenneDivision } from './effectif.js';
+import { effectifDuClub, forceMoyenneDivision, joueursLibresDuMarche } from './effectif.js';
 import { graine } from './championnat.js';
 import { pseudoStable } from './comptes.js';
 import { primeDeMatch, salaire } from './offres.js';
@@ -149,7 +149,7 @@ export function salairesEffectif(
     const contratInterne = contratsJoueurs && Object.values(contratsJoueurs).find((c) =>
       (c.joueurId === j.id || c.nom === j.nom) && c.club === club && c.fin > saison
         && c.derniereNegociation !== undefined);
-    const montant = contrat?.termes.salaire ?? contratInterne?.salaire
+    const montant = contratInterne?.salaire ?? contrat?.termes.salaire
       ?? (estAmateurNiveau(niveau) ? 0 : salaire(niveau, j.note - force, j.age));
     return { joueurId: j.id, nom: j.nom, salaire: Math.round(montant), negocie: !!contrat || !!contratInterne };
   });
@@ -344,7 +344,10 @@ export function ciblesDuMarche(
   // groupe dit s'il y est un cadre ou un remplaçant, donc ce qu'il réclame.
   // Les deux se calculent une fois par club, pas une fois par joueur.
   const niveauVendeur = comp.niveau;
-  return clubs.flatMap((club) => {
+  const libres = clubFiltre ? [] : joueursLibresDuMarche(saison).filter(j => competitionEffective(j.ancienClub)?.id === division)
+    .map(j => ({ ...ciblePour('Sans club', division, saison, j, forceManager, niveauVendeur, forceManager),
+      id: j.id, indemnite: 0, saisonsRestantes: 0, situation: 'libre' as const }));
+  return [...libres, ...clubs.flatMap((club) => {
     const forceVendeur = forceDuGroupe(club.nom, saison);
     return [...effectifDuClub(club.nom, saison)]
       .sort((a, b) => b.note - a.note || b.potentiel - a.potentiel)
@@ -352,7 +355,7 @@ export function ciblesDuMarche(
       .map((joueur) => ciblePour(
         club.nom, division, saison, joueur, forceManager, niveauVendeur, forceVendeur,
       ));
-  })
+  })]
     .filter((c) => c.club !== clubManager)
     .sort((a, b) => b.note - a.note || b.potentiel - a.potentiel)
     .slice(0, max);
@@ -496,39 +499,44 @@ function score(offre: TermesRecrutementManager, exigences: TermesRecrutementMana
 export function negocierAvecJoueur(
   negociation: NegociationManager,
   levier: LevierRecrutementManager,
+  proposition?: TermesRecrutementManager,
 ): { negociation: NegociationManager; accord: boolean } {
   if (negociation.etat !== 'ouverte') return { negociation, accord: negociation.etat === 'accord' };
-  const offre = { ...negociation.offre };
+  if (proposition && (!Number.isInteger(proposition.duree) || proposition.duree < 1 || proposition.duree > 5
+    || !ORDRE_ROLE.includes(proposition.role) || [proposition.salaire, proposition.prime, proposition.primeMatch ?? 0].some(n => !Number.isFinite(n) || n < 0))) {
+    return { negociation, accord: false };
+  }
+  const offre = { ...(proposition ?? negociation.offre) };
   const amateur = contratAmateur(negociation.exigences);
   // ⚠️ CHEZ UN AMATEUR, « PLUS DE SALAIRE » NÉGOCIE LE DÉFRAIEMENT. Multiplier
   // un salaire nul par 1,12 laisse zéro : le levier le plus utilisé du jeu
   // serait un bouton mort. Même bascule que côté joueur (`negociation.ts`), où
   // le levier salaire agit sur `primeMatch` quand le club n'en verse pas.
-  if (levier === 'salaire') {
+  if (!proposition && levier === 'salaire') {
     if (amateur) offre.primeMatch = arrondirPrime((offre.primeMatch ?? 0) * 1.12);
     else offre.salaire = arrondir(offre.salaire * 1.12, 5_000);
   }
   // Un club amateur n'a pas de prime à la signature : le levier retombe sur le
   // défraiement plutôt que d'être proposé sans effet.
-  if (levier === 'prime') {
+  if (!proposition && levier === 'prime') {
     if (amateur) offre.primeMatch = arrondirPrime((offre.primeMatch ?? 0) * 1.1);
     else offre.prime = arrondir(offre.prime * 1.35, 2_500);
   }
-  if (levier === 'duree') offre.duree = Math.min(5, offre.duree + 1);
-  if (levier === 'role') {
+  if (!proposition && levier === 'duree') offre.duree = Math.min(5, offre.duree + 1);
+  if (!proposition && levier === 'role') {
     offre.role = ORDRE_ROLE[Math.min(ORDRE_ROLE.length - 1, ORDRE_ROLE.indexOf(offre.role) + 1)];
   }
-  if (levier === 'bonus') {
+  if (!proposition && levier === 'bonus') {
     offre.primeTitularisation = arrondir(Math.max(500, (offre.primeTitularisation ?? 0) * 1.5), 500);
     offre.primeVictoire = arrondir(Math.max(500, (offre.primeVictoire ?? 0) * 1.5), 500);
     offre.primeEssai = arrondir(Math.max(500, (offre.primeEssai ?? 0) * 1.5), 500);
     offre.primeTitre = arrondir(Math.max(2_500, (offre.primeTitre ?? 0) * 1.5), 2_500);
   }
-  if (levier === 'option') {
+  if (!proposition && levier === 'option') {
     offre.option = negociation.exigences.option ?? 'joueur';
     offre.optionMatchs = negociation.exigences.optionMatchs;
   }
-  if (levier === 'clause') {
+  if (!proposition && levier === 'clause') {
     offre.clauseLiberation = negociation.exigences.clauseLiberation;
     offre.clauseRelegation = negociation.exigences.clauseRelegation;
     offre.hausseMontee = negociation.exigences.hausseMontee;
@@ -577,11 +585,17 @@ export function coutPremiereSaison(
  * nouvelle négociation de contrat en rouvrant l'ancien message du club.
  */
 export function joueurDejaRecrute(
-  manager: Pick<Manager, 'recrues' | 'negociations'>,
+  manager: Pick<Manager, 'recrues' | 'negociations'> & Partial<Pick<Manager, 'club' | 'saison'>>,
   cibleId: string,
 ): boolean {
-  return manager.recrues.some((r) => r.joueur.id === cibleId)
-    || manager.negociations.some((n) => n.joueur.id === cibleId && n.etat === 'signee');
+  const dossier = manager.recrues.find(r => r.joueur.id === cibleId)?.joueur
+    ?? manager.negociations.find(n => n.joueur.id === cibleId && n.etat === 'signee')?.joueur;
+  if (!dossier) return false;
+  // Un ancien recrutement bloque son rejeu tant que le joueur appartient au club.
+  // Après son départ libre, il peut recevoir une nouvelle proposition.
+  if (manager.club && manager.saison) return effectifDuClub(manager.club, manager.saison)
+    .some(j => j.id === dossier.id || j.nom === dossier.nom);
+  return true;
 }
 
 export interface ReparationRecrutementManager {
@@ -654,7 +668,7 @@ export function reparerRecrutementsDupliques(
   const finaleParCible = new Map<string, NegociationManager>();
   for (const nego of negociationsParId.values()) {
     const recrue = recrueParCible.get(nego.joueur.id);
-    if (!recrue) {
+    if (!recrue || nego.nature === 'prolongation' || nego.nature === 'revalorisation') {
       libres.push(nego);
       continue;
     }

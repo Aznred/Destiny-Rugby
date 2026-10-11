@@ -12,6 +12,8 @@ import { POSTES } from '../src/data/rugby.js';
 import type { PosteId } from '../src/types.js';
 import type { ArticleLabo } from '../src/lib/ligue/atelierCatalogue.js';
 import { prixValide } from '../src/lib/monnaies.js';
+import { cataloguePacksPublicitaires } from '../src/lib/ligue/catalogueSpecial.js';
+import { PUBLICITES_PAR_DEFAUT, type ConfigPublicites } from '../src/lib/publicitesRecompensees.js';
 
 export const contexteAtelier = new AsyncLocalStorage<CatalogueAdmin>();
 fournirCatalogueAdmin(() => contexteAtelier.getStore() ?? CATALOGUE_ADMIN_VIDE);
@@ -56,6 +58,7 @@ export function validerPack(v: unknown): PackCarriere {
   const garantie = p.garantie === '' || p.garantie === undefined ? undefined : p.garantie as RareteCarriere;
   if(garantie && !RARETES_CARRIERE.includes(garantie)) refuser('Garantie invalide.');
   const pack: PackCarriere = { id, nom:texte(p.nom,60), prix:entier(p.prix,1,1000000), cartes:entier(p.cartes,1,12), probabilites, garantie, promesse: p.promesse ? texte(p.promesse,180) : undefined, famille: ['general','poste','monde','age'].includes(String(p.famille)) ? p.famille as PackCarriere['famille'] : 'general', ...monnaiePack(p) };
+  Object.assign(pack, validerOptionsPublicites(p));
   if(p.filtre) {
     const f=objet(p.filtre); pack.filtre={};
     if(f.categorie) { if(!['avant','arriere'].includes(String(f.categorie))) refuser('Catégorie invalide.'); pack.filtre.categorie=f.categorie as 'avant'|'arriere'; }
@@ -76,6 +79,35 @@ export function validerPack(v: unknown): PackCarriere {
   for(const r of RARETES_CARRIERE) if(probabilites[r]>0 && !rayon.some(c=>c.rarete===r)) refuser(`Aucun joueur ${r} dans ce filtre : règle sa probabilité à 0 %.`);
   if(garantie && !rayon.some(c=>bandesGaranties(garantie).includes(c.rarete))) refuser('Aucun joueur ne peut satisfaire cette garantie.');
   return pack;
+}
+function validerOptionsPublicites(p: Record<string, unknown>): Partial<PackCarriere> {
+  const sortie: Partial<PackCarriere> = {};
+  for (const cle of ['published','rewardedAdsEnabled'] as const) if (p[cle] !== undefined) {
+    if (typeof p[cle] !== 'boolean') refuser('Activation du pack invalide.');
+    sortie[cle] = p[cle];
+  }
+  if (p.rewardedAdWeight !== undefined) sortie.rewardedAdWeight = p.rewardedAdWeight === null ? undefined : nombre(p.rewardedAdWeight,0,1000000);
+  for (const cle of ['startsAt','endsAt'] as const) if (p[cle]) {
+    if (typeof p[cle] !== 'string' || !Number.isFinite(Date.parse(p[cle]))) refuser('Date de pack invalide.');
+    sortie[cle] = new Date(p[cle] as string).toISOString();
+  }
+  if (sortie.startsAt && sortie.endsAt && Date.parse(sortie.startsAt) >= Date.parse(sortie.endsAt)) refuser('La fin du pack doit suivre son début.');
+  return sortie;
+}
+export function validerConfigPublicites(v: unknown): ConfigPublicites {
+  const p = objet(v), sortie = { ...PUBLICITES_PAR_DEFAUT };
+  for (const cle of ['enabled','ovasEnabled','packsEnabled'] as const) {
+    if (typeof p[cle] !== 'boolean') refuser('Activation publicitaire invalide.');
+    sortie[cle] = p[cle];
+  }
+  if (p.mode !== 'TEST' && p.mode !== 'LIVE') refuser('Mode publicitaire invalide.');
+  sortie.mode = p.mode;
+  sortie.apiKey = texte(p.apiKey,100);
+  if (!/^[a-f0-9-]{36}$/i.test(sortie.apiKey)) refuser('Clé AppLixir invalide.');
+  sortie.rewardedAdOvasAmount = entier(p.rewardedAdOvasAmount,1,10000);
+  sortie.ovasDailyLimit = entier(p.ovasDailyLimit,0,20);
+  sortie.packsDailyLimit = entier(p.packsDailyLimit,0,2);
+  return sortie;
 }
 const COULEUR = /^#[0-9a-fA-F]{6}$/;
 const MOTIFS = ['uni', 'cerceaux', 'rayures', 'epaules', 'bande', 'diagonale'];
@@ -198,6 +230,14 @@ export async function enregistrerAtelier(stockage: StockageAtelier, corps: Recor
       if (!source) refuser('Une source est requise pour cette rivalité.');
       suivant.rivalitesHistoriques = [...reste, { clubA: paire[0], clubB: paire[1], source }];
     }
+  } else if(corps.operation === 'publicites') {
+    suivant.publicites = validerConfigPublicites(corps.config);
+  } else if(corps.operation === 'publicitesPack') {
+    const id = texte(corps.packId,80), pack = cataloguePacksPublicitaires().find(p => p.id === id);
+    if (!pack) refuser('Pack introuvable.');
+    const options = validerOptionsPublicites(objet(corps.options));
+    // Les dates vides effacent une ancienne fenêtre de publication.
+    suivant.packs[id] = { ...pack, ...options, startsAt: options.startsAt, endsAt: options.endsAt };
   } else if(corps.operation === 'pack') {
     const pack=validerPack(corps.pack); suivant.packs[pack.id]=pack;
     if(Object.keys(suivant.packs).length>100) refuser('Maximum de 100 packs personnalisés.');

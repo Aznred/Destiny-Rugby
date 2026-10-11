@@ -147,9 +147,12 @@ export interface CommandeDirecte {
 
 export type ActionDirecte =
   | 'pousser' | 'quitter' | 'passe' | 'coupDePied' | 'raffut' | 'crochet' | 'plaquage' | 'grattage'
-  | 'appel' | 'feinte' | 'engager' | 'drop';
+  | 'appel' | 'feinte' | 'engager' | 'drop' | 'contreRuck';
 
 export interface DemandeDirecte {
+  offensif?: boolean;
+  cibleId?: string;
+  intentionPied?: 'rasant' | 'parDessus' | 'chandelle' | 'transversale' | 'degagement';
   action: ActionDirecte;
   /** Instant simulé de la demande, posé par `demanderDirect` : c'est ce qui la fait expirer. */
   t?: number;
@@ -275,6 +278,7 @@ export interface PackHumain {
 }
 
 export interface EtatDirect {
+  plaquageOffensifJusqua?: number;
   /** Le geste du joueur dans un pack, quand il en est. */
   pack?: PackHumain;
   /** Le numéro du ruck dont la fenêtre de grattage s'est refermée sans que le joueur se jette : elle ne revient pas. */
@@ -319,7 +323,7 @@ export function vueVide(): VueDirecte {
     horsJeu: false, cibleDePlaquage: null, ruckAPortee: false, contactImminent: false,
     possible: {
       passe: false, coupDePied: false, raffut: false, crochet: false, plaquage: false, grattage: false,
-      appel: false, feinte: false, engager: false, drop: false, pousser: false, quitter: false,
+      appel: false, feinte: false, engager: false, drop: false, pousser: false, quitter: false, contreRuck:false,
     },
     recharge: {}, arme: null,
   };
@@ -354,6 +358,7 @@ export function raisonSansControle(e: EtatMatch, p: Pion): RaisonDirect | null {
   switch (e.phase) {
     case 'jeuCourant': case 'ballonEnLAir': case 'ballonLibre': break;
     case 'ruck':
+      if (e.controleEquipe?.actif && e.organisationSolo?.neufId===p.id && e.possession===p.cote) return 'ruck';
       // Lié au regroupement (plaqué, plaqueur, nettoyeur, gratteur) : c'est l'IA qui le tient.
       if (p.role === 'ruck') return 'ruck';
       break;
@@ -659,7 +664,7 @@ function versLaTouche(p: Pion, dirY: number): number {
  * visée (`auto`), c'est la situation qui parle — comme `intentionDePied`, mais
  * sans tirage : le même ballon donne toujours le même coup de pied.
  */
-export function classerCoupDePied(e: EtatMatch, p: Pion, demande: Pick<DemandeDirecte, 'visee' | 'auto'>): PlanDePied {
+export function classerCoupDePied(e: EtatMatch, p: Pion, demande: Pick<DemandeDirecte, 'visee' | 'auto' | 'intentionPied'>): PlanDePied {
   const s = sens(p.cote);
   const portee = porteeDeFrappe(p);
   const devant = defenseurDevant(e, p);
@@ -667,6 +672,19 @@ export function classerCoupDePied(e: EtatMatch, p: Pion, demande: Pick<DemandeDi
   const chezSoi = dansSes22(p.pos, p.cote);
   const sonCamp = dansSonCamp(p.pos, p.cote);
   const bornerX = (x: number) => borner(x, LIGNE_A + 1, LIGNE_B - 1);
+  if (demande.intentionPied) {
+    const type = demande.intentionPied;
+    const puissance = borner(demande.visee?.puissance ?? 0.65,0,1);
+    const lateral = demande.visee?.y ?? e.ouvert * (type==='transversale'?0.85:0.35);
+    const longueur = type === 'rasant' ? Math.min(6+puissance*12, restant+2) : type === 'parDessus' ? 6+puissance*8
+      : type === 'chandelle' ? 12+puissance*18 : type==='transversale' ? 12+puissance*12 : Math.min(portee,15+puissance*35);
+    const ailier = type==='transversale' ? e.pions.filter(q=>q!==p && q.cote===p.cote && attaquantLibre(q)
+      && (q.pos.y-p.pos.y)*lateral>0 && Math.abs(q.pos.y-p.pos.y)>9)
+      .sort((a,b)=>Math.abs(b.pos.y-p.pos.y)-Math.abs(a.pos.y-p.pos.y))[0] : undefined;
+    const y = type === 'degagement' ? versLaTouche(p, lateral < 0 ? -1 : 1)
+      : borner(ailier?.pos.y ?? p.pos.y + lateral * (type === 'transversale' ? 32 : 12),2,LARGEUR-2);
+    return { intention:type, arrivee:{x:bornerX(p.pos.x+s*longueur),y}, duree:type==='chandelle'?3.2:type==='transversale'?2.8:1.4, hauteur:type==='rasant'?0.1:type==='chandelle'?1:0.55, libelle:type };
+  }
 
   // ── Sans visée : la situation décide ────────────────────────────────────
   if (!demande.visee) {
@@ -957,6 +975,7 @@ export function majVueDirecte(e: EtatMatch): void {
   poss.plaquage = libre && recharge('plaquage') <= 0 && (!!cible || (plongeonDirige(e) && !!cibleDePlaquage(e, p, REGLAGES_DIRECT.porteeLancer)));
   poss.grattage = libre && ((e.ia ?? 1) >= 5 ? peutGratter(e, p) : v.ruckAPortee) && !v.attaque && recharge('grattage') <= 0;
   poss.engager = libre && v.ruckAPortee && v.attaque;
+  poss.contreRuck=!!e.controleEquipe && libre && !!e.ruck && !e.ruck.duel && !v.attaque && !p.horsJeu && v.ruckAPortee && recharge('contreRuck')<=0;
   poss.pousser = !!d.pack;
   poss.quitter = !!d.pack && sortiesPossibles(d.pack).length > 0;
   poss.appel = libre && ouvert && !v.porte && (e.possession === p.cote || e.phase === 'ballonEnLAir') && recharge('appel') <= 0;

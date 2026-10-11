@@ -24,7 +24,8 @@ import { COMPETITIONS } from '../data/clubs.js';
 import { clubsDeDivision } from './divisions.js';
 import { poulesDe } from './championnat.js';
 import { tournoiDeFinDAnnee } from './tournoi.js';
-import { phaseFinale, matchAcces, pretendants, type PhaseFinale, type MatchFinal } from './phaseFinale.js';
+import { phaseFinale, matchAcces, pretendants, type PhaseFinale } from './phaseFinale.js';
+import type { MatchElimination } from './bracketProgressif.js';
 import { rulesFor } from './competitionRules.js';
 
 export interface MouvementClub {
@@ -127,8 +128,8 @@ export function phaseFinaleDe(
 export interface BilanPyramide {
   mouvements: MouvementClub[];
   phase: PhaseFinale; // la fin de saison de la division du joueur
-  accesVersLeHaut: MatchFinal | null; // notre finaliste tente de monter
-  accesDepuisLeBas: MatchFinal | null; // notre avant-dernier défend sa place
+  accesVersLeHaut: MatchElimination | null; // notre finaliste tente de monter
+  accesDepuisLeBas: MatchElimination | null; // notre avant-dernier défend sa place
   recits: string[];
 }
 
@@ -146,8 +147,8 @@ export function resoudrePyramide(
   const recits: string[] = [];
   const haut = divisionAuDessus(divisionId);
   const bas = divisionEnDessous(divisionId);
-  let accesVersLeHaut: MatchFinal | null = null;
-  let accesDepuisLeBas: MatchFinal | null = null;
+  let accesVersLeHaut: MatchElimination | null = null;
+  let accesDepuisLeBas: MatchElimination | null = null;
 
   const bouger = (club: string, de: string, vers: string, sens: MouvementClub['sens'], motif: MouvementClub['motif']) => {
     if (!club || mouvements.some((m) => m.club === club)) return;
@@ -170,7 +171,7 @@ export function resoudrePyramide(
       recits.push(`${club} est relégué de ${nomDivision(haut)} et descend.`);
     }
     accesVersLeHaut = matchAcces(phaseHaut, phase, saison);
-    if (accesVersLeHaut) {
+    if (accesVersLeHaut?.status === 'completed') {
       const m = accesVersLeHaut;
       const monte = m.vainqueur === m.exterieur;
       recits.push(
@@ -180,8 +181,8 @@ export function resoudrePyramide(
             : `${m.vainqueur} conserve sa place, ${m.perdant} reste en ${nomDivision(divisionId)}.`),
       );
       if (monte) {
-        bouger(m.vainqueur, divisionId, haut, 'montee', 'acces');
-        bouger(m.perdant, haut, divisionId, 'descente', 'acces');
+        bouger(m.vainqueur!, divisionId, haut, 'montee', 'acces');
+        bouger(m.perdant!, haut, divisionId, 'descente', 'acces');
       }
     }
   }
@@ -201,7 +202,7 @@ export function resoudrePyramide(
         : `${club} monte directement de ${nomDivision(bas)} en ${nomDivision(divisionId)}.`);
     });
     accesDepuisLeBas = matchAcces(phase, phaseBas, saison);
-    if (accesDepuisLeBas) {
+    if (accesDepuisLeBas?.status === 'completed') {
       const m = accesDepuisLeBas;
       const monte = m.vainqueur === m.exterieur;
       recits.push(
@@ -211,8 +212,8 @@ export function resoudrePyramide(
             : `${m.vainqueur} sauve sa place.`),
       );
       if (monte) {
-        bouger(m.vainqueur, bas, divisionId, 'montee', 'acces');
-        bouger(m.perdant, divisionId, bas, 'descente', 'acces');
+        bouger(m.vainqueur!, bas, divisionId, 'montee', 'acces');
+        bouger(m.perdant!, divisionId, bas, 'descente', 'acces');
       }
     }
   }

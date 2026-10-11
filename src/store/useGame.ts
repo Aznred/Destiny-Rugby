@@ -61,7 +61,7 @@ import { LANGUE_DE_REPLI } from '../lib/cible';
 import type { LigneReelle } from '../lib/moteur/saison';
 import { coupeEnDirect, coupesDuClub, coupesDuClubALaDate } from '../lib/coupe';
 import { LIMITES, ficheDepuisJoueur, ficheDepuisManager, scoreDeLaFiche } from '../lib/classementMondial';
-import { cleAleatoire, envoyerAuClassement } from '../lib/classementEnLigne';
+import { cleAleatoire, envoyerAuClassement, type ResultatEnvoi } from '../lib/classementEnLigne';
 import {
   estCarriereClassee, joueurDepuisCarte, responsabilitesDeDepart, scoreDeDepart,
 } from '../lib/carriereExistante';
@@ -97,7 +97,7 @@ const stockageJeu = stockageCarriereOptimise<Partial<GameState>>();
 function passeesDuType(numeroSemaine: number, type: string): number {
   return SEMAINES.slice(0, Math.max(0, numeroSemaine - 1)).filter((s) => s.type === type).length;
 }
-import { matchDeLaSemaine, afficheDuClub } from '../lib/matchLive';
+import { matchDeLaSemaine, afficheDuClub, afficheDuJoueur } from '../lib/matchLive';
 import { departager, estMatchCouperet } from '../lib/couperet';
 import {
   filDeLaSemaine, messageSpontane, invitationCoequipier, effetSurRelation, reponseLocale,
@@ -202,10 +202,14 @@ import { reportsBudgets, renouvelerBudgets, reparerPlafondSalarial } from '../li
 import { objectifsDeSaison } from '../lib/objectifsManager';
 import { competitionEffective, setArriveesClubs, setMouvementsClubs } from '../lib/divisions';
 import { phaseFinale, type MatchFinal, type PhaseFinale } from '../lib/phaseFinale';
+import { jouerAutresPhasesFinales } from '../lib/phasesFinalesJouees';
+import { tournoiDeFinDAnnee } from '../lib/tournoi';
+import type { MatchElimination } from '../lib/bracketProgressif';
+import { analyserReparationPlayoffs, type RapportReparationPlayoffs } from '../lib/reparationPlayoffs';
 import {
   championnatEnDirect, journeesApres, nombreJournees, graine, rangFinal,
   estAmateur, weekEndsJoues, totalWeekEnds, poulesDe, indexPoule,
-  enregistrerResultatJoue, setResultatsJoues, effacerResultatsJoues, jouerRencontre, type MatchChampionnat,
+  enregistrerResultatJoue, setResultatsJoues, effacerResultatsJoues, resultatJoue, jouerRencontre, type MatchChampionnat,
 } from '../lib/championnat';
 import {
   compositionManagerParDefaut, reconcilerCompositionManager, TACTIQUE_MANAGER_DEFAUT, EFFECTIF_MINIMUM,
@@ -758,6 +762,11 @@ export interface SanctionDeMatch {
 }
 
 interface GameState {
+  correctifPlayoffsApplique: number;
+  reparationPlayoffs?: RapportReparationPlayoffs;
+  reparerPlayoffs: () => void;
+  resultatsPhasesFinales: Record<string, MatchChampionnat>;
+  simulerAutresPhasesFinales: (saison: number, semaine: number, club: string) => void;
   ecran: Ecran;
   /**
    * Les écrans déjà ouverts au moins une fois, pour le guide de carrière.
@@ -876,6 +885,7 @@ interface GameState {
    * se refermerait, et sa carrière n’entrerait jamais.
    */
   dernierScoreEnvoye: number;
+  etatValidationClassement: ResultatEnvoi | null;
   /** Compteur des pubs récompensées (quota journalier et délai d'attente). */
   pubs: EtatPubs;
   pantheon: LegendeSauvegardee[];
@@ -1014,7 +1024,7 @@ interface GameState {
   contacterClubManager: (cible: CibleRecrutementManager) => void;
   negocierClubManager: (id: string, levier: LevierClubManager) => void;
   contacterJoueurManager: (cible: CibleRecrutementManager) => void;
-  negocierJoueurManager: (id: string, levier: LevierRecrutementManager) => void;
+  negocierJoueurManager: (id: string, levier: LevierRecrutementManager, proposition?: import('../types').TermesRecrutementManager) => void;
   accepterDemandesJoueurManager: (id: string) => void;
   signerJoueurManager: (id: string) => void;
   rompreNegociationManager: (id: string) => void;
@@ -1395,6 +1405,7 @@ function resultatDeLaRencontre(
 function etatDeDepartDeCarriere(joueur: Joueur): Partial<GameState> {
   return {
     joueur,
+    resultatsPhasesFinales: {},
     finCarriere: null,
     ecran: 'carriere',
     // ⚠️ Le guide lit `ecransVus` : un écran atteint sans passer par
@@ -1479,6 +1490,24 @@ export const useGame = create<GameState>()(
     (set, get) => ({
       ecran: 'accueil',
       joueur: null,
+      correctifPlayoffsApplique: 36,
+      reparerPlayoffs: () => {
+        const s = get();
+        const c = s.manager ?? (s.joueur && { ...s.joueur, division: s.joueur.division ?? '', semaine: s.joueur.semaine ?? 1 });
+        if (c?.club && c.division && s.correctifPlayoffsApplique < 36) {
+          const rapport = analyserReparationPlayoffs(c, s.joueur ? bonusClubDuJoueur(s.joueur) : 0);
+          set({ correctifPlayoffsApplique: 36, reparationPlayoffs: rapport,
+            ...(s.manager ? { manager: { ...s.manager, semaine: rapport.semaineReprise } } : {}),
+            ...(s.joueur ? { joueur: { ...s.joueur, semaine: rapport.semaineReprise } } : {}) });
+        } else set({ correctifPlayoffsApplique: 36 });
+      },
+      resultatsPhasesFinales: {},
+      simulerAutresPhasesFinales: (saison, semaine, club) => {
+        const joueur = get().joueur;
+        const resultats = jouerAutresPhasesFinales(saison, semaine, club,
+          !get().manager && joueur?.club === club ? bonusClubDuJoueur(joueur) : 0);
+        if (Object.keys(resultats).length) set(s => ({ resultatsPhasesFinales: { ...s.resultatsPhasesFinales, ...resultats } }));
+      },
       journal: [],
       coins: 0,
       achatsOvas: 0,
@@ -1498,6 +1527,7 @@ export const useGame = create<GameState>()(
       pseudoClassement: '',
       rangMondialId: null,
       dernierScoreEnvoye: 0,
+      etatValidationClassement: null,
       pubs: ETAT_PUBS_VIDE,
       pantheon: [],
       finCarriere: null,
@@ -2191,7 +2221,7 @@ export const useGame = create<GameState>()(
                         .join(' ')
                     : '')
                 : `${joueur.club} n'était pas qualifié pour la phase finale. `) +
-              ` Le titre revient à ${finale.vainqueur}, vainqueur ${Math.max(finale.scoreD, finale.scoreE)}-${Math.min(finale.scoreD, finale.scoreE)} de ${finale.perdant} en finale.` +
+              (finale.status === 'completed' ? ` Le titre revient à ${finale.vainqueur}, vainqueur ${Math.max(finale.scoreD!, finale.scoreE!)}-${Math.min(finale.scoreD!, finale.scoreE!)} de ${finale.perdant} en finale.` : '') +
               (bilan.champion ? ' 🏆 Et ce champion, c’est TOI.' : ''),
           });
         }
@@ -2753,6 +2783,17 @@ export const useGame = create<GameState>()(
         if (contratBloque(joueur)) return;
         const numero = joueur.semaine ?? 1;
         const sem = semaine(numero);
+        get().simulerAutresPhasesFinales(joueur.saison, numero, joueur.club);
+        const afficheFinale = afficheDuJoueur(joueur, bonusClubDuJoueur(joueur));
+        if (afficheFinale?.nature === 'phaseFinale' && !joueur.resultatsClub?.[afficheFinale.cle]) {
+          const a = afficheFinale;
+          const brut = jouerRencontre(a.match.domicile, a.match.exterieur, joueur.saison, a.cle, { club: joueur.club, bonus: bonusClubDuJoueur(joueur) });
+          const fin = departager(a.cle, brut.scoreD, brut.scoreE);
+          const match = { ...brut, scoreD: fin.scorePour, scoreE: fin.scoreContre, prolongation: fin.prolongation };
+          enregistrerResultatJoue(a.cle, match);
+          joueur = { ...joueur, resultatsClub: { ...joueur.resultatsClub, [a.cle]: match } };
+          get().simulerAutresPhasesFinales(joueur.saison, numero, joueur.club);
+        }
 
         // ═══ LES CLUBS DÉMARCHENT EN COURS D'ANNÉE ═════════════════════════
         // ⚠️ Décision de l'utilisateur : « intersaison plus dans l'année, mais
@@ -3986,6 +4027,7 @@ export const useGame = create<GameState>()(
         set((s) => ({
           manager,
           mouvementsClubs: {}, arriveesClubs: {},
+          resultatsPhasesFinales: {}, transfertsSociaux: [],
           joueur: null,
           reconversionManager: null,
           ecran: 'manager',
@@ -4316,19 +4358,22 @@ export const useGame = create<GameState>()(
         if (!m?.club) return;
         const groupe = effectifDuClub(m.club, m.saison);
         const avancee = assurerEtatCarriereAvancee(m, groupe);
+        const derniere = m.negociations.findLast(n => n.joueur.id === joueurId && n.nature !== 'recrutement' && n.saison === m.saison);
+        const enAttente = derniere?.etat === 'rompue' && m.semaine < derniere.semaine + 4;
         const existante = [...m.negociations].reverse().find((n) => n.joueur.id === joueurId
           && n.nature !== 'recrutement' && (n.etat === 'ouverte' || n.etat === 'accord'));
-        const nego = existante ?? ouvrirRenegociationJoueur(avancee, m, groupe, joueurId);
+        const aRelire = existante ?? (enAttente || derniere?.etat === 'signee' ? derniere : undefined);
+        const nego = aRelire ?? ouvrirRenegociationJoueur(avancee, m, groupe, joueurId);
         if (!nego) return;
         set((s) => ({
-          manager: existante ? { ...m, avancee } : { ...m, avancee, negociations: [...m.negociations, nego] },
-          conversations: existante ? s.conversations : { ...s.conversations, [nego.pseudo]: [
+          manager: aRelire ? { ...m, avancee } : { ...m, avancee, negociations: [...m.negociations, nego] },
+          conversations: aRelire ? s.conversations : { ...s.conversations, [nego.pseudo]: [
             ...(s.conversations[nego.pseudo] ?? []),
             { id: idUnique(), pseudo: nego.pseudo, de: 'moi' as const,
               texte: nego.nature === 'revalorisation' ? 'Parlons de ta revalorisation.' : 'Je veux te proposer une prolongation.',
               saison: m.saison, semaine: m.semaine, creeLe: Date.now(), lu: true },
             { id: idUnique(), pseudo: nego.pseudo, de: 'lui' as const,
-              texte: `Mon agent attend ${nombre(nego.exigences.salaire)} € par an, ${nego.exigences.duree} saison(s) et un statut ${nego.exigences.role}.`,
+              texte: nego.refusProlongation ? t(`staff.contract.refusal.${nego.refusProlongation}`) : `Mon agent attend ${nombre(nego.exigences.salaire)} € par an, ${nego.exigences.duree} saison(s) et un statut ${nego.exigences.role}.`,
               saison: m.saison, semaine: m.semaine, creeLe: Date.now() + 1, lu: false },
           ] },
           ouvrirSocialSur: 'messages', conversationSocialeCible: nego.pseudo,
@@ -4607,6 +4652,7 @@ export const useGame = create<GameState>()(
         if (m.club && (m.contrat?.saisons ?? 0) <= 0) return;
         // Sans banc, le temps ne passe pas : on cherche un club.
         if (!m.club) return;
+        get().simulerAutresPhasesFinales(m.saison, m.semaine, m.club);
         // Le championnat du manager est désormais joué, pas seulement simulé.
         // Tant que l'affiche de cette semaine n'a pas atteint la sirène, le
         // calendrier ne peut pas l'effacer en passant au lundi suivant.
@@ -4780,6 +4826,11 @@ export const useGame = create<GameState>()(
         const m = get().manager;
         if (!m?.club || resultat.club !== m.club || m.resultats[resultat.cle]) return;
         if (m.club && (m.contrat?.saisons ?? 0) <= 0) return;
+        if (resultat.cle.startsWith('tournoi#') || resultat.cle.startsWith('finale#') || resultat.cle.startsWith('phase#') || resultat.cle.startsWith('acces#')) {
+          const affiche = afficheDuClub(m);
+          if (!affiche || affiche.cle !== resultat.cle || resultat.saison !== m.saison || resultat.semaine !== m.semaine
+            || ![affiche.match.domicile, affiche.match.exterieur].includes(resultat.adversaire)) return;
+        }
         // Pas de nul en match couperet. Le départage est sauvegardé avec le
         // score, donc identique dans le calendrier, le tableau et le palmarès.
         const tranche = departager(resultat.cle, resultat.scorePour, resultat.scoreContre);
@@ -4801,6 +4852,7 @@ export const useGame = create<GameState>()(
         const essaisD = resultat.domicile ? resultat.essaisPour : resultat.essaisContre;
         const essaisE = resultat.domicile ? resultat.essaisContre : resultat.essaisPour;
         enregistrerResultatJoue(resultat.cle, { domicile, exterieur, scoreD, scoreE, essaisD, essaisE, ...issueDuResultatManager(resultat) });
+        get().simulerAutresPhasesFinales(m.saison, m.semaine, m.club);
         oublierResultats();
         const victoire = resultat.vainqueur ? resultat.vainqueur === 'pour' : resultat.scorePour > resultat.scoreContre;
         const nul = !resultat.vainqueur && resultat.scorePour === resultat.scoreContre;
@@ -5115,11 +5167,12 @@ export const useGame = create<GameState>()(
         }));
       },
 
-      negocierJoueurManager: (id, levier) => {
+      negocierJoueurManager: (id, levier, proposition) => {
         const m = get().manager;
         const actuelle = m?.negociations.find((n) => n.id === id);
         if (!m || !actuelle || actuelle.etat !== 'ouverte') return;
-        const resultat = negocierAvecJoueur(actuelle, levier);
+        const resultat = negocierAvecJoueur(actuelle, levier, proposition);
+        if (resultat.negociation === actuelle) return;
         const reponse = resultat.accord
           ? t('mgr.dm.accord')
           : resultat.negociation.etat === 'rompue'
@@ -5137,7 +5190,7 @@ export const useGame = create<GameState>()(
               ...(s.conversations[actuelle.pseudo] ?? []),
               {
                 id: idUnique(), pseudo: actuelle.pseudo, de: 'moi' as const,
-                texte: t(`mgr.dm.levier.${levier}`), saison: m.saison,
+                texte: proposition ? t('staff.contract.proposal') : t(`mgr.dm.levier.${levier}`), saison: m.saison,
                 semaine: m.semaine, creeLe: Date.now(), lu: true,
               },
               {
@@ -5232,6 +5285,7 @@ export const useGame = create<GameState>()(
         if (m.budgetTransferts < cout) return;
         if (actuelle.offre.salaire > situationSalariale(m).disponible) return;
         const transfert: TransfertAnnonce = {
+          joueurId: actuelle.joueur.id,
           nom: actuelle.joueur.nom,
           sourcePlayerId: m.mondeJeunes && jeuneMondeParId(m.mondeJeunes, actuelle.joueur.id)?.sourcePlayerId,
           de: actuelle.joueur.club,
@@ -5554,7 +5608,8 @@ export const useGame = create<GameState>()(
         // Le manager lit les MÊMES finales que la carrière joueur : le rang de
         // poule qualifie, mais seul le vainqueur du tableau soulève le titre.
         const phase = py.phase;
-        const tropheeNational = phase.champion === m.club
+        const championNational = tournoiDeFinDAnnee(m.division, m.saison, m.division, m.club)?.champion ?? phase.champion;
+        const tropheeNational = championNational === m.club
           ? TROPHEE_PAR_DIVISION[m.division]
           : undefined;
         // Les coupes sont elles aussi résolues par leur vrai tableau. Le mode
@@ -5578,6 +5633,12 @@ export const useGame = create<GameState>()(
         const verdictBoard = appliquerVerdict(m, v);
         const groupe = effectifDuClub(m.club, m.saison);
         const bilanAvance = finSaisonCarriereAvancee(m, groupe, rang);
+        const finsDeContrat = groupe.filter(j => (bilanAvance.etat.contratsJoueurs[j.id]?.fin ?? Infinity) <= m.saison + 1);
+        const transfertsApresExpiration: TransfertAnnonce[] = [...get().transfertsSociaux, ...finsDeContrat.map(j => ({
+          joueurId: j.id, sourcePlayerId: j.sourcePlayerId, nom: j.nom, de: m.club, vers: 'Sans club',
+          saison: m.saison + 1, poste: POSTE_PAR_ID[j.poste]?.famille, age: j.age, note: j.note, nation: j.nation,
+        }))];
+        setTransfertsSociaux(transfertsApresExpiration);
         // Les reports se mesurent dans l'ancienne division, avant les mouvements.
         const reports = reportsBudgets(m);
         const prestige = verdictBoard.prestige;
@@ -5792,6 +5853,7 @@ export const useGame = create<GameState>()(
         set((st) => ({
           manager: suivant,
           // ⚠️ LE REGISTRE DE MODULE NE SUFFIT PAS : il vit en mémoire et
+          transfertsSociaux: transfertsApresExpiration,
           // disparaît au rechargement. Sans cette ligne, un club promu
           // redescendait tout seul au premier F5 — c'est pour ça que la
           // réhydratation repose `setMouvementsClubs(etat.mouvementsClubs)`.
@@ -5904,12 +5966,12 @@ export const useGame = create<GameState>()(
         // publications (fin de saison, retraite, semaine jouée, banc quitté) passent par cette fonction. `force` n'y
         // change rien — il saute les freins de cadence, jamais le droit d'entrer. Une fonction pure comme
         // `ficheDepuisJoueur` qui refuserait de produire une fiche se contournerait en retirant le drapeau.
-        if (j ? !estCarriereClassee(j) : m!.horsClassement) return;
-        const fiche = j
-          ? ficheDepuisJoueur(j, get().pseudoClassement || undefined, get().cleClassement)
-          : ficheDepuisManager(m!, get().pseudoClassement || undefined, get().cleClassement);
+        if (m ? m.horsClassement || m.libre : !estCarriereClassee(j!)) return;
+        const fiche = m
+          ? ficheDepuisManager(m, get().pseudoClassement || undefined, get().cleClassement)
+          : ficheDepuisJoueur(j!, get().pseudoClassement || undefined, get().cleClassement);
         if (!force) {
-          if (fiche.score <= get().dernierScoreEnvoye) return;
+          if (fiche.score <= get().dernierScoreEnvoye && get().etatValidationClassement?.validation?.statut === 'ELIGIBLE') return;
           if (Date.now() - dernierEnvoiLe < DELAI_ENVOI) return;
         }
         dernierEnvoiLe = Date.now();
@@ -5919,7 +5981,8 @@ export const useGame = create<GameState>()(
         void envoyerAuClassement(fiche)
           .then((r) => {
             retenirMaLigne(set)(r);
-            if (r.ok) set({ dernierScoreEnvoye: fiche.score });
+            set({ etatValidationClassement: r });
+            if (r.ok) set({ dernierScoreEnvoye: r.score ?? fiche.score });
           })
           .catch(() => {});
       },
@@ -5935,6 +5998,7 @@ export const useGame = create<GameState>()(
         setContexteJoueur('', 0);
         set({
           joueur: null,
+          etatValidationClassement: null,
           finCarriere: null,
           journal: [],
           scenarioActif: null,
@@ -6829,6 +6893,7 @@ export const useGame = create<GameState>()(
             contexte.scorePour, contexte.scoreContre, contexte.essaisPour ?? 0, contexte.essaisContre ?? 0,
           );
           enregistrerResultatJoue(contexte.cle, match);
+          get().simulerAutresPhasesFinales(j.saison, j.semaine ?? 1, j.club);
           j = { ...j, resultatsClub: { ...(j.resultatsClub ?? {}), [contexte.cle]: match } };
           resultatClub = true;
         }
@@ -7344,7 +7409,7 @@ export const useGame = create<GameState>()(
     }),
     {
       name: 'destin-ovalie',
-      version: 32,
+      version: 36,
       storage: stockageJeu,
       // Sauvegardes d'avant les 15 postes : le poste stocké est une famille
       // (« pilier »), on lui attribue un numéro de maillot.
@@ -7353,6 +7418,7 @@ export const useGame = create<GameState>()(
       // à laisser le Hall et le Classement sur un écran blanc.
       migrate: (etat: unknown, version: number) => {
         const s = etat as {
+          correctifPlayoffsApplique?: number;
           joueur?: Joueur | null;
           pantheon?: LegendeSauvegardee[];
           posts?: PostSocial[];
@@ -7396,6 +7462,7 @@ export const useGame = create<GameState>()(
           collectionSolo?: EtatCollectionSolo;
         };
         if (!s) return s;
+        if (version < 36) s.correctifPlayoffsApplique = 0;
         s.collectionSolo = s.collectionSolo
           ? normaliserCollectionSolo(s.collectionSolo)
           : chargerAncienneCollectionSolo();
@@ -7818,6 +7885,9 @@ export const useGame = create<GameState>()(
         })));
         for (const [cle, match] of Object.entries(etat?.joueur?.international?.resultats ?? {})) enregistrerResultatJoue(cle, match);
         for (const [cle, match] of Object.entries(etat?.joueur?.resultatsClub ?? {})) enregistrerResultatJoue(cle, match);
+        for (const [cle, match] of Object.entries(etat?.resultatsPhasesFinales ?? {})) {
+          if (!resultatJoue(cle)) enregistrerResultatJoue(cle, match);
+        }
         for (const [cle, match] of Object.entries(etat?.manager?.avancee?.selection?.resultats ?? {})) enregistrerResultatJoue(cle, match);
         // ⚠️ Le thème vit sur <html>, pas dans React : il faut le reposer à la
         // réhydratation, sinon le site repart en vert à chaque rechargement.
@@ -7838,6 +7908,7 @@ export const useGame = create<GameState>()(
         // Et la clé Groq personnelle, pour la même raison (`lib/groq.ts` ne
         // peut pas lire le store sans créer un cycle d'imports).
         definirCleGroqJoueur(etat?.groqKey ?? '');
+        etat?.reparerPlayoffs();
       },
       partialize: projectionMemoisee((s: GameState) => ({
         achatsOvas: s.achatsOvas,
@@ -7852,6 +7923,9 @@ export const useGame = create<GameState>()(
         //    c’est un ordre donné à l’écran de création, pas un état de la
         //    partie (même règle que `attenteEvenement`).
         manager: s.manager,
+        correctifPlayoffsApplique: s.correctifPlayoffsApplique,
+        reparationPlayoffs: s.reparationPlayoffs,
+        resultatsPhasesFinales: s.resultatsPhasesFinales,
         journal: s.journal.slice(-160),
         coins: s.coins,
         collectionSolo: s.collectionSolo,
@@ -7866,6 +7940,7 @@ export const useGame = create<GameState>()(
         pseudoClassement: s.pseudoClassement,
         rangMondialId: s.rangMondialId,
         dernierScoreEnvoye: s.dernierScoreEnvoye,
+        etatValidationClassement: s.etatValidationClassement,
         pubs: s.pubs,
         pantheon: s.pantheon,
         finCarriere: s.finCarriere,
@@ -8435,8 +8510,10 @@ function jouerSemaine(j: Joueur, sem: Semaine): ResultatSemaine {
   // Quand on part avec sa sélection, on ne joue pas le championnat : le club
   // joue sans nous, comme dans la vraie vie.
   const enSelection = partEnSelection(j, sem);
+  const afficheCouperet = afficheDuJoueur(j, bonusClubDuJoueur(j));
   const semaineJouee: Semaine =
-    estAmateur(divisionDuJoueur) && (sem.type === 'coupe' || (sem.type === 'international' && !enSelection))
+    afficheCouperet?.nature === 'phaseFinale' ? { ...sem, type: 'phaseFinale', libelle: afficheCouperet.libelleTour ?? afficheCouperet.tour ?? sem.libelle }
+    : estAmateur(divisionDuJoueur) && (sem.type === 'coupe' || (sem.type === 'international' && !enSelection))
       ? { ...sem, type: 'championnat', libelle: 'Journée de championnat' }
       : sem;
 
@@ -8536,19 +8613,27 @@ function jouerSemaine(j: Joueur, sem: Semaine): ResultatSemaine {
       // On joue le VRAI bracket : barrages, demies, finale, puis match d'accès.
       const division = j.division ?? 'fed3';
       const bonus = bonusClubDuJoueur(j);
-      const tour = semaineJouee.tourFinal ?? 'finale';
+      const tour = afficheCouperet?.nature === 'phaseFinale' ? afficheCouperet.tour : semaineJouee.tourFinal ?? 'finale';
       const repos = (texte: string, emoji = '🏖️'): ResultatSemaine => ({
         emoji, titre: semaineJouee.libelle, texte,
         deltas: { forme: 4 },
         aJoue: false, titulaire: false, essais: 0,
       });
 
-      let match: MatchFinal | null = null;
-      if (tour === 'acces') {
+      let match: MatchFinal | MatchElimination | null = null;
+      if (afficheCouperet?.nature === 'phaseFinale') {
+        const reel = resultatJoue(afficheCouperet.cle);
+        if (!reel) return repos('Le match est encore à jouer.');
+        const domicile = reel.vainqueurDesigne ? reel.vainqueurDesigne === 'D' : reel.scoreD > reel.scoreE;
+        match = { ...reel, tour: afficheCouperet.tour as MatchFinal['tour'], libelle: afficheCouperet.libelleTour ?? '',
+          vainqueur: domicile ? reel.domicile : reel.exterieur, perdant: domicile ? reel.exterieur : reel.domicile };
+      } else if (tournoiDeFinDAnnee(division, j.saison, nomDivision(division), j.club, bonus)) {
+        return repos('Pas de match de tournoi cette semaine pour ton club.');
+      } else if (tour === 'acces') {
         const py = resoudrePyramide(division, j.saison, j.club, bonus);
         match =
           [py.accesVersLeHaut, py.accesDepuisLeBas].find(
-            (m): m is MatchFinal => !!m && (m.domicile === j.club || m.exterieur === j.club),
+            (m): m is MatchElimination => !!m && (m.domicile === j.club || m.exterieur === j.club),
           ) ?? null;
         if (!match) return repos('Pas de match d’accès pour ton club : la saison est bel et bien finie. Vacances, puis mercato.');
       } else {
@@ -8577,6 +8662,7 @@ function jouerSemaine(j: Joueur, sem: Semaine): ResultatSemaine {
         }
       }
 
+      if ('status' in match && match.status !== 'completed') return repos('Le match est encore à jouer.');
       const chezNous = match.domicile === j.club;
       const nous = chezNous ? match.scoreD : match.scoreE;
       const eux = chezNous ? match.scoreE : match.scoreD;

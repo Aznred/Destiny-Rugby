@@ -9,6 +9,7 @@ import { clubsDeDivision, divisionEffective } from '../src/lib/divisions';
 import { oublierResultats, resoudreSaisonClub } from '../src/lib/promotion';
 import { tableauDetectionManager, motifObservationJeune, proposerProjetJeune } from '../src/lib/formationManager';
 import { coupeEnDirect } from '../src/lib/coupe';
+import { tournoiDeFinDAnnee } from '../src/lib/tournoi';
 
 const etat = () => useGame.getState();
 const manager = () => etat().manager!;
@@ -78,7 +79,7 @@ for (const division of ['reg3', 'reg2', 'prod2']) {
     (pouleDe(division, club).length - 1) * 2,
     'Chaque match amateur reste jouable, y compris avec les journées exemptes des poules impaires');
   gagnerJusqua(playoffs('acces'));
-  assert.equal(phaseFinale(division, 1, club).champion, club);
+  assert.equal((tournoiDeFinDAnnee(division, 1, division, club) ?? phaseFinale(division, 1, club)).champion, club);
   const py = resoudreSaisonClub(division, 1, club);
   const mouvement = py.mouvements.find((x) => x.club === club);
   assert.equal(mouvement?.sens, 'montee', 'La montée ne doit pas disparaître pendant l’équilibrage');
@@ -94,22 +95,22 @@ for (const division of ['reg3', 'reg2', 'prod2']) {
 console.log('✓ promotion, trophée et tailles des divisions sur trois étages');
 
 // Le finaliste malheureux a son vrai match d'accès, dont le résultat compte.
-creer(COMPETITIONS.find((c) => c.id === 'reg2')!.clubs[0].nom);
+creer(COMPETITIONS.find((c) => c.id === 'prod2')!.clubs[0].nom);
 gagnerJusqua(playoffs('finale'));
 perdreLeWeekEnd();
 etat().semaineManager();
 assert.equal(afficheDuClub(manager())?.tour, 'accession');
 const acces = jouer();
 assert.ok(acces.cle.startsWith('acces#'));
-assert.equal(resoudreSaisonClub('reg2', 1, manager().club).mouvements.find((x) => x.club === manager().club)?.sens, 'montee');
+assert.equal(resoudreSaisonClub('prod2', 1, manager().club).mouvements.find((x) => x.club === manager().club)?.sens, 'montee');
 // Même registre reconstruit à partir des seules données sauvegardées.
 setResultatsJoues(Object.values(JSON.parse(JSON.stringify(manager().resultats)) as ReturnType<typeof manager>['resultats']).map((r) => ({
   cle: r.cle, match: { domicile: r.domicile ? r.club : r.adversaire, exterieur: r.domicile ? r.adversaire : r.club,
     scoreD: r.domicile ? r.scorePour : r.scoreContre, scoreE: r.domicile ? r.scoreContre : r.scorePour,
     essaisD: r.domicile ? r.essaisPour : r.essaisContre, essaisE: r.domicile ? r.essaisContre : r.essaisPour },
-})));
+})).concat(Object.entries(etat().resultatsPhasesFinales).map(([cle, match]) => ({ cle, match }))));
 oublierResultats();
-assert.equal(resoudreSaisonClub('reg2', 1, manager().club).mouvements.find((x) => x.club === manager().club)?.sens, 'montee');
+assert.equal(resoudreSaisonClub('prod2', 1, manager().club).mouvements.find((x) => x.club === manager().club)?.sens, 'montee');
 console.log('✓ barrage d’accès et résultats rechargés');
 
 // Une élimination en demi-finale ne doit pas proposer de finale au perdant.

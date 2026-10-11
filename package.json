@@ -4,6 +4,13 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "verify:correctif36": "vite-node scripts/verifierCorrectif36.ts",
+    "verify:correctif37": "vite-node scripts/verifierCorrectif37.ts",
+    "verify:correctif38": "node --loader ./scripts/chargeurTests36.mjs scripts/verifierCorrectif38.ts && node --loader ./scripts/chargeurTests38.mjs scripts/verifierApiClassement38.ts",
+    "audit:classement38": "node --loader ./scripts/chargeurTests36.mjs scripts/auditerClassement38.ts",
+    "revalider:classement38": "node --loader ./scripts/chargeurTests36.mjs scripts/auditerClassement38.ts --revalider",
+    "migrer:classement38": "node --loader ./scripts/chargeurTests36.mjs scripts/migrerClassement38.ts --appliquer",
+    "repair:correctif36": "vite-node scripts/reparerCorrectif36.ts",
     "verify:cartes-femmes": "node --loader ./scripts/chargeurTypeScript.mjs scripts/verifierCartesFemmes.ts",
     "verify:influenceurs": "vite-node scripts/verifierInfluenceurs.ts",
     "verify:complement29": "vite-node scripts/verifierComplement29.ts",
@@ -25,7 +32,7 @@
     "data:apparences-match": "node scripts/genererApparencesMatch.mjs",
     "data:sprites-match": "node scripts/synchroniserSpritesMatch.mjs",
     "data:notes-allrugby": "node scripts/revaloriserAllRugby.cjs",
-    "base:appliquer": "node scripts/appliquerSchema.mjs serveur/schema-ligues.sql serveur/schema-carriere.sql serveur/schema-echanges-solo.sql",
+    "base:appliquer": "node scripts/appliquerSchema.mjs serveur/schema-ligues.sql serveur/schema-carriere.sql serveur/schema-echanges-solo.sql serveur/schema-publicites.sql",
     "preview": "vite preview",
     "verify:situations": "vite-node scripts/verifierSituations.ts",
     "verify:social": "vite-node scripts/verifierDisciplineSociale.ts",
@@ -142,7 +149,10 @@
     "verify:packs-test": "vite-node scripts/verifierPacksTest.ts",
     "verify:demandes-image": "vite-node scripts/verifierDemandesImage.ts",
     "verify:monde-feminin": "vite-node scripts/verifierMondeFeminin.ts",
-    "verify:packs-femmes": "vite-node scripts/verifierPacksFemmes.ts"
+    "verify:packs-femmes": "vite-node scripts/verifierPacksFemmes.ts",
+    "verify:publicites": "vite-node scripts/verifierPublicites.ts && vite-node scripts/verifierRewardedAdsService.ts",
+    "verify:publicites-sql": "node scripts/verifierPublicitesSql.mjs",
+    "data:vignettes-packs": "node scripts/genererVignettesPacks.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

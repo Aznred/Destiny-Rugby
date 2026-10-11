@@ -12,18 +12,22 @@
 //   • 1 poule  → pas de tournoi, la phase finale classique suffit ;
 //   • 2 à 3 poules → les 2 premiers de chaque poule (4 à 6 qualifiés) ;
 //   • 4 poules et plus → le premier de chaque poule, plus les meilleurs
-//     deuxièmes pour atteindre 8, 16 ou 32 équipes.
+//     deuxièmes pour atteindre 8, 16, 32 ou 64 équipes.
 //
-// Tout est déterministe (graine = division + saison + tour) : rien à
-// sauvegarder, et rouvrir l'écran ne rejoue pas le tournoi.
+// Le tableau est une lecture des résultats enregistrés : sa construction
+// ne simule aucune rencontre et n'anticipe aucun vainqueur.
 
 import { poulesDe, versionResultatsJoues, type LigneTableau } from './championnat.js';
-import { phaseFinale, duel, type MatchFinal } from './phaseFinale.js';
-import { forceEffectif } from './effectif.js';
+import { championnatEnDirect } from './championnat.js';
+import { construireBracket, type MatchElimination } from './bracketProgressif.js';
 import { rulesFor, zones } from './competitionRules.js';
+import { clubParNom } from '../data/clubs.js';
 
 export interface QualifieTournoi {
   club: string;
+  qualificationId: string;
+  region?: string;
+  seed?: number;
   poule: number; // index de la poule d'origine
   rang: number; // sa place dans cette poule
   points: number;
@@ -35,24 +39,19 @@ export interface Tournoi {
   nom: string;
   poules: { nom: string; classement: LigneTableau[] }[];
   qualifies: QualifieTournoi[];
-  matchs: MatchFinal[];
+  matchs: MatchElimination[];
   champion: string | null;
   finaliste: string | null;
   /** Les relégués directs de chaque poule (règlement de la division) : tous les derniers d'abord, puis les avant-derniers. */
   relegues: string[];
 }
 
-const NOM_TOUR: Record<number, string> = {
-  32: 'Trente-deuxièmes', 16: 'Seizièmes', 8: 'Quarts de finale',
-  4: 'Demi-finales', 2: 'Finale',
-};
-
 // La plus grande puissance de deux qui tienne dans le nombre de candidats
 // (minimum 2 : sans ça il n'y a pas de finale).
 function tailleDuTableau(candidats: number): number {
   let n = 2;
   while (n * 2 <= candidats) n *= 2;
-  return Math.min(32, n);
+  return Math.min(64, n);
 }
 
 // Le tournoi d'une division amateur découpée en poules. Renvoie `null` quand la
@@ -86,7 +85,7 @@ function calculerTournoi(
 
   // 1. On joue TOUTES les poules jusqu'au bout.
   const classements = poules.map((_, i) =>
-    phaseFinale(divisionId, saison, clubJoueur, bonusJoueur, i).classement,
+    championnatEnDirect(divisionId, saison, clubJoueur, 999, bonusJoueur, i).classement,
   );
 
   const qualifies: QualifieTournoi[] = [];
@@ -97,11 +96,11 @@ function calculerTournoi(
 
   classements.forEach((cl, i) => {
     cl.slice(0, parPoule).forEach((l, r) => {
-      qualifies.push({ club: l.club, poule: i, rang: r + 1, points: l.points, difference: l.difference });
+      qualifies.push({ club: l.club, qualificationId: `${divisionId}#${saison}#${l.club}`, poule: i, rang: r + 1, points: l.points, difference: l.difference });
     });
     // Les deuxièmes non qualifiés d'office servent de repêchés.
     if (parPoule === 1 && cl[1]) {
-      deuxiemes.push({ club: cl[1].club, poule: i, rang: 2, points: cl[1].points, difference: cl[1].difference });
+      deuxiemes.push({ club: cl[1].club, qualificationId: `${divisionId}#${saison}#${cl[1].club}`, poule: i, rang: 2, points: cl[1].points, difference: cl[1].difference });
     }
     // Les relégués directs de la poule, le dernier d'abord. Leur nombre vient du règlement (deux en Fédérale).
     const n = zones(reglement, cl.length, poules.length).directRelegation;
@@ -115,39 +114,13 @@ function calculerTournoi(
   while (qualifies.length < cible && deuxiemes.length) qualifies.push(deuxiemes.shift()!);
   // Trop de qualifiés pour un tableau propre : on garde les meilleurs.
   qualifies.sort((a, b) => a.rang - b.rang || b.points - a.points || b.difference - a.difference);
-  const tableau = qualifies.slice(0, tailleDuTableau(qualifies.length));
+  const tableau = qualifies.slice(0, tailleDuTableau(qualifies.length)).map((q, i) => ({ ...q, region: clubParNom(q.club)?.ligue, seed: i + 1 }));
 
   // 3. Le tableau, en tête de série : le 1er reçoit le dernier qualifié.
-  //    Les clubs d'une même poule ne se croisent qu'après le premier tour,
-  //    c'est ce que donne naturellement l'appariement 1-N, 2-N-1…
-  const matchs: MatchFinal[] = [];
-  let tour = tableau.map((q) => q.club);
-  while (tour.length >= 2) {
-    const taille = tour.length;
-    const libelleTour = NOM_TOUR[taille] ?? `Tour à ${taille}`;
-    const suivant: string[] = [];
-    for (let i = 0; i < taille / 2; i++) {
-      const a = tour[i];
-      const b = tour[taille - 1 - i];
-      // Le mieux classé reçoit — sauf en finale, terrain neutre.
-      const finale = taille === 2;
-      const cle = `tournoi#${divisionId}#${saison}#${taille}#${a}#${b}`;
-      const m = duel(
-        a, b, saison,
-        cle,
-        finale ? 'finale' : taille === 4 ? 'demie' : taille === 8 ? 'quart' : 'barrage',
-        `${finale ? 'FINALE' : libelleTour} : ${a} - ${b}`,
-        finale ? 0 : 3,
-      );
-      matchs.push({ ...m, cle });
-      suivant.push(m.vainqueur);
-    }
-    // Le tour suivant est reclassé par force d'effectif : le plus solide des
-    // qualifiés devient tête de série, comme dans un vrai tirage protégé.
-    tour = suivant.sort((x, y) => forceEffectif(y, saison) - forceEffectif(x, saison));
-  }
-
-  const finale = matchs[matchs.length - 1] ?? null;
+  //    Les rencontres historiques valides gardent leur appariement.
+  // Les identités des qualifications sont conservées ; les graines ne servent qu'à l'appariement.
+  const matchs = construireBracket(tableau.map(q => q.club), `tournoi#${divisionId}#${saison}`);
+  const finale = matchs.find(m => m.tour === 'finale' && m.status === 'completed');
   return {
     divisionId,
     nom: `Tournoi final de ${nomDivision}`,

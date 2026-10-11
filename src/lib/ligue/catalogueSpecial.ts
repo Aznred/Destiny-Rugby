@@ -9,13 +9,14 @@ import { HALLOWEEN_DEPART, ICONS_DEPART, OCTOBRE_ROSE_DEPART } from '../../data/
 import { POSTE_PAR_ID } from '../../data/rugby.js';
 import type { PosteId } from '../../types.js';
 import { catalogueAdmin, type CatalogueAdmin } from './atelierCatalogue.js';
-import { catalogueMondialCarriere } from './catalogueCarriere.js';
+import { catalogueMondialCarriere, packsCatalogueAdmin } from './catalogueCarriere.js';
 import { sourceRetireeFfr } from './eligibiliteJoueurs.js';
 import {
   assemblerCatalogueSpecial, carteSpecialePubliee, carteSpecialeVisibleCollection, chanceSpecialeParCarte, EVENEMENTS_DEPART, FAMILLES_SPECIALES,
   postesDepuisNumeros, slugSpecial, type CatalogueSpecial, type DefinitionCarteSpeciale, type EvenementSpecial,
 } from './cartesSpeciales.js';
 import type { CarteCarriere, PackCarriere } from './typesCarriere.js';
+import { PACK_MYTHIQUE_PUBLICITAIRE } from '../publicitesRecompensees.js';
 
 export * from './cartesSpeciales.js';
 
@@ -155,6 +156,15 @@ export function packsEvenements(config: CatalogueAdmin = catalogueAdmin()): Pack
       // il promettrait une carte que personne ne peut encore recevoir.
       cartes: cat.definitions.filter(d => d.specialEventId === ev.id && d.canBePacked && carteSpecialePubliee(d, cat)).length },
   }));
+}
+
+/** Récompenses à pochette dédiée, distinctes du pack privé de test Kiri. */
+export function packsSpeciauxPublicitaires(config: CatalogueAdmin = catalogueAdmin()): PackCarriere[] {
+  return [PACK_MYTHIQUE_PUBLICITAIRE,...packsEvenements(config).filter(p=>p.evenement?.type !== 'influencer' && p.evenement?.type !== 'icon')];
+}
+
+export function cataloguePacksPublicitaires(): PackCarriere[] {
+  return [...packsCatalogueAdmin(true).filter(p=>!p.evenement && !p.id.startsWith('pub-')), ...packsSpeciauxPublicitaires()];
 }
 
 

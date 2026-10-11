@@ -36,6 +36,8 @@ import {
 } from '../../lib/controleDirect/touches';
 import { LIBELLES_MANETTE, type NomBouton, type TypeManette } from '../../lib/controleDirect/manette';
 import { Responsabilites } from './Responsabilites';
+import { CommandesEquipe } from './CommandesEquipe';
+import { optionNeufBalayage } from '../../lib/controleDirect/sortiesNeuf';
 import './ControleDirect.css';
 
 // ---------------------------------------------------------------------------
@@ -130,6 +132,7 @@ export function ControleDirect({ pilotage, surReprendre, suspendu = false }: {
     >
       {snap.visible && <Souffle valeur={snap.endurance} sprint={snap.reserve} />}
       {snap.visible && <Situation snap={snap} />}
+      {snap.visible && !suspendu && <CommandesEquipe pilotage={pilotage} snap={snap} />}
       {snap.visible && snap.libre && <Toast snap={snap} />}
 
       {/* Les zones tactiles : toujours posées (un portable tactile doit pouvoir passer au pouce), muettes pour la souris. */}
@@ -140,7 +143,7 @@ export function ControleDirect({ pilotage, surReprendre, suspendu = false }: {
       <ZoneCamera pilotage={pilotage} actif={enJeu && !snap.pause && !occupe} sensibilite={prefs.sensibiliteCamera} />
       <OrbiteSouris pilotage={pilotage} actif={enJeu && !snap.pause && !occupe} sensibilite={prefs.sensibiliteCamera} racine={racine} sansGauche={prefs.souris} />
 
-      {snap.visible && tactile && !snap.pause && !occupe && !snap.pack && (
+      {snap.visible && tactile && !snap.pause && !occupe && !snap.pack && !snap.equipe?.sortie && (
         <Commandes pilotage={pilotage} snap={snap} sprint={sprint} />
       )}
       {/* Le ballon hors du cadre (Correctif 33) : une flèche au bord de l'écran dit où le chercher, et qui le porte. */}
@@ -628,6 +631,11 @@ function Gestes({ pilotage, actif }: { pilotage: PilotageDirect; actif: boolean 
     geste.current = null;
     if (ev.type === 'pointercancel' || !actif) return;
     const dx = ev.clientX - g.x0, dy = ev.clientY - g.y0;
+    if(pilotage.lire().equipe?.sortie) {
+      const option=optionNeufBalayage(dx,dy);
+      if(option)pousser(pilotage,{type:'optionNeuf',option});
+      return;
+    }
     // Une passe est un coup de pouce nettement horizontal, assez long, et le joueur a le ballon.
     if (Math.abs(dx) < 46 || Math.abs(dx) < Math.abs(dy) * 1.25) return;
     if (!pilotage.lire().porte) return;

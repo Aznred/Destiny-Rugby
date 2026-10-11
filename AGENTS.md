@@ -60,7 +60,7 @@ Ce ne sont pas des suggestions. Elles ont toutes été demandées explicitement.
 
 ## Stack
 
-Vite 8 · React 19 · TypeScript · Zustand (+ persist, **migration v27**) ·
+Vite 8 · React 19 · TypeScript · Zustand (+ persist, **migration v36**) ·
 Framer Motion · Three.js (`@react-three/fiber` + `@react-three/drei`) ·
 Groq (API distante) · Neon (Postgres serverless) · déployé sur Vercel.
 
@@ -1220,6 +1220,45 @@ Détail et limites : `../analyse-rn26/SIMULATION.md`.
 
 ---
 
+### Match jouable en Carrière Entraîneur (Correctif 37)
+
+`ChoixMatchEquipe` précède les matchs de club et de sélection : Jouer / Regarder, avec Mêlées et Touches Manuel/Auto,
+Rucks Manuel/Assisté. `MatchLive.manager.modeControle` active `moteur/equipeSolo.ts` ; aucun joueur de carrière n'est créé
+et le résultat reste enregistré par le manager. Une carrière reconvertie ne reçoit pas les statistiques du dernier pion contrôlé.
+La sélection suit porteur, receveur, rôles de capitaine/buteur/lanceur et sauteur après l'annonce du lancer. En défense,
+elle conserve un joueur tant qu'un autre n'est pas nettement mieux placé. Tab/L3/bouton tactile changent avec la direction.
+Les recharges appartiennent aux pions ; une passe ou un geste armé ne se transmet pas au changement.
+
+`cellulesSolo` organise deux triangles de deux à trois avants disponibles, avec profondeur, soutien en retrait et un
+ramasseur distinct. Les cibles changent, jamais les positions : les joueurs au sol ou engagés restent exclus. Les groupes
+gardent leurs identités dans une phase, puis se recomposent au ruck suivant. Les dix derniers mètres raccourcissent les
+cellules. Le 9 attend la commande humaine, puis sert un premier avant déjà lancé, derrière ses mains au départ de la passe.
+Le pick and go rejoint et ramasse le ballon. Le mode observé choisit son côté selon largeur, défense, placement et 10.
+Les combinaisons programmées et les suites automatiques de touche ne reprennent pas la main sur le camp humain.
+
+Les sorties passent par `controleDirect/sortiesNeuf.ts` : Action tenue + passe gauche/droite, haut/bas, pied ou raffut
+(Espace + A/E sur AZERTY, Q/E sur QWERTY, haut/bas, V/F par défaut) ; LT/L2 + X/Carré, B/Rond, Y/Triangle, A/Croix, RB/R1, RT/R2 à la manette.
+Les touches remappées restent valables. Un balayage à droite du terrain choisit gauche/droite, 10 vers le haut, pick vers
+le bas, pied en diagonale haut gauche, départ en diagonale haut droite. `CommandesEquipe` montre une légende contextuelle,
+sans six boutons de sortie. Les gestes normaux reprennent après le ruck. Les huit consignes jouent sur les cibles et le tempo.
+La caméra `equipe` est le défaut, `joueur` reste disponible. Les QTE de conquête et les responsabilités réutilisent le pilote.
+Sans activation solo, aucun état ni hasard supplémentaires : quatre empreintes de simulations restent identiques à HEAD.
+Banc : `verify:correctif37` ; aperçu `/scripts/apercuCorrectif37.html?situation=ruck` et `&tactile=1` pour l'essai tactile.
+
+### Playoffs et contrats solo (Correctif 36)
+
+`bracketProgressif.ts` construit uniquement les tours dont les qualifiés sont établis, de 4 à 64 clubs. Les scores des
+rencontres futures sont `null`, les statuts scheduled/in_progress/completed explicites ; tous les résultats d'un tour sont
+requis avant le suivant. La lecture n'effectue aucun tirage. `phasesFinalesJouees.ts` inscrit les pairs à la commande de jeu
+ou d'avancement, avec protection du match humain. Les dates réparties sur les semaines 46 à 51 ne chevauchent aucune journée
+régulière ; les métadonnées de poule et les résultats persistés sont conservés. Le titre amateur vient du tournoi national.
+`reparationPlayoffs.ts` et la migration v36 reconstruisent les qualifications et ramènent un survivant aux matchs manquants
+sans retirer ses vrais résultats. `repair:correctif36` écrit une copie et un rapport, sans écraser la sauvegarde source.
+Marché mondial → Contrats à renouveler ouvre la proposition de L'Ovale : durée, salaire, rôle et primes modifiables,
+acceptation, contre-proposition ou refus selon le projet sportif et le temps de jeu. Les termes signés restent inscrits ;
+à expiration, le joueur quitte effectivement l'effectif et rejoint les joueurs libres. Aucun renouvellement automatique.
+Bancs : `verify:correctif36`, `verify:tournoi-final` ; aperçu `/scripts/apercuCorrectif36.html`.
+
 ### Le contrôle direct du joueur (Correctif 16 — carrière solo, 3D)
 
 En carrière, le joueur CONDUIT son pion dès qu'il est sur le terrain (les vingt-neuf autres gardent l'IA par poste).
@@ -1443,15 +1482,19 @@ des effectifs du Correctif 24 ; le moteur, lui, n'a pas bougé).
 - ⚠️ **LE TOURNOI FINAL DES DIVISIONS À POULES N'ÉTAIT PROPOSÉ NULLE PART.** De la Nationale 2 à la Régionale 3 (sept
   divisions, de 2 à 22 poules), le champion sort d'un tableau sec entre les meilleurs de chaque poule : l'écran Résultats
   l'affichait, la fin de saison s'en servait, mais ni l'entraîneur ni le joueur ne pouvaient en disputer un match.
-  `affichesDePhaseFinale(c)` rend TOUS les matchs couperets du week-end, dans l'ordre : le tour de sa poule (ou l'accès),
-  puis les tours du tournoi (`TOURS_DU_TOURNOI` : barrages ET quart le premier week-end, demie, finale — le même découpage
-  que le tableau affiché). `afficheDuClub` rend le premier non joué. Un week-end peut donc porter plusieurs matchs.
+  `affichesDePhaseFinale(c)` propose le tour national de la division à sa date, sans phase locale supplémentaire.
+  Les tailles 64/32/16/8/4/2 correspondent aux 32es/16es/8es/quarts/demies/finale, semaines 46 à 51.
+  `debutPlayoffsDivision` réserve ces dates dans le calendrier amateur ; toutes les journées régulières se répartissent
+  sur les week-ends précédents, y compris les journées exemptes ou doubles, sans concurrence avec le premier tour.
+  `bracketProgressif.ts` construit seulement le tour actuel : scores et qualifié restent `null` jusqu'au vrai résultat.
+  Tous les matchs du tour doivent être terminés, avec exactement un vainqueur par rencontre, avant le suivant.
+  Les phases classiques à six clubs conservent deux exemptions explicites de barrage ; l'accès se joue semaine 52.
 - ⚠️ **UN SEUL MOTEUR, UNE SEULE AFFICHE.** Il n'y a pas de simulateur par compétition : toute affiche s'ouvre dans
   `MatchLive` (mêmes vitesses, même « simuler la fin »), et l'avance déléguée de l'entraîneur leur donne un résultat
   automatique. La carrière joueur passe par `afficheDuJoueur` — elle fabriquait ses propres clés (« phase#…#semaine »)
   que le tableau ne relisait pas : barrage gagné sur le terrain, éliminé par le tirage.
-- ⚠️ **LA CLÉ D'UN MATCH DE TOURNOI EST `MatchFinal.cle`** (`tournoi#division#saison#taille#a#b`), celle que `duel` relit :
-  le score joué décide du tour suivant. `tournoiDeFinDAnnee` est mémoïsé (il rejoue toutes les poules de la division :
+- ⚠️ **LA CLÉ D'UN MATCH DE TOURNOI EST `MatchElimination.cle`** (`tournoi#division#saison#taille#a#b`) :
+  le tableau lit le score enregistré, sans appeler `duel`. `tournoiDeFinDAnnee` est mémoïsé (il calcule toutes les poules :
   de 40 à 700 ms selon l'étage, recalculé une fois par résultat inscrit) sur ses paramètres et `versionResultatsJoues()`.
 - **Il faut un vainqueur** : `departager(cle, pour, contre)` (`lib/couperet.ts`) est LA définition du nul couperet — trois
   points de prolongation, tirés de la clé. Le store (joueur et entraîneur) et l'écran de fin la lisent : la feuille annonce
@@ -1459,7 +1502,18 @@ des effectifs du Correctif 24 ; le moteur, lui, n'a pas bougé).
   ⚠️ Le moteur ne joue PAS de prolongation : c'est un départage, pas vingt minutes de plus.
 - Carrière joueur : un second match couperet le même week-end se compte comme le premier (`autreCouperet` dans
   `enregistrerMatchVecu`) et la semaine ne tourne que quand `resteUnMatchCeWeekEnd` est faux.
-- Banc : `npm run verify:tournoi-final` (97 contrôles, ~55 s).
+- Les autres rencontres sont simulées par la commande `phasesFinalesJouees.ts` aux seules dates atteintes, et
+  persistées dans `resultatsPhasesFinales`. Consulter l'écran ne lance aucune simulation de playoffs.
+- Migration v36 : `reparationPlayoffs.ts` conserve les résultats réels, laisse en attente les tours orphelins et
+  reprend au premier tour incomplet si le club est encore qualifié. Le réparateur JSON écrit une copie et un rapport :
+  `npm run repair:correctif36 -- chemin/sauvegarde.json`. Il ne remplace jamais l'original.
+- Contrats entraîneur : Marché mondial → Contrats à renouveler (échéance dans les douze mois). Propositions de durée,
+  salaire, rôle et primes dans L'Ovale ; acceptation, contre-proposition ou refus sportif explicite. Une signature
+  actualise les termes, l'échéance et la masse salariale et survit au rechargement. Un contrat expiré quitte réellement
+  l'effectif à l'intersaison et apparaît libre sans indemnité ; aucun renouvellement automatique.
+- Bancs : `npm run verify:correctif36`, `npm run verify:tournoi-final`, `npm run verify:saison-manager`.
+  Repli local : `node --loader ./scripts/chargeurTests36.mjs scripts/verifierCorrectif36.ts`.
+  Aperçu sans écriture de partie : `/scripts/apercuCorrectif36.html`.
 
 **Propositions de cartes** (`components/EchangesCollectionSolo.tsx`, `lib/echangesSolo.ts`, `serveur/carriereApi.ts`)
 
@@ -2608,3 +2662,22 @@ clubs homonymes. La Base joueurs du Labo conserve son autorisation interne. Banc
 Base privée de 470 742 profils, retrait des identités jeunesse et agrégats de formation. La validation des sources FFR
 reste réservée à Kiri par autorisation serveur ; les cartes femmes publiées sont accessibles à tous. Voir
 [serveur/FFR-INTEGRATION.md](serveur/FFR-INTEGRATION.md) pour les seuils, snapshots, commandes et limites de validation.
+
+
+### Publicités récompensées — AppLixir
+
+La boutique propose des Ovas volontaires ; les ligues proposent deux Packs Pub par compte et par jour (minuit Europe/Paris). Le callback signé MD5 + TID valide seul la récompense, dont la réclamation et l'ouverture sont idempotentes. Le SDK reste chargé à la demande et le lecteur nettoie ses médias.
+
+Le catalogue publicitaire utilise le vivier mixte, avec les pochettes dédiées masculines, les championnats féminins, Bronze, Argent, Or et Élite. Les variantes sans texture propre sont exclues. Mythique est une récompense distincte du pack privé Kiri ; ICON et Créateurs sont exclus de la roulette. Halloween et Octobre Rose suivent la publication, les dates et le stock des cartes. Les cartes spéciales respectent l'autorisation de la ligue. Par défaut : Bronze 25 %, Argent 20 %, Or 10 %, autres packs 45 % ; les poids personnalisés du Labo remplacent ces valeurs. Les rayons payants restent indépendants.
+
+Les vignettes WebP sont rendues hors ligne depuis les GLB et leurs textures par `npm run data:vignettes-packs`, sans scènes 3D supplémentaires dans la roulette. L'animation conserve le résultat serveur, avec un ralentissement suivi d'un second élan et des étincelles ; le mouvement réduit supprime ces effets.
+
+Bancs : `npm run verify:publicites` (serveur et SDK), `npm run verify:publicites-sql` (transaction Neon, données d'essai annulées). Aperçu local : `/scripts/apercuPublicites.html`, exclusivement simulé. Configuration serveur et étapes de mise en ligne : [PUBLICITES-APPLIXIR.md](serveur/PUBLICITES-APPLIXIR.md).
+
+### Validation du classement des carrières (Correctif 38)
+
+`lib/validationClassement.ts` remplace le crible strict dans la route active `api/classement.ts` et l'écran Classement. Le risque cumule les anomalies : ELIGIBLE (<30), LIMITED (30–59), PENDING_VALIDATION (>=60 ou données manquantes), REJECTED (incohérence forte). Les trois premiers restent visibles ; les carrières volontairement hors classement restent exclues. Les seules preuves d'intégrité exploitables viennent du serveur. Aucune signature solo n'est prétendue existante.
+
+`serveur/validationClassement.ts` conserve les dossiers et leur journal avec révisions concurrentes. Le Labo `LaboValidationClassement` est dans AtelierKiri : règles, risques, identifiants et dates, filtres et décisions. `/api/carriere` et le service autorisent les décisions uniquement à l'identifiant authentifié `kiri`. Un score inférieur nouvellement envoyé ne masque pas le record précédent de l'installation. Le store conserve le résultat réel de synchronisation et réessaie les cas en attente sans exiger une hausse du score.
+
+Migration atomique : `npm run migrer:classement38`. Audit/revalidation : `npm run audit:classement38`, `npm run revalider:classement38`. Le 11 octobre 2026 : 1 304 lignes existantes conservées, revalidées et visibles provisoirement ; les anciennes projections ne stockaient pas l'âge initial/version, 80 ont seulement un score. Les anciens refus ne sont pas quantifiables puisqu'ils n'étaient pas enregistrés. Aucun changement de sauvegarde. Détails et limites : [VALIDATION-CORRECTIF-38.md](VALIDATION-CORRECTIF-38.md). Banc : `npm run verify:correctif38` ; aperçu desktop/mobile `/scripts/apercuCorrectif38.html`.

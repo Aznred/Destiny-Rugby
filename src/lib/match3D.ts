@@ -30,10 +30,10 @@ export interface EquipeScene3D {
  * `tv` : la réalisation choisit ses plans (derrière le buteur, derrière les poteaux, en-but, vue aérienne…).
  * `joueur` : derrière notre joueur, légèrement surélevée — la vue du contrôle direct (Correctif 16).
  */
-export type Camera3D = 'tv' | 'follow' | 'close' | 'wide' | 'aerienne' | 'basse' | 'enbut' | 'joueur';
+export type Camera3D = 'tv' | 'equipe' | 'follow' | 'close' | 'wide' | 'aerienne' | 'basse' | 'enbut' | 'joueur';
 export const CAMERAS_3D: readonly Camera3D[] = ['tv', 'follow', 'close', 'wide', 'aerienne', 'basse', 'enbut'];
 /** Les mêmes, plus la vue derrière le joueur : celle que le bouton de caméra propose quand on incarne un joueur. */
-export const CAMERAS_3D_AVEC_JOUEUR: readonly Camera3D[] = ['tv', 'joueur', 'follow', 'close', 'wide', 'aerienne', 'basse', 'enbut'];
+export const CAMERAS_3D_AVEC_JOUEUR: readonly Camera3D[] = ['tv', 'equipe', 'joueur', 'follow', 'close', 'wide', 'aerienne', 'basse', 'enbut'];
 
 /**
  * Ce que l'hôte pose sur la pelouse pendant le contrôle direct (Correctif 16). Les points sont en repère

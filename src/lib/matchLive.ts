@@ -131,6 +131,7 @@ export function nomPoste(c: Coequipier): string {
 
 import { phaseFinale, type MatchFinal } from './phaseFinale.js';
 import { tournoiDeFinDAnnee } from './tournoi.js';
+import type { MatchElimination } from './bracketProgressif.js';
 import { coupeEnDirect, coupesDuClubALaDate, matchDuTourCourant } from './coupe.js';
 import { semaine as semaineDuCalendrier, CALENDRIER } from '../data/calendrier.js';
 import { divisionAuDessus, divisionEnDessous, nomDivision, resoudrePyramide } from './promotion.js';
@@ -155,11 +156,6 @@ export function libelleAfficheManager(affiche: AfficheComplete, division: string
   return `${affiche.competition ?? division} · ${affiche.libelleTour ?? (affiche.tour ? tours[affiche.tour] ?? affiche.tour : `Journée ${affiche.journee}`)}`;
 }
 
-/** Les tours du TOURNOI FINAL disputés à chaque week-end de phase finale : le même découpage que le tableau affiché. */
-const TOURS_DU_TOURNOI: Record<string, MatchFinal['tour'][]> = {
-  barrage: ['barrage', 'quart'], demie: ['demie'], finale: ['finale'], acces: [],
-};
-
 /**
  * TOUS les matchs couperets de ce club pour ce week-end de phase finale, dans l'ordre où ils se jouent.
  *
@@ -173,16 +169,29 @@ const TOURS_DU_TOURNOI: Record<string, MatchFinal['tour'][]> = {
  */
 export function affichesDePhaseFinale(c: CarriereDeClub, bonus = 0): AfficheComplete[] {
   const sem = semaineDuCalendrier(c.semaine);
-  if (!c.club || !c.division || sem.type !== 'phaseFinale' || !sem.tourFinal) return [];
+  if (!c.club || !c.division || c.semaine < 46) return [];
   const affiches: AfficheComplete[] = [];
-  const duelEnAffiche = (m: MatchFinal): MatchChampionnat => ({
+  const duelEnAffiche = (m: MatchFinal | MatchElimination): MatchChampionnat => ({
     domicile: m.domicile, exterieur: m.exterieur,
-    scoreD: m.scoreD, scoreE: m.scoreE,
+    scoreD: m.scoreD ?? 0, scoreE: m.scoreE ?? 0,
     // ⚠️ UN DUEL NE COMPTE PAS LES ESSAIS. `MatchFinal` ne porte que le
     // score : le moteur les recalculera au coup d’envoi, et les afficher
     // à zéro avant le match serait un chiffre faux, pas une absence.
     essaisD: 0, essaisE: 0,
   } as MatchChampionnat);
+
+  const tournoi = tournoiDeFinDAnnee(c.division, c.saison, nomDivision(c.division), c.club, bonus);
+  if (tournoi) {
+    // Un seul tour par date. Une sauvegarde en retard propose d'abord son dernier tour incomplet.
+    for (const m of tournoi.matchs) {
+      if (m.semaine > c.semaine || (m.domicile !== c.club && m.exterieur !== c.club)
+        || (m.status === 'completed' && m.semaine !== c.semaine)) continue;
+      affiches.push({ journee: 0, tour: m.tour, nature: 'phaseFinale', competition: tournoi.nom,
+        cle: m.cle, libelleTour: m.libelle.split(' : ')[0], match: duelEnAffiche(m) });
+    }
+    return affiches;
+  }
+  if (sem.type !== 'phaseFinale' || !sem.tourFinal) return [];
 
   // 1. Le tour de SA poule (barrage, demie, finale) ou le match d'accès.
   const phase = phaseFinale(c.division, c.saison, c.club, bonus);
@@ -196,22 +205,10 @@ export function affichesDePhaseFinale(c: CarriereDeClub, bonus = 0): AfficheComp
     nature: 'phaseFinale',
     cle: acces
       ? `acces#${acces.accesVersLeHaut === m ? divisionAuDessus(c.division) : c.division}#${acces.accesVersLeHaut === m ? c.division : divisionEnDessous(c.division)}#${c.saison}#${m.domicile}#${m.exterieur}`
-      : `phase#${c.division}#${c.saison}#${tour}#${m.domicile}#${m.exterieur}`,
+      : m.cle,
     match: duelEnAffiche(m),
   });
 
-  // 2. Le tournoi final de la division, pour les qualifiés des divisions à poules.
-  const tours = TOURS_DU_TOURNOI[sem.tourFinal] ?? [];
-  const tournoi = tours.length ? tournoiDeFinDAnnee(c.division, c.saison, nomDivision(c.division), c.club, bonus) : null;
-  for (const t of tournoi?.matchs ?? []) {
-    if (!t.cle || !tours.includes(t.tour) || (t.domicile !== c.club && t.exterieur !== c.club)) continue;
-    affiches.push({
-      journee: 0, tour: t.tour, nature: 'phaseFinale', competition: tournoi!.nom, cle: t.cle,
-      // « Seizièmes : A - B » → « Seizièmes » ; la finale s'écrit en capitales dans le tableau.
-      libelleTour: t.tour === 'finale' ? 'Finale' : t.libelle.split(' : ')[0],
-      match: duelEnAffiche(t),
-    });
-  }
   return affiches;
 }
 
@@ -228,16 +225,15 @@ export function afficheDuJoueur(j: Joueur, bonus = 0): AfficheComplete | null {
     division: j.division ?? '', club: j.club, saison: j.saison, semaine: j.semaine ?? 1, resultats: j.resultatsClub,
   };
   const sem = semaineDuCalendrier(c.semaine);
-  if (sem.type === 'phaseFinale' || (sem.type === 'coupe' && !estJourneeDe(c.division, sem))) return afficheDuClub(c, bonus);
+  if (affichesDePhaseFinale(c, bonus).length || sem.type === 'phaseFinale' || (sem.type === 'coupe' && !estJourneeDe(c.division, sem))) return afficheDuClub(c, bonus);
   const championnat = matchDeLaSemaine(j, bonus);
   return championnat ? { ...championnat, nature: 'championnat' } : null;
 }
 
 /** Reste-t-il au joueur un match couperet à disputer CE week-end (deuxième tour du tournoi final le même jour) ? */
 export function resteUnMatchCeWeekEnd(j: Joueur, bonus = 0): boolean {
-  if (semaineDuCalendrier(j.semaine ?? 1).type !== 'phaseFinale') return false;
   const affiche = afficheDuJoueur(j, bonus);
-  return !!affiche && !j.resultatsClub?.[affiche.cle];
+  return affiche?.nature === 'phaseFinale' && !j.resultatsClub?.[affiche.cle];
 }
 
 /**
@@ -251,6 +247,8 @@ export function resteUnMatchCeWeekEnd(j: Joueur, bonus = 0): boolean {
 export function afficheDuClub(c: CarriereDeClub, bonus = 0): AfficheComplete | null {
   if (!c.club || !c.division) return null;
   const sem = semaineDuCalendrier(c.semaine);
+  const finales = affichesDePhaseFinale(c, bonus);
+  if (finales.length) return finales.find(a => !c.resultats?.[a.cle]) ?? finales.at(-1)!;
   // Les divisions amateurs jouent leur championnat pendant les dates européennes.
   if (estJourneeDe(c.division, sem)) {
     const affiche = matchDuClubSemaine(c, bonus);

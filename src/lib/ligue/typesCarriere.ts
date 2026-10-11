@@ -75,6 +75,11 @@ export interface CarteCarriere {
   speciale?: InfoCarteSpeciale;
 }
 export interface PackCarriere {
+  published?: boolean;
+  startsAt?: string;
+  endsAt?: string;
+  rewardedAdsEnabled?: boolean;
+  rewardedAdWeight?: number;
   id: IdPackCarriere; nom: string; prix: number; cartes: number;
   probabilites: Record<RareteCarriere, number>;
   filtre?: FiltrePack;
@@ -236,6 +241,8 @@ export interface HistoireCarriere {
 }
 /** État exclusivement serveur. Écriture atomique avec comparaison de version en base. */
 export interface EtatCarriereEnLigne {
+  /** Coffre serveur des packs publicitaires : contenu invisible avant ouverture. */
+  packsPubReserves?: Record<string, { compte: string; pack: PackCarriere; cartes: CarteCarriere[] }>;
   playerPool?: 'men' | 'women' | 'mixed';
   migrationsFfr?: { version: string; carteId: string; owner: string | null; compensation: number; le: string }[];
   catalogueRevision?: number;
@@ -265,7 +272,7 @@ export interface EtatCarriereEnLigne {
   ventes: VenteCarriere[]; echanges: EchangeCarriere[]; transactions: TransactionCarriere[];
   objectifs: ObjectifCarriere[]; histoire: HistoireCarriere[];
 }
-export interface VueCarriereEnLigne extends Omit<EtatCarriereEnLigne, 'graine' | 'clubs' | 'cartes' | 'rencontres' | 'objectifs' | 'transactions' | 'echanges'> {
+export interface VueCarriereEnLigne extends Omit<EtatCarriereEnLigne, 'packsPubReserves' | 'graine' | 'clubs' | 'cartes' | 'rencontres' | 'objectifs' | 'transactions' | 'echanges'> {
   monClubId: string;
   /** Vue publique sans club, accessible uniquement au compte administrateur kiri. */
   observateur?: true;
@@ -304,6 +311,7 @@ export type CommandeCarriere =
   | { type: 'strategie'; strategie: StrategieEnLigne }
   | { type: 'ouvrirPack'; packId: IdPackCarriere }
   | { type: 'ouvrirPackGratuit'; attributionId: string }
+  | { type: 'ouvrirPackPub'; rewardSessionId: string }
   | { type: 'venteRapide'; carteId: string }
   // ⚠️ LE LOT PART D'UN SEUL BLOC, et c'est tout l'intérêt : le plancher
   // d'effectif se vérifie sur l'ENSEMBLE des sortants. Vendre les mêmes cartes

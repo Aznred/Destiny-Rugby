@@ -29,7 +29,8 @@
 
 import { neon } from '@neondatabase/serverless';
 import { createHash } from 'node:crypto';
-import { verifierFiche, type FicheCarriere } from '../src/lib/classementMondial.js';
+import { evaluerClassement, validationPublique, type EvaluationClassement } from '../src/lib/validationClassement.js';
+import { creerServiceValidation, stockageValidationNeon } from '../serveur/validationClassement.js';
 import { TROPHEES } from '../src/data/trophees.js';
 
 export const config = { runtime: 'nodejs' };
@@ -87,7 +88,8 @@ const PAGE_MAX = 400;
  * (« DATABASE_URL absente… ») n'était jamais atteint. Un diagnostic qu'on
  * n'atteint pas ne sert à rien.
  */
-let connexion: ReturnType<typeof neon> | null = null;
+type ClientNeon = ReturnType<typeof neon<false,false>>;
+let connexion: ClientNeon | null = null;
 function sqlClient() {
   connexion ??= neon(process.env.DATABASE_URL as string);
   return connexion;
@@ -114,6 +116,7 @@ function empreinteAppareil(req: Request, sel: string): string {
 }
 
 const ENTETES = {
+  'cache-control': 'no-store',
   'content-type': 'application/json',
   'access-control-allow-origin': '*',
   'access-control-allow-headers': 'content-type',
@@ -187,6 +190,16 @@ export async function GET(req?: Request): Promise<Response> {
       ? categorie : 'total';
 
     const lectures = [
+      ['v4', () => sql`
+        select c.id,c.pseudo,c.score,c.maj_le,c.nom,c.poste,c.nation,c.age,c.saisons,c.note,c.reputation,
+          c.matchs,c.essais,c.selections,c.titres,c.clubs,c.validation
+        from classement c
+        where coalesce((c.validation->>'visible')::boolean,true) and (
+          ${filtre}='total' or (${filtre}='joueur' and coalesce(c.poste,'')<>'entraineur')
+          or (${filtre}='entraineur' and c.poste='entraineur' and coalesce(c.matchs,0)=0)
+          or (${filtre}='joueurEntraineur' and c.poste='entraineur' and coalesce(c.matchs,0)>0))
+        order by c.score desc,c.maj_le asc,c.id asc limit ${PAR_PAGE} offset ${decalage}
+      `],
       // v3 : la ligne porte un identifiant public — c'est lui qui permet
       // d'afficher deux lignes sous le même pseudo sans les confondre.
       ['v3', () => sql`
@@ -231,7 +244,7 @@ export async function GET(req?: Request): Promise<Response> {
         schema = nom;
         break;
       } catch (e) {
-        if ((e as { code?: string }).code !== '42703') throw e;
+        if ((e as { code?: string }).code !== '42703' && !(nom==='v4' && (e as {code?:string}).code==='42P01')) throw e;
         console.warn(`[classement] schéma antérieur à ${nom} : lecture repliée d'un cran`);
       }
     }
@@ -244,7 +257,13 @@ export async function GET(req?: Request): Promise<Response> {
     //    une catégorie qui tient sur une page.
     let total = lignes.length + decalage;
     try {
-      const [c] = schema === 'v1'
+      const [c] = schema === 'v4' ? await sql`
+        select count(*)::int as total from classement c
+        where coalesce((c.validation->>'visible')::boolean,true) and (
+          ${filtre}='total' or (${filtre}='joueur' and coalesce(c.poste,'')<>'entraineur')
+          or (${filtre}='entraineur' and c.poste='entraineur' and coalesce(c.matchs,0)=0)
+          or (${filtre}='joueurEntraineur' and c.poste='entraineur' and coalesce(c.matchs,0)>0))`
+        : schema === 'v1'
         ? await sql`select count(*)::int as total from classement`
         : await sql`
           select count(*)::int as total from classement
@@ -265,9 +284,18 @@ export async function GET(req?: Request): Promise<Response> {
     // page : deux tris différents donneraient deux rangs différents pour la
     // même ligne, et le joueur aurait raison de ne pas y croire.
     let moi: Record<string, unknown> | null = null;
-    if (schema === 'v3' && Number.isFinite(monId) && monId > 0) {
+    if ((schema === 'v4' || schema === 'v3') && Number.isFinite(monId) && monId > 0) {
       try {
-        const [ligne] = await sql`
+        const [ligne] = schema === 'v4' ? await sql`
+          select * from (select c.id,c.pseudo,c.score,c.maj_le,c.nom,c.poste,c.nation,c.age,c.saisons,
+            c.note,c.reputation,c.matchs,c.essais,c.selections,c.titres,c.clubs,c.validation,
+            row_number() over(order by c.score desc,c.maj_le asc,c.id asc) as rang
+            from classement c
+            where coalesce((c.validation->>'visible')::boolean,true) and (
+              ${filtre}='total' or (${filtre}='joueur' and coalesce(c.poste,'')<>'entraineur')
+              or (${filtre}='entraineur' and c.poste='entraineur' and coalesce(c.matchs,0)=0)
+              or (${filtre}='joueurEntraineur' and c.poste='entraineur' and coalesce(c.matchs,0)>0))) tout
+            where id=${monId}` : await sql`
           select * from (
             select id, pseudo, score, maj_le,
                    nom, poste, nation, age, saisons, note, reputation,
@@ -308,7 +336,7 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   // ---- 1. LE DÉBIT, AVANT TOUT LE RESTE ------------------------------------
-  let sql: ReturnType<typeof neon>;
+  let sql: ClientNeon;
   let appareil: string;
   let heure = 0;
   let jour = 0;
@@ -334,36 +362,50 @@ export async function POST(req: Request): Promise<Response> {
   // ---- 2. LA FICHE ---------------------------------------------------------
   let fiche: unknown;
   try {
-    fiche = await req.json();
+    const contenu = await req.text();
+    if (Buffer.byteLength(contenu)>24000) return reponse({ erreur:'Fiche trop volumineuse.' },413);
+    fiche = JSON.parse(contenu);
   } catch {
     return reponse({ erreur: 'JSON illisible' }, 400);
   }
 
-  const verdict = verifierFiche(fiche, IDS_TROPHEES);
-
-  // ⚠️ UN REFUS NE CONSOMME PAS LE QUOTA, et ce n'est pas une faiblesse. Le
-  // débit protège la table `classement` ; une fiche refusée n'y écrit rien, et
-  // `verifierFiche` est pure, publique et sans coût. La compter, en revanche,
-  // enfermait le joueur honnête : une première tentative refusée (une vieille
-  // sauvegarde, un trophée non reconnu) le bloquait UNE HEURE, avec pour seule
-  // explication « Trop d'envois ». On journalise le refus — c'est là qu'on voit
-  // arriver les scripts — mais on ne le facture pas.
-  if (!verdict.valide) {
-    console.warn('[classement] refus', appareil, verdict.anomalies.join(' | '));
-    return reponse({ erreur: 'Fiche refusée', anomalies: verdict.anomalies }, 422);
+  let verdict: EvaluationClassement = evaluerClassement(fiche, IDS_TROPHEES);
+  if (verdict.regles.some(r=>r.id==='cle_invalide')) return reponse({ok:false,validation:validationPublique(verdict),erreur:'Identité de ligne invalide.'},422);
+  const cle = verdict.fiche.cle ?? `v1d:${appareil.slice(0,32)}`;
+  let verificationEnregistree = false;
+  let careerId: string | undefined;
+  try {
+    let userId: string | null = null;
+    const jeton = /(?:^|;\s*)destiny_carriere=([^;]+)/.exec(req.headers.get('cookie') ?? '')?.[1];
+    if (jeton) {
+      const empreinte = createHash('sha256').update(jeton).digest('hex');
+      const [session] = await sql`select compte from sessions where empreinte=${empreinte} and expire_le>now()`;
+      userId = session?.compte ? String(session.compte) : null;
+    }
+    const resultat = await creerServiceValidation(stockageValidationNeon(sql)).synchroniser(cle,userId,fiche);
+    verdict = resultat.evaluation; careerId = resultat.dossier.careerId; verificationEnregistree = true;
+  } catch (e) {
+    if ((e as {code?:string}).code!=='42P01') {
+      console.error('[classement] vérification indisponible',{code:(e as {code?:string}).code});
+      return reponse({ok:false,erreur:'Vérification temporairement indisponible.',validation:{...validationPublique(verdict),statut:'PENDING_VALIDATION'}},503);
+    }
+    console.warn('[classement] tables de validation à installer');
   }
+  const retour = (corps: Record<string,unknown>, statut=200) => reponse({ ...corps, validation: validationPublique(verdict), careerId, verificationEnregistree },statut);
 
+  // Toute vérification écrit désormais un journal. Le débit couvre donc aussi les refus.
   try {
     await sql`insert into envois (appareil) values (${appareil})`;
   } catch (e) {
     console.error('[classement] journal', e);
   }
+  if (!verdict.visible) return retour({ok:true,score:verdict.score,anomalies:verdict.regles.map(r=>r.detail)});
 
   // ---- 3. L'ÉCRITURE : le score RECALCULÉ, et les faits affichables --------
   // ⚠️ TOUT VIENT DE `fiche`, MAIS RIEN N'EST CRU SUR PAROLE : `verifierFiche`
   // a déjà borné chaque champ (types, longueurs, cohérence interne) et refusé la
   // fiche sinon. Le score écrit est celui du serveur, jamais `fiche.score`.
-  const f = fiche as FicheCarriere;
+  const f = verdict.fiche;
   const pseudo = String(f.pseudo).trim().slice(0, 24);
 
   // ⚠️ LA LIGNE N'EST PLUS IDENTIFIÉE PAR LE PSEUDO, ET C'ÉTAIT UN VRAI BUG.
@@ -389,23 +431,20 @@ export async function POST(req: Request): Promise<Response> {
   // connu et acceptable : un très ancien client qui change de réseau crée une
   // nouvelle ligne, exactement comme lorsqu’on vide son navigateur — et il
   // repart avec une vraie clé dès qu’il recharge la page.
-  const cle = typeof f.cle === 'string' && f.cle.trim()
-    ? f.cle.trim().slice(0, 40)
-    : `v1d:${appareil.slice(0, 32)}`;
-
   try {
-    const ecrit = await sql`
+    const valeurs: unknown[] = [cle,pseudo,verdict.score,f.nom,f.poste,f.nation,f.age,f.saisons,f.note,f.reputation,
+      f.matchs,f.essais,f.selections,JSON.stringify(f.titres),JSON.stringify(f.clubs)];
+    if (verificationEnregistree) valeurs.push(JSON.stringify(validationPublique(verdict)));
+    const ecrit = await sql.query(`
       insert into classement (
         cle, pseudo, score, nom, poste, nation, age, saisons, note, reputation,
-        matchs, essais, selections, titres, clubs
+        matchs, essais, selections, titres, clubs${verificationEnregistree?', validation':''}
       ) values (
-        ${cle}, ${pseudo}, ${verdict.score}, ${f.nom}, ${f.poste}, ${f.nation}, ${f.age},
-        ${f.saisons}, ${f.note}, ${f.reputation}, ${f.matchs}, ${f.essais},
-        ${f.selections}, ${JSON.stringify(f.titres)}::jsonb, ${JSON.stringify(f.clubs)}::jsonb
+        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14::jsonb,$15::jsonb${verificationEnregistree?',$16::jsonb':''}
       )
       on conflict (cle) do update
         set score = greatest(classement.score, excluded.score), maj_le = now(),
-            pseudo = excluded.pseudo,
+            pseudo = excluded.pseudo${verificationEnregistree?', validation = excluded.validation':''},
             nom = excluded.nom, poste = excluded.poste, nation = excluded.nation,
             age = excluded.age, saisons = excluded.saisons, note = excluded.note,
             reputation = excluded.reputation, matchs = excluded.matchs,
@@ -424,7 +463,7 @@ export async function POST(req: Request): Promise<Response> {
         -- trophées reste vide à l'écran, définitivement.
         where excluded.score >= classement.score
       returning id
-    `;
+    `,valeurs);
     // ⚠️ UN « ON CONFLICT … WHERE » NE RENVOIE RIEN QUAND IL N'ÉCRIT PAS. Le
     // score n'a pas progressé, mais la ligne existe : on va chercher son
     // identifiant, sinon le joueur perdrait le surlignage de SA ligne pour la
@@ -434,13 +473,13 @@ export async function POST(req: Request): Promise<Response> {
       const [dejaLa] = await sql`select id from classement where cle = ${cle}`;
       id = Number((dejaLa as { id?: unknown })?.id ?? NaN);
     }
-    return reponse(Number.isFinite(id)
+    return retour(Number.isFinite(id)
       ? { ok: true, score: verdict.score, id }
       : { ok: true, score: verdict.score });
   } catch (e) {
     if ((e as { code?: string }).code !== '42703') {
       console.error('[classement] écriture', e);
-      return reponse({ erreur: 'Écriture impossible' }, 500);
+      return retour({ erreur: 'Écriture impossible' }, 500);
     }
     console.warn('[classement] schéma antérieur à v3 : écriture repliée sur le pseudo');
   }
@@ -494,17 +533,17 @@ export async function POST(req: Request): Promise<Response> {
             set score = greatest(classement.score, excluded.score), maj_le = now()
             where excluded.score > classement.score
         `;
-        return reponse({ ok: true, score: verdict.score });
+        return retour({ ok: true, score: verdict.score });
       } catch (e2) {
         console.error('[classement] écriture (repli v1)', e2);
       }
     } else {
       console.error('[classement] écriture', e);
     }
-    return reponse({ erreur: 'Écriture impossible' }, 500);
+    return retour({ erreur: 'Écriture impossible' }, 500);
   }
 
-  return reponse({ ok: true, score: verdict.score });
+  return retour({ ok: true, score: verdict.score });
 }
 
 // Vercel appelle une fonction `api/*.ts` via son export par défaut (req, res).

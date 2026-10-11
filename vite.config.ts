@@ -1,4 +1,4 @@
-import { defineConfig, type Plugin } from 'vite'
+import { defineConfig, loadEnv, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import { createRequire } from 'node:module'
 import { readFileSync } from 'node:fs'
@@ -49,6 +49,9 @@ function carriereEnDeveloppement(): Plugin {
     name: 'destiny-carriere-dev',
     apply: 'serve',
     configureServer(serveur) {
+      // Variables serveur privées : ne jamais les exposer sous VITE_ au navigateur.
+      const variables = loadEnv(serveur.config.mode,serveur.config.envDir,'APPLIXIR_');
+      for (const [nom,valeur] of Object.entries(variables)) process.env[nom] ??= valeur;
       serveur.middlewares.use('/api/carriere', (req, res, suite) => {
         void (async () => {
           try {

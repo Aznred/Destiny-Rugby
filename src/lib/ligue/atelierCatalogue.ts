@@ -23,6 +23,7 @@ export type ArticleLabo = Pick<import('../../data/boutique.js').ArticleEquipemen
   'id' | 'nom' | 'categorie' | 'emoji' | 'glb' | 'teinte' | 'prixDef' | 'rarete' | 'kit' | 'detail' | 'dispoDu' | 'dispoAu' | 'publie'>;
 
 export interface CatalogueAdmin {
+  publicites?: import('../publicitesRecompensees.js').ConfigPublicites;
   revision: number;
   clubs?: Record<string, import('../localisationClub.js').LocalisationClub>;
   rivalitesHistoriques?: import('../localisationClub.js').RivaliteHistorique[];

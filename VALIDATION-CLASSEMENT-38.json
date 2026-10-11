@@ -1,0 +1,61 @@
+{
+  "total": 1304,
+  "classeesActuellement": 1304,
+  "normalementEligibles": 1304,
+  "visiblesProposees": 1304,
+  "statutsProposes": {
+    "ELIGIBLE": 0,
+    "LIMITED": 0,
+    "PENDING_VALIDATION": 1304,
+    "REJECTED": 0
+  },
+  "causesValidationProposee": [
+    [
+      "donnees_manquantes",
+      1304
+    ],
+    [
+      "ancienne_version",
+      1304
+    ],
+    [
+      "score_a_resynchroniser",
+      205
+    ],
+    [
+      "duree_longue",
+      1
+    ]
+  ],
+  "fichesScoreSeulement": 80,
+  "source": "Audit des lignes déjà classées. Les refus anciens ne sont pas enregistrés. Les champs de version et âge initial absents du stockage empêchent de rejouer exactement le crible historique.",
+  "ancienneFicheIncomplete": true,
+  "collecteLe": "2026-10-11T11:19:30.062Z",
+  "limite": 20000,
+  "tronque": false,
+  "revalidees": 1304,
+  "bilanEnregistre": {
+    "total": 1304,
+    "normalementEligibles": 1304,
+    "visibles": 1304,
+    "rejetes": 0,
+    "causes": [
+      [
+        "donnees_manquantes",
+        1304
+      ],
+      [
+        "ancienne_version",
+        1304
+      ],
+      [
+        "score_a_resynchroniser",
+        205
+      ],
+      [
+        "duree_longue",
+        1
+      ]
+    ]
+  }
+}

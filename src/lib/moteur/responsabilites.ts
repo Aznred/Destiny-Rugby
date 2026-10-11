@@ -457,8 +457,13 @@ function humain(e: Pick<EtatMatch, 'pions' | 'direct'>): Pion | undefined {
 }
 
 /** Le joueur tient-il ce rôle, maintenant, pour son équipe ? (jamais vrai sans contrôle direct) */
-export function humainTientLe(e: Pick<EtatMatch, 'pions' | 'direct' | 'responsabilites'>, role: RoleEquipe, cote?: Cote): boolean {
+export function humainTientLe(e: Pick<EtatMatch, 'pions' | 'direct' | 'responsabilites' | 'controleEquipe'>, role: RoleEquipe, cote?: Cote): boolean {
   if (!e.responsabilites) return false;
+  const equipe=e.controleEquipe;
+  if (equipe?.actif && e.direct?.actif && (!cote || cote===equipe.cote)) {
+    if ((role==='lanceur'||role==='lanceur2') && equipe.reglages.touches==='auto') return false;
+    return !!pionDuRole(e,equipe.cote,role);
+  }
   const moi = humain(e);
   if (!moi || !disponible(moi) || (cote && moi.cote !== cote)) return false;
   return pionDuRole(e, moi.cote, role) === moi;

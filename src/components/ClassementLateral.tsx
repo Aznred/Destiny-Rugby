@@ -21,6 +21,7 @@ import {
   championnatEnDirect, estAmateur, journeesALaSemaine, nombreJournees, poulesDe,
 } from '../lib/championnat';
 import { phaseFinale } from '../lib/phaseFinale';
+import { tournoiDeFinDAnnee } from '../lib/tournoi';
 import { coupeEnDirect, coupesDuClubALaDate } from '../lib/coupe';
 import { PRESENTATION_STATUT, rulesFor, standingsStatuses, type StandingsStatus } from '../lib/competitionRules';
 import {
@@ -54,7 +55,7 @@ interface Vue {
   nations: boolean;
   moi: string;        // la ligne à surligner
   pied: { domicile: string; scoreD: number; scoreE: number; exterieur: string } | null;
-  phase: { libelle: string; domicile: string; scoreD: number; scoreE: number; exterieur: string }[];
+  phase: { libelle: string; domicile: string; scoreD: number | null; scoreE: number | null; exterieur: string }[];
 }
 
 export function ClassementLateral({ joueur }: { joueur: Joueur }) {
@@ -135,7 +136,8 @@ export function ClassementLateral({ joueur }: { joueur: Joueur }) {
     const total = nombreJournees(division, joueur.club);
     const jouees = journeesALaSemaine(division, numero, total);
     const champ = championnatEnDirect(division, saison, joueur.club, jouees, bonus);
-    const phase = jouees >= total ? phaseFinale(division, saison, joueur.club, bonus) : null;
+    const phase = jouees >= total ? tournoiDeFinDAnnee(division, saison, COMPETITIONS.find(c => c.id === division)?.nom ?? division, joueur.club, bonus)
+      ?? phaseFinale(division, saison, joueur.club, bonus) : null;
     const derniere = champ.journees[champ.journees.length - 1] ?? [];
     const notre = derniere.find((m) => m.domicile === joueur.club || m.exterieur === joueur.club);
     const competition = COMPETITIONS.find((c) => c.id === division);
@@ -150,7 +152,7 @@ export function ClassementLateral({ joueur }: { joueur: Joueur }) {
       moi: joueur.club,
       pied: notre ?? null,
       phase: (phase?.matchs ?? [])
-        .filter((m) => TOUR_TERMINE[m.tour] <= passees(numero, 'phaseFinale'))
+        .filter((m) => m.semaine <= numero || m.domicile === joueur.club || m.exterieur === joueur.club)
         .map((m) => ({
         libelle: m.libelle, domicile: m.domicile, scoreD: m.scoreD,
         scoreE: m.scoreE, exterieur: m.exterieur,
@@ -223,7 +225,7 @@ export function ClassementLateral({ joueur }: { joueur: Joueur }) {
               data-moi={m.domicile === vue.moi || m.exterieur === vue.moi ? 'oui' : undefined}
             >
               <span>{m.domicile}</span>
-              <b>{m.scoreD}-{m.scoreE}</b>
+              <b>{m.scoreD === null || m.scoreE === null ? t('tb.aVenir') : `${m.scoreD}-${m.scoreE}`}</b>
               <span>{m.exterieur}</span>
             </div>
           ))}

@@ -26,6 +26,7 @@ import { placerCombinaison } from './combinaisons.js';
 import { PHASES_ARRETEES, type EtatMatch, type SystemeDefensif } from './etat.js';
 import { defenseurPresent, iaParPoste } from './ia/lecture.js';
 import { deserteurDefensif } from './direct.js';
+import { organiserCellulesSolo } from './equipeSolo.js';
 import { coutDeLaPlace, profilDe, type PlaceAvant } from './ia/postes.js';
 import {
   AXE, LARGEUR, LONGUEUR, LIGNE_A, LIGNE_B, adverse, borner, coteOuvert, dansSes22, distance, distance2,
@@ -686,6 +687,7 @@ export function placerEquipes(e: EtatMatch): void {
   const deserteur = deserteurDefensif(e);
   if (deserteur) structurerDefense(e, defense.filter((p) => p !== deserteur), adverse(e.possession));
   placerCombinaison(e);
+  organiserCellulesSolo(e);
   if (rolesConquete) {
     for (const p of e.pions) {
       const role = rolesConquete.get(p.id);

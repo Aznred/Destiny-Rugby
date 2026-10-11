@@ -678,6 +678,9 @@ export interface PlanDeScore {
 }
 
 export interface EtatMatch {
+  cellulesSolo?: boolean;
+  organisationSolo?: import('./equipeSolo.js').OrganisationSolo;
+  controleEquipe?: import('./equipeSolo.js').ControleEquipe;
   /** Une indication discrète pour l'écran (Correctif 23) : « BALLON GRATTÉ », « TURNOVER »… Elle ne dit que ce que la scène montre déjà. */
   indicationJeu?: { cle: 'grattage' | 'turnover' | 'contreRuck' | 'touchePerdue' | 'melee'; cote: Cote; t: number };
   plansCombinaisons?: Partial<Record<Cote, import('../ligue/combinaisons.js').Combinaison[]>>;

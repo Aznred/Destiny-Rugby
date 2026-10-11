@@ -47,6 +47,10 @@ export function resultatJoue(cle: string): MatchChampionnat | undefined {
   return RESULTATS_JOUES.get(cle);
 }
 
+export function resultatsJouesDuTableau(prefixe: string): { cle: string; match: MatchChampionnat }[] {
+  return [...RESULTATS_JOUES].filter(([cle]) => cle.startsWith(prefixe + '#')).map(([cle, match]) => ({ cle, match: { ...match } }));
+}
+
 export function enregistrerResultatJoue(cle: string, match: MatchChampionnat): void {
   revisionResultats++;
   RESULTATS_JOUES.set(cle, { ...match });
@@ -119,21 +123,36 @@ export function typesJoues(divisionId: string): TypeSemaine[] {
 }
 
 // Cette semaine du calendrier est-elle une journée pour cette division ?
+const datesPlayoffs = new Map<string, { clubs: string[]; semaine: number }>();
+/** Réserve un samedi par tour avant la finale, sans supprimer de journée régulière. */
+export function debutPlayoffsDivision(divisionId: string): number {
+  const barrage = CALENDRIER.find(s => s.tourFinal === 'barrage')!.numero;
+  if (!estAmateur(divisionId)) return barrage;
+  const clubs = clubsDeDivision(divisionId);
+  const connu = datesPlayoffs.get(divisionId);
+  if (connu?.clubs === clubs) return connu.semaine;
+  const poules = poulesDe(divisionId);
+  let taille = 2;
+  const candidats = poules.reduce((n, p) => n + Math.min(2, p.length), 0);
+  while (taille * 2 <= candidats && taille < 64) taille *= 2;
+  const semaine = poules.length <= 1 ? barrage : CALENDRIER.find(s => s.tourFinal === 'finale')!.numero - Math.log2(taille) + 1;
+  datesPlayoffs.set(divisionId, { clubs, semaine });
+  return semaine;
+}
+
 export function estJourneeDe(divisionId: string, sem: Semaine): boolean {
-  return typesJoues(divisionId).includes(sem.type);
+  return typesJoues(divisionId).includes(sem.type) && sem.numero < debutPlayoffsDivision(divisionId);
 }
 
 // Combien de journées se sont jouées AVANT cette semaine, dans cette division.
 export function weekEndsJoues(divisionId: string, numeroSemaine: number): number {
-  const types = typesJoues(divisionId);
   return CALENDRIER.slice(0, Math.max(0, numeroSemaine - 1))
-    .filter((s) => types.includes(s.type)).length;
+    .filter((s) => estJourneeDe(divisionId, s)).length;
 }
 
 // Combien de week-ends de jeu la saison compte-t-elle pour cette division.
 export function totalWeekEnds(divisionId: string): number {
-  const types = typesJoues(divisionId);
-  return CALENDRIER.filter((s) => types.includes(s.type)).length;
+  return CALENDRIER.filter((s) => estJourneeDe(divisionId, s)).length;
 }
 
 function distanceEntreClubs(a: string, b: string): number {

@@ -3932,6 +3932,13 @@
   padding-bottom: 0.4rem;
 }
 .arbre-tour { display: flex; flex-direction: column; min-width: 0; }
+.arbre-tour.verrouille { opacity: 0.55; }
+.arbre-match.a-venir { color: var(--craie-dim); }
+.arbre-tour.verrouille > p { margin: 0.3rem 0; font-size: 0.82rem; color: var(--craie-dim); }
+.proposition-contrat { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.7rem; padding: 1rem; margin: 0.8rem 0; border: 1px solid var(--bordure); border-radius: var(--rayon-sm); }
+.proposition-contrat label { display: grid; gap: 0.35rem; font-size: 0.8rem; min-width: 0; }
+.proposition-contrat input { width: 100%; min-width: 0; box-sizing: border-box; }
+.proposition-contrat > button { align-self: end; }
 .arbre-titre {
   font-family: var(--police-forte);
   font-weight: 700;

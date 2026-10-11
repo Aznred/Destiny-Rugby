@@ -45,9 +45,9 @@ const MODELES_FEMININS: Readonly<Record<string, string>> = {
   'women s all ireland league 1a': 'f-ail', 'women s all ireland league 1b': 'f-ail',
 };
 const modeleFeminin = (id: string) => MODELES_FEMININS[id.replace(/^womens:/, '')];
-const MODELES_PRIVES: Readonly<Record<string, string>> = { 'prive-kiri-icons': '/m3d/packs-speciaux/icon.glb' };
+const MODELES_PRIVES: Readonly<Record<string, string>> = { 'prive-kiri-icons': '/m3d/packs-speciaux/icon.glb', 'pub-mythique': '/m3d/packs/star-ferme.glb' };
 /** La boutique et le serveur appliquent la même liste, y compris aux anciens packs personnalisés. */
-export const packPropose = (pack: Pick<PackCarriere, 'id' | 'evenement'>) => ['bronze', 'standard', 'or', 'elite'].includes(pack.id) || packAvecSkin(pack);
+export const packPropose = (pack: Pick<PackCarriere, 'id' | 'evenement'>) => !pack.id.startsWith('pub-') && (['bronze', 'standard', 'or', 'elite'].includes(pack.id) || packAvecSkin(pack));
 export const evolutionEliteFrancaise = (pack: Pick<PackCarriere, 'id'>) => pack.id === 'womens:elite 1 feminine';
 export const modeleElite1 = '/m3d/packs-speciaux/f-elite1.glb';
 /**
@@ -67,4 +67,10 @@ export const packAvecSkin = (pack: string | Pick<PackCarriere, 'id' | 'evenement
 export function modelePackParNom(pack: PackCarriere): string {
   return modeleEvenement(pack) ?? MODELES_PRIVES[pack.id] ?? (modeleFeminin(pack.id) ? `/m3d/packs-speciaux/${modeleFeminin(pack.id)}.glb`
     : idsAvecSkin.has(pack.id) ? `/m3d/packs-speciaux/${pack.id}.glb` : modelePack(apparencePack(pack)));
+}
+
+/** Aperçu rendu hors ligne depuis le GLB : mêmes textures, poids réduit pour la roulette. */
+export function vignettePackPublicitaire(pack: PackCarriere): string {
+  const fichier=modelePackParNom(pack).split('/').at(-1)!.replace('.glb','').replace('-ferme','');
+  return '/images/packs-roulette/'+fichier+'.webp';
 }

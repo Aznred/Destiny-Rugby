@@ -4,6 +4,11 @@ import { chargerBoutiqueCompte, ErreurCarriere, modifierBoutiqueCompte, sauvegar
 
 let collectionDistante = false;
 let avantActionDistante: (() => Promise<void>) | undefined;
+let recevoirOvasDistants: ((ovas: number, achats: number) => void) | undefined;
+/** Le compteur des crédits serveur assure une réception unique, même entre deux onglets. */
+export function recevoirOvasPublicitaires(ovas: number, achats: number): void {
+  recevoirOvasDistants?.(ovas,achats);
+}
 /** Enregistre les packs locaux en attente avant qu'un pack serveur avance la révision. */
 export async function attendreBoutiqueSoloEnregistree(): Promise<void> {
   if (!avantActionDistante) throw new Error('La synchronisation du compte est indisponible.');
@@ -161,6 +166,13 @@ export function activerSynchronisationBoutiqueCompte(): () => void {
     }
   };
   avantActionDistante = avantAction;
+  const recevoirOvas = (_ovas: number, achats: number) => {
+    const s = useGame.getState(), ajout = Math.max(0,achats - (s.achatsOvas ?? 0));
+    if (!ajout) return;
+    if (confirmee) { confirmee = { ...confirmee, ovas: confirmee.ovas + ajout, achatsOvas: achats }; derniere = empreinte(confirmee); }
+    useGame.setState({ coins: s.coins + ajout, achatsOvas: achats });
+  };
+  recevoirOvasDistants = recevoirOvas;
 
   const desabonner = useGame.subscribe((etatStore, precedent) => {
     if (!actif || !compteConnecte) return;
@@ -196,6 +208,7 @@ export function activerSynchronisationBoutiqueCompte(): () => void {
   lectureInitiale = synchroniser();
   return () => {
     if (avantActionDistante === avantAction) avantActionDistante = undefined;
+    if (recevoirOvasDistants === recevoirOvas) recevoirOvasDistants = undefined;
     actif = false; generation++;
     clearTimeout(minuterie);
     attente = null;

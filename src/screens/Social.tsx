@@ -46,6 +46,8 @@ import { nomPoste } from '../data/rugby';
 import { coutPremiereSaison, joueurDejaRecrute, salairesEffectif, situationSalariale } from '../lib/recrutementManager';
 import { valeurDeVente } from '../lib/vestiaireManager';
 import { effectifDuClub } from '../lib/effectif';
+import { Selecteur } from '../components/Selecteur';
+import type { NegociationManager } from '../types';
 
 // ⚠️ L'HEURE DU JEU, PAS CELLE DE L'ORDINATEUR (retour de jeu : « dans les
 // messages, fais que la date et l'heure soient celles du calendrier in-game »).
@@ -1184,6 +1186,19 @@ function Messages({ ouvrirSur, onProfil }: { ouvrirSur: string | null; onProfil:
 }
 
 // --- Bureau de recrutement du manager, dans L'Ovale ------------------------
+function PropositionContrat({ nego }: { nego: NegociationManager }) {
+  const proposer = useGame(s => s.negocierJoueurManager);
+  const [offre, setOffre] = useState({ ...nego.offre });
+  return <form className="proposition-contrat" onSubmit={e => { e.preventDefault(); proposer(nego.id, 'salaire', offre); }}>
+    <label>{t('mgr.salaire')}<input type="number" min="0" step="100" required value={offre.salaire} onChange={e => setOffre({ ...offre, salaire: Number(e.target.value) })} /></label>
+    <label>{t('mgr.x.duree')}<input type="number" min="1" max="5" required value={offre.duree} onChange={e => setOffre({ ...offre, duree: Number(e.target.value) })} /></label>
+    <label>{t('mgr.x.prime')}<input type="number" min="0" step="100" required value={offre.prime} onChange={e => setOffre({ ...offre, prime: Number(e.target.value) })} /></label>
+    <label>{t('staff.contract.matchBonus')}<input type="number" min="0" step="5" required value={offre.primeMatch ?? 0} onChange={e => setOffre({ ...offre, primeMatch: Number(e.target.value) })} /></label>
+    <label>{t('mgr.x.role')}<Selecteur valeur={offre.role} options={(['espoir', 'rotation', 'cadre'] as const).map(role => ({ valeur: role, label: t(`mgr.role.${role}`) }))} onChange={role => setOffre({ ...offre, role: role as typeof offre.role })} /></label>
+    <button type="submit" className="x-nego-oui">{t('staff.contract.proposal')}</button>
+  </form>;
+}
+
 function NegociationRecrueManager({ pseudo }: { pseudo: string }) {
   const manager = useGame((s) => s.manager)!;
   const negocier = useGame((s) => s.negocierJoueurManager);
@@ -1230,6 +1245,8 @@ function NegociationRecrueManager({ pseudo }: { pseudo: string }) {
         })}
       </p>}
       <div className="nego-contexte-reel">
+        {interne && <p>{t('staff.contract.demands', { salaire: nombre(nego.exigences.salaire), duree: nego.exigences.duree, role: t(`mgr.role.${nego.exigences.role}`) })}</p>}
+        {nego.refusProlongation && <p role="status">{t(`staff.contract.refusal.${nego.refusProlongation}`)}</p>}
         <p><b>{t("ui.67c4e82c984a")}</b> {(nego.motivations ?? []).map((m) => `${m.type} ${m.importance}`).join(' · ') || t("ui.dbe644c3d8a1")}</p>
         <p><b>{t("ui.b1886a0146d8")}</b> {nego.interet ?? 50}/100 · <b>{t("ui.8484c31e4fa7")}</b> {nego.offresConcurrentes?.length ? nego.offresConcurrentes.map((o) => `${o.club} (${o.niveau})`).join(', ') : t("ui.544cb541d338")}</p>
         {nego.examenMedical && <p className={`examen-${nego.examenMedical.risque}`}><b>{t("ui.e777caa1a109")}</b>{t("ui.6ec49efc159e", { v0: nego.examenMedical.risque, v1: nego.examenMedical.reserve })}</p>}
@@ -1237,6 +1254,7 @@ function NegociationRecrueManager({ pseudo }: { pseudo: string }) {
 
       {nego.etat === 'ouverte' && (
         <>
+          {interne && <PropositionContrat key={`${nego.id}-${nego.historique?.length ?? 0}`} nego={nego} />}
           <div className="x-nego-leviers">
             <button onClick={() => negocier(nego.id, 'salaire')}>{t('mgr.x.augmenterSalaire')}</button>
             <button onClick={() => negocier(nego.id, 'prime')}>{t('mgr.x.augmenterPrime')}</button>
@@ -1263,7 +1281,7 @@ function NegociationRecrueManager({ pseudo }: { pseudo: string }) {
           <button className="x-nego-non" onClick={() => rompre(nego.id)}>{t('mgr.x.arreter')}</button>
         </div>
       )}
-      {nego.etat === 'signee' && <div className="x-nego-accord"><Icone d={I_OK} /> <b>{t('mgr.x.transfertFinalise')}</b></div>}
+      {nego.etat === 'signee' && <div className="x-nego-accord"><Icone d={I_OK} /> <b>{interne ? t('staff.contract.signed') : t('mgr.x.transfertFinalise')}</b></div>}
       {nego.etat === 'rompue' && <div className="x-nego-accord"><b>{t('mgr.x.discussionClose')}</b></div>}
     </div>
   );

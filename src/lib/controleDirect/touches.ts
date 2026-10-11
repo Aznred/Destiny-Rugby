@@ -19,7 +19,8 @@ import { t } from '../i18n';
 export type ActionClavier =
   | 'haut' | 'bas' | 'gauche' | 'droite' | 'sprint'
   | 'passeGauche' | 'passeDroite' | 'coupDePied' | 'raffut' | 'crochet'
-  | 'action' | 'appel' | 'gratter' | 'aide' | 'pause' | 'drop' | 'camGauche' | 'camDroite';
+  | 'action' | 'appel' | 'gratter' | 'aide' | 'pause' | 'drop' | 'camGauche' | 'camDroite' | 'changerJoueur'
+  | 'ordreEquipe' | 'typePied' | 'contreRuck';
 
 export interface DefinitionTouche {
   id: ActionClavier;
@@ -31,6 +32,10 @@ export interface DefinitionTouche {
 }
 
 export const DEFINITIONS_TOUCHES: DefinitionTouche[] = [
+  { id:'changerJoueur', cle:'ce.changer', aide:'ce.changerAide', groupe:'jeu' },
+  { id:'contreRuck', cle:'ce.contreRuck', aide:'ce.contreRuck', groupe:'sansBallon' },
+  {id:'ordreEquipe',cle:'ce.consigne',aide:'ce.consigne',groupe:'jeu'},
+  {id:'typePied',cle:'ce.pied',aide:'ce.pied',groupe:'ballon'},
   { id: 'haut', cle: 'cd.touche.haut', aide: 'cd.touche.haut.aide', groupe: 'deplacement' },
   { id: 'bas', cle: 'cd.touche.bas', aide: 'cd.touche.bas.aide', groupe: 'deplacement' },
   { id: 'gauche', cle: 'cd.touche.gauche', aide: 'cd.touche.gauche.aide', groupe: 'deplacement' },
@@ -54,6 +59,9 @@ export const DEFINITIONS_TOUCHES: DefinitionTouche[] = [
 export type TouchesDirectes = Record<ActionClavier, string[]>;
 
 export const TOUCHES_PAR_DEFAUT: Readonly<TouchesDirectes> = {
+  changerJoueur: ['Tab'],
+  contreRuck:['KeyN'],
+  ordreEquipe:['KeyB'],typePied:['KeyK'],
   haut: ['KeyW', 'ArrowUp'],
   bas: ['KeyS', 'ArrowDown'],
   gauche: ['KeyA', 'ArrowLeft'],

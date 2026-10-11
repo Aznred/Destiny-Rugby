@@ -17,6 +17,8 @@
 
 import type { EtatMatch } from '../moteur/etat';
 import type { Pion } from '../moteur/entites';
+import { actualiserSelectionEquipe, changerJoueurEquipe, choisirOptionNeuf, donnerOrdreEquipe, cibleOptionNeuf, type OptionNeuf, type OrdreEquipe } from '../moteur/equipeSolo';
+import { optionNeufClavier, optionNeufManette } from './sortiesNeuf';
 import {
   activerDirect, choisirReceveur, classerCoupDePied, commanderDirect, demanderDirect, poserViseur,
   type ActionDirecte, type VueDirecte,
@@ -50,6 +52,14 @@ export function famillePoste(p: Pion): FamillePoste {
 
 /** Ce que veut le joueur, quel que soit l'appareil. `cote` : −1 la gauche de l'écran, +1 la droite. */
 export type Intention =
+  | { type:'changerJoueur' }
+  | { type:'optionNeuf'; option:OptionNeuf }
+  | { type:'ordreEquipe'; ordre:OrdreEquipe }
+  | { type:'ordreSuivant' }
+  | { type:'typePied' }
+  | { type:'contreRuck' }
+  | { type:'plaquageOffensif' }
+  | { type:'piedPrecis'; intention: 'rasant' | 'parDessus' | 'chandelle' | 'transversale' | 'degagement' }
   | { type: 'passe'; cote: -1 | 1; longue: boolean }
   /** Coup de pied : `x, y` dans le repère de l'écran (x à droite, y vers le haut), `puissance` de 0 à 1. */
   | { type: 'pied'; auto: boolean; x: number; y: number; puissance: number; vif: number }
@@ -76,6 +86,7 @@ export interface EntreeTactile {
 }
 
 export interface SnapPilotage {
+  equipe: { numero:number; nom:string; sortie:boolean; options:OptionNeuf[]; ordre?:OrdreEquipe; pied?: 'rasant' | 'parDessus' | 'chandelle' | 'transversale' | 'degagement' } | null;
   phase: PhasePilotage;
   /** Le HUD est à l'écran. */
   visible: boolean;
@@ -230,6 +241,7 @@ export interface ContexteImage {
 }
 
 export class PilotageDirect {
+  private dernierPionEquipe?: string;
   phase: PhasePilotage = 'attente';
   appareil: Appareil = 'clavier';
   tactile: EntreeTactile = { stick: { x: 0, y: 0 }, sprint: false, pied: null, file: [], actif: 0 };
@@ -258,6 +270,7 @@ export class PilotageDirect {
   private pied: { source: Appareil; depuis: number } | null = null;
   private kickVise: { puissance: number } | null = null;
   private veutDernier = false;
+  private piedChoisi: 'rasant' | 'parDessus' | 'chandelle' | 'transversale' | 'degagement' | undefined;
   private sprintActuel = false;
   private visee: { x: number; y: number; puissance: number } | null = null;
   private rappels: RappelsPilotage;
@@ -329,12 +342,15 @@ export class PilotageDirect {
   // ───────────────────────────────────────────────────────────────────────────
   surImage(e: EtatMatch, scene: Scene3D | null, dt: number, ctx: ContexteImage): void {
     const prefs = lirePreferencesControle();
-    const moi = ctx.moi;
+    const moi = e.controleEquipe?.actif && ctx.moi ? actualiserSelectionEquipe(e) ?? ctx.moi : ctx.moi;
+    if(e.controleEquipe && moi && moi.id!==this.dernierPionEquipe) {
+      this.dernierPionEquipe=moi.id; this.passes.clear(); this.pied=null;
+    }
     this.clavier.action = (code) => actionDeLaTouche(prefs.touches, code);
     this.manette = this.lecteur.lire();
     this.pause = ctx.pause;
 
-    const veut = prefs.mode === 'direct' && !!scene && !!moi && !e.fini && !ctx.avantMatch;
+    const veut = (e.controleEquipe?.actif || prefs.mode === 'direct') && !!scene && !!moi && !e.fini && !ctx.avantMatch;
     this.veutDernier = veut;
     if (!veut) {
       if (this.phase !== 'attente') this.sortir(e, scene, ctx);
@@ -351,7 +367,7 @@ export class PilotageDirect {
           this.tEntree = 0;
           this.rappels.surPrise();
           this.cameraAuto = ctx.cameraChoisie === 'tv';
-          if (this.cameraAuto) this.rappels.surCamera('joueur');
+          if (this.cameraAuto) this.rappels.surCamera(e.controleEquipe ? 'equipe' : 'joueur');
         }
         break;
       case 'entree':
@@ -361,7 +377,7 @@ export class PilotageDirect {
         if (this.tEntree >= DUREE_ENTREE) {
           this.phase = 'actif';
           activerDirect(e, true);
-          if (!prefs.tutorielVu && !this.tuto && !tutorielsDesactives()) this.tuto = new TutorielDirect(prefs.tutoSection);
+          if (!e.controleEquipe && !prefs.tutorielVu && !this.tuto && !tutorielsDesactives()) this.tuto = new TutorielDirect(prefs.tutoSection);
           if (!this.ctx && !tutorielsDesactives()) this.ctx = new ExplicationsContextuelles(prefs.tutosContext, (vus) => ecrirePreferencesControle({ tutosContext: vus }));
         }
         break;
@@ -377,6 +393,7 @@ export class PilotageDirect {
       scene.reperes = null;
     }
     this.emettre(e, moi, prefs.aidePlacement, dt);
+    if (e.controleEquipe) scene.moi=e.controleEquipe.selectionId;
   }
 
   private sortir(e: EtatMatch, scene: Scene3D | null, ctx: ContexteImage): void {
@@ -489,12 +506,13 @@ export class PilotageDirect {
 
     const mx = rep.avant.x * sy + rep.droite.x * sx;
     const my = rep.avant.y * sy + rep.droite.y * sx;
-    commanderDirect(e, vue.libre ? mx : 0, vue.libre ? my : 0, vue.libre && sprint);
+    const combinaisonNeuf=!!e.controleEquipe?.sortie && (cl.est('action',t)||ma.boutons[6]);
+    commanderDirect(e, vue.libre && !combinaisonNeuf ? mx : 0, vue.libre && !combinaisonNeuf ? my : 0, vue.libre && !combinaisonNeuf && sprint);
     this.sprintActuel = vue.libre && sprint;
 
     // ── Les intentions de l'image ───────────────────────────────────────────
     const intentions: Intention[] = [];
-    this.intentionsClavier(intentions, t, maintenant, sx, sy);
+    this.intentionsClavier(intentions, t, maintenant, sx, sy, !!e.controleEquipe?.sortie);
     this.intentionsManette(intentions, ma, maintenant, sx, sy, rep, e, moi);
     for (const i of tac.file.splice(0)) intentions.push(i);
 
@@ -536,11 +554,16 @@ export class PilotageDirect {
 
   private vers(rep: ReturnType<Scene3D['reperesCamera']>, cote: number) { return produit(rep.droite, cote); }
 
-  private intentionsClavier(sortie: Intention[], t: ReturnType<typeof lirePreferencesControle>['touches'], maintenant: number, sx: number, sy: number): void {
+  private intentionsClavier(sortie: Intention[], t: ReturnType<typeof lirePreferencesControle>['touches'], maintenant: number, sx: number, sy: number, neuf=false): void {
     const cl = this.clavier;
     const fronts = cl.fronts.splice(0), relaches = cl.relaches.splice(0);
     const action = (code: string) => actionDeLaTouche(t, code);
     for (const code of fronts) {
+      if(neuf) {
+        const option=optionNeufClavier(action(code),cl.est('action',t));
+        if(option) { sortie.push({type:'optionNeuf',option}); this.passes.delete(`c:${code}`); continue; }
+        if(action(code)==='action') { this.passes.clear(); this.pied=null; continue; }
+      }
       switch (action(code)) {
         case 'passeGauche': this.passes.set(`c:${code}`, { debut: maintenant, long: false }); break;
         case 'passeDroite': this.passes.set(`c:${code}`, { debut: maintenant, long: false }); break;
@@ -553,6 +576,10 @@ export class PilotageDirect {
         case 'gratter': sortie.push({ type: 'gratter' }); break;
         case 'aide': sortie.push({ type: 'aide' }); break;
         case 'pause': sortie.push({ type: 'pause' }); break;
+        case 'changerJoueur': sortie.push({type:'changerJoueur'}); break;
+        case 'contreRuck': sortie.push({type:'contreRuck'}); break;
+        case 'ordreEquipe': sortie.push({type:'ordreSuivant'}); break;
+        case 'typePied': sortie.push({type:'typePied'}); break;
         default: break;
       }
     }
@@ -586,11 +613,22 @@ export class PilotageDirect {
 
   private intentionsManette(sortie: Intention[], ma: EtatManette, maintenant: number, sx: number, sy: number, rep: ReturnType<Scene3D['reperesCamera']>, e: EtatMatch, moi: Pion): void {
     if (!ma.connectee) return;
+    if(e.controleEquipe?.sortie && ma.boutons[6]) {
+      const option=optionNeufManette(ma.fronts,ma.boutons);
+      if(option) sortie.push({type:'optionNeuf',option});
+      this.passes.clear(); this.pied=null;
+      if(ma.fronts.includes(INDEX_BOUTON.start))sortie.push({type:'pause'});
+      return;
+    }
     const vue = e.direct!.vue;
     const cote = (b: number) => b; void cote;
     // Côté « principal » de A : celui où le stick pousse, sinon le côté ouvert du jeu (traduit en gauche/droite d'écran).
     const coteA: -1 | 1 = Math.abs(sx) > 0.35 ? (sx > 0 ? 1 : -1) : coteEcranDuOuvert(rep, e.ouvert);
     for (const b of ma.fronts) {
+      if (e.controleEquipe && b===10) { sortie.push({type:'changerJoueur'}); continue; }
+      if (e.controleEquipe && b===8) { sortie.push({type:'ordreSuivant'}); continue; }
+      if (e.controleEquipe && b===11) { sortie.push({type:'typePied'}); continue; }
+      if (e.controleEquipe && b===INDEX_BOUTON.x && ma.boutons[6] && e.phase==='ruck') { sortie.push({type:'contreRuck'}); continue; }
       if (b === INDEX_BOUTON.a) {
         if (vue.porte) this.passes.set('m:a', { debut: maintenant, long: false }); else sortie.push({ type: 'action' });
       } else if (b === INDEX_BOUTON.x) {
@@ -680,6 +718,22 @@ export class PilotageDirect {
       return { x: vx / n, y: vy / n };
     };
     switch (i.type) {
+      case 'contreRuck': demanderDirect(e,{action:'contreRuck'}); return;
+      case 'plaquageOffensif': demanderDirect(e,{action:'plaquage',offensif:true}); return;
+      case 'ordreSuivant': {
+        if (!e.controleEquipe) return;
+        const ordres:OrdreEquipe[]=['large','serre','cellules','pick','pied','occupation','rapide','lent'];
+        donnerOrdreEquipe(e,ordres[(ordres.indexOf(e.controleEquipe.ordre!)+1)%ordres.length]); return;
+      }
+      case 'typePied': {
+        if (!e.controleEquipe) return;
+        const types = ['rasant','parDessus','chandelle','transversale','degagement'] as const;
+        this.piedChoisi=types[(types.indexOf(this.piedChoisi!)+1)%types.length]; return;
+      }
+      case 'changerJoueur': changerJoueurEquipe(e,{x:rep.avant.x*sy+rep.droite.x*sx,y:rep.avant.y*sy+rep.droite.y*sx}); return;
+      case 'optionNeuf': choisirOptionNeuf(e,i.option); return;
+      case 'ordreEquipe': donnerOrdreEquipe(e,i.ordre); return;
+      case 'piedPrecis': demanderDirect(e,{action:'coupDePied',intentionPied:i.intention}); return;
       case 'pause': this.rappels.surPause(); return;
       case 'aide': ecrirePreferencesControle({ aidePlacement: !lirePreferencesControle().aidePlacement }); return;
       default: break;
@@ -707,14 +761,14 @@ export class PilotageDirect {
         demanderDirect(e, { action: 'passe', vers: this.vers(rep, i.cote), longue: i.longue });
         break;
       case 'pied': {
-        if (i.auto) demanderDirect(e, { action: 'coupDePied', auto: true });
+        if (i.auto) demanderDirect(e, { action: 'coupDePied', auto: true, intentionPied:e.controleEquipe?this.piedChoisi:undefined });
         else {
           const v = aEcran(i.x, i.y);
-          demanderDirect(e, { action: 'coupDePied', visee: { x: v.x, y: v.y, puissance: i.puissance, vif: i.vif } });
+          demanderDirect(e, { action: 'coupDePied', intentionPied:e.controleEquipe?this.piedChoisi:undefined, visee: { x: v.x, y: v.y, puissance: i.puissance, vif: i.vif } });
         }
         break;
       }
-      case 'raffut': demanderDirect(e, { action: 'raffut' }); break;
+      case 'raffut': demanderDirect(e, { action: e.controleEquipe && !vue.porte ? 'plaquage':'raffut',offensif:!vue.porte }); break;
       case 'crochet': {
         const cote = i.cote !== 0 ? i.cote : Math.abs(sx) > 0.35 ? (sx > 0 ? 1 : -1) : 0;
         demanderDirect(e, cote ? { action: 'crochet', vers: this.vers(rep, cote) } : { action: 'crochet' });
@@ -737,7 +791,7 @@ export class PilotageDirect {
       case 'gratter': demanderDirect(e, { action: vue.possible.grattage ? 'grattage' : vue.possible.engager ? 'engager' : 'grattage' }); break;
       case 'action': {
         const a = this.actionPrincipale(vue);
-        if (a) demanderDirect(e, { action: a });
+        if (a) demanderDirect(e, { action: a,offensif:!!e.controleEquipe && e.direct!.commande.sprint });
         break;
       }
     }
@@ -808,6 +862,8 @@ export class PilotageDirect {
     const d = e?.direct;
     const v = d?.vue;
     return {
+      equipe: e?.controleEquipe && moi ? {numero:moi.numero,nom:moi.nom,sortie:!!e.controleEquipe.sortie,
+        options:(['dix','gauche','droite','pick','box','depart'] as OptionNeuf[]).filter(o=>o==='box'||o==='depart'||!!cibleOptionNeuf(e,o)),ordre:e.controleEquipe.ordre,pied:this.piedChoisi} : null,
       phase: this.phase,
       visible: this.phase === 'actif' || (this.phase === 'entree' && this.tEntree > 0.7),
       appareil: this.appareil,
@@ -819,7 +875,7 @@ export class PilotageDirect {
       endurance: Math.round(moi?.endurance ?? 100),
       reserve: moi?.deuxReserves ? { valeur: Math.round(moi.sprint), max: Math.round(moi.sprintMax), essouffle: !!moi.essoufle } : null,
       famille: moi ? famillePoste(moi) : 'ailier',
-      possible: v?.possible ?? { passe: false, coupDePied: false, raffut: false, crochet: false, plaquage: false, grattage: false, appel: false, feinte: false, engager: false, drop: false, pousser: false, quitter: false },
+      possible: v?.possible ?? { passe: false, coupDePied: false, raffut: false, crochet: false, plaquage: false, grattage: false, appel: false, feinte: false, engager: false, drop: false, pousser: false, quitter: false,contreRuck:false },
       contactImminent: !!v?.contactImminent,
       horsJeu: !!v?.horsJeu,
       horsPoste: !!v?.horsPoste,

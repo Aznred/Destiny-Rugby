@@ -1,5 +1,29 @@
 # Destiny Rugby 🏉
 
+- **Correctif 37 — matchs jouables en Carrière Entraîneur** : choix Jouer / Regarder avant le match, contrôle de tout
+  le XV avec sélection automatique ou manuelle, caméra équipe et réglages Mêlées Manuel/Auto, Touches Manuel/Auto,
+  Rucks Manuel/Assisté. Le coach conserve sa carrière et les responsabilités passent aux vrais joueurs du XV.
+  Deux cellules de deux à trois avants se préparent autour des rucks, courent avant la passe et gardent des soutiens
+  en retrait. Les cellules raccourcissent dans les dix mètres ; le pick and go passe par un ramassage distinct.
+  Sorties du 9 : maintenir la touche Action (Espace par défaut) + A/E sur AZERTY (Q/E sur QWERTY) pour les cellules, déplacement haut/bas pour
+  le 10/pick, V pour le box kick, F pour partir. Les combinaisons suivent les touches remappées.
+  Manette : LT/L2 + X/Carré, B/Rond, Y/Triangle, A/Croix, RB/R1 ou RT/R2. Mobile : balayer la partie droite du terrain,
+  gauche/droite pour les cellules, haut pour le 10, bas pour le pick, diagonale haut gauche pour le pied, haut droite
+  pour le départ. Le repère contextuel est une légende, sans six boutons de sortie.
+  Huit consignes rapides influencent le placement et le tempo. Les rôles, gestes et QTE du contrôle direct sont réutilisés.
+  Les matchs en ligne n'activent aucun état collectif solo. Contrôle : `npm run verify:correctif37` ; aperçu local
+  `/scripts/apercuCorrectif37.html?situation=ruck` (ajouter `&tactile=1` pour le HUD tactile sur un ordinateur).
+
+- **Correctif 36 — playoffs et prolongations** : tableaux progressifs de 4 à 64 clubs, sans scores anticipés ni
+  tours sautés. Chaque tour a sa date et attend tous ses vrais résultats ; les tours suivants restent grisés.
+  Les anciennes carrières sont réparées au chargement en conservant les résultats réellement joués.
+  Le script `npm run repair:correctif36 -- chemin/sauvegarde.json` crée une copie et un rapport sans écraser l'original.
+  En Carrière Entraîneur, Marché mondial → Contrats à renouveler permet de proposer durée, salaire, rôle et primes
+  dans L'Ovale. Les joueurs peuvent accepter, négocier ou refuser ; un contrat expiré entraîne un départ libre effectif.
+  Contrôles : `npm run verify:correctif36`, `npm run verify:tournoi-final`, `npm run verify:saison-manager`.
+  Aperçu local : `/scripts/apercuCorrectif36.html`.
+  Résultats des essais et limites : [validation des correctifs 36 et 37](VALIDATION-CORRECTIFS-36-37.md).
+
 - **Packs et trophées féminins** : nouvelles pochettes et trophées 3D, Springboks, Spécial et ICON ; retrait des packs
   sans texture dédiée sauf Bronze, Argent, Or et Élite garantie. Ouverture jusqu’à ICON ; pack français Élite 2 →
   Élite 1 selon les joueuses tirées. Octobre Rose en solo : 150 Ovas, dix cartes dont une garantie, pendant octobre.
@@ -2047,3 +2071,20 @@ place dans Safari est déduit du code de son moteur, pas mesuré. Mesuré mais p
 ## Intégration FFR 2026_10_FFR_FULL
 
 Base privée de 470 742 profils, retrait des identités jeunesse, agrégats de formation et bêta féminine réservée au compte Kiri par autorisation serveur. Voir [serveur/FFR-INTEGRATION.md](serveur/FFR-INTEGRATION.md) pour les seuils, snapshots, commandes et limites de validation.
+
+
+### Publicités récompensées — AppLixir
+
+La boutique propose des Ovas volontaires ; les ligues proposent deux Packs Pub par compte et par jour (minuit Europe/Paris). Le callback signé MD5 + TID valide seul la récompense, dont la réclamation et l'ouverture sont idempotentes. Le SDK reste chargé à la demande et le lecteur nettoie ses médias.
+
+Le catalogue publicitaire utilise le vivier mixte, avec les pochettes dédiées masculines, les championnats féminins, Bronze, Argent, Or et Élite. Les variantes sans texture propre sont exclues. Mythique est une récompense distincte du pack privé Kiri ; ICON et Créateurs sont exclus de la roulette. Halloween et Octobre Rose suivent la publication, les dates et le stock des cartes. Les cartes spéciales respectent l'autorisation de la ligue. Par défaut : Bronze 25 %, Argent 20 %, Or 10 %, autres packs 45 % ; les poids personnalisés du Labo remplacent ces valeurs. Les rayons payants restent indépendants.
+
+Les vignettes WebP sont rendues hors ligne depuis les GLB et leurs textures par `npm run data:vignettes-packs`, sans scènes 3D supplémentaires dans la roulette. L'animation conserve le résultat serveur, avec un ralentissement suivi d'un second élan et des étincelles ; le mouvement réduit supprime ces effets.
+
+Bancs : `npm run verify:publicites` (serveur et SDK), `npm run verify:publicites-sql` (transaction Neon, données d'essai annulées). Aperçu local : `/scripts/apercuPublicites.html`, exclusivement simulé. Configuration serveur et étapes de mise en ligne : [PUBLICITES-APPLIXIR.md](serveur/PUBLICITES-APPLIXIR.md).
+
+### Classement des carrières — Correctif 38
+
+Une excellente saison ou une sauvegarde ancienne ne fait plus disparaître une carrière. Le classement distingue les carrières classées, les cas contrôlés, les lignes provisoires et les refus expliqués. Les données manquantes sont réexaminées à la prochaine synchronisation ; seules les incohérences fortes entraînent un blocage automatique. Les carrières volontairement hors classement restent hors compétition.
+
+Le Labo Kiri montre les règles déclenchées et permet de valider, refuser ou réinitialiser les cas ambigus avec autorisation serveur. La migration a conservé les 1 304 lignes de la base et leur revalidation les garde visibles provisoirement ; aucune sauvegarde n'est modifiée. Les anciens refus n'étant pas enregistrés, leur nombre historique reste inconnu. Le nouveau code doit être déployé pour activer cette interface sur le site public. Rapport et vérifications : [VALIDATION-CORRECTIF-38.md](VALIDATION-CORRECTIF-38.md). `npm run verify:correctif38`.

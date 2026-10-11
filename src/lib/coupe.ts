@@ -111,6 +111,7 @@ export interface EtatCoupe {
 //    (`lib/mondial.ts`) et ne lit pas cette table. Leur rang ici ne sert à
 //    rien — l'ordre d'AFFICHAGE vit dans `ORDRE_TOURS` (Tableau.tsx).
 export const ORDRE_TOUR: Record<MatchFinal['tour'], number> = {
+  trenteDeuxieme: 0, seizieme: 0,
   barrage: 1, quart: 2, demie: 3, finale: 4, accession: 5,
   huitieme: 6, petiteFinale: 7,
 };

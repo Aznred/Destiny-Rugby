@@ -9,6 +9,8 @@ import { locale, tn, texteTraduit, t, nombre } from '../lib/i18n';
 import { Blason } from '../components/Blason';
 import { LogoCompet } from '../components/LogoCompet';
 import { Confirmation } from '../components/Confirmation';
+import { ChoixMatchEquipe } from '../components/match/ChoixMatchEquipe';
+import { REGLAGES_EQUIPE, type ReglagesEquipe } from '../lib/moteur/equipeSolo';
 import { Selecteur } from '../components/Selecteur';
 import type { OptionSelecteur } from '../components/Selecteur';
 import { COMPETITIONS, clubParNom } from '../data/clubs';
@@ -63,7 +65,7 @@ import {
 } from '../lib/compositionManager';
 import {
   assurerEtatCarriereAvancee, chargeTotaleEntrainement, disponibiliteJoueur,
-  indisponiblesCarriereAvancee, moisRestantsContrat, palierContrat,
+  indisponiblesCarriereAvancee, moisRestantsContrat, palierContrat, avisProlongation,
   penalitesMedicales, rapportConnaissance, risqueMedicalJoueur,
   risqueMoyenGroupe,
 } from '../lib/carriereAvancee';
@@ -177,6 +179,7 @@ export function Manager() {
   const [divisionMarche, setDivisionMarche] = useState(manager?.division ?? 'top14');
   const [clubMarche, setClubMarche] = useState('');
   const [recherche, setRecherche] = useState('');
+  const [contratsARenouveler, setContratsARenouveler] = useState(true);
   const rechercheDifferee = useDeferredValue(recherche);
   const [limiteMarche, setLimiteMarche] = useState(24);
   const [poste, setPoste] = useState('');
@@ -189,6 +192,9 @@ export function Manager() {
   const [ageMarche, setAgeMarche] = useState('');
   useEffect(() => setLimiteMarche(24), [divisionMarche, clubMarche, rechercheDifferee, poste, ageMarche]);
   const [matchOuvert, setMatchOuvert] = useState<AfficheComplete | null>(null);
+  const [matchAChoisir,setMatchAChoisir]=useState<AfficheComplete | 'selection' | null>(null);
+  const [modeControle,setModeControle]=useState<'equipe'|'coach'>('coach');
+  const [reglagesControle,setReglagesControle]=useState<ReglagesEquipe>({...REGLAGES_EQUIPE});
   const [matchSelectionOuvert, setMatchSelectionOuvert] = useState(false);
   const [jeuneALiberer, setJeuneALiberer] = useState<string | null>(null);
   const [demission, setDemission] = useState(false);
@@ -869,21 +875,23 @@ export function Manager() {
               {(avancee.propositionSelection || selectionManager) && <section className="carte direction-selection">
                 <div className="comp-tete"><div><b><Icone nom="monde" taille={16} />{t("ui.dcec05d5a8fc")}</b><small>{t("ui.32986215d0f9")}</small></div></div>
                 {avancee.propositionSelection && <div className="proposition-selection"><h3>{t("ui.64b6b6ac6305", { v0: avancee.propositionSelection.nation })}</h3><p>{t("ui.4609a3ac4421")}</p><div><button className="btn primaire" onClick={() => repondreSelection(true)}>{t("pub.accepter")}</button><button className="btn fantome" onClick={() => repondreSelection(false)}>{t("pub.refuser")}</button></div></div>}
-                {selectionManager && <div className="selection-manager-kpis"><span><small>{t("tb.selection")}</small><b>{selectionManager.nation}</b></span><span><small>{t("attr.reputation")}</small><b>{selectionManager.reputation}</b></span><span><small>{t("ui.bbd2160534f8")}</small><b>{selectionManager.matchs}</b></span><span><small>{t("ui.728aebda41f6")}</small><b>{selectionManager.victoires}</b></span>{rencontreSelection && <button className="btn primaire" onClick={() => setMatchSelectionOuvert(true)}>{t("ui.b2cb1dbf86fe", { v0: rencontreSelection.adversaire })}</button>}</div>}
+                {selectionManager && <div className="selection-manager-kpis"><span><small>{t("tb.selection")}</small><b>{selectionManager.nation}</b></span><span><small>{t("attr.reputation")}</small><b>{selectionManager.reputation}</b></span><span><small>{t("ui.bbd2160534f8")}</small><b>{selectionManager.matchs}</b></span><span><small>{t("ui.728aebda41f6")}</small><b>{selectionManager.victoires}</b></span>{rencontreSelection && <button className="btn primaire" onClick={() => setMatchAChoisir('selection')}>{t("ui.b2cb1dbf86fe", { v0: rencontreSelection.adversaire })}</button>}</div>}
               </section>}
             </div>
           )}
 
           {vue === 'vestiaire' && avancee && <VestiaireManagerSimple manager={manager} effectif={effectifBrut} avancee={avancee} capitaines={definirHierarchieCapitaines} repondre={repondreDiscussion} demande={repondreDemande} />}
           {vue === 'infirmerie' && avancee && <InfirmerieManager manager={manager} effectif={effectifBrut} avancee={avancee} decider={deciderMedical} ameliorer={ameliorerMedical} />}
-          {vue === 'marche' && avancee && <details className="carte"><summary>{t('staff.manager.squadContracts')}</summary>
+          {vue === 'marche' && avancee && <details className="carte" open><summary>{t('staff.manager.squadContracts')}</summary>
               <section className="carte contrats-effectif-manager">
                 <div className="comp-tete"><div><b><Icone nom="signature" taille={16} />{t("ui.8cf044680897")}</b><small>{t("ui.909420981e2f")}</small></div><span className="comp-count">{Object.values(avancee.contratsJoueurs).filter((c) => c.club === manager.club).length}</span></div>
-                <div>{effectifBrut.map((j) => ({ j, c: avancee.contratsJoueurs[j.id] })).filter(({ c }) => c).sort((a, b) => a.c.fin - b.c.fin || b.c.interetExterieur - a.c.interetExterieur).map(({ j, c }) => {
+                <div className="barre-poules"><button className={`chip-poule${contratsARenouveler ? ' actif' : ''}`} onClick={() => setContratsARenouveler(true)}>{t('staff.contract.renewals')}</button><button className={`chip-poule${!contratsARenouveler ? ' actif' : ''}`} onClick={() => setContratsARenouveler(false)}>{t('staff.contract.all')}</button></div>
+                <div>{effectifBrut.map((j) => ({ j, c: avancee.contratsJoueurs[j.id] })).filter(({ c }) => c && (!contratsARenouveler || moisRestantsContrat(c.fin, manager.saison, manager.semaine) <= 12 || c.demandeRevalorisation)).sort((a, b) => a.c.fin - b.c.fin || b.c.interetExterieur - a.c.interetExterieur).map(({ j, c }) => {
                   const nego = manager.negociations.findLast((n) => n.joueur.id === j.id && n.nature !== 'recrutement');
                   const mois = moisRestantsContrat(c.fin, manager.saison, manager.semaine);
                   const palier = palierContrat(mois);
                   const dispo = disponibiliteJoueur(avancee.profilsMedicaux[j.id], manager.saison);
+                  const refus = avisProlongation(avancee, manager, j);
                   return <article key={j.id} className={`${c.demandeRevalorisation ? 'revalorisation ' : ''}palier-${palier}`}>
                     <span><b>{j.nom}</b><small>{t("ui.6d13dd4d9743", { v0: c.role, v1: c.fin, v2: c.option === 'aucune' ? t("ui.0300a63d8988") : t("ui.cd2d99d756f4", { v0: c.option }) })}</small></span>
                     {/* ⚠️ LE COMPTE À REBOURS EST LA VRAIE INFORMATION. « Fin
@@ -897,6 +905,7 @@ export function Manager() {
                     <div><small>{t("online.collection.status")}</small><strong>{dispo.possibles ? `${dispo.part}%` : '—'}</strong></div>
                     <div><small>{t("ui.57028eb9694d")}</small><strong>{t("ui.168b895b1689", { v0: c.interetExterieur, v1: c.offresExterieures })}</strong></div>
                     <small className="motivations-contrat">{c.motivations.map((m) => `${m.type} ${m.importance}`).join(' · ')}{palier === 'danger' ? t("ui.dc2fe6d10248") : palier === 'libre' ? t("ui.1d7c27822bda") : ''}</small>
+                    <small>{refus ? t(`staff.contract.refusal.${refus}`) : t('staff.contract.willing')}</small>
                     <button className={c.demandeRevalorisation ? 'danger' : ''} disabled={nego?.etat === 'signee' && nego.saison === manager.saison} onClick={() => ouvrirRenegociationJoueur(j.id)}>{nego?.etat === 'ouverte' || nego?.etat === 'accord' ? t("ui.302b36b46694") : c.demandeRevalorisation ? t("ui.05bdbd2100e7") : c.fin <= manager.saison + 1 ? t("ui.dc943ee62ae4") : t("ui.e79b4886f0ac")}</button>
                   </article>;
                 })}</div>
@@ -1060,7 +1069,7 @@ export function Manager() {
                   {resultatManager ? (
                     <div className="manager-match-joue"><b><Icone nom="check" taille={14} />{t("ui.0e747b62e94d")}</b><p>{tn("ui.d3b31a092ea5", resultatManager.essaisPour, { v0: resultatManager.essaisPour })}</p><button className="btn primaire" onClick={semaineManager}>{manager.semaine >= SEMAINES_PAR_SAISON ? t("mgr.cloreSaison") : t("ui.96dc682c2bc8")}</button></div>
                   ) : (
-                    <div className="manager-lancer-match"><p>{t("ui.4bb382ff1adf")}</p><div><button className="btn fantome" onClick={() => setVue('equipe')}><Icone nom="equipe" taille={16} />{t("ui.da1b992afed6")}</button><button className="btn primaire grand" data-tuto="mgr-lancer" onClick={() => setMatchOuvert(afficheManager)}><Icone nom="sifflet" taille={18} />{t("ui.db01ad9b4fe2")}</button></div></div>
+                    <div className="manager-lancer-match"><p>{t("ui.4bb382ff1adf")}</p><div><button className="btn fantome" onClick={() => setVue('equipe')}><Icone nom="equipe" taille={16} />{t("ui.da1b992afed6")}</button><button className="btn primaire grand" data-tuto="mgr-lancer" onClick={() => setMatchAChoisir(afficheManager)}><Icone nom="sifflet" taille={18} />{t("ui.db01ad9b4fe2")}</button></div></div>
                   )}
                 </section>
               )}
@@ -1704,6 +1713,7 @@ export function Manager() {
             cle={matchOuvert.cle}
             titre={libelleAfficheManager(matchOuvert, manager.divisionNom)}
             manager={{
+              modeControle, reglagesControle,
               club: manager.club,
               composition,
               tactique: manager.tactique,
@@ -1741,6 +1751,7 @@ export function Manager() {
             titre={`${rencontreSelection.competition} · ${selectionManager.nation}`}
             selection
             manager={{
+              modeControle, reglagesControle,
               club: selectionManager.nation,
               composition: compositionManagerParDefaut(effectifNational(selectionManager.nation, manager.saison)),
               tactique: manager.tactique,
@@ -1751,6 +1762,11 @@ export function Manager() {
           />
         </Suspense>
       )}
+      {matchAChoisir && <ChoixMatchEquipe surFermer={()=>setMatchAChoisir(null)} surChoisir={(mode,reglages)=>{
+        setModeControle(mode); setReglagesControle(reglages);
+        if (matchAChoisir==='selection') setMatchSelectionOuvert(true); else setMatchOuvert(matchAChoisir);
+        setMatchAChoisir(null);
+      }}/>}
     </motion.section>
   );
 }

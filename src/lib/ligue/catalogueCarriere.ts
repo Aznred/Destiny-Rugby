@@ -227,6 +227,8 @@ const DEFINITIONS_PACKS: PackCarriere[] = [
 ];
 
 export const PACKS_CARRIERE: PackCarriere[] = DEFINITIONS_PACKS.filter(packPropose);
+/** Catalogue complet pour les récompenses ; la sélection de la boutique reste indépendante. */
+export const PACKS_PUBLICITAIRES: readonly PackCarriere[] = DEFINITIONS_PACKS;
 const PACKS_PERMANENTS = ['bronze', 'standard', 'or'] as const;
 /** Sélections éditoriales datées en heure de Paris. Elles prennent le pas sur la rotation normale. */
 const PACKS_MIS_EN_AVANT_PAR_JOUR: Readonly<Record<string, readonly string[]>> = {
@@ -330,11 +332,12 @@ export function actualiserAncienPackBronze(pack: PackCarriere): PackCarriere {
     && ((p.bronze === 90 && p.star === 0) || (p.bronze === 89.99 && p.star === .01))
     ? { ...pack, probabilites: { ...PACKS_CARRIERE.find(p => p.id === 'bronze')!.probabilites } } : pack;
 }
-export function packsCatalogueAdmin(): PackCarriere[] {
+export function packsCatalogueAdmin(publicitaires = false): PackCarriere[] {
   const editions = catalogueAdmin().packs;
+  const definitions = publicitaires ? DEFINITIONS_PACKS : PACKS_CARRIERE;
   if(poolFfrCourant()==='women'){
     const pool=catalogueMondialCarriere();
-    const models=PACKS_CARRIERE.filter(p=>['general','poste'].includes(p.famille??''));
+    const models=definitions.filter(p=>['general','poste'].includes(p.famille??'')).map(p=>editions[p.id] ?? p);
     models.push(...packsChampionnatsFeminins(pool));
     return models.flatMap(p=>{
       const candidates=pool.filter(c=>!p.filtre||carteDansPack(c,p.filtre));if(!candidates.length)return [];
@@ -347,7 +350,8 @@ export function packsCatalogueAdmin(): PackCarriere[] {
       return [{...p,nom:`${p.nom} · Féminin`,probabilites,garantie,promesse:`${p.cartes} cartes seniors féminines${garantie?` · ${garantie} garantie`:''}.`}];
     });
   }
-  const packs = [...PACKS_CARRIERE.map(p => editions[p.id] ?? p), ...Object.values(editions).filter(p => !PACKS_CARRIERE.some(b => b.id === p.id))].filter(packPropose).map(actualiserAncienPackBronze);
+  const packs = [...definitions.map(p => editions[p.id] ?? p), ...Object.values(editions).filter(p => !definitions.some(b => b.id === p.id))]
+    .filter(p => publicitaires ? !p.id.startsWith('prive-') && packPropose(p) : packPropose(p)).map(actualiserAncienPackBronze);
   return poolFfrCourant() === 'mixed' ? [...packs, ...packsChampionnatsFeminins()] : packs;
 }
 

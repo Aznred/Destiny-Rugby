@@ -24,6 +24,7 @@ import { effectifDuClub } from '../src/lib/effectif';
 import { creerMatch } from '../src/lib/moteur/moteur';
 import { simulerPendant } from '../src/lib/moteur/sortie';
 import type { Joueur } from '../src/types';
+import { jouerAutresPhasesFinales } from '../src/lib/phasesFinalesJouees';
 
 let controles = 0;
 const ok = (condition: unknown, message: string) => { assert.ok(condition, message); controles++; };
@@ -38,7 +39,7 @@ for (const division of ['nationale2', 'fed1', 'reg1']) {
   const debut = Date.now();
   const tournoi = tournoiDeFinDAnnee(division, SAISON, nom(division))!;
   const calcul = Date.now() - debut;
-  ok(tournoi && tournoi.matchs.length >= 3, `${division} : le tournoi final existe (${poulesDe(division).length} poules)`);
+  ok(tournoi && tournoi.matchs.length === tournoi.qualifies.length / 2, `${division} : le premier tour final est complet (${poulesDe(division).length} poules)`);
   ok(tournoi.matchs.every((m) => m.cle?.startsWith(`tournoi#${division}#${SAISON}#`)), `${division} : chaque match du tournoi porte la clé que le tableau relit`);
   const rappel = Date.now();
   tournoiDeFinDAnnee(division, SAISON, nom(division));
@@ -50,9 +51,10 @@ for (const division of ['nationale2', 'fed1', 'reg1']) {
   const carriere = (semaine: number) => ({ division, club, saison: SAISON, semaine, resultats });
   let joues = 0;
   let moteurVerifie = false;
-  for (const tour of ['barrage', 'demie', 'finale']) {
+  for (let semaine = tournoi.matchs[0].semaine; semaine <= semaineDu('finale'); semaine++) {
+    jouerAutresPhasesFinales(SAISON, semaine, club);
     for (let garde = 0; garde < 8; garde++) {
-      const affiche = afficheDuClub(carriere(semaineDu(tour)));
+      const affiche = afficheDuClub(carriere(semaine));
       if (!affiche || resultats[affiche.cle]) break;
       ok(estMatchCouperet(affiche.cle), `${division} : « ${affiche.cle} » est un match couperet`);
       ok(affiche.match.domicile === club || affiche.match.exterieur === club, `${division} : l'affiche concerne bien le club`);
@@ -74,6 +76,7 @@ for (const division of ['nationale2', 'fed1', 'reg1']) {
         scoreD: chezLui ? 31 : 6, scoreE: chezLui ? 6 : 31, essaisD: chezLui ? 4 : 0, essaisE: chezLui ? 0 : 4 };
       enregistrerResultatJoue(affiche.cle, match); oublierResultats();
       resultats[affiche.cle] = match;
+      jouerAutresPhasesFinales(SAISON, semaine, club);
       joues++;
     }
   }
@@ -85,7 +88,7 @@ for (const division of ['nationale2', 'fed1', 'reg1']) {
   effacerResultatsJoues(); oublierResultats();
   const autre = tournoiDeFinDAnnee(division, SAISON, nom(division))!.qualifies[0].club;
   const perdus: Record<string, unknown> = {};
-  const premiere = affichesDePhaseFinale({ division, club: autre, saison: SAISON, semaine: semaineDu(division === 'nationale2' ? 'demie' : 'barrage'), resultats: perdus })
+  const premiere = affichesDePhaseFinale({ division, club: autre, saison: SAISON, semaine: tournoi.matchs[0].semaine, resultats: perdus })
     .find((a) => a.cle.startsWith('tournoi#'));
   ok(premiere, `${division} : la tête de série a un match de tournoi`);
   const chezLui = premiere!.match.domicile === autre;
@@ -174,7 +177,7 @@ for (const division of ['nationale2', 'fed1', 'reg1']) {
   const club = tournoi.qualifies[0].club;
   const joueur = (semaine: number, resultatsClub: Record<string, unknown> = {}) =>
     ({ nom: 'Banc', club, division, saison: SAISON, semaine, resultatsClub }) as unknown as Joueur;
-  const semaine = semaineDu('barrage');
+  const semaine = tournoi.matchs[0].semaine;
   const pourLeJoueur = afficheDuJoueur(joueur(semaine));
   const pourLeClub = afficheDuClub({ division, club, saison: SAISON, semaine, resultats: {} });
   ok(pourLeJoueur, 'le joueur a une affiche le premier week-end de phase finale');

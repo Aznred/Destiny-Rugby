@@ -17,7 +17,8 @@ import {
 } from '../data/boutique';
 import { TRAITS_A_DEBLOQUER, descriptionTrait, nomTrait } from '../data/traits';
 import { nombre, t, texteTraduit } from '../lib/i18n';
-import { CartePubRecompensee, BoutonDeblocageParPub } from '../components/Pub';
+import { BoutonDeblocageParPub } from '../components/Pub';
+import { CarteOvasGratuits } from '../components/PublicitesRecompensees';
 import { ApercuJoueur3D } from '../components/ApercuJoueur3D';
 import { MiniatureArticle, PastilleRarete, PrixBoutons } from '../components/CartesCosmetiques';
 import { SoldesMonnaies } from '../components/SoldesMonnaies';
@@ -158,6 +159,8 @@ export function Boutique() {
         <SoldesMonnaies />
       </div>
 
+      <CarteOvasGratuits />
+
       {flash && <div className="flash-boutique" role="status">{flash}</div>}
 
       <div className="bo-rayons" role="tablist" aria-label={t('bo.rayons')}>
@@ -244,11 +247,6 @@ export function Boutique() {
                       );
                     })}
                   </div>
-                </div>
-                {/* ═══ GAGNER DES OVAS SANS PAYER — facultatif, plafonné, et ça ne rapporte que des Ovas (voir `lib/pub.ts`). ═══ */}
-                <div className="bloc-vestiaire">
-                  <div className="vestiaire-titre">{t('bo.gagnerOvas')}</div>
-                  <div className="grille-boutique"><CartePubRecompensee /></div>
                 </div>
               </>
             ) : (

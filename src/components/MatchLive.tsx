@@ -182,6 +182,7 @@ import { texteTraduit, t } from '../lib/i18n';
 import { useModalDialog } from '../lib/useModalDialog';
 import { ControleDirect, ListeCommandes } from './match/ControleDirect';
 import { PilotageDirect } from '../lib/controleDirect/pilotage';
+import { configurerEquipeSolo, type ReglagesEquipe } from '../lib/moteur/equipeSolo';
 import { rolesDuJoueur } from '../lib/responsabilites';
 import { rolesImposesParLaComposition } from '../lib/compositionManager';
 import { chargerDisposition } from '../lib/controleDirect/touches';
@@ -396,6 +397,8 @@ export function MatchLive({
   }) => void;
   joueur?: Joueur | null;
   manager?: {
+    modeControle?: 'equipe' | 'coach';
+    reglagesControle?: ReglagesEquipe;
     club: string;
     composition: CompositionManager;
     tactique: TactiqueManager;
@@ -590,6 +593,12 @@ export function MatchLive({
     );
   }
   const e = moteur.current;
+  const equipeConfiguree = useRef(false);
+  if (!equipeConfiguree.current && manager) {
+    equipeConfiguree.current=true;
+    const cote=manager.club===e.clubA?'A':manager.club===e.clubB?'B':null;
+    if (cote) configurerEquipeSolo(e,cote,manager.modeControle==='equipe',manager.reglagesControle);
+  }
   const conditionAppliquee = useRef(false);
   if (!conditionAppliquee.current) {
     conditionAppliquee.current = true;
@@ -818,7 +827,7 @@ export function MatchLive({
   // ⚠️ « VOULU » N'EST PAS « ACTIF ». Voulu : le joueur a choisi de conduire, la 3D est là, il joue (pas « je
   // regarde ») — les cartes de décision, le vieux tutoriel et la vieille jauge de souffle s'effacent, même pendant
   // qu'il est sur le banc. Actif : il a la main (`pilotage.current.actif`), le HUD répond et le tempo est normal.
-  const directVoulu = enJeu && vue3D && prefsControle.mode === 'direct';
+  const directVoulu = enJeu && vue3D && (!!e.controleEquipe || prefsControle.mode === 'direct');
 
   // --- LA TAILLE DU TERRAIN À L'ÉCRAN ---------------------------------------
   // ⚠️ Par ResizeObserver, PAS par `getBoundingClientRect()` à chaque image :
@@ -1136,6 +1145,7 @@ export function MatchLive({
       // ⚠️ AVANT TOUT RETOUR ANTICIPÉ : la fin du match, la pause et la carte d'accueil du tutoriel doivent
       // pouvoir le lire (une touche de pause se lit PENDANT la pause, un joueur qui sort rend la main).
       const pilote = pilotage.current!;
+      if (e.controleEquipe) e.controleEquipe.actif=enJeu && !simulationRef.current;
       pilote.surImage(e, scene, dtReel, {
         moi: enJeu ? moi : undefined, pause: enPause, avantMatch: !!presentation.current || simulationRef.current,
         cameraChoisie: camera3DRef.current,
@@ -1430,10 +1440,10 @@ export function MatchLive({
   // Le détail de MA note. Calculé à partir de la même feuille que celle qui
   // part dans la saison — donc rigoureusement la note qui compte.
   const maNote = useMemo(() => {
-    if (!e.fini || !monPion) return null;
+    if (!e.fini || !monPion || manager) return null;
     const s = statsPourLaNote(monPion, e.direct?.stats);
     return { note: noterMatch(monPion.poste, s), detail: detailNote(monPion.poste, s) };
-  }, [e.fini, monPion, e.direct?.stats]);
+  }, [e.fini, monPion, e.direct?.stats, manager]);
 
   // ⚠️ UN MATCH COUPERET A TOUJOURS UN VAINQUEUR (`lib/couperet.ts`). Le moteur joue ses quatre-vingts minutes comme
   // pour n'importe quel match ; à égalité, la prolongation est tranchée par la même fonction que celle du store —
@@ -1478,7 +1488,7 @@ export function MatchLive({
     } : null);
     const final = { scoreA: e.scoreA, scoreB: e.scoreB, essaisA: e.essaisA, essaisB: e.essaisB, blessures: blessuresManager.current, minutesJouees: Object.fromEntries(e.pions.map(p => [p.sourceId, p.minutes])) };
     const etapes: (() => void)[] = [() => onTermine?.(final)];
-    if (monPion) {
+    if (monPion && !manager) {
       const maFeuille = statsPourLaNote(monPion, e.direct?.stats);
       const discipline = { citation: e.discipline.citation, blessure: e.discipline.blessure, jaunes: e.discipline.jaunes, rouges: e.discipline.rouges };
       etapes.push(() => {
@@ -1514,7 +1524,7 @@ export function MatchLive({
     // bouton éteint : sur téléphone, c'est la seule sortie de cet écran (ni Échap, ni bord de fenêtre où cliquer).
     const deverrouiller = () => setFinalise(true);
     finalisation.current = finaliserMatch(idMatch.current, etapes, { avant: scenesRendues }).then(deverrouiller, deverrouiller);
-  }, [e.fini, e, monPion, enregistrerMatchVecu, appliquerSanctionMatch, onTermine, titre, cle]);
+  }, [e.fini, e, monPion, enregistrerMatchVecu, appliquerSanctionMatch, onTermine, titre, cle, manager]);
   // Le dernier filet : huit secondes après la sirène, le bouton répond quoi qu'il soit arrivé à la finalisation.
   useEffect(() => {
     if (!e.fini || finalise) return;

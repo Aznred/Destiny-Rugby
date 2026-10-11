@@ -9,7 +9,9 @@ import { POSTE_PAR_ID, migrerPoste, nomPoste } from '../data/rugby';
 import { Drapeau } from '../components/Drapeau';
 import { nomNationTraduit } from '../lib/nations';
 import { TROPHEES } from '../data/trophees';
-import { LIMITES, ficheDepuisJoueur, verifierFiche } from '../lib/classementMondial';
+import { LIMITES, ficheDepuisJoueur, ficheDepuisManager } from '../lib/classementMondial';
+import { evaluerClassement, validationPublique } from '../lib/validationClassement';
+import { BadgeValidationClassement, EtatValidationClassement } from '../components/ValidationClassement';
 import { nombre, t } from '../lib/i18n';
 import { chantierVisible } from '../lib/modeDev';
 import type { LegendeSauvegardee, TitreGagne } from '../types';
@@ -283,6 +285,9 @@ export function Classement() {
   const managerVisible = chantierVisible('manager');
   const pantheon = useGame((s) => s.pantheon);
   const joueur = useGame((s) => s.joueur);
+  const manager = useGame((s) => s.manager);
+  const resultatValidation = useGame((s) => s.etatValidationClassement);
+  const synchroniser = useGame((s) => s.publierAuClassement);
   const setEcran = useGame((s) => s.setEcran);
   const monRangId = useGame((s) => s.rangMondialId);
   const pseudoClassement = useGame((s) => s.pseudoClassement);
@@ -350,19 +355,25 @@ export function Classement() {
     // pour renvoyer MON rang mondial, calculé sur le même tri que la page.
     lireClassementMondial(page, monRangId, categorie).then((r) => { if (vivant) setMondial(r); });
     return () => { vivant = false; };
-  }, [page, monRangId, categorie]);
+  }, [page, monRangId, categorie, resultatValidation]);
 
   // Le verdict que le serveur rendrait sur la carrière en cours : il sert à
   // afficher l'état de l'envoi automatique, et à dire pourquoi si ça coince.
   const envoi = useMemo(() => {
     // ⚠️ UNE CARRIÈRE HORS CLASSEMENT N'A PAS DE VERDICT À AFFICHER : rien ne part (voir `publierAuClassement`).
-    if (!joueur || !estCarriereClassee(joueur)) return null;
+    if (manager ? manager.horsClassement || manager.libre : !joueur || !estCarriereClassee(joueur)) return null;
     // ⚠️ LE MÊME PSEUDO QUE CELUI QUI PART VRAIMENT (voir `useGame` →
     // `pseudoClassement`). Afficher un verdict calculé sur un autre nom que
     // celui envoyé, c'est promettre une ligne qui n'arrivera pas.
-    const fiche = ficheDepuisJoueur(joueur, pseudoClassement || undefined);
-    return { fiche, verdict: verifierFiche(fiche, Object.keys(TROPHEES)) };
-  }, [joueur, pseudoClassement]);
+    const fiche = manager ? ficheDepuisManager(manager, pseudoClassement || undefined) : ficheDepuisJoueur(joueur!, pseudoClassement || undefined);
+    return { fiche, verdict: evaluerClassement(fiche, Object.keys(TROPHEES)) };
+  }, [joueur, manager, pseudoClassement]);
+  const validationRecue = resultatValidation?.validation;
+  const validation = validationRecue ? (resultatValidation?.ok === false && validationRecue.statut !== 'REJECTED'
+    ? {...validationRecue,statut:'PENDING_VALIDATION' as const,recompensesAutorisees:false} : validationRecue) : (envoi ? { ...validationPublique(envoi.verdict),
+    statut: envoi.verdict.statut==='REJECTED' ? 'REJECTED' as const : 'PENDING_VALIDATION' as const, recompensesAutorisees:false } : null);
+  const peutSynchroniser = !!envoi;
+  useEffect(() => { if (peutSynchroniser) synchroniser(); }, [synchroniser, peutSynchroniser]);
 
   const monPseudo = envoi?.fiche.pseudo ?? '';
   /** La ligne du joueur, où qu'elle soit dans le classement. */
@@ -529,6 +540,7 @@ export function Classement() {
                         {l.saisons} {t('clst.saisons').toLowerCase()}
                       </small>
                     )}
+                    <BadgeValidationClassement validation={l.validation} />
                   </span>
                 </span>
                 <span className="c-score">{nombre(l.score)}</span>
@@ -654,12 +666,10 @@ export function Classement() {
         {/* ⚠️ PLUS DE BOUTON : L'ENVOI EST AUTOMATIQUE. Ne reste que l'état, en
             une ligne — le joueur doit savoir sous quel nom il figure et avec
             quel score, mais il n'a rien à faire. */}
+        {envoi && validation && <EtatValidationClassement validation={validation} erreur={resultatValidation?.erreur} synchroniser={()=>synchroniser(true)} />}
         {envoi && (
           <p className="aide" style={{ marginTop: '1rem' }}>
-            {envoi.verdict.valide
-              ? t('clst.publie', { pseudo: monPseudo, score: nombre(envoi.verdict.score) })
-              : t('clst.rejete', { erreurs: envoi.verdict.anomalies.join(' · ') })}
-            {!maLigne && envoi.verdict.valide && ` ${t('clst.pasEncoreClasse')}`}
+            {monPseudo} · {nombre(resultatValidation?.score ?? envoi.verdict.score)}
             {pseudoEnCours === null && (
               <>
                 {' '}

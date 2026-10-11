@@ -169,6 +169,7 @@ export interface ProfilMedicalJoueur {
 }
 
 export interface ContratJoueurAvance {
+  termes?: import('../types.js').TermesRecrutementManager;
   joueurId: string;
   nom: string;
   club: string;
@@ -522,6 +523,7 @@ function motivationsContrat(p: ProfilVestiaire, j: Coequipier): ContratJoueurAva
 }
 
 function contratJoueurInitial(m: Manager, j: Coequipier, p: ProfilVestiaire): ContratJoueurAvance {
+  const signe = m.recrues.findLast(r => (r.joueur.id === j.id || r.joueur.nom === j.nom) && (!r.club || r.club === m.club));
   const rng = graine(`contrat-long#${m.club}#${j.id}#${m.saison}`);
   const niveau = competitionDuClub(m.club)?.niveau ?? 8;
   const role: RoleRecrueManager = j.age <= 23 && j.potentiel >= j.note + 4 ? 'espoir'
@@ -542,6 +544,8 @@ function contratJoueurInitial(m: Manager, j: Coequipier, p: ProfilVestiaire): Co
     attachement: attachementInitial(j, p, anciennete, formeAuClub),
     interetExterieur: Math.max(0, borne((j.note - forceEffectif(m.club, m.saison)) * 9 + rng() * 28)),
     offresExterieures: 0, demandeRevalorisation: false,
+    ...(signe ? { debut: signe.saison, fin: signe.saison + signe.termes.duree, salaire: signe.termes.salaire,
+      role: signe.termes.role, termes: { ...signe.termes }, derniereNegociation: signe.saison } : {}),
   };
 }
 
@@ -1230,13 +1234,31 @@ export function risqueMoyenGroupe(a: EtatCarriereAvancee, effectif: Coequipier[]
   ), 0) / effectif.length);
 }
 
+/** Avis sportif indépendant de l'offre : certains joueurs veulent réellement partir. */
+export function avisProlongation(a: EtatCarriereAvancee, m: Manager, j: Coequipier): NegociationManager['refusProlongation'] {
+  const c = a.contratsJoueurs[j.id];
+  if (!c) return undefined;
+  const ambition = c.motivations.find(x => x.type === 'ambition')?.importance ?? 0;
+  const niveau = competitionDuClub(m.club)?.niveau ?? 8;
+  const force = forceDuGroupe(m.club, m.saison);
+  if (niveau > 1 && j.age <= 29 && j.note >= force + 6 && ambition >= 75
+    && c.offresExterieures >= 1 && c.interetExterieur >= 75 && c.attachement < 70) return 'ambition';
+  const matchs = Object.values(m.resultats).filter(r => r.saison === m.saison && r.club === m.club);
+  const jeu = tempsDeJeuReclamable(m, j.id, matchs.length, a);
+  if (matchs.length >= 8 && c.role === 'cadre' && c.satisfaction < 30 && c.attachement < 55
+    && jeu.part !== null && jeu.part < .25) return 'tempsDeJeu';
+  if (matchs.length >= 10 && ambition >= 80 && c.interetExterieur >= 80 && c.attachement < 40
+    && matchs.filter(r => r.scorePour > r.scoreContre).length / matchs.length < .2) return 'resultats';
+  return undefined;
+}
+
 export function ouvrirRenegociationJoueur(
   a: EtatCarriereAvancee, m: Manager, effectif: Coequipier[], joueurId: string,
 ): NegociationManager | undefined {
   const j = effectif.find((x) => x.id === joueurId);
   const contrat = a.contratsJoueurs[joueurId];
   if (!j || !contrat) return undefined;
-  const salaires = salairesEffectif(m.club, m.saison, m.recrues);
+  const salaires = salairesEffectif(m.club, m.saison, m.recrues, a.contratsJoueurs);
   const courant = contrat.salaire || salaires.find((x) => x.joueurId === joueurId || x.nom === j.nom)?.salaire || 0;
   const revalorisation = contrat.demandeRevalorisation;
   const facteur = revalorisation ? 1.22 : contrat.fin <= m.saison + 1 ? 1.1 : 1.04;
@@ -1248,10 +1270,10 @@ export function ouvrirRenegociationJoueur(
     poste: j.poste, age: j.age, note: j.note, potentiel: j.potentiel, nation: j.nation,
     indemnite: 0, valeur: Math.max(0, courant * 5), saisonsRestantes: Math.max(0, contrat.fin - m.saison),
     situation: contrat.fin <= m.saison ? 'libre' as const : contrat.fin === m.saison + 1 ? 'finDeContrat' as const : 'sousContrat' as const,
-    salaireDemande: courant > 0 ? Math.round(courant * facteur / 5_000) * 5_000 : 0,
+    salaireDemande: courant > 0 ? Math.max(5_000, Math.round(courant * facteur / 5_000) * 5_000) : 0,
     primeDemandee: courant > 0 ? Math.round(courant * .16 / 2_500) * 2_500 : 0,
     primeMatchDemandee: courant > 0 ? 0 : 150 + Math.round(j.note / 5) * 25,
-    dureeDemandee: j.age >= 31 ? 2 : 3, roleDemande: contrat.role,
+    dureeDemandee: Math.min(5, Math.max(j.age >= 31 ? 2 : 3, contrat.fin - m.saison + (revalorisation ? 0 : 1))), roleDemande: contrat.role,
   };
   const nego = ouvrirNegociationManager(cible, m.saison, m.semaine, {
     nature: revalorisation ? 'revalorisation' : 'prolongation',
@@ -1263,7 +1285,9 @@ export function ouvrirRenegociationJoueur(
     satisfaction: contrat.satisfaction, performance: j.note,
     interetExterieur: contrat.interetExterieur + contrat.offresExterieures * 12, risqueMedical,
   });
-  return { ...nego, id: `nego-interne#${j.id}#${m.saison}#${m.semaine}`,
+  const refusProlongation = avisProlongation(a, m, j);
+  return { ...nego, id: `nego-interne#${j.id}#${m.saison}#${m.semaine}#${m.negociations.length}`,
+    ...(refusProlongation ? { refusProlongation, etat: 'rompue' as const } : {}),
     motivations: contrat.motivations, nature: revalorisation ? 'revalorisation' : 'prolongation' };
 }
 
@@ -1273,7 +1297,7 @@ export function signerRenegociationJoueur(
 ): EtatCarriereAvancee {
   const semaine = contexte.semaine ?? 1;
   const contrat = a.contratsJoueurs[nego.joueur.id];
-  if (!contrat || nego.nature === 'recrutement') return a;
+  if (!contrat || nego.nature === 'recrutement' || nego.etat !== 'signee' || nego.refusProlongation) return a;
   // ⚠️ UN STATUT PROMIS EST UNE PROMESSE, PAS UNE ÉTIQUETTE. Signer « cadre »
   // et laisser le joueur sur le banc doit se payer exactement comme une parole
   // donnée dans le vestiaire — c'est ce que le système de promesses fait déjà,
@@ -1287,7 +1311,8 @@ export function signerRenegociationJoueur(
     }]
     : a.promesses;
   return { ...a, promesses, contratsJoueurs: { ...a.contratsJoueurs, [nego.joueur.id]: {
-    ...contrat, debut: nego.saison, fin: nego.saison + nego.offre.duree,
+    ...contrat, debut: nego.saison, fin: nego.nature === 'revalorisation' ? contrat.fin : Math.max(contrat.fin, nego.saison + nego.offre.duree),
+    termes: { ...nego.offre },
     salaire: nego.offre.salaire, role: nego.offre.role,
     option: nego.offre.option ?? 'aucune', satisfaction: borne(contrat.satisfaction + 14),
     // Prolonger, c'est aussi choisir de rester : le lien avec le club y gagne.

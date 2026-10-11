@@ -12,6 +12,8 @@ import type { EtatBoutiqueCompte, ModificationsBoutiqueCompte } from '../src/lib
 import type { PageOffresSolo, LotCartesSolo, OffreSolo, SuiviEchangesSolo } from '../src/lib/echangesSolo.js';
 import { packsInternesSql, type StockagePacksInternes } from './packsInternesStockage.js';
 import { demandesImageSql, type StockageDemandesImage } from './demandesImageStockage.js';
+import { publicitesSql, type StockagePublicites } from './publicitesStockage.js';
+import { stockageValidationNeon, type StockageValidationClassement } from './validationClassement.js';
 
 export interface CompteStocke {
   id: string; identifiant: string; pseudo: string; empreinte?: string;
@@ -49,6 +51,8 @@ const resumeEtat = (etat: EtatCarriereEnLigne) => ({
   clubs: etat.clubs.map(c => ({ compteId: c.compteId, nom: c.nom, ovas: c.ovas, embleme: c.embleme })),
 });
 export interface StockageCarriere {
+  classementValidation?: StockageValidationClassement;
+  publicites?: StockagePublicites;
   snapshotFfr?(ligue: LigueStockee, migration: string): Promise<void>;
   joueurs?: StockageJoueurs;
   poolLigue?(id: string): Promise<string | null>;
@@ -312,6 +316,7 @@ export function stockageNeon(url: string): StockageCarriere {
     }
   }
   return {
+    classementValidation: stockageValidationNeon(sql),
     echangesSolo: {
       async lister(compte, offset) {
         // Les propositions des autres comptes ne quittent plus Postgres :
@@ -380,6 +385,7 @@ export function stockageNeon(url: string): StockageCarriere {
     atelier: atelierNeon(url),
     joueurs: joueursNeon(url),
     packsInternes: packsInternesSql((textes, ...valeurs) => sql(textes, ...valeurs) as Promise<Record<string, unknown>[]>),
+    publicites: publicitesSql((textes, ...valeurs) => sql(textes, ...valeurs) as Promise<Record<string, unknown>[]>),
     demandesImage: demandesImageSql((textes, ...valeurs) => sql(textes, ...valeurs) as Promise<Record<string, unknown>[]>),
     async snapshotFfr(l,migration) {
       await sql`insert into player_migration_snapshots(migration,kind,entity_id,revision,data)

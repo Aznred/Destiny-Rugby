@@ -452,6 +452,7 @@ export interface DossierRecrutementClub {
 
 // Un transfert ANNONCÉ sur L'Ovale — et réellement appliqué au monde du jeu.
 export interface TransfertAnnonce {
+  joueurId?: string;
   sourcePlayerId?: string;
   nom: string; // joueur concerné
   de: string; // club quitté
@@ -793,6 +794,7 @@ export interface TermesRecrutementManager {
 
 /** Une discussion de recrutement menée dans les messages de L'Ovale. */
 export interface NegociationManager {
+  refusProlongation?: 'ambition' | 'tempsDeJeu' | 'resultats';
   id: string;
   pseudo: string;
   joueur: CibleRecrutementManager;

@@ -826,3 +826,35 @@
 .cd-ballon-fleche { display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: color-mix(in srgb, var(--teinte) 22%, transparent); }
 .cd-ballon-nom { overflow: hidden; text-overflow: ellipsis; text-transform: uppercase; }
 .cd-ballon-nom:empty { display: none; }
+/* Contrôle collectif : options du 9 en haut, commandes de course au pouce en bas. */
+.ce-avant-match { width:min(620px,calc(100vw - 24px)); }
+.ce-modes {display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:20px 0}
+.ce-modes .btn {display:flex;flex-direction:column;align-items:flex-start;gap:10px;text-align:left;padding:20px;white-space:normal;min-height:145px}
+.ce-modes span {font-size:.8rem;font-weight:400;line-height:1.4}
+.ce-reglages {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.ce-reglages label {display:block;font-size:.8rem;margin-bottom:7px;color:var(--texte-doux)}
+.ce-reperes {margin:18px 0}
+.ce-hud {position:absolute;top:116px;left:16px;z-index:12;width:min(490px,calc(100% - 32px));pointer-events:none;font-family:var(--police);color:#f5efe1}
+.ce-hud button {pointer-events:auto;background:#121e22e8;color:inherit;border:1px solid #d2b57950;border-radius:6px;padding:8px 10px;font:inherit;font-size:11px;cursor:pointer;min-height:36px}
+.ce-hud button:hover,.ce-hud button[aria-pressed=true] {background:#35594d;border-color:#d2b579}
+.ce-hud button:disabled {opacity:.4;cursor:default}
+.ce-joueur {display:flex;align-items:center;gap:8px;background:#111c22de;padding:6px 8px;border-left:2px solid #d2b579;border-radius:4px;font-size:12px}
+.ce-joueur b {flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.ce-numero {font-variant-numeric:tabular-nums;color:#d2b579;font-weight:800;font-size:18px}
+.ce-hud kbd {display:inline-block;font:inherit;font-size:10px;opacity:.7;margin-right:4px}
+.ce-sortie {background:#111c22eb;padding:10px;margin-top:6px;border:1px solid #d2b57960;border-radius:6px}
+.ce-sortie small {display:block;font-size:11px;line-height:1.4;margin-bottom:8px;color:#ded8c9}
+.ce-combinaison {display:flex;align-items:center;gap:7px;padding:7px 5px;font-size:11px}
+.ce-combinaison kbd {font-size:11px;color:#ecd079;white-space:nowrap;opacity:1}
+.ce-combinaison[data-disponible=non] {opacity:.35}
+.ce-sortie>span {display:block;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#d2b579;margin-bottom:8px}
+.ce-sortie>div {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
+.ce-raccourcis {display:flex;gap:5px;margin-top:6px}
+.ce-options {display:flex;gap:5px;flex-wrap:wrap;background:#101b21ed;padding:8px;margin-top:4px;border-radius:6px}
+@media(max-width:700px){
+  .ce-hud {top:95px;left:8px;width:calc(100% - 76px);max-width:440px}
+  .ce-joueur {font-size:10px}.ce-hud button{padding:6px 8px;font-size:10px;min-height:44px}
+  .ce-combinaison {flex-direction:column;gap:3px;text-align:center;font-size:10px;padding:6px 2px}.ce-combinaison kbd{font-size:17px;line-height:1}
+  .ce-modes{gap:8px}.ce-modes .btn{padding:14px;min-height:140px}.ce-reglages{grid-template-columns:1fr}.ce-reglages>div{display:grid;grid-template-columns:90px 1fr;align-items:center}.ce-reglages label{margin:0}
+}
+@media(max-height:500px) and (min-width:700px){.ce-hud{top:14px;left:244px;width:calc(100% - 320px);max-width:410px}.ce-sortie{padding:6px}.ce-sortie>span{margin-bottom:4px}.ce-raccourcis{margin-top:4px}}

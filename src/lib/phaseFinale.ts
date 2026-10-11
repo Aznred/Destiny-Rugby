@@ -17,6 +17,8 @@ import { forceEffectif } from './effectif.js';
 import { semaine } from '../data/calendrier.js';
 import type { Joueur } from '../types.js';
 import { nombreQualifies, rulesFor, zones } from './competitionRules.js';
+import { preparerElimination, vainqueursDuTour, type MatchElimination } from './bracketProgressif.js';
+import { CALENDRIER } from '../data/calendrier.js';
 
 /**
  * ⚠️ `huitieme` ET `petiteFinale` NE SERVENT QU'À LA COUPE DU MONDE
@@ -26,7 +28,7 @@ import { nombreQualifies, rulesFor, zones } from './competitionRules.js';
  * PORTEUSES pour les coupes.
  */
 export type TourFinal =
-  | 'barrage' | 'huitieme' | 'quart' | 'demie' | 'petiteFinale' | 'finale' | 'accession';
+  | 'trenteDeuxieme' | 'seizieme' | 'barrage' | 'huitieme' | 'quart' | 'demie' | 'petiteFinale' | 'finale' | 'accession';
 
 export interface MatchFinal {
   tour: TourFinal;
@@ -51,7 +53,7 @@ export interface PhaseFinale {
   divisionId: string;
   classement: LigneTableau[];
   qualifies: string[]; // dans l'ordre du classement (tête de série 1, 2, 3…)
-  matchs: MatchFinal[];
+  matchs: MatchElimination[];
   champion: string | null;
   finaliste: string | null; // le perdant de la finale — celui qui jouera l'accès
   /** Les relégués DIRECTS, le plus mal classé d'abord — leur nombre vient du règlement (`competitionRules.ts`). */
@@ -158,19 +160,33 @@ export function phaseFinale(
 
   const n = Math.min(nbQualifies(taille), taille);
   const q = classement.slice(0, n).map((l) => l.club);
-  const matchs: MatchFinal[] = [];
+  const matchs: MatchElimination[] = [];
   const cle = (tour: string, a: string, b: string) => `finale#${divisionId}#${saison}#${tour}#${a}#${b}`;
+  const rencontre = (a: string, b: string, indice: string, tour: TourFinal, libelle: string) =>
+    preparerElimination(a, b, cle(indice, a, b), tour, libelle,
+      CALENDRIER.find(s => s.tourFinal === tour)!.numero, undefined,
+      `phase#${divisionId}#${saison}#${tour}#${a}#${b}`);
+  const z = zones(rulesFor(divisionId), taille);
+  const relegues = classement.slice(taille - z.directRelegation).map((l) => l.club).reverse();
+  const barragistes = z.accessMatch.map((position) => classement[position - 1].club).reverse();
+  const bilan = (finale?: MatchElimination): PhaseFinale => ({
+    divisionId, classement, qualifies: q, matchs,
+    champion: finale?.vainqueur ?? null, finaliste: finale?.perdant ?? null,
+    relegues, barragistes, dernier: relegues[0] ?? null, avantDernier: barragistes[0] ?? null,
+  });
   // Rang d'un club dans le classement (sert à faire recevoir le mieux classé).
   const rang = (club: string) => classement.findIndex((l) => l.club === club);
 
   let demiFinalistes: string[];
   if (n >= 6) {
     // Barrages : 3 reçoit 6, 4 reçoit 5. Les deux premiers attendent.
-    const b1 = duel(q[2], q[5], saison, cle('barrage1', q[2], q[5]), 'barrage', `Barrage : ${q[2]} - ${q[5]}`);
-    const b2 = duel(q[3], q[4], saison, cle('barrage2', q[3], q[4]), 'barrage', `Barrage : ${q[3]} - ${q[4]}`);
+    const b1 = rencontre(q[2], q[5], 'barrage1', 'barrage', `Barrage : ${q[2]} - ${q[5]}`);
+    const b2 = rencontre(q[3], q[4], 'barrage2', 'barrage', `Barrage : ${q[3]} - ${q[4]}`);
     matchs.push(b1, b2);
+    const gagnants = vainqueursDuTour([b1, b2], [q[2], q[5], q[3], q[4]]);
+    if (!gagnants) return bilan();
     // Le 1er reçoit le moins bien classé des deux qualifiés.
-    const [faible, fort] = [b1.vainqueur, b2.vainqueur].sort((a, b) => rang(b) - rang(a));
+    const [faible, fort] = gagnants.sort((a, b) => rang(b) - rang(a));
     demiFinalistes = [q[0], faible, q[1], fort];
   } else if (n >= 4) {
     demiFinalistes = [q[0], q[3], q[1], q[2]];
@@ -180,45 +196,27 @@ export function phaseFinale(
 
   let finalistes: string[];
   if (demiFinalistes.length === 4) {
-    const d1 = duel(
-      demiFinalistes[0], demiFinalistes[1], saison,
-      cle('demie1', demiFinalistes[0], demiFinalistes[1]), 'demie',
+    const d1 = rencontre(
+      demiFinalistes[0], demiFinalistes[1], 'demie1', 'demie',
       `Demi-finale : ${demiFinalistes[0]} - ${demiFinalistes[1]}`,
     );
-    const d2 = duel(
-      demiFinalistes[2], demiFinalistes[3], saison,
-      cle('demie2', demiFinalistes[2], demiFinalistes[3]), 'demie',
+    const d2 = rencontre(
+      demiFinalistes[2], demiFinalistes[3], 'demie2', 'demie',
       `Demi-finale : ${demiFinalistes[2]} - ${demiFinalistes[3]}`,
     );
     matchs.push(d1, d2);
-    finalistes = [d1.vainqueur, d2.vainqueur];
+    const gagnants = vainqueursDuTour([d1, d2], demiFinalistes);
+    if (!gagnants) return bilan();
+    finalistes = gagnants;
   } else {
     finalistes = [q[0], q[1]];
   }
 
   // LA FINALE — terrain neutre : personne ne reçoit.
   const [fa, fb] = finalistes.sort((a, b) => rang(a) - rang(b));
-  const finale = duel(fa, fb, saison, cle('finale', fa, fb), 'finale', `FINALE : ${fa} - ${fb}`, 0);
+  const finale = rencontre(fa, fb, 'finale', 'finale', `FINALE : ${fa} - ${fb}`);
   matchs.push(finale);
-
-  // ⚠️ LE BAS DE TABLEAU SUIT LE RÈGLEMENT DE LA DIVISION, pas une règle commune : en Fédérale les deux derniers
-  // descendent sans jouer ; en Top 14 le dernier descend et l'avant-dernier défend sa place.
-  const z = zones(rulesFor(divisionId), taille);
-  const relegues = classement.slice(taille - z.directRelegation).map((l) => l.club).reverse();
-  const barragistes = z.accessMatch.map((position) => classement[position - 1].club).reverse();
-
-  return {
-    divisionId,
-    classement,
-    qualifies: q,
-    matchs,
-    champion: finale.vainqueur,
-    finaliste: finale.perdant,
-    relegues,
-    barragistes,
-    dernier: relegues[0] ?? null,
-    avantDernier: barragistes[0] ?? null,
-  };
+  return bilan(finale);
 }
 
 /**
@@ -231,7 +229,7 @@ export function pretendants(phase: PhaseFinale): string[] {
 }
 
 /** L'affiche de phase finale du joueur, uniquement le week-end du tour concerné. */
-export function matchPhaseFinaleDuJoueur(joueur: Joueur, bonusJoueur = 0): MatchFinal | null {
+export function matchPhaseFinaleDuJoueur(joueur: Joueur, bonusJoueur = 0): MatchElimination | null {
   const sem = semaine(joueur.semaine ?? 1);
   if (sem.type !== 'phaseFinale' || !sem.tourFinal || !joueur.division) return null;
   const phase = phaseFinale(joueur.division, joueur.saison, joueur.club, bonusJoueur);
@@ -247,17 +245,18 @@ export function matchAcces(
   haut: PhaseFinale,
   bas: PhaseFinale,
   saison: number,
-): MatchFinal | null {
+): MatchElimination | null {
   // Le tenant est le barragiste du haut ; le prétendant, le premier club du bas qui ne monte pas d'office.
   const tenant = haut.barragistes[0] ?? null;
+  if (!bas.champion) return null;
   const pretendant = pretendants(bas)[Math.max(1, haut.relegues.length)] ?? null;
   if (!tenant || !pretendant || tenant === pretendant) return null;
-  return duel(
-    tenant, pretendant, saison,
+  return preparerElimination(
+    tenant, pretendant,
     `acces#${haut.divisionId}#${bas.divisionId}#${saison}#${tenant}#${pretendant}`,
     'accession',
     `Match d’accès : ${tenant} - ${pretendant}`,
     // Recevoir chez soi avec sa place en jeu : un vrai avantage.
-    5,
+    CALENDRIER.find(s => s.tourFinal === 'acces')!.numero,
   );
 }
