@@ -882,36 +882,7 @@ export function Manager() {
 
           {vue === 'vestiaire' && avancee && <VestiaireManagerSimple manager={manager} effectif={effectifBrut} avancee={avancee} capitaines={definirHierarchieCapitaines} repondre={repondreDiscussion} demande={repondreDemande} />}
           {vue === 'infirmerie' && avancee && <InfirmerieManager manager={manager} effectif={effectifBrut} avancee={avancee} decider={deciderMedical} ameliorer={ameliorerMedical} />}
-          {vue === 'marche' && avancee && <details className="carte" open><summary>{t('staff.manager.squadContracts')}</summary>
-              <section className="carte contrats-effectif-manager">
-                <div className="comp-tete"><div><b><Icone nom="signature" taille={16} />{t("ui.8cf044680897")}</b><small>{t("ui.909420981e2f")}</small></div><span className="comp-count">{Object.values(avancee.contratsJoueurs).filter((c) => c.club === manager.club).length}</span></div>
-                <div className="barre-poules"><button className={`chip-poule${contratsARenouveler ? ' actif' : ''}`} onClick={() => setContratsARenouveler(true)}>{t('staff.contract.renewals')}</button><button className={`chip-poule${!contratsARenouveler ? ' actif' : ''}`} onClick={() => setContratsARenouveler(false)}>{t('staff.contract.all')}</button></div>
-                <div>{effectifBrut.map((j) => ({ j, c: avancee.contratsJoueurs[j.id] })).filter(({ c }) => c && (!contratsARenouveler || moisRestantsContrat(c.fin, manager.saison, manager.semaine) <= 12 || c.demandeRevalorisation)).sort((a, b) => a.c.fin - b.c.fin || b.c.interetExterieur - a.c.interetExterieur).map(({ j, c }) => {
-                  const nego = manager.negociations.findLast((n) => n.joueur.id === j.id && n.nature !== 'recrutement');
-                  const mois = moisRestantsContrat(c.fin, manager.saison, manager.semaine);
-                  const palier = palierContrat(mois);
-                  const dispo = disponibiliteJoueur(avancee.profilsMedicaux[j.id], manager.saison);
-                  const refus = avisProlongation(avancee, manager, j);
-                  return <article key={j.id} className={`${c.demandeRevalorisation ? 'revalorisation ' : ''}palier-${palier}`}>
-                    <span><b>{j.nom}</b><small>{t("ui.6d13dd4d9743", { v0: c.role, v1: c.fin, v2: c.option === 'aucune' ? t("ui.0300a63d8988") : t("ui.cd2d99d756f4", { v0: c.option }) })}</small></span>
-                    {/* ⚠️ LE COMPTE À REBOURS EST LA VRAIE INFORMATION. « Fin
-                        S4 » ne dit pas s'il faut agir cette semaine ; « 6 mois »
-                        si. Les paliers viennent de `palierContrat`, la seule
-                        définition, et colorent la ligne. */}
-                    <div className={`echeance-contrat ${palier}`}><small>{t("ui.394c96234324")}</small><strong>{mois <= 0 ? t("mgr.libreGratuit") : t("ui.43a5293487af", { v0: mois })}</strong></div>
-                    <div><small>{t("of.salaire")}</small><strong>{c.salaire > 0 ? `${nombre(c.salaire)} €` : t("mgr.amateur")}</strong></div>
-                    <div><small>{t("ui.07674f7ecdcb")}</small><strong>{c.satisfaction}/100</strong></div>
-                    <div><small>{t("ui.a75a02969ec8")}</small><strong>{c.attachement}/100{c.formeAuClub ? t("ui.697be59d8b4d") : ''}</strong></div>
-                    <div><small>{t("online.collection.status")}</small><strong>{dispo.possibles ? `${dispo.part}%` : '—'}</strong></div>
-                    <div><small>{t("ui.57028eb9694d")}</small><strong>{t("ui.168b895b1689", { v0: c.interetExterieur, v1: c.offresExterieures })}</strong></div>
-                    <small className="motivations-contrat">{c.motivations.map((m) => `${m.type} ${m.importance}`).join(' · ')}{palier === 'danger' ? t("ui.dc2fe6d10248") : palier === 'libre' ? t("ui.1d7c27822bda") : ''}</small>
-                    <small>{refus ? t(`staff.contract.refusal.${refus}`) : t('staff.contract.willing')}</small>
-                    <button className={c.demandeRevalorisation ? 'danger' : ''} disabled={nego?.etat === 'signee' && nego.saison === manager.saison} onClick={() => ouvrirRenegociationJoueur(j.id)}>{nego?.etat === 'ouverte' || nego?.etat === 'accord' ? t("ui.302b36b46694") : c.demandeRevalorisation ? t("ui.05bdbd2100e7") : c.fin <= manager.saison + 1 ? t("ui.dc943ee62ae4") : t("ui.e79b4886f0ac")}</button>
-                  </article>;
-                })}</div>
-              </section>
 
-          </details>}
 
           {vue === 'univers' && avancee && (
             <div className="manager-avance-grille univers-manager">
@@ -1483,7 +1454,37 @@ export function Manager() {
           )}
 
           {vue === 'marche' && (
-            <div className="manager-marche" data-tuto="mgr-marche">
+            <div className="manager-marche" data-tuto="mgr-marche" tabIndex={0} role="region" aria-label={t('mgr.marche')}>
+          {avancee && <details className="carte manager-contrats-marche"><summary>{t('staff.manager.squadContracts')}</summary>
+              <section className="carte contrats-effectif-manager">
+                <div className="comp-tete"><div><b><Icone nom="signature" taille={16} />{t("ui.8cf044680897")}</b><small>{t("ui.909420981e2f")}</small></div><span className="comp-count">{Object.values(avancee.contratsJoueurs).filter((c) => c.club === manager.club).length}</span></div>
+                <div className="barre-poules"><button className={`chip-poule${contratsARenouveler ? ' actif' : ''}`} onClick={() => setContratsARenouveler(true)}>{t('staff.contract.renewals')}</button><button className={`chip-poule${!contratsARenouveler ? ' actif' : ''}`} onClick={() => setContratsARenouveler(false)}>{t('staff.contract.all')}</button></div>
+                <div>{effectifBrut.map((j) => ({ j, c: avancee.contratsJoueurs[j.id] })).filter(({ c }) => c && (!contratsARenouveler || moisRestantsContrat(c.fin, manager.saison, manager.semaine) <= 12 || c.demandeRevalorisation)).sort((a, b) => a.c.fin - b.c.fin || b.c.interetExterieur - a.c.interetExterieur).map(({ j, c }) => {
+                  const nego = manager.negociations.findLast((n) => n.joueur.id === j.id && n.nature !== 'recrutement');
+                  const mois = moisRestantsContrat(c.fin, manager.saison, manager.semaine);
+                  const palier = palierContrat(mois);
+                  const dispo = disponibiliteJoueur(avancee.profilsMedicaux[j.id], manager.saison);
+                  const refus = avisProlongation(avancee, manager, j);
+                  return <article key={j.id} className={`${c.demandeRevalorisation ? 'revalorisation ' : ''}palier-${palier}`}>
+                    <span><b>{j.nom}</b><small>{t("ui.6d13dd4d9743", { v0: c.role, v1: c.fin, v2: c.option === 'aucune' ? t("ui.0300a63d8988") : t("ui.cd2d99d756f4", { v0: c.option }) })}</small></span>
+                    {/* ⚠️ LE COMPTE À REBOURS EST LA VRAIE INFORMATION. « Fin
+                        S4 » ne dit pas s'il faut agir cette semaine ; « 6 mois »
+                        si. Les paliers viennent de `palierContrat`, la seule
+                        définition, et colorent la ligne. */}
+                    <div className={`echeance-contrat ${palier}`}><small>{t("ui.394c96234324")}</small><strong>{mois <= 0 ? t("mgr.libreGratuit") : t("ui.43a5293487af", { v0: mois })}</strong></div>
+                    <div><small>{t("of.salaire")}</small><strong>{c.salaire > 0 ? `${nombre(c.salaire)} €` : t("mgr.amateur")}</strong></div>
+                    <div><small>{t("ui.07674f7ecdcb")}</small><strong>{c.satisfaction}/100</strong></div>
+                    <div><small>{t("ui.a75a02969ec8")}</small><strong>{c.attachement}/100{c.formeAuClub ? t("ui.697be59d8b4d") : ''}</strong></div>
+                    <div><small>{t("online.collection.status")}</small><strong>{dispo.possibles ? `${dispo.part}%` : '—'}</strong></div>
+                    <div><small>{t("ui.57028eb9694d")}</small><strong>{t("ui.168b895b1689", { v0: c.interetExterieur, v1: c.offresExterieures })}</strong></div>
+                    <small className="motivations-contrat">{c.motivations.map((m) => `${m.type} ${m.importance}`).join(' · ')}{palier === 'danger' ? t("ui.dc2fe6d10248") : palier === 'libre' ? t("ui.1d7c27822bda") : ''}</small>
+                    <small>{refus ? t(`staff.contract.refusal.${refus}`) : t('staff.contract.willing')}</small>
+                    <button className={c.demandeRevalorisation ? 'danger' : ''} disabled={nego?.etat === 'signee' && nego.saison === manager.saison} onClick={() => ouvrirRenegociationJoueur(j.id)}>{nego?.etat === 'ouverte' || nego?.etat === 'accord' ? t("ui.302b36b46694") : c.demandeRevalorisation ? t("ui.05bdbd2100e7") : c.fin <= manager.saison + 1 ? t("ui.dc943ee62ae4") : t("ui.e79b4886f0ac")}</button>
+                  </article>;
+                })}</div>
+              </section>
+
+          </details>}
               <div className="carte manager-marche-tete">
                 <div><div className="eyebrow">{t('mgr.baseMondiale')}</div><h2><Icone nom="monde" taille={22} /> {t('mgr.marcheTitre')}</h2><p>{t('mgr.marcheIntro')}</p></div>
                 {/* ⚠️ LA MASSE ENGAGÉE PASSE DEVANT LE PLAFOND. Un plafond seul

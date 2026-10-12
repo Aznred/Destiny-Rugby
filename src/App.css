@@ -60,6 +60,9 @@
 .manager-top-classement > div > strong { color:var(--craie-dim); }
 .manager-prochain { margin:.9rem 0 0; padding-top:.75rem; border-top:1px solid var(--bordure); color:var(--craie-dim); font-size:.8rem; }
 .manager-marche,.manager-negociations { display:grid; gap:1rem; }
+.manager-contrats-marche { margin:0; }
+.manager-contrats-marche > summary { cursor:pointer; padding:.8rem 1rem; }
+.manager-marche:focus-visible { outline:2px solid var(--or); outline-offset:3px; }
 .manager-marche-tete { display:flex; justify-content:space-between; gap:1rem; align-items:center; }
 .manager-marche-tete h2 { margin:.25rem 0; }
 .manager-marche-tete p { margin:.2rem 0 0; color:var(--craie-dim); }
@@ -805,16 +808,8 @@
     align-content: start;
     grid-auto-rows: max-content;
   }
-  /* Le Marché porte deux zones : les contrats de l'effectif, repliés, puis le marché. Dépliée, la liste des contrats
-     mesurait 5 960 px dans une colonne de 793 : elle sortait de la fenêtre, coupée, et le marché n'avait plus un
-     pixel de haut. Elle prend au plus la moitié de la colonne et défile en elle-même ; le marché garde le reste. */
-  .carriere-manager > details.carte[open] {
-    flex: 0 1 auto;
-    min-height: 0;
-    max-height: 55%;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-  }
+  /* Contrats et cibles partagent le défilement du marché : ouvrir les contrats
+     ne peut plus comprimer la liste des joueurs dans une seconde zone. */
   /* Les dossiers de détection s'affichent aussi dans Formation : même liste,
      même plancher de rangée que dans Recruteurs — sans quoi la grille écrase
      ses cartes au lieu de les laisser défiler. */

@@ -2073,6 +2073,11 @@ place dans Safari est déduit du code de son moteur, pas mesuré. Mesuré mais p
 Base privée de 470 742 profils, retrait des identités jeunesse, agrégats de formation et bêta féminine réservée au compte Kiri par autorisation serveur. Voir [serveur/FFR-INTEGRATION.md](serveur/FFR-INTEGRATION.md) pour les seuils, snapshots, commandes et limites de validation.
 
 
+
+### Marché mondial et vivier solo
+
+Sur PC, les contrats de l’effectif et les joueurs du marché partagent une seule zone de défilement ; les contrats sont repliés au départ. Les instantanés privés `2026_10_FFR_CAREER34` et `2026_10_FFR_CAREER34_V2` sont disponibles en production avec 792 profils chacun. Une carrière charge sa version épinglée, avec une session de compte, puis conserve sa timeline locale. `scripts/publierVivierCarriereFfr.mjs <version>` audite le snapshot ; `--appliquer` publie ses seuls profils privés dans une transaction, sans remplacer le catalogue de cartes actif. Les fichiers sources restent hors du répertoire public.
+
 ### Publicités récompensées — AppLixir
 
 La boutique propose des Ovas volontaires ; les ligues proposent deux Packs Pub par compte et par jour (minuit Europe/Paris). Le callback signé MD5 + TID valide seul la récompense, dont la réclamation et l'ouverture sont idempotentes. Le webhook utilise directement `https://www.destiny-rugby.fr/api/carriere?applixirCallback=1`, sans redirection. Le SDK suit `start` et attend sa fin de lecteur avant le nettoyage ; les erreurs asynchrones libèrent la tentative. Un reçu signé retardé prime sur une fermeture locale avant expiration, avec quota atomique. Les complétions locales en attente sont récupérables après rechargement, sans crédit client. Le Labo explique le maintien en Test jusqu'à l'approbation AppLixir et l'activation serveur ; une clé Test ne produit pas de statistiques Live.
