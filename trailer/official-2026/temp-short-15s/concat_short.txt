@@ -1,0 +1,7 @@
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/official-2026/temp-short-15s/short_00_fifa.mp4'
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/official-2026/temp-short-15s/short_01_fm.mp4'
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/official-2026/temp-short-15s/short_02_rugby.mp4'
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/official-2026/temp-short-15s/short_04_clubs.mp4'
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/official-2026/temp-short-15s/short_05_pack.mp4'
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/official-2026/temp-short-15s/short_10_highlights.mp4'
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/official-2026/temp-short-15s/short_11_outro.mp4'

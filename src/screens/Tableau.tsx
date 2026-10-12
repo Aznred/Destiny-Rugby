@@ -24,7 +24,8 @@ import { phaseFinale, type MatchFinal } from '../lib/phaseFinale';
 import { tournoiDeFinDAnnee } from '../lib/tournoi';
 import { TOURS_ELIMINATION, semaineElimination, type MatchElimination } from '../lib/bracketProgressif';
 import { coupeEnDirect, coupesDuClubALaDate } from '../lib/coupe';
-import { rulesFor, standingsStatuses, type StandingsStatus } from '../lib/competitionRules';
+import { type StandingsStatus } from '../lib/competitionRules';
+import { statutsDeLaPoule } from '../lib/promotion';
 import { TableauClassement } from '../components/TableauClassement';
 import {
   internationalEnDirect, affichesInternationales, competitionsDeLaSaison,
@@ -985,7 +986,7 @@ export function Tableau() {
               <span className="comp-count">{etat.poule.length} {t('gen.clubs')}</span>
             </div>
             <Tableau1 lignes={etat.classement} club={carriere.club}
-              statuts={standingsStatuses(rulesFor(choix), etat.classement.length, poules.length)} />
+              statuts={statutsDeLaPoule(choix, poules.length > 1 ? poule : 0, etat.classement.length)} />
           </div>
 
           {/* ---------- TOURNOI DE FIN D'ANNÉE ---------- */}

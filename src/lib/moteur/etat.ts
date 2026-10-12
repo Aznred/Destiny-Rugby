@@ -605,6 +605,14 @@ export interface Aplatissage {
   lieu: Vec;
   /** Comment il marque (niveau 6) : plongeon, en force, glissade, posé, en coin, sous les poteaux… */
   style?: import('./animations').StyleEssai;
+  // ── Niveau 7 (Correctif 39) : le plongeon qui garde son élan ──
+  /** Où le ballon touche l'en-but (la fin du vol) : c'est la marque de la transformation. */
+  pose?: Vec;
+  /** Le sens du plongeon (radians, repère du terrain) et la durée du vol (s) : la scène cale son geste dessus. */
+  cap?: number;
+  vol?: number;
+  /** Les défenseurs qui étaient sur le marqueur quand il a franchi la ligne : eux seuls peuvent tenir le ballon en-but. */
+  auContact?: string[];
 }
 
 // LE LANCEMENT DE JEU : la combinaison décidée pour la phase qui commence.

@@ -1269,6 +1269,8 @@ export interface Manager {
   historique: SaisonManager[];
   /** Les systèmes persistants des carrières longues (direction, monde et mémoire). */
   avancee?: import('./lib/carriereAvancee').EtatCarriereAvancee;
+  /** Ce que la dernière clôture de saison a réglé d'office, et les étapes annexes qui ont échoué (Correctif 39). */
+  derniereCloture?: import('./lib/clotureSaison').RapportCloture;
   /**
    * Le passé de joueur, quand la carrière vient d’une reconversion.
    *

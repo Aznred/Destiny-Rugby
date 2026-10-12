@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Destiny Rugby — pub « L'homme qui a disparu devant 80 000 témoins »</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@600;700;800&display=block">
+  <link rel="stylesheet" href="../catastrophe/pub.css">
+  <link rel="stylesheet" href="./pub.css">
+</head>
+<body>
+  <!-- 540 × 960 points : filmée à l'échelle 2, la page donne 1080 × 1920. -->
+  <div id="cadre">
+    <canvas id="toile"></canvas>
+    <canvas id="jeu" width="1080" height="1920"></canvas>
+    <!-- L'habillage de la caméra de surveillance, posé sur le vrai jeu le temps de la chute. -->
+    <div id="surveillance">
+      <div class="sv-lignes"></div>
+      <div class="sv-haut"><span>CAM 09</span><span class="sv-rec"><i></i>REC</span></div>
+      <div class="sv-bas"></div>
+      <i class="sv-coin hg"></i><i class="sv-coin hd"></i><i class="sv-coin bg"></i><i class="sv-coin bd"></i>
+    </div>
+    <div id="fin">
+      <div class="fin-voile"></div>
+      <div class="fin-lignes"></div>
+      <img class="fin-embleme" src="/favicon.svg" alt="">
+      <div class="fin-nom"><span class="fin-mot" id="fin-destiny">DESTINY</span><span class="fin-mot" id="fin-rugby">RUGBY</span></div>
+      <div class="fin-filet"></div>
+      <div class="fin-accroche"></div>
+      <div class="fin-adresse">destiny-rugby.fr</div>
+    </div>
+    <div id="eclair"></div>
+    <div id="sous-titres"></div>
+  </div>
+  <script type="module" src="./pub.js"></script>
+</body>
+</html>

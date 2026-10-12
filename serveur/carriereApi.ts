@@ -32,7 +32,7 @@ import {
 } from '../src/lib/packsInternes.js';
 import { cleJoueurImage, imagesDepuisDemandes, validerDemandeImage, type ImagesJoueurs } from '../src/lib/demandesImage.js';
 import { apparencePackInterne, contenuPackInterne, detailPackInterne, rechercherCartes, resoudreCartes, universCartes } from './packsInternes.js';
-import { creerServicePublicites, configPublicites, raisonModePublicites, packPourPublicites } from './publicitesRecompensees.js';
+import { creerServicePublicites, configPublicites, raisonModePublicites, packPourPublicites, parametresCallbackAppLixir, resumeCallback, type RefusCallback } from './publicitesRecompensees.js';
 import { ouvrirPackPublicitaire, reserverPackPublicitaire, packPublicitaireDisponible } from '../src/lib/ligue/carriere.js';
 import { chancesPacksPub, PUBLICITES_PAR_DEFAUT } from '../src/lib/publicitesRecompensees.js';
 import { creerServiceValidation, dossierPublic } from './validationClassement.js';
@@ -787,15 +787,20 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
     res.setHeader('X-Content-Type-Options', 'nosniff');
     try {
       if (req.method !== 'GET' && req.method !== 'POST') throw new ErreurHttp(405, 'Méthode non autorisée.');
-      protegerOrigine(req);
       const url = new URL(req.url ?? '/api/carriere', 'http://localhost');
       const maintenant = Date.now();
-      if (url.searchParams.get('applixirCallback') === '1') {
-        if (req.method !== 'GET') throw new ErreurHttp(405, 'Méthode non autorisée.');
+      // ⚠️ LE CALLBACK APPLIXIR PASSE AVANT LA PROTECTION D'ORIGINE : c'est un appel de serveur à serveur, sans cookie, que
+      // seule sa signature authentifie. `parametresCallbackAppLixir` reconnaît aussi l'adresse propre (`/api/applixir`) et
+      // des paramètres collés avec un second « ? » — voir son commentaire : cette forme recevait un 401.
+      const rappel = parametresCallbackAppLixir(url, req.method === 'POST' ? req.body : undefined);
+      if (rappel) {
         if (!stockage.publicites) throw new ErreurHttp(503, 'Publicités indisponibles.');
+        const publicites = creerServicePublicites(stockage.publicites);
+        const forme = url.searchParams.get('applixirCallback') === '1' ? 'propre' : url.searchParams.has('applixirCallback') ? 'second « ? »' : 'adresse /api/applixir';
         try {
-          const resultat = await creerServicePublicites(stockage.publicites).callback(url.searchParams, maintenant);
-          const session = await stockage.publicites.trouver(url.searchParams.get('userId')!);
+          const resultat = await publicites.callback(rappel, maintenant);
+          console.info('[applixir] callback accepté', JSON.stringify({ methode: req.method, forme, ...resumeCallback(rappel) }));
+          const session = await stockage.publicites.trouver((rappel.get('userId') ?? '').toLowerCase());
           if (session?.rewardStatus === 'RESERVED' && session.pack && session.ligue) {
             // Le contenu reste privé mais durable, même si le navigateur a déjà fermé.
             await appliquer(session.ligue, session.compte, 'reserve-pub-'+session.rewardSessionId,
@@ -803,10 +808,17 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
           }
           return res.status(200).json(resultat);
         } catch (e) {
-          if ((e as Error).name === 'ErreurCarriere') throw new ErreurHttp(process.env.APPLIXIR_CALLBACK_SECRET ? 403 : 503, (e as Error).message);
+          if ((e as Error).name === 'ErreurCarriere') {
+            // Un refus se LIT : dans les journaux du serveur, et sur la session concernée (Labo → Publicités).
+            const raison = (e as Error & { refus?: RefusCallback }).refus ?? 'autre';
+            console.warn('[applixir] callback refusé', JSON.stringify({ raison, methode: req.method, forme, ...resumeCallback(rappel) }));
+            await publicites.noterRefus(rappel, raison, maintenant);
+            throw new ErreurHttp(process.env.APPLIXIR_CALLBACK_SECRET ? 403 : 503, (e as Error).message);
+          }
           throw e;
         }
       }
+      protegerOrigine(req);
       if (url.searchParams.get('horloge') === '1') {
         const secret = process.env.CRON_SECRET;
         if (!secret || entete(req, 'authorization') !== `Bearer ${secret}`) throw new ErreurHttp(401, 'Connexion requise.');
@@ -1271,7 +1283,9 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
             const packs = await ffr.avecPool('mixed', () => cataloguePacksPublicitaires().map(packPourPublicites));
             return res.status(200).json({ revision: catalogueAdmin().revision, config: { ...PUBLICITES_PAR_DEFAUT, ...catalogueAdmin().publicites },
               modeEffectif: configPublicites().mode, raisonMode: raisonModePublicites(), callbackConfigure: Boolean(process.env.APPLIXIR_CALLBACK_SECRET),
-              packs, chances: chancesPacksPub(packs,maintenant), statistiques: await stockage.publicites.statistiques() });
+              packs, chances: chancesPacksPub(packs,maintenant), statistiques: await stockage.publicites.statistiques(),
+              // Le journal des callbacks refusés : facultatif, il ne doit jamais retirer la page au Labo.
+              refus: await stockage.publicites.refus?.().catch(() => null) ?? null });
           }
           if (section === 'clubs') return res.status(200).json(vueDonneesClubs());
           if (section === 'speciales') return res.status(200).json(vueSpeciales(maintenant));

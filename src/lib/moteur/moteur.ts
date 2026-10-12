@@ -56,7 +56,7 @@ import {
   placementRuck, placementTir, placementTouche,
 } from './phasesArretees.js';
 import { decomposer } from './plan.js';
-import { avancerArbitre, avancerCorps, declencherChute, incidentDeContact, jouerGeste, visibiliteFaute } from './dynamique.js';
+import { avancerArbitre, avancerCorps, declencherChute, declencherGlissade, incidentDeContact, jouerGeste, visibiliteFaute } from './dynamique.js';
 import { organiserRuck, placerRegroupement, animerRegroupement, preparerChenille, designerRelayeur, ramasseurAuRuck } from './regroupements.js';
 import * as C from './commentaire.js';
 import { routineDuJoueur } from './routinesButeur.js';
@@ -68,10 +68,11 @@ import {
   FETEURS, MANQUES_DEBOUT, TEMPS_GRATTAGE, choisirCelebration, choisirCrochet, choisirEssai, choisirFrappe, choisirManque, choisirPasse,
   choisirPercussion, choisirPlaquage, choisirRaffut, choisirReception, issuePercussion, jeuPhysique, lireContexte, lirePlaquageDangereux,
   niveauFatigue, profilAnimation, risqueDeGesteDangereux, sequenceDuGrattageGagne, varianteContreRuck,
+  essaisVivants, planifierEssai,
   type CauseAltercation, type ContexteContact, type SequenceGrattage, type StyleEssai,
 } from './animations.js';
 import { jeuxDeTouche, sortieDeLaSuite, type ZoneDeTouche } from './touches.js';
-import { chercherAltercation, conduireAltercation } from './altercations.js';
+import { chercherAltercation, conduireAltercation, tirageAPart } from './altercations.js';
 import { positionVol, GRAVITE_BALLON, viseeTir, viseeTirVariee, type ContexteTir } from './trajectoire.js';
 import {
   deriveDuTir, distanceAuxPoteaux, porteeEngagement, puissanceUtile, resoudreEngagement, resoudreTirHumain, type ViseeEngagement, type ViseeHumaine,
@@ -190,7 +191,13 @@ export const TEMPS_MELEE = { liaison: 3.6, impact: 1.2, introduction: 1.6, pouss
 const DUREE_MELEE_DETAILLEE = TEMPS_MELEE.liaison + TEMPS_MELEE.impact + TEMPS_MELEE.introduction
   + TEMPS_MELEE.poussee + TEMPS_MELEE.sortie;
 /** Le rituel du buteur : on fête l'essai, puis ramassage, pose, concentration, élan. */
-export const RITUEL_TIR = { celebration: 6, ramassage: 1.5, pose: 9.6, pret: 1.8, elan: 2.25, poseHumain: 2.4, elanHumain: 2.25 };
+// ⚠️ `elanHumain` EST PLUS COURT QUE `elan`, ET C'EST LE CLIP QUI LE DIT (Correctif 39). Demande : « dès que le geste est
+// terminé, le botteur commence immédiatement sa course d'élan — pas de grosse pause entre l'input et l'animation ».
+// Le clip de frappe de l'APK dure 2,25 s jusqu'à l'impact, mais sa racine ne bouge pas pendant la première seconde : le
+// buteur s'y balance sur place avant de partir (mesuré sur la courbe de sa racine : il quitte sa marque à 1,1 s). Avec un
+// élan de 2,25 s, le joueur relâchait son geste et regardait un botteur immobile. Un tir joué à la main entre donc dans
+// le clip à 1,05 s — la scène lit ce décalage ici (`IMPACT_TIR − elanHumain`) — et le ballon part 1,2 s après le geste.
+export const RITUEL_TIR = { celebration: 6, ramassage: 1.5, pose: 9.6, pret: 1.8, elan: 2.25, poseHumain: 2.4, elanHumain: 1.2 };
 /** Secondes simulées accordées au joueur pour viser un tir : au-delà, l'IA tape à sa place. */
 export const DELAI_TIR_HUMAIN = 25;
 
@@ -8748,6 +8755,8 @@ function tenterEssai(e: EtatMatch, marqueur: Pion, origine: 'jeu' | 'maul' = 'je
   // Ce bref état garde porteur et ballon ensemble et rend enfin l'essai visible
   // avant que l'écran bascule sur la transformation.
   if (!e.aplatissage) {
+    // Niveau 7 : le marqueur garde son élan — vol, réception, glissade (`lancerEssaiVivant`).
+    if (essaisVivants(e) && e.cadenceDetaillee && origine === 'jeu') return lancerEssaiVivant(e, marqueur);
     const lieu = {
       x: cote === 'A' ? Math.max(marqueur.pos.x, LIGNE_B + 0.55) : Math.min(marqueur.pos.x, LIGNE_A - 0.55),
       y: borner(marqueur.pos.y, 1.5, LARGEUR - 1.5),
@@ -8784,7 +8793,12 @@ function tenterEssai(e: EtatMatch, marqueur: Pion, origine: 'jeu' | 'maul' = 'je
   e.aplatissage = null;
 
   // 🛡️ DÉFENSE SUR LA LIGNE : Ballon tenu en-but uniquement si des défenseurs sont au contact direct (< 2.0 m)
-  const defenseursEnBut = surLeTerrain(e, adverse(cote)).filter((p) => distance(p.pos, marqueur.pos) < 2.0 && p.battu <= 0);
+  // Niveau 7 : le marqueur a glissé loin de la ligne — ce sont ceux qui étaient SUR LUI en la franchissant qui peuvent
+  // se glisser sous le ballon, pas ceux qui l'ont rejoint (ou perdu) pendant la glissade.
+  const auContact = action?.auContact;
+  const defenseursEnBut = auContact
+    ? surLeTerrain(e, adverse(cote)).filter((p) => auContact.includes(p.id) && p.sanction <= 0)
+    : surLeTerrain(e, adverse(cote)).filter((p) => distance(p.pos, marqueur.pos) < 2.0 && p.battu <= 0);
   if (!e.carriereDixMinutes && defenseursEnBut.length > 0) {
     const forceDef = defenseursEnBut.reduce((acc, d) => acc + d.plaquage * 0.55 + d.puissance * 0.45, 0) / defenseursEnBut.length;
     const forceAtt = (marqueur.puissance * 0.55 + marqueur.evitement * 0.45) * (0.75 + marqueur.endurance / 400);
@@ -8805,7 +8819,114 @@ function tenterEssai(e: EtatMatch, marqueur: Pion, origine: 'jeu' | 'maul' = 'je
     return;
   }
 
-  validerEssai(e, marqueur, origine, action?.style);
+  validerEssai(e, marqueur, origine, action?.style, action?.pose ? { pose: action.pose, cap: action.cap } : undefined);
+}
+
+/**
+ * ═══ L'ESSAI QUI GARDE SON ÉLAN (Correctif 39, niveau 7) ═════════════════════════════════════════════════════════════
+ *
+ * Demande : « le joueur ne doit pas passer de 9 m/s à 0 m/s instantanément dès que TRY = true ».
+ *
+ * Le marqueur franchit la ligne : sa façon de marquer se lit sur la situation (`planifierEssai` : qui le poursuit et d'où,
+ * sa vitesse, son gabarit, sa place dans l'en-but), puis son corps suit un vrai mouvement — un vol qui garde l'essentiel
+ * de sa vitesse, une réception, une glissade que la pelouse freine. Un ailier lancé à neuf mètres par seconde parcourt
+ * cinq mètres après la ligne ; un pilier au ras pose le ballon sans s'envoler.
+ *
+ * ⚠️ LA PHASE DURE CE QUE DURE LE MOUVEMENT (`e.minuteur`) : la validation n'arrive qu'une fois le corps arrêté. Plus de
+ * `stopper` sur un joueur qui court encore.
+ * ⚠️ IL NE SORT PAS DE L'EN-BUT : la glissade est freinée pour finir un mètre avant la ligne de ballon mort, et un
+ * plongeon qui partirait en touche d'en-but part droit.
+ */
+function lancerEssaiVivant(e: EtatMatch, marqueur: Pion): void {
+  const cote = marqueur.cote, s = sens(cote);
+  const v = Math.hypot(marqueur.vitesse.x, marqueur.vitesse.y);
+  // Sa course ; à l'arrêt ou presque, droit vers l'en-but.
+  let ux = v > 0.8 ? marqueur.vitesse.x / v : s, uy = v > 0.8 ? marqueur.vitesse.y / v : 0;
+  // Le défenseur valide le plus proche, et d'où il vient par rapport à cette course.
+  let proche: Pion | null = null, d = Infinity;
+  const auContact: string[] = [];
+  for (const p of surLeTerrain(e, adverse(cote))) {
+    if (p.sanction > 0 || p.corps || p.battu > 0) continue;
+    const dp = distance(p.pos, marqueur.pos);
+    if (dp < 2.0) auContact.push(p.id);
+    if (dp < d) { d = dp; proche = p; }
+  }
+  const rx = proche ? (proche.pos.x - marqueur.pos.x) / Math.max(0.01, d) : 0;
+  const ry = proche ? (proche.pos.y - marqueur.pos.y) / Math.max(0.01, d) : 0;
+  // La normale à sa course : le signe dit de quel côté est le défenseur.
+  const lateral = rx * -uy + ry * ux;
+  const plan = planifierEssai({
+    vitesse: v, defenseur: d, devant: rx * ux + ry * uy, cote: Math.abs(lateral) < 0.25 ? 0 : Math.sign(lateral),
+    touche: Math.min(marqueur.pos.y, LARGEUR - marqueur.pos.y), axe: Math.abs(marqueur.pos.y - AXE),
+    profil: profilAnimation(marqueur),
+    // Une interception se reconnaît à son geste : il est gardé huit secondes dans l'état, le temps d'aller à dame.
+    intercepte: (e.gestes ?? []).some((g) => g.joueurId === marqueur.id && g.clip === 'intercept'),
+    // Un tirage À PART (graine du vent, instant, joueur) : il ne décale aucun tirage du match.
+    hasard: tirageAPart(e, 'essai:' + marqueur.id),
+  });
+  // Il s'écarte du contact, mais toujours vers l'en-but : au moins la moitié de son élan dans l'axe.
+  if (plan.ecart) {
+    const nx = -uy, ny = ux;
+    ux += nx * plan.ecart; uy += ny * plan.ecart;
+    const n = Math.max(0.01, Math.hypot(ux, uy)); ux /= n; uy /= n;
+  }
+  if (ux * s < 0.5) { ux = s * 0.5; uy = (uy < 0 ? -1 : 1) * Math.sqrt(0.75); }
+  // Un mètre avant la ligne de ballon mort : c'est tout ce qu'il a devant lui.
+  const profondeur = Math.max(0.6, ((s > 0 ? LONGUEUR - 1.2 : 1.2) - marqueur.pos.x) * s);
+  let lieu: Vec, pose: Vec | undefined, cap: number | undefined, duree: number;
+  if (plan.plonge) {
+    // On se jette, même à petite allure ; et personne ne plonge plus vite qu'il ne court.
+    const v0 = Math.max(3.4, Math.min(v, 10.9));
+    let enLAir = v0 * plan.garde;
+    const auSol = v0 * plan.reception;
+    // Il partirait en touche d'en-but : il plonge droit.
+    const libre = enLAir * plan.vol + auSol * auSol / (2 * plan.frottement);
+    const yFin = marqueur.pos.y + uy * libre;
+    if (yFin < 1 || yFin > LARGEUR - 1) { ux = s; uy = 0; }
+    // Un vol qui ne tient pas dans ce qu'il reste d'en-but est raccourci ; la pelouse freine le reste.
+    enLAir = Math.min(enLAir, 0.6 * profondeur / Math.max(0.01, plan.vol * Math.abs(ux)));
+    const dVol = enLAir * plan.vol;
+    const pourGlisser = Math.max(0.3, (profondeur - dVol * Math.abs(ux)) / Math.max(0.3, Math.abs(ux)));
+    const frottement = Math.max(plan.frottement, auSol * auSol / (2 * pourGlisser));
+    const dGlisse = auSol * auSol / (2 * frottement);
+    pose = { x: marqueur.pos.x + ux * dVol, y: borner(marqueur.pos.y + uy * dVol, 0.6, LARGEUR - 0.6) };
+    lieu = { x: pose.x + ux * dGlisse, y: borner(pose.y + uy * dGlisse, 1, LARGEUR - 1) };
+    cap = Math.atan2(uy, ux);
+    duree = plan.vol + auSol / frottement;
+    declencherGlissade(marqueur, { x: ux, y: uy }, { vol: plan.vol, enLAir, auSol, frottement }, duree + 1.1);
+    // Le défenseur accroché à lui plonge avec lui, un temps derrière.
+    if (proche && d < 2.1) {
+      declencherGlissade(proche, { x: ux, y: uy }, { vol: plan.vol * 0.8, enLAir: enLAir * 0.7, auSol: auSol * 0.55, frottement: frottement * 1.3 }, duree + 0.9);
+      jouerGeste(e, proche, 'tackle_low', 1.35);
+    }
+    duree += 0.35;
+    jouerGeste(e, marqueur, 'dive_try', duree + 0.6, plan.style);
+  } else {
+    // Il pose le ballon sans plonger : sa course le porte encore, et il freine — jamais d'arrêt net.
+    const elan = Math.min(Math.max(0.5, profondeur - 0.6), v * v / (2 * plan.frottement) + 0.4);
+    lieu = { x: marqueur.pos.x + ux * elan, y: borner(marqueur.pos.y + uy * elan, 1.5, LARGEUR - 1.5) };
+    // Jamais sur la ligne : il entre d'au moins une cinquantaine de centimètres, même bousculé au contact.
+    lieu.x = cote === 'A' ? Math.max(lieu.x, LIGNE_B + 0.55) : Math.min(lieu.x, LIGNE_A - 0.55);
+    marqueur.effort = Math.min(marqueur.effort, 0.55);
+    duree = Math.max(1.35, v / plan.frottement + 1);
+    jouerGeste(e, marqueur, 'try', duree, plan.style);
+    if (proche && d < 2.1) {
+      declencherChute(proche, { x: s * 2, y: 0 }, 1.35);
+      jouerGeste(e, proche, 'tackle_low', 1.35);
+    }
+  }
+  marqueur.cible = { ...lieu };
+  e.ballon = { ...marqueur.pos };
+  e.porteur = marqueur;
+  e.vol = null;
+  e.ballonLibre = null;
+  e.lancement = null;
+  e.aplatissage = {
+    marqueur, origine: 'jeu', lieu, style: plan.style, auContact,
+    ...(pose ? { pose, cap, vol: plan.vol } : {}),
+  };
+  e.phase = 'aplatissage';
+  e.minuteur = duree;
 }
 
 /** Les styles où le marqueur se jette dans l'en-but (les autres posent le ballon debout ou un genou à terre). */
@@ -8899,8 +9020,15 @@ function declencherTMOEssai(e: EtatMatch, action: Aplatissage): void {
   dire(e, 'jalon', null, `📺 TMO DEMANDÉ ! L'arbitre interrompt la validation pour vérifier à la vidéo : ${libelle}.`);
 }
 
-function validerEssai(e: EtatMatch, marqueur: Pion, origine: 'jeu' | 'maul', style?: StyleEssai): void {
+function validerEssai(
+  e: EtatMatch, marqueur: Pion, origine: 'jeu' | 'maul', style?: StyleEssai,
+  /** Niveau 7 : où le ballon a touché l'en-but (la marque de la transformation) et dans quel sens le marqueur a plongé. */
+  vivant?: { pose: Vec; cap?: number },
+): void {
   const cote = marqueur.cote;
+  // ⚠️ LA MARQUE EST LE POINT D'APLATISSAGE, pas l'endroit où la glissade s'arrête : un plongeon en travers ne déplace
+  // pas la transformation de trois mètres.
+  const yEssai = vivant?.pose.y ?? marqueur.pos.y;
 
   marqueur.stats.essais += 1;
   if (e.dernierPasseur && e.dernierPasseur !== marqueur && e.dernierPasseur.cote === cote) {
@@ -8937,7 +9065,7 @@ function validerEssai(e: EtatMatch, marqueur: Pion, origine: 'jeu' | 'maul', sty
 
   const liste = surLeTerrain(e, cote);
   const buteur = liste.find((p) => p.buteur) ?? [...liste].sort((a, b) => b.pied - a.pied)[0] ?? marqueur;
-  const ecartAxe = Math.abs(marqueur.pos.y - AXE);
+  const ecartAxe = Math.abs(yEssai - AXE);
   const chance = probaTir(22 + ecartAxe * 0.55, ecartAxe, buteur.pied);
 
   const transforme = e.rng() < chance;
@@ -8951,7 +9079,7 @@ function validerEssai(e: EtatMatch, marqueur: Pion, origine: 'jeu' | 'maul', sty
 
   const lieu = {
     x: (cote === 'A' ? LIGNE_B : LIGNE_A) - sens(cote) * 22,
-    y: borner(marqueur.pos.y, 2.5, LARGEUR - 2.5),
+    y: borner(yEssai, 2.5, LARGEUR - 2.5),
   };
   const routine = routineDuJoueur(buteur);
   if (e.cadenceDetaillee) {
@@ -8959,7 +9087,11 @@ function validerEssai(e: EtatMatch, marqueur: Pion, origine: 'jeu' | 'maul', sty
     // coéquipiers les plus proches viennent à lui, et le ballon reste où il a
     // été aplati jusqu'à ce que le buteur vienne le chercher. Auparavant le
     // buteur et le ballon étaient posés d'un coup à vingt-deux mètres.
-    const sol = { ...marqueur.pos };
+    // Après un plongeon, le ballon reste où les MAINS l'ont posé : devant le corps allongé, pas sous son bassin.
+    const sol = vivant?.cap !== undefined ? {
+      x: borner(marqueur.pos.x + Math.cos(vivant.cap) * 0.6, 0.6, LONGUEUR - 0.6),
+      y: borner(marqueur.pos.y + Math.sin(vivant.cap) * 0.6, 0.6, LARGEUR - 0.6),
+    } : { ...marqueur.pos };
     e.ballon = { ...sol };
     buteur.stats.butsTentes += 1;
     // Niveau 6 : la fête dépend du match — un coéquipier vient taper dans la main de celui qui marque à vingt points
@@ -9189,7 +9321,7 @@ function phaseTMO(e: EtatMatch): void {
     tmo.decision = 'essai_accorde';
     dire(e, 'jalon', null, `✅ TMO DÉCISION : Aucune irrégularité constatée après visionnage des angles vidéo ! ESSAI ACCORDÉ !`);
     e.tmo = null;
-    validerEssai(e, action.marqueur, action.origine, action.style);
+    validerEssai(e, action.marqueur, action.origine, action.style, action.pose ? { pose: action.pose, cap: action.cap } : undefined);
     return;
   }
 

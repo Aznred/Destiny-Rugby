@@ -1,0 +1,320 @@
+{
+ "langue": "en",
+ "voix": "en.mp3",
+ "modele": "prise fournie, alignée par transcription (Scribe)",
+ "duree": 26.72,
+ "ecart": 0,
+ "entendu": "What would happen if an 800-kilometer wide object headed straight for Earth? Its impact could unleash gigantic tsunamis, violent earthquakes, and perhaps even the end of civilization. But scientists would discover something that should be completely impossible. Wait, is that a rugby ball? [laughs] Someone kicked it way too hard. Destiny Rugby, play free at destiny-rugby.fr.",
+ "scenes": [
+  {
+   "scene": 1,
+   "texte": "What would happen if an eight-hundred-kilometer-wide object headed straight for Earth?",
+   "debut": 0.14,
+   "fin": 4.58,
+   "mots": [
+    {
+     "mot": "What",
+     "debut": 0.14,
+     "fin": 0.28
+    },
+    {
+     "mot": "would",
+     "debut": 0.3,
+     "fin": 0.42
+    },
+    {
+     "mot": "happen",
+     "debut": 0.52,
+     "fin": 0.94
+    },
+    {
+     "mot": "if",
+     "debut": 1,
+     "fin": 1.08
+    },
+    {
+     "mot": "an",
+     "debut": 1.12,
+     "fin": 1.3
+    },
+    {
+     "mot": "eight-hundred-kilometer-wide",
+     "debut": 1.54,
+     "fin": 2.66
+    },
+    {
+     "mot": "object",
+     "debut": 2.82,
+     "fin": 3.2
+    },
+    {
+     "mot": "headed",
+     "debut": 3.26,
+     "fin": 3.48
+    },
+    {
+     "mot": "straight",
+     "debut": 3.7,
+     "fin": 4.019
+    },
+    {
+     "mot": "for",
+     "debut": 4.059,
+     "fin": 4.14
+    },
+    {
+     "mot": "Earth?",
+     "debut": 4.26,
+     "fin": 4.58
+    }
+   ]
+  },
+  {
+   "scene": 2,
+   "texte": "Its impact could unleash gigantic tsunamis, violent earthquakes, and perhaps even the end of civilization.",
+   "debut": 5.2,
+   "fin": 12.2,
+   "mots": [
+    {
+     "mot": "Its",
+     "debut": 5.2,
+     "fin": 5.38
+    },
+    {
+     "mot": "impact",
+     "debut": 5.44,
+     "fin": 5.96
+    },
+    {
+     "mot": "could",
+     "debut": 5.98,
+     "fin": 6.1
+    },
+    {
+     "mot": "unleash",
+     "debut": 6.14,
+     "fin": 6.5
+    },
+    {
+     "mot": "gigantic",
+     "debut": 6.56,
+     "fin": 7.18
+    },
+    {
+     "mot": "tsunamis,",
+     "debut": 7.24,
+     "fin": 7.88
+    },
+    {
+     "mot": "violent",
+     "debut": 8.24,
+     "fin": 8.58
+    },
+    {
+     "mot": "earthquakes,",
+     "debut": 8.68,
+     "fin": 9.24
+    },
+    {
+     "mot": "and",
+     "debut": 9.6,
+     "fin": 9.68
+    },
+    {
+     "mot": "perhaps",
+     "debut": 9.72,
+     "fin": 10.26
+    },
+    {
+     "mot": "even",
+     "debut": 10.42,
+     "fin": 10.62
+    },
+    {
+     "mot": "the",
+     "debut": 10.66,
+     "fin": 10.82
+    },
+    {
+     "mot": "end",
+     "debut": 10.9,
+     "fin": 11.14
+    },
+    {
+     "mot": "of",
+     "debut": 11.18,
+     "fin": 11.3
+    },
+    {
+     "mot": "civilization.",
+     "debut": 11.36,
+     "fin": 12.2
+    }
+   ]
+  },
+  {
+   "scene": 3,
+   "texte": "But scientists would discover something that should be completely impossible...",
+   "debut": 12.8,
+   "fin": 17.1,
+   "mots": [
+    {
+     "mot": "But",
+     "debut": 12.8,
+     "fin": 12.94
+    },
+    {
+     "mot": "scientists",
+     "debut": 13.04,
+     "fin": 13.56
+    },
+    {
+     "mot": "would",
+     "debut": 13.58,
+     "fin": 13.7
+    },
+    {
+     "mot": "discover",
+     "debut": 13.72,
+     "fin": 14.16
+    },
+    {
+     "mot": "something",
+     "debut": 14.28,
+     "fin": 14.68
+    },
+    {
+     "mot": "that",
+     "debut": 14.74,
+     "fin": 14.9
+    },
+    {
+     "mot": "should",
+     "debut": 14.96,
+     "fin": 15.16
+    },
+    {
+     "mot": "be",
+     "debut": 15.2,
+     "fin": 15.32
+    },
+    {
+     "mot": "completely",
+     "debut": 15.36,
+     "fin": 16.16
+    },
+    {
+     "mot": "impossible...",
+     "debut": 16.219,
+     "fin": 17.1
+    }
+   ]
+  },
+  {
+   "scene": 4,
+   "texte": "Wait... Is that a rugby ball?! Someone kicked it way too hard!",
+   "debut": 17.68,
+   "fin": 21.96,
+   "mots": [
+    {
+     "mot": "Wait...",
+     "debut": 17.68,
+     "fin": 17.9
+    },
+    {
+     "mot": "Is",
+     "debut": 18.38,
+     "fin": 18.46
+    },
+    {
+     "mot": "that",
+     "debut": 18.52,
+     "fin": 18.6
+    },
+    {
+     "mot": "a",
+     "debut": 18.68,
+     "fin": 18.7
+    },
+    {
+     "mot": "rugby",
+     "debut": 18.9,
+     "fin": 19.2
+    },
+    {
+     "mot": "ball?!",
+     "debut": 19.28,
+     "fin": 19.5
+    },
+    {
+     "mot": "Someone",
+     "debut": 20.18,
+     "fin": 20.58
+    },
+    {
+     "mot": "kicked",
+     "debut": 20.64,
+     "fin": 20.84
+    },
+    {
+     "mot": "it",
+     "debut": 20.88,
+     "fin": 20.96
+    },
+    {
+     "mot": "way",
+     "debut": 21.2,
+     "fin": 21.44
+    },
+    {
+     "mot": "too",
+     "debut": 21.48,
+     "fin": 21.62
+    },
+    {
+     "mot": "hard!",
+     "debut": 21.68,
+     "fin": 21.96
+    }
+   ]
+  },
+  {
+   "scene": 5,
+   "texte": "Destiny Rugby. Play free at destiny-rugby.fr.",
+   "debut": 22.5,
+   "fin": 26.52,
+   "mots": [
+    {
+     "mot": "Destiny",
+     "debut": 22.5,
+     "fin": 22.9
+    },
+    {
+     "mot": "Rugby.",
+     "debut": 23,
+     "fin": 23.34
+    },
+    {
+     "mot": "Play",
+     "debut": 23.7,
+     "fin": 23.86
+    },
+    {
+     "mot": "free",
+     "debut": 24,
+     "fin": 24.32
+    },
+    {
+     "mot": "at",
+     "debut": 24.38,
+     "fin": 24.54
+    },
+    {
+     "mot": "destiny-rugby.fr.",
+     "debut": 24.58,
+     "fin": 26.52
+    }
+   ]
+  }
+ ]
+}

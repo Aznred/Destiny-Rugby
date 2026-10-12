@@ -132,20 +132,6 @@ export function ReglagesControleDirect() {
       <h4 className="rcd-sous-titre">{t('cd.reg.resp')}</h4>
       {commutateur('conseilCapitaine', t('cd.reg.conseil'), t('cd.reg.conseil.aide'))}
       {commutateur('aideTir', t('cd.reg.aideTir'), t('cd.reg.aideTir.aide'))}
-      <div className="champ">
-        <label>{t('cd.reg.tirManette')}</label>
-        <div className="choix-langue rcd-choix">
-          {(['direct', 'charge'] as const).map((m) => (
-            <button
-              key={m} type="button" className={prefs.tirManette === m ? 'actif' : ''} aria-pressed={prefs.tirManette === m}
-              onClick={() => ecrirePreferencesControle({ tirManette: m })}
-            >
-              {t(m === 'direct' ? 'cd.reg.tirManette.direct' : 'cd.reg.tirManette.charge')}
-            </button>
-          ))}
-        </div>
-        <p className="aide">{t('cd.reg.tirManette.aide')}</p>
-      </div>
 
       {/* ── Le pouce ───────────────────────────────────────────────────────────── */}
       <h4 className="rcd-sous-titre">{t('cd.reg.mobile')}</h4>

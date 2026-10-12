@@ -25,3 +25,34 @@ Au callback, le pack est choisi côté serveur et son contenu réservé avant r�
 npm run verify:publicites contrôle notamment l'authentification, le quota interligues, les callbacks falsifiés/rejoués, les crédits concurrents, la reprise, les chances et le nettoyage du SDK. npm run verify:publicites-sql contrôle les verrous et reçus sur Neon ; les écritures d'essai sont annulées par rollback. Le Labo cumule les distributions réellement obtenues et les probabilités de chaque tirage, même quand les poids changent.
 
 /scripts/apercuPublicites.html est un banc Vite de simulation : il affiche aussi un inventaire spécial simulé comme publié pour examiner toutes les textures, sans publier de cartes ni créditer de compte réel. Le mode simulé peut vérifier complete, no-fill, skipped et error avec les événements de fin de lecteur du SDK v6.1. L'audit initial du 12 octobre a trouvé 44 tentatives conservées et aucun reçu signé. Après correction de l'URL et enregistrement du webhook global, un nouveau visionnage sur le site public a émis start, les trois quartiles, complete à 10 h 17 min 44 s (Europe/Paris), puis allAdsCompleted. La base conserve bien started=true et videoTerminee=true, mais aucun reçu signé accepté : le solde reste à 19 Ovas et l'interface propose la vérification. La réception réelle de la récompense reste donc non validée. Voir DIAGNOSTIC-PUBLICITES-2026-10-12.md pour le constat à transmettre au fournisseur.
+
+## Le reçu qui n'arrivait pas (12 octobre 2026, seconde passe)
+
+Signalé en jeu : « on ne récupère pas la récompense quand on regarde la vidéo en entier ». Le navigateur voit bien la vidéo finie (`videoTerminee`), mais la récompense n'est créditée que sur le reçu SIGNÉ qu'AppLixir envoie à notre serveur — et aucun n'a jamais été accepté.
+
+Mesuré sur le site public, par des requêtes GET non signées et sans effet :
+
+| Forme de la requête | Réponse |
+|---|---|
+| `/api/carriere?applixirCallback=1&gameApiKey=…` | 403 « Signature AppLixir invalide » : le callback est reconnu |
+| `/api/carriere?applixirCallback=1?gameApiKey=…` | **401 « Connectez-vous pour retrouver vos ligues. »** : le callback n'est PAS reconnu |
+| même requête sans `www` | 308 |
+| POST | 415 |
+
+L'adresse enregistrée chez AppLixir contient déjà un « ? ». Si le fournisseur y colle ses paramètres avec un second « ? » — ce que font beaucoup de webhooks —, la requête prend la deuxième forme et tombait sur l'authentification ordinaire. ⚠️ C'est une hypothèse forte, PAS une preuve : nous n'avons ni les journaux de livraison d'AppLixir ni ceux de Vercel.
+
+Ce que le serveur fait désormais (`parametresCallbackAppLixir`, `serveur/publicitesRecompensees.ts`) :
+
+- il reconnaît le callback AVANT la protection d'origine, en GET comme en POST (corps JSON ou formulaire) ;
+- il relit des paramètres collés avec un second « ? » ;
+- il répond aussi sur une adresse sans « ? » : `https://www.destiny-rugby.fr/api/applixir` (réécriture de `vercel.json`) ;
+- il accepte une signature en majuscules ;
+- il journalise chaque reçu (`[applixir] callback accepté` / `refusé`, avec la forme et la raison — jamais le secret ni la signature) et note un refus sur la session visée (`SessionPub.callback`, `stats.callbacksRefuses`).
+
+La signature, l'unicité du TID, l'expiration, le plafond et la propriété de la session sont inchangés : un reçu mal signé reste refusé quelle que soit sa forme.
+
+**Labo → Publicités → « Reçus AppLixir refusés »** tranche entre les deux pannes possibles : si des vidéos sont regardées en entier et que le compteur reste à zéro, le reçu n'arrive pas jusqu'au serveur (adresse de callback, ou callbacks inactifs sur une clé Test / Under Review) ; s'il monte, la raison affichée dit quoi corriger (secret, clé d'API, identifiant de jeu, session expirée).
+
+À faire après déploiement, dans l'ordre : regarder une vidéo en entier ; lire le Labo et les journaux Vercel (`[applixir]`) ; si rien n'arrive, enregistrer l'adresse sans « ? » chez AppLixir et recommencer ; si rien n'arrive encore, pointer provisoirement le callback sur une adresse d'inspection pour voir ce qu'AppLixir envoie vraiment, puis écrire au support (message prêt dans `DIAGNOSTIC-PUBLICITES-2026-10-12.md`).
+
+Banc : `npm run verify:publicites` (94 contrôles, dont les quatre formes du reçu, le journal sans secret et la protection d'origine des autres routes). ⚠️ Non essayé : la réécriture `/api/applixir` en production, la lecture SQL des refus sur Neon (à la moindre erreur le Labo affiche « Journal indisponible » et rien d'autre ne change).

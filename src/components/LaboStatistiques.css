@@ -45,6 +45,8 @@
 .ls-valeur small { color: var(--brume); font: 500 .7rem/1.2 var(--police); white-space: nowrap; }
 
 .ls-defile { min-width: 0; overflow-x: auto; scrollbar-width: thin; }
+/* La liste des verrous de clôture, telle qu'elle se copie dans un rapport (Correctif 39). */
+.ls-diagnostic { margin: 0; padding: 10px 12px; max-height: 240px; overflow: auto; border: 1px solid #ffffff1f; border-radius: 8px; background: #0000003d; font: 12px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
 .ls-tableau { width: 100%; border-collapse: collapse; font-size: .84rem; }
 .ls-tableau th, .ls-tableau td { padding: .55rem .6rem; border-bottom: 1px solid rgba(255, 255, 255, .07); text-align: right; font-variant-numeric: tabular-nums; }
 .ls-tableau thead th { color: var(--brume); font: 600 .72rem/1.25 var(--police-forte); vertical-align: bottom; }

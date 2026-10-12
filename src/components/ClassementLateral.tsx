@@ -18,12 +18,13 @@ import { useMemo } from 'react';
 import { LogoCompet } from './LogoCompet';
 import { useGame, bonusClubDuJoueur } from '../store/useGame';
 import {
-  championnatEnDirect, estAmateur, journeesALaSemaine, nombreJournees, poulesDe,
+  championnatEnDirect, estAmateur, journeesALaSemaine, nombreJournees,
 } from '../lib/championnat';
 import { phaseFinale } from '../lib/phaseFinale';
 import { tournoiDeFinDAnnee } from '../lib/tournoi';
 import { coupeEnDirect, coupesDuClubALaDate } from '../lib/coupe';
-import { PRESENTATION_STATUT, rulesFor, standingsStatuses, type StandingsStatus } from '../lib/competitionRules';
+import { PRESENTATION_STATUT, type StandingsStatus } from '../lib/competitionRules';
+import { numeroDeLaPoule, statutsDeLaPoule } from '../lib/promotion';
 import {
   internationalEnDirect, journeesInternationalesA,
 } from '../lib/international';
@@ -147,7 +148,8 @@ export function ClassementLateral({ joueur }: { joueur: Joueur }) {
       emoji: competition?.emoji,
       sousTitre: `J${Math.min(jouees, total)}/${total}`,
       classement: champ.classement,
-      statuts: standingsStatuses(rulesFor(division), champ.classement.length, poulesDe(division).length),
+      // Les places de SA poule : montées et descentes suivent l'étage voisin et la ligue régionale (Correctif 39).
+      statuts: statutsDeLaPoule(division, numeroDeLaPoule(division, joueur.club), champ.classement.length),
       nations: false,
       moi: joueur.club,
       pied: notre ?? null,

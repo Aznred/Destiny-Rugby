@@ -1,0 +1,1055 @@
+{
+ "langue": "fr",
+ "ips": 30,
+ "duree": 27.2,
+ "scenes": [
+  {
+   "scene": 1,
+   "debut": 0,
+   "fin": 5.566666666666666
+  },
+  {
+   "scene": 2,
+   "debut": 5.566666666666666,
+   "fin": 9.833333333333334
+  },
+  {
+   "scene": 3,
+   "debut": 9.833333333333334,
+   "fin": 16
+  },
+  {
+   "scene": 4,
+   "debut": 16,
+   "fin": 21.866666666666667
+  },
+  {
+   "scene": 5,
+   "debut": 21.866666666666667,
+   "fin": 27.2
+  }
+ ],
+ "plans": [
+  {
+   "nom": "ecrans",
+   "scene": 1,
+   "debut": 0,
+   "fin": 2.9
+  },
+  {
+   "nom": "disparition",
+   "scene": 1,
+   "debut": 2.9,
+   "fin": 5.566666666666666
+  },
+  {
+   "nom": "suspects",
+   "scene": 2,
+   "debut": 5.566666666666666,
+   "fin": 7.8
+  },
+  {
+   "nom": "tableau",
+   "scene": 2,
+   "debut": 7.8,
+   "fin": 9.833333333333334
+  },
+  {
+   "nom": "indices",
+   "scene": 3,
+   "debut": 9.833333333333334,
+   "fin": 12.533333333333333
+  },
+  {
+   "nom": "craie",
+   "scene": 3,
+   "debut": 12.533333333333333,
+   "fin": 16
+  }
+ ],
+ "voix": [
+  {
+   "scene": 1,
+   "source": [
+    0,
+    5.39
+   ],
+   "a": 0.18,
+   "debut": 0.3,
+   "fin": 5.3999999999999995
+  },
+  {
+   "scene": 2,
+   "source": [
+    5.39,
+    9.65
+   ],
+   "a": 5.516666666666667,
+   "debut": 5.6866666666666665,
+   "fin": 9.546666666666667
+  },
+  {
+   "scene": 3,
+   "source": [
+    9.65,
+    14.52
+   ],
+   "a": 9.853333333333333,
+   "debut": 10.083333333333334,
+   "fin": 14.503333333333334
+  },
+  {
+   "scene": 4,
+   "source": [
+    14.52,
+    18.52
+   ],
+   "a": 16.93,
+   "debut": 17.15,
+   "fin": 20.729999999999997
+  },
+  {
+   "scene": 5,
+   "source": [
+    18.52,
+    22.57
+   ],
+   "a": 22.566666666666666,
+   "debut": 22.766666666666666,
+   "fin": 26.246666666666666
+  }
+ ],
+ "mots": [
+  {
+   "mot": "Le",
+   "scene": 1,
+   "debut": 0.3,
+   "fin": 0.38,
+   "fort": false
+  },
+  {
+   "mot": "12",
+   "scene": 1,
+   "debut": 0.46,
+   "fin": 0.64,
+   "fort": false
+  },
+  {
+   "mot": "octobre,",
+   "scene": 1,
+   "debut": 0.68,
+   "fin": 1.1,
+   "fort": false
+  },
+  {
+   "mot": "à",
+   "scene": 1,
+   "debut": 1.42,
+   "fin": 1.5,
+   "fort": false
+  },
+  {
+   "mot": "21 h 04,",
+   "scene": 1,
+   "debut": 1.6,
+   "fin": 2.4,
+   "fort": false
+  },
+  {
+   "mot": "un",
+   "scene": 1,
+   "debut": 2.8,
+   "fin": 2.88,
+   "fort": false
+  },
+  {
+   "mot": "homme",
+   "scene": 1,
+   "debut": 2.94,
+   "fin": 3.08,
+   "fort": false
+  },
+  {
+   "mot": "a",
+   "scene": 1,
+   "debut": 3.1,
+   "fin": 3.16,
+   "fort": false
+  },
+  {
+   "mot": "disparu",
+   "scene": 1,
+   "debut": 3.2,
+   "fin": 3.62,
+   "fort": true
+  },
+  {
+   "mot": "sous",
+   "scene": 1,
+   "debut": 3.72,
+   "fin": 3.82,
+   "fort": false
+  },
+  {
+   "mot": "les",
+   "scene": 1,
+   "debut": 3.84,
+   "fin": 3.98,
+   "fort": false
+  },
+  {
+   "mot": "yeux",
+   "scene": 1,
+   "debut": 4,
+   "fin": 4.1,
+   "fort": false
+  },
+  {
+   "mot": "de",
+   "scene": 1,
+   "debut": 4.14,
+   "fin": 4.3,
+   "fort": false
+  },
+  {
+   "mot": "80 000",
+   "scene": 1,
+   "debut": 4.34,
+   "fin": 4.92,
+   "fort": true
+  },
+  {
+   "mot": "témoins.",
+   "scene": 1,
+   "debut": 5,
+   "fin": 5.4,
+   "fort": true
+  },
+  {
+   "mot": "Quinze",
+   "scene": 2,
+   "debut": 5.687,
+   "fin": 5.927,
+   "fort": true
+  },
+  {
+   "mot": "suspects.",
+   "scene": 2,
+   "debut": 5.967,
+   "fin": 6.347,
+   "fort": true
+  },
+  {
+   "mot": "Tous",
+   "scene": 2,
+   "debut": 6.827,
+   "fin": 7.047,
+   "fort": false
+  },
+  {
+   "mot": "présents",
+   "scene": 2,
+   "debut": 7.087,
+   "fin": 7.367,
+   "fort": false
+  },
+  {
+   "mot": "sur",
+   "scene": 2,
+   "debut": 7.407,
+   "fin": 7.527,
+   "fort": false
+  },
+  {
+   "mot": "les",
+   "scene": 2,
+   "debut": 7.567,
+   "fin": 7.647,
+   "fort": false
+  },
+  {
+   "mot": "lieux.",
+   "scene": 2,
+   "debut": 7.667,
+   "fin": 7.867,
+   "fort": false
+  },
+  {
+   "mot": "Aucun",
+   "scene": 2,
+   "debut": 8.307,
+   "fin": 8.607,
+   "fort": true
+  },
+  {
+   "mot": "n'a",
+   "scene": 2,
+   "debut": 8.647,
+   "fin": 8.727,
+   "fort": false
+  },
+  {
+   "mot": "réussi",
+   "scene": 2,
+   "debut": 8.767,
+   "fin": 9.067,
+   "fort": false
+  },
+  {
+   "mot": "à",
+   "scene": 2,
+   "debut": 9.087,
+   "fin": 9.127,
+   "fort": false
+  },
+  {
+   "mot": "l'arrêter.",
+   "scene": 2,
+   "debut": 9.147,
+   "fin": 9.547,
+   "fort": true
+  },
+  {
+   "mot": "Les",
+   "scene": 3,
+   "debut": 10.083,
+   "fin": 10.203,
+   "fort": false
+  },
+  {
+   "mot": "enquêteurs",
+   "scene": 3,
+   "debut": 10.243,
+   "fin": 10.723,
+   "fort": false
+  },
+  {
+   "mot": "n'ont",
+   "scene": 3,
+   "debut": 10.763,
+   "fin": 10.843,
+   "fort": false
+  },
+  {
+   "mot": "retrouvé",
+   "scene": 3,
+   "debut": 10.883,
+   "fin": 11.343,
+   "fort": false
+  },
+  {
+   "mot": "qu'une",
+   "scene": 3,
+   "debut": 11.363,
+   "fin": 11.543,
+   "fort": false
+  },
+  {
+   "mot": "seule",
+   "scene": 3,
+   "debut": 11.583,
+   "fin": 11.743,
+   "fort": false
+  },
+  {
+   "mot": "chose :",
+   "scene": 3,
+   "debut": 11.803,
+   "fin": 12.103,
+   "fort": false
+  },
+  {
+   "mot": "l'arme",
+   "scene": 3,
+   "debut": 12.623,
+   "fin": 12.883,
+   "fort": true
+  },
+  {
+   "mot": "du",
+   "scene": 3,
+   "debut": 12.923,
+   "fin": 13.023,
+   "fort": false
+  },
+  {
+   "mot": "crime...",
+   "scene": 3,
+   "debut": 13.063,
+   "fin": 13.343,
+   "fort": true
+  },
+  {
+   "mot": "un",
+   "scene": 3,
+   "debut": 13.903,
+   "fin": 14.003,
+   "fort": false
+  },
+  {
+   "mot": "crochet.",
+   "scene": 3,
+   "debut": 14.043,
+   "fin": 14.503,
+   "fort": true
+  },
+  {
+   "mot": "Attendez...",
+   "scene": 4,
+   "debut": 17.15,
+   "fin": 17.49,
+   "fort": false
+  },
+  {
+   "mot": "un",
+   "scene": 4,
+   "debut": 17.91,
+   "fin": 18.01,
+   "fort": false
+  },
+  {
+   "mot": "crochet",
+   "scene": 4,
+   "debut": 18.05,
+   "fin": 18.45,
+   "fort": true
+  },
+  {
+   "mot": "intérieur ?!",
+   "scene": 4,
+   "debut": 18.489,
+   "fin": 18.99,
+   "fort": true
+  },
+  {
+   "mot": "C'était",
+   "scene": 4,
+   "debut": 19.39,
+   "fin": 19.77,
+   "fort": false
+  },
+  {
+   "mot": "juste",
+   "scene": 4,
+   "debut": 19.83,
+   "fin": 20.03,
+   "fort": false
+  },
+  {
+   "mot": "Antoine",
+   "scene": 4,
+   "debut": 20.07,
+   "fin": 20.35,
+   "fort": true
+  },
+  {
+   "mot": "Dupont !",
+   "scene": 4,
+   "debut": 20.43,
+   "fin": 20.73,
+   "fort": true
+  },
+  {
+   "mot": "Destiny",
+   "scene": 5,
+   "debut": 22.767,
+   "fin": 23.167,
+   "fort": true
+  },
+  {
+   "mot": "Rugby.",
+   "scene": 5,
+   "debut": 23.207,
+   "fin": 23.507,
+   "fort": true
+  },
+  {
+   "mot": "Gratuit",
+   "scene": 5,
+   "debut": 23.887,
+   "fin": 24.267,
+   "fort": true
+  },
+  {
+   "mot": "sur",
+   "scene": 5,
+   "debut": 24.347,
+   "fin": 24.507,
+   "fort": false
+  },
+  {
+   "mot": "destiny-rugby.fr.",
+   "scene": 5,
+   "debut": 24.547,
+   "fin": 26.247,
+   "fort": true
+  }
+ ],
+ "sousTitres": [
+  {
+   "debut": 0.24,
+   "fin": 1.4,
+   "scene": 1,
+   "mots": [
+    {
+     "mot": "Le",
+     "scene": 1,
+     "debut": 0.3,
+     "fin": 0.38,
+     "fort": false
+    },
+    {
+     "mot": "12",
+     "scene": 1,
+     "debut": 0.46,
+     "fin": 0.64,
+     "fort": false
+    },
+    {
+     "mot": "octobre,",
+     "scene": 1,
+     "debut": 0.68,
+     "fin": 1.1,
+     "fort": false
+    }
+   ]
+  },
+  {
+   "debut": 1.36,
+   "fin": 2.78,
+   "scene": 1,
+   "mots": [
+    {
+     "mot": "à",
+     "scene": 1,
+     "debut": 1.42,
+     "fin": 1.5,
+     "fort": false
+    },
+    {
+     "mot": "21 h 04,",
+     "scene": 1,
+     "debut": 1.6,
+     "fin": 2.4,
+     "fort": false
+    }
+   ]
+  },
+  {
+   "debut": 2.74,
+   "fin": 3.18,
+   "scene": 1,
+   "mots": [
+    {
+     "mot": "un",
+     "scene": 1,
+     "debut": 2.8,
+     "fin": 2.88,
+     "fort": false
+    },
+    {
+     "mot": "homme",
+     "scene": 1,
+     "debut": 2.94,
+     "fin": 3.08,
+     "fort": false
+    },
+    {
+     "mot": "a",
+     "scene": 1,
+     "debut": 3.1,
+     "fin": 3.16,
+     "fort": false
+    }
+   ]
+  },
+  {
+   "debut": 3.14,
+   "fin": 3.98,
+   "scene": 1,
+   "mots": [
+    {
+     "mot": "disparu",
+     "scene": 1,
+     "debut": 3.2,
+     "fin": 3.62,
+     "fort": true
+    },
+    {
+     "mot": "sous",
+     "scene": 1,
+     "debut": 3.72,
+     "fin": 3.82,
+     "fort": false
+    },
+    {
+     "mot": "les",
+     "scene": 1,
+     "debut": 3.84,
+     "fin": 3.98,
+     "fort": false
+    }
+   ]
+  },
+  {
+   "debut": 3.94,
+   "fin": 4.98,
+   "scene": 1,
+   "mots": [
+    {
+     "mot": "yeux",
+     "scene": 1,
+     "debut": 4,
+     "fin": 4.1,
+     "fort": false
+    },
+    {
+     "mot": "de",
+     "scene": 1,
+     "debut": 4.14,
+     "fin": 4.3,
+     "fort": false
+    },
+    {
+     "mot": "80 000",
+     "scene": 1,
+     "debut": 4.34,
+     "fin": 4.92,
+     "fort": true
+    }
+   ]
+  },
+  {
+   "debut": 4.94,
+   "fin": 5.667,
+   "scene": 1,
+   "mots": [
+    {
+     "mot": "témoins.",
+     "scene": 1,
+     "debut": 5,
+     "fin": 5.4,
+     "fort": true
+    }
+   ]
+  },
+  {
+   "debut": 5.627,
+   "fin": 6.767,
+   "scene": 2,
+   "mots": [
+    {
+     "mot": "Quinze",
+     "scene": 2,
+     "debut": 5.687,
+     "fin": 5.927,
+     "fort": true
+    },
+    {
+     "mot": "suspects.",
+     "scene": 2,
+     "debut": 5.967,
+     "fin": 6.347,
+     "fort": true
+    }
+   ]
+  },
+  {
+   "debut": 6.767,
+   "fin": 7.547,
+   "scene": 2,
+   "mots": [
+    {
+     "mot": "Tous",
+     "scene": 2,
+     "debut": 6.827,
+     "fin": 7.047,
+     "fort": false
+    },
+    {
+     "mot": "présents",
+     "scene": 2,
+     "debut": 7.087,
+     "fin": 7.367,
+     "fort": false
+    },
+    {
+     "mot": "sur",
+     "scene": 2,
+     "debut": 7.407,
+     "fin": 7.527,
+     "fort": false
+    }
+   ]
+  },
+  {
+   "debut": 7.507,
+   "fin": 8.287,
+   "scene": 2,
+   "mots": [
+    {
+     "mot": "les",
+     "scene": 2,
+     "debut": 7.567,
+     "fin": 7.647,
+     "fort": false
+    },
+    {
+     "mot": "lieux.",
+     "scene": 2,
+     "debut": 7.667,
+     "fin": 7.867,
+     "fort": false
+    }
+   ]
+  },
+  {
+   "debut": 8.247,
+   "fin": 9.067,
+   "scene": 2,
+   "mots": [
+    {
+     "mot": "Aucun",
+     "scene": 2,
+     "debut": 8.307,
+     "fin": 8.607,
+     "fort": true
+    },
+    {
+     "mot": "n'a",
+     "scene": 2,
+     "debut": 8.647,
+     "fin": 8.727,
+     "fort": false
+    },
+    {
+     "mot": "réussi",
+     "scene": 2,
+     "debut": 8.767,
+     "fin": 9.067,
+     "fort": false
+    }
+   ]
+  },
+  {
+   "debut": 9.027,
+   "fin": 9.967,
+   "scene": 2,
+   "mots": [
+    {
+     "mot": "à",
+     "scene": 2,
+     "debut": 9.087,
+     "fin": 9.127,
+     "fort": false
+    },
+    {
+     "mot": "l'arrêter.",
+     "scene": 2,
+     "debut": 9.147,
+     "fin": 9.547,
+     "fort": true
+    }
+   ]
+  },
+  {
+   "debut": 10.023,
+   "fin": 10.743,
+   "scene": 3,
+   "mots": [
+    {
+     "mot": "Les",
+     "scene": 3,
+     "debut": 10.083,
+     "fin": 10.203,
+     "fort": false
+    },
+    {
+     "mot": "enquêteurs",
+     "scene": 3,
+     "debut": 10.243,
+     "fin": 10.723,
+     "fort": false
+    }
+   ]
+  },
+  {
+   "debut": 10.703,
+   "fin": 11.343,
+   "scene": 3,
+   "mots": [
+    {
+     "mot": "n'ont",
+     "scene": 3,
+     "debut": 10.763,
+     "fin": 10.843,
+     "fort": false
+    },
+    {
+     "mot": "retrouvé",
+     "scene": 3,
+     "debut": 10.883,
+     "fin": 11.343,
+     "fort": false
+    }
+   ]
+  },
+  {
+   "debut": 11.303,
+   "fin": 11.783,
+   "scene": 3,
+   "mots": [
+    {
+     "mot": "qu'une",
+     "scene": 3,
+     "debut": 11.363,
+     "fin": 11.543,
+     "fort": false
+    },
+    {
+     "mot": "seule",
+     "scene": 3,
+     "debut": 11.583,
+     "fin": 11.743,
+     "fort": false
+    }
+   ]
+  },
+  {
+   "debut": 11.743,
+   "fin": 12.523,
+   "scene": 3,
+   "mots": [
+    {
+     "mot": "chose :",
+     "scene": 3,
+     "debut": 11.803,
+     "fin": 12.103,
+     "fort": false
+    }
+   ]
+  },
+  {
+   "debut": 12.563,
+   "fin": 13.763,
+   "scene": 3,
+   "mots": [
+    {
+     "mot": "l'arme",
+     "scene": 3,
+     "debut": 12.623,
+     "fin": 12.883,
+     "fort": true
+    },
+    {
+     "mot": "du",
+     "scene": 3,
+     "debut": 12.923,
+     "fin": 13.023,
+     "fort": false
+    },
+    {
+     "mot": "crime...",
+     "scene": 3,
+     "debut": 13.063,
+     "fin": 13.343,
+     "fort": true
+    }
+   ]
+  },
+  {
+   "debut": 13.843,
+   "fin": 14.923,
+   "scene": 3,
+   "mots": [
+    {
+     "mot": "un",
+     "scene": 3,
+     "debut": 13.903,
+     "fin": 14.003,
+     "fort": false
+    },
+    {
+     "mot": "crochet.",
+     "scene": 3,
+     "debut": 14.043,
+     "fin": 14.503,
+     "fort": true
+    }
+   ]
+  },
+  {
+   "debut": 17.09,
+   "fin": 17.89,
+   "scene": 4,
+   "mots": [
+    {
+     "mot": "Attendez...",
+     "scene": 4,
+     "debut": 17.15,
+     "fin": 17.49,
+     "fort": false
+    }
+   ]
+  },
+  {
+   "debut": 17.85,
+   "fin": 18.469,
+   "scene": 4,
+   "mots": [
+    {
+     "mot": "un",
+     "scene": 4,
+     "debut": 17.91,
+     "fin": 18.01,
+     "fort": false
+    },
+    {
+     "mot": "crochet",
+     "scene": 4,
+     "debut": 18.05,
+     "fin": 18.45,
+     "fort": true
+    }
+   ]
+  },
+  {
+   "debut": 18.429,
+   "fin": 19.37,
+   "scene": 4,
+   "mots": [
+    {
+     "mot": "intérieur ?!",
+     "scene": 4,
+     "debut": 18.489,
+     "fin": 18.99,
+     "fort": true
+    }
+   ]
+  },
+  {
+   "debut": 19.33,
+   "fin": 20.05,
+   "scene": 4,
+   "mots": [
+    {
+     "mot": "C'était",
+     "scene": 4,
+     "debut": 19.39,
+     "fin": 19.77,
+     "fort": false
+    },
+    {
+     "mot": "juste",
+     "scene": 4,
+     "debut": 19.83,
+     "fin": 20.03,
+     "fort": false
+    }
+   ]
+  },
+  {
+   "debut": 20.01,
+   "fin": 21.15,
+   "scene": 4,
+   "mots": [
+    {
+     "mot": "Antoine",
+     "scene": 4,
+     "debut": 20.07,
+     "fin": 20.35,
+     "fort": true
+    },
+    {
+     "mot": "Dupont !",
+     "scene": 4,
+     "debut": 20.43,
+     "fin": 20.73,
+     "fort": true
+    }
+   ]
+  },
+  {
+   "debut": 22.707,
+   "fin": 23.867,
+   "scene": 5,
+   "mots": [
+    {
+     "mot": "Destiny",
+     "scene": 5,
+     "debut": 22.767,
+     "fin": 23.167,
+     "fort": true
+    },
+    {
+     "mot": "Rugby.",
+     "scene": 5,
+     "debut": 23.207,
+     "fin": 23.507,
+     "fort": true
+    }
+   ]
+  },
+  {
+   "debut": 23.827,
+   "fin": 24.527,
+   "scene": 5,
+   "mots": [
+    {
+     "mot": "Gratuit",
+     "scene": 5,
+     "debut": 23.887,
+     "fin": 24.267,
+     "fort": true
+    },
+    {
+     "mot": "sur",
+     "scene": 5,
+     "debut": 24.347,
+     "fin": 24.507,
+     "fort": false
+    }
+   ]
+  },
+  {
+   "debut": 24.487,
+   "fin": 26.667,
+   "scene": 5,
+   "mots": [
+    {
+     "mot": "destiny-rugby.fr.",
+     "scene": 5,
+     "debut": 24.547,
+     "fin": 26.247,
+     "fort": true
+    }
+   ]
+  }
+ ],
+ "jeu": {
+  "pack": [
+   21.866666666666667,
+   22.833333333333332
+  ],
+  "compo": [
+   22.833333333333332,
+   23.666666666666668
+  ],
+  "essai": [
+   16,
+   21.866666666666667
+  ],
+  "titre": [
+   23.666666666666668,
+   27.2
+  ],
+  "accroche": 23.887,
+  "adresse": 24.547
+ },
+ "accroche": "JOUE GRATUITEMENT",
+ "voixSource": {
+  "id": "fr.mp3",
+  "modele": "prise fournie, alignée par transcription (Scribe)",
+  "duree": 22.32
+ }
+}

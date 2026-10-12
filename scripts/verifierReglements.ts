@@ -63,7 +63,9 @@ for (const division of ['fed1', 'fed2', 'fed3']) {
   const py = resoudrePyramide(division, SAISON, club);
   const descendants = py.mouvements.filter((m) => m.de === division && m.sens === 'descente');
   if (division !== 'fed3' || descendants.length) {
-    egal(descendants.map((m) => m.club).sort(), [...phase.relegues].sort(), `${division} : les deux relégués descendent sans jouer`);
+    // Correctif 39 : la division entière bouge, plus seulement la poule du club — deux descentes par poule, dans TOUTES les poules.
+    ok(phase.relegues.every((c) => descendants.some((m) => m.club === c)), `${division} : les deux relégués de la poule descendent sans jouer`);
+    egal(descendants.length, 2 * poulesDe(division).length, `${division} : deux descentes par poule, sur toutes les poules`);
   }
   ok(descendants.every((m) => m.motif === 'dernier'), `${division} : aucune descente par match d'accès`);
   egal(py.accesDepuisLeBas, null, `${division} : pas de match d'accès pour garder sa place`);

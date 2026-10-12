@@ -9,6 +9,12 @@
       "schedule": "0 4 * * *"
     }
   ],
+  "rewrites": [
+    {
+      "source": "/api/applixir",
+      "destination": "/api/carriere?applixirCallback=1"
+    }
+  ],
   "headers": [
     {
       "source": "/(.*)",

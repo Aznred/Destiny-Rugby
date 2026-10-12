@@ -1327,6 +1327,10 @@ export async function creerScene3D(conteneur,options={}){
         hands(holder,t);t.y=SOL;key='sol:relais';
       }else{
         hands(holder,t,motion?.carry==='bras');key='main:'+match.carrier;heading=holder.heading;orientation='main';
+        // Correctif 39 — l'essai : le ballon suit les mains jusqu'à la pelouse, n'y entre jamais, et dès qu'elles sont au ras du
+        // sol il y est POSÉ. C'est l'aplatissage : mains et ballon touchent réellement l'en-but.
+        if(e.phase==='aplatissage'||(e.phase==='tmo'&&e.tmo?.origineEssai)){if(t.y<SOL+.14){t.y=SOL;orientation='sol';}}
+        else if(t.y<SOL)t.y=SOL;
         // Correctif 30 — la réception mal assurée : le ballon danse une fraction de seconde au-dessus des mains avant d'être maîtrisé.
         const j=match.jongle,u=j&&j.id===match.carrier?(visualTime-j.arrivee)/j.duree:-1;
         if(u>0&&u<1){t.y+=Math.sin(Math.PI*u)*.24;t.x-=Math.sin(holder.heading)*.11*Math.sin(Math.PI*u);t.z-=Math.cos(holder.heading)*.11*Math.sin(Math.PI*u);st.spin+=simDt*8;orientation='sol';}

@@ -56,8 +56,6 @@ export interface PreferencesControle {
   tutosContext: string[];
   touches: TouchesDirectes;
   // ── Les responsabilités (Correctif 17) ──────────────────────────────────
-  /** Tir à la manette : `direct` (stick gauche vise, stick droit dose, A frappe) ou `charge` (on tient A pour charger, on relâche pour frapper). */
-  tirManette: 'direct' | 'charge';
   /** L'aide de visée légère : la ligne vers les poteaux, le repère de force utile, le vent. Jamais le résultat. */
   aideTir: boolean;
   /** Montrer au capitaine ce qu'un vice-capitaine lui conseillerait après une pénalité. */
@@ -69,7 +67,7 @@ export interface PreferencesControle {
 export const PREFERENCES_PAR_DEFAUT: Readonly<PreferencesControle> = {
   mode: 'direct', aidePlacement: true, tailleHud: 1, opaciteHud: 0.5, joystick: 'flottant', sprintAuBord: true,
   gaucher: false, positionJoystick: 'gauche', positionActions: 'droite', hudSimple: true, reculCamera: 1, cameraMode: 'assistee', sensibiliteCamera: 1, souris: false, vibrations: true, indications: true, tutorielVu: false, tutoSection: 'tout', tutosContext: [], touches: copierTouches(),
-  tirManette: 'direct', aideTir: true, conseilCapitaine: true, tutosResp: [],
+  aideTir: true, conseilCapitaine: true, tutosResp: [],
 };
 
 const bornerNombre = (v: unknown, min: number, max: number, defaut: number) =>
@@ -103,7 +101,6 @@ function assainir(brut: unknown): PreferencesControle {
     tutoSection: (['general', 'attaque', 'defense', 'pied'] as const).find((x) => x === b.tutoSection) ?? 'tout',
     tutosContext: Array.isArray(b.tutosContext) ? b.tutosContext.filter((x): x is string => typeof x === 'string').slice(0, 12) : [],
     touches: assainirTouches(b.touches),
-    tirManette: b.tirManette === 'charge' ? 'charge' : 'direct',
     aideTir: b.aideTir !== false,
     conseilCapitaine: b.conseilCapitaine !== false,
     tutosResp: Array.isArray(b.tutosResp) ? b.tutosResp.filter((x): x is string => typeof x === 'string').slice(0, 12) : [],

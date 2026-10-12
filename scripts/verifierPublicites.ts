@@ -3,7 +3,7 @@ import { randomUUID, createHash } from 'node:crypto';
 import { mkdirSync, unlinkSync, readFileSync } from 'node:fs';
 import { stockageFichier } from '../serveur/carriereFichier';
 import { creerGestionnaireCarriere, empreinteJeton } from '../serveur/carriereApi';
-import { creerServicePublicites } from '../serveur/publicitesRecompensees';
+import { parametresCallbackAppLixir, resumeCallback, creerServicePublicites } from '../serveur/publicitesRecompensees';
 import { contexteAtelier, validerConfigPublicites } from '../serveur/atelierAdmin';
 import { CATALOGUE_ADMIN_VIDE } from '../src/lib/ligue/atelierCatalogue';
 import { PUBLICITES_PAR_DEFAUT, chancesPacksPub, choisirPackPub, jourPublicites } from '../src/lib/publicitesRecompensees';
@@ -167,6 +167,72 @@ try {
   ok(nouvelle.rewardSessionId,'reset quotidien effectif côté backend');
   await assert.rejects(()=>service.callback(signature(nouvelle.rewardSessionId),lendemain+16*60000)); controles++;
   egal((await db.boutique(joueur))!.ovas,58,'session expirée ne récompense jamais');
+  // ═══ LE CALLBACK TEL QU'UN FOURNISSEUR PEUT L'ENVOYER (12 octobre 2026) ════════════════════════════════════════
+  // Signalé : « on ne récupère pas la récompense quand on regarde la vidéo en entier ». L'adresse enregistrée chez
+  // AppLixir contient déjà un « ? » : collée naïvement, la requête devient « ?applixirCallback=1?gameApiKey=… » et
+  // n'était pas reconnue (401 « Connectez-vous… », mesuré sur le site public).
+  const brut = async (methode: string, url: string, headers: Record<string, string> = { host: 'localhost' }, body?: unknown) => {
+    let statut = 200, donnees: any;
+    const res = { status(n: number) { statut = n; return res; }, setHeader() {}, json(x: unknown) { donnees = x; } };
+    await api.handler({ method: methode, url, headers, body }, res);
+    return { statut, donnees };
+  };
+  const comptes: string[] = [];
+  for (let i = 0; i < 4; i++) {
+    const idCompte = randomUUID(); comptes.push(`s2s-${i}`);
+    await db.creerCompte({ id: idCompte, identifiant: `s2s-${i}`, pseudo: `S2S ${i}`, empreinte: 'x' });
+    await db.ouvrirSession(empreinteJeton(`s2s-${i}`), idCompte, maintenant + 3600000); await db.sauvegarderBoutique(idCompte, coffre());
+  }
+  const ouvrir = async (jeton: string) => (await action(jeton, 'commencer', { contexte: 'SHOP_OVAS' })).donnees.rewardSessionId as string;
+  const statutDe = async (jeton: string, idSession: string) => (await action(jeton, 'reclamer', { rewardSessionId: idSession })).donnees.statut;
+  const silence = { info: console.info, warn: console.warn }; const journal: string[] = [];
+  console.info = (...x: unknown[]) => { journal.push(x.join(' ')); }; console.warn = (...x: unknown[]) => { journal.push(x.join(' ')); };
+  try {
+    // 1. Le second « ? » : la forme qui recevait un 401.
+    const colle = await ouvrir(comptes[0]);
+    egal((await brut('GET', `/api/carriere?applixirCallback=1?${signature(colle)}`)).statut, 200, 'paramètres collés avec un second « ? » : callback reconnu et accepté');
+    egal(await statutDe(comptes[0], colle), 'CLAIMED', 'et la récompense est créditée');
+    // 2. L'adresse propre, sans « ? ».
+    const propre = await ouvrir(comptes[0]);
+    egal((await brut('GET', `/api/applixir?${signature(propre)}`)).statut, 200, 'adresse /api/applixir : callback accepté');
+    egal(await statutDe(comptes[0], propre), 'CLAIMED', 'récompense créditée par l’adresse propre');
+    // 3. Une signature en majuscules, et le secret que le fournisseur joint à sa requête.
+    const majuscules = await ouvrir(comptes[1]); const qMaj = signature(majuscules); qMaj.set('signature', qMaj.get('signature')!.toUpperCase()); qMaj.set('secretKey', 'jamais-dans-un-journal');
+    egal((await brut('GET', `/api/carriere?applixirCallback=1&${qMaj}`)).statut, 200, 'signature en majuscules acceptée');
+    // 4. Un POST de serveur à serveur : ni JSON, ni origine, paramètres dans le corps.
+    const poste = await ouvrir(comptes[1]);
+    egal((await brut('POST', '/api/applixir', { host: 'localhost', 'content-type': 'application/x-www-form-urlencoded' }, String(signature(poste)))).statut, 200, 'POST de serveur à serveur accepté (corps de formulaire)');
+    egal(await statutDe(comptes[1], poste), 'CLAIMED', 'récompense créditée par le POST');
+    // 5. Un reçu REFUSÉ laisse une trace : on saura qu'il est arrivé, et pourquoi il n'a rien donné.
+    // Les reçus falsifiés du début du banc ont déjà laissé leur trace : on compte ce que CETTE section ajoute.
+    const refusAvant = (await db.publicites!.refus!()).total;
+    const refusee = await ouvrir(comptes[2]); const qFaux = signature(refusee); qFaux.set('signature', 'f'.repeat(32));
+    egal((await brut('GET', `/api/carriere?applixirCallback=1?${qFaux}`)).statut, 403, 'un reçu mal signé reste refusé, quelle que soit sa forme');
+    egal(await statutDe(comptes[2], refusee), 'PENDING', 'et ne crédite rien');
+    const trace = (await db.publicites!.trouver(refusee))!.callback;
+    ok(trace && trace.refus === 'signature' && trace.n === 1, 'le refus est noté sur la session : date, raison');
+    const autreCle = signature(refusee); autreCle.set('gameApiKey', 'une-autre-cle');
+    autreCle.set('signature', createHash('md5').update('une-autre-cle' + '123' + refusee + autreCle.get('tid') + process.env.APPLIXIR_CALLBACK_SECRET!).digest('hex'));
+    egal((await brut('GET', `/api/applixir?${autreCle}`)).statut, 403, 'un reçu signé pour une autre clé d’API est refusé');
+    egal((await db.publicites!.trouver(refusee))!.callback, { le: (await db.publicites!.trouver(refusee))!.callback!.le, refus: 'cle', n: 2 }, 'la raison distingue une mauvaise clé d’une mauvaise signature');
+    const refus = await db.publicites!.refus!();
+    ok(refus.total === refusAvant + 2 && refus.derniers[0].refus === 'cle', 'le Labo retrouve les derniers refus, le plus récent en tête');
+    ok(refus.derniers.every((r) => Object.keys(r).sort().join() === 'le,refus,videoTerminee'), 'sans compte, sans session, sans signature');
+    const laboPub = await appel('kiri', '?atelier=1&section=publicites');
+    ok(laboPub.statut === 200 && laboPub.donnees.refus?.total === refusAvant + 2, 'ils arrivent avec les statistiques du Labo');
+    // 6. Le journal du serveur : la forme et la raison, jamais le secret ni la signature.
+    ok(journal.some((l) => l.includes('callback accepté') && l.includes('second « ? »')), 'le journal dit qu’un callback collé a été accepté');
+    ok(journal.some((l) => l.includes('callback refusé') && l.includes('"raison":"signature"')), 'et pourquoi un autre a été refusé');
+    ok(!journal.some((l) => l.includes('jamais-dans-un-journal') || l.includes(process.env.APPLIXIR_CALLBACK_SECRET!) || /[a-f0-9]{32}/i.test(l)), 'ni secret ni signature dans le journal');
+    egal(resumeCallback(qMaj).parametres.includes('secretKey'), false, 'le secret joint à la requête n’est pas même nommé');
+    // 7. Ce qui n'est pas un callback ne le devient pas.
+    egal(parametresCallbackAppLixir(new URL('http://x/api/carriere?publicites=1')), null, 'une requête ordinaire n’est pas un callback');
+    egal(parametresCallbackAppLixir(new URL('http://x/api/carriere?applixirCallback=2')), null, 'ni une autre valeur du drapeau');
+    egal((await brut('GET', '/api/carriere?applixirCallback=2&gameApiKey=x')).statut, 401, 'elle suit le chemin ordinaire');
+    egal(parametresCallbackAppLixir(new URL('http://x/api/carriere?applixirCallback=1?gameApiKey=abc&tid=7'))!.get('gameApiKey'), 'abc', 'le premier paramètre collé est retrouvé');
+    egal(parametresCallbackAppLixir(new URL('http://x/api/applixir/'), { userId: 'u', tid: 3 })!.get('tid'), '3', 'le corps JSON complète la requête');
+    egal((await brut('POST', '/api/carriere?publicites=1', { host: 'localhost', 'content-type': 'text/plain' }, {})).statut, 415, 'la protection d’origine des autres routes n’a pas bougé');
+  } finally { console.info = silence.info; console.warn = silence.warn; }
   console.log(`\n${controles} contrôles publicités validés.`);
 } finally {
   if(secretAvant===undefined) delete process.env.APPLIXIR_CALLBACK_SECRET; else process.env.APPLIXIR_CALLBACK_SECRET=secretAvant;

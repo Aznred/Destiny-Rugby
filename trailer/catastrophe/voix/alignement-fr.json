@@ -1,0 +1,350 @@
+{
+ "langue": "fr",
+ "voix": "fr.mp3",
+ "modele": "prise fournie, alignée par transcription (Scribe)",
+ "duree": 24.764063,
+ "ecart": 0,
+ "entendu": "Que se passerait-il si un objet de huit cents kilomètres de diamètre fonçait droit vers la Terre ? Son impact provoquerait des tsunamis gigantesques, des séismes et peut-être même la fin de notre civilisation. Mais les scientifiques découvriraient alors quelque chose d'absolument impossible. Attendez, c'est un ballon de rugby ? Quelqu'un a frappé un peu trop fort. Destiny Rugby, gratuit sur destiny-rugby.fr.",
+ "scenes": [
+  {
+   "scene": 1,
+   "texte": "Que se passerait-il si un objet de huit cents kilomètres de diamètre fonçait droit vers la Terre ?",
+   "debut": 0.1,
+   "fin": 4.64,
+   "mots": [
+    {
+     "mot": "Que",
+     "debut": 0.1,
+     "fin": 0.18
+    },
+    {
+     "mot": "se",
+     "debut": 0.22,
+     "fin": 0.3
+    },
+    {
+     "mot": "passerait-il",
+     "debut": 0.32,
+     "fin": 0.9
+    },
+    {
+     "mot": "si",
+     "debut": 1.02,
+     "fin": 1.1
+    },
+    {
+     "mot": "un",
+     "debut": 1.14,
+     "fin": 1.22
+    },
+    {
+     "mot": "objet",
+     "debut": 1.26,
+     "fin": 1.48
+    },
+    {
+     "mot": "de",
+     "debut": 1.54,
+     "fin": 1.62
+    },
+    {
+     "mot": "huit",
+     "debut": 1.64,
+     "fin": 1.9
+    },
+    {
+     "mot": "cents",
+     "debut": 1.94,
+     "fin": 2.14
+    },
+    {
+     "mot": "kilomètres",
+     "debut": 2.18,
+     "fin": 2.6
+    },
+    {
+     "mot": "de",
+     "debut": 2.64,
+     "fin": 2.7
+    },
+    {
+     "mot": "diamètre",
+     "debut": 2.76,
+     "fin": 3.16
+    },
+    {
+     "mot": "fonçait",
+     "debut": 3.32,
+     "fin": 3.7
+    },
+    {
+     "mot": "droit",
+     "debut": 3.74,
+     "fin": 3.98
+    },
+    {
+     "mot": "vers",
+     "debut": 4.04,
+     "fin": 4.16
+    },
+    {
+     "mot": "la",
+     "debut": 4.2,
+     "fin": 4.3
+    },
+    {
+     "mot": "Terre ?",
+     "debut": 4.34,
+     "fin": 4.64
+    }
+   ]
+  },
+  {
+   "scene": 2,
+   "texte": "Son impact provoquerait des tsunamis gigantesques, des séismes, et peut-être même la fin de notre civilisation.",
+   "debut": 5.22,
+   "fin": 11.2,
+   "mots": [
+    {
+     "mot": "Son",
+     "debut": 5.22,
+     "fin": 5.34
+    },
+    {
+     "mot": "impact",
+     "debut": 5.42,
+     "fin": 5.74
+    },
+    {
+     "mot": "provoquerait",
+     "debut": 5.88,
+     "fin": 6.28
+    },
+    {
+     "mot": "des",
+     "debut": 6.32,
+     "fin": 6.4
+    },
+    {
+     "mot": "tsunamis",
+     "debut": 6.44,
+     "fin": 6.86
+    },
+    {
+     "mot": "gigantesques,",
+     "debut": 6.98,
+     "fin": 7.64
+    },
+    {
+     "mot": "des",
+     "debut": 7.96,
+     "fin": 8.06
+    },
+    {
+     "mot": "séismes,",
+     "debut": 8.119,
+     "fin": 8.6
+    },
+    {
+     "mot": "et",
+     "debut": 8.94,
+     "fin": 9
+    },
+    {
+     "mot": "peut-être",
+     "debut": 9.04,
+     "fin": 9.4
+    },
+    {
+     "mot": "même",
+     "debut": 9.46,
+     "fin": 9.64
+    },
+    {
+     "mot": "la",
+     "debut": 9.68,
+     "fin": 9.74
+    },
+    {
+     "mot": "fin",
+     "debut": 9.92,
+     "fin": 10.04
+    },
+    {
+     "mot": "de",
+     "debut": 10.1,
+     "fin": 10.16
+    },
+    {
+     "mot": "notre",
+     "debut": 10.18,
+     "fin": 10.44
+    },
+    {
+     "mot": "civilisation.",
+     "debut": 10.48,
+     "fin": 11.2
+    }
+   ]
+  },
+  {
+   "scene": 3,
+   "texte": "Mais les scientifiques découvriraient alors quelque chose d'absolument impossible...",
+   "debut": 11.78,
+   "fin": 15.78,
+   "mots": [
+    {
+     "mot": "Mais",
+     "debut": 11.78,
+     "fin": 11.86
+    },
+    {
+     "mot": "les",
+     "debut": 11.9,
+     "fin": 12
+    },
+    {
+     "mot": "scientifiques",
+     "debut": 12.04,
+     "fin": 12.6
+    },
+    {
+     "mot": "découvriraient",
+     "debut": 12.64,
+     "fin": 13.16
+    },
+    {
+     "mot": "alors",
+     "debut": 13.22,
+     "fin": 13.46
+    },
+    {
+     "mot": "quelque",
+     "debut": 13.52,
+     "fin": 13.8
+    },
+    {
+     "mot": "chose",
+     "debut": 13.84,
+     "fin": 14.12
+    },
+    {
+     "mot": "d'absolument",
+     "debut": 14.22,
+     "fin": 14.86
+    },
+    {
+     "mot": "impossible...",
+     "debut": 15.08,
+     "fin": 15.78
+    }
+   ]
+  },
+  {
+   "scene": 4,
+   "texte": "Attendez... C'est un ballon de rugby ?! Quelqu'un a frappé un peu trop fort !",
+   "debut": 16.28,
+   "fin": 20.46,
+   "mots": [
+    {
+     "mot": "Attendez...",
+     "debut": 16.28,
+     "fin": 16.64
+    },
+    {
+     "mot": "C'est",
+     "debut": 17.16,
+     "fin": 17.3
+    },
+    {
+     "mot": "un",
+     "debut": 17.34,
+     "fin": 17.4
+    },
+    {
+     "mot": "ballon",
+     "debut": 17.56,
+     "fin": 17.82
+    },
+    {
+     "mot": "de",
+     "debut": 17.84,
+     "fin": 17.88
+    },
+    {
+     "mot": "rugby ?!",
+     "debut": 17.94,
+     "fin": 18.28
+    },
+    {
+     "mot": "Quelqu'un",
+     "debut": 18.8,
+     "fin": 19.24
+    },
+    {
+     "mot": "a",
+     "debut": 19.28,
+     "fin": 19.36
+    },
+    {
+     "mot": "frappé",
+     "debut": 19.42,
+     "fin": 19.7
+    },
+    {
+     "mot": "un",
+     "debut": 19.74,
+     "fin": 19.78
+    },
+    {
+     "mot": "peu",
+     "debut": 19.84,
+     "fin": 19.92
+    },
+    {
+     "mot": "trop",
+     "debut": 19.96,
+     "fin": 20.14
+    },
+    {
+     "mot": "fort !",
+     "debut": 20.18,
+     "fin": 20.46
+    }
+   ]
+  },
+  {
+   "scene": 5,
+   "texte": "Destiny Rugby. Gratuit sur destiny-rugby.fr.",
+   "debut": 21,
+   "fin": 24.62,
+   "mots": [
+    {
+     "mot": "Destiny",
+     "debut": 21,
+     "fin": 21.4
+    },
+    {
+     "mot": "Rugby.",
+     "debut": 21.44,
+     "fin": 21.78
+    },
+    {
+     "mot": "Gratuit",
+     "debut": 22.1,
+     "fin": 22.5
+    },
+    {
+     "mot": "sur",
+     "debut": 22.6,
+     "fin": 22.78
+    },
+    {
+     "mot": "destiny-rugby.fr.",
+     "debut": 22.84,
+     "fin": 24.62
+    }
+   ]
+  }
+ ]
+}

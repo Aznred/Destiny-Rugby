@@ -14,11 +14,14 @@
 export type StandingsStatus =
   | 'QUALIFIED'          // qualification directe (demi-finale, tournoi final, huitièmes de la coupe)
   | 'PLAYOFF'            // barrages / phase finale
-  | 'PROMOTION'          // montée directe (divisions publiques en ligne)
+  | 'PROMOTION'          // montée directe, acquise au classement
+  | 'PROMOTION_FINALS'   // montée acquise ET qualification pour le tableau qui désigne le champion
+  | 'PROMOTION_POSSIBLE' // montée possible : les meilleurs suivants prennent les places restantes
   | 'CHALLENGE_CUP'      // reversé en Challenge Cup
   | 'SAFE'
   | 'ACCESS_MATCH'       // match d'accès / barrage de maintien
   | 'DIRECT_RELEGATION'
+  | 'RELEGATION_POSSIBLE' // relégation possible : les moins bien classés de la ligue complètent les descentes
   | 'ELIMINATED';        // éliminé de la compétition (poule de coupe)
 
 /** D'où vient un club dans un tableau à élimination directe. */
@@ -63,9 +66,61 @@ export interface PoolQualification {
   transferred?: { positions: number[]; to: string; origin: QualifiedFrom };
 }
 
+// ── Titre et montée : deux règles distinctes (Correctif 39) ──────────────────
+//
+// Signalé en jeu : « plusieurs groupes/régions participent à la compétition, mais finalement un seul club obtient la
+// montée, comme si toute la pyramide dépendait du champion unique du tableau final ».
+//
+// ⚠️ LA MONTÉE SE GAGNE AU CLASSEMENT DE SA POULE, LE TITRE DANS LE TABLEAU. Finir assez haut donne la montée ; on
+// continue ensuite les phases finales pour devenir champion. Chaque division déclare ses quatre blocs ci-dessous, et
+// corriger une compétition, c'est changer SA ligne dans `TABLE`.
+
+/** Qui dispute le tableau final. Le tableau désigne le champion ; il ne donne pas la montée (voir `ChampionshipBracket`). */
+export interface QualificationToFinals {
+  /** Qualifiés par poule. `auto` : la phase finale de la poule (poule unique), deux par poule jusqu'à trois poules, un au-delà. */
+  perPool: number | 'auto';
+  /** Le tableau est complété à la puissance de deux par les meilleurs suivants. */
+  bestRunnersUp: boolean;
+}
+
+/** La montée sportive : des places PAR POULE, gagnées au classement de la saison régulière. */
+export interface PromotionRules {
+  /** Montées par poule (`promotionSlots`). 0 : personne ne monte de cette division. */
+  promotionSlots: number;
+  /**
+   * Le territoire de l'échange avec l'étage du dessus. `ligue` : les places se comptent à l'intérieur de chaque ligue
+   * régionale — un club occitan ne dispute sa montée qu'aux clubs d'Occitanie, et ce sont des clubs d'Occitanie qui
+   * descendent à sa place. `division` : toutes poules confondues.
+   */
+  territory: 'ligue' | 'division';
+  /** Les places que l'étage du dessus libère en plus vont aux meilleurs suivants (les deuxièmes les mieux classés). */
+  bestRunnersUp: boolean;
+}
+
+/** Les descentes : les mêmes valeurs que `standings` (une seule saisie), nommées pour ce qu'elles sont. */
+export interface RelegationRules {
+  /** Relégués directs par poule. Dans un échange par ligue, c'est la valeur nominale : le compte réel suit les montées de la ligue. */
+  directPerPool: number;
+  /** Places qui jouent un match de maintien, comptées depuis le bas. */
+  accessMatchPositions: number[];
+}
+
+/**
+ * Le tableau final et la montée. `decides` : le champion monte, le finaliste joue l'accès (poule unique : Pro D2,
+ * Nationale). `tiebreak` : le tableau ne donne aucune place, mais le champion passe en tête des meilleurs suivants.
+ * `none` : le tableau ne désigne que le champion.
+ */
+export interface ChampionshipBracket {
+  promotionImpact: 'decides' | 'tiebreak' | 'none';
+}
+
 export interface CompetitionRules {
   competition: string;
   standings: StandingsRules;
+  qualificationToFinals: QualificationToFinals;
+  promotionRules: PromotionRules;
+  relegationRules: RelegationRules;
+  championshipBracket: ChampionshipBracket;
   poolQualification?: PoolQualification;
   /** Un match de saison régulière peut finir sur un nul. */
   league: { allowDraw: true };
@@ -86,44 +141,85 @@ const COUPERET_TIRS: KnockoutRules = {
   drawResolution: { extraTime: PROLONGATION, thenCompetitionSpecificTiebreak: ['tirsAuBut'] },
 };
 
+/** Ce qu'une division déclare en plus de son bas de tableau : sa montée, son tableau final, et ce que l'un doit à l'autre. */
+interface ReglesSportives {
+  promotion?: Partial<PromotionRules>;
+  finals?: Partial<QualificationToFinals>;
+  bracket?: ChampionshipBracket['promotionImpact'];
+}
+
 const regles = (
   competition: string, standings: Partial<StandingsRules>, knockout: KnockoutRules = COUPERET_ESSAIS,
-  poolQualification?: PoolQualification,
-): CompetitionRules => ({
-  competition,
-  standings: { qualified: 'auto', playoffs: 'auto', directRelegation: 0, accessMatchPositions: [], ...standings },
-  league: { allowDraw: true },
-  knockout,
-  ...(poolQualification ? { poolQualification } : {}),
-});
+  poolQualification?: PoolQualification, sport: ReglesSportives = {},
+): CompetitionRules => {
+  const s: StandingsRules = { qualified: 'auto', playoffs: 'auto', directRelegation: 0, accessMatchPositions: [], ...standings };
+  return {
+    competition,
+    standings: s,
+    qualificationToFinals: { perPool: 'auto', bestRunnersUp: true, ...sport.finals },
+    promotionRules: { promotionSlots: s.promotion ?? 0, territory: 'division', bestRunnersUp: false, ...sport.promotion },
+    // ⚠️ UNE SEULE SAISIE : les descentes sont celles de `standings`, que `zones()` colore au classement.
+    relegationRules: { directPerPool: s.directRelegation, accessMatchPositions: s.accessMatchPositions },
+    // Sans précision, c'est le tableau qui donne la place (le comportement de toute poule unique).
+    championshipBracket: { promotionImpact: sport.bracket ?? 'decides' },
+    league: { allowDraw: true },
+    knockout,
+    ...(poolQualification ? { poolQualification } : {}),
+  };
+};
+
+/** Une division de la pyramide : son bas de tableau, puis sa montée et son tableau final. */
+const division = (competition: string, standings: Partial<StandingsRules>, sport: ReglesSportives = {}): CompetitionRules =>
+  regles(competition, standings, COUPERET_ESSAIS, undefined, sport);
 
 /** Le dernier descend, l'avant-dernier défend sa place contre le finaliste de l'étage du dessous. */
 const UN_PLUS_ACCES = { directRelegation: 1, accessMatchPositions: [2] };
-/** Fédérale : les deux derniers descendent, personne ne joue de match d'accès. */
+/** Les deux derniers descendent, personne ne joue de match d'accès. */
 const DEUX_DIRECTS = { directRelegation: 2, accessMatchPositions: [] };
+/** Régionale : un relégué par poule en valeur nominale — le compte réel suit les montées de la ligue (`promotion.ts`). */
+const UN_DIRECT = { directRelegation: 1, accessMatchPositions: [] };
+
+/** Poule unique : le champion monte, le finaliste joue l'accès. C'est le tableau final qui donne la place. */
+const MONTEE_DU_CHAMPION: ReglesSportives = { promotion: { promotionSlots: 1 }, bracket: 'decides' };
+/** Division à poules : le premier de CHAQUE poule monte. Le tableau final ne désigne que le champion. */
+const MONTEE_PAR_POULE: ReglesSportives = { promotion: { promotionSlots: 1 }, bracket: 'none' };
+/** Le premier de chaque poule monte, et les meilleurs deuxièmes prennent les places que l'étage du dessus libère en plus. */
+const MONTEE_ET_MEILLEURS_DEUXIEMES: ReglesSportives = { promotion: { promotionSlots: 1, bestRunnersUp: true }, bracket: 'tiebreak' };
+/** Régionale : le premier de chaque poule monte, à l'intérieur de sa ligue régionale. */
+const MONTEE_PAR_LIGUE: ReglesSportives = { promotion: { promotionSlots: 1, territory: 'ligue' }, bracket: 'none' };
 
 /**
  * ⚠️ UNE ENTRÉE PAR COMPÉTITION. Changer le sort d'une division, c'est changer SA ligne — jamais une règle
  * « globale » du bas de tableau.
+ *
+ * ⚠️ LES PLACES DOIVENT SE RÉPONDRE D'UN ÉTAGE À L'AUTRE (Correctif 39) : ce qu'un étage promeut, celui du dessus le
+ * relègue. Mesuré sur les poules du jeu (`npm run verify:montees`) :
+ *
+ *   Nationale 2 (2 poules) → Nationale : 2 montées, 2 relégués directs — plus de match d'accès, qui ne se jouait jamais
+ *     (il attendait le finaliste d'une poule unique que la Nationale 2 n'a pas) ;
+ *   Fédérale 1 (4) → Nationale 2 : 4 montées, 2 relégués par poule ;
+ *   Fédérale 2 (8) → Fédérale 1 : 8 et 8 ;  Fédérale 3 (14) → Fédérale 2 : 14 premiers + 2 meilleurs deuxièmes, 16 ;
+ *   Régionale 1 (22) → Fédérale 3 : 22 premiers + 6 meilleurs deuxièmes, 28 ;
+ *   Régionale 2 → Régionale 1 et Régionale 3 → Régionale 2 : par LIGUE régionale, autant de descentes que de montées.
  */
 const TABLE: Record<string, CompetitionRules> = Object.fromEntries([
   // Pyramide française
-  regles('top14', UN_PLUS_ACCES),
-  regles('prod2', UN_PLUS_ACCES),
-  regles('nationale', UN_PLUS_ACCES),
-  regles('nationale2', UN_PLUS_ACCES),
-  regles('fed1', DEUX_DIRECTS),
-  regles('fed2', DEUX_DIRECTS),
-  regles('fed3', DEUX_DIRECTS),
-  regles('reg1', UN_PLUS_ACCES),
-  regles('reg2', UN_PLUS_ACCES),
-  regles('reg3', {}),
+  division('top14', UN_PLUS_ACCES),
+  division('prod2', UN_PLUS_ACCES, MONTEE_DU_CHAMPION),
+  division('nationale', DEUX_DIRECTS, MONTEE_DU_CHAMPION),
+  division('nationale2', DEUX_DIRECTS, MONTEE_PAR_POULE),
+  division('fed1', DEUX_DIRECTS, MONTEE_PAR_POULE),
+  division('fed2', DEUX_DIRECTS, MONTEE_PAR_POULE),
+  division('fed3', DEUX_DIRECTS, MONTEE_ET_MEILLEURS_DEUXIEMES),
+  division('reg1', UN_DIRECT, MONTEE_ET_MEILLEURS_DEUXIEMES),
+  division('reg2', UN_DIRECT, MONTEE_PAR_LIGUE),
+  division('reg3', {}, MONTEE_PAR_LIGUE),
   // Pyramides étrangères
-  regles('premiership', UN_PLUS_ACCES),
-  regles('championship', {}),
-  regles('japon1', UN_PLUS_ACCES),
-  regles('japon2', UN_PLUS_ACCES),
-  regles('japon3', {}),
+  division('premiership', UN_PLUS_ACCES),
+  division('championship', {}, MONTEE_DU_CHAMPION),
+  division('japon1', UN_PLUS_ACCES),
+  division('japon2', UN_PLUS_ACCES, MONTEE_DU_CHAMPION),
+  division('japon3', {}, MONTEE_DU_CHAMPION),
   // Coupes d'Europe : quatre qualifiés par poule ; le cinquième de Champions Cup est reversé en Challenge Cup.
   regles('championsCup', { qualified: 4, playoffs: 0 }, COUPERET_ESSAIS, {
     qualified: [1, 2, 3, 4],
@@ -240,8 +336,11 @@ export function zones(rules: CompetitionRules, taille: number, poules = 1): Zone
   if (s.qualified === 'auto') {
     // Poule unique : les deux premiers attendent en demi-finale quand il y a des barrages. Division à poules : les
     // qualifiés du tournoi final (deux par poule jusqu'à trois poules, un au-delà).
-    qualified = poules > 1 ? (poules <= 3 ? 2 : 1) : phase >= 6 ? 2 : phase;
-    playoffs = s.playoffs === 'auto' ? Math.max(0, phase - qualified) : s.playoffs;
+    const finales = rules.qualificationToFinals.perPool;
+    qualified = poules > 1 ? (finales === 'auto' ? (poules <= 3 ? 2 : 1) : finales) : phase >= 6 ? 2 : phase;
+    // ⚠️ UNE DIVISION À POULES N'A PAS DE BARRAGES DE POULE : ses qualifiés vont droit au tableau final. Les places 2 à 6
+    // s'affichaient « Barrages » pour un tour qui n'existe pas.
+    playoffs = poules > 1 ? 0 : s.playoffs === 'auto' ? Math.max(0, phase - qualified) : s.playoffs;
   } else {
     // Ligue en ligne : le nombre de qualifiés suit la taille du championnat. Avec des barrages (six qualifiés), les
     // exemptés du premier tour sont « qualifiés » et les autres « en barrage » — le tableau dit la même chose.
@@ -251,7 +350,9 @@ export function zones(rules: CompetitionRules, taille: number, poules = 1): Zone
   }
   qualified = Math.min(qualified, taille);
   playoffs = Math.min(playoffs, taille - qualified);
-  const promotion = Math.min(s.promotion ?? 0, taille);
+  // La montée acquise au classement : les places par poule d'une division à poules. En poule unique, c'est le tableau
+  // final qui la donne (`decides`) — rien n'est promis au classement —, sauf montée directe déclarée (`standings.promotion`).
+  const promotion = Math.min(poules > 1 ? rules.promotionRules.promotionSlots : s.promotion ?? 0, taille);
   // Une toute petite poule ne perd pas la moitié de ses clubs : un relégué par tranche de quatre, au plus.
   const directRelegation = Math.max(0, Math.min(s.directRelegation, Math.floor(taille / 4)));
   const haut = Math.max(qualified + playoffs, promotion);
@@ -269,7 +370,8 @@ export function standingsStatuses(rules: CompetitionRules, taille: number, poule
     const position = i + 1;
     if (position > taille - z.directRelegation) return 'DIRECT_RELEGATION';
     if (z.accessMatch.includes(position)) return 'ACCESS_MATCH';
-    if (position <= z.promotion) return 'PROMOTION';
+    // Monter ET jouer le titre : la montée est acquise au classement, le tableau final reste à disputer.
+    if (position <= z.promotion) return poules > 1 && position <= z.qualified ? 'PROMOTION_FINALS' : 'PROMOTION';
     if (position <= z.qualified) return 'QUALIFIED';
     if (position <= z.qualified + z.playoffs) return 'PLAYOFF';
     return 'SAFE';
@@ -313,8 +415,11 @@ export const PRESENTATION_STATUT: Record<Exclude<StandingsStatus, 'SAFE'>, { sym
   QUALIFIED: { symbole: 'Q', cle: 'zone.qualifie' },
   PLAYOFF: { symbole: 'PO', cle: 'zone.playoff' },
   PROMOTION: { symbole: '▲', cle: 'zone.promotion' },
+  PROMOTION_FINALS: { symbole: '▲Q', cle: 'zone.promotionFinales' },
+  PROMOTION_POSSIBLE: { symbole: '△', cle: 'zone.promotionPossible' },
   CHALLENGE_CUP: { symbole: 'CC', cle: 'zone.challenge' },
   ACCESS_MATCH: { symbole: 'B', cle: 'zone.acces' },
   DIRECT_RELEGATION: { symbole: '▼', cle: 'zone.relegation' },
+  RELEGATION_POSSIBLE: { symbole: '▽', cle: 'zone.relegationPossible' },
   ELIMINATED: { symbole: '✕', cle: 'zone.elimine' },
 };

@@ -12,6 +12,11 @@ export interface CorpsMatch {
   age: number; duree: number; direction: number; intensite: number;
   /** Bassin, épaules, deux appuis et deux mains, contraints dans le plan. */
   points: Array<{ x: number; y: number; vx: number; vy: number }>;
+  /**
+   * Un plongeon qui garde son élan (Correctif 39) : la vitesse du corps est PRESCRITE — un vol à vitesse constante, puis
+   * une glissade que la pelouse freine. Absent : la chute ordinaire, qui s'amortit d'elle-même.
+   */
+  glisse?: { ux: number; uy: number; vol: number; enLAir: number; auSol: number; frottement: number };
 }
 
 export function corpsPourAffichage(p: Pion, avance = 0) {
@@ -122,6 +127,30 @@ export function declencherChute(p: Pion, impulsion: Vec, duree = 1.5): void {
   p.battu = Math.max(p.battu, duree);
 }
 
+/**
+ * LE PLONGEON QUI GARDE SON ÉLAN (Correctif 39). Le corps part dans la direction `cap` à la vitesse `enLAir` pendant `vol`
+ * secondes, touche le sol à `auSol` m/s, puis glisse en perdant `frottement` m/s par seconde jusqu'à l'arrêt.
+ *
+ * ⚠️ PAS DE PLAFOND À 6 m/s ICI : c'est tout l'objet. `declencherChute` borne son impulsion (une chute de plaquage ne
+ * projette personne à dix mètres) ; un marqueur lancé, lui, traverse l'en-but à la vitesse où il est arrivé.
+ */
+export function declencherGlissade(
+  p: Pion, cap: Vec, mouvement: { vol: number; enLAir: number; auSol: number; frottement: number }, duree: number,
+): void {
+  const n = Math.max(.01, Math.hypot(cap.x, cap.y));
+  const ux = cap.x / n, uy = cap.y / n;
+  p.corps = {
+    age: 0, duree, direction: Math.atan2(uy, ux), intensite: Math.min(1, mouvement.enLAir / 6),
+    points: [0, .48, -.35, -.35, .48, .48].map((long, i) => ({
+      x: p.pos.x + ux * long - uy * (i === 2 ? .22 : i === 3 ? -.22 : i === 4 ? .42 : i === 5 ? -.42 : 0),
+      y: p.pos.y + uy * long + ux * (i === 2 ? .22 : i === 3 ? -.22 : i === 4 ? .42 : i === 5 ? -.42 : 0),
+      vx: ux * mouvement.enLAir, vy: uy * mouvement.enLAir,
+    })),
+    glisse: { ux, uy, ...mouvement },
+  };
+  p.battu = Math.max(p.battu, duree);
+}
+
 /** Solveur à sous-pas bornés, contraintes de longueur et friction au sol. */
 export function avancerCorps(e: EtatMatch, dt: number): void {
   for (const p of e.pions) {
@@ -133,9 +162,13 @@ export function avancerCorps(e: EtatMatch, dt: number): void {
     const voisins = e.pions.filter(q => q !== p && q.surLeTerrain && q.sanction <= 0
       && Math.abs(q.pos.x - p.pos.x) < 4 && Math.abs(q.pos.y - p.pos.y) < 4);
     const pas = dt / 5;
+    // Un plongeon : le corps entier suit la vitesse prescrite (vol, puis glissade freinée) — il ne s'amortit pas seul.
+    const g = c.glisse;
+    const allure = g ? (c.age < g.vol ? g.enLAir : Math.max(0, g.auSol - g.frottement * (c.age - g.vol))) : 0;
     for (let k = 0; k < 5; k++) {
       for (const q of c.points) {
-        q.vx *= Math.exp(-2.8 * pas); q.vy *= Math.exp(-2.8 * pas);
+        if (g) { q.vx = g.ux * allure; q.vy = g.uy * allure; }
+        else { q.vx *= Math.exp(-2.8 * pas); q.vy *= Math.exp(-2.8 * pas); }
         q.x = borner(q.x + q.vx * pas, .2, LONGUEUR - .2);
         q.y = borner(q.y + q.vy * pas, .2, LARGEUR - .2);
         for (const voisin of voisins) {

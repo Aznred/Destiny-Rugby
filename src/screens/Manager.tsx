@@ -2,7 +2,7 @@ import { InfirmerieManager } from '../components/InfirmerieManager';
 import { VestiaireManagerSimple } from '../components/VestiaireManagerSimple';
 import { compositionMedicale, autorisationMedicale, bilanMedical, STATUTS_MEDICAUX, centreMedical } from '../lib/infirmerieManager';
 import { CadreCompositionManager } from '../components/CadreCompositionManager';
-import { lazy, Suspense, useDeferredValue, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useGame } from '../store/useGame';
 import { locale, tn, texteTraduit, t, nombre } from '../lib/i18n';
@@ -47,7 +47,9 @@ import {
   CONFIANCE_DEPART, CONFIANCE_LICENCIEMENT, clubsAccessibles, etageAccessible,
   noteMaximale, salaireManager,
 } from '../lib/manager';
-import { afficheDuClub, libelleAfficheManager, type AfficheComplete } from '../lib/matchLive';
+import { libelleAfficheManager, type AfficheComplete } from '../lib/matchLive';
+import { afficheSure, contratsExpirants, diagnostiquerCloture, estSemaineDeCloture, prolongationsAcceptees, type VerrouCloture } from '../lib/clotureSaison';
+import { VerrousSaison } from '../components/VerrousSaison';
 import { porteeSportive } from '../lib/recrutementManager';
 import { LIMITES } from '../lib/classementMondial';
 import {
@@ -162,6 +164,10 @@ export function Manager() {
   const definirHierarchieCapitaines = useGame((s) => s.definirHierarchieCapitainesManager);
   const repondreDecisionStrategique = useGame((s) => s.repondreDecisionStrategiqueManager);
   const journal = useGame((s) => s.journal);
+  const clotureRetenue = useGame((s) => s.clotureRetenue);
+  // La semaine sur laquelle un clic « semaine suivante » n'a rien changé : c'est là qu'on dit pourquoi (Correctif 39).
+  const [tentativeVaine, setTentativeVaine] = useState<string | null>(null);
+  const alerteConseil = useRef<HTMLElement>(null);
 
   const [vue, setVue] = useState<VueManager>('bureau');
   // ⚠️ LES MURS SONT CEUX DU CLUB, pas ceux de l'entraîneur : on lit le club
@@ -271,14 +277,14 @@ export function Manager() {
   // — c’est le « je n’ai pas fait les play-offs ».  couvre les
   // trois natures de week-end ().
   const afficheMemo = useMemo(
-    () => manager ? afficheDuClub(manager) : null,
+    () => manager ? afficheSure(manager).affiche : null,
     [manager],
   );
   const prochainesAffiches = useMemo(() => {
     if (!manager?.club) return [];
     const suite: { semaine: number; affiche: AfficheComplete }[] = [];
     for (let numero = manager.semaine; numero <= SEMAINES_PAR_SAISON; numero++) {
-      const affiche = afficheDuClub({ ...manager, semaine: numero });
+      const affiche = afficheSure({ ...manager, semaine: numero }).affiche;
       if (affiche && !manager.resultats[affiche.cle]) suite.push({ semaine: numero, affiche });
     }
     const visibles = suite.slice(0, 4);
@@ -296,6 +302,19 @@ export function Manager() {
   const avancerSemaines = () => {
     const r = avancerJusquaManager(SEMAINES_PAR_SAISON);
     if (r.semaines > 0) setAvanceFaite(r);
+  };
+  /**
+   * ⚠️ UN CLIC QUI NE FAIT RIEN SE LIT COMME UN BOUTON CASSÉ (Correctif 39). `semaineManager` refuse quand un match attend ou
+   * quand le contrat est à zéro : on compare la date avant et après, et si rien n'a bougé le panneau `VerrousSaison` dit pourquoi.
+   */
+  const passerLaSemaine = () => {
+    const avant = useGame.getState().manager;
+    semaineManager();
+    const apres = useGame.getState().manager;
+    const immobile = !!avant && !!apres && apres.club === avant.club && apres.saison === avant.saison && apres.semaine === avant.semaine;
+    setTentativeVaine(immobile ? `${avant.saison}#${avant.semaine}` : null);
+    // Le panneau qui explique vit dans le bureau : on y revient.
+    if (immobile) setVue('bureau');
   };
 
   const derbyMemo = useMemo(() => {
@@ -419,6 +438,18 @@ export function Manager() {
   const composition = compositionMemo;
   const afficheManager = afficheMemo;
   const resultatManager = afficheManager ? manager.resultats[afficheManager.cle] : undefined;
+  // ── Ce qui retient la semaine ou la saison (Correctif 39) ──────────────────
+  // Le diagnostic n'est lu que lorsqu'il y a quelque chose à dire : un contrat à zéro, un clic resté sans effet, une clôture retenue.
+  const clotureDeSaison = estSemaineDeCloture(manager.semaine);
+  const contratAZero = !!manager.club && (manager.contrat?.saisons ?? 0) <= 0;
+  const erreurCloture = clotureRetenue?.saison === manager.saison ? clotureRetenue.erreur : undefined;
+  const montrerVerrous = !!manager.club && (contratAZero || !!erreurCloture || tentativeVaine === `${manager.saison}#${manager.semaine}`);
+  const verrous: VerrouCloture[] = montrerVerrous ? diagnostiquerCloture(manager, effectifBrut) : [];
+  // Les contrats qui s'arrêtent à la fin de CETTE saison, annoncés dès le palier « danger » (six mois).
+  const prolonges = new Set(prolongationsAcceptees(manager).map((n) => n.joueur.id));
+  const expirants = manager.club && avancee ? contratsExpirants(manager, effectifBrut, avancee).filter((j) => !prolonges.has(j.id)) : [];
+  const alerteContrats = expirants.length > 0
+    && ['danger', 'libre'].includes(palierContrat(moisRestantsContrat(manager.saison + 1, manager.saison, manager.semaine)));
   const academieClub = manager.academie.filter((j) => j.clubCentre === manager.club);
   const mentors = effectif.filter((j) => j.age >= 28).sort((a, b) => b.note - a.note);
   const revenusFormationClub = Object.entries(manager.revenusFormation)
@@ -666,7 +697,7 @@ export function Manager() {
           {vue === 'calendrier' && <CalendrierManager onMatch={() => setVue('match')} />}
           {vue === 'tresorerie' && <TresorerieManager manager={manager} onMarche={() => setVue('marche')} onStructures={() => setVue('formation')} />}
 
-          {manager.conseil?.offre && <section className="carte conseil27-alerte"><b>{t('staff.manager.contractExpired')}</b><p>{t('staff.manager.extensionOffer', { n: manager.conseil.offre.duree })}</p><button className="btn principal" onClick={negocierContrat}>{t('staff.manager.acceptOffer')}</button> <button className="btn fantome" onClick={() => setDemission(true)}>{t('staff.manager.refuseFindClub')}</button></section>}
+          {manager.conseil?.offre && <section className="carte conseil27-alerte" ref={alerteConseil}><b>{t('staff.manager.contractExpired')}</b><p>{t('staff.manager.extensionOffer', { n: manager.conseil.offre.duree })}</p><button className="btn principal" onClick={negocierContrat}>{t('staff.manager.acceptOffer')}</button> <button className="btn fantome" onClick={() => setDemission(true)}>{t('staff.manager.refuseFindClub')}</button></section>}
           {vue === 'bureau' && (
             <div className="manager-bureau">
               <section className="carte manager-club-resume" data-tuto="mgr-club">
@@ -695,9 +726,9 @@ export function Manager() {
                     </button>
                   )}
                   <button className="btn primaire" data-tuto="mgr-semaine" onClick={() => {
-                    if (afficheManager && !resultatManager) setVue('match'); else semaineManager();
+                    if (afficheManager && !resultatManager && !clotureDeSaison) setVue('match'); else passerLaSemaine();
                   }}>
-                    {afficheManager && !resultatManager ? t("ui.010f4333aeb4") : t("mgr.semaineSuivante")}
+                    {afficheManager && !resultatManager && !clotureDeSaison ? t("ui.010f4333aeb4") : clotureDeSaison ? t("mgr.cloreSaison") : t("mgr.semaineSuivante")}
                   </button>
                 </div>
               </section>
@@ -715,6 +746,23 @@ export function Manager() {
                     <Icone nom="croix" taille={13} />
                   </button>
                 </p>
+              )}
+
+              {montrerVerrous && (
+                <VerrousSaison
+                  verrous={verrous} cloture={clotureDeSaison} erreur={erreurCloture}
+                  onConseil={() => alerteConseil.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+                  onMatch={() => setVue('match')}
+                  onFermer={contratAZero || erreurCloture ? undefined : () => setTentativeVaine(null)}
+                />
+              )}
+              {alerteContrats && (
+                <section className="carte contrats-expirants">
+                  <b><Icone nom="maillot" taille={16} /> {tn('cloture.contrats.titre', expirants.length)}</b>
+                  <p className="contrats-expirants-noms">{expirants.slice(0, 6).map((j) => j.nom).join(', ')}{expirants.length > 6 ? '…' : ''}</p>
+                  <p>{t('cloture.contrats.texte')}</p>
+                  <button className="btn fantome" onClick={() => { setContratsARenouveler(true); setVue('marche'); }}>{t('cloture.contrats.voir')}</button>
+                </section>
               )}
 
               <section className="manager-kpis" aria-label={t("ui.1727855df4ce")} data-tuto="mgr-kpis">
@@ -1022,7 +1070,7 @@ export function Manager() {
           {vue === 'match' && (
             <div className="manager-match-centre" data-tuto="mgr-match">
               {!afficheManager ? (
-                <section className="carte manager-match-vide"><span><Icone nom="calendrier" taille={32} /></span><h2>{t("ui.3ebc7b10db2b")}</h2><p>{t("ui.e046ca836960")}</p><button className="btn primaire" onClick={semaineManager}>{t("ui.96dc682c2bc8")}</button></section>
+                <section className="carte manager-match-vide"><span><Icone nom="calendrier" taille={32} /></span><h2>{t("ui.3ebc7b10db2b")}</h2><p>{t("ui.e046ca836960")}</p><button className="btn primaire" onClick={passerLaSemaine}>{clotureDeSaison ? t("mgr.cloreSaison") : t("ui.96dc682c2bc8")}</button></section>
               ) : (
                 <section className="carte manager-affiche-match">
                   <div className="eyebrow">{libelleAfficheManager(afficheManager, manager.divisionNom)}</div>
@@ -1038,7 +1086,7 @@ export function Manager() {
                     <span>{clubParNom(afficheManager.match.exterieur) && <Blason club={clubParNom(afficheManager.match.exterieur)!} taille={54} />}<b>{afficheManager.match.exterieur}</b></span>
                   </div>
                   {resultatManager ? (
-                    <div className="manager-match-joue"><b><Icone nom="check" taille={14} />{t("ui.0e747b62e94d")}</b><p>{tn("ui.d3b31a092ea5", resultatManager.essaisPour, { v0: resultatManager.essaisPour })}</p><button className="btn primaire" onClick={semaineManager}>{manager.semaine >= SEMAINES_PAR_SAISON ? t("mgr.cloreSaison") : t("ui.96dc682c2bc8")}</button></div>
+                    <div className="manager-match-joue"><b><Icone nom="check" taille={14} />{t("ui.0e747b62e94d")}</b><p>{tn("ui.d3b31a092ea5", resultatManager.essaisPour, { v0: resultatManager.essaisPour })}</p><button className="btn primaire" onClick={passerLaSemaine}>{manager.semaine >= SEMAINES_PAR_SAISON ? t("mgr.cloreSaison") : t("ui.96dc682c2bc8")}</button></div>
                   ) : (
                     <div className="manager-lancer-match"><p>{t("ui.4bb382ff1adf")}</p><div><button className="btn fantome" onClick={() => setVue('equipe')}><Icone nom="equipe" taille={16} />{t("ui.da1b992afed6")}</button><button className="btn primaire grand" data-tuto="mgr-lancer" onClick={() => setMatchAChoisir(afficheManager)}><Icone nom="sifflet" taille={18} />{t("ui.db01ad9b4fe2")}</button></div></div>
                   )}

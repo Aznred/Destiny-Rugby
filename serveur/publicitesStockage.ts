@@ -5,7 +5,11 @@ export interface SessionPub extends RecompensePub {
   compte: string; jour: string; creeLe: number; expireLe: number;
   config: ConfigPublicites; chances: ChancePackPub[];
   verifieLe?: number; started?: boolean; videoTerminee?: boolean; failure?: 'FAILED' | 'NO_FILL' | 'CLOSED'; tid?: string;
+  /** Le dernier callback AppLixir REFUSÉ pour cette session : quand, pourquoi, et combien de fois (diagnostic du Labo). */
+  callback?: { le: number; refus: string; n: number };
 }
+/** Les derniers callbacks refusés, tous comptes confondus : jamais d'identité, seulement la date et la raison. */
+export interface RefusPublicites { total: number; derniers: { le: number; refus: string; videoTerminee: boolean }[] }
 export interface RegistrePublicites { revision: number; sessions: SessionPub[]; stats: StatsPublicites }
 export interface StockagePublicites {
   lire(compte: string): Promise<RegistrePublicites | null>;
@@ -13,6 +17,8 @@ export interface StockagePublicites {
   /** CAS, reçu AppLixir et crédit du coffre : une seule transaction. */
   ecrire(compte: string, revision: number | null, registre: RegistrePublicites, credit?: number, tid?: string): Promise<boolean>;
   statistiques(): Promise<StatsPublicites>;
+  /** Facultatif : le Labo s'en passe si la lecture échoue. */
+  refus?(): Promise<RefusPublicites>;
 }
 export function publicitesSql(sql: ExecuterSql): StockagePublicites {
   return {
@@ -30,6 +36,14 @@ export function publicitesSql(sql: ExecuterSql): StockagePublicites {
       const lignes = await sql`select pub_ecrire(${compte}::uuid, ${revision}::int, ${JSON.stringify(registre)}::jsonb,
         ${credit}::bigint, ${tid ?? null}::text) as ok`;
       return lignes[0]?.ok === true;
+    },
+    async refus() {
+      const total = await sql`select coalesce(sum((donnees->'stats'->>'callbacksRefuses')::bigint),0) as n from pub_comptes`;
+      const derniers = await sql`select s->'callback' as c, coalesce((s->>'videoTerminee')::boolean,false) as v
+        from pub_comptes, jsonb_array_elements(donnees->'sessions') s
+        where s ? 'callback' order by (s->'callback'->>'le')::bigint desc limit 8`;
+      return { total: Number(total[0]?.n ?? 0),
+        derniers: derniers.map((l) => ({ le: Number((l.c as { le: number }).le), refus: String((l.c as { refus: string }).refus), videoTerminee: l.v === true })) };
     },
     async statistiques() {
       const lignes = await sql`select

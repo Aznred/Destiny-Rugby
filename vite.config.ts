@@ -1,4 +1,4 @@
-import { defineConfig, loadEnv, type Plugin } from 'vite'
+import { defineConfig, loadEnv, type Connect, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import { createRequire } from 'node:module'
 import { readFileSync } from 'node:fs'
@@ -52,7 +52,8 @@ function carriereEnDeveloppement(): Plugin {
       // Variables serveur privées : ne jamais les exposer sous VITE_ au navigateur.
       const variables = loadEnv(serveur.config.mode,serveur.config.envDir,'APPLIXIR_');
       for (const [nom,valeur] of Object.entries(variables)) process.env[nom] ??= valeur;
-      serveur.middlewares.use('/api/carriere', (req, res, suite) => {
+      // `/api/applixir` : l'adresse de callback sans « ? » (réécrite vers la carrière par `vercel.json` en production).
+      const relais: Connect.NextHandleFunction = (req, res, suite) => {
         void (async () => {
           try {
             const { creerGestionnaireCarriere } = await serveur.ssrLoadModule('/serveur/carriereApi.ts');
@@ -82,7 +83,8 @@ function carriereEnDeveloppement(): Plugin {
             await gestionnaire.handler({
               method: req.method, url: req.originalUrl ?? req.url,
               headers: req.headers as Record<string, string | undefined>,
-              body: brut ? JSON.parse(brut) : undefined,
+              // Un reçu de fournisseur peut arriver en formulaire : le gestionnaire sait le lire, on ne le rejette pas ici.
+              body: brut ? corpsLisible(brut) : undefined,
               socket: req.socket,
             }, reponse);
           } catch (erreur) {
@@ -91,11 +93,14 @@ function carriereEnDeveloppement(): Plugin {
             suite(erreur as Error);
           }
         })();
-      });
+      };
+      serveur.middlewares.use('/api/carriere', relais);
+      serveur.middlewares.use('/api/applixir', relais);
     },
   };
 }
 let stockage: unknown;
+function corpsLisible(brut: string): unknown { try { return JSON.parse(brut); } catch { return brut; } }
 
 // https://vite.dev/config/
 export default defineConfig({

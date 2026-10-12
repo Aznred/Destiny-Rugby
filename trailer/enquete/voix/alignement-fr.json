@@ -1,0 +1,310 @@
+{
+ "langue": "fr",
+ "voix": "fr.mp3",
+ "modele": "prise fournie, alignée par transcription (Scribe)",
+ "duree": 22.32,
+ "ecart": 0,
+ "entendu": "Le 12 octobre à 21 h 04, un homme a disparu sous les yeux de quatre-vingt mille témoins. Quinze suspects, tous présents sur les lieux. Aucun n'a réussi à l'arrêter. Les enquêteurs n'ont retrouvé qu'une seule chose : l'arme du crime, un crochet. Attendez, un crochet intérieur ? C'était juste Antoine Dupont. Destiny Rugby, gratuit sur destiny-rugby.fr.",
+ "scenes": [
+  {
+   "scene": 1,
+   "texte": "Le 12 octobre, à 21 h 04, un homme a disparu sous les yeux de 80 000 témoins.",
+   "debut": 0.12,
+   "fin": 5.22,
+   "mots": [
+    {
+     "mot": "Le",
+     "debut": 0.12,
+     "fin": 0.2
+    },
+    {
+     "mot": "12",
+     "debut": 0.28,
+     "fin": 0.46
+    },
+    {
+     "mot": "octobre,",
+     "debut": 0.5,
+     "fin": 0.92
+    },
+    {
+     "mot": "à",
+     "debut": 1.24,
+     "fin": 1.32
+    },
+    {
+     "mot": "21 h 04,",
+     "debut": 1.42,
+     "fin": 2.22
+    },
+    {
+     "mot": "un",
+     "debut": 2.62,
+     "fin": 2.7
+    },
+    {
+     "mot": "homme",
+     "debut": 2.76,
+     "fin": 2.9
+    },
+    {
+     "mot": "a",
+     "debut": 2.92,
+     "fin": 2.98
+    },
+    {
+     "mot": "disparu",
+     "debut": 3.02,
+     "fin": 3.44
+    },
+    {
+     "mot": "sous",
+     "debut": 3.54,
+     "fin": 3.64
+    },
+    {
+     "mot": "les",
+     "debut": 3.66,
+     "fin": 3.8
+    },
+    {
+     "mot": "yeux",
+     "debut": 3.82,
+     "fin": 3.92
+    },
+    {
+     "mot": "de",
+     "debut": 3.96,
+     "fin": 4.12
+    },
+    {
+     "mot": "80 000",
+     "debut": 4.16,
+     "fin": 4.74
+    },
+    {
+     "mot": "témoins.",
+     "debut": 4.82,
+     "fin": 5.22
+    }
+   ]
+  },
+  {
+   "scene": 2,
+   "texte": "Quinze suspects. Tous présents sur les lieux. Aucun n'a réussi à l'arrêter.",
+   "debut": 5.56,
+   "fin": 9.42,
+   "mots": [
+    {
+     "mot": "Quinze",
+     "debut": 5.56,
+     "fin": 5.8
+    },
+    {
+     "mot": "suspects.",
+     "debut": 5.84,
+     "fin": 6.22
+    },
+    {
+     "mot": "Tous",
+     "debut": 6.7,
+     "fin": 6.92
+    },
+    {
+     "mot": "présents",
+     "debut": 6.96,
+     "fin": 7.24
+    },
+    {
+     "mot": "sur",
+     "debut": 7.28,
+     "fin": 7.4
+    },
+    {
+     "mot": "les",
+     "debut": 7.44,
+     "fin": 7.52
+    },
+    {
+     "mot": "lieux.",
+     "debut": 7.54,
+     "fin": 7.74
+    },
+    {
+     "mot": "Aucun",
+     "debut": 8.18,
+     "fin": 8.48
+    },
+    {
+     "mot": "n'a",
+     "debut": 8.52,
+     "fin": 8.6
+    },
+    {
+     "mot": "réussi",
+     "debut": 8.64,
+     "fin": 8.94
+    },
+    {
+     "mot": "à",
+     "debut": 8.96,
+     "fin": 9
+    },
+    {
+     "mot": "l'arrêter.",
+     "debut": 9.02,
+     "fin": 9.42
+    }
+   ]
+  },
+  {
+   "scene": 3,
+   "texte": "Les enquêteurs n'ont retrouvé qu'une seule chose : l'arme du crime... un crochet.",
+   "debut": 9.88,
+   "fin": 14.3,
+   "mots": [
+    {
+     "mot": "Les",
+     "debut": 9.88,
+     "fin": 10
+    },
+    {
+     "mot": "enquêteurs",
+     "debut": 10.04,
+     "fin": 10.52
+    },
+    {
+     "mot": "n'ont",
+     "debut": 10.56,
+     "fin": 10.64
+    },
+    {
+     "mot": "retrouvé",
+     "debut": 10.68,
+     "fin": 11.14
+    },
+    {
+     "mot": "qu'une",
+     "debut": 11.16,
+     "fin": 11.34
+    },
+    {
+     "mot": "seule",
+     "debut": 11.38,
+     "fin": 11.54
+    },
+    {
+     "mot": "chose :",
+     "debut": 11.6,
+     "fin": 11.9
+    },
+    {
+     "mot": "l'arme",
+     "debut": 12.42,
+     "fin": 12.68
+    },
+    {
+     "mot": "du",
+     "debut": 12.72,
+     "fin": 12.82
+    },
+    {
+     "mot": "crime...",
+     "debut": 12.86,
+     "fin": 13.14
+    },
+    {
+     "mot": "un",
+     "debut": 13.7,
+     "fin": 13.8
+    },
+    {
+     "mot": "crochet.",
+     "debut": 13.84,
+     "fin": 14.3
+    }
+   ]
+  },
+  {
+   "scene": 4,
+   "texte": "Attendez... un crochet intérieur ?! C'était juste Antoine Dupont !",
+   "debut": 14.74,
+   "fin": 18.32,
+   "mots": [
+    {
+     "mot": "Attendez...",
+     "debut": 14.74,
+     "fin": 15.08
+    },
+    {
+     "mot": "un",
+     "debut": 15.5,
+     "fin": 15.6
+    },
+    {
+     "mot": "crochet",
+     "debut": 15.64,
+     "fin": 16.04
+    },
+    {
+     "mot": "intérieur ?!",
+     "debut": 16.079,
+     "fin": 16.58
+    },
+    {
+     "mot": "C'était",
+     "debut": 16.98,
+     "fin": 17.36
+    },
+    {
+     "mot": "juste",
+     "debut": 17.42,
+     "fin": 17.62
+    },
+    {
+     "mot": "Antoine",
+     "debut": 17.66,
+     "fin": 17.94
+    },
+    {
+     "mot": "Dupont !",
+     "debut": 18.02,
+     "fin": 18.32
+    }
+   ]
+  },
+  {
+   "scene": 5,
+   "texte": "Destiny Rugby. Gratuit sur destiny-rugby.fr.",
+   "debut": 18.72,
+   "fin": 22.2,
+   "mots": [
+    {
+     "mot": "Destiny",
+     "debut": 18.72,
+     "fin": 19.12
+    },
+    {
+     "mot": "Rugby.",
+     "debut": 19.16,
+     "fin": 19.46
+    },
+    {
+     "mot": "Gratuit",
+     "debut": 19.84,
+     "fin": 20.22
+    },
+    {
+     "mot": "sur",
+     "debut": 20.3,
+     "fin": 20.46
+    },
+    {
+     "mot": "destiny-rugby.fr.",
+     "debut": 20.5,
+     "fin": 22.2
+    }
+   ]
+  }
+ ]
+}

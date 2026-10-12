@@ -9,8 +9,10 @@
 //   ⬇️ les RELÉGUÉS DIRECTS de la division descendent — leur nombre est celui du
 //      règlement de la division (`competitionRules.ts`) : un en Top 14, deux en
 //      Fédérale ;
-//   ⬆️ AUTANT de clubs montent de la division du dessous : son champion, puis
-//      son finaliste, puis le classement ;
+//   ⬆️ AUTANT de clubs montent de la division du dessous. En POULE UNIQUE : son
+//      champion, puis son finaliste, puis le classement. Dans une DIVISION À
+//      POULES (Correctif 39) : les places de CHAQUE poule, gagnées au classement
+//      — le tableau final ne désigne que le champion (`echangeFrontiere`) ;
 //   ⚔️ le MATCH D'ACCÈS, quand le règlement en prévoit un : le barragiste
 //      reçoit le premier club du dessous qui ne monte pas d'office, et le
 //      vainqueur prend la place. ⚠️ En Fédérale il n'y en a PAS : les deux
@@ -20,20 +22,21 @@
 // `lib/divisions.ts` : dès la saison suivante, les poules, les classements et
 // l'écran Championnats tiennent compte des mouvements.
 
-import { COMPETITIONS } from '../data/clubs.js';
+import { COMPETITIONS, clubParNom } from '../data/clubs.js';
 import { clubsDeDivision } from './divisions.js';
-import { poulesDe } from './championnat.js';
+import { championnatEnDirect, poulesDe, versionResultatsJoues, type LigneTableau } from './championnat.js';
 import { tournoiDeFinDAnnee } from './tournoi.js';
 import { phaseFinale, matchAcces, pretendants, type PhaseFinale } from './phaseFinale.js';
 import type { MatchElimination } from './bracketProgressif.js';
-import { rulesFor } from './competitionRules.js';
+import { rulesFor, standingsStatuses, zones, type StandingsStatus } from './competitionRules.js';
 
 export interface MouvementClub {
   club: string;
   de: string; // id de division
   vers: string;
   sens: 'montee' | 'descente';
-  motif: 'champion' | 'dernier' | 'acces';
+  /** `classement` : une place de montée de sa poule ; `repechage` : meilleur suivant ; `champion`, `acces` : par le tableau final. */
+  motif: 'champion' | 'dernier' | 'acces' | 'classement' | 'repechage';
 }
 
 // Ordre des divisions françaises, du sommet vers le bas. Les championnats du
@@ -125,6 +128,280 @@ export function phaseFinaleDe(
   return r;
 }
 
+// ---------------------------------------------------------------------------
+// L'ÉCHANGE ENTRE DEUX ÉTAGES — UNE SEULE DÉFINITION PAR FRONTIÈRE (Correctif 39)
+// ---------------------------------------------------------------------------
+// Signalé en jeu : « plusieurs groupes/régions participent à la compétition, mais finalement un seul club obtient la
+// montée, comme si toute la pyramide dépendait du champion unique du tableau final ».
+//
+// ⚠️ C'ÉTAIT VRAI, ET PAS POUR LA RAISON QU'ON CROIT. Deux résolutions cohabitaient :
+//
+//   • `resoudrePyramide` — la division du club et ses deux voisines — ne lisait que SA POULE : le premier de la poule
+//     de l'entraîneur montait, personne d'autre ;
+//   • `resoudreToutesDivisions` promouvait bien les vainqueurs de chaque poule…
+//   • … mais `resoudreSaisonClub` « réservait » les deux frontières de la division du club à la première, et jetait
+//     tout ce que la seconde disait de ces frontières. Dans SA division, sur vingt-deux poules régionales, un seul
+//     club montait — le premier de la poule de l'entraîneur — et un seul descendait pour lui faire place.
+//
+// Il n'y a plus qu'UN calcul par frontière (`echangeFrontiere`), lu par la carrière joueur, la carrière entraîneur,
+// l'archive du monde et le classement affiché. Et la montée ne doit plus rien au champion :
+//
+//   • POULE UNIQUE des deux côtés (Top 14 ↔ Pro D2 ↔ Nationale) : rien ne change — le champion monte, le finaliste
+//     joue le match d'accès (`championshipBracket.promotionImpact = 'decides'`) ;
+//   • DIVISION À POULES : chaque poule a ses places (`promotionRules.promotionSlots`), gagnées au classement de la
+//     saison régulière. Le tableau final ne désigne que le champion — on peut être promu ET continuer à jouer le titre.
+//   • RÉGIONALES (`territory: 'ligue'`) : l'échange se fait à l'intérieur de chaque ligue régionale. Les premiers des
+//     poules d'Occitanie montent, et ce sont des clubs d'Occitanie qui descendent à leur place. Une ligue qui n'a
+//     personne en dessous ne relègue personne.
+
+/** Un club dans le classement final de sa poule, avec ce qu'il faut pour le comparer aux autres poules. */
+interface Classe {
+  club: string;
+  /** Sa place dans sa poule (1 = premier) et sa place comptée depuis le bas (1 = dernier). */
+  rang: number;
+  depuisLeBas: number;
+  points: number;
+  difference: number;
+  /** La ligue régionale de sa poule, et la taille de celle-ci. */
+  ligue: string;
+  taille: number;
+}
+
+/** La ligue régionale d'une poule : celle de la majorité de ses clubs (une petite poule rattachée garde la sienne). */
+export function ligueDeLaPoule(clubs: string[]): string {
+  const compte = new Map<string, number>();
+  for (const c of clubs) {
+    const ligue = clubParNom(c)?.ligue ?? 'sans-ligue';
+    compte.set(ligue, (compte.get(ligue) ?? 0) + 1);
+  }
+  return [...compte].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'fr'))[0]?.[0] ?? 'sans-ligue';
+}
+
+/** Jamais plus d'un club sur quatre d'une même poule : une poule de huit ne perd pas trois clubs d'un coup. */
+const plafondDeDescentes = (taille: number): number => Math.max(1, Math.floor(taille / 4));
+
+// Le découpage en poules coûte une trentaine de millisecondes par division : on le garde tant que la division garde
+// ses clubs (même test d'identité que `debutPlayoffsDivision`).
+const memoPoules = new Map<string, { clubs: string[]; poules: string[][]; ligues: string[] }>();
+function poulesEtLigues(divisionId: string): { poules: string[][]; ligues: string[] } {
+  const clubs = clubsDeDivision(divisionId);
+  const connu = memoPoules.get(divisionId);
+  if (connu?.clubs === clubs) return connu;
+  const poules = poulesDe(divisionId);
+  const neuf = { clubs, poules, ligues: poules.map(ligueDeLaPoule) };
+  memoPoules.set(divisionId, neuf);
+  return neuf;
+}
+
+const estAPoules = (divisionId: string): boolean => poulesEtLigues(divisionId).poules.length > 1;
+
+/** Le tournoi final d'une division, vu par le contexte du joueur : le MÊME que celui de son écran. */
+function tournoiContextuel(divisionId: string, saison: number) {
+  const sienne = !!CONTEXTE.club && clubsDeDivision(divisionId).includes(CONTEXTE.club);
+  return tournoiDeFinDAnnee(divisionId, saison, nomDivision(divisionId), sienne ? CONTEXTE.club : '', sienne ? CONTEXTE.bonus : 0);
+}
+
+const cacheClassements = new Map<string, LigneTableau[][]>();
+
+/**
+ * Le classement final de CHAQUE poule d'une division.
+ *
+ * ⚠️ ON LIT LE TOURNOI QUAND IL EXISTE (il a déjà joué toutes les poules, et il est mémoïsé), MAIS ON NE DÉPEND PAS DE
+ * SON TABLEAU : un résultat de phase finale incohérent fait lever le tableau exprès — les montées, elles, ne lui
+ * doivent rien. On rejoue alors les poules directement.
+ */
+function classementsFinaux(divisionId: string, saison: number): LigneTableau[][] {
+  const cle = `${divisionId}#${saison}#${CONTEXTE.club}#${CONTEXTE.bonus}#${versionResultatsJoues()}`;
+  const connu = cacheClassements.get(cle);
+  if (connu) return connu;
+  const { poules } = poulesEtLigues(divisionId);
+  let classements: LigneTableau[][];
+  if (poules.length <= 1) classements = [phaseFinaleDe(divisionId, saison).classement];
+  else {
+    try {
+      classements = tournoiContextuel(divisionId, saison)!.poules.map((p) => p.classement);
+    } catch {
+      const sienne = !!CONTEXTE.club && clubsDeDivision(divisionId).includes(CONTEXTE.club);
+      classements = poules.map((_, i) => championnatEnDirect(
+        divisionId, saison, sienne ? CONTEXTE.club : '', 999, sienne ? CONTEXTE.bonus : 0, i,
+      ).classement);
+    }
+  }
+  if (cacheClassements.size >= 40) cacheClassements.clear();
+  cacheClassements.set(cle, classements);
+  return classements;
+}
+
+function classes(divisionId: string, classements: LigneTableau[][]): Classe[] {
+  const { ligues } = poulesEtLigues(divisionId);
+  return classements.flatMap((classement, i) => classement.map((l, r) => ({
+    club: l.club, rang: r + 1, depuisLeBas: classement.length - r,
+    points: l.points, difference: l.difference,
+    ligue: ligues[i] ?? ligueDeLaPoule(classement.map((x) => x.club)), taille: classement.length,
+  })));
+}
+
+/** Du mieux classé au moins bien classé, toutes poules confondues : la place d'abord, puis les points. */
+const duMeilleur = (a: Classe, b: Classe) => a.rang - b.rang || b.points - a.points || b.difference - a.difference || a.club.localeCompare(b.club, 'fr');
+/** Du plus menacé au moins menacé : les derniers d'abord (le moins de points en tête), puis les avant-derniers. */
+const duPlusMenace = (a: Classe, b: Classe) => a.depuisLeBas - b.depuisLeBas || a.points - b.points || a.difference - b.difference || a.club.localeCompare(b.club, 'fr');
+
+function parLigue(liste: Classe[]): Map<string, Classe[]> {
+  const groupes = new Map<string, Classe[]>();
+  for (const c of liste) {
+    if (!groupes.has(c.ligue)) groupes.set(c.ligue, []);
+    groupes.get(c.ligue)!.push(c);
+  }
+  return groupes;
+}
+
+/** L'échange d'une frontière dont l'un des deux étages est découpé en poules : des places, pas un champion. */
+function echangeAPlaces(haut: string, bas: string, saison: number): MouvementClub[] {
+  const regles = rulesFor(bas);
+  const { promotionSlots: places, territory, bestRunnersUp } = regles.promotionRules;
+  if (places <= 0) return [];
+  const B = classes(bas, classementsFinaux(bas, saison));
+  const classementsHaut = classementsFinaux(haut, saison);
+  const H = classes(haut, classementsHaut);
+  const montants: { c: Classe; motif: MouvementClub['motif'] }[] = [];
+  const descendants: Classe[] = [];
+
+  if (territory === 'ligue') {
+    // ── PAR LIGUE RÉGIONALE : autant de descentes que de montées, à l'intérieur du territoire ──
+    const hautParLigue = parLigue(H);
+    const orphelins: Classe[] = [];
+    for (const [ligue, lignes] of parLigue(B)) {
+      const promus = lignes.filter((l) => l.rang <= places).sort(duMeilleur);
+      const relegables = (hautParLigue.get(ligue) ?? []).filter((l) => l.depuisLeBas <= plafondDeDescentes(l.taille)).sort(duPlusMenace);
+      const n = Math.min(promus.length, relegables.length);
+      for (const c of promus.slice(0, n)) montants.push({ c, motif: 'classement' });
+      descendants.push(...relegables.slice(0, n));
+      orphelins.push(...promus.slice(n));
+    }
+    // Une ligue sans étage au-dessus (ou qui n'a plus personne à reléguer) : ses premiers de poule montent quand même,
+    // à la place des clubs les plus menacés du pays. Aucun cas dans les poules d'aujourd'hui ; c'est un filet.
+    if (orphelins.length) {
+      const pris = new Set(descendants.map((d) => d.club));
+      const reste = H.filter((l) => !pris.has(l.club) && l.depuisLeBas <= plafondDeDescentes(l.taille)).sort(duPlusMenace);
+      const n = Math.min(orphelins.length, reste.length);
+      for (const c of orphelins.sort(duMeilleur).slice(0, n)) montants.push({ c, motif: 'classement' });
+      descendants.push(...reste.slice(0, n));
+    }
+  } else {
+    // ── TOUTES POULES CONFONDUES : les relégués directs de l'étage du dessus libèrent les places ──
+    const reglesHaut = rulesFor(haut);
+    const relegables = H
+      .filter((l) => l.depuisLeBas <= zones(reglesHaut, l.taille, classementsHaut.length).directRelegation)
+      .sort(duPlusMenace);
+    const promus = B.filter((l) => l.rang <= places).sort(duMeilleur);
+    // Les meilleurs suivants prennent les places que l'étage du dessus libère en plus. Le champion, s'il n'a pas gagné
+    // sa poule, passe en tête de cette file quand le règlement le dit (`tiebreak`) : c'est le seul effet du tableau.
+    let champion: string | null = null;
+    if (bestRunnersUp && regles.championshipBracket.promotionImpact === 'tiebreak') {
+      try { champion = tournoiContextuel(bas, saison)?.champion ?? null; } catch { champion = null; }
+    }
+    const suivants = bestRunnersUp
+      ? B.filter((l) => l.rang > places && l.rang <= places + 2)
+        .sort((a, b) => Number(b.club === champion) - Number(a.club === champion) || duMeilleur(a, b))
+      : [];
+    const file = [
+      ...promus.map((c) => ({ c, motif: 'classement' as const })),
+      ...suivants.map((c) => ({ c, motif: (c.club === champion ? 'champion' : 'repechage') as MouvementClub['motif'] })),
+    ];
+    const n = Math.min(relegables.length, file.length);
+    montants.push(...file.slice(0, n));
+    // S'il y a moins de montants que de relégables, ce sont les moins menacés qui sont sauvés.
+    descendants.push(...relegables.slice(0, n));
+  }
+
+  return [
+    ...montants.map(({ c, motif }) => ({ club: c.club, de: bas, vers: haut, sens: 'montee' as const, motif })),
+    ...descendants.map((c) => ({ club: c.club, de: haut, vers: bas, sens: 'descente' as const, motif: 'dernier' as const })),
+  ];
+}
+
+interface Echange {
+  mouvements: MouvementClub[];
+  /** Le match d'accès de la frontière, quand le règlement en prévoit un (poule unique des deux côtés). */
+  acces: MatchElimination | null;
+  recits: string[];
+}
+
+const cacheEchanges = new Map<string, Echange>();
+
+/** Les noms d'une liste de clubs pour un récit : les six premiers, puis « et N autres ». */
+function enumerer(clubs: string[]): string {
+  return clubs.length <= 6 ? clubs.join(', ') : `${clubs.slice(0, 6).join(', ')} et ${clubs.length - 6} autres`;
+}
+
+/**
+ * CE QUI S'ÉCHANGE ENTRE DEUX ÉTAGES VOISINS, À LA FIN DE CETTE SAISON — LA source unique.
+ *
+ * ⚠️ MÉMOÏSÉE SUR LE CONTEXTE DU JOUEUR ET SUR LES RÉSULTATS JOUÉS : la division du club est lue avec son apport, et
+ * tout le monde (les deux carrières, l'archive, l'écran) lit la même réponse.
+ */
+export function echangeFrontiere(haut: string, bas: string, saison: number): Echange {
+  const cle = `${haut}#${bas}#${saison}#${CONTEXTE.club}#${CONTEXTE.bonus}#${versionResultatsJoues()}`;
+  const connu = cacheEchanges.get(cle);
+  if (connu) return connu;
+  const mouvements: MouvementClub[] = [];
+  const recits: string[] = [];
+  let acces: MatchElimination | null = null;
+  const bouger = (club: string, de: string, vers: string, sens: MouvementClub['sens'], motif: MouvementClub['motif']) => {
+    if (!club || mouvements.some((m) => m.club === club)) return;
+    mouvements.push({ club, de, vers, sens, motif });
+  };
+
+  if (estAPoules(haut) || estAPoules(bas)) {
+    for (const m of echangeAPlaces(haut, bas, saison)) bouger(m.club, m.de, m.vers, m.sens, m.motif);
+    const montees = mouvements.filter((m) => m.sens === 'montee').map((m) => m.club);
+    const descentes = mouvements.filter((m) => m.sens === 'descente').map((m) => m.club);
+    if (montees.length) {
+      recits.push(`${montees.length} club${montees.length > 1 ? 's montent' : ' monte'} de ${nomDivision(bas)} en ${nomDivision(haut)} : ${enumerer(montees)}.`);
+      recits.push(`${descentes.length} club${descentes.length > 1 ? 's descendent' : ' descend'} de ${nomDivision(haut)} : ${enumerer(descentes)}.`);
+    }
+  } else {
+    // ── Poule unique des deux côtés : le champion monte, le finaliste joue l'accès ──
+    const phaseHaut = phaseFinaleDe(haut, saison);
+    const phaseBas = phaseFinaleDe(bas, saison);
+    // Le tableau final donne la place (`decides`) ; sinon c'est le classement de la saison régulière.
+    const ordre = rulesFor(bas).championshipBracket.promotionImpact === 'decides'
+      ? pretendants(phaseBas) : phaseBas.classement.map((l) => l.club);
+    // Autant de montées directes que la division du dessus relègue de clubs.
+    const montants = ordre.slice(0, phaseHaut.relegues.length);
+    montants.forEach((club, i) => {
+      bouger(club, bas, haut, 'montee', 'champion');
+      recits.push(i === 0 && club === phaseBas.champion
+        ? `${club}, champion de ${nomDivision(bas)}, accède à la ${nomDivision(haut)}.`
+        : `${club} monte directement en ${nomDivision(haut)}.`);
+    });
+    for (const club of phaseHaut.relegues.slice(0, montants.length)) {
+      bouger(club, haut, bas, 'descente', 'dernier');
+      recits.push(`${club} est relégué de ${nomDivision(haut)} et descend en ${nomDivision(bas)}.`);
+    }
+    acces = matchAcces(phaseHaut, phaseBas, saison);
+    if (acces?.status === 'completed') {
+      const m = acces;
+      const monte = m.vainqueur === m.exterieur;
+      recits.push(
+        `Match d’accès à la ${nomDivision(haut)} : ${m.domicile} ${m.scoreD}-${m.scoreE} ${m.exterieur}. ` +
+          (monte
+            ? `${m.vainqueur} arrache sa montée, ${m.perdant} est relégué.`
+            : `${m.vainqueur} conserve sa place, ${m.perdant} reste en ${nomDivision(bas)}.`),
+      );
+      if (monte) {
+        bouger(m.vainqueur!, bas, haut, 'montee', 'acces');
+        bouger(m.perdant!, haut, bas, 'descente', 'acces');
+      }
+    }
+  }
+
+  const echange = { mouvements, acces, recits };
+  if (cacheEchanges.size >= 60) cacheEchanges.clear();
+  cacheEchanges.set(cle, echange);
+  return echange;
+}
+
 export interface BilanPyramide {
   mouvements: MouvementClub[];
   phase: PhaseFinale; // la fin de saison de la division du joueur
@@ -133,92 +410,31 @@ export interface BilanPyramide {
   recits: string[];
 }
 
+/** La division du joueur et ses deux voisines : ce qui monte, ce qui descend, et les matchs d'accès de son club. */
 export function resoudrePyramide(
   divisionId: string,
   saison: number,
   clubJoueur: string,
   bonusJoueur = 0,
 ): BilanPyramide {
-  // ⚠️ On POSE le contexte avant de lire quoi que ce soit : `resultatDivision`
-  // et `phaseFinaleDe` doivent voir exactement le même championnat.
+  // ⚠️ On POSE le contexte avant de lire quoi que ce soit : `echangeFrontiere` et `phaseFinaleDe` doivent voir
+  // exactement le même championnat.
   setContexteJoueur(clubJoueur, bonusJoueur);
   const phase = phaseFinaleDe(divisionId, saison);
-  const mouvements: MouvementClub[] = [];
-  const recits: string[] = [];
   const haut = divisionAuDessus(divisionId);
   const bas = divisionEnDessous(divisionId);
-  let accesVersLeHaut: MatchElimination | null = null;
-  let accesDepuisLeBas: MatchElimination | null = null;
-
-  const bouger = (club: string, de: string, vers: string, sens: MouvementClub['sens'], motif: MouvementClub['motif']) => {
-    if (!club || mouvements.some((m) => m.club === club)) return;
-    mouvements.push({ club, de, vers, sens, motif });
+  const versLeHaut = haut ? echangeFrontiere(haut, divisionId, saison) : null;
+  const versLeBas = bas ? echangeFrontiere(divisionId, bas, saison) : null;
+  const mouvements: MouvementClub[] = [];
+  for (const m of [...(versLeHaut?.mouvements ?? []), ...(versLeBas?.mouvements ?? [])]) {
+    if (!mouvements.some((x) => x.club === m.club)) mouvements.push(m);
+  }
+  return {
+    mouvements, phase,
+    accesVersLeHaut: versLeHaut?.acces ?? null,
+    accesDepuisLeBas: versLeBas?.acces ?? null,
+    recits: [...(versLeHaut?.recits ?? []), ...(versLeBas?.recits ?? [])],
   };
-
-  // ---- Vers le haut : notre champion monte, notre finaliste joue l'accès ----
-  if (haut) {
-    const phaseHaut = phaseFinaleDe(haut, saison);
-    // Autant de montées directes que la division du dessus relègue de clubs (au moins le champion).
-    const montants = pretendants(phase).slice(0, phaseHaut.relegues.length);
-    montants.forEach((club, i) => {
-      bouger(club, divisionId, haut, 'montee', 'champion');
-      recits.push(i === 0 && club === phase.champion
-        ? `${club}, champion de ${nomDivision(divisionId)}, accède à la ${nomDivision(haut)}.`
-        : `${club} monte directement en ${nomDivision(haut)}.`);
-    });
-    for (const club of phaseHaut.relegues.slice(0, montants.length)) {
-      bouger(club, haut, divisionId, 'descente', 'dernier');
-      recits.push(`${club} est relégué de ${nomDivision(haut)} et descend.`);
-    }
-    accesVersLeHaut = matchAcces(phaseHaut, phase, saison);
-    if (accesVersLeHaut?.status === 'completed') {
-      const m = accesVersLeHaut;
-      const monte = m.vainqueur === m.exterieur;
-      recits.push(
-        `Match d’accès à la ${nomDivision(haut)} : ${m.domicile} ${m.scoreD}-${m.scoreE} ${m.exterieur}. ` +
-          (monte
-            ? `${m.vainqueur} arrache sa montée, ${m.perdant} est relégué.`
-            : `${m.vainqueur} conserve sa place, ${m.perdant} reste en ${nomDivision(divisionId)}.`),
-      );
-      if (monte) {
-        bouger(m.vainqueur!, divisionId, haut, 'montee', 'acces');
-        bouger(m.perdant!, haut, divisionId, 'descente', 'acces');
-      }
-    }
-  }
-
-  // ---- Vers le bas : le dernier descend, l'avant-dernier défend sa place ----
-  if (bas) {
-    const phaseBas = phaseFinaleDe(bas, saison);
-    const montants = pretendants(phaseBas).slice(0, phase.relegues.length);
-    for (const club of phase.relegues.slice(0, montants.length)) {
-      bouger(club, divisionId, bas, 'descente', 'dernier');
-      recits.push(`${club} est relégué de ${nomDivision(divisionId)} et descend en ${nomDivision(bas)}.`);
-    }
-    montants.forEach((club, i) => {
-      bouger(club, bas, divisionId, 'montee', 'champion');
-      recits.push(i === 0 && club === phaseBas.champion
-        ? `${club}, champion de ${nomDivision(bas)}, monte en ${nomDivision(divisionId)}.`
-        : `${club} monte directement de ${nomDivision(bas)} en ${nomDivision(divisionId)}.`);
-    });
-    accesDepuisLeBas = matchAcces(phase, phaseBas, saison);
-    if (accesDepuisLeBas?.status === 'completed') {
-      const m = accesDepuisLeBas;
-      const monte = m.vainqueur === m.exterieur;
-      recits.push(
-        `Match d’accès à la ${nomDivision(divisionId)} : ${m.domicile} ${m.scoreD}-${m.scoreE} ${m.exterieur}. ` +
-          (monte
-            ? `${m.vainqueur} monte, ${m.perdant} redescend en ${nomDivision(bas)}.`
-            : `${m.vainqueur} sauve sa place.`),
-      );
-      if (monte) {
-        bouger(m.vainqueur!, bas, divisionId, 'montee', 'acces');
-        bouger(m.perdant!, divisionId, bas, 'descente', 'acces');
-      }
-    }
-  }
-
-  return { mouvements, phase, accesVersLeHaut, accesDepuisLeBas, recits };
 }
 
 // ---------------------------------------------------------------------------
@@ -230,10 +446,10 @@ export function resoudrePyramide(
 // chaque saison.
 //
 // Le champion d'une division amateur n'est pas le premier d'un classement
-// unique (elles comptent jusqu'à 13 poules) mais le vainqueur du TOURNOI DE FIN
-// D'ANNÉE (lib/tournoi.ts). Les places d'échange entre deux étages suivent le
-// nombre de poules : une division à poule unique n'échange qu'un club, une
-// division à poules multiples jusqu'à trois.
+// unique (elles comptent jusqu'à 22 poules) mais le vainqueur du TOURNOI DE FIN
+// D'ANNÉE (lib/tournoi.ts). ⚠️ Il ne décide plus des montées (Correctif 39) :
+// les places d'échange viennent du règlement de chaque division
+// (`promotionRules`), poule par poule — voir `echangeFrontiere`.
 //
 // ⚠️ COÛT : on joue vraiment toutes les poules de toutes les divisions. C'est
 // la partie la plus lourde de la fin de saison (quelques dizaines de milliers
@@ -249,7 +465,8 @@ export interface ResultatDivision {
   vainqueurTournoi: string | null;
 }
 
-// Champions et relégables d'une division, poules comprises.
+// Champions et relégables d'une division, poules comprises. Sert au récit des tournois ; les montées, elles, passent
+// par `echangeFrontiere`.
 export function resultatDivision(divisionId: string, saison: number): ResultatDivision {
   const cle = `${divisionId}#${saison}`;
   const enCache = cacheChampions.get(cle);
@@ -266,25 +483,20 @@ export function resultatDivision(divisionId: string, saison: number): ResultatDi
       vainqueurTournoi: null,
     };
   } else {
-    const t = tournoiDeFinDAnnee(divisionId, saison, nomDivision(divisionId));
+    // Le tournoi du CONTEXTE : celui que le joueur voit à l'écran, apport de son club compris.
+    const t = tournoiContextuel(divisionId, saison);
     if (!t) {
       res = { divisionId, champions: [], derniers: [], vainqueurTournoi: null };
     } else {
-      // TOUS les vainqueurs de poule montent. Le vainqueur du tournoi passe en
-      // tête de liste (c'est lui le champion de la division), mais l'ordre
-      // n'exclut plus personne : il y a autant de places que de poules.
       const vainqueursDePoule = t.poules
         .map((poule) => poule.classement[0]?.club)
         .filter((c): c is string => !!c);
-      // Les deuxièmes de poule suivent, les mieux classés d'abord : une division du dessus qui relègue deux clubs
-      // par poule (Fédérale) a besoin d'autant de montants.
       const deuxiemes = t.poules
         .map((poule) => poule.classement[1])
         .filter((l): l is NonNullable<typeof l> => !!l)
         .sort((a, b) => b.points - a.points || b.difference - a.difference)
         .map((l) => l.club);
       const champions = [
-        // Le champion de la division d'abord, à condition d'avoir gagné sa poule.
         ...(t.champion && vainqueursDePoule.includes(t.champion) ? [t.champion] : []),
         ...vainqueursDePoule,
         ...(t.champion && !vainqueursDePoule.includes(t.champion) ? [t.champion] : []),
@@ -300,22 +512,20 @@ export function resultatDivision(divisionId: string, saison: number): ResultatDi
 export function oublierResultats(): void {
   cacheChampions.clear();
   cachePhases.clear();
+  cacheClassements.clear();
+  cacheEchanges.clear();
 }
 
 // ---------------------------------------------------------------------------
 // ⚠️ LE GARDE-FOU : UNE DIVISION NE CHANGE JAMAIS DE TAILLE
 // ---------------------------------------------------------------------------
-// Même avec une source unique, deux résolutions se superposent : celle de la
-// division du joueur (match d'accès compris) et celle de toute la pyramide.
-// Un jour ou l'autre, un cas limite les fera diverger — un club champion de sa
-// poule ET vainqueur du match d'accès, une division amateur dont le tournoi
-// final ne désigne pas le premier de poule…
-//
-// Ce filtre est la ceinture ET les bretelles : pour CHAQUE division, autant de
-// clubs doivent entrer que de clubs doivent sortir. Si ce n'est pas le cas, on
-// retire le mouvement le moins prioritaire (les derniers de la liste sont ceux
-// des étages où le joueur ne joue pas) jusqu'à ce que tout s'équilibre.
-// Résultat : le Top 14 compte 14 clubs à la saison 12 comme à la saison 1.
+// `echangeFrontiere` échange toujours autant de clubs dans un sens que dans
+// l'autre. Ce filtre reste la ceinture ET les bretelles : pour CHAQUE division,
+// autant de clubs doivent entrer que de clubs doivent sortir. Si ce n'est pas le
+// cas, on retire le mouvement le moins prioritaire (les derniers de la liste
+// sont ceux des étages où le joueur ne joue pas) jusqu'à ce que tout
+// s'équilibre. Résultat : le Top 14 compte 14 clubs à la saison 12 comme à la
+// saison 1.
 export function equilibrerMouvements(mouvements: MouvementClub[]): MouvementClub[] {
   const garde = [...mouvements];
   const soldes = () => {
@@ -345,45 +555,46 @@ export function equilibrerMouvements(mouvements: MouvementClub[]): MouvementClub
   return garde;
 }
 
-// Combien de clubs s'échangent entre deux étages voisins.
-// Autant de places que de poules : chaque vainqueur de poule monte, chaque
-// dernier de poule descend. Une division à poule unique n'échange qu'un club
-// (plus le match d'accès, géré par `resoudrePyramide`).
-// ⚠️ MULTIPLIÉ PAR LE NOMBRE DE RELÉGUÉS DIRECTS DU RÈGLEMENT : une Fédérale relègue ses DEUX derniers par poule.
-function placesEchangees(haut: string, bas: string): number {
-  const parPoule = Math.max(1, rulesFor(haut).standings.directRelegation);
-  return Math.max(1, Math.min(poulesDe(haut).length, poulesDe(bas).length)) * parPoule;
-}
-
 export interface BilanPyramideComplete {
   mouvements: MouvementClub[];
   recits: string[];
   tournois: { divisionId: string; nom: string; champion: string | null }[];
+  /** Les frontières qui n'ont pas pu être résolues (un tableau incohérent lève exprès) : rien n'y bouge, les autres bougent. */
+  incidents: string[];
 }
 
+const messageDe = (erreur: unknown) => (erreur instanceof Error ? erreur.message : String(erreur));
+
 /**
- * Les échanges proches du club sont prioritaires PAR PAIRE de divisions.
- * Dédoublonner les noms puis « équilibrer » supprimait parfois la montée du
- * champion : les deux résolutions ne choisissaient pas la même poule amateur.
+ * La fin de saison vue d'un club : sa division, ses matchs d'accès, et TOUS les mouvements de la pyramide.
+ *
+ * ⚠️ PLUS DE « FRONTIÈRE RÉSERVÉE » (Correctif 39). Les deux résolutions lisent la même `echangeFrontiere` : là où
+ * elles se recouvrent, elles disent la même chose, et il n'y a plus rien à arbitrer. C'est l'ancien arbitrage qui
+ * laissait, dans la division de l'entraîneur, un seul club monter sur toutes les poules.
  */
-export function resoudreSaisonClub(division: string, saison: number, club: string) {
-  const proche = resoudrePyramide(division, saison, club);
+export function resoudreSaisonClub(division: string, saison: number, club: string): BilanPyramide & { incidents: string[] } {
+  const incidents: string[] = [];
+  // ⚠️ UNE FRONTIÈRE ILLISIBLE NE FIGE PAS TOUTE LA PYRAMIDE. Si la division du club ne se résout pas (tableau
+  // incohérent), son club ne bouge pas — et le reste du pays monte et descend quand même.
+  let proche: BilanPyramide;
+  try { proche = resoudrePyramide(division, saison, club); } catch (erreur) {
+    setContexteJoueur(club, 0);
+    incidents.push(`${nomDivision(division)} : ${messageDe(erreur)}`);
+    proche = {
+      mouvements: [], accesVersLeHaut: null, accesDepuisLeBas: null, recits: [],
+      phase: { divisionId: division, classement: [], qualifies: [], matchs: [], champion: null, finaliste: null, relegues: [], barragistes: [], dernier: null, avantDernier: null },
+    };
+  }
   const complete = resoudreToutesDivisions(saison);
-  const frontiere = (m: MouvementClub) => [m.de, m.vers].sort().join('|');
-  const reservees = new Set(proche.mouvements.map(frontiere));
+  incidents.push(...complete.incidents.filter((i) => !incidents.includes(i)));
   const mouvements = [...proche.mouvements];
   const deplaces = new Set(mouvements.map((m) => m.club));
-  // Ajouter les autres échanges par couples, jamais un entrant sans sortant.
-  for (const montant of complete.mouvements.filter((m) => m.sens === 'montee')) {
-    if (reservees.has(frontiere(montant)) || deplaces.has(montant.club)) continue;
-    const descendant = complete.mouvements.find((m) => m.de === montant.vers
-      && m.vers === montant.de && m.sens === 'descente' && !deplaces.has(m.club));
-    if (!descendant) continue;
-    mouvements.push(montant, descendant);
-    deplaces.add(montant.club);
-    deplaces.add(descendant.club);
+  for (const m of complete.mouvements) {
+    if (deplaces.has(m.club)) continue;
+    mouvements.push(m);
+    deplaces.add(m.club);
   }
-  return { ...proche, mouvements };
+  return { ...proche, mouvements: equilibrerMouvements(mouvements), incidents };
 }
 
 export function resoudreToutesDivisions(saison: number): BilanPyramideComplete {
@@ -391,20 +602,12 @@ export function resoudreToutesDivisions(saison: number): BilanPyramideComplete {
   const mouvements: MouvementClub[] = [];
   const recits: string[] = [];
   const tournois: BilanPyramideComplete['tournois'] = [];
+  const incidents: string[] = [];
   const deplaces = new Set<string>();
 
-  const bouger = (
-    club: string, de: string, vers: string,
-    sens: MouvementClub['sens'], motif: MouvementClub['motif'],
-  ) => {
-    if (!club || deplaces.has(club)) return false;
-    deplaces.add(club);
-    mouvements.push({ club, de, vers, sens, motif });
-    return true;
-  };
-
   for (const id of pyramide) {
-    const r = resultatDivision(id, saison);
+    let r: ResultatDivision;
+    try { r = resultatDivision(id, saison); } catch { continue; }
     if (r.vainqueurTournoi) {
       tournois.push({ divisionId: id, nom: nomDivision(id), champion: r.vainqueurTournoi });
       recits.push(`🏆 ${r.vainqueurTournoi} remporte le tournoi final de ${nomDivision(id)}.`);
@@ -414,23 +617,159 @@ export function resoudreToutesDivisions(saison: number): BilanPyramideComplete {
   for (let i = 0; i < pyramide.length - 1; i++) {
     const haut = pyramide[i];
     const bas = pyramide[i + 1];
-    const places = placesEchangees(haut, bas);
-    // Jamais un entrant sans sortant : on échange le même nombre de clubs dans les deux sens.
-    const echanges = Math.min(places, resultatDivision(bas, saison).champions.length, resultatDivision(haut, saison).derniers.length);
-    const montants = resultatDivision(bas, saison).champions.slice(0, echanges);
-    const descendants = resultatDivision(haut, saison).derniers.slice(0, echanges);
-
-    for (const club of montants) {
-      if (bouger(club, bas, haut, 'montee', 'champion')) {
-        recits.push(`⬆️ ${club} monte de ${nomDivision(bas)} en ${nomDivision(haut)}.`);
-      }
+    let echange: MouvementClub[];
+    try { echange = echangeFrontiere(haut, bas, saison).mouvements; } catch (erreur) {
+      incidents.push(`${nomDivision(haut)} / ${nomDivision(bas)} : ${messageDe(erreur)}`);
+      continue;
     }
-    for (const club of descendants) {
-      if (bouger(club, haut, bas, 'descente', 'dernier')) {
-        recits.push(`⬇️ ${club} descend de ${nomDivision(haut)} en ${nomDivision(bas)}.`);
+    for (const m of echange) {
+      if (deplaces.has(m.club)) continue;
+      deplaces.add(m.club);
+      mouvements.push(m);
+      recits.push(m.sens === 'montee'
+        ? `⬆️ ${m.club} monte de ${nomDivision(bas)} en ${nomDivision(haut)}.`
+        : `⬇️ ${m.club} descend de ${nomDivision(haut)} en ${nomDivision(bas)}.`);
+    }
+  }
+
+  return { mouvements, recits, tournois, incidents };
+}
+
+// ---------------------------------------------------------------------------
+// CE QUE VAUT CHAQUE PLACE D'UNE POULE — pour le classement affiché
+// ---------------------------------------------------------------------------
+// ⚠️ L'ÉCRAN COLORE CE QUE LA CLÔTURE APPLIQUERA. Dans une division à poules, le nombre de montées et de descentes
+// d'une poule dépend de l'étage voisin (combien de poules, dans quelle ligue) : `zones()` ne le sait pas, c'est un
+// module feuille. Ces deux fonctions comptent les places à partir de la STRUCTURE seule (aucun match joué) — donc
+// dès la première journée, et sans rien coûter.
+
+export interface PlacesDePoule {
+  /** Les premières places qui montent à coup sûr, et s'il en reste une « possible » juste derrière. */
+  promotion: number;
+  promotionPossible: number;
+  /** Les dernières places qui descendent à coup sûr, et s'il en reste une « possible » juste au-dessus. */
+  relegation: number;
+  relegationPossible: number;
+}
+
+/**
+ * Remplit des « couches » (tous les derniers, puis tous les avant-derniers…) avec `n` places : rend combien de couches
+ * sont pleines pour une poule qui en a `mienne` de disponibles, et si la suivante est entamée.
+ */
+function couches(n: number, capacites: number[], mienne: number): { sures: number; possible: number } {
+  let reste = n;
+  let sures = 0;
+  for (let d = 1; d <= mienne; d++) {
+    const dansLaCouche = capacites.filter((c) => c >= d).length;
+    if (reste >= dansLaCouche) { sures++; reste -= dansLaCouche; } else return { sures, possible: reste > 0 ? 1 : 0 };
+  }
+  return { sures, possible: 0 };
+}
+
+export function placesDeLaPoule(divisionId: string, numeroPoule: number): PlacesDePoule {
+  const { poules, ligues } = poulesEtLigues(divisionId);
+  const places: PlacesDePoule = { promotion: 0, promotionPossible: 0, relegation: 0, relegationPossible: 0 };
+  const poule = poules[numeroPoule];
+  if (!poule) return places;
+  const ligue = ligues[numeroPoule];
+  const haut = divisionAuDessus(divisionId);
+  const bas = divisionEnDessous(divisionId);
+
+  // ── Vers le haut : mes places de montée ──────────────────────────────────
+  if (haut && (poules.length > 1 || estAPoules(haut))) {
+    const r = rulesFor(divisionId).promotionRules;
+    const H = poulesEtLigues(haut);
+    if (r.promotionSlots > 0) {
+      if (r.territory === 'ligue') {
+        // Les places de la ligue d'abord ; à défaut, celles du pays (le filet des « orphelins »).
+        const demande = r.promotionSlots * ligues.filter((l) => l === ligue).length;
+        const offre = H.poules.filter((_, i) => H.ligues[i] === ligue).reduce((n, p) => n + plafondDeDescentes(p.length), 0);
+        const demandeTotale = r.promotionSlots * poules.length;
+        const offreTotale = H.poules.reduce((n, p) => n + plafondDeDescentes(p.length), 0);
+        if (offre >= demande || offreTotale >= demandeTotale) places.promotion = r.promotionSlots;
+        else places.promotionPossible = 1;
+      } else {
+        const offre = H.poules.reduce((n, p) => n + zones(rulesFor(haut), p.length, H.poules.length).directRelegation, 0);
+        const demande = r.promotionSlots * poules.length;
+        if (demande <= offre) {
+          places.promotion = r.promotionSlots;
+          places.promotionPossible = r.bestRunnersUp && offre > demande ? 1 : 0;
+        } else {
+          places.promotion = Math.min(r.promotionSlots, Math.floor(offre / poules.length));
+          places.promotionPossible = 1;
+        }
       }
     }
   }
 
-  return { mouvements, recits, tournois };
+  // ── Vers le bas : mes places de descente ─────────────────────────────────
+  if (bas && (poules.length > 1 || estAPoules(bas))) {
+    const r = rulesFor(bas).promotionRules;
+    const B = poulesEtLigues(bas);
+    if (r.promotionSlots > 0) {
+      if (r.territory === 'ligue') {
+        const memes = poules.filter((_, i) => ligues[i] === ligue).map((p) => plafondDeDescentes(p.length));
+        const montantsDeLaLigue = r.promotionSlots * B.ligues.filter((l) => l === ligue).length;
+        const offre = memes.reduce((n, c) => n + c, 0);
+        const c = couches(Math.min(montantsDeLaLigue, offre), memes, plafondDeDescentes(poule.length));
+        places.relegation = c.sures;
+        places.relegationPossible = c.possible;
+        // Des premiers de poule sans place dans leur ligue prennent celles des clubs les plus menacés du pays.
+        const orphelins = [...new Set(B.ligues)].reduce((n, l) => {
+          const demande = r.promotionSlots * B.ligues.filter((x) => x === l).length;
+          const offreL = poules.filter((_, i) => ligues[i] === l).reduce((s, p) => s + plafondDeDescentes(p.length), 0);
+          return n + Math.max(0, demande - offreL);
+        }, 0);
+        if (orphelins > 0 && places.relegation < plafondDeDescentes(poule.length)) places.relegationPossible = 1;
+      } else {
+        const directs = poules.map((p) => zones(rulesFor(divisionId), p.length, poules.length).directRelegation);
+        const mien = directs[numeroPoule];
+        const montants = r.promotionSlots * B.poules.length + (r.bestRunnersUp ? 2 * B.poules.length : 0);
+        const c = couches(Math.min(montants, directs.reduce((n, d) => n + d, 0)), directs, mien);
+        places.relegation = c.sures;
+        places.relegationPossible = c.possible;
+      }
+    }
+  }
+  return places;
+}
+
+/**
+ * Le statut de chaque place de CETTE poule, de la première à la dernière : ce que `standingsStatuses` promet, corrigé par
+ * les places réelles de la poule dans sa division et dans sa ligue. `taille` : le nombre de lignes du classement affiché.
+ */
+export function statutsDeLaPoule(divisionId: string, numeroPoule: number, taille?: number): StandingsStatus[] {
+  const { poules } = poulesEtLigues(divisionId);
+  const n = taille ?? poules[numeroPoule]?.length ?? 0;
+  const regles = rulesFor(divisionId);
+  const base = standingsStatuses(regles, n, poules.length);
+  const haut = divisionAuDessus(divisionId);
+  const bas = divisionEnDessous(divisionId);
+  const hautAPlaces = !!haut && (poules.length > 1 || estAPoules(haut));
+  const basAPlaces = !!bas && (poules.length > 1 || estAPoules(bas));
+  if (!hautAPlaces && !basAPlaces) return base;
+  const places = placesDeLaPoule(divisionId, numeroPoule);
+  const z = zones(regles, n, poules.length);
+  return base.map((statut, i) => {
+    const position = i + 1;
+    const depuisLeBas = n - i;
+    if (basAPlaces) {
+      if (depuisLeBas <= places.relegation) return 'DIRECT_RELEGATION';
+      if (depuisLeBas <= places.relegation + places.relegationPossible) return 'RELEGATION_POSSIBLE';
+      // La valeur nominale du règlement ne s'applique pas à cette poule-ci.
+      if (statut === 'DIRECT_RELEGATION' || statut === 'ACCESS_MATCH') statut = 'SAFE';
+    }
+    if (hautAPlaces) {
+      const finales = poules.length > 1 && position <= z.qualified;
+      if (position <= places.promotion) return finales ? 'PROMOTION_FINALS' : 'PROMOTION';
+      if (position <= places.promotion + places.promotionPossible) return finales ? 'QUALIFIED' : 'PROMOTION_POSSIBLE';
+      if (statut === 'PROMOTION' || statut === 'PROMOTION_FINALS') statut = finales ? 'QUALIFIED' : 'SAFE';
+    }
+    return statut;
+  });
+}
+
+/** Le numéro de la poule d'un club dans sa division (0 s'il n'y figure pas). */
+export function numeroDeLaPoule(divisionId: string, club: string): number {
+  return Math.max(0, poulesEtLigues(divisionId).poules.findIndex((p) => p.includes(club)));
 }

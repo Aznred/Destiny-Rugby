@@ -12,8 +12,14 @@
 // ⚠️ UN SEUL VOCABULAIRE POUR TROIS APPAREILS : le même panneau, avec la touche, le symbole de la manette ou le geste du pouce
 // dont l'appareil du moment a besoin. Rien ne se cache derrière une option : le panneau dit ce qu'il attend.
 //
-// ⚠️ LA VISÉE EST DESSINÉE SANS RÉVÉLER LE RÉSULTAT : le repère de visée, le vent, la distance, une marque de force utile (à couper
-// dans les réglages). Jamais où le ballon tomberait, ni s'il passe.
+// ⚠️ LA VISÉE EST DESSINÉE SANS RÉVÉLER LE RÉSULTAT : le vent, la distance, une marque de force utile (à couper dans les
+// réglages). Jamais où le ballon tomberait, ni s'il passe.
+//
+// ⚠️ UN TIR, C'EST UN GESTE — PAS UN TABLEAU DE BORD (Correctif 39). Demande : « supprimer les grosses jauges et interfaces qui
+// cassent l'immersion ; le terrain et l'animation doivent rester au centre ». Transformation, pénalité et coup d'envoi n'ont
+// plus ni poteaux dessinés, ni terrain vu d'en haut, ni jauges, ni bouton « Frapper » : on pose le doigt (ou on clique), on
+// glisse vers là où l'on vise, on relâche. Il reste une pastille en bas de l'image — ce qu'on tape, la distance, le vent, le
+// temps qu'il reste — et, le temps du geste, un trait fin pour la force. La touche garde sa carte : on y CHOISIT une annonce.
 
 import { useEffect, useRef, type ReactNode } from 'react';
 import { Icone, type NomIcone } from '../Icone';
@@ -48,6 +54,13 @@ function Bouton({ b, type }: { b: NomBouton; type: TypeManette }) {
   return <span className="cd-pastille-manette" data-b={b}>{libelle}</span>;
 }
 
+/** Le nom d'un bouton dans une phrase : la lettre d'une Xbox, la forme d'une PlayStation (□, pas le mot « carre »). */
+const FORMES_PLAYSTATION: Record<string, string> = { croix: '✕', rond: '○', carre: '□', triangle: '△' };
+function nomDuBouton(type: TypeManette, b: NomBouton): string {
+  const libelle = LIBELLES_MANETTE[type][b];
+  return FORMES_PLAYSTATION[libelle] ?? libelle;
+}
+
 /** L'aide courte du panneau, selon l'appareil : un trait de texte, jamais un manuel. */
 function Aide({ cle, snap, prefs, vars }: { cle: string; snap: SnapPilotage; prefs: PreferencesControle; vars?: Record<string, string> }) {
   const a = snap.appareil;
@@ -58,8 +71,8 @@ function Aide({ cle, snap, prefs, vars }: { cle: string; snap: SnapPilotage; pre
     droite: libelleDeTouche(touches.droite[0]),
     haut: libelleDeTouche(touches.haut[0]),
     bas: libelleDeTouche(touches.bas[0]),
-    valider: LIBELLES_MANETTE[snap.manette].a,
-    charge: snap.resp.modeManette === 'charge' ? LIBELLES_MANETTE[snap.manette].a : LIBELLES_MANETTE[snap.manette].rt,
+    valider: nomDuBouton(snap.manette, 'a'),
+    charge: nomDuBouton(snap.manette, 'x'),
     ...vars,
   };
   return <p className="rv-aide">{t(`${cle}.${a}`, v)}</p>;
@@ -80,8 +93,8 @@ export function Responsabilites({ pilotage, snap, prefs }: { pilotage: PilotageD
     <div className="rv" data-appareil={snap.appareil} data-panneau={r.panneau ?? undefined}>
       {r.zone && <ZoneVisee pilotage={pilotage} />}
       {r.panneau === 'penalite' && !r.tuto && <PanneauPenalite pilotage={pilotage} snap={snap} prefs={prefs} />}
-      {r.panneau === 'tir' && !r.tuto && <PanneauTir pilotage={pilotage} snap={snap} prefs={prefs} />}
-      {r.panneau === 'engagement' && !r.tuto && <PanneauEngagement pilotage={pilotage} snap={snap} prefs={prefs} />}
+      {r.panneau === 'tir' && !r.tuto && <RepereDeTir snap={snap} prefs={prefs} />}
+      {r.panneau === 'engagement' && !r.tuto && <RepereDEngagement snap={snap} prefs={prefs} />}
       {r.panneau === 'touche' && !r.tuto && <PanneauTouche pilotage={pilotage} snap={snap} prefs={prefs} />}
       {r.retour && <div className="rv-retour" key={r.retour.n} role="status">{t(r.retour.cle)}</div>}
       {r.derniere && <Bandeau resp={r} />}
@@ -180,40 +193,40 @@ function PanneauPenalite({ pilotage, snap, prefs }: { pilotage: PilotageDirect; 
 }
 
 // ---------------------------------------------------------------------------
-// LA ZONE DE VISÉE : la souris vise et dose, le doigt trace — un seul calque, sous les panneaux
+// LE GESTE : poser, glisser, relâcher — un seul calque, sous les repères
 // ---------------------------------------------------------------------------
 
+/** Balayage de référence pour une force pleine (voir `REGLAGES_VISEE.longueurPleine`), sur un cadre de 390 px. */
+const LONGUEUR_PLEINE = 190;
+
+/**
+ * ⚠️ LA SOURIS ET LE DOIGT TRACENT LE MÊME BALAYAGE. Bouton tenu ou doigt posé, on glisse, on relâche : le pilote reçoit les
+ * mêmes évènements (`bas`, `bouge`, `haut`) et les lit par la même loi. Le fil qu'on voit part de là où le geste a commencé ;
+ * l'anneau à son bout se remplit avec la longueur — c'est toute l'indication de force.
+ */
 function ZoneVisee({ pilotage }: { pilotage: PilotageDirect }) {
   const zone = useRef<HTMLDivElement>(null);
   const fil = useRef<HTMLDivElement>(null);
   const tete = useRef<HTMLDivElement>(null);
-  const doigt = useRef<{ id: number; x0: number; y0: number } | null>(null);
+  const geste = useRef<{ id: number; x0: number; y0: number } | null>(null);
 
-  const envoyer = (ev: { clientX: number; clientY: number; pointerType?: string; button?: number }, type: 'bas' | 'bouge' | 'haut' | 'annule' | 'survol') => {
+  const envoyer = (ev: { clientX: number; clientY: number; pointerType?: string }, type: 'bas' | 'bouge' | 'haut' | 'annule') => {
     const z = zone.current;
     if (!z) return;
     const r = z.getBoundingClientRect();
     pilotage.resp.pointeur({
       type, x: ev.clientX - r.left, y: ev.clientY - r.top, w: r.width, h: r.height,
-      pointeur: ev.pointerType === 'mouse' ? 'souris' : 'doigt', principal: (ev.button ?? 0) === 0,
+      pointeur: ev.pointerType === 'mouse' ? 'souris' : 'doigt',
     });
   };
-
-  // La molette doit pouvoir empêcher le défilement de la page : un écouteur natif, non passif.
-  useEffect(() => {
-    const z = zone.current;
-    if (!z) return;
-    const roue = (ev: WheelEvent) => {
-      ev.preventDefault();
-      const r = z.getBoundingClientRect();
-      const crans = -Math.sign(ev.deltaY) * Math.max(1, Math.min(5, Math.round(Math.abs(ev.deltaY) / (ev.deltaMode === 1 ? 3 : 100))));
-      pilotage.resp.pointeur({ type: 'molette', x: ev.clientX - r.left, y: ev.clientY - r.top, w: r.width, h: r.height, pointeur: 'souris', crans });
-    };
-    z.addEventListener('wheel', roue, { passive: false });
-    return () => z.removeEventListener('wheel', roue);
-  }, [pilotage]);
-
   const cacherFil = () => { if (fil.current) delete fil.current.dataset.actif; if (tete.current) delete tete.current.dataset.actif; };
+  const finir = (ev: { clientX: number; clientY: number; pointerType?: string; pointerId: number }, type: 'haut' | 'annule') => {
+    const g = geste.current;
+    if (!g || ev.pointerId !== g.id) return;
+    geste.current = null;
+    envoyer(ev, type);
+    cacherFil();
+  };
 
   return (
     <>
@@ -221,41 +234,33 @@ function ZoneVisee({ pilotage }: { pilotage: PilotageDirect }) {
         ref={zone}
         className="rv-zone"
         onPointerDown={(ev) => {
-          if (ev.pointerType === 'mouse') { if (ev.button === 0) envoyer(ev, 'bas'); return; }
-          if (doigt.current) return;
+          // Un seul geste à la fois ; à la souris, seul le bouton principal trace.
+          if (geste.current || (ev.pointerType === 'mouse' && ev.button !== 0)) return;
           try { ev.currentTarget.setPointerCapture(ev.pointerId); } catch { /* pointeur disparu */ }
           const r = ev.currentTarget.getBoundingClientRect();
-          doigt.current = { id: ev.pointerId, x0: ev.clientX - r.left, y0: ev.clientY - r.top };
+          geste.current = { id: ev.pointerId, x0: ev.clientX - r.left, y0: ev.clientY - r.top };
           envoyer(ev, 'bas');
-          pilotage.tactile.actif = performance.now();
+          if (ev.pointerType !== 'mouse') pilotage.tactile.actif = performance.now();
         }}
         onPointerMove={(ev) => {
-          if (ev.pointerType === 'mouse') { envoyer(ev, 'survol'); return; }
-          const d = doigt.current;
-          if (!d || ev.pointerId !== d.id) return;
+          const g = geste.current;
+          if (!g || ev.pointerId !== g.id) return;
           envoyer(ev, 'bouge');
-          // Le fil part de là où le doigt s'est posé et le suit : on voit la direction et la longueur du glissé.
           const r = ev.currentTarget.getBoundingClientRect();
-          const px = ev.clientX - r.left - d.x0, py = ev.clientY - r.top - d.y0, L = Math.hypot(px, py);
-          if (fil.current && tete.current) {
-            if (L > 10) {
-              fil.current.dataset.actif = '1'; tete.current.dataset.actif = '1';
-              fil.current.style.left = `${d.x0}px`; fil.current.style.top = `${d.y0}px`;
-              fil.current.style.width = `${L}px`; fil.current.style.transform = `rotate(${Math.atan2(py, px)}rad)`;
-              tete.current.style.left = `${d.x0 + px}px`; tete.current.style.top = `${d.y0 + py}px`;
-            } else cacherFil();
-          }
+          const px = ev.clientX - r.left - g.x0, py = ev.clientY - r.top - g.y0, L = Math.hypot(px, py);
+          if (!fil.current || !tete.current) return;
+          if (L <= 10) { cacherFil(); return; }
+          fil.current.dataset.actif = '1'; tete.current.dataset.actif = '1';
+          fil.current.style.left = `${g.x0}px`; fil.current.style.top = `${g.y0}px`;
+          fil.current.style.width = `${L}px`; fil.current.style.transform = `rotate(${Math.atan2(py, px)}rad)`;
+          tete.current.style.left = `${g.x0 + px}px`; tete.current.style.top = `${g.y0 + py}px`;
+          // La même échelle que le pilote : un geste de même longueur donne la même force sur tout écran.
+          const echelle = borner(r.width, 320, 520) / 390;
+          tete.current.style.setProperty('--rv-p', String(borner(L / (LONGUEUR_PLEINE * echelle), 0, 1)));
         }}
-        onPointerUp={(ev) => {
-          const d = doigt.current;
-          if (ev.pointerType === 'mouse' || !d || ev.pointerId !== d.id) return;
-          doigt.current = null; envoyer(ev, 'haut'); cacherFil();
-        }}
-        onPointerCancel={(ev) => {
-          const d = doigt.current;
-          if (ev.pointerType === 'mouse' || !d || ev.pointerId !== d.id) return;
-          doigt.current = null; envoyer(ev, 'annule'); cacherFil();
-        }}
+        onPointerUp={(ev) => finir(ev, 'haut')}
+        onPointerCancel={(ev) => finir(ev, 'annule')}
+        onLostPointerCapture={(ev) => finir(ev, 'annule')}
         onContextMenu={(ev) => ev.preventDefault()}
       />
       <div ref={fil} className="rv-fil" aria-hidden />
@@ -265,7 +270,7 @@ function ZoneVisee({ pilotage }: { pilotage: PilotageDirect }) {
 }
 
 // ---------------------------------------------------------------------------
-// LES JAUGES : la force, le geste
+// LES JAUGES DE LA TOUCHE : la force, le geste (les tirs n'en ont plus)
 // ---------------------------------------------------------------------------
 
 function JaugeForce({ p, utile, aide, charge }: { p: number; utile?: number; aide: boolean; charge?: boolean }) {
@@ -293,7 +298,7 @@ function JaugeGeste({ g }: { g: number }) {
 }
 
 // ---------------------------------------------------------------------------
-// L'EN-TÊTE COMMUN : le titre, la situation, le chrono — dans la barre du bas, jamais sur le tableau de score
+// L'EN-TÊTE DE LA TOUCHE : le titre, la situation, le chrono
 // ---------------------------------------------------------------------------
 
 function Entete({ icone, titre, sous, reste, delai, children }: {
@@ -310,118 +315,74 @@ function Entete({ icone, titre, sous, reste, delai, children }: {
 }
 
 // ---------------------------------------------------------------------------
-// LE TIR : le vent, la distance, les poteaux vus de face
+// LE TIR ET LE COUP D'ENVOI : une pastille, un trait — le terrain reste au centre
 // ---------------------------------------------------------------------------
 
-/** La demi-largeur affichée du plan des poteaux (m) : la visée va de −COTE à +COTE. */
-const COTE_AFFICHE = 7;
-
-function PanneauTir({ pilotage, snap, prefs }: { pilotage: PilotageDirect; snap: SnapPilotage; prefs: PreferencesControle }) {
-  const r = snap.resp, a = r.tir, v = r.visee;
-  if (!a || !v) return null;
-  const manette = snap.appareil === 'manette';
-  const vent = Math.hypot(a.ventDos, a.ventTravers);
-  // Le vent à l'écran : « vers le haut » = vers les poteaux (vent dans le dos), « à droite » = vers la droite de l'écran.
-  const angle = Math.atan2(a.ventTravers * r.sens, a.ventDos) * 180 / Math.PI;
-  const x = borner(v.x, -1, 1);
-  const titre = t(a.valeur === 2 ? 'rv.tir.transformation' : 'rv.tir.penalite');
+/** Le vent, vu par le buteur : « vers le haut » = vers les poteaux, « à droite » = vers la droite de l'écran. */
+function Vent({ dos, travers, sens }: { dos: number; travers: number; sens: 1 | -1 }) {
+  const vent = Math.hypot(dos, travers);
+  const angle = Math.atan2(travers * sens, dos) * 180 / Math.PI;
   return (
-    <>
-      {/* Les poteaux, vus de face : le repère de visée glisse le long de la barre. */}
-      <div className="rv-poteaux" aria-hidden>
-        <svg viewBox="0 0 200 124" width="100%" height="100%">
-          <line className="rv-sol" x1="6" y1="112" x2="194" y2="112" />
-          {/* Les montants : ±2,8 m sur une échelle de 92 px / 7 m. */}
-          <line className="rv-montant" x1={100 - 2.8 * (92 / COTE_AFFICHE)} y1="22" x2={100 - 2.8 * (92 / COTE_AFFICHE)} y2="112" />
-          <line className="rv-montant" x1={100 + 2.8 * (92 / COTE_AFFICHE)} y1="22" x2={100 + 2.8 * (92 / COTE_AFFICHE)} y2="112" />
-          <line className="rv-barre" x1={100 - 2.8 * (92 / COTE_AFFICHE)} y1="72" x2={100 + 2.8 * (92 / COTE_AFFICHE)} y2="72" />
-          <line className="rv-axe" x1="100" y1="76" x2="100" y2="112" />
-          <g transform={`translate(${100 + x * 92} 52)`}>
-            <circle className="rv-viseur" r="8.5" />
-            <path className="rv-viseur-croix" d="M-13 0h7M6 0h7M0 -13v7M0 6v7" />
-          </g>
-          {Math.abs(v.effet) > 0.15 && (
-            <path className="rv-effet" d={`M100 108Q${100 + x * 46 + v.effet * 26} 82 ${100 + x * 92} 60`} />
-          )}
-        </svg>
-      </div>
-
-      <section className="rv-barre-bas" aria-label={titre}>
-        <Entete
-          icone="poteaux" titre={titre} reste={r.reste} delai={r.delai}
-          sous={a.aide ? `${t('rv.tir.distance', { distance: a.distance })} · ${t('rv.tir.chance', { chance: a.chance })}` : t('rv.tir.distance', { distance: a.distance })}
-        >
-          <span className="rv-vent" title={t('rv.tir.vent', { v: vent.toFixed(0) })}>
-            <Icone nom="vent" taille={15} />
-            <span className="rv-vent-fleche" style={{ transform: `rotate(${angle}deg)`, opacity: vent < 0.8 ? 0.28 : 1 }} aria-hidden>
-              <svg viewBox="0 0 24 24" width="18" height="18"><path d="M12 20V5M6.5 10.5 12 5l5.5 5.5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-            </span>
-            <b>{vent < 0.8 ? t('rv.tir.ventNul') : t('rv.tir.vent', { v: vent.toFixed(0) })}</b>
-          </span>
-        </Entete>
-        <JaugeForce p={v.p} utile={a.utile} aide={a.aide} charge={manette && v.arme} />
-        <JaugeGeste g={v.geste} />
-        <button type="button" className="btn vert rv-frapper" onClick={() => pilotage.resp.demander({ t: 'valider' })}>
-          <Icone nom="pied" taille={18} /> {t('rv.tir.frapper')}
-        </button>
-        <Aide cle="rv.tir.aide" snap={snap} prefs={prefs} />
-      </section>
-    </>
+    <span className="rv-vent" title={t('rv.tir.vent', { v: vent.toFixed(0) })}>
+      <span className="rv-vent-fleche" style={{ transform: `rotate(${angle}deg)`, opacity: vent < 0.8 ? 0.28 : 1 }} aria-hidden>
+        <svg viewBox="0 0 24 24" width="16" height="16"><path d="M12 20V5M6.5 10.5 12 5l5.5 5.5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+      </span>
+      <b>{vent < 0.8 ? t('rv.tir.ventNul') : t('rv.tir.vent', { v: vent.toFixed(0) })}</b>
+    </span>
   );
 }
 
-// ---------------------------------------------------------------------------
-// L'ENGAGEMENT : où tombe le coup d'envoi — vu d'en haut
-// ---------------------------------------------------------------------------
+/**
+ * Le trait de force : il n'apparaît que le temps où la force se dose (un balayage en cours, le bouton tenu, les flèches).
+ * `utile` : la force qui suffit juste à passer la barre — un cran fin, à couper dans les réglages.
+ */
+function TraitDeForce({ p, utile }: { p: number; utile?: number }) {
+  return (
+    <span className="rv-trait" role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(borner(p, 0, 1) * 100)} aria-label={t('rv.force')}>
+      <i style={{ transform: `scaleX(${borner(p, 0, 1)})` }} />
+      {utile !== undefined && utile > 0 && utile <= 1 && <u style={{ left: `${utile * 100}%` }} aria-hidden />}
+    </span>
+  );
+}
 
-function PanneauEngagement({ pilotage, snap, prefs }: { pilotage: PilotageDirect; snap: SnapPilotage; prefs: PreferencesControle }) {
+/** La force se dose-t-elle en ce moment ? Au balayage, seulement pendant le geste ; au clavier et à la manette, tout le temps. */
+function doseEnCours(snap: SnapPilotage): boolean {
+  const v = snap.resp.visee;
+  return !!v && (v.arme || v.source === 'clavier' || v.source === 'manette' || snap.appareil === 'manette');
+}
+
+function RepereDeTir({ snap, prefs }: { snap: SnapPilotage; prefs: PreferencesControle }) {
+  const r = snap.resp, a = r.tir, v = r.visee;
+  if (!a || !v) return null;
+  const titre = t(a.valeur === 2 ? 'rv.tir.transformation' : 'rv.tir.penalite');
+  return (
+    <section className="rv-repere" aria-label={titre}>
+      <div className="rv-repere-ligne">
+        <b><Icone nom="poteaux" taille={15} /> {titre}</b>
+        <span className="rv-repere-info">{t('rv.tir.distance', { distance: a.distance })}{a.aide ? ` · ${t('rv.tir.chance', { chance: a.chance })}` : ''}</span>
+        <Vent dos={a.ventDos} travers={a.ventTravers} sens={r.sens} />
+        <Chrono reste={r.reste} delai={r.delai} />
+      </div>
+      {doseEnCours(snap) ? <TraitDeForce p={v.p} utile={a.aide ? a.utile : undefined} /> : <Aide cle="rv.tir.aide" snap={snap} prefs={prefs} />}
+    </section>
+  );
+}
+
+function RepereDEngagement({ snap, prefs }: { snap: SnapPilotage; prefs: PreferencesControle }) {
   const r = snap.resp, e = r.engagement, v = r.visee;
   if (!e || !v) return null;
-  const manette = snap.appareil === 'manette';
-  const paliers: { h: number; cle: string }[] = [{ h: 0.2, cle: 'tendu' }, { h: 0.6, cle: 'moyen' }, { h: 1, cle: 'chandelle' }];
-  const actuel = paliers.reduce((m, p) => (Math.abs(p.h - e.hauteur) < Math.abs(m.h - e.hauteur) ? p : m), paliers[0]);
-  // Vue d'en haut : le demi-terrain adverse, 52 m de long sur 70 m de large.
-  const W = 210, H = 150;
-  const px = 10 + (v.x * 0.5 + 0.5) * (W - 20);
-  const py = H - 12 - (e.distance / 52) * (H - 30);
+  const hauteur = e.hauteur < 0.34 ? 'tendu' : e.hauteur < 0.75 ? 'moyen' : 'chandelle';
+  const dose = doseEnCours(snap);
   return (
-    <>
-      <div className="rv-terrain" aria-hidden>
-        <svg viewBox={`0 0 ${W} ${H}`} width="100%" height="100%">
-          <rect className="rv-pelouse" x="4" y="4" width={W - 8} height={H - 8} rx="6" />
-          <line className="rv-ligne" x1="4" y1={H - 12} x2={W - 4} y2={H - 12} />
-          <line className="rv-ligne rv-ligne-fine" x1="4" y1={H - 12 - (10 / 52) * (H - 30)} x2={W - 4} y2={H - 12 - (10 / 52) * (H - 30)} />
-          <line className="rv-ligne rv-ligne-fine" x1="4" y1={H - 12 - (40 / 52) * (H - 30)} x2={W - 4} y2={H - 12 - (40 / 52) * (H - 30)} />
-          <circle className="rv-botteur" cx={W / 2} cy={H - 12} r="4" />
-          <path className="rv-trajet" d={`M${W / 2} ${H - 14}Q${(W / 2 + px) / 2} ${(H + py) / 2 - 18 - e.hauteur * 20} ${px} ${py}`} />
-          <g transform={`translate(${px} ${py})`}>
-            <circle className="rv-viseur" r="8" />
-            <path className="rv-viseur-croix" d="M-12 0h6M6 0h6M0 -12v6M0 6v6" />
-          </g>
-        </svg>
+    <section className="rv-repere" aria-label={t('rv.eng.titre')}>
+      <div className="rv-repere-ligne">
+        <b><Icone nom="engagement" taille={15} /> {t('rv.eng.titre')}</b>
+        {/* Ce que le geste dessine, pendant qu'on le fait : la longueur visée et la hauteur du ballon. */}
+        {dose && <span className="rv-repere-info">{t('rv.eng.distance', { distance: e.distance })} · {t(`rv.eng.h.${hauteur}`)}</span>}
+        <Chrono reste={r.reste} delai={r.delai} />
       </div>
-
-      <section className="rv-barre-bas" aria-label={t('rv.eng.titre')}>
-        <Entete
-          icone="engagement" titre={t('rv.eng.titre')} reste={r.reste} delai={r.delai}
-          sous={`${t('rv.eng.distance', { distance: e.distance })} · ${t(`rv.eng.h.${actuel.cle}`)}`}
-        />
-        <JaugeForce p={v.p} aide={false} charge={manette && v.arme} />
-        <div className="rv-hauteurs" role="group" aria-label={t('rv.eng.hauteur')}>
-          {paliers.map((p, i) => (
-            <button key={p.cle} type="button" data-actif={p.cle === actuel.cle ? 'oui' : undefined} onClick={() => pilotage.resp.demander({ t: 'hauteur', h: p.h })}>
-              {snap.appareil === 'clavier' && <kbd className="cd-touche">{i + 1}</kbd>}
-              {t(`rv.eng.h.${p.cle}`)}
-            </button>
-          ))}
-        </div>
-        <button type="button" className="btn vert rv-frapper" onClick={() => pilotage.resp.demander({ t: 'valider' })}>
-          <Icone nom="engagement" taille={18} /> {t('rv.eng.frapper')}
-        </button>
-        <Aide cle="rv.eng.aide" snap={snap} prefs={prefs} />
-        {manette && <p className="rv-aide rv-aide-petit">{t('rv.eng.h.manette', { lb: LIBELLES_MANETTE[snap.manette].lb, rb: LIBELLES_MANETTE[snap.manette].rb })}</p>}
-      </section>
-    </>
+      {dose ? <TraitDeForce p={v.p} /> : <Aide cle="rv.eng.aide" snap={snap} prefs={prefs} />}
+    </section>
   );
 }
 
@@ -506,8 +467,8 @@ function CarteTuto({ pilotage, snap, prefs }: { pilotage: PilotageDirect; snap: 
     droite: libelleDeTouche(prefs.touches.droite[0]),
     haut: libelleDeTouche(prefs.touches.haut[0]),
     bas: libelleDeTouche(prefs.touches.bas[0]),
-    valider: LIBELLES_MANETTE[snap.manette].a,
-    charge: snap.resp.modeManette === 'charge' ? LIBELLES_MANETTE[snap.manette].a : LIBELLES_MANETTE[snap.manette].rt,
+    valider: nomDuBouton(snap.manette, 'a'),
+    charge: nomDuBouton(snap.manette, 'x'),
     drop: libelleDeTouche(prefs.touches.drop[0]),
     lb: LIBELLES_MANETTE[snap.manette].lb,
     b: LIBELLES_MANETTE[snap.manette].b,

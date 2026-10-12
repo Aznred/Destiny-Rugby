@@ -108,6 +108,12 @@ export function stockageFichier(fichier: string): StockageCarriere {
         }
         sauver(); return true;
       },
+      async refus() {
+        const registres = Object.values(base.publicites ?? {});
+        return { total: registres.reduce((n, r) => n + (r.stats.callbacksRefuses ?? 0), 0),
+          derniers: registres.flatMap(r => r.sessions).filter(s => s.callback).sort((a, b) => b.callback!.le - a.callback!.le).slice(0, 8)
+            .map(s => ({ le: s.callback!.le, refus: s.callback!.refus, videoTerminee: s.videoTerminee === true })) };
+      },
       async statistiques() {
         const stats = STATS_PUB_VIDES();
         for (const r of Object.values(base.publicites ?? {})) {

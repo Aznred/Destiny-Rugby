@@ -1,0 +1,14 @@
+{
+  "_": "Le vrai jeu de la pub « enquête ». « essai » : pour chaque langue, le match (graine) et l'image de l'essai (gameplay.cjs le rejoue et le photographie dans « dossier », où l'essai tombe à l'image « essai » ; filmé sans l'étiquette du porteur, SANS_NOM=1). « intro » : la seconde de caméra de surveillance qui dézoome ; « delai » : l'essai tombe ce temps après le nom du joueur.",
+  "essai": {
+    "ips": 30,
+    "vitesse": 1,
+    "intro": 0.95,
+    "delai": 0.15,
+    "fr": { "graine": "1", "image": 7016, "avant": 8, "apres": 3.5, "dossier": "rushes/essai-fr-close-sansnom", "essai": 239, "origine": "50% 56%" },
+    "en": { "graine": "12", "image": 10807, "avant": 9, "apres": 3.5, "dossier": "rushes/essai-en-close-sansnom", "essai": 266, "geste": [74, 118], "origine": "50% 56%" }
+  },
+  "pack": { "fr": "../catastrophe/rushes/fr-pack", "en": "rushes/en-pack", "vitesse": 1,
+    "morceaux": { "fr": [{ "a": 0, "depart": 0.9 }, { "a": 0.36, "depart": 5.25 }], "en": [{ "a": 0, "depart": 0.9 }, { "a": 0.36, "depart": 10.55 }] } },
+  "compo": { "fr": "../catastrophe/rushes/fr-composition", "en": "../catastrophe/rushes/en-composition", "depart": 0.6, "vitesse": 1 }
+}

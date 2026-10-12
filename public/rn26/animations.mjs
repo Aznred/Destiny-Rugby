@@ -261,16 +261,25 @@ export const CONTRE = { bras: { clip: 'charge_down_long', depart: .55, cadence: 
 
 // ═══ ESSAIS, CÉLÉBRATIONS, DÉCEPTIONS ═══════════════════════════════════════
 // `fin` : l'instant où le marqueur a fini de marquer (il se relève et célèbre ensuite) ; `biais` : il plonge de travers, vers le coin.
+// Correctif 39 — `sol` : l'instant du clip où le corps touche la pelouse (hauteur de la racine lue dans les clips de l'APK).
+// Le moteur de niveau 7 fait voler puis glisser le marqueur à sa vraie vitesse ; la scène cale le clip sur ce vol.
 export const ESSAIS = {
-  plongeon: { clip: 'try_dive', fin: 4.05 },
-  puissance: { clip: 'dive_on_ball_try', fin: 3.7 },
-  glissade: { clip: 'try_dive_quick', fin: 3.75 },
+  plongeon: { clip: 'try_dive', fin: 4.05, sol: .8 },
+  puissance: { clip: 'dive_on_ball_try', fin: 3.7, sol: .5 },
+  glissade: { clip: 'try_dive_quick', fin: 3.75, sol: .5 },
   calme: { clip: 'touchdown_quick', fin: 2.8 },
   poteaux: { clip: 'touchdown', fin: 3.4 },
-  coin: { clip: 'try_dive', fin: 4.05, biais: .45 },
+  coin: { clip: 'try_dive', fin: 4.05, biais: .45, sol: .8 },
   melee: { clip: 'try_touchdown_quick', fin: 1.35 },
   maul: { clip: 'try_pushover_maul', fin: 4.05 },
-  interception: { clip: 'try_dive_flamboyant', fin: 5.3 },
+  interception: { clip: 'try_dive_flamboyant', fin: 5.3, sol: 1 },
+  // Niveau 7 : le plongeon horizontal qui glisse loin, le plongeon bas en s'écartant du contact, le plongeon pour assurer
+  // (défenseur dans le dos), le grand saut en extension, et l'essai en force — posé dans le contact, sans s'envoler.
+  horizontal: { clip: 'dive_on_ball_try', fin: 3.7, sol: .5 },
+  bas: { clip: 'try_dive_quick', fin: 3.75, sol: .5 },
+  securise: { clip: 'try_dive_quick', fin: 3.75, sol: .5 },
+  extension: { clip: 'try_dive_flamboyant', fin: 5.3, sol: 1 },
+  force: { clip: 'try_touchdown_quick', fin: 1.35 },
 };
 export const REPLI_ESSAI = { plonge: { clip: 'try_dive', fin: 4.05 }, pose: { clip: 'try_touchdown', fin: 1.9 } };
 // Le marqueur, puis ceux qui viennent à lui. `leve` : il brandit le ballon (construit : le bras monte, le ballon avec).

@@ -1,0 +1,9 @@
+# Tout ceci se régénère (gameplay.cjs, filmer.cjs, son.cjs, apercu.cjs) ou se redépose.
+rushes/
+rendus/
+son/
+apercus/
+voix/recues/
+voix/provisoire/
+voix/*.json
+!voix/alignement-*.json

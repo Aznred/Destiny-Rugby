@@ -296,7 +296,7 @@ export class DestinyMatch {
       const devant=this.players.filter(p=>p.team===this.team&&p.source.role==='alignement'&&!pris.has(p.id)).sort((a,b)=>bord(a)-bord(b)).slice(0,3);
       if(devant.length===3){const tri=[...devant].sort((a,b)=>a.source.pos.y-b.source.pos.y);this.leurre={sauteur:tri[1].id,lifteurs:[tri[0].id,tri[2].id]};}
     }
-    if(e.aplatissage&&this.aplatissage!==e.aplatissage){this.aplatissage=e.aplatissage;const g=(e.gestes||[]).filter(g=>g.joueurId===e.aplatissage.marqueur.id).pop();this.essai={id:e.aplatissage.marqueur.id,start:e.sim,plonge:g?.clip==='dive_try',maul:e.aplatissage.origine==='maul',style:e.aplatissage.style};}
+    if(e.aplatissage&&this.aplatissage!==e.aplatissage){this.aplatissage=e.aplatissage;const g=(e.gestes||[]).filter(g=>g.joueurId===e.aplatissage.marqueur.id).pop();this.essai={id:e.aplatissage.marqueur.id,start:e.sim,plonge:g?.clip==='dive_try',maul:e.aplatissage.origine==='maul',style:e.aplatissage.style,vol:e.aplatissage.vol,cap:e.aplatissage.cap};}
     if(e.sifflet!==this.lastWhistle){this.lastWhistle=e.sifflet;if(e.sifflet)this.whistle={start:e.sim,cle:e.sifflet.cle||'',avertissement:e.sifflet.avertissement};if(/carton/.test(e.sifflet?.cle||''))this.card={start:e.sim,red:/Rouge/.test(e.sifflet.cle)};}
     this.slots=this.formation(0);
     this.players=this.physics.update(this.players,dt,this);
@@ -427,6 +427,13 @@ export class DestinyMatch {
       if(E&&this.dispo(E.clip))return E;
       return essai?.maul?B.ESSAIS.maul:essai?.plonge?B.REPLI_ESSAI.plonge:B.REPLI_ESSAI.pose;
     };
+    // Correctif 39 — le clip suit le VOL du moteur : un peu plus vite tant que le marqueur est en l'air (jamais plus de
+    // 1,6 fois), pour que le corps touche la pelouse quand le moteur dit qu'il la touche ; à vitesse réelle ensuite.
+    const cadenceEssai=(essai,E)=>essai?.vol&&E.sol?Math.min(1.6,Math.max(1,E.sol/essai.vol)):1;
+    const tempsEssai=(essai,E,t)=>{const k=cadenceEssai(essai,E);return k===1?t:t<essai.vol?t*k:essai.vol*k+(t-essai.vol);};
+    const finEssai=(essai,E)=>E.fin-(essai?.vol?essai.vol*(cadenceEssai(essai,E)-1):0);
+    /** Le sens du plongeon tel que le moteur l'a écrit (repère du terrain) : c'est son élan, pas l'axe des poteaux. */
+    const capTerrain=c=>cap(Math.sin(c),Math.cos(c));
     /** Le cap de celui qui marque : dans l'axe, ou de travers vers le coin. */
     const capEssai=E=>{const devant=p.team===0?1:-1,b=E.biais||0;return cap(Math.sign(p.x||1)*Math.sin(b),devant*Math.cos(b));};
     /** Celui qui attend, debout, pendant un arrêt de jeu : vivant, et qui regarde quelque chose. */
@@ -490,14 +497,17 @@ export class DestinyMatch {
       }else if(tir.etape==='transport'){d.carry='deux';d.heading=speed<.4?face:null;}
       else if(tir.etape==='pose'){const fait=tir.humain?0:(tir.rituel?.de??0);clip('kick_conversion_a_setup',fait+(1-fait)*clamp(depuis/(tir.humain?this.outils.RITUEL_TIR.poseHumain:(tir.rituel?.pose??this.outils.RITUEL_TIR.pose)),0,1),false,true);d.anchor=tee;}
       else if(tir.etape==='pret'||tir.etape==='vise'){clip('kick_conversion_a_ready',depuis,true);d.anchor=tee;}
-      else if(tir.etape==='elan'){clip('kick_conversion_a_kick',Math.min(depuis,IMPACT_TIR));d.anchor=tee;}
+      else if(tir.etape==='elan'){
+        // Correctif 39 — le botteur part au geste : un tir joué à la main entre dans le clip là où le buteur QUITTE sa marque.
+        const entree=tir.humain?Math.max(0,IMPACT_TIR-(this.outils.RITUEL_TIR?.elanHumain??IMPACT_TIR)):0;
+        clip('kick_conversion_a_kick',Math.min(entree+depuis,IMPACT_TIR));d.anchor=tee;}
       return done();
     }
     // ── Après l'essai : le marqueur se relève puis célèbre, ses coéquipiers l'entourent ──
     if(tir?.etape==='celebration'&&tir.marqueurId===p.id){
       const essai=this.essai?.id===p.id?this.essai:null,depuis=now-(essai?.start??tir.etapeDepuis);
-      const E=gesteEssai(essai),fin=E.fin;
-      if(essai&&depuis<fin){clip(E.clip,depuis);if(E.biais)d.heading=capEssai(E);return done();}
+      const E=gesteEssai(essai),fin=finEssai(essai,E);
+      if(essai&&depuis<fin){clip(E.clip,tempsEssai(essai,E,depuis));if(essai.cap!==undefined)d.heading=capTerrain(essai.cap);else if(E.biais)d.heading=capEssai(E);return done();}
       const debut=(essai?.start??tir.etapeDepuis)+(essai?fin:0);
       // Correctif 30 : la fête dépend du match (`tir.celebration`) — sobre, accolade, ballon brandi, collective, décisive.
       const fete=B.CELEBRATIONS30[tir.celebration],liste=fete?fete.marqueur.filter(n=>this.dispo(n)):[];
@@ -507,7 +517,8 @@ export class DestinyMatch {
         if(tt<1.1)clip('pick_up_ball',tt*1.05);else{clip(fetes,tt-1.1);if(tt<3.7)d.proc={type:'ballonLeve',t:tt-1.1,duree:2.6};}
         d.ballon=clamp((tt-.45)/.3,0,1)*clamp((3.55-tt)/.4,0,1);
       }else clip(fetes,tt);
-      d.anchor={...this.remember('fete:'+tir.etapeDepuis,()=>({x:p.x,z:p.z,heading:p.team===0?0:Math.PI})),mode:'rel'};
+      // Correctif 39 : après un plongeon il se retourne vers les siens à allure d'homme, sans demi-tour instantané.
+      d.anchor={...this.remember('fete:'+tir.etapeDepuis,()=>({x:p.x,z:p.z,heading:p.team===0?0:Math.PI})),mode:'rel',...(essai?.cap!==undefined?{pivot:3.4,fondu:.5}:{})};
       return done();
     }
     if(tir?.etape==='celebration'&&tir.feteurs?.includes(p.id)){
@@ -1040,8 +1051,11 @@ export class DestinyMatch {
     // secondes, tourné vers l'ancien regroupement (mesuré : 180 images sur 36 000).
     // Correctif 30 — L'ESSAI TEL QU'IL EST MARQUÉ : plongeon, en force, glissade, posé, en coin, sous les poteaux, après mêlée, après interception.
     if(recent&&(recent.clip==='try'||recent.clip==='dive_try')&&now-recent.debut<=recent.duree+.2){
-      const E=gesteEssai({style:recent.variante,plonge:recent.clip==='dive_try'});
-      clip(E.clip,now-recent.debut);if(E.biais)d.heading=capEssai(E);return done();
+      const E=gesteEssai({style:recent.variante,plonge:recent.clip==='dive_try'}),ess=this.essai?.id===p.id&&Math.abs(this.essai.start-recent.debut)<.05?this.essai:null;
+      clip(E.clip,tempsEssai(ess,E,now-recent.debut));
+      // Correctif 39 : il plonge dans le sens de son élan et le garde pendant toute la glissade.
+      if(ess?.cap!==undefined)d.heading=capTerrain(ess.cap);else if(E.biais)d.heading=capEssai(E);
+      return done();
     }
     // Correctif 30 — LE CONTRE : il arrive bras levés sur le botteur (tout le corps), ou les lève seulement pour gêner.
     if(recent?.clip==='charge_down'&&B.CONTRE[recent.variante]&&now-recent.debut<1.1&&this.dispo(B.CONTRE[recent.variante].clip)){

@@ -9040,6 +9040,47 @@ select:focus {
 }
 .manager-avance-bilan button { margin-left: auto; min-height: 32px; padding: 0 0.5rem; }
 
+/* Ce qui retient la semaine ou la saison, et l'alerte des contrats qui expirent (Correctif 39).
+   Même vocabulaire que le bilan d'avance : une arête dorée à gauche, rien qui crie. */
+.verrous-saison, .contrats-expirants {
+  display: grid; gap: 0.5rem;
+  margin: 0 0 0.9rem; padding: 0.75rem 0.9rem;
+  border-left: 3px solid var(--or-500);
+  border-radius: 0 var(--rayon-sm) var(--rayon-sm) 0;
+  font-size: 0.9rem;
+}
+.verrous-saison > header { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; }
+.verrous-saison > header b { display: inline-flex; align-items: center; gap: 0.45rem; }
+.verrous-saison > header button { min-height: 32px; padding: 0 0.5rem; }
+.verrous-saison small {
+  color: var(--craie-dim); font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase;
+}
+.verrous-saison ul { display: grid; gap: 0.35rem; margin: 0; padding: 0; list-style: none; }
+.verrous-saison li {
+  display: flex; align-items: center; gap: 0.55rem; flex-wrap: wrap;
+  min-height: 34px; color: var(--craie);
+}
+.verrous-saison li > span { flex: 1 1 12rem; min-width: 0; }
+.verrous-saison li[data-gravite="auto"] { color: var(--craie-dim); min-height: 26px; }
+.verrous-saison li button { margin-left: auto; }
+.verrous-saison-erreur { margin: 0; color: var(--craie); }
+.verrous-saison-diagnostic {
+  margin: 0; padding: 0.6rem 0.7rem; max-height: 11rem; overflow: auto;
+  background: rgba(0, 0, 0, 0.28); border: 1px solid var(--bordure); border-radius: var(--rayon-sm);
+  font: 0.74rem/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: var(--craie-dim); white-space: pre-wrap; overflow-wrap: anywhere; user-select: text;
+}
+.contrats-expirants { grid-template-columns: 1fr auto; align-items: center; column-gap: 0.9rem; }
+.contrats-expirants b { display: inline-flex; align-items: center; gap: 0.45rem; }
+.contrats-expirants p { grid-column: 1; margin: 0; color: var(--craie-dim); font-size: 0.84rem; }
+.contrats-expirants .contrats-expirants-noms { color: var(--craie); }
+.contrats-expirants button { grid-column: 2; grid-row: 1 / span 3; }
+@media (max-width: 560px) {
+  .contrats-expirants { grid-template-columns: 1fr; }
+  .contrats-expirants button { grid-column: 1; grid-row: auto; justify-self: start; }
+  .verrous-saison li button { margin-left: 0; }
+}
+
 /* Informations éditoriales et légales accessibles depuis chaque écran. */
 .pied-application {
   display: flex;
@@ -9219,6 +9260,9 @@ select:focus {
 }
 [data-statut='QUALIFIED'] { --zone: var(--zone-QUALIFIED); }
 [data-statut='PROMOTION'] { --zone: var(--zone-PROMOTION); }
+[data-statut='PROMOTION_FINALS'] { --zone: var(--zone-PROMOTION); }
+[data-statut='PROMOTION_POSSIBLE'] { --zone: color-mix(in srgb, var(--zone-PROMOTION) 55%, transparent); }
+[data-statut='RELEGATION_POSSIBLE'] { --zone: color-mix(in srgb, var(--zone-DIRECT_RELEGATION) 55%, transparent); }
 [data-statut='PLAYOFF'] { --zone: var(--zone-PLAYOFF); }
 [data-statut='CHALLENGE_CUP'] { --zone: var(--zone-CHALLENGE_CUP); }
 [data-statut='ACCESS_MATCH'] { --zone: var(--zone-ACCESS_MATCH); }

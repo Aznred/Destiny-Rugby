@@ -27,6 +27,8 @@
   cursor: crosshair;
 }
 .rv[data-appareil='tactile'] .rv-zone { cursor: default; }
+/* À la souris, on « attrape » l'image pour tracer le geste. */
+.rv-zone:active { cursor: grabbing; }
 .rv-fil {
   position: absolute;
   z-index: 2;
@@ -40,16 +42,19 @@
   pointer-events: none;
 }
 .rv-fil[data-actif] { opacity: 1; }
+/* Le bout du fil : un anneau qui se remplit avec la longueur du geste — c'est toute l'indication de force. */
 .rv-fil-tete {
+  --rv-p: 0;
   position: absolute;
   z-index: 2;
-  width: 26px;
-  height: 26px;
-  margin: -13px 0 0 -13px;
+  width: 30px;
+  height: 30px;
+  margin: -15px 0 0 -15px;
   border-radius: 50%;
-  border: 2px solid var(--cd-or);
-  background: rgba(244, 205, 99, 0.22);
-  box-shadow: 0 0 14px rgba(244, 205, 99, 0.6);
+  background: conic-gradient(var(--cd-or) calc(var(--rv-p) * 360deg), rgba(255, 255, 255, 0.2) 0);
+  -webkit-mask: radial-gradient(circle, transparent 9.5px, #000 10.5px);
+  mask: radial-gradient(circle, transparent 9.5px, #000 10.5px);
+  filter: drop-shadow(0 0 5px rgba(0, 0, 0, 0.55));
   opacity: 0;
   pointer-events: none;
 }
@@ -177,7 +182,7 @@
 }
 .rv-conseil-capitaine svg { flex: 0 0 auto; color: var(--cd-or); }
 
-/* ── Le tir : la fiche, les poteaux, la barre du bas ──────────────────────────────────────────────── */
+/* ── Le tir et le coup d'envoi : une pastille, un trait (Correctif 39) ──────────────────────────────── */
 .rv-vent {
   display: inline-flex;
   align-items: center;
@@ -187,48 +192,69 @@
 }
 .rv-vent b { font-family: var(--police-forte, 'Archivo', system-ui, sans-serif); font-weight: 700; color: #fff4cc; }
 .rv-vent-fleche { display: inline-grid; place-items: center; color: var(--cd-or); transition: transform 0.4s ease; }
-.rv-poteaux {
-  position: absolute;
-  z-index: 2;
-  right: 64px;
-  top: 46%;
-  transform: translateY(-50%);
-  width: min(34%, 210px);
-  aspect-ratio: 200 / 124;
-  border-radius: 14px;
-  background: linear-gradient(180deg, rgba(14, 34, 22, 0.86), rgba(7, 20, 13, 0.86));
-  border: 1px solid var(--cd-contour, rgba(244, 205, 99, 0.5));
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5);
-  padding: 4px;
-}
-.rv-sol { stroke: rgba(255, 255, 255, 0.28); stroke-width: 1.5; }
-.rv-montant { stroke: #f5f7f2; stroke-width: 3.2; stroke-linecap: round; }
-.rv-barre { stroke: #f5f7f2; stroke-width: 3; stroke-linecap: round; }
-.rv-axe { stroke: rgba(255, 255, 255, 0.35); stroke-width: 1.4; stroke-dasharray: 3 3; }
-.rv-viseur { fill: rgba(244, 205, 99, 0.2); stroke: var(--cd-or); stroke-width: 2; }
-.rv-viseur-croix { stroke: var(--cd-or); stroke-width: 2; stroke-linecap: round; fill: none; }
-.rv-effet { fill: none; stroke: rgba(244, 205, 99, 0.55); stroke-width: 2; stroke-dasharray: 4 4; stroke-linecap: round; }
 
-.rv-barre-bas {
+/* ── Le repère de tir (Correctif 39) ───────────────────────────────────────────────────────────────
+   Demande : « supprimer les grosses jauges ; le terrain et l'animation doivent rester au centre ». Une pastille en bas de
+   l'image — ce qu'on tape, la distance, le vent, le temps qui reste — et, le temps du geste, un trait fin pour la force.
+   ⚠️ ELLE NE PREND PAS LE TOUCHER : le balayage passe à travers, on vise n'importe où sur l'image. */
+.rv-repere {
   position: absolute;
   z-index: 2;
   left: 50%;
-  bottom: calc(max(12px, env(safe-area-inset-bottom)) + 6px);
+  bottom: calc(max(10px, env(safe-area-inset-bottom)) + 4px);
   transform: translateX(-50%);
-  width: min(94%, 640px);
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  grid-template-areas: 'entete entete' 'force frapper' 'geste frapper' 'aide aide';
-  align-items: center;
-  gap: 6px 14px;
-  padding: 10px 14px;
-  border-radius: 14px;
-  background: linear-gradient(180deg, rgba(14, 34, 22, 0.94), rgba(7, 20, 13, 0.94));
-  border: 1px solid var(--cd-contour, rgba(244, 205, 99, 0.5));
-  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.55);
-  pointer-events: auto;
-  animation: rv-entre-centre 0.26s ease-out both;
+  gap: 5px;
+  width: max-content;
+  max-width: min(92%, 520px);
+  padding: 7px 13px 8px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(10, 26, 17, 0.72), rgba(6, 16, 11, 0.78));
+  border: 1px solid rgba(244, 205, 99, 0.28);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.4);
+  animation: rv-entre-centre 0.22s ease-out both;
 }
+.rv-repere-ligne { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 12px; }
+.rv-repere-ligne > b {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--police-forte, 'Archivo', system-ui, sans-serif);
+  font-size: 13.5px;
+  color: var(--cd-or);
+}
+.rv-repere-info { font-size: 12px; color: #fff4cc; font-variant-numeric: tabular-nums; }
+.rv-repere .rv-vent { gap: 5px; }
+.rv-repere .rv-chrono { margin-left: auto; }
+.rv-repere .rv-aide { max-width: 46ch; }
+/* Le trait de force : fin, sans chiffre. Le cran clair marque la force qui suffit juste à passer la barre. */
+.rv-trait {
+  position: relative;
+  display: block;
+  height: 4px;
+  min-width: 190px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+}
+.rv-trait i {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  transform-origin: 0 50%;
+  background: linear-gradient(90deg, #d9a93a, #f4cd63);
+  transition: transform 0.06s linear;
+}
+.rv-trait u {
+  position: absolute;
+  top: -3px;
+  width: 2px;
+  height: 10px;
+  margin-left: -1px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.85);
+  text-decoration: none;
+}
+
 .rv-entete { grid-area: entete; display: flex; align-items: center; flex-wrap: wrap; gap: 4px 14px; }
 .rv-entete b {
   display: inline-flex;
@@ -239,10 +265,6 @@
   color: var(--cd-or);
 }
 .rv-entete .rv-chrono { margin-left: auto; }
-.rv-barre-bas .rv-force { grid-area: force; }
-.rv-barre-bas .rv-geste { grid-area: geste; }
-.rv-barre-bas .rv-frapper { grid-area: frapper; min-width: 118px; justify-content: center; }
-.rv-barre-bas .rv-aide { grid-area: aide; }
 
 .rv-force { display: grid; grid-template-columns: auto minmax(60px, 1fr) 46px; align-items: center; gap: 9px; font-size: 12px; }
 .rv-force-nom { display: inline-flex; align-items: center; gap: 5px; color: var(--craie-dim, #c7d1c6); white-space: nowrap; }
@@ -271,9 +293,7 @@
 .rv-geste[data-net='oui'] { color: #9be26c; }
 .rv-geste[data-net='oui'] i b { background: #9be26c; box-shadow: 0 0 8px rgba(155, 226, 108, 0.6); }
 
-/* ── L'engagement : le terrain vu d'en haut ────────────────────────────────────────────────────────── */
-.rv-hauteurs { display: flex; gap: 6px; }
-.rv-hauteurs button, .rv-combos button, .rv-rapide {
+.rv-combos button, .rv-rapide {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -288,31 +308,11 @@
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
-.rv-hauteurs button { flex: 1; }
-.rv-hauteurs button[data-actif='oui'], .rv-combos button[data-actif='oui'] {
+.rv-combos button[data-actif='oui'] {
   background: rgba(244, 205, 99, 0.2);
   border-color: var(--cd-or);
   color: #fff4cc;
 }
-.rv-terrain {
-  position: absolute;
-  z-index: 2;
-  right: 64px;
-  top: 46%;
-  transform: translateY(-50%);
-  width: min(36%, 230px);
-  aspect-ratio: 210 / 150;
-  padding: 4px;
-  border-radius: 14px;
-  background: linear-gradient(180deg, rgba(14, 34, 22, 0.86), rgba(7, 20, 13, 0.86));
-  border: 1px solid var(--cd-contour, rgba(244, 205, 99, 0.5));
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5);
-}
-.rv-pelouse { fill: rgba(46, 125, 66, 0.35); stroke: rgba(255, 255, 255, 0.2); stroke-width: 1; }
-.rv-ligne { stroke: rgba(255, 255, 255, 0.55); stroke-width: 1.5; }
-.rv-ligne-fine { stroke: rgba(255, 255, 255, 0.25); stroke-dasharray: 4 4; stroke-width: 1; }
-.rv-botteur { fill: #f4cd63; stroke: rgba(0, 0, 0, 0.5); stroke-width: 1; }
-.rv-trajet { fill: none; stroke: rgba(244, 205, 99, 0.7); stroke-width: 2; stroke-dasharray: 5 4; stroke-linecap: round; }
 
 /* ── La touche : l'annonce, le lancer ──────────────────────────────────────────────────────────────── */
 .rv-touche {
@@ -328,7 +328,6 @@
 .rv-lancer .rv-geste { grid-area: geste; }
 .rv-lancer .rv-frapper { grid-area: frapper; min-width: 118px; justify-content: center; }
 .rv-lancer .rv-aide { grid-area: aide; }
-.rv-hauteurs { grid-area: geste; }
 .rv-combos { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
 .rv-combos button { flex-direction: column; gap: 2px; padding: 7px 4px 6px; position: relative; font-size: 11.5px; line-height: 1.15; text-align: center; }
 .rv-combos button svg { color: var(--cd-or); }
@@ -405,27 +404,25 @@
 
 /* ── Les petits écrans : tout se serre ────────────────────────────────────────────────────────────── */
 @media (max-width: 560px) {
-  .rv-poteaux, .rv-terrain { right: 58px; top: 38%; width: min(40%, 170px); }
   .rv-choix { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .rv-choix-bouton { min-height: 74px; padding: 8px 4px 6px; }
-  .rv-barre-bas { grid-template-columns: minmax(0, 1fr); grid-template-areas: 'entete' 'force' 'geste' 'frapper' 'aide'; }
-  .rv-barre-bas .rv-frapper, .rv-lancer .rv-frapper { width: 100%; }
+  .rv-lancer .rv-frapper { width: 100%; }
   .rv-lancer { grid-template-columns: minmax(0, 1fr); grid-template-areas: 'force' 'geste' 'frapper' 'aide'; }
   .rv-combos { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 @media (max-height: 430px) and (orientation: landscape) {
+  /* Téléphone couché : le repère se serre contre le bas, son aide tient sur une ligne. */
+  .rv-repere { bottom: calc(max(4px, env(safe-area-inset-bottom)) + 2px); padding: 5px 11px 6px; gap: 3px; }
+  .rv-repere-ligne > b { font-size: 12.5px; }
+  .rv-repere .rv-aide { font-size: 10.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .rv-carte { padding: 7px 11px 7px; gap: 5px; }
   .rv-carte header b { font-size: 13.5px; }
   .rv-sous, .rv-aide { font-size: 11px; }
-  .rv-poteaux, .rv-terrain { right: 58px; top: 42%; width: min(26%, 170px); }
   .rv-penalite { width: min(80%, 560px); bottom: 8px; }
   .rv-choix { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
   .rv-choix-bouton { min-height: 60px; padding: 6px 4px 5px; gap: 1px; }
   .rv-choix-bouton svg { width: 20px; height: 20px; }
   .rv-choix-aide { display: none; }
-  .rv-barre-bas { width: min(72%, 560px); bottom: 6px; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: 'entete entete' 'force frapper' 'geste frapper'; padding: 7px 11px; }
-  .rv-barre-bas .rv-aide { display: none; }
-  .rv-barre-bas .rv-frapper { width: auto; }
   .rv-combos { grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
   .rv-combos button { padding: 5px 2px 4px; font-size: 10px; }
   .rv-combos button svg { width: 16px; height: 16px; }
@@ -435,7 +432,7 @@
   .rv-conseil, .rv-bandeau { top: 44px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .rv-carte, .rv-barre-bas, .rv-bandeau, .rv-conseil { animation: none; }
+  .rv-carte, .rv-repere, .rv-bandeau, .rv-conseil { animation: none; }
   .rv-retour { animation-duration: 0.01s; opacity: 1; }
 }
 

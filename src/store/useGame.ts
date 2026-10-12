@@ -130,7 +130,7 @@ import type { Scenario } from '../data/scenarios';
 import { COMPETITIONS, divisionDuClub, competitionDuClub, clubParNom } from '../data/clubs';
 import {
   forceEffectif, forceMoyenneDivision, noteDuClub, setApportsDuCentre, setJoueurIncarne, setTransfertsSociaux,
-  effectifDuClub, setEffectifJeunesCarriere,
+  effectifDuClub, setEffectifJeunesCarriere, type Coequipier,
 } from '../lib/effectif';
 import { nomAleatoirePourNation } from '../lib/nomsJoueurs';
 import { chantierVisible } from '../lib/modeDev';
@@ -219,7 +219,13 @@ import { effetsTraits, MAX_TRAITS, TRAIT_PAR_ID } from '../data/traits';
 import { nouerRelations, bonusVestiaire, meriteLeBrassard } from '../lib/vestiaire';
 import { evaluerResponsabilites, ligneDeJournal, responsabilitesInitiales } from '../lib/responsabilites';
 import { compositionMedicale, niveauMedical, CENTRES_MEDICAUX, evoluerSoin, dateMedicale } from '../lib/infirmerieManager';
-import { suivreConseil, bilanContrat } from '../lib/conseilManager';
+import { suivreConseil, bilanContrat, offreDeSecours } from '../lib/conseilManager';
+import {
+  afficheSure, contratsExpirants, diagnostiquerCloture, estSemaineDeCloture, prolongationsAcceptees, texteDiagnostic,
+  tracerCloture, type RapportCloture, type VerrouCloture,
+} from '../lib/clotureSaison';
+import type { AfficheComplete } from '../lib/matchLive';
+import type { IncidentCloture } from '../lib/carriereAvancee';
 import { classementManagerEnDirect } from '../lib/tableauManager';
 import { apparenceValide, personnaliser } from '../lib/apparenceJoueur';
 import { interviewAleatoire, scenarioDuPool, type JugementMJ } from '../lib/ia';
@@ -1072,6 +1078,10 @@ interface GameState {
   observerCibleManager: (cible: CibleRecrutementManager) => void;
   postulerBancManager: (club: string) => void;
   negocierContratManager: () => void;
+  /** Pose l'offre de secours du conseil quand le contrat est à zéro sans offre valide (Correctif 39). Rend `true` si elle vient d'être posée. */
+  assurerOffreDuConseil: () => boolean;
+  /** Ce que le dernier clic sur « Clore la saison » a rencontré : un verrou bloquant ou une erreur de structure. Non persisté. */
+  clotureRetenue: { saison: number; verrous: VerrouCloture[]; erreur?: string } | null;
   demissionnerManager: () => void;
   accepterOffreBancManager: (id: string) => void;
   repondreSelectionManager: (accepter: boolean) => void;
@@ -1360,6 +1370,32 @@ async function personnaliserReponseNegociation(pseudo: string, id: string, conte
  * (`enregistrerResultatManager`) — le tableau final et la suite du tableau ne peuvent pas diverger.
  */
 /** L'issue d'un match couperet de l'entraîneur (prolongation, vainqueur désigné), ramenée au repère domicile/extérieur. */
+/**
+ * LE RÉSULTAT D'UN MATCH QUE L'ENTRAÎNEUR NE JOUE PAS LUI-MÊME (avance déléguée, match en retard à la clôture).
+ * Le même tirage que le monde simulé, pesé par les absents du groupe : rien d'autre qu'un match ordinaire.
+ */
+function resultatDelegue(avant: Manager, affiche: AfficheComplete): ResultatMatchManager {
+  const { domicile, exterieur } = affiche.match;
+  const groupe = effectifDuClub(avant.club, avant.saison);
+  const absents = new Set(indisponiblesCarriereAvancee(avant.avancee, avant.semaine));
+  const moyenne = (liste: typeof groupe) => {
+    const meilleurs = [...liste].sort((a, b) => b.note - a.note).slice(0, 23);
+    return meilleurs.reduce((n, j) => n + j.note, 0) / Math.max(1, meilleurs.length);
+  };
+  const bonus = moyenne(groupe.filter((j) => !absents.has(j.id))) - moyenne(groupe);
+  const match = jouerRencontre(domicile, exterieur, avant.saison, affiche.cle, { club: avant.club, bonus });
+  const chezMoi = domicile === avant.club;
+  return {
+    cle: affiche.cle, club: avant.club, saison: avant.saison, semaine: avant.semaine,
+    journee: affiche.journee, domicile: chezMoi,
+    adversaire: chezMoi ? exterieur : domicile,
+    scorePour: chezMoi ? match.scoreD : match.scoreE,
+    scoreContre: chezMoi ? match.scoreE : match.scoreD,
+    essaisPour: chezMoi ? match.essaisD : match.essaisE,
+    essaisContre: chezMoi ? match.essaisE : match.essaisD,
+  };
+}
+
 function issueDuResultatManager(r: ResultatMatchManager): Partial<MatchChampionnat> {
   return {
     ...(r.prolongation ? { prolongation: true } : {}),
@@ -1502,6 +1538,7 @@ export const useGame = create<GameState>()(
         } else set({ correctifPlayoffsApplique: 36 });
       },
       resultatsPhasesFinales: {},
+      clotureRetenue: null,
       simulerAutresPhasesFinales: (saison, semaine, club) => {
         const joueur = get().joueur;
         const resultats = jouerAutresPhasesFinales(saison, semaine, club,
@@ -2518,7 +2555,7 @@ export const useGame = create<GameState>()(
               role: 'mj',
               titre: sien.sens === 'montee' ? '⬆️ Ton club monte !' : '⬇️ Ton club descend',
               texte: sien.sens === 'montee'
-                ? `${joueur.club} accède à la ${nomDivision(sien.vers)}${parAcces ? ' au terme du match d’accès' : ' en tant que champion'}. Une marche de plus, et un niveau de jeu qui va piquer.`
+                ? `${joueur.club} accède à la ${nomDivision(sien.vers)}${parAcces ? ' au terme du match d’accès' : sien.motif === 'classement' ? ' grâce à sa place en tête de poule' : sien.motif === 'repechage' ? ' parmi les meilleurs deuxièmes' : ' en tant que champion'}. Une marche de plus, et un niveau de jeu qui va piquer.`
                 : `${joueur.club} est relégué en ${nomDivision(sien.vers)}${parAcces ? ' après avoir perdu le match d’accès' : ''}. À toi de voir si tu suis le club ou si tu cherches mieux ailleurs.`,
               deltas: sien.sens === 'montee' ? { moral: 10, reputation: 3 } : { moral: -10 },
             });
@@ -4646,13 +4683,35 @@ export const useGame = create<GameState>()(
         }));
       },
 
+      /**
+       * UN CONTRAT À ZÉRO A TOUJOURS UNE OFFRE À LAQUELLE RÉPONDRE (Correctif 39). Rend `true` si elle vient d'être posée.
+       * Voir `offreDeSecours` : sans elle, un entraîneur sans contrat et sans offre n'avait plus aucun bouton.
+       */
+      assurerOffreDuConseil: () => {
+        const m = get().manager;
+        const secours = m ? offreDeSecours(m) : null;
+        if (!m || !secours) return false;
+        const salaire = secours.offre!.salaire || salaireManager(forceEffectif(m.club, m.saison));
+        set((s) => ({
+          manager: { ...m, conseil: { ...secours, offre: { ...secours.offre!, salaire } } },
+          journal: [...s.journal, {
+            id: idUnique(), saison: m.saison, role: 'mj' as const,
+            titre: t('cloture.offreSecours.titre'), texte: t('cloture.offreSecours.texte', { club: m.club }),
+          }],
+        }));
+        return true;
+      },
+
       semaineManager: () => {
         const m = get().manager;
         if (!m) return;
-        if (m.club && (m.contrat?.saisons ?? 0) <= 0) return;
         // Sans banc, le temps ne passe pas : on cherche un club.
         if (!m.club) return;
-        get().simulerAutresPhasesFinales(m.saison, m.semaine, m.club);
+        // Contrat à zéro : la réponse au conseil est la seule suite — encore faut-il qu'il y ait une offre sur la table.
+        if ((m.contrat?.saisons ?? 0) <= 0) { get().assurerOffreDuConseil(); return; }
+        // ⚠️ UNE LECTURE DU TABLEAU QUI LÈVE NE RETIENT PAS LA SEMAINE. Un résultat enregistré qui ne correspond plus à son
+        // tableau lève exprès (`bracketProgressif.ts`) : le diagnostic de clôture le dit, le calendrier continue.
+        try { get().simulerAutresPhasesFinales(m.saison, m.semaine, m.club); } catch { /* voir `diagnostiquerCloture` */ }
         // Le championnat du manager est désormais joué, pas seulement simulé.
         // Tant que l'affiche de cette semaine n'a pas atteint la sirène, le
         // calendrier ne peut pas l'effacer en passant au lundi suivant.
@@ -4662,8 +4721,28 @@ export const useGame = create<GameState>()(
         // se déclenchait pas et le calendrier passait par-dessus le match.
         // C'est l'autre moitié du « je n'ai pas fait les play-offs » : même
         // avec un match proposé à l'écran, la semaine pouvait avancer sans lui.
-        const affiche = afficheDuClub(m);
-        if (affiche && !m.resultats[affiche.cle]) return;
+        let affiche = afficheSure(m).affiche;
+        if (affiche && !m.resultats[affiche.cle]) {
+          if (!estSemaineDeCloture(m.semaine)) return;
+          // ═══ À LA DATE DE CLÔTURE, UN MATCH ENCORE DÛ EST EN RETARD (Correctif 39) ═══
+          // Plus aucune rencontre n'est programmée cette semaine-là : ce qui reste est un match de phase finale d'une
+          // date passée, resté sans résultat (un tableau recalculé après coup, une sauvegarde reprise en cours de route).
+          // L'entraîneur ne peut plus le retrouver dans son calendrier ; il est joué par l'adjoint, et la clôture le dit.
+          for (let garde = 0; garde < 8 && affiche; garde++) {
+            const avant: Manager | null = get().manager;
+            if (!avant?.club || avant.resultats[affiche.cle]) break;
+            get().enregistrerResultatManager(resultatDelegue(avant, affiche));
+            const apres: Manager | null = get().manager;
+            // Refusé par le store (clé qui ne correspond plus à rien) : on ne tourne pas en rond, la saison se clôt sans lui.
+            if (!apres?.club || !apres.resultats[affiche.cle]) break;
+            affiche = afficheSure(apres).affiche;
+          }
+          // Le conseil a pu trancher sur ce dernier résultat : sans banc, la saison ne se clôt pas ici.
+          const apresRetard = get().manager;
+          if (!apresRetard?.club || (apresRetard.contrat?.saisons ?? 0) <= 0) return;
+          get().saisonManager();
+          return;
+        }
         if (m.semaine < SEMAINES_PAR_SAISON) {
           const suivante = m.semaine + 1;
           const groupe = effectifDuClub(m.club, m.saison);
@@ -4718,41 +4797,24 @@ export const useGame = create<GameState>()(
         const depart = get().manager?.semaine ?? 1;
         let semaines = 0;
         if (!get().manager?.club) return { semaines, arret: 'sansBanc' as const };
-        if ((get().manager?.contrat?.saisons ?? 0) <= 0) return { semaines, arret: 'contrat' as const };
+        if ((get().manager?.contrat?.saisons ?? 0) <= 0) { get().assurerOffreDuConseil(); return { semaines, arret: 'contrat' as const }; }
         if (cible <= depart) return { semaines, arret: 'arrive' as const };
 
         let arret: 'arrive' | 'decision' | 'match' | 'saison' | 'sansBanc' | 'approche' | 'contrat' = 'arrive';
         while ((get().manager?.semaine ?? 1) < cible) {
           const avant = get().manager;
           if (!avant?.club) { arret = 'sansBanc'; break; }
-          if ((avant.contrat?.saisons ?? 0) <= 0) { arret = 'contrat'; break; }
+          if ((avant.contrat?.saisons ?? 0) <= 0) { get().assurerOffreDuConseil(); arret = 'contrat'; break; }
           // ⚠️ ON S'ARRÊTE À CE QUI DEMANDE L'ENTRAÎNEUR, exactement comme la
           // carrière joueur s'arrête sur une scène du MJ. Enjamber une décision
           // du board ou un match à coacher, c'est refaire l'ancien mode
           // « saison rapide » qui a été supprimé pour cette raison précise.
           if (avant.decision) { arret = 'decision'; break; }
-          const affiche = afficheDuClub(avant);
-          if (affiche && !avant.resultats[affiche.cle]) {
+          const affiche = afficheSure(avant).affiche;
+          // À la date de clôture, un match encore dû est en retard : `semaineManager` le règle et clôt la saison.
+          if (affiche && !avant.resultats[affiche.cle] && !estSemaineDeCloture(avant.semaine)) {
             if (!deleguerMatchs) { arret = 'match'; break; }
-            const { domicile, exterieur } = affiche.match;
-            const groupe = effectifDuClub(avant.club, avant.saison);
-            const absents = new Set(indisponiblesCarriereAvancee(avant.avancee, avant.semaine));
-            const moyenne = (liste: typeof groupe) => {
-              const meilleurs = [...liste].sort((a,b) => b.note - a.note).slice(0,23);
-              return meilleurs.reduce((n,j) => n + j.note,0) / Math.max(1, meilleurs.length);
-            };
-            const bonus = moyenne(groupe.filter((j) => !absents.has(j.id))) - moyenne(groupe);
-            const match = jouerRencontre(domicile, exterieur, avant.saison, affiche.cle, { club: avant.club, bonus });
-            const chezMoi = domicile === avant.club;
-            get().enregistrerResultatManager({
-              cle: affiche.cle, club: avant.club, saison: avant.saison, semaine: avant.semaine,
-              journee: affiche.journee, domicile: chezMoi,
-              adversaire: chezMoi ? exterieur : domicile,
-              scorePour: chezMoi ? match.scoreD : match.scoreE,
-              scoreContre: chezMoi ? match.scoreE : match.scoreD,
-              essaisPour: chezMoi ? match.essaisD : match.essaisE,
-              essaisContre: chezMoi ? match.essaisE : match.essaisD,
-            });
+            get().enregistrerResultatManager(resultatDelegue(avant, affiche));
             // Certaines semaines contiennent deux journées : toutes passent
             // par l'enregistrement normal avant d'avancer la date.
             if (!get().manager?.resultats[affiche.cle]) { arret = 'match'; break; }
@@ -4827,7 +4889,7 @@ export const useGame = create<GameState>()(
         if (!m?.club || resultat.club !== m.club || m.resultats[resultat.cle]) return;
         if (m.club && (m.contrat?.saisons ?? 0) <= 0) return;
         if (resultat.cle.startsWith('tournoi#') || resultat.cle.startsWith('finale#') || resultat.cle.startsWith('phase#') || resultat.cle.startsWith('acces#')) {
-          const affiche = afficheDuClub(m);
+          const affiche = afficheSure(m).affiche;
           if (!affiche || affiche.cle !== resultat.cle || resultat.saison !== m.saison || resultat.semaine !== m.semaine
             || ![affiche.match.domicile, affiche.match.exterieur].includes(resultat.adversaire)) return;
         }
@@ -4852,7 +4914,9 @@ export const useGame = create<GameState>()(
         const essaisD = resultat.domicile ? resultat.essaisPour : resultat.essaisContre;
         const essaisE = resultat.domicile ? resultat.essaisContre : resultat.essaisPour;
         enregistrerResultatJoue(resultat.cle, { domicile, exterieur, scoreD, scoreE, essaisD, essaisE, ...issueDuResultatManager(resultat) });
-        get().simulerAutresPhasesFinales(m.saison, m.semaine, m.club);
+        // Le score du club est inscrit : une lecture du tableau qui lève ne doit pas laisser le match « joué » dans le
+        // registre et « à jouer » dans la fiche de l'entraîneur.
+        try { get().simulerAutresPhasesFinales(m.saison, m.semaine, m.club); } catch { /* voir `diagnostiquerCloture` */ }
         oublierResultats();
         const victoire = resultat.vainqueur ? resultat.vainqueur === 'pour' : resultat.scorePour > resultat.scoreContre;
         const nul = !resultat.vainqueur && resultat.scorePour === resultat.scoreContre;
@@ -5569,13 +5633,57 @@ export const useGame = create<GameState>()(
        * stratégie serait de prendre le meilleur club accessible et d’y rester.
        */
       saisonManager: () => {
-        const m = get().manager;
-        if (!m || !m.club) return;
-        if (m.club && (m.contrat?.saisons ?? 0) <= 0) return;
-        const rang = rangFinal(m.division, m.saison, m.club);
-        const py = resoudreSaisonClub(m.division, m.saison, m.club);
-        const monte = py.mouvements.some((x) => x.club === m.club && x.sens === 'montee');
-        const descendu = py.mouvements.some((x) => x.club === m.club && x.sens === 'descente');
+        const depart = get().manager;
+        if (!depart || !depart.club) return;
+        // Contrat à zéro : la réponse au conseil est la seule suite (voir `assurerOffreDuConseil`).
+        if ((depart.contrat?.saisons ?? 0) <= 0) {
+          get().assurerOffreDuConseil();
+          const verrous = diagnostiquerCloture(get().manager ?? depart);
+          set({ clotureRetenue: { saison: depart.saison, verrous } });
+          tracerCloture({ saison: depart.saison, club: depart.club, issue: 'retenue', texte: texteDiagnostic(verrous) });
+          return;
+        }
+
+        // ═══ LA CLÔTURE NE PEUT PLUS RESTER EN PLAN (Correctif 39) ═════════════
+        // Signalé en jeu : « on arrive à la fin de saison mais le bouton permettant de conclure reste bloqué ».
+        //
+        // ⚠️ UNE SEULE EXCEPTION, N'IMPORTE OÙ CI-DESSOUS, ET LE CLIC NE FAISAIT RIEN — pour toujours. Reproduit : une
+        // partie créée avant l'ajout d'un club au jeu n'a pas sa fiche dans `avancee.clubsMonde`, l'évolution du monde
+        // lisait `undefined.entraineurId`, et la saison ne se closait plus jamais. La clôture enchaîne une trentaine de
+        // calculs (classement, pyramide, coupes, académie, recruteurs, budgets, monde, archives) : aucun ne vaut une
+        // sauvegarde perdue.
+        //
+        // Chaque étape passe donc par `tenter` : si elle lève, elle rend son REPLI (la valeur d'avant, ou « rien ne
+        // bouge »), laisse un incident dans le bilan, et la saison se clôt. ⚠️ CE N'EST PAS UN CACHE-MISÈRE : l'incident
+        // est écrit dans le journal de l'entraîneur, gardé dans `derniereCloture` et tracé pour le Labo. Un vrai problème
+        // de structure se lit ; il ne retient plus la partie.
+        const incidents: IncidentCloture[] = [];
+        const tenter = <T,>(etape: string, calcul: () => T, repli: () => T): T => {
+          try { return calcul(); } catch (erreur) {
+            incidents.push({ etape, message: erreur instanceof Error ? erreur.message : String(erreur) });
+            return repli();
+          }
+        };
+
+        try {
+        // ═══ CE QUI SE RÈGLE TOUT SEUL ════════════════════════════════════════
+        // Le diagnostic est lu AVANT toute résolution : c'est lui qui dira, dans le bilan, ce qui a été réglé d'office.
+        const verrousAvant = tenter('diagnostic', () => diagnostiquerCloture(depart), () => [] as VerrouCloture[]);
+        // Une prolongation que le joueur a déjà acceptée s'applique : il ne manquait que la signature. Le store la
+        // refuse si la masse salariale ou la prime ne passent pas — l'offre expire alors comme les autres.
+        const signees: string[] = [];
+        for (const n of prolongationsAcceptees(depart)) {
+          tenter(`prolongation de ${n.joueur.nom}`, () => get().signerJoueurManager(n.id), () => undefined);
+          if (get().manager?.negociations.find((x) => x.id === n.id)?.etat === 'signee') signees.push(n.joueur.nom);
+        }
+        const m = get().manager ?? depart;
+
+        const rang = tenter('classement', () => rangFinal(m.division, m.saison, m.club), () => m.objectif);
+        const py = tenter('montées et descentes', () => resoudreSaisonClub(m.division, m.saison, m.club), () => null);
+        for (const i of py?.incidents ?? []) incidents.push({ etape: 'montées et descentes', message: i });
+        const mouvements = py?.mouvements ?? [];
+        const monte = mouvements.some((x) => x.club === m.club && x.sens === 'montee');
+        const descendu = mouvements.some((x) => x.club === m.club && x.sens === 'descente');
 
         // ═══ LA PYRAMIDE BOUGE AUSSI POUR L'ENTRAÎNEUR ═════════════════════
         // ⚠️ ELLE NE BOUGEAIT PAS DU TOUT, ET C'ÉTAIT LE BUG SIGNALÉ (« gros
@@ -5594,7 +5702,6 @@ export const useGame = create<GameState>()(
         // depuis longtemps — « sans ça, la division du club promu ne changeait
         // nulle part et le championnat de la saison suivante était identique au
         // précédent ». Le mode manager ne l'avait simplement jamais reçue.
-        const mouvements = py.mouvements;
         const majMouvements = { ...get().mouvementsClubs };
         const majArrivees = { ...get().arriveesClubs };
         for (const x of mouvements) {
@@ -5607,15 +5714,16 @@ export const useGame = create<GameState>()(
         const compSuivante = COMPETITIONS.find((c) => c.id === divisionSuivante);
         // Le manager lit les MÊMES finales que la carrière joueur : le rang de
         // poule qualifie, mais seul le vainqueur du tableau soulève le titre.
-        const phase = py.phase;
-        const championNational = tournoiDeFinDAnnee(m.division, m.saison, m.division, m.club)?.champion ?? phase.champion;
+        const championNational = tenter('titre',
+          () => tournoiDeFinDAnnee(m.division, m.saison, nomDivision(m.division), m.club)?.champion ?? py?.phase.champion ?? null,
+          () => null);
         const tropheeNational = championNational === m.club
           ? TROPHEE_PAR_DIVISION[m.division]
           : undefined;
         // Les coupes sont elles aussi résolues par leur vrai tableau. Le mode
         // manager ne repart donc plus sans trophée après une finale européenne
         // remportée dans le monde simulé.
-        const tropheesCoupes = ['championsCup', 'challengeCup', 'premCup'].flatMap((coupeId) => {
+        const tropheesCoupes = tenter('coupes', () => ['championsCup', 'challengeCup', 'premCup'].flatMap((coupeId) => {
           const tropheeCoupe = TROPHEE_PAR_COUPE[coupeId];
           if (!tropheeCoupe) return [];
           const etat = coupeEnDirect(
@@ -5623,7 +5731,7 @@ export const useGame = create<GameState>()(
             SEMAINES.filter((s) => s.type === 'coupe').length,
           );
           return etat?.vainqueur === m.club ? [tropheeCoupe] : [];
-        });
+        }), () => [] as string[]);
         const titres = [...new Set([...(tropheeNational ? [tropheeNational] : []), ...tropheesCoupes])];
         const gainTrophees = titres.reduce((total, id) => total + (TROPHEES[id]?.ovas ?? 0), 0);
 
@@ -5631,18 +5739,29 @@ export const useGame = create<GameState>()(
           titres: titres.length, montee: monte, descente: descendu,
         });
         const verdictBoard = appliquerVerdict(m, v);
-        const groupe = effectifDuClub(m.club, m.saison);
-        const bilanAvance = finSaisonCarriereAvancee(m, groupe, rang);
-        const finsDeContrat = groupe.filter(j => (bilanAvance.etat.contratsJoueurs[j.id]?.fin ?? Infinity) <= m.saison + 1);
+        const groupe = tenter('effectif', () => effectifDuClub(m.club, m.saison), () => [] as Coequipier[]);
+        const bilanAvance = tenter('carrière', () => finSaisonCarriereAvancee(m, groupe, rang), () => ({
+          etat: { ...(m.avancee ?? creerEtatCarriereAvancee(m, groupe)), convocations: [] },
+          confiance: 0, resume: '', revenusMarketing: 0, incidents: [] as IncidentCloture[],
+        }));
+        incidents.push(...bilanAvance.incidents);
+
+        // ═══ LES CONTRATS OUBLIÉS SE RÈGLENT SEULS ═════════════════════════
+        // Demande : « un contrat oublié ne doit surtout pas empêcher définitivement de terminer une saison ». Sans
+        // prolongation signée, le joueur va au bout de son contrat et quitte le club, libre. Le groupe est recomplété
+        // (`completerEffectif`) : la sanction est sportive — un joueur de complément à sa place —, jamais un blocage.
+        const finsDeContrat = contratsExpirants(m, groupe, bilanAvance.etat);
         const transfertsApresExpiration: TransfertAnnonce[] = [...get().transfertsSociaux, ...finsDeContrat.map(j => ({
           joueurId: j.id, sourcePlayerId: j.sourcePlayerId, nom: j.nom, de: m.club, vers: 'Sans club',
           saison: m.saison + 1, poste: POSTE_PAR_ID[j.poste]?.famille, age: j.age, note: j.note, nation: j.nation,
         }))];
         setTransfertsSociaux(transfertsApresExpiration);
         // Les reports se mesurent dans l'ancienne division, avant les mouvements.
-        const reports = reportsBudgets(m);
+        const reports = tenter('reports', () => reportsBudgets(m), () => ({ transferts: 0, salarial: 0, structure: Math.max(0, m.budgetStructure) }));
         const prestige = verdictBoard.prestige;
-        const conseil = bilanContrat(m, groupe, rang);
+        const conseil = tenter('conseil', () => bilanContrat(m, groupe, rang), () => ({
+          club: m.club, score: 60, detail: { sportif: 60, objectifs: 60, finances: 85, groupe: 65 }, decision: 'attente' as const,
+        }) as ReturnType<typeof bilanContrat>);
         const confiance = borne(m.confiance * .35 + conseil.score * .65);
 
         // On fige les titres et l'histoire AVANT de changer les poules.
@@ -5666,7 +5785,7 @@ export const useGame = create<GameState>()(
         const nonRenouvele = conseil.decision === 'nonRenouvele';
         const licencie = nonRenouvele;
         const saisonsContrat = Math.max(0, (m.contrat?.saisons ?? 1) - 1);
-        const budgets = budgetsDuClub(m.club, m.saison + 1);
+        const budgets = tenter('budgets', () => budgetsDuClub(m.club, m.saison + 1), () => null);
 
         // ═══ LES INSTALLATIONS RENDENT LEUR SAISON ═════════════════════════
         // ⚠️ TOUT SE PASSE ICI, ET AVANT LA CONSTRUCTION DE `suivant`. La
@@ -5679,22 +5798,23 @@ export const useGame = create<GameState>()(
         // 🎓 L'académie ne fabrique plus magiquement des seniors. Les jeunes
         // repérés, recrutés puis gérés par le manager progressent ici ; leur
         // intégration au groupe professionnel reste une décision explicite.
-        const bilanAcademie = licencie ? {
+        const academieInchangee = () => ({
           academie: m.academie,
           observations: m.observationsJeunes,
           indemnites: 0,
           revenus: [],
           liberes: [],
           progressions: [],
-        } : evoluerAcademieManager(m);
+        }) as ReturnType<typeof evoluerAcademieManager>;
+        const bilanAcademie = licencie ? academieInchangee() : tenter('académie', () => evoluerAcademieManager(m), academieInchangee);
         const jeunesFormes = m.jeunesFormes;
-        const mondeJeunes = m.mondeJeunes ? avancerMondeJeunes(m.mondeJeunes,
+        const mondeJeunes = m.mondeJeunes ? tenter('monde des jeunes', () => avancerMondeJeunes(m.mondeJeunes!,
           licencie ? [] : bilanAcademie.academie.filter(j => !!j.sourcePlayerId).map(j => ({
             id: j.id, saison: m.saison, type: 'developpement' as const,
             note: j.note, potentielReel: j.potentielReel, moral: j.moral,
             tempsDeJeu: j.tempsDeJeu, postesSecondaires: j.polyvalence,
             blesse: j.derniereProgression?.blesse,
-          }))) : undefined;
+          }))), () => m.mondeJeunes) : undefined;
         const cleRevenus = `${m.club}|${m.saison}`;
         const revenusFormation = bilanAcademie.indemnites > 0
           ? {
@@ -5706,7 +5826,7 @@ export const useGame = create<GameState>()(
         // 🏋️ Le programme individuel rend ce qu'il a fait gagner.
         const progres = { ...m.progres };
         const gagnants: string[] = [];
-        if (!licencie && murs.entrainement > 0) {
+        if (!licencie && murs.entrainement > 0) tenter('entraînement', () => {
           const places = PLACES_ENTRAINEMENT[Math.min(murs.entrainement, NIVEAU_INSTALLATION_MAX)];
           for (const nom of m.entrainements.slice(0, places)) {
             const j = groupe.find((x) => x.nom === nom);
@@ -5718,31 +5838,46 @@ export const useGame = create<GameState>()(
             progres[cle] = [...(progres[cle] ?? []), { depuis: m.saison + 1, gain }];
             gagnants.push(`${nom} +${gain.toString().replace('.', ',')}`);
           }
-        }
+        }, () => undefined);
 
         // 🔎 Les recruteurs rendent leur rapport de la saison à venir.
         const rapports = licencie || murs.recrutement <= 0
           ? m.rapports
-          : explorer(m.club, m.saison + 1, murs.recrutement);
+          : tenter('recruteurs', () => explorer(m.club, m.saison + 1, murs.recrutement), () => m.rapports);
 
         // Les bonus négociés avec le club vendeur sont différés, mais réels :
         // ils deviennent dus si la recrue participe à au moins la moitié des
         // rencontres de sa première saison. Ils sortent de l'enveloppe suivante.
         const matchsJouesSaison = Math.max(1, Object.keys(m.resultats).length);
-        const bonusConditionnels = m.recrues.filter((r) => r.club === m.club && r.saison === m.saison && (r.accordClub?.bonus ?? 0) > 0)
+        const bonusConditionnels = tenter('bonus de transfert', () => m.recrues.filter((r) => r.club === m.club && r.saison === m.saison && (r.accordClub?.bonus ?? 0) > 0)
           .reduce((total, r) => {
             const joueur = groupe.find((j) => j.id === r.joueur.id || j.nom === r.joueur.nom);
             const feuilles = joueur ? (m.tempsDeJeu[joueur.id] ?? 0) : 0;
             return total + (feuilles >= matchsJouesSaison / 2 ? (r.accordClub?.bonus ?? 0) : 0);
-          }, 0);
-        const budgetsRenouveles = renouvelerBudgets(
+          }, 0), () => 0);
+        // Sans dotation lisible, les enveloppes restent ce qu'elles sont : mieux qu'une saison qui ne se clôt pas.
+        const budgetsInchanges = () => ({ budgetTransferts: m.budgetTransferts, budgetSalarial: m.budgetSalarial, budgetStructure: m.budgetStructure });
+        const budgetsRenouveles = budgets ? tenter('budgets', () => renouvelerBudgets(
           m, budgets, bilanAcademie.indemnites, bilanAvance.revenusMarketing, reports,
-        );
+        ), budgetsInchanges) : budgetsInchanges();
         budgetsRenouveles.budgetTransferts = Math.max(0, budgetsRenouveles.budgetTransferts - bonusConditionnels);
 
         // ⚠️ ON DÉVERSE AVANT DE LIRE L'EFFECTIF SUIVANT, pas après.
         setApportsDuCentre(jeunesFormes, progres);
-        installerEffectifsJeunes({ ...m, mondeJeunes, saison: m.saison + 1 });
+        tenter('effectifs jeunes', () => installerEffectifsJeunes({ ...m, mondeJeunes, saison: m.saison + 1 }), () => undefined);
+
+        // ═══ LE BILAN DE CLÔTURE : ce qui a été réglé d'office ══════════════
+        const resolutions: VerrouCloture[] = [
+          ...(signees.length ? [{ code: 'prolongationsAcceptees' as const, gravite: 'auto' as const, nombre: signees.length, details: signees }] : []),
+          ...(finsDeContrat.length ? [{ code: 'contratsJoueurs' as const, gravite: 'auto' as const, nombre: finsDeContrat.length, details: finsDeContrat.map((j) => j.nom) }] : []),
+          ...verrousAvant.filter((x) => x.gravite === 'auto' && x.code !== 'contratsJoueurs' && x.code !== 'prolongationsAcceptees'),
+        ];
+        const derniereCloture: RapportCloture = {
+          saison: m.saison, club: m.club,
+          // Les noms suffisent au bilan : on ne garde pas la liste entière dans la sauvegarde.
+          resolutions: resolutions.map((r) => ({ ...r, details: r.details.slice(0, 12) })),
+          incidents: incidents.map((i) => ({ etape: i.etape, message: i.message.slice(0, 240) })),
+        };
 
         const suivant: Manager = {
           ...m,
@@ -5787,11 +5922,11 @@ export const useGame = create<GameState>()(
           // Nationale 2 : `objectifDuBoard` classe l'effectif dans SA poule,
           // et la poule vient de changer.
           objectif: licencie ? 0
-            : objectifDuBoard(m.club, compSuivante ?? competitionDuClub(m.club), m.saison + 1),
+            : tenter('objectif', () => objectifDuBoard(m.club, compSuivante ?? competitionDuClub(m.club), m.saison + 1), () => m.objectif),
           decision: null,
           composition: licencie
             ? m.composition
-            : reconcilerCompositionManager(effectifDuClub(m.club, m.saison + 1), m.composition, new Set(indisponiblesCarriereAvancee(m.avancee, m.semaine))),
+            : tenter('composition', () => reconcilerCompositionManager(effectifDuClub(m.club, m.saison + 1), m.composition, new Set(indisponiblesCarriereAvancee(m.avancee, m.semaine))), () => m.composition),
           negociations: m.negociations.map((n) => (
             n.etat === 'ouverte' || n.etat === 'accord' ? { ...n, etat: 'rompue' as const } : n
           )),
@@ -5805,12 +5940,19 @@ export const useGame = create<GameState>()(
           avancee: bilanAvance.etat,
           conseil,
           departsCoach: { ...m.departsCoach, ...(nonRenouvele ? { [m.club]: m.saison + 1 } : {}) },
+          derniereCloture,
         };
-        suivant.academie = synchroniserAcademieReelle(suivant);
+        suivant.academie = tenter('académie réelle', () => synchroniserAcademieReelle(suivant), () => suivant.academie);
         if (conseil.offre && conseil.score >= 75) suivant.objectif = Math.max(1, suivant.objectif - 1);
-        const joursInterSaison = Math.max(0, Math.round((dateMedicale(suivant.saison, 1).getTime() - dateMedicale(m.saison, m.semaine).getTime()) / 86400000));
-        suivant.avancee = { ...bilanAvance.etat, medical: bilanAvance.etat.medical.map(d => evoluerSoin(d, niveauMedical(m), joursInterSaison)), objectifs: objectifsDeSaison(suivant,
-          suivant.club ? effectifDuClub(suivant.club, suivant.saison) : []) };
+        suivant.avancee = tenter('santé et objectifs', () => {
+          const joursInterSaison = Math.max(0, Math.round((dateMedicale(suivant.saison, 1).getTime() - dateMedicale(m.saison, m.semaine).getTime()) / 86400000));
+          return { ...bilanAvance.etat, medical: bilanAvance.etat.medical.map(d => evoluerSoin(d, niveauMedical(m), joursInterSaison)), objectifs: objectifsDeSaison(suivant,
+            suivant.club ? effectifDuClub(suivant.club, suivant.saison) : []) };
+        }, () => bilanAvance.etat);
+        // ⚠️ UN CONTRAT QUI TOMBE À ZÉRO A TOUJOURS SON OFFRE. Si le bilan du conseil n'a pas pu la produire (étape en
+        // repli), elle est posée ici : sans elle, la saison suivante s'ouvrirait sur un entraîneur sans aucun bouton.
+        const secours = offreDeSecours(suivant);
+        if (secours) suivant.conseil = { ...secours, offre: { ...secours.offre!, salaire: secours.offre!.salaire || m.contrat?.salaire || 0 } };
 
         // ⚠️ CE QUE LES STRUCTURES ONT PRODUIT SE DIT, sinon elles n'existent
         // pas. Une promotion qui apparaît en silence dans l'écran Composition
@@ -5834,6 +5976,15 @@ export const useGame = create<GameState>()(
           ditesLe.push(t('mgr.inst.rapport', { n: String(rapports.length) }));
         }
 
+        // Ce que la clôture a réglé à la place de l'entraîneur : dit une fois, dans le journal.
+        const noms = (liste: string[]) => liste.slice(0, 8).join(', ') + (liste.length > 8 ? '…' : '');
+        const regle: string[] = [];
+        if (signees.length) regle.push(t('cloture.journal.prolongations', { n: signees.length, noms: noms(signees) }));
+        if (finsDeContrat.length) regle.push(t('cloture.journal.contrats', { n: finsDeContrat.length, noms: noms(finsDeContrat.map((j) => j.nom)) }));
+        const autres = resolutions.filter((r) => !['contratsJoueurs', 'prolongationsAcceptees', 'mondeIncomplet'].includes(r.code));
+        if (autres.length) regle.push(t('cloture.journal.autres', { liste: autres.map((r) => t(`cloture.verrou.${r.code}`, { n: r.nombre })).join(' · ') }));
+        if (incidents.length) regle.push(t('cloture.journal.incidents', { n: incidents.length, liste: incidents.map((i) => i.etape).join(', ') }));
+
         // ⚠️ UN ENTRAÎNEUR RACCROCHE, LUI AUSSI — et ça manquait. Le manager
         // vieillissait d'un an par saison sans qu'aucune borne ne l'arrête,
         // alors que le crible du classement refuse une fiche au-delà de
@@ -5852,6 +6003,7 @@ export const useGame = create<GameState>()(
 
         set((st) => ({
           manager: suivant,
+          clotureRetenue: null,
           // ⚠️ LE REGISTRE DE MODULE NE SUFFIT PAS : il vit en mémoire et
           transfertsSociaux: transfertsApresExpiration,
           // disparaît au rechargement. Sans cette ligne, un club promu
@@ -5867,6 +6019,12 @@ export const useGame = create<GameState>()(
             role: 'mj' as const,
             titre: t('mgr.inst.titre'),
             texte: ditesLe.join(' '),
+          }] : []), ...(regle.length ? [{
+            id: idUnique(),
+            saison: m.saison,
+            role: 'systeme' as const,
+            titre: t('cloture.journal.titre'),
+            texte: regle.join(' '),
           }] : []), {
             id: idUnique(),
             saison: m.saison,
@@ -5895,7 +6053,27 @@ export const useGame = create<GameState>()(
             }),
           }] : [])],
         }));
-        get().verifierSucces();
+        tracerCloture({ saison: m.saison, club: m.club, issue: 'close', texte: texteDiagnostic(resolutions, incidents) });
+        if (incidents.length) console.warn(texteDiagnostic(resolutions, incidents));
+        } catch (erreur) {
+          // ═══ LE DERNIER FILET : une erreur que rien n'a rattrapé ═══════════
+          // La fiche n'a pas bougé (`set` n'a pas été appelé), mais trois registres de module ont pu prendre de l'avance :
+          // on les rend à ce que dit la sauvegarde, et on dit exactement ce qui s'est passé.
+          setTransfertsSociaux(get().transfertsSociaux);
+          setMouvementsClubs(get().mouvementsClubs);
+          setArriveesClubs(get().arriveesClubs);
+          oublierResultats();
+          const message = erreur instanceof Error ? erreur.message : String(erreur);
+          const verrous: VerrouCloture[] = [
+            ...tenter('diagnostic', () => diagnostiquerCloture(depart), () => [] as VerrouCloture[]),
+            { code: 'erreur', gravite: 'bloquant', nombre: 1, details: [message] },
+          ];
+          set({ clotureRetenue: { saison: depart.saison, verrous, erreur: message } });
+          tracerCloture({ saison: depart.saison, club: depart.club, issue: 'erreur', texte: texteDiagnostic(verrous, incidents) });
+          console.error(texteDiagnostic(verrous, incidents), erreur);
+          return;
+        }
+        try { get().verifierSucces(); } catch { /* un succès mal lu ne retient pas la saison suivante */ }
       },
 
       quitterBanc: () => {
@@ -7909,6 +8087,8 @@ export const useGame = create<GameState>()(
         // peut pas lire le store sans créer un cycle d'imports).
         definirCleGroqJoueur(etat?.groqKey ?? '');
         etat?.reparerPlayoffs();
+        // Un entraîneur en poste, contrat à zéro et sans offre valide, n'avait plus aucun bouton (Correctif 39).
+        if (etat?.manager && !MONDE_FEMININ) etat.assurerOffreDuConseil();
       },
       partialize: projectionMemoisee((s: GameState) => ({
         achatsOvas: s.achatsOvas,
@@ -8008,6 +8188,13 @@ export const useGame = create<GameState>()(
 // Aperçus et essais dans le navigateur (développement seulement, retiré du build) : de quoi poser une carrière à la
 // semaine voulue depuis un script de test, sans cliquer vingt semaines d'événements (voir `window.__tutoriel`).
 if (import.meta.env.DEV) (globalThis as { __useGame?: unknown }).__useGame = useGame;
+// La liste des verrous de clôture, telle quelle, dans la console (Correctif 39) : `__clotureSaison()`.
+if (import.meta.env.DEV) (globalThis as { __clotureSaison?: unknown }).__clotureSaison = () => {
+  const m = useGame.getState().manager;
+  const texte = m ? texteDiagnostic(diagnostiquerCloture(m), m.derniereCloture?.incidents ?? []) : 'No manager career loaded.';
+  console.info(texte);
+  return texte;
+};
 
 /**
  * ⚠️ ET LE COMPTE SE RÉÉCRIT QUAND IL BOUGE, PAS QUAND LA PARTIE BOUGE.

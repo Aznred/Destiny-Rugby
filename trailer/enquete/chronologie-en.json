@@ -1,0 +1,1111 @@
+{
+ "langue": "en",
+ "ips": 30,
+ "duree": 31.733333333333334,
+ "scenes": [
+  {
+   "scene": 1,
+   "debut": 0,
+   "fin": 6.966666666666667
+  },
+  {
+   "scene": 2,
+   "debut": 6.966666666666667,
+   "fin": 12.333333333333334
+  },
+  {
+   "scene": 3,
+   "debut": 12.333333333333334,
+   "fin": 19.366666666666667
+  },
+  {
+   "scene": 4,
+   "debut": 19.366666666666667,
+   "fin": 25.766666666666666
+  },
+  {
+   "scene": 5,
+   "debut": 25.766666666666666,
+   "fin": 31.733333333333334
+  }
+ ],
+ "plans": [
+  {
+   "nom": "ecrans",
+   "scene": 1,
+   "debut": 0,
+   "fin": 3.6333333333333333
+  },
+  {
+   "nom": "disparition",
+   "scene": 1,
+   "debut": 3.6333333333333333,
+   "fin": 6.966666666666667
+  },
+  {
+   "nom": "suspects",
+   "scene": 2,
+   "debut": 6.966666666666667,
+   "fin": 9.766666666666667
+  },
+  {
+   "nom": "tableau",
+   "scene": 2,
+   "debut": 9.766666666666667,
+   "fin": 12.333333333333334
+  },
+  {
+   "nom": "indices",
+   "scene": 3,
+   "debut": 12.333333333333334,
+   "fin": 15.433333333333334
+  },
+  {
+   "nom": "craie",
+   "scene": 3,
+   "debut": 15.433333333333334,
+   "fin": 19.366666666666667
+  }
+ ],
+ "voix": [
+  {
+   "scene": 1,
+   "source": [
+    0,
+    6.98
+   ],
+   "a": 0.13999999999999999,
+   "debut": 0.3,
+   "fin": 6.8
+  },
+  {
+   "scene": 2,
+   "source": [
+    6.98,
+    12.57
+   ],
+   "a": 6.7666666666666675,
+   "debut": 7.086666666666667,
+   "fin": 12.046666666666667
+  },
+  {
+   "scene": 3,
+   "source": [
+    12.57,
+    18.5
+   ],
+   "a": 12.273333333333333,
+   "debut": 12.583333333333334,
+   "fin": 17.863333333333333
+  },
+  {
+   "scene": 4,
+   "source": [
+    18.5,
+    23.16
+   ],
+   "a": 20.176666666666666,
+   "debut": 20.516666666666666,
+   "fin": 24.616666666666667
+  },
+  {
+   "scene": 5,
+   "source": [
+    23.16,
+    27.93
+   ],
+   "a": 26.446666666666665,
+   "debut": 26.666666666666664,
+   "fin": 30.766666666666666
+  }
+ ],
+ "mots": [
+  {
+   "mot": "On",
+   "scene": 1,
+   "debut": 0.3,
+   "fin": 0.36,
+   "fort": false
+  },
+  {
+   "mot": "October",
+   "scene": 1,
+   "debut": 0.42,
+   "fin": 0.8,
+   "fort": false
+  },
+  {
+   "mot": "12th,",
+   "scene": 1,
+   "debut": 0.9,
+   "fin": 1.34,
+   "fort": false
+  },
+  {
+   "mot": "at",
+   "scene": 1,
+   "debut": 1.68,
+   "fin": 1.84,
+   "fort": false
+  },
+  {
+   "mot": "9:04 PM,",
+   "scene": 1,
+   "debut": 2.06,
+   "fin": 3.04,
+   "fort": false
+  },
+  {
+   "mot": "a",
+   "scene": 1,
+   "debut": 3.62,
+   "fin": 3.64,
+   "fort": false
+  },
+  {
+   "mot": "man",
+   "scene": 1,
+   "debut": 3.76,
+   "fin": 3.98,
+   "fort": false
+  },
+  {
+   "mot": "vanished",
+   "scene": 1,
+   "debut": 4.159,
+   "fin": 4.62,
+   "fort": true
+  },
+  {
+   "mot": "in",
+   "scene": 1,
+   "debut": 4.68,
+   "fin": 4.78,
+   "fort": false
+  },
+  {
+   "mot": "front",
+   "scene": 1,
+   "debut": 4.84,
+   "fin": 4.96,
+   "fort": false
+  },
+  {
+   "mot": "of",
+   "scene": 1,
+   "debut": 5,
+   "fin": 5.18,
+   "fort": false
+  },
+  {
+   "mot": "80,000",
+   "scene": 1,
+   "debut": 5.38,
+   "fin": 6.1,
+   "fort": true
+  },
+  {
+   "mot": "witnesses.",
+   "scene": 1,
+   "debut": 6.2,
+   "fin": 6.8,
+   "fort": true
+  },
+  {
+   "mot": "15",
+   "scene": 2,
+   "debut": 7.087,
+   "fin": 7.527,
+   "fort": true
+  },
+  {
+   "mot": "suspects.",
+   "scene": 2,
+   "debut": 7.667,
+   "fin": 8.227,
+   "fort": true
+  },
+  {
+   "mot": "All",
+   "scene": 2,
+   "debut": 8.847,
+   "fin": 8.947,
+   "fort": false
+  },
+  {
+   "mot": "of",
+   "scene": 2,
+   "debut": 9.007,
+   "fin": 9.087,
+   "fort": false
+  },
+  {
+   "mot": "them",
+   "scene": 2,
+   "debut": 9.107,
+   "fin": 9.207,
+   "fort": false
+  },
+  {
+   "mot": "at",
+   "scene": 2,
+   "debut": 9.247,
+   "fin": 9.327,
+   "fort": false
+  },
+  {
+   "mot": "the",
+   "scene": 2,
+   "debut": 9.367,
+   "fin": 9.467,
+   "fort": false
+  },
+  {
+   "mot": "scene.",
+   "scene": 2,
+   "debut": 9.547,
+   "fin": 9.847,
+   "fort": false
+  },
+  {
+   "mot": "Not",
+   "scene": 2,
+   "debut": 10.527,
+   "fin": 10.667,
+   "fort": true
+  },
+  {
+   "mot": "one",
+   "scene": 2,
+   "debut": 10.847,
+   "fin": 10.967,
+   "fort": true
+  },
+  {
+   "mot": "of",
+   "scene": 2,
+   "debut": 11.007,
+   "fin": 11.107,
+   "fort": false
+  },
+  {
+   "mot": "them",
+   "scene": 2,
+   "debut": 11.147,
+   "fin": 11.347,
+   "fort": false
+  },
+  {
+   "mot": "could",
+   "scene": 2,
+   "debut": 11.387,
+   "fin": 11.527,
+   "fort": false
+  },
+  {
+   "mot": "stop",
+   "scene": 2,
+   "debut": 11.627,
+   "fin": 11.867,
+   "fort": true
+  },
+  {
+   "mot": "him.",
+   "scene": 2,
+   "debut": 11.887,
+   "fin": 12.047,
+   "fort": false
+  },
+  {
+   "mot": "Investigators",
+   "scene": 3,
+   "debut": 12.583,
+   "fin": 13.323,
+   "fort": false
+  },
+  {
+   "mot": "recovered",
+   "scene": 3,
+   "debut": 13.363,
+   "fin": 13.763,
+   "fort": false
+  },
+  {
+   "mot": "a",
+   "scene": 3,
+   "debut": 13.803,
+   "fin": 13.883,
+   "fort": false
+  },
+  {
+   "mot": "single",
+   "scene": 3,
+   "debut": 14.003,
+   "fin": 14.303,
+   "fort": true
+  },
+  {
+   "mot": "clue:",
+   "scene": 3,
+   "debut": 14.443,
+   "fin": 14.803,
+   "fort": true
+  },
+  {
+   "mot": "he",
+   "scene": 3,
+   "debut": 15.463,
+   "fin": 15.543,
+   "fort": false
+  },
+  {
+   "mot": "had",
+   "scene": 3,
+   "debut": 15.583,
+   "fin": 15.743,
+   "fort": false
+  },
+  {
+   "mot": "sold",
+   "scene": 3,
+   "debut": 15.823,
+   "fin": 16.063,
+   "fort": false
+  },
+  {
+   "mot": "them",
+   "scene": 3,
+   "debut": 16.082,
+   "fin": 16.243,
+   "fort": false
+  },
+  {
+   "mot": "something...",
+   "scene": 3,
+   "debut": 16.303,
+   "fin": 16.683,
+   "fort": false
+  },
+  {
+   "mot": "a",
+   "scene": 3,
+   "debut": 17.323,
+   "fin": 17.343,
+   "fort": false
+  },
+  {
+   "mot": "dummy.",
+   "scene": 3,
+   "debut": 17.483,
+   "fin": 17.863,
+   "fort": true
+  },
+  {
+   "mot": "Wait...",
+   "scene": 4,
+   "debut": 20.517,
+   "fin": 20.757,
+   "fort": false
+  },
+  {
+   "mot": "he",
+   "scene": 4,
+   "debut": 21.217,
+   "fin": 21.357,
+   "fort": false
+  },
+  {
+   "mot": "sold",
+   "scene": 4,
+   "debut": 21.437,
+   "fin": 21.617,
+   "fort": false
+  },
+  {
+   "mot": "them",
+   "scene": 4,
+   "debut": 21.657,
+   "fin": 21.737,
+   "fort": false
+  },
+  {
+   "mot": "a",
+   "scene": 4,
+   "debut": 21.797,
+   "fin": 21.837,
+   "fort": false
+  },
+  {
+   "mot": "dummy?!",
+   "scene": 4,
+   "debut": 22.057,
+   "fin": 22.377,
+   "fort": true
+  },
+  {
+   "mot": "That's",
+   "scene": 4,
+   "debut": 22.917,
+   "fin": 23.237,
+   "fort": false
+  },
+  {
+   "mot": "just",
+   "scene": 4,
+   "debut": 23.317,
+   "fin": 23.597,
+   "fort": false
+  },
+  {
+   "mot": "Cheslin",
+   "scene": 4,
+   "debut": 23.657,
+   "fin": 24.017,
+   "fort": true
+  },
+  {
+   "mot": "Kolbe!",
+   "scene": 4,
+   "debut": 24.137,
+   "fin": 24.617,
+   "fort": true
+  },
+  {
+   "mot": "Destiny",
+   "scene": 5,
+   "debut": 26.667,
+   "fin": 27.067,
+   "fort": true
+  },
+  {
+   "mot": "Rugby.",
+   "scene": 5,
+   "debut": 27.167,
+   "fin": 27.547,
+   "fort": true
+  },
+  {
+   "mot": "Play",
+   "scene": 5,
+   "debut": 27.867,
+   "fin": 28.027,
+   "fort": false
+  },
+  {
+   "mot": "free",
+   "scene": 5,
+   "debut": 28.167,
+   "fin": 28.487,
+   "fort": true
+  },
+  {
+   "mot": "at",
+   "scene": 5,
+   "debut": 28.547,
+   "fin": 28.707,
+   "fort": false
+  },
+  {
+   "mot": "destiny-rugby.fr.",
+   "scene": 5,
+   "debut": 28.747,
+   "fin": 30.767,
+   "fort": true
+  }
+ ],
+ "sousTitres": [
+  {
+   "debut": 0.24,
+   "fin": 1.66,
+   "scene": 1,
+   "mots": [
+    {
+     "mot": "On",
+     "scene": 1,
+     "debut": 0.3,
+     "fin": 0.36,
+     "fort": false
+    },
+    {
+     "mot": "October",
+     "scene": 1,
+     "debut": 0.42,
+     "fin": 0.8,
+     "fort": false
+    },
+    {
+     "mot": "12th,",
+     "scene": 1,
+     "debut": 0.9,
+     "fin": 1.34,
+     "fort": false
+    }
+   ]
+  },
+  {
+   "debut": 1.62,
+   "fin": 3.46,
+   "scene": 1,
+   "mots": [
+    {
+     "mot": "at",
+     "scene": 1,
+     "debut": 1.68,
+     "fin": 1.84,
+     "fort": false
+    },
+    {
+     "mot": "9:04 PM,",
+     "scene": 1,
+     "debut": 2.06,
+     "fin": 3.04,
+     "fort": false
+    }
+   ]
+  },
+  {
+   "debut": 3.56,
+   "fin": 4.66,
+   "scene": 1,
+   "mots": [
+    {
+     "mot": "a",
+     "scene": 1,
+     "debut": 3.62,
+     "fin": 3.64,
+     "fort": false
+    },
+    {
+     "mot": "man",
+     "scene": 1,
+     "debut": 3.76,
+     "fin": 3.98,
+     "fort": false
+    },
+    {
+     "mot": "vanished",
+     "scene": 1,
+     "debut": 4.159,
+     "fin": 4.62,
+     "fort": true
+    }
+   ]
+  },
+  {
+   "debut": 4.62,
+   "fin": 5.36,
+   "scene": 1,
+   "mots": [
+    {
+     "mot": "in",
+     "scene": 1,
+     "debut": 4.68,
+     "fin": 4.78,
+     "fort": false
+    },
+    {
+     "mot": "front",
+     "scene": 1,
+     "debut": 4.84,
+     "fin": 4.96,
+     "fort": false
+    },
+    {
+     "mot": "of",
+     "scene": 1,
+     "debut": 5,
+     "fin": 5.18,
+     "fort": false
+    }
+   ]
+  },
+  {
+   "debut": 5.32,
+   "fin": 7.067,
+   "scene": 1,
+   "mots": [
+    {
+     "mot": "80,000",
+     "scene": 1,
+     "debut": 5.38,
+     "fin": 6.1,
+     "fort": true
+    },
+    {
+     "mot": "witnesses.",
+     "scene": 1,
+     "debut": 6.2,
+     "fin": 6.8,
+     "fort": true
+    }
+   ]
+  },
+  {
+   "debut": 7.027,
+   "fin": 8.647,
+   "scene": 2,
+   "mots": [
+    {
+     "mot": "15",
+     "scene": 2,
+     "debut": 7.087,
+     "fin": 7.527,
+     "fort": true
+    },
+    {
+     "mot": "suspects.",
+     "scene": 2,
+     "debut": 7.667,
+     "fin": 8.227,
+     "fort": true
+    }
+   ]
+  },
+  {
+   "debut": 8.787,
+   "fin": 9.227,
+   "scene": 2,
+   "mots": [
+    {
+     "mot": "All",
+     "scene": 2,
+     "debut": 8.847,
+     "fin": 8.947,
+     "fort": false
+    },
+    {
+     "mot": "of",
+     "scene": 2,
+     "debut": 9.007,
+     "fin": 9.087,
+     "fort": false
+    },
+    {
+     "mot": "them",
+     "scene": 2,
+     "debut": 9.107,
+     "fin": 9.207,
+     "fort": false
+    }
+   ]
+  },
+  {
+   "debut": 9.187,
+   "fin": 10.267,
+   "scene": 2,
+   "mots": [
+    {
+     "mot": "at",
+     "scene": 2,
+     "debut": 9.247,
+     "fin": 9.327,
+     "fort": false
+    },
+    {
+     "mot": "the",
+     "scene": 2,
+     "debut": 9.367,
+     "fin": 9.467,
+     "fort": false
+    },
+    {
+     "mot": "scene.",
+     "scene": 2,
+     "debut": 9.547,
+     "fin": 9.847,
+     "fort": false
+    }
+   ]
+  },
+  {
+   "debut": 10.467,
+   "fin": 11.127,
+   "scene": 2,
+   "mots": [
+    {
+     "mot": "Not",
+     "scene": 2,
+     "debut": 10.527,
+     "fin": 10.667,
+     "fort": true
+    },
+    {
+     "mot": "one",
+     "scene": 2,
+     "debut": 10.847,
+     "fin": 10.967,
+     "fort": true
+    },
+    {
+     "mot": "of",
+     "scene": 2,
+     "debut": 11.007,
+     "fin": 11.107,
+     "fort": false
+    }
+   ]
+  },
+  {
+   "debut": 11.087,
+   "fin": 11.867,
+   "scene": 2,
+   "mots": [
+    {
+     "mot": "them",
+     "scene": 2,
+     "debut": 11.147,
+     "fin": 11.347,
+     "fort": false
+    },
+    {
+     "mot": "could",
+     "scene": 2,
+     "debut": 11.387,
+     "fin": 11.527,
+     "fort": false
+    },
+    {
+     "mot": "stop",
+     "scene": 2,
+     "debut": 11.627,
+     "fin": 11.867,
+     "fort": true
+    }
+   ]
+  },
+  {
+   "debut": 11.827,
+   "fin": 12.467,
+   "scene": 2,
+   "mots": [
+    {
+     "mot": "him.",
+     "scene": 2,
+     "debut": 11.887,
+     "fin": 12.047,
+     "fort": false
+    }
+   ]
+  },
+  {
+   "debut": 12.523,
+   "fin": 13.343,
+   "scene": 3,
+   "mots": [
+    {
+     "mot": "Investigators",
+     "scene": 3,
+     "debut": 12.583,
+     "fin": 13.323,
+     "fort": false
+    }
+   ]
+  },
+  {
+   "debut": 13.303,
+   "fin": 14.423,
+   "scene": 3,
+   "mots": [
+    {
+     "mot": "recovered",
+     "scene": 3,
+     "debut": 13.363,
+     "fin": 13.763,
+     "fort": false
+    },
+    {
+     "mot": "a",
+     "scene": 3,
+     "debut": 13.803,
+     "fin": 13.883,
+     "fort": false
+    },
+    {
+     "mot": "single",
+     "scene": 3,
+     "debut": 14.003,
+     "fin": 14.303,
+     "fort": true
+    }
+   ]
+  },
+  {
+   "debut": 14.383,
+   "fin": 15.223,
+   "scene": 3,
+   "mots": [
+    {
+     "mot": "clue:",
+     "scene": 3,
+     "debut": 14.443,
+     "fin": 14.803,
+     "fort": true
+    }
+   ]
+  },
+  {
+   "debut": 15.403,
+   "fin": 16.063,
+   "scene": 3,
+   "mots": [
+    {
+     "mot": "he",
+     "scene": 3,
+     "debut": 15.463,
+     "fin": 15.543,
+     "fort": false
+    },
+    {
+     "mot": "had",
+     "scene": 3,
+     "debut": 15.583,
+     "fin": 15.743,
+     "fort": false
+    },
+    {
+     "mot": "sold",
+     "scene": 3,
+     "debut": 15.823,
+     "fin": 16.063,
+     "fort": false
+    }
+   ]
+  },
+  {
+   "debut": 16.022,
+   "fin": 17.103,
+   "scene": 3,
+   "mots": [
+    {
+     "mot": "them",
+     "scene": 3,
+     "debut": 16.082,
+     "fin": 16.243,
+     "fort": false
+    },
+    {
+     "mot": "something...",
+     "scene": 3,
+     "debut": 16.303,
+     "fin": 16.683,
+     "fort": false
+    }
+   ]
+  },
+  {
+   "debut": 17.263,
+   "fin": 18.283,
+   "scene": 3,
+   "mots": [
+    {
+     "mot": "a",
+     "scene": 3,
+     "debut": 17.323,
+     "fin": 17.343,
+     "fort": false
+    },
+    {
+     "mot": "dummy.",
+     "scene": 3,
+     "debut": 17.483,
+     "fin": 17.863,
+     "fort": true
+    }
+   ]
+  },
+  {
+   "debut": 20.457,
+   "fin": 21.177,
+   "scene": 4,
+   "mots": [
+    {
+     "mot": "Wait...",
+     "scene": 4,
+     "debut": 20.517,
+     "fin": 20.757,
+     "fort": false
+    }
+   ]
+  },
+  {
+   "debut": 21.157,
+   "fin": 21.777,
+   "scene": 4,
+   "mots": [
+    {
+     "mot": "he",
+     "scene": 4,
+     "debut": 21.217,
+     "fin": 21.357,
+     "fort": false
+    },
+    {
+     "mot": "sold",
+     "scene": 4,
+     "debut": 21.437,
+     "fin": 21.617,
+     "fort": false
+    },
+    {
+     "mot": "them",
+     "scene": 4,
+     "debut": 21.657,
+     "fin": 21.737,
+     "fort": false
+    }
+   ]
+  },
+  {
+   "debut": 21.737,
+   "fin": 22.797,
+   "scene": 4,
+   "mots": [
+    {
+     "mot": "a",
+     "scene": 4,
+     "debut": 21.797,
+     "fin": 21.837,
+     "fort": false
+    },
+    {
+     "mot": "dummy?!",
+     "scene": 4,
+     "debut": 22.057,
+     "fin": 22.377,
+     "fort": true
+    }
+   ]
+  },
+  {
+   "debut": 22.857,
+   "fin": 24.117,
+   "scene": 4,
+   "mots": [
+    {
+     "mot": "That's",
+     "scene": 4,
+     "debut": 22.917,
+     "fin": 23.237,
+     "fort": false
+    },
+    {
+     "mot": "just",
+     "scene": 4,
+     "debut": 23.317,
+     "fin": 23.597,
+     "fort": false
+    },
+    {
+     "mot": "Cheslin",
+     "scene": 4,
+     "debut": 23.657,
+     "fin": 24.017,
+     "fort": true
+    }
+   ]
+  },
+  {
+   "debut": 24.077,
+   "fin": 25.037,
+   "scene": 4,
+   "mots": [
+    {
+     "mot": "Kolbe!",
+     "scene": 4,
+     "debut": 24.137,
+     "fin": 24.617,
+     "fort": true
+    }
+   ]
+  },
+  {
+   "debut": 26.607,
+   "fin": 27.847,
+   "scene": 5,
+   "mots": [
+    {
+     "mot": "Destiny",
+     "scene": 5,
+     "debut": 26.667,
+     "fin": 27.067,
+     "fort": true
+    },
+    {
+     "mot": "Rugby.",
+     "scene": 5,
+     "debut": 27.167,
+     "fin": 27.547,
+     "fort": true
+    }
+   ]
+  },
+  {
+   "debut": 27.807,
+   "fin": 28.727,
+   "scene": 5,
+   "mots": [
+    {
+     "mot": "Play",
+     "scene": 5,
+     "debut": 27.867,
+     "fin": 28.027,
+     "fort": false
+    },
+    {
+     "mot": "free",
+     "scene": 5,
+     "debut": 28.167,
+     "fin": 28.487,
+     "fort": true
+    },
+    {
+     "mot": "at",
+     "scene": 5,
+     "debut": 28.547,
+     "fin": 28.707,
+     "fort": false
+    }
+   ]
+  },
+  {
+   "debut": 28.687,
+   "fin": 31.187,
+   "scene": 5,
+   "mots": [
+    {
+     "mot": "destiny-rugby.fr.",
+     "scene": 5,
+     "debut": 28.747,
+     "fin": 30.767,
+     "fort": true
+    }
+   ]
+  }
+ ],
+ "jeu": {
+  "pack": [
+   25.766666666666666,
+   26.733333333333334
+  ],
+  "compo": [
+   26.733333333333334,
+   27.566666666666666
+  ],
+  "essai": [
+   19.366666666666667,
+   25.766666666666666
+  ],
+  "titre": [
+   27.566666666666666,
+   31.733333333333334
+  ],
+  "accroche": 27.867,
+  "adresse": 28.747
+ },
+ "accroche": "PLAY FOR FREE",
+ "voixSource": {
+  "id": "en.mp3",
+  "modele": "prise fournie, alignée par transcription (Scribe)",
+  "duree": 27.68
+ }
+}

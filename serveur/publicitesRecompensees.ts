@@ -27,6 +27,53 @@ export function packPourPublicites(pack: PackCarriere): PackCarriere {
   };
 }
 function erreur(message: string): never { const e=new Error(message); e.name='ErreurCarriere'; throw e; }
+
+/** Pourquoi un callback AppLixir a été refusé : c'est ce que le journal du Labo et les journaux du serveur affichent. */
+export type RefusCallback = 'format' | 'signature' | 'session' | 'cle' | 'jeu' | 'expiree' | 'plafond' | 'autre';
+function refuser(raison: RefusCallback, message: string): never {
+  const e = new Error(message) as Error & { refus: RefusCallback }; e.name = 'ErreurCarriere'; e.refus = raison; throw e;
+}
+
+/**
+ * LES PARAMÈTRES D'UN CALLBACK APPLIXIR, quelle que soit la façon dont ils ont été collés à notre adresse.
+ *
+ * Signalé le 12 octobre 2026 : « on ne récupère pas la récompense quand on regarde la vidéo en entier ». Le lecteur
+ * annonce bien `complete`, mais aucun reçu signé n'a jamais été accepté — et rien ne disait s'il en arrivait.
+ *
+ * ⚠️ L'ADRESSE ENREGISTRÉE CHEZ APPLIXIR CONTIENT DÉJÀ UN « ? » (`/api/carriere?applixirCallback=1`). Leur documentation
+ * ne dit pas comment ils y ajoutent leurs paramètres. S'ils écrivent « adresse + ? + paramètres », la requête devient
+ * `?applixirCallback=1?gameApiKey=…&gameId=…` : `applixirCallback` ne vaut plus « 1 » mais « 1?gameApiKey=… », le callback
+ * n'était pas reconnu, et le serveur répondait 401 « Connectez-vous… » — mesuré sur le site public. Aucune récompense ne
+ * pouvait arriver par ce chemin. On relit donc cette forme, et on offre une adresse SANS « ? » (`/api/applixir`, réécrite
+ * par `vercel.json`) où n'importe quel collage reste bien formé.
+ *
+ * Le corps d'un POST (objet JSON ou formulaire) complète la requête : la documentation annonce un GET, on n'en dépend pas.
+ * Rend `null` quand la requête n'est pas un callback.
+ */
+export function parametresCallbackAppLixir(url: URL, corps?: unknown): URLSearchParams | null {
+  const marque = url.searchParams.get('applixirCallback');
+  const adressePropre = /\/applixir\/?$/.test(url.pathname);
+  if (marque === null && !adressePropre) return null;
+  const q = new URLSearchParams(url.searchParams);
+  if (marque !== null && marque !== '1') {
+    const colle = /^1[?&]([^=]+)=?(.*)$/s.exec(marque);
+    if (!colle) return null;
+    q.set('applixirCallback', '1');
+    q.set(colle[1], colle[2]);
+  }
+  const ajouter = (cle: string, valeur: unknown) => {
+    if (!q.has(cle) && (typeof valeur === 'string' || typeof valeur === 'number')) q.set(cle, String(valeur));
+  };
+  if (corps && typeof corps === 'object' && !Array.isArray(corps)) for (const [cle, valeur] of Object.entries(corps)) ajouter(cle, valeur);
+  else if (typeof corps === 'string' && corps.includes('=')) for (const [cle, valeur] of new URLSearchParams(corps)) ajouter(cle, valeur);
+  return q;
+}
+
+/** Ce qu'on a le droit d'écrire d'un callback dans un journal : jamais le secret, jamais la signature. */
+export function resumeCallback(q: URLSearchParams): { parametres: string[]; userId: string; tid: boolean } {
+  const id = q.get('userId') ?? '';
+  return { parametres: [...new Set(q.keys())].filter((k) => k !== 'secretKey').sort(), userId: id ? `${id.slice(0, 8)}…` : '', tid: Boolean(q.get('tid')) };
+}
 function publicSession(s: SessionPub) {
   return { rewardSessionId: s.rewardSessionId, contexte: s.contexte, ligue: s.ligue,
     rewardStatus: s.rewardStatus, pack: s.pack, montant: s.montant };
@@ -99,23 +146,26 @@ export function creerServicePublicites(stockage: StockagePublicites) {
     const secret = process.env.APPLIXIR_CALLBACK_SECRET;
     if (!secret) erreur('Callback AppLixir non configuré.');
     const key = q.get('gameApiKey') ?? '', game = q.get('gameId') ?? '', id = q.get('userId') ?? '', tid = q.get('tid') ?? '';
-    const signature = q.get('signature') ?? '';
-    if (!/^[a-f0-9]{32}$/.test(signature) || !/^[a-f0-9-]{36}$/.test(id) || !game || game.length > 100 || !tid || tid.length > 200) erreur('Signature AppLixir invalide.');
+    // La documentation annonce un MD5 en minuscules ; une casse différente n'est pas une raison de perdre une récompense.
+    const signature = (q.get('signature') ?? '').toLowerCase();
+    if (!/^[a-f0-9]{32}$/.test(signature) || !/^[a-f0-9-]{36}$/i.test(id) || !game || game.length > 100 || !tid || tid.length > 200) refuser('format', 'Signature AppLixir invalide.');
     const attendue = createHash('md5').update(key + game + id + tid + secret).digest();
-    if (!timingSafeEqual(attendue, Buffer.from(signature, 'hex'))) erreur('Signature AppLixir invalide.');
-    const session = await stockage.trouver(id);
-    if (!session || session.config.apiKey !== key || (process.env.APPLIXIR_GAME_ID && game !== process.env.APPLIXIR_GAME_ID)) erreur('Session AppLixir introuvable.');
+    if (!timingSafeEqual(attendue, Buffer.from(signature, 'hex'))) refuser('signature', 'Signature AppLixir invalide.');
+    const session = await stockage.trouver(id.toLowerCase());
+    if (!session) refuser('session', 'Session AppLixir introuvable.');
+    if (session.config.apiKey !== key) refuser('cle', 'Session AppLixir introuvable.');
+    if (process.env.APPLIXIR_GAME_ID && game !== process.env.APPLIXIR_GAME_ID) refuser('jeu', 'Session AppLixir introuvable.');
     if (recompensee(session)) return { ok: true }; // Replay : aucune nouvelle écriture.
-    if (session.expireLe < maintenant) erreur('Session AppLixir expirée.');
+    if (session.expireLe < maintenant) refuser('expiree', 'Session AppLixir expirée.');
     const pack = session.contexte === 'DAILY_PACK' ? choisirPackPub(session.chances, randomInt(0, 0x100000000) / 0x100000000) : undefined;
     return modifier(session.compte, r => {
       const s = r.sessions.find(s => s.rewardSessionId === id); if (!s) return null;
       if (recompensee(s)) return { resultat: { ok: true } };
-      if (s.expireLe < maintenant) erreur('Session AppLixir expirée.');
+      if (s.expireLe < maintenant) refuser('expiree', 'Session AppLixir expirée.');
       // Un reçu signé prime sur une fermeture ou un no-fill local arrivé en premier.
       // Les callbacks retardés restent soumis au plafond journalier, dans le même CAS.
       const limite = s.contexte === 'SHOP_OVAS' ? s.config.ovasDailyLimit : s.config.packsDailyLimit;
-      if (r.sessions.filter(a => a.jour === s.jour && a.contexte === s.contexte && recompensee(a)).length >= limite) erreur('DAILY_LIMIT — Plafond publicitaire atteint.');
+      if (r.sessions.filter(a => a.jour === s.jour && a.contexte === s.contexte && recompensee(a)).length >= limite) refuser('plafond', 'DAILY_LIMIT — Plafond publicitaire atteint.');
       if (s.rewardStatus === 'FAILED') { r.stats.failed--; if (s.failure === 'NO_FILL') r.stats.noFill--; delete s.failure; }
       s.verifieLe = maintenant; s.tid = tid; s.pack = pack; s.rewardStatus = pack ? 'RESERVED' : 'VERIFIED';
       if (pack) {
@@ -128,6 +178,25 @@ export function creerServicePublicites(stockage: StockagePublicites) {
       if (pack) { r.stats.packsEarned++; r.stats.distribution[pack.id] = (r.stats.distribution[pack.id] ?? 0) + 1; }
       return { resultat: { ok: true }, tid };
     });
+  }
+  /**
+   * UN CALLBACK REFUSÉ LAISSE UNE TRACE SUR SA SESSION, quand elle existe : « un reçu est arrivé le …, refusé pour … ».
+   * Sans elle, un reçu mal signé et un reçu jamais envoyé se ressemblaient — c'est ce qui a rendu la panne illisible.
+   * ⚠️ Rien n'est crédité ici, et un identifiant de session inconnu n'écrit rien. Un échec d'écriture est ignoré.
+   */
+  async function noterRefus(q: URLSearchParams, raison: RefusCallback, maintenant: number): Promise<void> {
+    const id = (q.get('userId') ?? '').toLowerCase();
+    if (!/^[a-f0-9-]{36}$/.test(id)) return;
+    try {
+      const session = await stockage.trouver(id);
+      if (!session) return;
+      await modifier(session.compte, r => {
+        const s = r.sessions.find(s => s.rewardSessionId === id); if (!s) return null;
+        s.callback = { le: maintenant, refus: raison, n: (s.callback?.n ?? 0) + 1 };
+        r.stats.callbacksRefuses = (r.stats.callbacksRefuses ?? 0) + 1;
+        return { resultat: true };
+      });
+    } catch { /* le journal est un confort : il ne doit jamais changer la réponse faite au fournisseur */ }
   }
   async function reclamer(compte: string, id: string) {
     const r = await stockage.lire(compte), session = r?.sessions.find(s => s.rewardSessionId === id);
@@ -154,5 +223,5 @@ export function creerServicePublicites(stockage: StockagePublicites) {
       s.rewardStatus = 'CLAIMED'; return { resultat: true };
     });
   }
-  return { vue, commencer, evenement, callback, reclamer, packReserve, marquerOuvert };
+  return { vue, commencer, evenement, callback, noterRefus, reclamer, packReserve, marquerOuvert };
 }

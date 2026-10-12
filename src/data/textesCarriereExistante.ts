@@ -97,6 +97,10 @@ export const TEXTES_CARRIERE_EXISTANTE: Record<string, Traduction> = {
   'zone.qualifie': tr('Qualification', 'Qualified', 'Clasificación', 'Qualificazione', 'Qualifikation', 'Apuramento', '進出'),
   'zone.playoff': tr('Barrages', 'Play-offs', 'Play-offs', 'Play-off', 'Play-offs', 'Play-offs', 'プレーオフ'),
   'zone.promotion': tr('Montée', 'Promotion', 'Ascenso', 'Promozione', 'Aufstieg', 'Subida', '昇格'),
+  // Correctif 39 : la montée se gagne au classement de sa poule, le titre dans le tableau final.
+  'zone.promotionFinales': tr('Montée et phase finale', 'Promotion and finals', 'Ascenso y fase final', 'Promozione e fase finale', 'Aufstieg und Endrunde', 'Subida e fase final', '昇格＋決勝トーナメント'),
+  'zone.promotionPossible': tr('Montée possible (meilleurs suivants)', 'Possible promotion (best runners-up)', 'Ascenso posible (mejores siguientes)', 'Promozione possibile (migliori piazzate)', 'Aufstieg möglich (beste Nächstplatzierte)', 'Subida possível (melhores seguintes)', '昇格の可能性（次点上位）'),
+  'zone.relegationPossible': tr('Relégation possible (moins bien classés de la ligue)', 'Possible relegation (lowest ranked in the league)', 'Descenso posible (peores de la liga)', 'Retrocessione possibile (peggiori della lega)', 'Abstieg möglich (Schlechteste der Liga)', 'Descida possível (piores da liga)', '降格の可能性（リーグ下位）'),
   'zone.challenge': tr('Reversé en Challenge Cup', 'Drops into the Challenge Cup', 'Pasa a la Challenge Cup', 'Passa in Challenge Cup', 'Wechsel in den Challenge Cup', 'Passa para a Challenge Cup', 'チャレンジカップへ'),
   'zone.acces': tr('Match d’accès', 'Relegation play-off', 'Promoción de permanencia', 'Spareggio salvezza', 'Relegationsspiel', 'Jogo de manutenção', '入替戦'),
   'zone.relegation': tr('Relégation', 'Relegation', 'Descenso', 'Retrocessione', 'Abstieg', 'Descida', '降格'),

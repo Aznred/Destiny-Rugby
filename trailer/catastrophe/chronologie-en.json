@@ -1,0 +1,1162 @@
+{
+ "langue": "en",
+ "ips": 30,
+ "duree": 30.566666666666666,
+ "scenes": [
+  {
+   "scene": 1,
+   "debut": 0,
+   "fin": 4.933333333333334
+  },
+  {
+   "scene": 2,
+   "debut": 4.933333333333334,
+   "fin": 12.366666666666667
+  },
+  {
+   "scene": 3,
+   "debut": 12.366666666666667,
+   "fin": 18.666666666666668
+  },
+  {
+   "scene": 4,
+   "debut": 18.666666666666668,
+   "fin": 23.8
+  },
+  {
+   "scene": 5,
+   "debut": 23.8,
+   "fin": 30.566666666666666
+  }
+ ],
+ "plans": [
+  {
+   "nom": "approche",
+   "scene": 1,
+   "debut": 0,
+   "fin": 2.1666666666666665
+  },
+  {
+   "nom": "entree",
+   "scene": 1,
+   "debut": 2.1666666666666665,
+   "fin": 3.5
+  },
+  {
+   "nom": "foule",
+   "scene": 1,
+   "debut": 3.5,
+   "fin": 4.933333333333334
+  },
+  {
+   "nom": "tsunami",
+   "scene": 2,
+   "debut": 4.933333333333334,
+   "fin": 6.933333333333334
+  },
+  {
+   "nom": "effondrement",
+   "scene": 2,
+   "debut": 6.933333333333334,
+   "fin": 8.8
+  },
+  {
+   "nom": "faille",
+   "scene": 2,
+   "debut": 8.8,
+   "fin": 10.6
+  },
+  {
+   "nom": "onde",
+   "scene": 2,
+   "debut": 10.6,
+   "fin": 12.366666666666667
+  },
+  {
+   "nom": "surface",
+   "scene": 3,
+   "debut": 12.366666666666667,
+   "fin": 14.433333333333334
+  },
+  {
+   "nom": "labo",
+   "scene": 3,
+   "debut": 14.433333333333334,
+   "fin": 16.133333333333333
+  },
+  {
+   "nom": "macro",
+   "scene": 3,
+   "debut": 16.133333333333333,
+   "fin": 18.666666666666668
+  },
+  {
+   "nom": "devoile",
+   "scene": 4,
+   "debut": 18.666666666666668,
+   "fin": 20.2
+  },
+  {
+   "nom": "heros",
+   "scene": 4,
+   "debut": 20.2,
+   "fin": 22.866666666666667
+  },
+  {
+   "nom": "ruee",
+   "scene": 4,
+   "debut": 22.866666666666667,
+   "fin": 23.8
+  }
+ ],
+ "voix": [
+  {
+   "scene": 1,
+   "source": [
+    0,
+    4.890000000000001
+   ],
+   "a": 0.15999999999999998,
+   "debut": 0.3,
+   "fin": 4.74
+  },
+  {
+   "scene": 2,
+   "source": [
+    4.890000000000001,
+    12.5
+   ],
+   "a": 4.743333333333334,
+   "debut": 5.053333333333334,
+   "fin": 12.053333333333333
+  },
+  {
+   "scene": 3,
+   "source": [
+    12.5,
+    17.39
+   ],
+   "a": 12.316666666666666,
+   "debut": 12.616666666666667,
+   "fin": 16.916666666666668
+  },
+  {
+   "scene": 4,
+   "source": [
+    17.39,
+    22.23
+   ],
+   "a": 18.92666666666667,
+   "debut": 19.21666666666667,
+   "fin": 23.49666666666667
+  },
+  {
+   "scene": 5,
+   "source": [
+    22.23,
+    26.97
+   ],
+   "a": 25.330000000000002,
+   "debut": 25.6,
+   "fin": 29.62
+  }
+ ],
+ "mots": [
+  {
+   "mot": "What",
+   "scene": 1,
+   "debut": 0.3,
+   "fin": 0.44,
+   "fort": false
+  },
+  {
+   "mot": "would",
+   "scene": 1,
+   "debut": 0.46,
+   "fin": 0.58,
+   "fort": false
+  },
+  {
+   "mot": "happen",
+   "scene": 1,
+   "debut": 0.68,
+   "fin": 1.1,
+   "fort": false
+  },
+  {
+   "mot": "if",
+   "scene": 1,
+   "debut": 1.16,
+   "fin": 1.24,
+   "fort": false
+  },
+  {
+   "mot": "an",
+   "scene": 1,
+   "debut": 1.28,
+   "fin": 1.46,
+   "fort": false
+  },
+  {
+   "mot": "eight-hundred-",
+   "scene": 1,
+   "debut": 1.7,
+   "fin": 2.26,
+   "fort": true,
+   "lie": true
+  },
+  {
+   "mot": "kilometer-wide",
+   "scene": 1,
+   "debut": 2.26,
+   "fin": 2.82,
+   "fort": true
+  },
+  {
+   "mot": "object",
+   "scene": 1,
+   "debut": 2.98,
+   "fin": 3.36,
+   "fort": false
+  },
+  {
+   "mot": "headed",
+   "scene": 1,
+   "debut": 3.42,
+   "fin": 3.64,
+   "fort": false
+  },
+  {
+   "mot": "straight",
+   "scene": 1,
+   "debut": 3.86,
+   "fin": 4.179,
+   "fort": false
+  },
+  {
+   "mot": "for",
+   "scene": 1,
+   "debut": 4.219,
+   "fin": 4.3,
+   "fort": false
+  },
+  {
+   "mot": "Earth?",
+   "scene": 1,
+   "debut": 4.42,
+   "fin": 4.74,
+   "fort": true
+  },
+  {
+   "mot": "Its",
+   "scene": 2,
+   "debut": 5.053,
+   "fin": 5.233,
+   "fort": false
+  },
+  {
+   "mot": "impact",
+   "scene": 2,
+   "debut": 5.293,
+   "fin": 5.813,
+   "fort": false
+  },
+  {
+   "mot": "could",
+   "scene": 2,
+   "debut": 5.833,
+   "fin": 5.953,
+   "fort": false
+  },
+  {
+   "mot": "unleash",
+   "scene": 2,
+   "debut": 5.993,
+   "fin": 6.353,
+   "fort": false
+  },
+  {
+   "mot": "gigantic",
+   "scene": 2,
+   "debut": 6.413,
+   "fin": 7.033,
+   "fort": true
+  },
+  {
+   "mot": "tsunamis,",
+   "scene": 2,
+   "debut": 7.093,
+   "fin": 7.733,
+   "fort": true
+  },
+  {
+   "mot": "violent",
+   "scene": 2,
+   "debut": 8.093,
+   "fin": 8.433,
+   "fort": false
+  },
+  {
+   "mot": "earthquakes,",
+   "scene": 2,
+   "debut": 8.533,
+   "fin": 9.093,
+   "fort": true
+  },
+  {
+   "mot": "and",
+   "scene": 2,
+   "debut": 9.453,
+   "fin": 9.533,
+   "fort": false
+  },
+  {
+   "mot": "perhaps",
+   "scene": 2,
+   "debut": 9.573,
+   "fin": 10.113,
+   "fort": false
+  },
+  {
+   "mot": "even",
+   "scene": 2,
+   "debut": 10.273,
+   "fin": 10.473,
+   "fort": false
+  },
+  {
+   "mot": "the",
+   "scene": 2,
+   "debut": 10.513,
+   "fin": 10.673,
+   "fort": false
+  },
+  {
+   "mot": "end",
+   "scene": 2,
+   "debut": 10.753,
+   "fin": 10.993,
+   "fort": true
+  },
+  {
+   "mot": "of",
+   "scene": 2,
+   "debut": 11.033,
+   "fin": 11.153,
+   "fort": false
+  },
+  {
+   "mot": "civilization.",
+   "scene": 2,
+   "debut": 11.213,
+   "fin": 12.053,
+   "fort": true
+  },
+  {
+   "mot": "But",
+   "scene": 3,
+   "debut": 12.617,
+   "fin": 12.757,
+   "fort": false
+  },
+  {
+   "mot": "scientists",
+   "scene": 3,
+   "debut": 12.857,
+   "fin": 13.377,
+   "fort": false
+  },
+  {
+   "mot": "would",
+   "scene": 3,
+   "debut": 13.397,
+   "fin": 13.517,
+   "fort": false
+  },
+  {
+   "mot": "discover",
+   "scene": 3,
+   "debut": 13.537,
+   "fin": 13.977,
+   "fort": false
+  },
+  {
+   "mot": "something",
+   "scene": 3,
+   "debut": 14.097,
+   "fin": 14.497,
+   "fort": false
+  },
+  {
+   "mot": "that",
+   "scene": 3,
+   "debut": 14.557,
+   "fin": 14.717,
+   "fort": false
+  },
+  {
+   "mot": "should",
+   "scene": 3,
+   "debut": 14.777,
+   "fin": 14.977,
+   "fort": false
+  },
+  {
+   "mot": "be",
+   "scene": 3,
+   "debut": 15.017,
+   "fin": 15.137,
+   "fort": false
+  },
+  {
+   "mot": "completely",
+   "scene": 3,
+   "debut": 15.177,
+   "fin": 15.977,
+   "fort": false
+  },
+  {
+   "mot": "impossible...",
+   "scene": 3,
+   "debut": 16.036,
+   "fin": 16.917,
+   "fort": true
+  },
+  {
+   "mot": "Wait...",
+   "scene": 4,
+   "debut": 19.217,
+   "fin": 19.437,
+   "fort": false
+  },
+  {
+   "mot": "Is",
+   "scene": 4,
+   "debut": 19.917,
+   "fin": 19.997,
+   "fort": false
+  },
+  {
+   "mot": "that",
+   "scene": 4,
+   "debut": 20.057,
+   "fin": 20.137,
+   "fort": false
+  },
+  {
+   "mot": "a",
+   "scene": 4,
+   "debut": 20.217,
+   "fin": 20.237,
+   "fort": false
+  },
+  {
+   "mot": "rugby",
+   "scene": 4,
+   "debut": 20.437,
+   "fin": 20.737,
+   "fort": true
+  },
+  {
+   "mot": "ball?!",
+   "scene": 4,
+   "debut": 20.817,
+   "fin": 21.037,
+   "fort": true
+  },
+  {
+   "mot": "Someone",
+   "scene": 4,
+   "debut": 21.717,
+   "fin": 22.117,
+   "fort": false
+  },
+  {
+   "mot": "kicked",
+   "scene": 4,
+   "debut": 22.177,
+   "fin": 22.377,
+   "fort": false
+  },
+  {
+   "mot": "it",
+   "scene": 4,
+   "debut": 22.417,
+   "fin": 22.497,
+   "fort": false
+  },
+  {
+   "mot": "way",
+   "scene": 4,
+   "debut": 22.737,
+   "fin": 22.977,
+   "fort": true
+  },
+  {
+   "mot": "too",
+   "scene": 4,
+   "debut": 23.017,
+   "fin": 23.157,
+   "fort": true
+  },
+  {
+   "mot": "hard!",
+   "scene": 4,
+   "debut": 23.217,
+   "fin": 23.497,
+   "fort": true
+  },
+  {
+   "mot": "Destiny",
+   "scene": 5,
+   "debut": 25.6,
+   "fin": 26,
+   "fort": true
+  },
+  {
+   "mot": "Rugby.",
+   "scene": 5,
+   "debut": 26.1,
+   "fin": 26.44,
+   "fort": true
+  },
+  {
+   "mot": "Play",
+   "scene": 5,
+   "debut": 26.8,
+   "fin": 26.96,
+   "fort": false
+  },
+  {
+   "mot": "free",
+   "scene": 5,
+   "debut": 27.1,
+   "fin": 27.42,
+   "fort": true
+  },
+  {
+   "mot": "at",
+   "scene": 5,
+   "debut": 27.48,
+   "fin": 27.64,
+   "fort": false
+  },
+  {
+   "mot": "destiny-rugby.fr.",
+   "scene": 5,
+   "debut": 27.68,
+   "fin": 29.62,
+   "fort": true
+  }
+ ],
+ "sousTitres": [
+  {
+   "debut": 0.24,
+   "fin": 1.14,
+   "scene": 1,
+   "mots": [
+    {
+     "mot": "What",
+     "scene": 1,
+     "debut": 0.3,
+     "fin": 0.44,
+     "fort": false
+    },
+    {
+     "mot": "would",
+     "scene": 1,
+     "debut": 0.46,
+     "fin": 0.58,
+     "fort": false
+    },
+    {
+     "mot": "happen",
+     "scene": 1,
+     "debut": 0.68,
+     "fin": 1.1,
+     "fort": false
+    }
+   ]
+  },
+  {
+   "debut": 1.1,
+   "fin": 1.68,
+   "scene": 1,
+   "mots": [
+    {
+     "mot": "if",
+     "scene": 1,
+     "debut": 1.16,
+     "fin": 1.24,
+     "fort": false
+    },
+    {
+     "mot": "an",
+     "scene": 1,
+     "debut": 1.28,
+     "fin": 1.46,
+     "fort": false
+    }
+   ]
+  },
+  {
+   "debut": 1.64,
+   "fin": 2.26,
+   "scene": 1,
+   "mots": [
+    {
+     "mot": "eight-hundred-",
+     "scene": 1,
+     "debut": 1.7,
+     "fin": 2.26,
+     "fort": true,
+     "lie": true
+    }
+   ]
+  },
+  {
+   "debut": 2.2,
+   "fin": 2.96,
+   "scene": 1,
+   "mots": [
+    {
+     "mot": "kilometer-wide",
+     "scene": 1,
+     "debut": 2.26,
+     "fin": 2.82,
+     "fort": true
+    }
+   ]
+  },
+  {
+   "debut": 2.92,
+   "fin": 3.84,
+   "scene": 1,
+   "mots": [
+    {
+     "mot": "object",
+     "scene": 1,
+     "debut": 2.98,
+     "fin": 3.36,
+     "fort": false
+    },
+    {
+     "mot": "headed",
+     "scene": 1,
+     "debut": 3.42,
+     "fin": 3.64,
+     "fort": false
+    }
+   ]
+  },
+  {
+   "debut": 3.8,
+   "fin": 5.033,
+   "scene": 1,
+   "mots": [
+    {
+     "mot": "straight",
+     "scene": 1,
+     "debut": 3.86,
+     "fin": 4.179,
+     "fort": false
+    },
+    {
+     "mot": "for",
+     "scene": 1,
+     "debut": 4.219,
+     "fin": 4.3,
+     "fort": false
+    },
+    {
+     "mot": "Earth?",
+     "scene": 1,
+     "debut": 4.42,
+     "fin": 4.74,
+     "fort": true
+    }
+   ]
+  },
+  {
+   "debut": 4.993,
+   "fin": 5.973,
+   "scene": 2,
+   "mots": [
+    {
+     "mot": "Its",
+     "scene": 2,
+     "debut": 5.053,
+     "fin": 5.233,
+     "fort": false
+    },
+    {
+     "mot": "impact",
+     "scene": 2,
+     "debut": 5.293,
+     "fin": 5.813,
+     "fort": false
+    },
+    {
+     "mot": "could",
+     "scene": 2,
+     "debut": 5.833,
+     "fin": 5.953,
+     "fort": false
+    }
+   ]
+  },
+  {
+   "debut": 5.933,
+   "fin": 7.073,
+   "scene": 2,
+   "mots": [
+    {
+     "mot": "unleash",
+     "scene": 2,
+     "debut": 5.993,
+     "fin": 6.353,
+     "fort": false
+    },
+    {
+     "mot": "gigantic",
+     "scene": 2,
+     "debut": 6.413,
+     "fin": 7.033,
+     "fort": true
+    }
+   ]
+  },
+  {
+   "debut": 7.033,
+   "fin": 8.073,
+   "scene": 2,
+   "mots": [
+    {
+     "mot": "tsunamis,",
+     "scene": 2,
+     "debut": 7.093,
+     "fin": 7.733,
+     "fort": true
+    }
+   ]
+  },
+  {
+   "debut": 8.033,
+   "fin": 8.513,
+   "scene": 2,
+   "mots": [
+    {
+     "mot": "violent",
+     "scene": 2,
+     "debut": 8.093,
+     "fin": 8.433,
+     "fort": false
+    }
+   ]
+  },
+  {
+   "debut": 8.473,
+   "fin": 9.433,
+   "scene": 2,
+   "mots": [
+    {
+     "mot": "earthquakes,",
+     "scene": 2,
+     "debut": 8.533,
+     "fin": 9.093,
+     "fort": true
+    }
+   ]
+  },
+  {
+   "debut": 9.393,
+   "fin": 10.493,
+   "scene": 2,
+   "mots": [
+    {
+     "mot": "and",
+     "scene": 2,
+     "debut": 9.453,
+     "fin": 9.533,
+     "fort": false
+    },
+    {
+     "mot": "perhaps",
+     "scene": 2,
+     "debut": 9.573,
+     "fin": 10.113,
+     "fort": false
+    },
+    {
+     "mot": "even",
+     "scene": 2,
+     "debut": 10.273,
+     "fin": 10.473,
+     "fort": false
+    }
+   ]
+  },
+  {
+   "debut": 10.453,
+   "fin": 11.193,
+   "scene": 2,
+   "mots": [
+    {
+     "mot": "the",
+     "scene": 2,
+     "debut": 10.513,
+     "fin": 10.673,
+     "fort": false
+    },
+    {
+     "mot": "end",
+     "scene": 2,
+     "debut": 10.753,
+     "fin": 10.993,
+     "fort": true
+    },
+    {
+     "mot": "of",
+     "scene": 2,
+     "debut": 11.033,
+     "fin": 11.153,
+     "fort": false
+    }
+   ]
+  },
+  {
+   "debut": 11.153,
+   "fin": 12.473,
+   "scene": 2,
+   "mots": [
+    {
+     "mot": "civilization.",
+     "scene": 2,
+     "debut": 11.213,
+     "fin": 12.053,
+     "fort": true
+    }
+   ]
+  },
+  {
+   "debut": 12.557,
+   "fin": 13.377,
+   "scene": 3,
+   "mots": [
+    {
+     "mot": "But",
+     "scene": 3,
+     "debut": 12.617,
+     "fin": 12.757,
+     "fort": false
+    },
+    {
+     "mot": "scientists",
+     "scene": 3,
+     "debut": 12.857,
+     "fin": 13.377,
+     "fort": false
+    }
+   ]
+  },
+  {
+   "debut": 13.337,
+   "fin": 14.077,
+   "scene": 3,
+   "mots": [
+    {
+     "mot": "would",
+     "scene": 3,
+     "debut": 13.397,
+     "fin": 13.517,
+     "fort": false
+    },
+    {
+     "mot": "discover",
+     "scene": 3,
+     "debut": 13.537,
+     "fin": 13.977,
+     "fort": false
+    }
+   ]
+  },
+  {
+   "debut": 14.037,
+   "fin": 14.757,
+   "scene": 3,
+   "mots": [
+    {
+     "mot": "something",
+     "scene": 3,
+     "debut": 14.097,
+     "fin": 14.497,
+     "fort": false
+    },
+    {
+     "mot": "that",
+     "scene": 3,
+     "debut": 14.557,
+     "fin": 14.717,
+     "fort": false
+    }
+   ]
+  },
+  {
+   "debut": 14.717,
+   "fin": 15.157,
+   "scene": 3,
+   "mots": [
+    {
+     "mot": "should",
+     "scene": 3,
+     "debut": 14.777,
+     "fin": 14.977,
+     "fort": false
+    },
+    {
+     "mot": "be",
+     "scene": 3,
+     "debut": 15.017,
+     "fin": 15.137,
+     "fort": false
+    }
+   ]
+  },
+  {
+   "debut": 15.117,
+   "fin": 16.016,
+   "scene": 3,
+   "mots": [
+    {
+     "mot": "completely",
+     "scene": 3,
+     "debut": 15.177,
+     "fin": 15.977,
+     "fort": false
+    }
+   ]
+  },
+  {
+   "debut": 15.976,
+   "fin": 17.337,
+   "scene": 3,
+   "mots": [
+    {
+     "mot": "impossible...",
+     "scene": 3,
+     "debut": 16.036,
+     "fin": 16.917,
+     "fort": true
+    }
+   ]
+  },
+  {
+   "debut": 19.157,
+   "fin": 19.857,
+   "scene": 4,
+   "mots": [
+    {
+     "mot": "Wait...",
+     "scene": 4,
+     "debut": 19.217,
+     "fin": 19.437,
+     "fort": false
+    }
+   ]
+  },
+  {
+   "debut": 19.857,
+   "fin": 20.417,
+   "scene": 4,
+   "mots": [
+    {
+     "mot": "Is",
+     "scene": 4,
+     "debut": 19.917,
+     "fin": 19.997,
+     "fort": false
+    },
+    {
+     "mot": "that",
+     "scene": 4,
+     "debut": 20.057,
+     "fin": 20.137,
+     "fort": false
+    },
+    {
+     "mot": "a",
+     "scene": 4,
+     "debut": 20.217,
+     "fin": 20.237,
+     "fort": false
+    }
+   ]
+  },
+  {
+   "debut": 20.377,
+   "fin": 21.457,
+   "scene": 4,
+   "mots": [
+    {
+     "mot": "rugby",
+     "scene": 4,
+     "debut": 20.437,
+     "fin": 20.737,
+     "fort": true
+    },
+    {
+     "mot": "ball?!",
+     "scene": 4,
+     "debut": 20.817,
+     "fin": 21.037,
+     "fort": true
+    }
+   ]
+  },
+  {
+   "debut": 21.657,
+   "fin": 22.717,
+   "scene": 4,
+   "mots": [
+    {
+     "mot": "Someone",
+     "scene": 4,
+     "debut": 21.717,
+     "fin": 22.117,
+     "fort": false
+    },
+    {
+     "mot": "kicked",
+     "scene": 4,
+     "debut": 22.177,
+     "fin": 22.377,
+     "fort": false
+    },
+    {
+     "mot": "it",
+     "scene": 4,
+     "debut": 22.417,
+     "fin": 22.497,
+     "fort": false
+    }
+   ]
+  },
+  {
+   "debut": 22.677,
+   "fin": 23.917,
+   "scene": 4,
+   "mots": [
+    {
+     "mot": "way",
+     "scene": 4,
+     "debut": 22.737,
+     "fin": 22.977,
+     "fort": true
+    },
+    {
+     "mot": "too",
+     "scene": 4,
+     "debut": 23.017,
+     "fin": 23.157,
+     "fort": true
+    },
+    {
+     "mot": "hard!",
+     "scene": 4,
+     "debut": 23.217,
+     "fin": 23.497,
+     "fort": true
+    }
+   ]
+  },
+  {
+   "debut": 25.54,
+   "fin": 26.78,
+   "scene": 5,
+   "mots": [
+    {
+     "mot": "Destiny",
+     "scene": 5,
+     "debut": 25.6,
+     "fin": 26,
+     "fort": true
+    },
+    {
+     "mot": "Rugby.",
+     "scene": 5,
+     "debut": 26.1,
+     "fin": 26.44,
+     "fort": true
+    }
+   ]
+  },
+  {
+   "debut": 26.74,
+   "fin": 27.66,
+   "scene": 5,
+   "mots": [
+    {
+     "mot": "Play",
+     "scene": 5,
+     "debut": 26.8,
+     "fin": 26.96,
+     "fort": false
+    },
+    {
+     "mot": "free",
+     "scene": 5,
+     "debut": 27.1,
+     "fin": 27.42,
+     "fort": true
+    },
+    {
+     "mot": "at",
+     "scene": 5,
+     "debut": 27.48,
+     "fin": 27.64,
+     "fort": false
+    }
+   ]
+  },
+  {
+   "debut": 27.62,
+   "fin": 30.04,
+   "scene": 5,
+   "mots": [
+    {
+     "mot": "destiny-rugby.fr.",
+     "scene": 5,
+     "debut": 27.68,
+     "fin": 29.62,
+     "fort": true
+    }
+   ]
+  }
+ ],
+ "jeu": {
+  "tir": [
+   23.8,
+   25.266666666666666
+  ],
+  "pack": [
+   25.266666666666666,
+   26
+  ],
+  "compo": [
+   26,
+   26.7
+  ],
+  "titre": [
+   26.7,
+   30.566666666666666
+  ],
+  "accroche": 26.8,
+  "adresse": 27.68
+ },
+ "accroche": "PLAY FOR FREE",
+ "voixSource": {
+  "id": "en.mp3",
+  "modele": "prise fournie, alignée par transcription (Scribe)",
+  "duree": 26.72
+ }
+}

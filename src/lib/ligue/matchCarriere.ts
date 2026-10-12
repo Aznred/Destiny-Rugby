@@ -569,7 +569,9 @@ export interface EtatMatchEnLigne {
 // en séquences, combinaisons de touche, plaquages dangereux jugés à leur gravité, altercations.
 // Règles 8 (Correctif 33) : les règles 7, plus la pénaltouche qui garde son lancer même retombée dans le champ et sortie
 // après rebonds (`reglesPenaltouche`). Même IA (niveau 6) : seul le sort de ce ballon change.
-export const REGLES_MATCH_EN_LIGNE = 8;
+// Règles 9 (Correctif 39) : l'essai qui garde son élan (IA 7). Un match créé avant garde ses règles ; revenir en arrière =
+// remettre 8. ⚠️ À METTRE EN LIGNE QUAND AUCUN MATCH NE SE JOUE, comme toute nouvelle règle.
+export const REGLES_MATCH_EN_LIGNE = 9;
 /**
  * Défense resserrée des règles 2 : la cadence détaillée marque davantage, ce
  * réglage ramène le nombre d'essais à celui des matchs de ligue d'avant
@@ -582,7 +584,8 @@ export const RESSERREMENT_REGLES_2 = 1;
  * déjà commencés : la porter par un nouveau niveau, donc une nouvelle règle.
  */
 // Règles 4 : le porteur lit ce qu'il a devant lui (`moteur/ia/vision.ts`, IA de niveau 3).
-export const iaDesRegles = (regles: number | undefined): number | undefined => ((regles ?? 1) >= 7 ? 6 : (regles ?? 1) >= 5 ? 5 : (regles ?? 1) >= 4 ? 3 : (regles ?? 1) >= 3 ? 2 : undefined);
+// Règles 9 : l'essai qui garde son élan (`moteur/animations.ts`, IA de niveau 7).
+export const iaDesRegles = (regles: number | undefined): number | undefined => ((regles ?? 1) >= 9 ? 7 : (regles ?? 1) >= 7 ? 6 : (regles ?? 1) >= 5 ? 5 : (regles ?? 1) >= 4 ? 3 : (regles ?? 1) >= 3 ? 2 : undefined);
 
 /** Ce que le client reçoit : jamais la graine, jamais le plan d'en face. */
 export interface VueMatchEnLigne {

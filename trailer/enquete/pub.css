@@ -1,0 +1,16 @@
+/* Pub « enquête » — ce qui s'ajoute à ../catastrophe/pub.css : l'habillage de caméra de surveillance.
+   Rien ne s'anime en CSS : pub.js pose chaque style pour l'instant demandé. */
+#surveillance { position: absolute; inset: 0; visibility: hidden; pointer-events: none; color: #eafff0;
+  font-family: 'Archivo', sans-serif; font-weight: 700; font-size: 21px; letter-spacing: 1.5px; text-shadow: 0 0 8px rgba(120, 255, 170, .55); }
+.sv-lignes { position: absolute; inset: 0;
+  background: repeating-linear-gradient(to bottom, rgba(0, 0, 0, .26) 0 2px, transparent 2px 4px),
+              radial-gradient(120% 90% at 50% 50%, transparent 55%, rgba(0, 0, 0, .55) 100%); }
+.sv-haut { position: absolute; left: 30px; right: 30px; top: 64px; display: flex; justify-content: space-between; align-items: center; }
+.sv-rec { display: inline-flex; align-items: center; gap: 9px; }
+.sv-rec i { width: 14px; height: 14px; border-radius: 50%; background: #ff3b30; box-shadow: 0 0 12px rgba(255, 59, 48, .8); }
+.sv-bas { position: absolute; left: 30px; bottom: 250px; }
+.sv-coin { position: absolute; width: 34px; height: 34px; border: 0 solid rgba(234, 255, 240, .85); }
+.sv-coin.hg { left: 20px; top: 42px; border-left-width: 3px; border-top-width: 3px; }
+.sv-coin.hd { right: 20px; top: 42px; border-right-width: 3px; border-top-width: 3px; }
+.sv-coin.bg { left: 20px; bottom: 228px; border-left-width: 3px; border-bottom-width: 3px; }
+.sv-coin.bd { right: 20px; bottom: 228px; border-right-width: 3px; border-bottom-width: 3px; }

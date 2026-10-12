@@ -21,7 +21,10 @@
  */
 // Niveau 6 (Correctif 30) : le jeu physique — bibliothèque d'animations contextuelles, grattages et contre-rucks en
 // séquences, combinaisons de touche, plaquages dangereux jugés à leur gravité, altercations (`moteur/animations.ts`).
-export const IA_MATCH_DE_CARRIERE = 6;
+// Niveau 7 (Correctif 39) : l'essai qui garde son élan — le marqueur vole puis glisse à la vitesse où il est arrivé, et sa
+// façon de marquer se lit sur la situation (`planifierEssai`, `lancerEssaiVivant`). Rien d'autre ne change : le niveau 6
+// rejoue à l'identique (empreinte `90b6ea8a`).
+export const IA_MATCH_DE_CARRIERE = 7;
 
 export const REGLAGES_IA = {
   // ── Le duel porteur / plaqueur (`avantageDuPorteur`) ──────────────────────

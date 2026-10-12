@@ -1,0 +1,22 @@
+{
+  "_": "Le vrai gameplay de la scène 5. « segments » : des images du match 3D (60 pas par seconde), d'une image à l'autre ; « dossier » + « depart » (secondes) : un flux horodaté de l'interface.",
+  "tir": {
+    "ips": 60,
+    "vitesse": 1,
+    "frappe": 188,
+    "entrePoteaux": 316,
+    "segments": [
+      { "dossier": "rushes/tir-close-2", "de": 174, "a": 200 },
+      { "dossier": "rushes/tir-tv-2", "de": 272, "a": 350 }
+    ]
+  },
+  "pack": { "fr": "rushes/fr-pack", "en": "rushes/en-pack", "depart": 9.0, "vitesse": 1 },
+  "compo": { "fr": "rushes/fr-composition", "en": "rushes/en-composition", "depart": 0.6, "vitesse": 1 },
+  "fond": {
+    "ips": 60,
+    "vitesse": 0.5,
+    "segments": [
+      { "dossier": "rushes/tir-tv-2", "de": 350, "a": 548 }
+    ]
+  }
+}

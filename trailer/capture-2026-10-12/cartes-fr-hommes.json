@@ -1,0 +1,23 @@
+[
+  {
+    "sourceId": "reel:thomas ramos",
+    "nom": "Thomas RAMOS",
+    "note": 93,
+    "rarete": "star",
+    "photo": "/photos/thomas_ramos.webp"
+  },
+  {
+    "sourceId": "reel:matthieu jalibert",
+    "nom": "Matthieu JALIBERT",
+    "note": 93,
+    "rarete": "star",
+    "photo": "/photos/matthieu_jalibert.webp"
+  },
+  {
+    "sourceId": "reel:antoine dupont",
+    "nom": "Antoine DUPONT",
+    "note": 95,
+    "rarete": "star",
+    "photo": "/photos/antoine_dupont.webp"
+  }
+]

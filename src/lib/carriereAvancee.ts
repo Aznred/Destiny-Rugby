@@ -623,31 +623,75 @@ function rattacherAgents(agents: AgentPersistant[], effectif: Coequipier[]): Age
   return suivants;
 }
 
+/** La fiche de départ d'UN club du monde et de son entraîneur : les mêmes tirages qu'à la création de la partie. */
+function ficheInitialeDuClub(club: string, coachId: string): { coach: EntraineurIA; fiche: ClubDynamique } {
+  const rng = graine(`monde-club#${club}`);
+  const niveau = competitionDuClub(club)?.niveau ?? 8;
+  const coach: EntraineurIA = {
+    id: coachId,
+    nom: `${PRENOMS_COACH[Math.floor(rng() * PRENOMS_COACH.length)]} ${NOMS_COACH[Math.floor(rng() * NOMS_COACH.length)]}`,
+    club, reputation: borne(forceEffectif(club, 1) + rng() * 16 - 8), confiance: 48 + Math.round(rng() * 34),
+    contrat: 1 + Math.floor(rng() * 4), saisons: 0,
+  };
+  const strategies: ClubDynamique['strategie'][] = ['formation', 'local', 'equilibre', 'international', 'stars'];
+  const fiche: ClubDynamique = {
+    club, richesse: borne((NOTE_PAR_NIVEAU[niveau] ?? 30) + rng() * 18),
+    infrastructures: borne(18 + (10 - niveau) * 5 + rng() * 24),
+    strategie: strategies[Math.floor(rng() * strategies.length)],
+    professionnel: niveau <= 4, entraineurId: coachId, tendance: 0,
+  };
+  return { coach, fiche };
+}
+
 function mondeInitial(): Pick<EtatCarriereAvancee, 'entraineursIA' | 'clubsMonde' | 'identites'> {
   const entraineursIA: Record<string, EntraineurIA> = {};
   const clubsMonde: Record<string, ClubDynamique> = {};
   const identites: Record<string, Identite> = {};
   for (let i = 0; i < TOUS_LES_CLUBS.length; i++) {
     const club = TOUS_LES_CLUBS[i];
-    const rng = graine(`monde-club#${club}`);
-    const niveau = competitionDuClub(club)?.niveau ?? 8;
-    const coachId = `coach-${i}`;
-    entraineursIA[coachId] = {
-      id: coachId,
-      nom: `${PRENOMS_COACH[Math.floor(rng() * PRENOMS_COACH.length)]} ${NOMS_COACH[Math.floor(rng() * NOMS_COACH.length)]}`,
-      club, reputation: borne(forceEffectif(club, 1) + rng() * 16 - 8), confiance: 48 + Math.round(rng() * 34),
-      contrat: 1 + Math.floor(rng() * 4), saisons: 0,
-    };
-    const strategies: ClubDynamique['strategie'][] = ['formation', 'local', 'equilibre', 'international', 'stars'];
-    clubsMonde[club] = {
-      club, richesse: borne((NOTE_PAR_NIVEAU[niveau] ?? 30) + rng() * 18),
-      infrastructures: borne(18 + (10 - niveau) * 5 + rng() * 24),
-      strategie: strategies[Math.floor(rng() * strategies.length)],
-      professionnel: niveau <= 4, entraineurId: coachId, tendance: 0,
-    };
+    const { coach, fiche } = ficheInitialeDuClub(club, `coach-${i}`);
+    entraineursIA[coach.id] = coach;
+    clubsMonde[club] = fiche;
     identites[club] = identiteHistorique(club);
   }
   return { entraineursIA, clubsMonde, identites };
+}
+
+/**
+ * LES CLUBS DU JEU QUE LA PARTIE NE CONNAÎT PAS (Correctif 39).
+ *
+ * ⚠️ LA LISTE DES CLUBS CHANGE D'UNE VERSION DU JEU À L'AUTRE (imports FFR, clubs renommés, divisions complétées), et les
+ * trois registres du monde (`clubsMonde`, `entraineursIA`, `identites`) sont écrits UNE fois, à la création de la partie.
+ * Une sauvegarde plus ancienne que le dernier import n'a donc pas de fiche pour les clubs arrivés depuis — et la clôture
+ * de saison, qui les parcourt tous, levait « Cannot read properties of undefined (reading 'entraineurId') » : le bouton
+ * « Clore la saison » ne faisait plus rien, pour toujours. Reproduit en retirant un seul club du registre.
+ *
+ * Rend les noms des clubs sans fiche ou dont l'entraîneur a disparu. Parcours de 1 300 clés : négligeable.
+ */
+export function clubsAbsentsDuMonde(a: EtatCarriereAvancee | undefined): string[] {
+  if (!a?.clubsMonde || !a.entraineursIA) return [];
+  return TOUS_LES_CLUBS.filter((club) => {
+    const fiche = a.clubsMonde[club];
+    return !fiche || !a.entraineursIA[fiche.entraineurId];
+  });
+}
+
+/** Complète les registres du monde pour les clubs que la partie ne connaît pas. Ne touche à aucune fiche existante. */
+export function completerMonde(a: EtatCarriereAvancee): EtatCarriereAvancee {
+  const absents = clubsAbsentsDuMonde(a);
+  if (!absents.length) return a;
+  const clubsMonde = { ...a.clubsMonde };
+  const entraineursIA = { ...a.entraineursIA };
+  const identites = { ...a.identites };
+  for (const club of absents) {
+    // Un identifiant qui ne peut pas heurter ceux de la création (`coach-<rang>`) ni ceux d'un remplacement (`coach-<club>-<saison>`).
+    const { coach, fiche } = ficheInitialeDuClub(club, `coach-ajout-${club}`);
+    const existante = clubsMonde[club];
+    entraineursIA[coach.id] = coach;
+    clubsMonde[club] = existante ? { ...existante, entraineurId: coach.id } : fiche;
+    identites[club] ??= identiteHistorique(club);
+  }
+  return { ...a, clubsMonde, entraineursIA, identites };
 }
 
 export function creerEtatCarriereAvancee(m: Manager, effectif: Coequipier[]): EtatCarriereAvancee {
@@ -1441,6 +1485,9 @@ function archiverEffectif(a: EtatCarriereAvancee, m: Manager, effectif: Coequipi
 }
 
 function evoluerMonde(a: EtatCarriereAvancee, m: Manager): Pick<EtatCarriereAvancee, 'clubsMonde' | 'entraineursIA' | 'identites' | 'actualites' | 'offresBanc'> {
+  // ⚠️ ON COMPLÈTE AVANT DE PARCOURIR : une partie plus ancienne que le dernier import de clubs n'a pas de fiche pour
+  // les nouveaux venus, et la boucle ci-dessous les lit tous (voir `clubsAbsentsDuMonde`).
+  a = completerMonde(a);
   const clubsMonde = { ...a.clubsMonde };
   const entraineursIA = { ...a.entraineursIA };
   const identites = { ...a.identites };
@@ -1479,12 +1526,29 @@ function evoluerMonde(a: EtatCarriereAvancee, m: Manager): Pick<EtatCarriereAvan
   return { clubsMonde, entraineursIA, identites, actualites: actualitesBornees(actualites), offresBanc };
 }
 
-export function finSaisonCarriereAvancee(m: Manager, effectif: Coequipier[], rang: number): { etat: EtatCarriereAvancee; confiance: number; resume: string; revenusMarketing: number } {
+/** Une étape annexe de la clôture qui a échoué : la saison se clôt quand même, et le bilan dit ce qui n'a pas été fait. */
+export interface IncidentCloture { etape: string; message: string }
+
+/**
+ * ⚠️ AUCUNE ÉTAPE ANNEXE NE RETIENT LA SAISON (Correctif 39). L'évolution du monde, les archives, la reconversion des
+ * anciens : rien de tout cela ne vaut qu'une sauvegarde reste bloquée sur sa dernière semaine. Chaque étape a un repli
+ * (la valeur d'avant) et laisse un incident, que le store range dans le bilan de clôture.
+ */
+export function finSaisonCarriereAvancee(m: Manager, effectif: Coequipier[], rang: number): { etat: EtatCarriereAvancee; confiance: number; resume: string; revenusMarketing: number; incidents: IncidentCloture[] } {
+  const incidents: IncidentCloture[] = [];
+  const tenter = <T,>(etape: string, calcul: () => T, repli: () => T): T => {
+    try { return calcul(); } catch (erreur) {
+      incidents.push({ etape, message: erreur instanceof Error ? erreur.message : String(erreur) });
+      return repli();
+    }
+  };
   let a = assurerEtatCarriereAvancee(m, effectif);
-  const objectifs = a.objectifs.map((o) => evaluerObjectif(o, m, effectif, rang, true));
+  const objectifs = tenter('objectifs', () => a.objectifs.map((o) => evaluerObjectif(o, m, effectif, rang, true)), () => a.objectifs);
   const confiance = objectifs.reduce((n, o) => n + (o.etat === 'reussi' ? 3.5 : -5) * o.importance, 0);
-  const monde = evoluerMonde(a, m);
-  const carrieresJoueurs = archiverEffectif(a, m, effectif);
+  const monde = tenter('monde', () => evoluerMonde(a, m), () => ({
+    clubsMonde: a.clubsMonde, entraineursIA: a.entraineursIA, identites: a.identites, actualites: a.actualites, offresBanc: [],
+  }));
+  const carrieresJoueurs = tenter('carrieres', () => archiverEffectif(a, m, effectif), () => a.carrieresJoueurs);
   const rng = graine(`reconversion#${m.club}#${m.saison}`);
   const staffAnciens = [...a.staffAnciens];
   for (const j of effectif.filter((x) => x.age >= 34)) {
@@ -1500,18 +1564,19 @@ export function finSaisonCarriereAvancee(m: Manager, effectif: Coequipier[], ran
     const selection = candidates[Math.floor(rng() * candidates.length)] ?? SELECTIONS_SENIOR.find((s) => s.nation === m.nation);
     if (selection && rng() < Math.min(0.82, (m.prestige - 38) / 55)) propositionSelection = { nation: selection.nation, reputationDemandee: Math.round(m.prestige), cumulClub: true, saison: m.saison + 1 };
   }
+  const avant = a;
   a = {
-    ...a, objectifs, histoire: archiverMonde(a, m), carrieresJoueurs,
+    ...a, objectifs, histoire: tenter('histoire', () => archiverMonde(avant, m), () => avant.histoire), carrieresJoueurs,
     clubsMonde: monde.clubsMonde, entraineursIA: monde.entraineursIA, identites: monde.identites,
     actualites: monde.actualites, offresBanc: monde.offresBanc, staffAnciens, propositionSelection,
-    rivalites: a.rivalites.map((r) => r.derniereSaison === m.saison ? r : apresLaSaisonRivalite(r, [], m.saison)),
-    profonde: finSaisonProfonde(a.profonde, m, effectif, rang),
+    rivalites: tenter('rivalites', () => avant.rivalites.map((r) => r.derniereSaison === m.saison ? r : apresLaSaisonRivalite(r, [], m.saison)), () => avant.rivalites),
+    profonde: tenter('direction', () => finSaisonProfonde(avant.profonde, m, effectif, rang), () => avant.profonde),
   };
   // Le store fixera les nouveaux objectifs après la montée/descente et les nouveaux budgets.
   a = { ...a, dernierBilanObjectifs: { saison: m.saison, club: m.club, objectifs }, discussions: a.discussions.slice(-60), medical: a.medical.map(normaliserDossier).filter((d) => d.phase !== 'clos'), convocations: [], connaissances: Object.fromEntries(Object.entries(a.connaissances).filter(([, c]) => c.derniereSaison >= m.saison - 2)) };
   const reussis = objectifs.filter((o) => o.etat === 'reussi').length;
-  const revenusMarketing = revenusMarketingProfonde(a.profonde, m.club);
-  return { etat: a, confiance: Math.round(confiance), revenusMarketing, resume: `Direction : ${reussis}/${objectifs.length} objectifs atteints (${confiance >= 0 ? '+' : ''}${Math.round(confiance)} confiance). Marketing : ${revenusMarketing.toLocaleString('fr-FR')} €.` };
+  const revenusMarketing = tenter('marketing', () => revenusMarketingProfonde(a.profonde, m.club), () => 0);
+  return { etat: a, confiance: Math.round(confiance), revenusMarketing, incidents, resume: `Direction : ${reussis}/${objectifs.length} objectifs atteints (${confiance >= 0 ? '+' : ''}${Math.round(confiance)} confiance). Marketing : ${revenusMarketing.toLocaleString('fr-FR')} €.` };
 }
 
 export function postulerBancAvance(a: EtatCarriereAvancee, m: Manager, club: string): EtatCarriereAvancee {

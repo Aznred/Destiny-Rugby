@@ -19,3 +19,7 @@ Pouvez-vous vérifier la remise de `/api/v1/callbacks` et du webhook S2S pour ce
 Merci.
 
 Références : [callbacks officiels](https://support.applixir.com/applixir-integration/integration-for-html5-sites-apps/step-4-setting-up-local-callback-360053188774), [FAQ : le trafic Test est exclu des rapports](https://support.applixir.com/frequently-asked-questions).
+
+## Seconde passe du 12 octobre : la forme de la requête
+
+Mesuré depuis l'extérieur, sans signature : notre adresse de callback suivie de `&gameApiKey=…` répond 403 (signature refusée, donc callback reconnu) ; suivie de `?gameApiKey=…` — un second « ? » — elle répondait 401, comme une requête ordinaire sans session. Si AppLixir construit sa requête en ajoutant « ? » puis ses paramètres à l'adresse enregistrée, aucun reçu ne pouvait être reconnu. Le serveur accepte maintenant les deux formes, une adresse sans « ? » (`/api/applixir`), le POST, et note chaque refus (Labo → Publicités). Question à ajouter au message ci-dessus : « Comment vos serveurs ajoutent-ils leurs paramètres à une adresse de callback qui contient déjà une query string ? »

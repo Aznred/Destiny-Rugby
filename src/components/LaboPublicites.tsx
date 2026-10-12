@@ -3,7 +3,14 @@ import type { PackCarriere } from '../lib/ligue/typesCarriere';
 import { chancesPacksPub, type ConfigPublicites, type StatsPublicites } from '../lib/publicitesRecompensees';
 import './PublicitesRecompensees.css';
 
-interface DonneesLabo { revision: number; config: ConfigPublicites; modeEffectif: string; raisonMode?: string; callbackConfigure: boolean; packs: PackCarriere[]; statistiques: StatsPublicites }
+interface DonneesLabo { revision: number; config: ConfigPublicites; modeEffectif: string; raisonMode?: string; callbackConfigure: boolean; packs: PackCarriere[]; statistiques: StatsPublicites;
+  /** Les reçus AppLixir que le serveur a refusés — arrivés, donc, mais sans rien créditer. Absent si la lecture a échoué. */
+  refus?: { total: number; derniers: { le: number; refus: string; videoTerminee: boolean }[] } | null }
+// Pourquoi un reçu a été refusé, en clair. Les codes sont ceux de `RefusCallback` (serveur/publicitesRecompensees.ts).
+const RAISONS_REFUS: Record<string, string> = {
+  format: 'paramètres manquants ou illisibles', signature: 'signature fausse (secret ou ordre des champs)', session: 'session de publicité inconnue',
+  cle: 'autre clé d’API que celle du jeu', jeu: 'autre identifiant de jeu', expiree: 'session expirée', plafond: 'plafond quotidien atteint',
+};
 async function appeler(corps?: unknown): Promise<DonneesLabo> {
   const r = await fetch('/api/carriere?atelier=1&section=publicites', { method: corps ? 'POST' : 'GET', credentials:'same-origin', cache:'no-store',
     headers: corps ? {'Content-Type':'application/json'} : undefined, body: corps ? JSON.stringify(corps) : undefined });
@@ -61,6 +68,11 @@ export function LaboPublicites() {
     <section className="pub-statistiques"><h3>Statistiques AppLixir</h3><button className="btn fantome" disabled={occupe} onClick={() => void charger().catch(e => setErreur((e as Error).message))}>Actualiser</button>
       <dl>{([['Demandées',stats.requested],['Démarrées',stats.started],['Terminées et vérifiées',stats.completed],['Échecs / fermetures',stats.failed],['Sans annonce (no-fill)',stats.noFill],['Ovas attribués',stats.ovasRewarded],['Packs gagnés',stats.packsEarned],['Joueurs ayant terminé une pub',stats.joueurs]] as const).map(([nom,n]) => <div key={nom}><dt>{nom}</dt><dd>{n.toLocaleString('fr-FR')}</dd></div>)}</dl>
       <p>Taux de complétion : {stats.started ? (stats.completed/stats.started*100).toFixed(2) : '0'} % · Publicités terminées par joueur : {stats.joueurs ? (stats.completed/stats.joueurs).toFixed(2) : '0'}</p>
+      <h3>Reçus AppLixir refusés</h3>
+      {!d.refus ? <p className="ak-note">Journal indisponible sur ce stockage.</p> : d.refus.total === 0
+        ? <p className="ak-note">Aucun. Si des vidéos sont regardées en entier sans récompense et que ce compteur reste à zéro, le reçu d’AppLixir n’arrive pas jusqu’au serveur : vérifier l’adresse de callback enregistrée chez AppLixir.</p>
+        : <><p className="ak-note">{d.refus.total.toLocaleString('fr-FR')} reçu{d.refus.total > 1 ? 's' : ''} arrivé{d.refus.total > 1 ? 's' : ''} jusqu’au serveur sans rien créditer. Les plus récents :</p>
+          <div className="pub-tableau-defile"><table><thead><tr><th>Date</th><th>Raison</th><th>Vidéo terminée côté joueur</th></tr></thead><tbody>{d.refus.derniers.map((r, i) => <tr key={`${r.le}-${i}`}><td>{new Date(r.le).toLocaleString('fr-FR')}</td><td>{RAISONS_REFUS[r.refus] ?? r.refus}</td><td>{r.videoTerminee ? 'oui' : 'non'}</td></tr>)}</tbody></table></div></>}
       <h3>Distribution des packs</h3><p className="ak-note">La théorie historique cumule les probabilités réellement proposées à chaque tirage, même après un changement de poids ou de ligue. Les écarts sur peu de tirages restent normaux.</p>
       <div className="pub-tableau-defile"><table><thead><tr><th>Pack</th><th>Théorique historique</th><th>Gagnés</th><th>Réel cumulé</th></tr></thead><tbody>{d.packs.map(p => <tr key={p.id}><td>{p.nom}</td><td>{(stats.packsEarned ? (stats.distributionAttendue?.[p.id] ?? 0)/stats.packsEarned*100 : 0).toFixed(2)} %</td><td>{stats.distribution[p.id] ?? 0}</td><td>{stats.packsEarned ? ((stats.distribution[p.id] ?? 0)/stats.packsEarned*100).toFixed(2) : '0'} %</td></tr>)}</tbody></table></div>
     </section>

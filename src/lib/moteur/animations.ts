@@ -554,8 +554,114 @@ export function choisirFrappe(botteur: Pion, pression: number): StyleFrappe {
 // LES ESSAIS ET CE QUI LES SUIT
 // ═══════════════════════════════════════════════════════════════════════════
 
-export type StyleEssai = 'plongeon' | 'puissance' | 'glissade' | 'calme' | 'coin' | 'poteaux' | 'melee' | 'maul' | 'interception';
+export type StyleEssai = 'plongeon' | 'puissance' | 'glissade' | 'calme' | 'coin' | 'poteaux' | 'melee' | 'maul' | 'interception'
+  // Niveau 7 (Correctif 39) : le plongeon qui garde l'élan — voir `planifierEssai`.
+  | 'horizontal' | 'bas' | 'extension' | 'securise' | 'force';
 export const STYLES_ESSAI: readonly StyleEssai[] = ['plongeon', 'puissance', 'glissade', 'calme', 'coin', 'poteaux', 'melee', 'maul', 'interception'];
+
+// ═══════════════════════════════════════════════════════════════════════════
+// L'ESSAI QUI GARDE SON ÉLAN (Correctif 39, niveau 7)
+// ═══════════════════════════════════════════════════════════════════════════
+// Demande : « lorsqu'un joueur marque, il semble parfois se verrouiller dans une animation rigide. Le joueur ne doit pas
+// passer de 9 m/s à 0 m/s instantanément dès que TRY = true. Conserver le momentum pendant le saut, la chute, la glissade. »
+//
+// ⚠️ C'ÉTAIT LITTÉRAL. À l'instant où le porteur franchissait la ligne, le moteur lui donnait une chute de 2,6 m/s —
+// la même pour un ailier lancé à neuf mètres par seconde et pour un pilier à l'arrêt — ou le stoppait net s'il ne
+// plongeait pas. Un mètre de course après la ligne, quelle que soit la vitesse.
+//
+// Le plongeon est maintenant un MOUVEMENT : un vol qui garde l'essentiel de la vitesse, une réception, puis une glissade
+// freinée par la pelouse — d'autant plus longue que le marqueur arrivait vite. Le style se lit sur la situation (qui le
+// poursuit, d'où, à quelle vitesse il arrive, où il est dans l'en-but, son gabarit) ; il ne se tire pas.
+
+/** Le plongeon vivant : matchs de carrière (`IA_MATCH_DE_CARRIERE`) et ligue en règles 9. */
+export function essaisVivants(e: Pick<EtatMatch, 'ia'>): boolean { return (e.ia ?? 1) >= 7; }
+
+/** Les façons de marquer du niveau 7 (jeu courant ; mêlée et maul gardent leurs styles). */
+export const STYLES_ESSAI_VIVANT: readonly StyleEssai[] = ['plongeon', 'horizontal', 'bas', 'extension', 'coin', 'securise', 'force', 'poteaux', 'calme', 'interception'];
+
+export interface ContexteEssai {
+  /** Vitesse du marqueur à l'instant de franchir la ligne (m/s). */
+  vitesse: number;
+  /** Le défenseur valide le plus proche : sa distance (m ; Infinity s'il n'y en a pas)… */
+  defenseur: number;
+  /** … où il est par rapport à la course du marqueur (−1 : dans son dos, +1 : droit devant)… */
+  devant: number;
+  /** … et de quel côté (−1 : à sa gauche, +1 : à sa droite ; 0 : dans l'axe). */
+  cote: number;
+  /** Distance à la ligne de touche la plus proche, et à l'axe des poteaux (m). */
+  touche: number;
+  axe: number;
+  profil: ProfilAnimation;
+  intercepte: boolean;
+  /** Un nombre de [0, 1[ propre à cet essai, lu sur un tirage À PART : il ne sert qu'à rendre le grand saut occasionnel. */
+  hasard: number;
+}
+
+export interface PlanEssai {
+  style: StyleEssai;
+  /** Il se jette (vol, réception, glissade). Faux : il pose le ballon en ralentissant, sans quitter ses appuis. */
+  plonge: boolean;
+  /** Durée du vol (s). */
+  vol: number;
+  /** Part de sa vitesse gardée en l'air, puis à la réception. */
+  garde: number;
+  reception: number;
+  /** Ce que la pelouse lui retire pendant la glissade (m/s²). */
+  frottement: number;
+  /** Il s'écarte de sa course : de −1 (vers sa gauche) à +1 (vers sa droite) — plonger en évitant le contact. */
+  ecart: number;
+}
+
+const plongeon = (style: StyleEssai, vol: number, garde: number, reception: number, frottement: number, ecart = 0): PlanEssai =>
+  ({ style, plonge: true, vol, garde, reception, frottement, ecart });
+const pose = (style: StyleEssai): PlanEssai => ({ style, plonge: false, vol: 0, garde: 1, reception: 1, frottement: 6.5, ecart: 0 });
+
+/**
+ * COMMENT IL MARQUE — fonction pure, sans tirage du match.
+ *
+ *   défenseur dans le dos, tout près      → il plonge bas pour assurer (`securise`) ;
+ *   défenseur sur le côté                 → il plonge en s'écartant du contact (`bas`) ;
+ *   pilier ou deuxième ligne à petite allure → en force, sans plonger (`force`) ;
+ *   lancé le long de la touche            → le long plongeon dans le coin (`coin`) ;
+ *   seul, à pleine vitesse                → le grand saut en extension, de loin en loin (`extension`), sinon bras tendus ;
+ *   seul sous les poteaux, sans se presser → il aplatit calmement (`poteaux`) ;
+ *   poursuivi à distance, lancé           → le plongeon horizontal, qui glisse loin (`horizontal`).
+ */
+export function planifierEssai(c: ContexteEssai): PlanEssai {
+  const { vitesse: v, defenseur: d } = c;
+  const lourd = c.profil === 'lourd';
+  // ── Un défenseur sur lui ──────────────────────────────────────────────────
+  if (d < 3.2) {
+    // Un avant qui arrive sans élan passe en force : il pose le ballon dans le contact, il ne s'envole pas.
+    if ((lourd || c.profil === 'troisieme') && v < 4.6) return pose('force');
+    if (c.touche < 6.5) return plongeon('coin', 0.46, 0.84, 0.74, 8.5, c.cote === 0 ? 0 : -Math.sign(c.cote) * 0.25);
+    // Dans son dos : le plongeon bas, tout de suite, pour que la main ne l'attrape pas.
+    if (c.devant < -0.25) return plongeon('securise', 0.3, 0.84, 0.74, 9);
+    // Sur le côté ou devant : il plonge en s'écartant du contact.
+    return plongeon('bas', 0.32, 0.8, 0.7, 9.5, c.cote === 0 ? 0 : -Math.sign(c.cote) * 0.45);
+  }
+  // ── Personne pour l'arrêter ───────────────────────────────────────────────
+  if (lourd && v < 5.2) return pose(c.axe < 7 ? 'poteaux' : 'force');
+  if (c.intercepte && d > 6 && v >= 6) return plongeon('interception', 0.95, 0.82, 0.62, 8.5);
+  // Le long de la touche, lancé : le long plongeon dans le coin.
+  if (c.touche < 6.5 && v >= 5) return plongeon('coin', 0.5, 0.86, 0.78, 8);
+  if (d >= 7) {
+    // Beaucoup d'espace et de vitesse : le grand saut, mais pas à chaque essai (un sur trois dans ces conditions).
+    if (v >= 7.4 && !lourd && c.hasard < 0.34) return plongeon('extension', 0.92, 0.8, 0.6, 8.5);
+    if (c.axe < 7 && v < 6.6) return pose('poteaux');
+    return v >= 5.6 ? plongeon('plongeon', 0.42, 0.8, 0.72, 9) : pose('calme');
+  }
+  // Poursuivi à distance : lancé, il s'allonge et glisse ; sinon le plongeon bras tendus.
+  if (v >= 5.8) return plongeon('horizontal', 0.5, 0.86, 0.8, 7.5);
+  return v >= 3.6 ? plongeon('plongeon', 0.4, 0.8, 0.72, 9) : pose('calme');
+}
+
+/** La distance qu'un plongeon parcourt après la ligne (vol puis glissade), pour une vitesse d'arrivée donnée (m). */
+export function porteeDuPlongeon(plan: PlanEssai, vitesse: number): { vol: number; glissade: number } {
+  if (!plan.plonge) return { vol: 0, glissade: vitesse * vitesse / (2 * plan.frottement) };
+  const auSol = vitesse * plan.reception;
+  return { vol: vitesse * plan.garde * plan.vol, glissade: auSol * auSol / (2 * plan.frottement) };
+}
 
 /**
  * @param defenseur distance du défenseur valide le plus proche à l'instant d'aplatir (m ; Infinity s'il n'y en a pas).

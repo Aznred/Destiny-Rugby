@@ -1,0 +1,151 @@
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00029.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00030.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00031.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00032.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00033.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00034.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00035.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00036.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00037.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00038.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00039.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00040.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00041.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00042.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00043.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00044.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00045.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00046.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00047.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00049.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00050.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00053.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00055.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00056.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00059.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00061.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00063.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00065.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00067.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00069.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00071.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00073.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00075.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00077.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00079.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00081.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00083.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00085.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00087.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00089.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00090.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00093.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00095.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00097.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00099.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00101.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00102.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00105.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00107.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00109.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00111.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00113.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00115.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00117.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00119.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00120.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00123.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00125.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00127.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00129.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00131.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00132.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00135.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00137.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00139.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00141.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00143.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00145.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00147.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00149.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00151.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00153.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00155.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00156.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00159.jpg'
+duration 0.03333333333333333
+file 'C:/Users/Utilisateur/Desktop/rpg strat/Destiny Rugby/trailer/work/feminines/match-f1-06/00159.jpg'

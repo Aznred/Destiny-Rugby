@@ -1,0 +1,52 @@
+/* Pub « catastrophe » — rien ne s'anime en CSS : chaque style est posé par pub.js pour l'instant demandé,
+   ce qui rend l'image reproductible (rendu image par image). */
+:root {
+  --or-clair: #ffecaa;
+  --or: #e9c76e;
+  --or-sombre: #b87c2f;
+  --pelouse: #17473a;
+  --nuit: #061c1d;
+  --surligne: #ffc928;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: #000; overflow: hidden; }
+#cadre { position: fixed; left: 0; top: 0; width: 540px; height: 960px; overflow: hidden; background: #000; }
+#toile, #jeu { position: absolute; inset: 0; width: 540px; height: 960px; display: block; }
+#jeu { visibility: hidden; transform-origin: 50% 50%; }
+#eclair { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; }
+
+/* ── Sous-titres : au-dessus de la zone des légendes de TikTok, à l'écart de la colonne de boutons. ── */
+#sous-titres {
+  position: absolute; left: 30px; right: 78px; top: 598px; height: 150px;
+  display: flex; flex-wrap: wrap; align-content: center; justify-content: center; gap: 2px 19px;
+  font-family: 'Anton', 'Archivo', Impact, sans-serif; font-size: 50px; line-height: 1.12; letter-spacing: 0.4px;
+  text-transform: uppercase; text-align: center; color: #fff;
+}
+#sous-titres .mot {
+  display: inline-block; white-space: nowrap; transform-origin: 50% 80%;
+  -webkit-text-stroke: 9px #0b0b0d; paint-order: stroke fill;
+  text-shadow: 0 5px 0 rgba(0, 0, 0, .55), 0 0 22px rgba(0, 0, 0, .55);
+}
+#sous-titres .mot.fort { color: var(--surligne); }
+#sous-titres .mot.adresse { text-transform: none; letter-spacing: 0; }
+
+/* ── Le carton final ── */
+#fin { position: absolute; inset: 0; visibility: hidden; font-family: 'Anton', 'Archivo', sans-serif; color: #fff; }
+.fin-voile { position: absolute; inset: 0; background: radial-gradient(120% 80% at 50% 38%, rgba(23, 71, 58, .80) 0%, rgba(8, 36, 32, .92) 52%, rgba(3, 14, 15, .97) 100%); }
+.fin-lignes { position: absolute; inset: -20%; opacity: .16;
+  background: repeating-linear-gradient(98deg, transparent 0 118px, rgba(255, 255, 255, .55) 118px 120px); }
+.fin-embleme { position: absolute; left: 50%; top: 178px; width: 150px; height: 150px; margin-left: -75px; border-radius: 34px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, .55), 0 0 0 2px rgba(233, 199, 110, .45); }
+.fin-nom { position: absolute; left: 0; right: 0; top: 352px; text-align: center; line-height: .92; }
+.fin-mot { display: block; font-size: 128px; letter-spacing: 2px;
+  background: linear-gradient(180deg, #fffdf3 0%, var(--or-clair) 38%, var(--or) 62%, var(--or-sombre) 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(0 8px 0 rgba(0, 0, 0, .45)) drop-shadow(0 0 26px rgba(233, 199, 110, .28)); }
+.fin-filet { position: absolute; left: 50%; top: 606px; width: 380px; height: 4px; margin-left: -190px; transform-origin: 50% 50%;
+  background: linear-gradient(90deg, transparent, var(--or) 18%, var(--or-clair) 50%, var(--or) 82%, transparent); }
+.fin-accroche { position: absolute; left: 50%; top: 632px; transform-origin: 50% 50%; white-space: nowrap;
+  font-size: 40px; letter-spacing: 3px; color: #0a2a22; padding: 9px 30px 7px;
+  background: linear-gradient(180deg, var(--or-clair), var(--or) 60%, var(--or-sombre)); border-radius: 8px;
+  box-shadow: 0 10px 0 rgba(0, 0, 0, .35), 0 0 34px rgba(233, 199, 110, .35); }
+.fin-adresse { position: absolute; left: 0; right: 0; top: 728px; text-align: center; font-family: 'Archivo', sans-serif; font-weight: 800;
+  font-size: 46px; letter-spacing: .5px; color: #fff; text-shadow: 0 4px 0 rgba(0, 0, 0, .5), 0 0 26px rgba(255, 236, 170, .35); }

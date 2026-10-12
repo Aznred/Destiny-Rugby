@@ -44,6 +44,7 @@ import { TEXTES_ARTICLES_21 } from './textesArticles21.js';
 import { TEXTES_STAFF } from './textesStaff.js';
 import { TEXTES_EQUIPE } from './textesEquipe.js';
 import { TEXTES_VALIDATION_CLASSEMENT } from './textesValidationClassement.js';
+import { TEXTES_CLOTURE } from './textesCloture.js';
 
 // ⚠️ LA TRADUCTION AUTOMATIQUE PASSE EN DERNIER — c'est-à-dire qu'elle est
 // écrasée par tout le reste. `scripts/traduire.ts` remplit les langues
@@ -101,6 +102,7 @@ const ECRIT_A_LA_MAIN: Record<string, Traduction> = {
   ...TEXTES_STAFF,
   ...TEXTES_EQUIPE,
   ...TEXTES_VALIDATION_CLASSEMENT,
+  ...TEXTES_CLOTURE,
 
   // --- NAVIGATION ---------------------------------------------------------
   'nav.accueil': { fr: 'Accueil', en: 'Home', es: 'Inicio', it: 'Home', de: 'Start', pt: 'Início', ja: 'ホーム' },

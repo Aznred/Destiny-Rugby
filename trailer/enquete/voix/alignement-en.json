@@ -1,0 +1,330 @@
+{
+ "langue": "en",
+ "voix": "en.mp3",
+ "modele": "prise fournie, alignée par transcription (Scribe)",
+ "duree": 27.68,
+ "ecart": 0,
+ "entendu": "On October 12th at 9:04 PM, a man vanished in front of 80,000 witnesses. 15 suspects, all of them at the scene. Not one of them could stop him. Investigators recovered a single clue. He had sold them something, a dummy. Wait, he sold them a dummy? That's just Cheslin Kolbe. Destiny Rugby. Play free at destiny-rugby.fr",
+ "scenes": [
+  {
+   "scene": 1,
+   "texte": "On October 12th, at 9:04 PM, a man vanished in front of 80,000 witnesses.",
+   "debut": 0.16,
+   "fin": 6.66,
+   "mots": [
+    {
+     "mot": "On",
+     "debut": 0.16,
+     "fin": 0.22
+    },
+    {
+     "mot": "October",
+     "debut": 0.28,
+     "fin": 0.66
+    },
+    {
+     "mot": "12th,",
+     "debut": 0.76,
+     "fin": 1.2
+    },
+    {
+     "mot": "at",
+     "debut": 1.54,
+     "fin": 1.7
+    },
+    {
+     "mot": "9:04 PM,",
+     "debut": 1.92,
+     "fin": 2.9
+    },
+    {
+     "mot": "a",
+     "debut": 3.48,
+     "fin": 3.5
+    },
+    {
+     "mot": "man",
+     "debut": 3.62,
+     "fin": 3.84
+    },
+    {
+     "mot": "vanished",
+     "debut": 4.019,
+     "fin": 4.48
+    },
+    {
+     "mot": "in",
+     "debut": 4.54,
+     "fin": 4.64
+    },
+    {
+     "mot": "front",
+     "debut": 4.7,
+     "fin": 4.82
+    },
+    {
+     "mot": "of",
+     "debut": 4.86,
+     "fin": 5.04
+    },
+    {
+     "mot": "80,000",
+     "debut": 5.24,
+     "fin": 5.96
+    },
+    {
+     "mot": "witnesses.",
+     "debut": 6.06,
+     "fin": 6.66
+    }
+   ]
+  },
+  {
+   "scene": 2,
+   "texte": "15 suspects. All of them at the scene. Not one of them could stop him.",
+   "debut": 7.3,
+   "fin": 12.26,
+   "mots": [
+    {
+     "mot": "15",
+     "debut": 7.3,
+     "fin": 7.74
+    },
+    {
+     "mot": "suspects.",
+     "debut": 7.88,
+     "fin": 8.44
+    },
+    {
+     "mot": "All",
+     "debut": 9.06,
+     "fin": 9.16
+    },
+    {
+     "mot": "of",
+     "debut": 9.22,
+     "fin": 9.3
+    },
+    {
+     "mot": "them",
+     "debut": 9.32,
+     "fin": 9.42
+    },
+    {
+     "mot": "at",
+     "debut": 9.46,
+     "fin": 9.54
+    },
+    {
+     "mot": "the",
+     "debut": 9.58,
+     "fin": 9.68
+    },
+    {
+     "mot": "scene.",
+     "debut": 9.76,
+     "fin": 10.06
+    },
+    {
+     "mot": "Not",
+     "debut": 10.74,
+     "fin": 10.88
+    },
+    {
+     "mot": "one",
+     "debut": 11.06,
+     "fin": 11.18
+    },
+    {
+     "mot": "of",
+     "debut": 11.22,
+     "fin": 11.32
+    },
+    {
+     "mot": "them",
+     "debut": 11.36,
+     "fin": 11.56
+    },
+    {
+     "mot": "could",
+     "debut": 11.6,
+     "fin": 11.74
+    },
+    {
+     "mot": "stop",
+     "debut": 11.84,
+     "fin": 12.08
+    },
+    {
+     "mot": "him.",
+     "debut": 12.1,
+     "fin": 12.26
+    }
+   ]
+  },
+  {
+   "scene": 3,
+   "texte": "Investigators recovered a single clue: he had sold them something... a dummy.",
+   "debut": 12.88,
+   "fin": 18.16,
+   "mots": [
+    {
+     "mot": "Investigators",
+     "debut": 12.88,
+     "fin": 13.62
+    },
+    {
+     "mot": "recovered",
+     "debut": 13.66,
+     "fin": 14.06
+    },
+    {
+     "mot": "a",
+     "debut": 14.1,
+     "fin": 14.18
+    },
+    {
+     "mot": "single",
+     "debut": 14.3,
+     "fin": 14.6
+    },
+    {
+     "mot": "clue:",
+     "debut": 14.74,
+     "fin": 15.1
+    },
+    {
+     "mot": "he",
+     "debut": 15.76,
+     "fin": 15.84
+    },
+    {
+     "mot": "had",
+     "debut": 15.88,
+     "fin": 16.04
+    },
+    {
+     "mot": "sold",
+     "debut": 16.12,
+     "fin": 16.36
+    },
+    {
+     "mot": "them",
+     "debut": 16.379,
+     "fin": 16.54
+    },
+    {
+     "mot": "something...",
+     "debut": 16.6,
+     "fin": 16.98
+    },
+    {
+     "mot": "a",
+     "debut": 17.62,
+     "fin": 17.64
+    },
+    {
+     "mot": "dummy.",
+     "debut": 17.78,
+     "fin": 18.16
+    }
+   ]
+  },
+  {
+   "scene": 4,
+   "texte": "Wait... he sold them a dummy?! That's just Cheslin Kolbe!",
+   "debut": 18.84,
+   "fin": 22.94,
+   "mots": [
+    {
+     "mot": "Wait...",
+     "debut": 18.84,
+     "fin": 19.08
+    },
+    {
+     "mot": "he",
+     "debut": 19.54,
+     "fin": 19.68
+    },
+    {
+     "mot": "sold",
+     "debut": 19.76,
+     "fin": 19.94
+    },
+    {
+     "mot": "them",
+     "debut": 19.98,
+     "fin": 20.06
+    },
+    {
+     "mot": "a",
+     "debut": 20.12,
+     "fin": 20.16
+    },
+    {
+     "mot": "dummy?!",
+     "debut": 20.38,
+     "fin": 20.7
+    },
+    {
+     "mot": "That's",
+     "debut": 21.24,
+     "fin": 21.56
+    },
+    {
+     "mot": "just",
+     "debut": 21.64,
+     "fin": 21.92
+    },
+    {
+     "mot": "Cheslin",
+     "debut": 21.98,
+     "fin": 22.34
+    },
+    {
+     "mot": "Kolbe!",
+     "debut": 22.46,
+     "fin": 22.94
+    }
+   ]
+  },
+  {
+   "scene": 5,
+   "texte": "Destiny Rugby. Play free at destiny-rugby.fr.",
+   "debut": 23.38,
+   "fin": 27.48,
+   "mots": [
+    {
+     "mot": "Destiny",
+     "debut": 23.38,
+     "fin": 23.78
+    },
+    {
+     "mot": "Rugby.",
+     "debut": 23.88,
+     "fin": 24.26
+    },
+    {
+     "mot": "Play",
+     "debut": 24.58,
+     "fin": 24.74
+    },
+    {
+     "mot": "free",
+     "debut": 24.88,
+     "fin": 25.2
+    },
+    {
+     "mot": "at",
+     "debut": 25.26,
+     "fin": 25.42
+    },
+    {
+     "mot": "destiny-rugby.fr.",
+     "debut": 25.46,
+     "fin": 27.48
+    }
+   ]
+  }
+ ]
+}

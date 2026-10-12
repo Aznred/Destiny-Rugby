@@ -86,6 +86,34 @@ export function bilanContrat(m: Manager, effectif: Coequipier[], rang: number): 
   }
   return { ...suivi, decision: 'attente', motif: 'Le contrat se poursuit. Le renouvellement sera évalué à son échéance.' };
 }
+/** L'offre du conseil est-elle celle de ce club et de cette saison (la seule que `accepterProlongation` signe) ? */
+export function offreDuConseilValide(m: Manager): boolean {
+  const offre = m.conseil?.offre;
+  return !!offre && offre.club === m.club && offre.saison === m.saison;
+}
+
+/**
+ * UN CONTRAT À ZÉRO A TOUJOURS UNE RÉPONSE POSSIBLE (Correctif 39).
+ *
+ * ⚠️ SANS OFFRE SUR LA TABLE, LA PARTIE ÉTAIT MORTE. `semaineManager` et `saisonManager` refusent d'avancer tant que
+ * l'entraîneur n'a pas de contrat, et le seul bouton qui en redonne un (« Accepter l'offre ») n'apparaît que si
+ * `conseil.offre` existe. Une sauvegarde d'avant le suivi du conseil, ou une offre datée d'une autre saison, laissait
+ * donc un entraîneur en poste, sans contrat, sans offre, et sans aucun bouton : le temps ne passait plus.
+ *
+ * Le conseil propose alors une saison de plus aux conditions actuelles. Ce n'est pas un cadeau : c'est la décision
+ * (rester ou partir) rendue à l'entraîneur. Rend `null` quand il n'y a rien à réparer.
+ */
+export function offreDeSecours(m: Manager): SuiviConseil | null {
+  if (!m.club || (m.contrat?.saisons ?? 0) > 0 || offreDuConseilValide(m)) return null;
+  const base: SuiviConseil = m.conseil?.club === m.club ? m.conseil
+    : { club: m.club, score: 60, detail: { sportif: 60, objectifs: 60, finances: 85, groupe: 65 } };
+  return {
+    ...base, club: m.club, decision: 'prolongation',
+    motif: 'Votre contrat est arrivé à son terme. Le conseil propose une saison supplémentaire aux mêmes conditions.',
+    offre: { club: m.club, saison: m.saison, duree: 1, salaire: m.contrat?.salaire ?? 0, budgetBonus: 0 },
+  };
+}
+
 export function accepterProlongation(m: Manager): { contrat: Manager['contrat']; conseil: SuiviConseil | undefined; budgetBonus: number } {
   const offre = m.conseil?.offre;
   if (!offre || offre.club !== m.club || offre.saison !== m.saison || (m.contrat?.saisons ?? 0) > 0) return { contrat: m.contrat, conseil: m.conseil, budgetBonus: 0 };

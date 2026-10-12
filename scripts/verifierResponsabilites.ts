@@ -548,55 +548,92 @@ console.log('— Des matchs entiers, conduits à la main : ni blocage, ni NaN �
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-console.log('— La visée : un geste, trois appareils —');
+console.log('— La visée : un geste, trois appareils (Correctif 39) —');
 {
   const v = new ControleurVisee();
-  v.reinitialiser(0.7, 0);
-  v.souris(0.75, 100);
-  verifier(Math.abs(v.etat.x - 0.5) < 1e-9, 'la souris à trois quarts de la zone vise la moitié droite');
-  v.molette(5, 120);
-  verifier(Math.abs(v.etat.p - 0.8) < 1e-9, 'cinq crans de molette valent dix points de force');
-  v.molette(-100, 130);
-  verifier(v.etat.p === 0, 'la force est bornée');
-  v.rafraichir(131);
-  const brouillon = v.etat.geste;
-  v.rafraichir(131 + REGLAGES_VISEE.calme + 10);
-  verifier(v.etat.geste > brouillon && v.etat.geste === 1, 'le calme avant la frappe donne un geste net');
-  verifier(brouillon <= REGLAGES_VISEE.plancherGeste + 0.01, 'frapper aussitôt après avoir bougé donne un geste brouillon');
-  // Clavier : les flèches accélèrent.
+  // Clavier (le repli) : les flèches accélèrent, et le calme avant la frappe donne un geste net.
   v.reinitialiser(0.5, 0);
   for (let i = 0; i < 10; i++) v.clavier(1, 0, 0.05, i * 50);
   const apresDemi = v.etat.x;
   for (let i = 10; i < 20; i++) v.clavier(1, 0, 0.05, i * 50);
   verifier(apresDemi > 0 && v.etat.x - apresDemi > apresDemi * 1.05, 'une flèche tenue accélère');
-  // Manette : le stick vise, la charge monte et se relâche.
-  v.reinitialiser(0.5, 0);
-  v.manette(-0.6, null, false, 0.016, 10);
-  verifier(Math.abs(v.etat.x + 0.6) < 1e-9, 'le stick gauche vise');
-  for (let i = 0; i < 40; i++) v.manette(0, null, true, 0.05, 100 + i * 50);
-  verifier(v.etat.p > 0.9 && v.etat.arme, 'tenir le bouton charge la force');
-  verifier(v.relacherCharge() && !v.etat.arme, 'relâcher la charge déclenche la frappe');
-  // Doigt : direction, longueur, courbure.
-  const glisse = (dx: number, dy: number, bruit = 0, courbe = 0) => {
+  v.rafraichir(19 * 50 + 1);
+  const brouillon = v.etat.geste;
+  v.rafraichir(20 * 50 + REGLAGES_VISEE.calme + 10);
+  verifier(v.etat.geste > brouillon && v.etat.geste === 1, 'le calme avant la frappe donne un geste net');
+  verifier(brouillon <= REGLAGES_VISEE.plancherGeste + 0.01, 'frapper aussitôt après avoir bougé donne un geste brouillon');
+  v.hauteur(3); verifier(v.etat.h === 1, 'la hauteur est bornée');
+
+  // Manette : le stick oriente, le bouton tenu charge jusqu'à la limite, le relâcher frappe.
+  v.reinitialiser(0.5, 0, 'tir');
+  v.manette(-0.6, 0, false, 0.016, 10);
+  verifier(Math.abs(v.etat.x + 0.6) < 1e-9, 'le stick gauche oriente le tir');
+  verifier(!v.relacherCharge(), 'sans charge, relâcher ne frappe pas');
+  v.manette(-0.6, 0, true, 0.016, 20);
+  verifier(v.etat.p < 0.05 && v.etat.arme, 'la charge part de zéro');
+  for (let i = 0; i < 12; i++) v.manette(-0.6, 0, true, 0.05, 100 + i * 50);
+  const mi = v.etat.p;
+  verifier(mi > 0.4 && mi < 0.6, `plus on tient, plus la force monte (${mi.toFixed(2)} après 0,6 s)`);
+  for (let i = 0; i < 40; i++) v.manette(-0.6, 0, true, 0.05, 700 + i * 50);
+  verifier(v.etat.p === 1, 'elle s’arrête à la limite du joueur');
+  verifier(v.relacherCharge() && !v.etat.arme, 'relâcher le bouton déclenche la frappe');
+  // Coup d'envoi : le stick dit aussi la hauteur.
+  v.reinitialiser(0.5, 0, 'engagement');
+  v.manette(0.3, 0.9, false, 0.016, 10);
+  const pousse = v.etat.h;
+  v.manette(0.3, -0.9, false, 0.016, 20);
+  verifier(pousse < 0.25 && v.etat.h > 0.9, 'stick poussé : tendu ; stick tiré : en cloche');
+  v.reinitialiser(0.5, 0, 'tir');
+  v.manette(0, -0.9, false, 0.016, 10);
+  verifier(v.etat.h === 0.6, 'sur un tir au but, le stick ne touche pas à la hauteur');
+
+  // Le balayage : la souris et le doigt tracent le MÊME geste.
+  const glisse = (dx: number, dy: number, o: { bruit?: number; courbe?: number; pas?: number; mode?: 'tir' | 'engagement' | 'touche'; source?: 'doigt' | 'souris' } = {}) => {
     const d = new ControleurVisee();
-    d.reinitialiser(0.7, 0);
-    d.doigtDebut(200, 500, 0);
+    d.reinitialiser(0.7, 0, o.mode ?? 'tir');
+    d.traceDebut(200, 500, 0, o.source ?? 'doigt');
+    const bruit = o.bruit ?? 0, pas = o.pas ?? 16;
     for (let i = 1; i <= 24; i++) {
       const u = i / 24;
-      d.doigtBouge(200 + dx * u + (i % 2 ? bruit : -bruit) + courbe * Math.sin(Math.PI * u), 500 + dy * u + (i % 3 ? bruit : -bruit), i * 16);
+      d.traceBouge(200 + dx * u + (i % 2 ? bruit : -bruit) + (o.courbe ?? 0) * Math.sin(Math.PI * u), 500 + dy * u + (i % 3 ? bruit : -bruit), i * pas);
     }
-    return { d, decide: d.doigtFin() };
+    const arme = d.etat.arme;
+    return { d, arme, decide: d.traceFin() };
   };
   const droit = glisse(0, -150);
-  verifier(droit.decide && Math.abs(droit.d.etat.x) < 0.05 && Math.abs(droit.d.etat.p - 150 / 170) < 0.02, 'un glissé droit vers le haut vise l’axe, avec la force de sa longueur');
-  const incline = glisse(70, -150);
-  verifier(incline.d.etat.x > 0.5, 'un glissé penché à droite vise à droite');
+  verifier(droit.arme && droit.decide && !droit.d.etat.arme, 'poser, glisser, relâcher : le geste est armé puis frappe');
+  verifier(Math.abs(droit.d.etat.x) < 0.05, 'un balayage droit vers le haut vise l’axe');
+  const souris = glisse(0, -150, { source: 'souris' });
+  verifier(souris.decide && Math.abs(souris.d.etat.p - droit.d.etat.p) < 1e-9 && Math.abs(souris.d.etat.x - droit.d.etat.x) < 1e-9 && souris.d.etat.source === 'souris',
+    'la souris tenue trace exactement le même geste que le doigt');
+  const long = glisse(0, -190), demi = glisse(0, -95);
+  verifier(long.d.etat.p > demi.d.etat.p * 1.8 && long.d.etat.p > 0.85, `la longueur donne la force (${demi.d.etat.p.toFixed(2)} à mi-geste, ${long.d.etat.p.toFixed(2)} à geste plein)`);
+  const vif = glisse(0, -150, { pas: 6 }), pose = glisse(0, -150, { pas: 40 });
+  verifier(vif.d.etat.p > pose.d.etat.p + 0.05 && pose.d.etat.p > vif.d.etat.p * 0.7, 'la vitesse du geste ajoute un peu de force, sans la décider');
+  const incline = glisse(70, -150), gauche = glisse(-70, -150);
+  verifier(incline.d.etat.x > 0.5 && gauche.d.etat.x < -0.5, 'un balayage penché vise de son côté');
   const court = glisse(0, -10);
   verifier(!court.decide, 'un tapotement ne décide rien');
-  const tremble = glisse(0, -150, 9);
+  const tremble = glisse(0, -150, { bruit: 9 });
   verifier(tremble.d.etat.geste < droit.d.etat.geste - 0.25, 'un tracé qui tremble donne un geste moins net');
-  const courbe = glisse(0, -150, 0, 26);
-  verifier(Math.abs(courbe.d.etat.effet) > 0.5, 'une boucle dans le tracé demande d’effet');
+  const courbe = glisse(0, -150, { courbe: 26 });
+  verifier(Math.abs(courbe.d.etat.effet) > 0.5, 'une boucle dans le tracé demande de l’effet');
+  const abandon = new ControleurVisee();
+  abandon.reinitialiser(0.7, 0);
+  abandon.traceDebut(10, 10, 0);
+  abandon.traceBouge(10, -200, 100);
+  abandon.traceAnnule();
+  verifier(!abandon.etat.arme && !abandon.traceFin(), 'un geste abandonné ne frappe pas');
+
+  // Le coup d'envoi : la longueur donne la distance, la vitesse la hauteur, l'inclinaison le côté.
+  const eLong = glisse(0, -185, { mode: 'engagement', pas: 6 }), eCourt = glisse(0, -60, { mode: 'engagement', pas: 30 });
+  verifier(eLong.d.etat.p > 0.9 && eLong.d.etat.h < 0.3, `long et vif : loin et tendu (force ${eLong.d.etat.p.toFixed(2)}, hauteur ${eLong.d.etat.h.toFixed(2)})`);
+  verifier(eCourt.d.etat.p < 0.4 && eCourt.d.etat.h > 0.8, `court et posé : court et en cloche (force ${eCourt.d.etat.p.toFixed(2)}, hauteur ${eCourt.d.etat.h.toFixed(2)})`);
+  const eProfond = glisse(0, -185, { mode: 'engagement', pas: 45 });
+  verifier(eProfond.d.etat.p > 0.9 && eProfond.d.etat.h > 0.8, 'long et posé : profond ET en cloche — la force seule ne décide pas de tout');
+  const eCote = glisse(-80, -150, { mode: 'engagement' });
+  verifier(eCote.d.etat.x < -0.6 && eCote.d.etat.effet === 0, 'penché à gauche : vers la gauche, sans effet');
+  verifier(Math.abs(eLong.d.etat.p - glisse(0, -185, { mode: 'engagement', pas: 45 }).d.etat.p) < 1e-9, 'au coup d’envoi, la vitesse ne change pas la longueur');
 }
 
 console.log(`\n${ok} contrôles passés.`);

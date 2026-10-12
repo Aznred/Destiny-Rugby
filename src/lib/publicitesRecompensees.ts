@@ -38,6 +38,8 @@ export interface StatsPublicites {
   ovasRewarded: number; packsEarned: number; joueurs: number;
   distribution: Record<string, number>;
   distributionAttendue?: Record<string, number>;
+  /** Callbacks AppLixir refusés pour ce compte (reçu arrivé, mais mal signé, expiré, hors plafond…). */
+  callbacksRefuses?: number;
 }
 export const STATS_PUB_VIDES = (): StatsPublicites => ({
   requested: 0, started: 0, completed: 0, failed: 0, noFill: 0,

@@ -12,6 +12,8 @@ import { POSTE_PAR_ID } from '../data/rugby';
 import type { PosteId } from '../types';
 import { annoterSeance, oublierLesSeances, profileurActif, reglerProfileur, seancesProfilees, type SeanceProfilee } from '../lib/profileur';
 import { dernierFil } from '../lib/finMatch';
+import { derniereTraceCloture, diagnostiquerCloture, texteDiagnostic } from '../lib/clotureSaison';
+import { useGame } from '../store/useGame';
 import './LaboStatistiques.css';
 import type { BilanCarriereUsage } from '../lib/usage/carrieres';
 
@@ -159,6 +161,34 @@ function DerniereFinDeMatch() {
 }
 
 /**
+ * LA CLÔTURE DE SAISON D'UNE CARRIÈRE D'ENTRAÎNEUR (Correctif 39) : ce qui la retient en ce moment sur cet appareil, et ce que
+ * la dernière clôture a réglé d'office. La liste est celle que lit le store (`diagnostiquerCloture`), telle quelle.
+ */
+function ClotureDeSaison() {
+  const manager = useGame((s) => s.manager);
+  const retenue = useGame((s) => s.clotureRetenue);
+  const trace = derniereTraceCloture();
+  if (!manager?.club && !trace) return null;
+  const maintenant = manager?.club ? texteDiagnostic(diagnostiquerCloture(manager), manager.derniereCloture?.saison === manager.saison ? manager.derniereCloture.incidents : []) : null;
+  return <section className="ls-bloc">
+    <h4>Clôture de saison (carrière d’entraîneur)</h4>
+    {maintenant && <>
+      <p className="ls-note">{manager!.club} · saison {manager!.saison}, semaine {manager!.semaine}{retenue?.erreur ? ' · la dernière tentative a levé une erreur' : ''}</p>
+      <pre className="ls-diagnostic">{maintenant}{retenue?.erreur ? `
+- last attempt threw: ${retenue.erreur}` : ''}</pre>
+    </>}
+    {trace && <>
+      <p className="ls-note">
+        Dernière tentative de clôture : {new Date(trace.le).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })} ·{' '}
+        {trace.club}, saison {trace.saison} · {trace.issue === 'close' ? 'saison close' : trace.issue === 'retenue' ? 'retenue par un verrou' : 'arrêtée par une erreur'}
+      </p>
+      <pre className="ls-diagnostic">{trace.texte}</pre>
+    </>}
+    <p className="ls-note">« blocking » demande un geste de l’entraîneur ; « auto-resolved » est réglé d’office à la clôture ; une étape « skipped » a échoué sans retenir la saison.</p>
+  </section>;
+}
+
+/**
  * LE PROFILEUR (points 49 et 50). Un réglage de CET appareil : allumé, un cartouche de mesures s'affiche sur tout match en
  * 3D, et chaque match mesuré laisse un résumé ici — on en aligne deux pour juger une optimisation, chiffres à l'appui.
  */
@@ -175,6 +205,7 @@ function PanneauProfileur() {
       <button type="button" className="ls-bascule" aria-pressed={actif} onClick={() => { reglerProfileur(!actif); setActif(!actif); }}><i />{actif ? 'Profileur allumé' : 'Profileur éteint'}</button>
     </section>
     <DerniereFinDeMatch />
+    <ClotureDeSaison />
     <section className="ls-bloc">
       <h4>Séances mesurées</h4>
       <label>Appareil <select aria-label="Filtrer les mesures par appareil" value={filtre} onChange={e => setFiltre(e.target.value)}>
