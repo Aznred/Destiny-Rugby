@@ -2677,7 +2677,7 @@ Le catalogue publicitaire utilise le vivier mixte, avec les pochettes dédiées 
 
 Les vignettes WebP sont rendues hors ligne depuis les GLB et leurs textures par `npm run data:vignettes-packs`, sans scènes 3D supplémentaires dans la roulette. L'animation conserve le résultat serveur, avec un ralentissement suivi d'un second élan et des étincelles ; le mouvement réduit supprime ces effets.
 
-Bancs : `npm run verify:publicites` (serveur et SDK), `npm run verify:publicites-sql` (transaction Neon, données d'essai annulées). Aperçu local : `/scripts/apercuPublicites.html`, exclusivement simulé. Configuration serveur et étapes de mise en ligne : [PUBLICITES-APPLIXIR.md](serveur/PUBLICITES-APPLIXIR.md).
+Bancs : `npm run verify:publicites` (serveur et SDK), `npm run verify:publicites-sql` (transaction Neon, données d'essai annulées). Aperçu local : `/scripts/apercuPublicites.html`, exclusivement simulé. Configuration serveur et étapes de mise en ligne : [PUBLICITES-APPLIXIR.md](serveur/PUBLICITES-APPLIXIR.md). Le 12 octobre, l'override et le webhook global sont enregistrés en MD5 + TID ; le visionnage complet réel reste sans reçu signé accepté. [Diagnostic fournisseur](serveur/DIAGNOSTIC-PUBLICITES-2026-10-12.md).
 
 ### Validation du classement des carrières (Correctif 38)
 
