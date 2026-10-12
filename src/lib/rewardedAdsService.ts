@@ -6,7 +6,7 @@ interface OptionsAppLixir {
   adStatusCallbackFn: (statut: StatutAppLixir) => void;
   adErrorCallbackFn: (erreur: { getError?: () => { data?: { errorCode?: number } } }) => void;
 }
-declare global { interface Window { initializeAndOpenPlayer?: (options: OptionsAppLixir) => void } }
+declare global { interface Window { initializeAndOpenPlayer?: (options: OptionsAppLixir) => void | Promise<unknown> } }
 export interface SessionNavigateurPub extends RecompensePub { apiKey: string; mode: 'TEST' | 'LIVE' }
 export async function appelerPublicites<T>(corps?: unknown, ligue?: string, signal?: AbortSignal): Promise<T> {
   const r = await fetch(`/api/carriere?publicites=1${ligue ? `&ligue=${encodeURIComponent(ligue)}` : ''}`, {
@@ -33,12 +33,12 @@ class ServicePublicitesRecompensees {
       const existant = document.querySelector<HTMLScriptElement>(`script[src="${src}"]`);
       const script = existant ?? document.createElement('script');
       const nettoyer = () => { clearTimeout(delai); script.removeEventListener('load', charge); script.removeEventListener('error', echoue); };
-      const charge = () => { nettoyer(); if (window.initializeAndOpenPlayer) resolve(); else reject(new Error('Le lecteur publicitaire est indisponible.')); };
-      const echoue = () => { nettoyer(); reject(new Error('La publicité est bloquée ou momentanément indisponible.')); };
+      const charge = () => { nettoyer(); if (window.initializeAndOpenPlayer) resolve(); else { script.remove(); reject(new Error('Le lecteur publicitaire est indisponible.')); } };
+      const echoue = () => { nettoyer(); script.remove(); reject(new Error('La publicité est bloquée ou momentanément indisponible.')); };
       const delai = setTimeout(echoue,15000);
       script.addEventListener('load',charge,{once:true}); script.addEventListener('error',echoue,{once:true});
       if (!existant) { script.src = src; script.async = true; document.head.appendChild(script); }
-    });
+    }).catch(e => { this.chargement = undefined; throw e; });
     return this.chargement;
   }
   isAvailable(): boolean { return Boolean(this.config?.enabled && window.initializeAndOpenPlayer && !this.terminer); }
@@ -60,29 +60,37 @@ class ServicePublicitesRecompensees {
         for (const a of audios) { if (a.isConnected) void a.play().catch(() => {}); }
         resolve(ok);
       };
+      // Les callbacks locaux précèdent le traitement interne du SDK (reçu et télémétrie).
+      // Ne pas retirer son lecteur au milieu de cette pile d'appels.
+      const finirApresSdk = (evenement?: string) => queueMicrotask(() => finir(complete,complete ? undefined : evenement));
+      const attendreFinSdk = () => { fermeture ??= setTimeout(() => finir(complete,complete ? undefined : 'NO_FILL'),5000); };
       this.terminer = () => finir(complete,complete ? undefined : 'CLOSED');
       const delai = setTimeout(() => finir(complete,complete ? undefined : 'FAILED'),180000);
       try {
         // Appel synchrone dans le clic « Lancer la vidéo » : conserve le geste Safari/iOS.
-        window.initializeAndOpenPlayer!({ apiKey: session.apiKey, injectionElementId: conteneur.id,
+        const ouverture = window.initializeAndOpenPlayer!({ apiKey: session.apiKey, injectionElementId: conteneur.id,
           userId: session.rewardSessionId, customData: { context: contexte },
           adStatusCallbackFn: s => {
             if (finie) return;
-            if (s.type === 'started') signaler('STARTED');
+            // IMA émet « start » ; certains adaptateurs exposent « started ».
+            if (s.type === 'start' || s.type === 'started') signaler('STARTED');
             else if (s.type === 'complete') {
+              if (!complete) signaler('WATCHED'); // Reprise durable, jamais une preuve de récompense.
               complete = true;
-              // Laisser le SDK terminer son cycle, même sans allAdsCompleted.
-              fermeture ??= setTimeout(() => finir(true),1200);
-            } else if (s.type === 'allAdsCompleted') finir(complete,complete ? undefined : 'NO_FILL');
-            else if (['skipped','manuallyEnded','consentDeclined'].includes(s.type)) finir(complete,complete ? undefined : 'CLOSED');
-            else if (s.type === 'noAd') finir(false,'NO_FILL');
+              attendreFinSdk();
+            } else if (s.type === 'allAdsCompleted' || s.type === 'skipped') attendreFinSdk();
+            else if (['thankYouModalClosed','adSkippedNoReward'].includes(s.type)) finirApresSdk(s.type === 'adSkippedNoReward' ? 'CLOSED' : 'NO_FILL');
+            else if (['manuallyEnded','consentDeclined'].includes(s.type)) finirApresSdk('CLOSED');
+            else if (s.type === 'noAd') finirApresSdk('NO_FILL');
           },
           adErrorCallbackFn: e => {
             let code: number | undefined;
             try { code = e.getError?.().data?.errorCode; } catch { /* aucune confiance dans l'erreur SDK */ }
-            finir(complete,complete ? undefined : code === 303 ? 'NO_FILL' : 'FAILED');
+            finirApresSdk(code === 303 ? 'NO_FILL' : 'FAILED');
           },
         });
+        // Le SDK v6 ouvre le lecteur de façon asynchrone : un try/catch seul ne suffit pas.
+        if (ouverture) void ouverture.catch(() => finirApresSdk('FAILED'));
       } catch { finir(false,'FAILED'); }
     });
   }

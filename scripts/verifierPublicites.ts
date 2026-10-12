@@ -70,6 +70,9 @@ try {
   egal((await action('joueur','reclamer',{rewardSessionId:id,videoComplete:true,montant:10000})).donnees.statut,'PENDING','une fausse complétion client ne récompense pas');
   egal((await action('autre','reclamer',{rewardSessionId:id})).statut,400,'session privée, inaccessible à un autre compte');
   egal((await action('joueur','evenement',{rewardSessionId:id,evenement:'COMPLETE'})).statut,400,'aucun événement client ne valide une vidéo');
+  egal((await action('joueur','evenement',{rewardSessionId:id,evenement:'WATCHED'})).statut,200,'complétion locale conservée pour la reprise');
+  egal((await action('joueur','reclamer',{rewardSessionId:id})).donnees.statut,'PENDING','WATCHED seul ne crédite aucun gain');
+  egal((await appel('joueur','?publicites=1')).donnees.aVerifier.map((s:any)=>s.rewardSessionId),[id],'récompense à vérifier retrouvée après rechargement');
   const q=signature(id), fausse=new URLSearchParams(q); fausse.set('signature','0'.repeat(32));
   egal((await callback(fausse)).statut,403,'signature falsifiée refusée');
   const autreId=new URLSearchParams(q); autreId.set('userId',randomUUID());
@@ -94,7 +97,15 @@ try {
   const echouee=await action('autre','commencer',{contexte:'SHOP_OVAS'});
   await action('autre','evenement',{rewardSessionId:echouee.donnees.rewardSessionId,evenement:'NO_FILL'});
   egal((await action('autre','reclamer',{rewardSessionId:echouee.donnees.rewardSessionId})).donnees.statut,'PENDING','no-fill, aucune récompense');
-  egal((await callback(signature(echouee.donnees.rewardSessionId))).statut,403,'session abandonnée fermée au callback tardif');
+  egal((await callback(signature(echouee.donnees.rewardSessionId))).statut,200,'reçu signé retardé accepté après un no-fill local');
+  egal((await action('autre','reclamer',{rewardSessionId:echouee.donnees.rewardSessionId})).donnees.statut,'CLAIMED','récompense retardée récupérable une seule fois');
+  const annulee=await action('autre','commencer',{contexte:'SHOP_OVAS'});
+  await action('autre','evenement',{rewardSessionId:annulee.donnees.rewardSessionId,evenement:'CLOSED'});
+  const derniere=await action('autre','commencer',{contexte:'SHOP_OVAS'});
+  const callbacksRetardes=await Promise.all([callback(signature(derniere.donnees.rewardSessionId)),callback(signature(annulee.donnees.rewardSessionId))]);
+  egal(callbacksRetardes.map(r=>r.statut).sort(),[200,403],'callbacks concurrents et retardés soumis au plafond quotidien');
+  const sansAnnonce=await action('kiri','commencer',{contexte:'SHOP_OVAS'});
+  await action('kiri','evenement',{rewardSessionId:sansAnnonce.donnees.rewardSessionId,evenement:'NO_FILL'});
 
   const ligue=randomUUID();
   let etat=creerCarriere({id:ligue,code:'PUBBANC',nom:'Banc Publicités',compteId:joueur,pseudo:'Alice',clubNom:'Club Test',maxClubs:2,rythme:3,
@@ -134,7 +145,7 @@ try {
   egal((await commencer('DAILY_PACK',ligue2)).statut,400,'changer de ligue ne contourne pas les deux packs quotidiens');
   egal((await db.publicites!.statistiques()).packsEarned,2,'statistiques serveur des packs gagnés');
   const stats=await db.publicites!.statistiques();
-  egal(stats.completed,4,'complétions signées, sans doublon ni no-fill'); egal(stats.ovasRewarded,8,'Ovas réellement attribués'); egal(stats.noFill,1,'no-fill comptabilisé');
+  egal(stats.completed,6,'complétions signées, y compris retardées, sans doublon'); egal(stats.ovasRewarded,12,'Ovas réellement attribués'); egal(stats.noFill,1,'no-fill comptabilisé seulement sans reçu signé');
   egal(Object.values(stats.distribution).reduce((a,b)=>a+b,0),2,'distribution cumulée exacte');
   ok(Math.abs(Object.values(stats.distributionAttendue ?? {}).reduce((a,b)=>a+b,0)-2)<1e-9,'théorie cumulée depuis les vraies probabilités de chaque tirage');
   const schema=readFileSync('serveur/schema-publicites.sql','utf8');

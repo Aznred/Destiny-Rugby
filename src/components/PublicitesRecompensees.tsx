@@ -37,6 +37,7 @@ export function OffrePublicitaire({ contexte, ligue, onPack, disabled = false }:
     return () => { vivant.current=false; abort.current?.abort(); void audioRoulette.current?.close().catch(()=>{}); document.removeEventListener('visibilitychange',reveil); };
   },[charger]);
   const recevoir = async (id: string) => {
+    setVerification(id); // La reprise reste possible si la confirmation réseau échoue.
     abort.current?.abort(); const controle = new AbortController(); abort.current = controle;
     const r = await claimRewardedAdReward(id,controle.signal);
     if (!vivant.current || controle.signal.aborted) return;
@@ -105,6 +106,10 @@ export function OffrePublicitaire({ contexte, ligue, onPack, disabled = false }:
     {erreur && <p className="offre-pub-message" role="alert">{erreur}</p>}
     {message && <p className="offre-pub-message" role="status">{message}</p>}
     {verification && <button className="btn fantome" disabled={occupe} onClick={() => void reprendre(verification)}>Vérifier ma récompense</button>}
+    {vue?.aVerifier?.filter(r => r.contexte === contexte && r.rewardSessionId !== verification).map(r => <div key={r.rewardSessionId} className="pub-reprise">
+      <span>Votre vidéo est terminée. La confirmation de la récompense est en attente.</span>
+      <button className="btn fantome" disabled={disabled || occupe} onClick={() => void reprendre(r.rewardSessionId)}>Vérifier ma récompense</button>
+    </div>)}
     {vue?.enAttente.filter(r => r.contexte === contexte).map(r => <div key={r.rewardSessionId} className="pub-reprise">
       <span>{ovas ? 'Vous avez des Ovas à recevoir.' : `Vous avez un Pack Pub non ouvert : ${r.pack?.nom}.`}</span>
       <button className="btn fantome" disabled={disabled || occupe} onClick={() => void reprendre(r.rewardSessionId)}>{ovas ? 'Recevoir mes Ovas' : 'Récupérer mon pack'}</button>
@@ -123,6 +128,7 @@ function LecteurPublicite({ session, lecture, lancer, fermer }: { session: Sessi
       <button className="pub-fermer" aria-label="Fermer la publicité" onClick={fermer}><Icone nom="croix" taille={20} /></button>
       <span className="eyebrow">Publicité récompensée</span><h2 id="pub-titre">Regardez une courte publicité</h2>
       <p>Récompense : {session.contexte === 'SHOP_OVAS' ? `+ ${session.montant} Ovas` : '1 pack garanti'}</p>
+      {session.mode === 'TEST' && <small>Annonce de test</small>}
       <div id="applixir-ad-container" className={lecture ? 'pub-video active' : 'pub-video'} />
       {!lecture && <button className="btn primaire" onClick={lancer}><Icone nom="video" taille={18} /> Lancer la vidéo</button>}
       {lecture && <small>La récompense est validée après le visionnage complet.</small>}

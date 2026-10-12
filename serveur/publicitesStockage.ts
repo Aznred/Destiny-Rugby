@@ -4,7 +4,7 @@ import type { ExecuterSql } from './packsInternesStockage.js';
 export interface SessionPub extends RecompensePub {
   compte: string; jour: string; creeLe: number; expireLe: number;
   config: ConfigPublicites; chances: ChancePackPub[];
-  verifieLe?: number; started?: boolean; failure?: 'FAILED' | 'NO_FILL' | 'CLOSED'; tid?: string;
+  verifieLe?: number; started?: boolean; videoTerminee?: boolean; failure?: 'FAILED' | 'NO_FILL' | 'CLOSED'; tid?: string;
 }
 export interface RegistrePublicites { revision: number; sessions: SessionPub[]; stats: StatsPublicites }
 export interface StockagePublicites {

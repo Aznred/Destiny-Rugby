@@ -35,18 +35,18 @@ window.initializeAndOpenPlayer = options => {
   bouton.onclick=()=> {
     if(resultat==='complete') {
       const session=sessions.get(options.userId)!; session.rewardStatus='RESERVED'; session.pack=packs.find(p=>p.id==='top14')!; utilisations++;
-      options.adStatusCallbackFn({type:'complete'}); options.adStatusCallbackFn({type:'allAdsCompleted'});
-    } else if(resultat==='no-fill') options.adStatusCallbackFn({type:'allAdsCompleted'});
+      options.adStatusCallbackFn({type:'complete'}); options.adStatusCallbackFn({type:'allAdsCompleted'}); options.adStatusCallbackFn({type:'thankYouModalClosed'});
+    } else if(resultat==='no-fill') { options.adStatusCallbackFn({type:'allAdsCompleted'}); options.adStatusCallbackFn({type:'thankYouModalClosed'}); }
     else if(resultat==='error') options.adErrorCallbackFn({getError:()=>({data:{errorCode:303}})});
-    else options.adStatusCallbackFn({type:'skipped'});
+    else { options.adStatusCallbackFn({type:'skipped'}); options.adStatusCallbackFn({type:'adSkippedNoReward'}); }
   };
-  conteneur.appendChild(bouton); options.adStatusCallbackFn({type:'started'});
+  conteneur.appendChild(bouton); options.adStatusCallbackFn({type:'start'});
 };
 window.fetch = async (_url,options) => {
   appels++;
   const url=String(_url), body=options?.body ? JSON.parse(String(options.body)) : null;
   let donnees: unknown;
-  if(url.includes('atelier')) donnees={revision:0,config:PUBLICITES_PAR_DEFAUT,modeEffectif:'TEST',callbackConfigure:true,packs,statistiques:STATS_PUB_VIDES()};
+  if(url.includes('atelier')) donnees={revision:0,config:{...PUBLICITES_PAR_DEFAUT,mode:'LIVE'},modeEffectif:'TEST',raisonMode:'Le mode Test reste actif jusqu’à l’approbation du site par AppLixir et l’activation du Live sur le serveur.',callbackConfigure:true,packs,statistiques:STATS_PUB_VIDES()};
   else if(!body) donnees={config:PUBLICITES_PAR_DEFAUT,disponible:true,jour:'2026-10-11',ovasRestantes:2,packsRestants:Math.max(0,2-utilisations),chances,
     enAttente:[...sessions.values()].filter(s=>s.rewardStatus==='RESERVED')};
   else if(body.operation==='commencer') {
@@ -64,10 +64,10 @@ export function Banc() {
     const auto=demarrages===avant;
     const s:SessionNavigateurPub={rewardSessionId:crypto.randomUUID(),contexte:'DAILY_PACK',rewardStatus:'REQUESTED',montant:0,apiKey:PUBLICITES_PAR_DEFAUT.apiKey,mode:'TEST'};
     const conteneur=document.createElement('div');conteneur.id='applixir-ad-container';document.body.appendChild(conteneur);
-    const tous=RewardedAdsService.showRewardedAd('DAILY_PACK',s); dernieresOptions.adStatusCallbackFn({type:'allAdsCompleted'}); const sans=!(await tous);
-    const abandon=RewardedAdsService.showRewardedAd('DAILY_PACK',s); dernieresOptions.adStatusCallbackFn({type:'skipped'}); const ferme=!(await abandon);
+    const tous=RewardedAdsService.showRewardedAd('DAILY_PACK',s); dernieresOptions.adStatusCallbackFn({type:'allAdsCompleted'}); dernieresOptions.adStatusCallbackFn({type:'thankYouModalClosed'}); const sans=!(await tous);
+    const abandon=RewardedAdsService.showRewardedAd('DAILY_PACK',s); dernieresOptions.adStatusCallbackFn({type:'skipped'}); dernieresOptions.adStatusCallbackFn({type:'adSkippedNoReward'}); const ferme=!(await abandon);
     const erreur=RewardedAdsService.showRewardedAd('DAILY_PACK',s); dernieresOptions.adErrorCallbackFn({getError:()=>({data:{errorCode:303}})}); const nofill=!(await erreur);
-    const fin=RewardedAdsService.showRewardedAd('DAILY_PACK',s); dernieresOptions.adStatusCallbackFn({type:'complete'}); dernieresOptions.adStatusCallbackFn({type:'allAdsCompleted'}); const complet=await fin;
+    const fin=RewardedAdsService.showRewardedAd('DAILY_PACK',s); dernieresOptions.adStatusCallbackFn({type:'complete'}); dernieresOptions.adStatusCallbackFn({type:'allAdsCompleted'}); dernieresOptions.adStatusCallbackFn({type:'thankYouModalClosed'}); const complet=await fin;
     const propre=conteneur.childElementCount===0 && RewardedAdsService.isAvailable();conteneur.remove();
     setVerification([auto,sans,ferme,nofill,complet,propre].every(Boolean)?'6 contrôles SDK validés : volontaire, no-fill, fermeture, erreur, complétion et nettoyage.':'Échec des contrôles SDK');
   };

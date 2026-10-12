@@ -3,7 +3,7 @@ import type { PackCarriere } from '../lib/ligue/typesCarriere';
 import { chancesPacksPub, type ConfigPublicites, type StatsPublicites } from '../lib/publicitesRecompensees';
 import './PublicitesRecompensees.css';
 
-interface DonneesLabo { revision: number; config: ConfigPublicites; modeEffectif: string; callbackConfigure: boolean; packs: PackCarriere[]; statistiques: StatsPublicites }
+interface DonneesLabo { revision: number; config: ConfigPublicites; modeEffectif: string; raisonMode?: string; callbackConfigure: boolean; packs: PackCarriere[]; statistiques: StatsPublicites }
 async function appeler(corps?: unknown): Promise<DonneesLabo> {
   const r = await fetch('/api/carriere?atelier=1&section=publicites', { method: corps ? 'POST' : 'GET', credentials:'same-origin', cache:'no-store',
     headers: corps ? {'Content-Type':'application/json'} : undefined, body: corps ? JSON.stringify(corps) : undefined });
@@ -32,7 +32,8 @@ export function LaboPublicites() {
   const stats = d.statistiques;
   return <section className="labo-publicites">
     <header><h2>Publicités récompensées · AppLixir</h2><p>Mode effectif : <b>{d.modeEffectif === 'TEST' ? 'Test' : 'Live'}</b> · Callback serveur : <b>{d.callbackConfigure ? 'configuré' : 'à configurer'}</b></p>
-      <p className="ak-note">Les annonces et l’inventaire de test se règlent aussi dans AppLixir. Le mode Live exige la validation du site et l’activation serveur.</p></header>
+      {d.raisonMode && <p role="status" className="ak-note">{d.raisonMode}</p>}
+      <p className="ak-note">Une clé marquée Test dans AppLixir reste une clé de test, même si Live est sélectionné ici. Les annonces de test sont exclues des rapports AppLixir.</p></header>
     {erreur && <p className="ak-erreur" role="alert">{erreur}</p>}{message && <p className="ak-succes" role="status">{message}</p>}
     <form onSubmit={e => void sauver(e,'publicites')}><fieldset disabled={occupe}><legend>AppLixir et récompenses</legend>
       <label><input type="checkbox" checked={config.enabled} onChange={e => maj({enabled:e.target.checked})} /> AppLixir activé</label>

@@ -14,6 +14,11 @@ export function configPublicites(): ConfigPublicites {
   if (config.mode === 'TEST') config.apiKey = process.env.APPLIXIR_TEST_API_KEY || config.apiKey;
   return config;
 }
+export function raisonModePublicites(): string | undefined {
+  if (catalogueAdmin().publicites?.mode !== 'LIVE') return;
+  if (process.env.VERCEL_ENV !== 'production') return 'Les aperçus et le développement utilisent toujours le mode Test.';
+  if (process.env.APPLIXIR_LIVE_APPROVED !== 'true') return 'Le mode Test reste actif jusqu’à l’approbation du site par AppLixir et l’activation du Live sur le serveur.';
+}
 export function packPourPublicites(pack: PackCarriere): PackCarriere {
   const edition = catalogueAdmin().packs[pack.id];
   return { ...pack, ...edition, ...(pack.evenement ? {evenement:pack.evenement} : {}),
@@ -52,6 +57,8 @@ export function creerServicePublicites(stockage: StockagePublicites) {
       packsRestants: Math.max(0, config.packsDailyLimit - utilisees('DAILY_PACK')), chances,
       enAttente: sessions.filter(s => (s.rewardStatus === 'VERIFIED' || s.rewardStatus === 'RESERVED')
         && (s.contexte === 'SHOP_OVAS' || s.ligue === ligue)).map(publicSession),
+      aVerifier: sessions.filter(s => s.rewardStatus === 'REQUESTED' && s.videoTerminee && s.expireLe > maintenant
+        && (s.contexte === 'SHOP_OVAS' || s.ligue === ligue)).map(publicSession),
     };
   }
   async function commencer(compte: string, contexte: ContextePub, packs: PackCarriere[], ligue: string | undefined, maintenant: number) {
@@ -76,11 +83,14 @@ export function creerServicePublicites(stockage: StockagePublicites) {
     return { ...publicSession(session), apiKey: config.apiKey, mode: config.mode };
   }
   async function evenement(compte: string, id: string, type: string) {
-    if (!['STARTED','FAILED','NO_FILL','CLOSED'].includes(type)) erreur('Événement publicitaire invalide.');
+    if (!['STARTED','WATCHED','FAILED','NO_FILL','CLOSED'].includes(type)) erreur('Événement publicitaire invalide.');
     return modifier(compte, r => {
       const s = r.sessions.find(s => s.rewardSessionId === id); if (!s) return null;
       if (s.rewardStatus !== 'REQUESTED') return { resultat: true };
-      if (type === 'STARTED') { if (!s.started) { s.started = true; r.stats.started++; } }
+      if (type === 'STARTED' || type === 'WATCHED') {
+        if (!s.started) { s.started = true; r.stats.started++; }
+        if (type === 'WATCHED') s.videoTerminee = true;
+      }
       else { s.rewardStatus = 'FAILED'; s.failure = type as SessionPub['failure']; r.stats.failed++; if (type === 'NO_FILL') r.stats.noFill++; }
       return { resultat: true };
     });
@@ -96,12 +106,17 @@ export function creerServicePublicites(stockage: StockagePublicites) {
     const session = await stockage.trouver(id);
     if (!session || session.config.apiKey !== key || (process.env.APPLIXIR_GAME_ID && game !== process.env.APPLIXIR_GAME_ID)) erreur('Session AppLixir introuvable.');
     if (recompensee(session)) return { ok: true }; // Replay : aucune nouvelle écriture.
-    if (session.rewardStatus !== 'REQUESTED' || session.expireLe < maintenant) erreur('Session AppLixir expirée ou annulée.');
+    if (session.expireLe < maintenant) erreur('Session AppLixir expirée.');
     const pack = session.contexte === 'DAILY_PACK' ? choisirPackPub(session.chances, randomInt(0, 0x100000000) / 0x100000000) : undefined;
     return modifier(session.compte, r => {
       const s = r.sessions.find(s => s.rewardSessionId === id); if (!s) return null;
       if (recompensee(s)) return { resultat: { ok: true } };
-      if (s.rewardStatus !== 'REQUESTED' || s.expireLe < maintenant) erreur('Session AppLixir expirée ou annulée.');
+      if (s.expireLe < maintenant) erreur('Session AppLixir expirée.');
+      // Un reçu signé prime sur une fermeture ou un no-fill local arrivé en premier.
+      // Les callbacks retardés restent soumis au plafond journalier, dans le même CAS.
+      const limite = s.contexte === 'SHOP_OVAS' ? s.config.ovasDailyLimit : s.config.packsDailyLimit;
+      if (r.sessions.filter(a => a.jour === s.jour && a.contexte === s.contexte && recompensee(a)).length >= limite) erreur('DAILY_LIMIT — Plafond publicitaire atteint.');
+      if (s.rewardStatus === 'FAILED') { r.stats.failed--; if (s.failure === 'NO_FILL') r.stats.noFill--; delete s.failure; }
       s.verifieLe = maintenant; s.tid = tid; s.pack = pack; s.rewardStatus = pack ? 'RESERVED' : 'VERIFIED';
       if (pack) {
         r.stats.distributionAttendue ??= {};

@@ -31,6 +31,7 @@ export interface VuePublicites {
   config: ConfigPublicites; disponible: boolean; raison?: string; jour: string;
   ovasRestantes: number; packsRestants: number; chances: ChancePackPub[];
   enAttente: RecompensePub[];
+  aVerifier?: RecompensePub[];
 }
 export interface StatsPublicites {
   requested: number; started: number; completed: number; failed: number; noFill: number;

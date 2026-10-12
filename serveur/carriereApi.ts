@@ -32,7 +32,7 @@ import {
 } from '../src/lib/packsInternes.js';
 import { cleJoueurImage, imagesDepuisDemandes, validerDemandeImage, type ImagesJoueurs } from '../src/lib/demandesImage.js';
 import { apparencePackInterne, contenuPackInterne, detailPackInterne, rechercherCartes, resoudreCartes, universCartes } from './packsInternes.js';
-import { creerServicePublicites, configPublicites, packPourPublicites } from './publicitesRecompensees.js';
+import { creerServicePublicites, configPublicites, raisonModePublicites, packPourPublicites } from './publicitesRecompensees.js';
 import { ouvrirPackPublicitaire, reserverPackPublicitaire, packPublicitaireDisponible } from '../src/lib/ligue/carriere.js';
 import { chancesPacksPub, PUBLICITES_PAR_DEFAUT } from '../src/lib/publicitesRecompensees.js';
 import { creerServiceValidation, dossierPublic } from './validationClassement.js';
@@ -1270,7 +1270,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
             if (!stockage.publicites) throw new ErreurHttp(503, 'Publicités indisponibles.');
             const packs = await ffr.avecPool('mixed', () => cataloguePacksPublicitaires().map(packPourPublicites));
             return res.status(200).json({ revision: catalogueAdmin().revision, config: { ...PUBLICITES_PAR_DEFAUT, ...catalogueAdmin().publicites },
-              modeEffectif: configPublicites().mode, callbackConfigure: Boolean(process.env.APPLIXIR_CALLBACK_SECRET),
+              modeEffectif: configPublicites().mode, raisonMode: raisonModePublicites(), callbackConfigure: Boolean(process.env.APPLIXIR_CALLBACK_SECRET),
               packs, chances: chancesPacksPub(packs,maintenant), statistiques: await stockage.publicites.statistiques() });
           }
           if (section === 'clubs') return res.status(200).json(vueDonneesClubs());
