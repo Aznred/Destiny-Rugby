@@ -268,7 +268,7 @@ const nationLisible = (s: string) => s.replace(/[^\p{L}\p{M}\s'-]/gu, '').trim()
 
 
 
-export type SourceCarte = Omit<CarteCarriere, 'id' | 'proprietaire' | 'fatigue' | 'matchs' | 'essais' | 'clubs'>;
+export type SourceCarte = Omit<CarteCarriere, 'id' | 'proprietaire' | 'fatigue' | 'matchs' | 'essais' | 'clubs'> & { editionManuelle?: boolean };
 let catalogue: SourceCarte[] | undefined;
 const cataloguesAdmin = new WeakMap<CatalogueAdmin, readonly SourceCarte[]>();
 /** Un joueur ajouté par « Imports joueurs » devient une source comme les autres. */
@@ -278,7 +278,7 @@ function sourceDepuisAjout(a: AjoutJoueur): SourceCarte {
     postesSecondaires: a.postesSecondaires?.length ? [...a.postesSecondaires] : undefined,
     note: a.note, potentiel: Math.max(a.note, a.potentiel), age: a.age, nation: a.nation, clubReel: a.clubReel,
     championnat: a.championnat, pays: a.pays, photo: a.photo, origine: 'professionnel', rarete: rareteCarriere(a.note),
-    statistiques: statistiquesCarte(a.note, famille, a.sourceId) };
+    statistiques: statistiquesCarte(a.note, famille, a.sourceId), gender: a.gender, editionManuelle: true };
 }
 
 export function catalogueMondialCarriere(config: CatalogueAdmin = catalogueAdmin()): readonly SourceCarte[] {
@@ -316,6 +316,7 @@ function catalogueAvantProtection(config: CatalogueAdmin): readonly SourceCarte[
     return {
       ...source,
       ...edition,
+      editionManuelle: true,
       poste,
       famille,
       postesSecondaires,

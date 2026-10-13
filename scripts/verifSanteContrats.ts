@@ -63,7 +63,7 @@ verifier('les leviers modifient les vraies conditions', (avecPrimes.offre.primeV
   && avecOption.offre.option === nego.exigences.option
   && avecClauses.offre.clauseRelegation === nego.exigences.clauseRelegation);
 const signee = signerRenegociationJoueur(avancee, { ...nego, offre: nego.exigences, etat: 'signee' });
-verifier('la signature remplace duree salaire et demande', signee.contratsJoueurs[joueur.id].fin === manager.saison + nego.exigences.duree && !signee.contratsJoueurs[joueur.id].demandeRevalorisation);
+verifier('la signature couvre les saisons suivantes et remplace salaire et demande', signee.contratsJoueurs[joueur.id].fin === manager.saison + 1 + nego.exigences.duree && !signee.contratsJoueurs[joueur.id].demandeRevalorisation);
 
 const cible: CibleRecrutementManager = {
   id: 'cible-club', pseudo: 'cible_club', nom: 'Cible Club', club: 'RC Toulon', division: 'top14',

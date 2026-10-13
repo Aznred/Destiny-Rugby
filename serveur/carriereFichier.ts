@@ -20,6 +20,7 @@ import type { RegistrePublicites } from './publicitesStockage.js';
 import { STATS_PUB_VIDES } from '../src/lib/publicitesRecompensees.js';
 import { stockageValidationLocal, type DossierClassement } from './validationClassement.js';
 import { modifierCollectionSolo, possedeDoublons } from '../src/lib/echangesSolo.js';
+import type { DemandeCarte } from '../src/lib/cartesNormales.js';
 
 interface BaseLocale {
   classementsValidation?: Record<string, DossierClassement>;
@@ -48,6 +49,7 @@ interface BaseLocale {
   journalPacksInternes?: (LigneJournalPackInterne & { compte: string })[];
   /** « Mon image » : la même table que la base, en mémoire. */
   demandesImage?: (DemandeImage & { compte: string })[];
+  demandesCartes?: (DemandeCarte & { compte: string })[];
 }
 import { DEMANDES_EN_ATTENTE_MAX, type DemandeImage } from '../src/lib/demandesImage.js';
 export function stockageFichier(fichier: string): StockageCarriere {
@@ -159,6 +161,41 @@ export function stockageFichier(fichier: string): StockageCarriere {
       async journal(compte, limite) {
         return base.journalPacksInternes!.filter(l => l.compte === compte).slice(-Math.max(1, Math.min(200, limite))).reverse()
           .map(({ compte: _compte, ...ligne }) => copie(ligne));
+      },
+    },
+    demandesCartes: {
+      async creer(compte, id, saisie) {
+        base.demandesCartes ??= [];
+        if (base.demandesCartes.filter(d => d.compte === compte && d.statut === 'attente').length >= 5) return false;
+        base.demandesCartes.push({ ...copie(saisie), id, compte, statut: 'attente', revision: 0, creeLe: new Date().toISOString() });
+        sauver(); return true;
+      },
+      async lister(compte) {
+        return (base.demandesCartes ?? []).filter(d => compte === null || d.compte === compte)
+          .sort((a,b) => Number(b.statut === 'attente') - Number(a.statut === 'attente') || b.creeLe.localeCompare(a.creeLe)).slice(0,200)
+          .map(({ compte: auteur, ...d }) => { const { photo, ...carte } = d.carte; return copie({ ...d, carte,
+            photoProposee: Boolean(photo), pseudo: base.comptes.find(c => c.id === auteur)?.pseudo }); });
+      },
+      async lire(id, compte) {
+        const d = base.demandesCartes?.find(d => d.id === id && (compte === null || d.compte === compte));
+        if (!d) return null;
+        const { compte: _compte, ...publique } = d; return copie(publique);
+      },
+      async modifier(id, revision, carte) {
+        const d = base.demandesCartes?.find(d => d.id === id && d.revision === revision && d.statut === 'attente');
+        if (!d) return false;
+        d.carte = copie(carte); d.revision++; sauver(); return true;
+      },
+      async refuser(id, revision, reponse) {
+        const d = base.demandesCartes?.find(d => d.id === id && d.revision === revision && d.statut === 'attente');
+        if (!d) return false;
+        d.statut = 'refusee'; d.revision++; d.reponse = reponse; d.decideLe = new Date().toISOString(); sauver(); return true;
+      },
+      async approuver(id, revision, config, revisionCatalogue, carte) {
+        const d = base.demandesCartes?.find(d => d.id === id && d.revision === revision && d.statut === 'attente');
+        if (!d || (base.atelier?.revision ?? 0) !== revisionCatalogue) return false;
+        base.atelier = copie(config); d.carte = copie(carte); d.statut = 'acceptee'; d.revision++; d.decideLe = new Date().toISOString();
+        sauver(); return true;
       },
     },
     demandesImage: {

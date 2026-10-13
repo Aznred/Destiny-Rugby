@@ -12,6 +12,7 @@ import type { EtatBoutiqueCompte, ModificationsBoutiqueCompte } from '../src/lib
 import type { PageOffresSolo, LotCartesSolo, OffreSolo, SuiviEchangesSolo } from '../src/lib/echangesSolo.js';
 import { packsInternesSql, type StockagePacksInternes } from './packsInternesStockage.js';
 import { demandesImageSql, type StockageDemandesImage } from './demandesImageStockage.js';
+import { demandesCartesSql, type StockageDemandesCartes } from './demandesCartesStockage.js';
 import { publicitesSql, type StockagePublicites } from './publicitesStockage.js';
 import { stockageValidationNeon, type StockageValidationClassement } from './validationClassement.js';
 
@@ -75,6 +76,7 @@ export interface StockageCarriere {
   packsInternes?: StockagePacksInternes;
   /** « Mon image » : demandes de retrait ou d'ajout d'un portrait, décidées dans le Labo. */
   demandesImage?: StockageDemandesImage;
+  demandesCartes?: StockageDemandesCartes;
   push?: StockagePush;
   compteParIdentifiant(identifiant: string): Promise<CompteStocke | null>;
   compteParGoogle(sujet: string): Promise<CompteStocke | null>;
@@ -387,6 +389,7 @@ export function stockageNeon(url: string): StockageCarriere {
     packsInternes: packsInternesSql((textes, ...valeurs) => sql(textes, ...valeurs) as Promise<Record<string, unknown>[]>),
     publicites: publicitesSql((textes, ...valeurs) => sql(textes, ...valeurs) as Promise<Record<string, unknown>[]>),
     demandesImage: demandesImageSql((textes, ...valeurs) => sql(textes, ...valeurs) as Promise<Record<string, unknown>[]>),
+    demandesCartes: demandesCartesSql((textes, ...valeurs) => sql(textes, ...valeurs) as Promise<Record<string, unknown>[]>),
     async snapshotFfr(l,migration) {
       await sql`insert into player_migration_snapshots(migration,kind,entity_id,revision,data)
         values(${migration},'league',${l.id},${l.version},${JSON.stringify(l.etat)}::jsonb) on conflict do nothing`;

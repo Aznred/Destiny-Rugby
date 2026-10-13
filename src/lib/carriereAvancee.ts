@@ -169,6 +169,8 @@ export interface ProfilMedicalJoueur {
 }
 
 export interface ContratJoueurAvance {
+  /** Identité conservée tant que le contrat court, même si le mercato du monde change. */
+  profil?: { joueur: Coequipier; saison: number };
   termes?: import('../types.js').TermesRecrutementManager;
   joueurId: string;
   nom: string;
@@ -536,6 +538,7 @@ function contratJoueurInitial(m: Manager, j: Coequipier, p: ProfilVestiaire): Co
   const formeAuClub = j.age - anciennete <= 20 && rng() > .58;
   return {
     joueurId: j.id, nom: j.nom, club: m.club, debut: m.saison,
+    profil: { joueur: { ...j }, saison: m.saison },
     arrivee: m.saison - anciennete, formeAuClub,
     fin: m.saison + 1 + Math.floor(rng() * (j.age >= 31 ? 2 : 4)),
     salaire: niveau > 3 ? 0 : Math.round(salaire(niveau, j.note - forceDuGroupe(m.club, m.saison), j.age)),
@@ -748,6 +751,7 @@ export function assurerEtatCarriereAvancee(m: Manager, effectif: Coequipier[]): 
       ? contratJoueurInitial(m, j, vestiaire[j.id]) : null;
     contratsJoueurs[j.id] = {
       ...contratsJoueurs[j.id], nom: j.nom, club: m.club,
+      profil: contratsJoueurs[j.id].profil ?? { joueur: { ...j }, saison: m.saison },
       attachement: contratsJoueurs[j.id].attachement ?? initial!.attachement,
       arrivee: contratsJoueurs[j.id].arrivee ?? initial?.arrivee ?? contratsJoueurs[j.id].debut,
       formeAuClub: contratsJoueurs[j.id].formeAuClub ?? initial?.formeAuClub ?? false,
@@ -1304,7 +1308,7 @@ export function ouvrirRenegociationJoueur(
   if (!j || !contrat) return undefined;
   const salaires = salairesEffectif(m.club, m.saison, m.recrues, a.contratsJoueurs);
   const courant = contrat.salaire || salaires.find((x) => x.joueurId === joueurId || x.nom === j.nom)?.salaire || 0;
-  const revalorisation = contrat.demandeRevalorisation;
+  const revalorisation = contrat.demandeRevalorisation && contrat.fin > m.saison + 1;
   const facteur = revalorisation ? 1.22 : contrat.fin <= m.saison + 1 ? 1.1 : 1.04;
   const profilMedical = a.profilsMedicaux[joueurId] ?? profilMedicalInitial(j);
   const risqueMedical = borne(profilMedical.fragiliteNaturelle * .35 + profilMedical.historique.length * 10
@@ -1355,7 +1359,9 @@ export function signerRenegociationJoueur(
     }]
     : a.promesses;
   return { ...a, promesses, contratsJoueurs: { ...a.contratsJoueurs, [nego.joueur.id]: {
-    ...contrat, debut: nego.saison, fin: nego.nature === 'revalorisation' ? contrat.fin : Math.max(contrat.fin, nego.saison + nego.offre.duree),
+    ...contrat, debut: nego.saison,
+    // La durée d'une prolongation couvre les saisons à venir après la saison en cours.
+    fin: nego.nature === 'revalorisation' ? contrat.fin : Math.max(contrat.fin, nego.saison + 1 + nego.offre.duree),
     termes: { ...nego.offre },
     salaire: nego.offre.salaire, role: nego.offre.role,
     option: nego.offre.option ?? 'aucune', satisfaction: borne(contrat.satisfaction + 14),

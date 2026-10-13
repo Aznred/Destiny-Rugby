@@ -41,6 +41,7 @@ export interface LigneImport {
 
 /** Un joueur créé par le Labo. Il rejoint le catalogue mondial de toutes les ligues. */
 export interface AjoutJoueur {
+  gender?: 'male' | 'female';
   sourceId: string; nom: string; poste: PosteId; postesSecondaires?: PosteId[];
   note: number; potentiel: number; age: number; nation: string;
   clubReel: string; championnat: string; pays: string; photo?: string;

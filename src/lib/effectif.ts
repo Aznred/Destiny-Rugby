@@ -637,7 +637,8 @@ function effectifDuClubComplet(nomClub: string, saison: number): Coequipier[] {
   // ⚠️ ET LES JEUNES DU CENTRE ARRIVENT ENCORE APRÈS : un joueur formé au club
   // ne peut pas avoir été transféré ailleurs par un tweet la saison d'avant.
   const liste = appliquerJeunesFormes(nomClub, saison, appliquerTransfertsSociaux(
-    nomClub, saison, appliquerMercato(nomClub, saison, effectifBrut(nomClub, saison)),
+    nomClub, saison, appliquerContratsManager(nomClub, saison,
+      appliquerMercato(nomClub, saison, effectifBrut(nomClub, saison))),
   ));
 
   // ═══ LA GÉNÉRATION DU CLUB ════════════════════════════════════════════════
@@ -887,6 +888,59 @@ function appliquerMercato(nomClub: string, saison: number, base: Coequipier[]): 
 // tient la liste et la déverse ici (même principe que `setMouvementsClubs`).
 // ---------------------------------------------------------------------------
 let TRANSFERTS_SOCIAUX: TransfertAnnonce[] = [];
+
+interface ContratEffectifManager {
+  joueurId: string;
+  nom: string;
+  club: string;
+  debut: number;
+  fin: number;
+  profil?: { joueur: Coequipier; saison: number };
+}
+let CLUB_MANAGER = '';
+let CONTRATS_MANAGER: ContratEffectifManager[] = [];
+
+/** Le contrat de la partie commande l'effectif ; les ventes explicites passent ensuite. */
+export function setContratsEffectifManager(club = '', contrats?: Record<string, ContratEffectifManager>): void {
+  CLUB_MANAGER = club;
+  CONTRATS_MANAGER = Object.values(contrats ?? {}).filter(c => c.club === club);
+  cacheForce.clear();
+  cacheReference.clear();
+}
+
+function appliquerContratsManager(club: string, saison: number, liste: Coequipier[]): Coequipier[] {
+  if (!CLUB_MANAGER || !CONTRATS_MANAGER.length) return liste;
+  const correspond = (j: Coequipier, c: ContratEffectifManager) => j.id === c.joueurId
+    || j.id.endsWith(`-transfert-${c.joueurId}`)
+    || (!!j.sourcePlayerId && j.sourcePlayerId === c.profil?.joueur.sourcePlayerId)
+    || normaliser(j.nom) === normaliser(c.nom);
+  const actifs = CONTRATS_MANAGER.filter(c => c.fin > saison);
+  if (club !== CLUB_MANAGER) {
+    return liste.filter(j => !actifs.some(c => correspond(j, c)));
+  }
+  let sortie = liste.filter(j => !CONTRATS_MANAGER.some(c => c.fin <= saison && correspond(j, c)));
+  for (const c of actifs) {
+    const present = sortie.find(j => correspond(j, c));
+    if (present) {
+      // Le mercato réel peut recréer le même joueur sous un autre identifiant.
+      if (present.id !== c.joueurId) sortie = sortie.map(j => j === present ? { ...j, id: c.joueurId } : j);
+      continue;
+    }
+    // Compatibilité des sauvegardes antérieures : retrouver l'identité d'origine avant les départs du mercato.
+    const courant = effectifBrut(club, saison).find(j => correspond(j, c));
+    if (courant) {
+      sortie.push({ ...courant, id: c.joueurId });
+      continue;
+    }
+    const ancien = c.profil ?? { joueur: effectifBrut(club, c.debut).find(j => correspond(j, c)), saison: c.debut };
+    if (!ancien.joueur) continue;
+    const age = ancien.joueur.age + Math.max(0, saison - ancien.saison);
+    sortie.push({ ...ancien.joueur, id: c.joueurId, age,
+      note: noteALAge(ancien.joueur.note, ancien.joueur.age, ancien.joueur.potentiel, age, graine(`contrat#${c.joueurId}`)(), 20),
+      horsGeneration: true });
+  }
+  return sortie;
+}
 
 export function setTransfertsSociaux(liste: TransfertAnnonce[] | undefined): void {
   TRANSFERTS_SOCIAUX = liste ?? [];

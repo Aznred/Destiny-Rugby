@@ -30,6 +30,12 @@ export function filtrerCatalogueFfr(base: readonly SourceCarte[]): readonly Sour
   let cache = caches.get(base); if (!cache) { cache = new Map(); caches.set(base, cache); }
   const existant = cache.get(cle); if (existant && existant.ajouts === ajouts) return existant.resultat;
   const liste = [...base, ...(ajouts ?? [])];
-  const resultat = [...new Map(liste.filter(c => carteSeniorAutorisee(c, pool)).map(c => [c.sourceId, c])).values()];
+  const parId = new Map<string, SourceCarte>();
+  for (const c of liste.filter(c => carteSeniorAutorisee(c, pool))) {
+    // Une correction validée dans le Labo reste prioritaire sur le profil FFR chargé ensuite.
+    if (parId.get(c.sourceId)?.editionManuelle && !c.editionManuelle) continue;
+    parId.set(c.sourceId,c);
+  }
+  const resultat = [...parId.values()];
   cache.set(cle, { ajouts, resultat }); return resultat;
 }

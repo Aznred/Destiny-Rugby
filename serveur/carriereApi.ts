@@ -2,6 +2,8 @@ import { contexteFfr, serviceFfr } from './ffr/contexte.js';
 import { cartesJeunesseARetirer } from '../src/lib/ligue/migrationJeunesse.js';
 import { VERSION_PROTECTION_FFR } from '../src/data/protectionFfr.generated.js';
 import type { SourceCarte } from '../src/lib/ligue/catalogueCarriere.js';
+import { validerCarteNormale, validerDemandeCarte } from '../src/lib/cartesNormales.js';
+import { catalogueAvecCarteNormale } from './cartesNormales.js';
 import { contexteAtelier, enregistrerAtelier, vueAtelier, vueDonneesClubs } from './atelierAdmin.js';
 import { lotImport, vueImports, vueSpeciales } from './atelierSpeciales.js';
 import { catalogueSpecial, specialesPubliques, cataloguePacksPublicitaires } from '../src/lib/ligue/catalogueSpecial.js';
@@ -959,7 +961,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
 
       const corps = req.method === 'POST' ? objet(typeof req.body === 'string' ? JSON.parse(req.body) : req.body) : {};
       // Le Labo envoie des images de cartes (350 Ko) et des lots d'import ; « Mon image », un portrait de 600 px.
-      const tailleMax = corps.action === 'sauvegarderBoutique' ? 4_000_000 : corps.action === 'atelier' ? 1_000_000 : corps.action === 'demandeImage' ? 300_000 : 24_000;
+      const tailleMax = corps.action === 'sauvegarderBoutique' ? 4_000_000 : corps.action === 'atelier' ? 1_000_000 : corps.action === 'demandeImage' ? 300_000 : corps.action === 'demandesCartes' ? 110_000 : 24_000;
       const corpsJson = JSON.stringify(corps);
       if (corpsJson.length > tailleMax) throw new ErreurHttp(413, 'Demande trop volumineuse.');
       const action = corps.action;
@@ -1114,6 +1116,57 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
           if ((erreur as Error).message.includes('indisponible')) throw new ErreurHttp(404, (erreur as Error).message);
           throw erreur;
         }
+      }
+      // Cartes normales : propositions privées, publication réservée au compte interne.
+      if (url.searchParams.has('demandesCartes') || action === 'demandesCartes') {
+        const depot = stockage.demandesCartes;
+        if (!depot) throw new ErreurHttp(503, 'Demandes de cartes indisponibles.');
+        const interne = compte.identifiant === 'kiri';
+        const auteur = interne ? null : compte.id;
+        res.setHeader('Cache-Control', 'private, no-store');
+        res.setHeader('Vary', 'Cookie, Authorization');
+        if (req.method === 'GET') {
+          const id = url.searchParams.get('id');
+          if (id) {
+            if (!idValide(id)) throw new ErreurHttp(400, 'Demande invalide.');
+            const demande = await depot.lire(id, auteur);
+            if (!demande) throw new ErreurHttp(404, 'Demande introuvable.');
+            return res.status(200).json({ demande });
+          }
+          const q = (url.searchParams.get('q') ?? '').trim().slice(0,100).toLocaleLowerCase('fr');
+          const cartes = q ? await ffr.avecPool('mixed', async () => catalogueMondialCarriere().filter(c => !c.speciale && c.nom.toLocaleLowerCase('fr').includes(q)).slice(0,20)) : [];
+          return res.status(200).json({ demandes: await depot.lister(auteur), cartes, revisionCatalogue: catalogueAdmin().revision, interne });
+        }
+        try {
+          if (corps.operation === 'soumettre') {
+            if (!await stockage.limiter(`demande-carte:${compte.id}`,6,3_600_000,maintenant)) throw new ErreurHttp(429, 'Trop de demandes. Réessaie plus tard.');
+            const saisie = validerDemandeCarte(corps);
+            if (saisie.type === 'correction' && !await ffr.avecPool('mixed', async () => catalogueMondialCarriere().some(c => c.sourceId === saisie.sourceId && !c.speciale)))
+              throw new ErreurHttp(404, 'Carte à corriger introuvable.');
+            if (!await depot.creer(compte.id,randomUUID(),saisie)) throw new ErreurHttp(409, 'Tu as déjà cinq demandes en attente.');
+            return res.status(200).json({ demandes: await depot.lister(auteur) });
+          }
+          if (!interne) throw new ErreurHttp(403, 'FORBIDDEN');
+          if (typeof corps.id !== 'string' || !idValide(corps.id) || !Number.isInteger(corps.revision)) throw new ErreurHttp(400, 'Demande invalide.');
+          const demande = await depot.lire(corps.id,null);
+          if (!demande || demande.statut !== 'attente' || demande.revision !== corps.revision) throw new ErreurHttp(409, 'Cette demande a changé. Recharge-la.');
+          let fait = false;
+          if (corps.operation === 'refuser') fait = await depot.refuser(demande.id,demande.revision,String(corps.reponse ?? '').slice(0,500),compte.identifiant);
+          else {
+            const carte = validerCarteNormale(corps.carte);
+            if (corps.operation === 'modifier') fait = await depot.modifier(demande.id,demande.revision,carte);
+            else if (corps.operation === 'approuver') {
+              const courant = catalogueAdmin();
+              if (corps.revisionCatalogue !== courant.revision) throw new ErreurHttp(409, 'Le catalogue a changé. Recharge les demandes.');
+              const suivant = await ffr.avecPool('mixed', async () => catalogueAvecCarteNormale(courant,demande.sourceId ?? `normale-${demande.id}`,carte));
+              suivant.revision = courant.revision + 1;
+              fait = await depot.approuver(demande.id,demande.revision,suivant,courant.revision,carte,compte.identifiant);
+              if (fait) catalogueLuLe = -Infinity;
+            } else throw new ErreurHttp(400, 'Opération inconnue.');
+          }
+          if (!fait) throw new ErreurHttp(409, 'Une autre modification a été enregistrée. Recharge les demandes.');
+          return res.status(200).json({ demandes: await depot.lister(null), revisionCatalogue: corps.operation === 'approuver' ? catalogueAdmin().revision + 1 : catalogueAdmin().revision });
+        } catch (e) { if (e instanceof ErreurHttp) throw e; throw new ErreurHttp(400,(e as Error).message); }
       }
       // ═══ « MON IMAGE » — demandes et décisions ═════════════════════════════
       // Un compte demande le retrait de son portrait, ou propose le sien ; RIEN ne s'applique avant la décision du compte
@@ -1294,7 +1347,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         }
         if (!stockage.atelier) throw new ErreurHttp(503, 'Atelier indisponible sur ce serveur.');
         catalogueLuLe = -Infinity;
-        return res.status(200).json(await (corps.operation === 'publicitesPack' ? ffr.avecPool('mixed', () => enregistrerAtelier(stockage.atelier!, corps)) : enregistrerAtelier(stockage.atelier, corps)));
+        return res.status(200).json(await (['publicitesPack','carteNormale'].includes(String(corps.operation)) ? ffr.avecPool('mixed', () => enregistrerAtelier(stockage.atelier!, corps)) : enregistrerAtelier(stockage.atelier, corps)));
       }
       if (action === 'deconnexion') {
         await stockage.fermerSession(empreinteSession); sessionsChaudes.delete(empreinteSession); cookie(req, res, '', true);
@@ -1899,7 +1952,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
   }
   return { handler: async (req: RequeteCarriere, res: ReponseCarriere) => {
     // L'atelier lui-même lit toujours la révision du moment : son écriture est un CAS dessus.
-    const atelier = /[?&]atelier\b/.test(req.url ?? '')
+    const atelier = /[?&](atelier|demandesCartes)\b/.test(req.url ?? '')
       || Boolean(req.body && typeof req.body === 'object' && (req.body as { action?: unknown }).action === 'atelier')
       || (typeof req.body === 'string' && req.body.includes('"atelier"'));
     try { return await contexteFfr.run({request:true,pool:'men',joueurs:[]}, () => avecAtelier(() => handler(req,res), atelier)); }

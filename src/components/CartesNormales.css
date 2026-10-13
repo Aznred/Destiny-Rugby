@@ -1,0 +1,19 @@
+.cn-labo,.cn-demandes{display:grid;gap:1rem;min-width:0}
+.cn-formulaire{display:grid;grid-template-columns:minmax(0,1fr) 230px;gap:1.5rem;align-items:start}
+.cn-formulaire fieldset{min-width:0;display:grid;gap:.9rem;border:1px solid var(--bordure,#294236);padding:1rem;border-radius:12px}
+.cn-formulaire label,.cn-labo form>label,.cn-demandes form>label,.cn-recherche>label{display:grid;gap:.35rem;min-width:0}
+.cn-formulaire input,.cn-labo textarea,.cn-demandes textarea,.cn-recherche input{width:100%;min-width:0;box-sizing:border-box;background:var(--fond-carte,#101e17);color:inherit;border:1px solid var(--bordure,#294236);border-radius:8px;padding:.65rem}
+.cn-champs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.8rem}
+.cn-actions{display:flex;gap:.6rem;flex-wrap:wrap;align-items:center;margin:.8rem 0}
+.cn-apercu{display:grid;gap:.6rem;justify-items:center;position:sticky;top:1rem;width:230px;max-width:100%;justify-self:center}
+.cn-apercu .carte-joueur-en-ligne{max-width:230px}
+.cn-recherche{display:grid;gap:.7rem;margin:1rem 0}
+.cn-resultats{display:flex;gap:.5rem;flex-wrap:wrap;max-height:300px;overflow:auto;align-content:start}
+.cn-resultats button{display:grid;gap:.25rem;text-align:left;min-height:44px;padding:.65rem .9rem;background:var(--fond-carte,#101e17);color:inherit;border:1px solid var(--bordure,#294236);border-radius:9px}
+.cn-resultats button[aria-pressed=true]{border-color:var(--or,#d5b56d)}
+.cn-actions button,.cn-recherche>button{min-height:44px;padding:.65rem 1rem;border:1px solid var(--bordure,#294236);border-radius:10px;background:var(--fond-carte,#101e17);color:inherit;cursor:pointer}
+.cn-actions button[aria-pressed=true]{border-color:var(--or,#d5b56d);color:var(--or,#d5b56d)}
+.cn-actions button:disabled,.cn-recherche>button:disabled{opacity:.5;cursor:default}
+.cn-demandes article{display:grid;gap:.3rem;padding:.7rem;border-bottom:1px solid var(--bordure,#294236)}
+.cn-labo form,.cn-demandes form{display:grid;gap:1rem;min-width:0}
+@media(max-width:700px){.cn-formulaire{grid-template-columns:minmax(0,1fr)}.cn-apercu{position:static;grid-row:1}.cn-actions button{flex:1 1 160px}.cn-champs{grid-template-columns:minmax(0,1fr)}}

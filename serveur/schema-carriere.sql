@@ -193,6 +193,17 @@ create index if not exists demandes_image_statut_idx on demandes_image (statut, 
 create index if not exists demandes_image_compte_idx on demandes_image (compte, cree_le);
 alter table demandes_image enable row level security;
 
+-- Propositions de cartes normales : privées jusqu'à l'approbation de Kiri.
+create table if not exists demandes_cartes (
+  id uuid primary key, compte uuid not null references comptes(id),
+  type text not null check(type in ('creation','correction')), source_id text, carte jsonb not null,
+  message text not null default '', statut text not null default 'attente' check(statut in ('attente','acceptee','refusee')),
+  revision integer not null default 0, place integer not null check(place between 1 and 5),
+  cree_le timestamptz not null default now(), decide_le timestamptz, decide_par text, reponse text
+);
+create unique index if not exists demandes_cartes_places on demandes_cartes(compte,place) where statut='attente';
+alter table demandes_cartes enable row level security;
+
 -- Un pack de test : une liste de cartes imposées, dans l'ordre de révélation. Lisible par son seul auteur ; il n'entre
 -- ni dans le catalogue des packs, ni dans une probabilité.
 create table if not exists packs_internes (

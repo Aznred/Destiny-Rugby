@@ -130,7 +130,7 @@ import type { Scenario } from '../data/scenarios';
 import { COMPETITIONS, divisionDuClub, competitionDuClub, clubParNom } from '../data/clubs';
 import {
   forceEffectif, forceMoyenneDivision, noteDuClub, setApportsDuCentre, setJoueurIncarne, setTransfertsSociaux,
-  effectifDuClub, setEffectifJeunesCarriere, type Coequipier,
+  effectifDuClub, setEffectifJeunesCarriere, setContratsEffectifManager, type Coequipier,
 } from '../lib/effectif';
 import { nomAleatoirePourNation } from '../lib/nomsJoueurs';
 import { chantierVisible } from '../lib/modeDev';
@@ -1771,6 +1771,7 @@ export const useGame = create<GameState>()(
         setContexteJoueur('', 0);
         setTransfertsSociaux([]);
         setApportsDuCentre([], {});
+        setContratsEffectifManager();
         // ⚠️ ET PERSONNE N'EST « INCARNÉ » : le monde reprend tous ses joueurs (voir `lib/joueurIncarne.ts`).
         setJoueurIncarne(null);
         set(etatDeDepartDeCarriere(joueur));
@@ -3976,6 +3977,7 @@ export const useGame = create<GameState>()(
         setTransfertsSociaux([]);
         setApportsDuCentre([], {});
         setEffectifJeunesCarriere();
+        setContratsEffectifManager();
         const comp = competitionDuClub(club);
         const prestige = depuis ? prestigeDepuisJoueur(depuis) : PRESTIGE_DEBUT;
         // Plus de joueur incarné : le monde reprend tous ses joueurs avant qu'on lise un effectif.
@@ -5565,6 +5567,7 @@ export const useGame = create<GameState>()(
           nom: joueur.nom,
           de: m.club,
           vers: offre.club,
+          joueurId: joueur.id,
           sourcePlayerId: joueur.sourcePlayerId,
           saison: m.saison,
           poste: POSTE_PAR_ID[joueur.poste]?.famille,
@@ -8045,6 +8048,7 @@ export const useGame = create<GameState>()(
         // (`lib/effectif.ts`). Sans cette ligne, une carrière rechargée verrait
         // sa promotion s'évaporer et son effectif rétrécir sans un mot.
         setApportsDuCentre(etat?.manager?.jeunesFormes, etat?.manager?.progres);
+        setContratsEffectifManager(etat?.manager?.club, etat?.manager?.avancee?.contratsJoueurs);
         installerEffectifsJeunes(etat?.manager);
         if (etat?.manager?.mondeJeunes) queueMicrotask(() => {
           void etat.chargerJeunesCarriereManager().catch(() => {});
@@ -8205,7 +8209,10 @@ if (import.meta.env.DEV) (globalThis as { __clotureSaison?: unknown }).__cloture
  */
 useGame.subscribe((etat) => ecrireCompte(etat as unknown as Record<string, unknown>));
 useGame.subscribe((etat, avant) => {
-  if (etat.manager !== avant.manager) installerEffectifsJeunes(etat.manager);
+  if (etat.manager !== avant.manager) {
+    setContratsEffectifManager(etat.manager?.club, etat.manager?.avancee?.contratsJoueurs);
+    installerEffectifsJeunes(etat.manager);
+  }
   if (etat.manager?.mondeJeunes && etat.manager.usageId !== avant.manager?.usageId) {
     void etat.chargerJeunesCarriereManager().catch(() => {});
   }

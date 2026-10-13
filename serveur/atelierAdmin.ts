@@ -14,6 +14,7 @@ import type { ArticleLabo } from '../src/lib/ligue/atelierCatalogue.js';
 import { prixValide } from '../src/lib/monnaies.js';
 import { cataloguePacksPublicitaires } from '../src/lib/ligue/catalogueSpecial.js';
 import { PUBLICITES_PAR_DEFAUT, type ConfigPublicites } from '../src/lib/publicitesRecompensees.js';
+import { catalogueAvecCarteNormale } from './cartesNormales.js';
 
 export const contexteAtelier = new AsyncLocalStorage<CatalogueAdmin>();
 fournirCatalogueAdmin(() => contexteAtelier.getStore() ?? CATALOGUE_ADMIN_VIDE);
@@ -256,6 +257,8 @@ export async function enregistrerAtelier(stockage: StockageAtelier, corps: Recor
   } else if(corps.operation === 'rotationPacks') {
     if(typeof corps.active !== 'boolean') refuser('Réglage de rotation invalide.');
     suivant.rotationPacks=corps.active;
+  } else if(corps.operation === 'carteNormale') {
+    Object.assign(suivant, catalogueAvecCarteNormale(courant, texte(corps.sourceId,250), corps.carte));
   } else if(corps.operation === 'joueur') {
     const id=texte(corps.sourceId,250), source=catalogueMondialCarriere().find(c=>c.sourceId===id);
     if(!source) refuser('Joueur introuvable.');

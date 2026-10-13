@@ -16,6 +16,7 @@ import { Icone } from './Icone';
 import { ReglagesControleDirect } from './ReglagesControleDirect';
 import { ReglagesTutoriel } from './tutoriel/ReglagesTutoriel';
 import { ReglagesImage } from './ReglagesImage';
+import { DemandesCartes } from './DemandesCartes';
 import { usePreferencesInterface } from '../store/preferencesInterface';
 
 // Les huit ambiances. `apercu` est le dégradé montré sur la pastille — il
@@ -273,6 +274,7 @@ export function Reglages({ onFermer }: Props) {
 
         {/* « MON IMAGE » : une joueuse ou un joueur fait retirer son portrait, ou propose le sien (décidé dans le Labo). */}
         <ReglagesImage />
+        <DemandesCartes />
 
         <div className="note-sans-cle">
           <Icone nom="sifflet" taille={15} /> {t('reg.sansCleAide')}

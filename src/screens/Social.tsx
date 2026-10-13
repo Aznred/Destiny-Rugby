@@ -1397,7 +1397,12 @@ function DemandeVestiaireManager({ pseudo }: { pseudo: string }) {
         <button className="x-nego-oui" onClick={() => repondre(demande.id, true)}>{demande.type === 'depart' ? t("ui.cb38c88ab368") : t("ui.ab627960c187")}</button>
         {demande.type === 'depart' && <button onClick={() => ouvrirContrat(demande.joueurId)}>{t("ui.ffd2d75b1a88")}</button>}
         <button className="x-nego-non" onClick={() => repondre(demande.id, false)}>{t("pub.refuser")}</button>
-      </div> : <div className="x-nego-accord">{demande.etat === 'acceptee' ? t("ui.20967bdf0d4b") : t("ui.a5c1aef9d92a")}</div>}
+      </div> : <>
+        <div className="x-nego-accord">{demande.etat === 'acceptee' ? t("ui.20967bdf0d4b") : t("ui.a5c1aef9d92a")}</div>
+        {demande.etat === 'refusee' && demande.type === 'depart'
+          && !manager.negociations.some(n => n.pseudo === pseudo && n.nature !== 'recrutement' && n.saison === manager.saison)
+          && <div className="x-nego-fin"><button onClick={() => ouvrirContrat(demande.joueurId)}>{t("ui.ffd2d75b1a88")}</button></div>}
+      </>}
     </div>
   );
 }
@@ -1699,7 +1704,10 @@ export function OvaleManager({ embarque = false, onRetour }: OvaleManagerProps =
               })}<div ref={bas} /></div>
               {actif && dossier?.type === 'club' && <NegociationClubVendeur pseudo={actif} />}
               {actif && dossier?.type === 'joueur' && <NegociationRecrueManager pseudo={actif} />}
-              {actif && dossier?.type === 'demande' && <DemandeVestiaireManager pseudo={actif} />}
+              {actif && dossier?.type === 'demande' && <>
+                <DemandeVestiaireManager pseudo={actif} />
+                {manager.negociations.some(n => n.pseudo === actif) && <NegociationRecrueManager pseudo={actif} />}
+              </>}
               {actif && dossier?.type === 'approche' && <ApprocheClubCarte pseudo={actif} />}
               {actif && (dossier?.type === 'libre' || dossier?.type === 'club' || dossier?.type === 'joueur') && <form className="x-envoi" onSubmit={e=>{e.preventDefault();if(texteLibre.trim()){void envoyerLibre(actif,texteLibre);setTexteLibre('');}}}>
                 <input aria-label={t("ui.5e8d80ab8a23")} value={texteLibre} maxLength={400} onChange={e=>setTexteLibre(e.target.value)} placeholder={dossier.type === 'libre' ? t("ui.5e8d80ab8a23") : t("ui.cdb7a36303a7")} />

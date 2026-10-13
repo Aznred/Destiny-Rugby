@@ -2146,6 +2146,16 @@ elle remplace le salaire courant dans `situationSalariale`. Les négociations
 externes conservent l'ordre club vendeur → joueur et portent les bonus et la
 part à la revente dans `RecrueManager.accordClub`.
 
+`setContratsEffectifManager` installe les contrats de la partie dans la projection
+du monde, à la création, à chaque changement du manager et au rechargement.
+Le mercato réel ou simulé ne retire plus un joueur sous contrat du club entraîné ;
+son `profil` conserve son identité. Les ventes explicites et les départs libres
+gardent priorité. Une prolongation couvre la saison en cours puis la durée signée ;
+à échéance, une demande de hausse salariale ouvre une prolongation. Dans L’Ovale,
+une demande de départ et la négociation de contrat restent visibles dans le même fil,
+y compris après un refus. Banc : `verify:contrats-manager` ; aperçu sans sauvegarde :
+`/scripts/apercuContratsManager.html`.
+
 `moisRestantsContrat` / `palierContrat` sont **la seule** définition des paliers
 de fin de contrat (serein / discussions 18 / réflexion 12 / danger 6 / libre) :
 l'écran, la pression du marché et l'appétit des prétendants lisent celles-là.
@@ -2684,5 +2694,18 @@ Bancs : `npm run verify:publicites` (serveur et SDK), `npm run verify:publicites
 `lib/validationClassement.ts` remplace le crible strict dans la route active `api/classement.ts` et l'écran Classement. Le risque cumule les anomalies : ELIGIBLE (<30), LIMITED (30–59), PENDING_VALIDATION (>=60 ou données manquantes), REJECTED (incohérence forte). Les trois premiers restent visibles ; les carrières volontairement hors classement restent exclues. Les seules preuves d'intégrité exploitables viennent du serveur. Aucune signature solo n'est prétendue existante.
 
 `serveur/validationClassement.ts` conserve les dossiers et leur journal avec révisions concurrentes. Le Labo `LaboValidationClassement` est dans AtelierKiri : règles, risques, identifiants et dates, filtres et décisions. `/api/carriere` et le service autorisent les décisions uniquement à l'identifiant authentifié `kiri`. Un score inférieur nouvellement envoyé ne masque pas le record précédent de l'installation. Le store conserve le résultat réel de synchronisation et réessaie les cas en attente sans exiger une hausse du score.
+
+### Cartes normales et propositions de cartes
+
+Labo → Cartes normales crée ou modifie une carte ordinaire via `CatalogueAdmin.ajouts`,
+avec la même identité pour les corrections. GEN, potentiel, poste, âge senior,
+genre, club, championnat, nation et portrait sont saisis dans `FormulaireCarteNormale`.
+Réglages → Créer ou corriger une carte envoie une proposition privée ; seul Kiri
+peut la modifier, la refuser avec un motif ou la valider dans Demandes de cartes.
+`demandes_cartes` conserve les révisions et cinq places d'attente par compte.
+L'approbation et la publication du catalogue sont atomiques (CTE SQL ou une écriture
+locale). Les corrections manuelles restent prioritaires sur les sources FFR.
+Les photos ne traversent pas les listes de demandes. Banc : `verify:cartes-normales` ;
+aperçu sans publication : `/scripts/apercuCartesNormales.html`.
 
 Migration atomique : `npm run migrer:classement38`. Audit/revalidation : `npm run audit:classement38`, `npm run revalider:classement38`. Le 11 octobre 2026 : 1 304 lignes existantes conservées, revalidées et visibles provisoirement ; les anciennes projections ne stockaient pas l'âge initial/version, 80 ont seulement un score. Les anciens refus ne sont pas quantifiables puisqu'ils n'étaient pas enregistrés. Aucun changement de sauvegarde. Détails et limites : [VALIDATION-CORRECTIF-38.md](VALIDATION-CORRECTIF-38.md). Banc : `npm run verify:correctif38` ; aperçu desktop/mobile `/scripts/apercuCorrectif38.html`.

@@ -2,6 +2,18 @@
 
 Dans Carrière en ligne, ouvrir une ligue puis l’onglet Atelier Kiri. Cet onglet et les lectures/écritures de /api/carriere?atelier=1 sont réservés à la session dont l’identifiant serveur est exactement kiri. Le pseudo affiché ou un paramètre client ne donne aucun droit.
 
+Cartes normales permet de créer une carte ordinaire et de corriger une carte existante.
+Le formulaire partage le GEN, le potentiel, le poste, le club, le championnat, la
+nation, le genre, l'âge et le portrait avec les demandes publiques des Réglages.
+Demandes de cartes permet de modifier une proposition avant validation, de publier
+la carte, ou de la refuser avec un motif. Les propositions restent privées et les
+photos ne sont chargées qu'au détail. La table `demandes_cartes` est initialisée à
+la première utilisation ; son schéma est également dans `schema-carriere.sql`.
+Les décisions comparent les révisions de la demande et du catalogue ; l'approbation
+publie et tranche la demande dans une seule écriture atomique. Les corrections
+gardent leur `sourceId`, leurs propriétaires et leur historique. Banc :
+`npm run verify:cartes-normales`.
+
 L’atelier permet de créer des packs, modifier leur nom, description, prix, volume, probabilités, garantie et filtres de poste, championnat et nation. Le sélecteur de nation permet de limiter un pack aux joueurs d’une seule sélection nationale. Les autres filtres existants sont conservés et peuvent être retirés. Les nouveaux packs kiri-* restent disponibles chaque jour. Les probabilités totalisent 100 % ; le serveur contrôle le vivier et la garantie.
 
 La recherche donne accès au catalogue mondial de joueurs (40 résultats par page de recherche). GEN de 20 à 99, potentiel, nation et photo sont modifiables. La rareté et les statistiques sportives suivent le GEN. Changer la nation déplace également le joueur entre les viviers des packs filtrés par nation. Les photos PNG/JPEG/WebP importées sont réduites à 320 px et conservées dans la base ; une URL HTTPS est également acceptée. Limites : 90 Ko par portrait, 3 Mo de personnalisations, 2 000 joueurs et 100 packs.
