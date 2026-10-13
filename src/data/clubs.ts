@@ -498,7 +498,8 @@ const NOUVELLES: Competition[] = COMPETITIONS_NOUVELLES.map((c) => ({
 // les championnats du monde viennent de la base réelle, le reste est saisi ici.
 // ⚠️ UN SEUL MONDE À LA FOIS (`lib/mondeActif.ts`) : le rugby féminin REMPLACE cette liste, il ne s'y ajoute pas — les deux
 // mondes ont des clubs du même nom, et tout le jeu retrouve un club par son nom.
-export const COMPETITIONS: Competition[] = MONDE_FEMININ ? competitionsFeminines() : [
+// Le Labo consulte aussi ce registre lorsqu'il crée une carte masculine depuis le monde féminin.
+export const COMPETITIONS_MASCULINES: Competition[] = [
   ...COMPETITIONS_REELLES.filter((c) => c.zone === 'France').map((c) => (
     c.id === 'nationale' ? { ...c, clubs: clubsFfr('nationale', c.clubs) } : c
   )),
@@ -506,6 +507,8 @@ export const COMPETITIONS: Competition[] = MONDE_FEMININ ? competitionsFeminines
   ...COMPETITIONS_REELLES.filter((c) => c.zone === 'Monde'),
   ...NOUVELLES,
 ].map(c => ({ ...c, clubs: c.clubs.map(cl => enrichirClub(cl, c.pays)) }));
+
+export const COMPETITIONS: Competition[] = MONDE_FEMININ ? competitionsFeminines() : COMPETITIONS_MASCULINES;
 
 // Divisions françaises, de l'élite (indice 0) vers le bas de la pyramide.
 export const DIVISIONS_FRANCE = COMPETITIONS.filter((c) => c.zone === 'France');

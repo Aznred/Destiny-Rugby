@@ -6,6 +6,7 @@ import { randomUUID } from 'node:crypto';
 import { stockageFichier } from '../serveur/carriereFichier';
 import { creerGestionnaireCarriere, empreinteJeton } from '../serveur/carriereApi';
 import { validerCarteNormale, validerDemandeCarte, carteNormaleVide, saisieDepuisSource } from '../src/lib/cartesNormales';
+import { championnatCarteNormale, championnatsCarteNormale, clubsCarteNormale, choisirChampionnatCarte, choisirClubCarte, changerGenreCarte } from '../src/lib/clubsCarteNormale';
 import { catalogueAvecCarteNormale } from '../serveur/cartesNormales';
 import { catalogueMondialCarriere } from '../src/lib/ligue/catalogueCarriere';
 import { contexteFfr } from '../serveur/ffr/contexte';
@@ -21,6 +22,37 @@ for (const [id,identifiant] of [[kiri,'kiri'],[joueur,'proposant'],[autre,'autre
 const api = creerGestionnaireCarriere(db);
 let controles=0;
 const eg = (a:unknown,b:unknown,raison:string) => {assert.deepEqual(a,b,raison);controles++;};
+const vide = carteNormaleVide();
+const toulouse = clubsCarteNormale('male').find(c => c.club.nom === 'Stade Toulousain' && c.competition.id === 'top14')!;
+const toulouseFeminin = clubsCarteNormale('female').find(c => c.club.nom === 'Stade Toulousain')!;
+const selection = choisirClubCarte(vide,toulouse.id);
+eg([selection.clubReel,selection.championnat,selection.pays],['Stade Toulousain','Top 14','France'],'Choisir directement un club remplit son championnat et son pays');
+eg(championnatCarteNormale(selection)?.id,'top14','Une correction retrouve le championnat de la carte');
+eg(choisirChampionnatCarte(selection,'top14').clubReel,'Stade Toulousain','Le même championnat conserve le club');
+eg(choisirChampionnatCarte(selection,'prod2').clubReel,'','Changer de championnat efface le club incompatible');
+eg(choisirChampionnatCarte(selection,'').championnat,'','Effacer le championnat permet de chercher tous les clubs');
+eg(choisirChampionnatCarte(selection,'').clubReel,'','Un club ne reste pas rattaché à un championnat effacé');
+eg(choisirClubCarte(selection,'').championnat,'Top 14','Effacer seulement le club conserve le filtre du championnat');
+eg(choisirClubCarte(selection,'club-inconnu'),selection,'Une option périmée ne modifie pas la carte');
+const joueuse = changerGenreCarte(selection,'female');
+eg([joueuse.gender,joueuse.clubReel,joueuse.championnat,joueuse.pays],['female','','',''],'Changer de genre efface les rattachements du monde précédent');
+eg(changerGenreCarte(selection,'male'),selection,'Le même genre conserve la carte');
+eg(choisirClubCarte(joueuse,toulouse.id),joueuse,'Une identité masculine ne sélectionne pas le club féminin homonyme');
+const selectionFeminine = choisirClubCarte(joueuse,toulouseFeminin.id);
+eg(selectionFeminine.championnat,'Élite 1 Féminine','Le club féminin homonyme rejoint son propre championnat');
+eg(validerCarteNormale({...selectionFeminine,nom:'Carte Féminine'}).gender,'female','La sélection féminine est une saisie publiable');
+const etranger = clubsCarteNormale('male').find(c => c.club.nom === 'Crusaders')!;
+eg(choisirClubCarte(selection,etranger.id).pays,etranger.competition.pays,'Le pays suit le championnat étranger');
+const historique = {...vide,clubReel:'Club historique',championnat:'Ancien championnat'};
+eg(choisirClubCarte(historique,'actuel'),historique,'Une valeur historique reste intacte tant qu’elle n’est pas remplacée');
+eg(championnatsCarteNormale('male').some(c=>c.id==='reg3'),true,'Les divisions amateurs existantes sont proposées');
+for (const genre of ['male','female'] as const) {
+  eg(new Set(clubsCarteNormale(genre).map(c=>c.id)).size,clubsCarteNormale(genre).length,`Les choix de clubs ${genre} ont des identités distinctes`);
+  eg(clubsCarteNormale(genre).every(c=>{
+    const choisie=choisirClubCarte({...vide,gender:genre},c.id);
+    return choisie.clubReel===c.club.nom&&choisie.championnat===c.competition.nom&&choisie.pays===c.competition.pays;
+  }),true,`Tous les clubs ${genre} remplissent les trois informations cohérentes`);
+}
 async function appel(compte:string,corps?:unknown,params='',origin='http://localhost') {
   let statut=200,donnees: any;
   const res = {status(n:number){statut=n;return res;},setHeader(){},json(d:unknown){donnees=d;}};

@@ -2700,6 +2700,10 @@ Bancs : `npm run verify:publicites` (serveur et SDK), `npm run verify:publicites
 Labo → Cartes normales crée ou modifie une carte ordinaire via `CatalogueAdmin.ajouts`,
 avec la même identité pour les corrections. GEN, potentiel, poste, âge senior,
 genre, club, championnat, nation et portrait sont saisis dans `FormulaireCarteNormale`.
+Club et championnat utilisent des listes recherchables des deux mondes, selon le
+genre de la carte (`clubsCarteNormale.ts`). Choisir un club renseigne championnat
+et pays ; choisir un championnat filtre les clubs et efface un club incompatible.
+Les valeurs historiques hors registre restent affichées dans les corrections.
 Réglages → Créer ou corriger une carte envoie une proposition privée ; seul Kiri
 peut la modifier, la refuser avec un motif ou la valider dans Demandes de cartes.
 `demandes_cartes` conserve les révisions et cinq places d'attente par compte.
