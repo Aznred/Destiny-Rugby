@@ -69,6 +69,9 @@ const carteEnJoueur = (c: CarteCarriere): Coequipier => ({
   horsGeneration: true,
   clubReel: c.clubReel,
   championnat: c.championnat,
+  // Le portrait et le genre voyagent avec le joueur : la fiche lit la même source que la carte (`lib/imageJoueur.ts`).
+  photo: c.photo,
+  gender: c.gender,
 });
 
 function Choix({

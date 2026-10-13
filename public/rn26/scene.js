@@ -1227,6 +1227,20 @@ export async function creerScene3D(conteneur,options={}){
     tmp.set(-Math.sin(actor.heading),0,-Math.cos(actor.heading));
     return target.addScaledVector(tmp,.06);
   }
+  // Correctif 40 — le point où le pied touchera le ballon : devant le joueur, du côté de son pied droit (tous les clips de
+  // frappe de l'APK sont droitiers), à la hauteur que le clip donne à ce pied au contact. C'est là que le ballon descend.
+  const piedA=new THREE.Vector3();
+  function pointDeFrappe(actor,fr,target){
+    const fx=-Math.sin(actor.heading),fz=-Math.cos(actor.heading),P=actor.group.position;
+    const o=actor.orteilD??=actor.model.getObjectByName('CC_Base_R_ToeBase')||actor.model.getObjectByName('CC_Base_R_Foot');
+    let lx=0,lz=0;
+    if(o){
+      o.getWorldPosition(piedA);
+      const dx=piedA.x-P.x,dz=piedA.z-P.z,a=dx*fx+dz*fz;lx=dx-fx*a;lz=dz-fz*a;
+      const n=Math.hypot(lx,lz);if(n>.2){lx*=.2/n;lz*=.2/n;}
+    }
+    return target.set(P.x+fx*fr.devant+lx,Math.max(SOL,fr.hauteur),P.z+fz*fr.devant+lz);
+  }
   function renderBall(simDt,visualTime,offset,alpha,still){
     const e=match.e,st=ballState,t=st.target,tir=e.tir,m=e.conquete?.melee,positionVol=match.outils.positionVol;
     let key='sol',orientation='sol',heading=0;
@@ -1235,7 +1249,26 @@ export async function creerScene3D(conteneur,options={}){
     t.set(lerp(avant.x,match.ball.x,alpha),Math.max(SOL,lerp(avant.y??match.ball.y,match.ball.y,alpha)),lerp(avant.z,match.ball.z,alpha));
     teeMesh.visible=false;
     const flight=match.flight;
-    if(flight){
+    // ── Correctif 40 — LE BALLON QUITTE LE PIED, À L'IMAGE DU CONTACT ─────────────
+    // Tant que le pied ne l'a pas touché (`contact`, l'instant du moteur), il est dans les mains du botteur, puis descend
+    // vers le point où le pied le prendra. Le vol peut déjà exister : l'image a un pas de retard sur le moteur, et le
+    // ballon ne part pas avant elle.
+    const fr=match.frappeAffichee,botteur=fr&&Math.abs(fr.vu-visualTime)<1e-4?actors.get(fr.id):null;
+    const duBotteur=!!botteur&&(match.carrier===fr.id||fr.parti||(flight?.type==='pied'&&flight.auteur?.id===fr.id));
+    if(duBotteur&&botteur.group.visible&&visualTime<fr.contact&&!tir){
+      hands(botteur,t);key='main:'+fr.id;heading=botteur.heading;orientation='main';
+      const u=clamp(1-(fr.contact-visualTime)/fr.lacher,0,1);
+      if(u>0){
+        pointDeFrappe(botteur,fr,handA);
+        if(fr.drop){
+          // Le drop : lâché pointe en bas, il touche la pelouse, et le pied le reprend au rebond.
+          const haut=t.y,chute=clamp(u/.7,0,1);
+          t.x+=(handA.x-t.x)*smooth(u);t.z+=(handA.z-t.z)*smooth(u);
+          t.y=u<.7?haut+(SOL+.02-haut)*chute*chute:SOL+.02+Math.sin(Math.PI/2*(u-.7)/.3)*Math.max(.05,handA.y-SOL-.02);
+          orientation='drop';
+        }else t.lerp(handA,u*u);
+      }
+    }else if(flight){
       const sample=positionVol(flight,offset),pos=xyz(sample),next=positionVol(flight,offset+.015),np=xyz(next);
       t.set(pos.x,sample.hauteur,pos.z);key='vol:'+match.flightStart;orientation='vol';
       const axis=tmp.set(np.x-pos.x,next.hauteur-sample.hauteur,np.z-pos.z);
@@ -1352,6 +1385,7 @@ export async function creerScene3D(conteneur,options={}){
     }else ballMesh.position.copy(t);
     st.shown.copy(ballMesh.position);
     if(orientation==='main')ballMesh.rotation.set(.3,heading,1.3);
+    else if(orientation==='drop')ballMesh.rotation.set(1.42,heading,0);
     else if(orientation==='sol')ballMesh.rotation.set(0,st.spin*.2,Math.PI/2+st.spin);
     else if(orientation==='libre'){const o=e.ballonLibre?.orientation||0;ballMesh.rotation.set(o,0,o*.37);}
   }
@@ -1398,10 +1432,15 @@ export async function creerScene3D(conteneur,options={}){
   function cameraJoueur(real,moiA,e){
     let J=rig.joueur;
     const P=moiA.group.position,B=ballMesh.position,equipe=match.byId.get(options.moi)?.team??0;
-    const collectif=!!e.controleEquipe?.actif;
     const ax=0,az=equipe===0?1:-1;
     if(!J){J=rig.joueur={yaw:az>0?0:Math.PI,zoom:1,wB:0,vx:0,vz:0,px:P.x,pz:P.z,pos:new THREE.Vector3(),posV:new THREE.Vector3(),look:new THREE.Vector3(),lookV:new THREE.Vector3(),init:false};}
-    if(collectif&&J.id!==options.moi){J.id=options.moi;J.px=P.x;J.pz=P.z;J.vx=0;J.vz=0;J.init=false;}
+    // Correctif 40 — LE JOUEUR CONTRÔLÉ CHANGE (contrôle de toute l'équipe) : la caméra ne saute pas. Elle garde son lacet et
+    // glisse en 0,38 s de l'ancien cadre au nouveau (place, orientation, recul) ; seule la mesure de sa course repart de zéro.
+    if(J.id!==options.moi){
+      const change=J.id!==undefined&&J.init&&!snap;
+      J.id=options.moi;J.px=P.x;J.pz=P.z;J.vx=0;J.vz=0;
+      if(change){glisser(.38);J.recale=true;}
+    }
     const dt=Math.max(real,.001);
     // La course lissée, vue de la caméra (positions affichées, pas celles du moteur : jamais de saut).
     const vx=(P.x-J.px)/dt,vz=(P.z-J.pz)/dt;J.px=P.x;J.pz=P.z;
@@ -1428,20 +1467,14 @@ export async function creerScene3D(conteneur,options={}){
     // Mode libre : inchangé — elle reste où il l'a mise, avec la seule aide lente au ballon franchement hors champ.
     const cap=null;
     J.age=(J.age??99)+dt;
-    if(options.orbite){if(!collectif){J.yaw-=options.orbite;J.age=0;}options.orbite=0;}
+    if(options.orbite){J.yaw-=options.orbite;options.orbite=0;J.age=0;}
     const porteurJ=match.carrier?match.byId.get(match.carrier):null;
     const moiPorte=match.carrier===options.moi;
     const amiPorte=!!porteurJ&&!moiPorte&&porteurJ.team===equipe;
     const advPorte=!!porteurJ&&porteurJ.team!==equipe;
     const volJ=match.flights.get(options.moi),passeSurMoi=!!volJ&&match.time-volJ.start<volJ.duree+.2;
     const aerienJ=!porteurJ&&ballMesh.position.y>2.2;
-    if(collectif){
-      // Le modèle regarde selon son axe -Z. La caméra suit son dos, sans partir vers un ballon éloigné.
-      const voulu=moiA.heading-Math.PI;
-      const delta=Math.atan2(Math.sin(voulu-J.yaw),Math.cos(voulu-J.yaw));
-      J.yaw=(!J.init||snap)?voulu:J.yaw+delta*(1-Math.exp(-dt*8));
-    }
-    else if(!J.init||snap){J.yaw=Math.atan2(ax+dvx*wV,az+dvz*wV);J.age=99;}
+    if(!J.init||snap){J.yaw=Math.atan2(ax+dvx*wV,az+dvz*wV);J.age=99;}
     else{
       const libre=options.cameraLibre===true;
       const ab=Math.atan2(bx,bz);
@@ -1496,15 +1529,15 @@ export async function creerScene3D(conteneur,options={}){
     const dist=11.8*J.zoom*asp*recul,haut=5.6*J.zoom*asp*recul;
     // Pas collée à son dos : un peu décalée de l'autre côté du ballon, pour qu'il reste lisible à côté du joueur.
     const droiteX=-fz,droiteZ=fx;
-    const decal=collectif?0:clamp(-((B.x-P.x)*droiteX+(B.z-P.z)*droiteZ)*.07,-1.4,1.4)*(1-impliquee*.7);
+    const decal=clamp(-((B.x-P.x)*droiteX+(B.z-P.z)*droiteZ)*.07,-1.4,1.4)*(1-impliquee*.7);
     cible_J.set(P.x-fx*dist+droiteX*decal,Math.max(2.1,haut),P.z-fz*dist+droiteZ*decal);
     cible_J.x=clamp(cible_J.x,-37,37);cible_J.z=clamp(cible_J.z,-72,72);
     // On regarde plus loin devant : l'espace et la ligne défensive comptent plus que le dos du joueur.
     // Quand un autre porte (ou que le ballon vole), le regard se pose entre l'espace devant le joueur et le ballon.
-    const poidsB=collectif?0:moiPorte?.1:.3,avance=(12+.7*sp)*(moiPorte?1:.8);
+    const poidsB=moiPorte?.1:.3,avance=(12+.7*sp)*(moiPorte?1:.8);
     const eB=Math.min(1,16/Math.max(1,db));
     viser_J.set(P.x+fx*avance+(B.x-P.x)*poidsB*eB,1.1,P.z+fz*avance+(B.z-P.z)*poidsB*eB);
-    if(!J.init||snap){J.pos.copy(cible_J);J.posV.set(0,0,0);J.look.copy(viser_J);J.lookV.set(0,0,0);J.init=true;}
+    if(!J.init||snap||J.recale){J.pos.copy(cible_J);J.posV.set(0,0,0);J.look.copy(viser_J);J.lookV.set(0,0,0);J.init=true;J.recale=false;}
     else{dampVector(J.pos,cible_J,J.posV,.24,real);dampVector(J.look,viser_J,J.lookV,.16,real);}
     camera.position.copy(J.pos);camera.lookAt(J.look);
     J.cap=J.yaw;
@@ -1824,6 +1857,8 @@ export async function creerScene3D(conteneur,options={}){
     entreeEnCours(id){return !!match&&(match.changements||[]).some(c=>c.type==='entree'&&c.id===id&&!c.retour);},
     /** Fond la pose de la caméra avec la précédente (par défaut en 1,5 s) : un changement de point de vue sans coupe. */
     glisser,
+    /** Correctif 40 — les derniers coups de pied montrés : `{ id, clip, animA, contactA }` (instants `performance.now()`). */
+    frappesAffichees(){return match?.frappesAffichees?.()||[];},
     /** Position à l'écran (pixels du conteneur) du dessus de la tête d'un joueur. */
     ecran(id,hauteurTete=2.02){
       const a=actors.get(id);if(!a||!a.group.visible)return null;

@@ -582,7 +582,9 @@ que l'affichage lise exactement la version du moteur qui joue.
   d'une mise en ligne garde donc son moteur — et son score. Remettre
   `REGLES_MATCH_EN_LIGNE` à 1 suffit à revenir en arrière pour les suivants.
   **Depuis : règles 4 = lecture locale (IA 3), règles 5 = jeu vivant (IA 5, Correctifs 24-25), règles 6 = transformation après la
-  sirène et prolongations jouées (Correctif 29), règles 7 = jeu physique (IA 6, Correctif 30 — celles des matchs créés aujourd'hui).**
+  sirène et prolongations jouées (Correctif 29), règles 7 = jeu physique (IA 6, Correctif 30), règles 8 = pénaltouche qui garde son lancer
+  (Correctif 33), règles 9 = essai qui garde son élan (IA 7, Correctif 39), règles 10 = coup de pied en une seule action (IA 8,
+  Correctif 40 — celles des matchs créés aujourd'hui).**
   ⚠️ Toute retouche du moteur détaillé change la rejoue des matchs en règles 2
   DÉJÀ COMMENCÉS : la passer sous une règle 3, ou la mettre en ligne quand aucun
   match ne se joue.
@@ -1241,7 +1243,8 @@ Les sorties passent par `controleDirect/sortiesNeuf.ts` : Action tenue + passe g
 Les touches remappées restent valables. Un balayage à droite du terrain choisit gauche/droite, 10 vers le haut, pick vers
 le bas, pied en diagonale haut gauche, départ en diagonale haut droite. `CommandesEquipe` montre une légende contextuelle,
 sans six boutons de sortie. Les gestes normaux reprennent après le ruck. Les huit consignes jouent sur les cibles et le tempo.
-La caméra `equipe` est le défaut, `joueur` reste disponible. Les QTE de conquête et les responsabilités réutilisent le pilote.
+La caméra est celle de la Carrière Joueur (Correctif 40) : elle suit le joueur contrôlé et glisse au changement de joueur ; `equipe`
+reste dans le menu, sans être imposée. Les QTE de conquête et les responsabilités réutilisent le pilote.
 Sans activation solo, aucun état ni hasard supplémentaires : quatre empreintes de simulations restent identiques à HEAD.
 Banc : `verify:correctif37` ; aperçu `/scripts/apercuCorrectif37.html?situation=ruck` et `&tactile=1` pour l'essai tactile.
 
@@ -2066,6 +2069,123 @@ portraits (`photoReelle`). Sur téléphone, c'est le plus gros gel du jeu, à ch
 **Pas fait / à dire** : rien n'a été essayé sur iPhone, iPad ni Safari ; la mémoire graphique n'est toujours pas mesurée ;
 la sauvegarde reste dans `localStorage` (IndexedDB lèverait le plafond, mais rend la relecture asynchrone) ; `avancee`
 pèse 80 % d'une partie d'entraîneur et n'a pas été allégé.
+
+### Le coup de pied en une seule action, la caméra du contrôle d'équipe, la fiche des joueuses (Correctif 40)
+
+Demande : « un input = une seule action de kick = une seule animation = un seul événement de contact = départ immédiat et
+synchronisé du ballon » ; le contrôle complet de l'équipe (Carrière Entraîneur) avec la caméra de la Carrière Joueur ; les
+cartes de joueuses avec leur image dans la fiche et le logo de leur ligue sous le club.
+
+**Le coup de pied (IA de niveau 8 — `moteur/frappe.ts`, `frappeFranche(e)`)**
+
+⚠️ **TOUT EST DERRIÈRE `EtatMatch.ia` ≥ 8.** Carrière : `IA_MATCH_DE_CARRIERE` = 8. Ligue : **règles 10** (`REGLES_MATCH_EN_LIGNE`,
+`iaDesRegles` → 8) pour les matchs créés désormais ; un match en cours garde ses règles, revenir en arrière = remettre 9.
+Empreintes vérifiées après le correctif : niveau 7 `6c96f0b0`, 6 `90b6ea8a`, 5 `7c3b3a4d`, 3 `6aca6be7` (inchangées) ; niveau 8 `ba4d9477`.
+
+- ⚠️ **CE QUE LE MOTEUR FAISAIT** (mesuré, `npm run mesure:frappes` avec `IA_EMPREINTE=7`) : le botteur devait REVENIR où le coup
+  de pied avait été demandé. À l'arrêt, 0,45 à 0,60 s entre la demande et le départ du ballon ; en course il dépassait ce point,
+  l'armé était annulé, il freinait, revenait sur ses pas et l'armé repartait de zéro — **1,65 à 1,80 s, deux gestes de frappe,
+  quatre à neuf mètres parcourus**. Même mal pour un ballon posé au sol : 23 armés pour 9 pénaltouches (le botteur arrivait
+  lancé, était armé en passant, dépassait le ballon). Et un 9 encore « battu » à la sortie d'un ruck voyait sa boîte annulée
+  puis redemandée à chaque pas (jusqu'à trois armés en 0,6 s).
+- **Au niveau 8, un coup de pied est UNE ACTION** (`piedPrepare.id`, compteur `e.frappes`) :
+  `demande ─(orientation : 0 ou 1 pas)→ armé ─(amorce)→ CONTACT ─(suivi 0,3 s)→ reprise`. `armeA` et `contactA` sont écrits à
+  la demande (`planDeFrappe`, pure) et ne bougent plus ; `etat` passe de `demande` à `arme` une fois (`armerFranche`) ; au
+  contact `e.frappeFaite = { id, auteurId, geste, contactA, finA }`. Le botteur ne revient nulle part : il tape de là où il
+  est, sur sa course (`conduireLeBotteur` — il freine seulement pour un drop ou une boîte).
+- **Une amorce par geste**, en PAS du moteur (`AMORCE_EN_PAS`) : rasant 1, par-dessus 1, course 2 (dégagement, occupation,
+  chandelle, transversale), drop 3, boîte 3 (le 9, à la sortie d'un regroupement, presque à l'arrêt : `aLaSortieDuRuck`).
+  Pénalité et transformation gardent leur rituel (`tir`). ⚠️ En pas, pas en secondes : le contact tombe sur un pas, et la
+  scène — qui affiche le match un pas en retard — a un pas de plus pour dérouler son clip.
+- **Plaquable avant le contact, pas après** : `plaqueurDuBotteur` abandonne le geste (jamais rejoué) ; si le plaquage est
+  MANQUÉ, la même action continue au même instant de contact (`manques`). Au contact, le contre et la gêne se jugent sur qui
+  est là (`contreurDuDrop`) : le tirage « contré » fait à la DEMANDE du coup de pied du joueur est supprimé au niveau 8, et
+  le contre de la chenille (1 sur 12) n'est plus un ballon qui part tout seul — le 9 arme, le défenseur monte, le contre
+  tombe au contact (`contrePar`).
+- **Un ballon posé au sol** (pénaltouche, renvoi : le « placement ») : numéro d'action aussi, le botteur FREINE sur sa marque
+  (`deplacer(…, vif)`), n'arme qu'une fois presque arrêté, et un armé ne se relance plus.
+- **Une seule commande** (tous niveaux, côté joueur) : un second appui pendant qu'un coup de pied attend son pas ou se prépare
+  n'entre pas dans la file (`demanderDirect`), et `executerDemande` refuse en silence — deux appuis dans le même pas
+  remplaçaient le premier coup de pied, en comptaient deux et relançaient le geste.
+- **L'annonce** (`e.direct.frappeAnnoncee`, solo) : à l'image même de l'appui, `demanderDirect` écrit le geste et les instants
+  que le moteur écrira à son prochain pas. La scène part tout de suite ; `piedPrepare` prend le relais sans que rien ne redémarre.
+- **Mesuré** (`npm run mesure:frappes`, niveau 8) : demande → contact 0,30 s (rasant, par-dessus), 0,45 s (dégagement,
+  chandelle, visé), 0,60 s (drop), À TOUTES LES ALLURES, un armé, zéro mètre à rebours. Dans le navigateur (18 images par
+  seconde, rendu logiciel) : appui → animation 46 à 97 ms, appui → contact affiché 340 ms pour un rasant en course, 586 ms
+  pour un coup de pied d'occupation à l'arrêt.
+- **Équilibre** (`npm run mesure:rugby -- 96 carriere3d 7` puis `8`) : 37,2 → 37,6 points, 5,3 → 5,3 essais, 6,3 → 6,3
+  pénalités, coups de pied dans le jeu 13,3 → 13,8, drops tentés 0,06 → 0,16, durée 15,1 → 15,0 min. Ligue, 72 matchs :
+  80,1 → 81,3 points, 10,9 → 11,1 essais, 77,5 → 80,2 coups de pied, 81,2 → 81,1 min.
+
+**La scène** (hors git : `../analyse-rn26/correctif_40_frappes.cjs`, sauvegarde `sauvegarde-avant-correctif-40/`)
+
+- ⚠️ **DEUX HORLOGES, ET UN SECOND LECTEUR.** Le clip de frappe était calé sur les délais d'avant le jeu vivant (0,70 / 0,84 /
+  1,12 s) alors que le moteur frappe en 0,18 à 0,50 s depuis le Correctif 24 ; et la branche générique des gestes rejouait le
+  clip EN ENTIER dès que l'armé était annulé. Mesuré sur 45 coups de pied (`node verifier_frappes.mjs`, lecteur et moteur
+  d'avant) : clip à **0,31 s** de son image de contact quand le ballon part, **61 gestes rejoués, 59 joués dans le vide, 15
+  ballons partis sans geste** (le 9 derrière sa chenille ne tapait pas : sa boucle d'attente durait jusqu'au bout).
+- `DestinyMatch.frappeDe` est le SEUL lecteur d'un coup de pied : une action, un clip choisi une fois, une horloge de clip
+  qui ne recule jamais, et l'image de contact (`FRAPPES[clip]`) posée sur l'instant de contact du moteur —
+  `outils.contactDeFrappe` (remis par `lib/match3D.ts`), puis le départ réel du vol. ⚠️ `FRAPPES` a été RELUE SUR LES OS
+  (`node mesurer_clips_frappe.mjs`) : le rasant arraché était noté à 0,36 s, son pied touche à 0,16 s.
+- Le ballon descend des mains vers le point où le pied le prendra et ne rejoint son vol qu'à l'image du contact (un drop
+  touche la pelouse et repart du pied) ; le bruit de la frappe attend la même image. Le 9 de la chenille joue enfin
+  `extending_ruck_kick_box_from_feet`. Les clips de frappe sont dans la banque `common`, attendue avant le coup d'envoi.
+- **Après** (six matchs, 148 coups de pied) : écart nul à l'image de contact pour les sept clips, 0 geste rejoué, 0 dans le
+  vide, 0 ballon sans geste, 151 armés pour 151 actions.
+- **Profileur** (`lib/controleDirect/latenceFrappe.ts`) : le pilote note l'appui, la scène le début du clip et le contact
+  affiché (`scene.frappesAffichees()`), le cartouche affiche « Appui → animation » et « Animation → contact ».
+
+**La caméra du contrôle d'équipe** (`pilotage.ts`, `../analyse-rn26/correctif_40_camera.cjs`)
+
+- ⚠️ **IL N'Y A PLUS QU'UN CHEMIN.** `cameraJoueur` avait une branche `collectif` : lacet vissé au dos du joueur, `orbiter`
+  jeté (ni doigt, ni souris, ni stick droit), aucune assistance vers le ballon, et la caméra reposée d'un coup à chaque
+  changement de joueur. `cameraPour` imposait en plus le plan « joueur » quel que soit le choix. Tout cela est retiré :
+  c'est la logique de la Carrière Joueur (suivi de la course, 360°, ballon gardé à l'image, reprise de l'assistance après
+  2 s sans geste), et seul le joueur suivi change (`scene.moi`).
+- **Changement de joueur** : la caméra garde son lacet et `glisser(.38)` fond l'ancien cadre dans le nouveau (place,
+  orientation, recul). La focale ne dépend que de la forme de l'écran : rien à interpoler. Mesuré dans le navigateur : le
+  nouveau joueur glisse à l'écran sur environ 0,4 s (1 280 × 720 et 812 × 375 tactile) ; douze gestes d'orbite tournent la vue.
+- La caméra « équipe » reste dans le menu ; elle n'est plus imposée, ni le défaut.
+
+**Les joueuses** (`lib/imageJoueur.ts`, `lib/logoChampionnat.ts`)
+
+- ⚠️ **LA FICHE NE LISAIT PAS LE PORTRAIT DE LA CARTE.** La carte (`CarteJoueurEnLigne`) affichait `carte.photo` ; la fiche de
+  composition recevait un joueur fabriqué SANS ce champ (`carteEnJoueur`, en ligue et en collection) et cherchait un visage
+  par le NOM dans l'index des photos — celui des joueurs. Une joueuse n'y trouvait rien, ou le portrait d'un homonyme :
+  mesuré, « Bethan LEWIS » y prenait celui d'Ethan Lewis.
+- **Une seule source** : `portraitsDe` / `usePortrait` — « Mon image », puis le portrait porté par la carte, puis l'index
+  (jamais pour une carte spéciale, jamais pour une joueuse hors du monde féminin), sinon la silhouette de son genre. Jamais
+  un cadre vide ni une adresse « undefined ». La carte, la fiche et la composition la lisent ; `Coequipier.gender` et
+  `photo` voyagent avec le joueur.
+- ⚠️ **LES CHAMPIONNATS FÉMININS N'AVAIENT PAS DE LOGO, NULLE PART.** Leurs douze logos étaient livrés (`LOGO_COMPETITION`,
+  `f-…`) mais `logoChampionnat` ne parcourait que `COMPETITIONS`, le monde masculin. Mesuré sur les 1 803 cartes de
+  joueuses : aucune ne trouvait le logo de sa ligue. Le pont nom → identifiant (`CHAMPIONNATS_FEMININS_PAR_NOM`, recopié
+  pour ne pas charger le monde féminin avec chaque carte ; le banc vérifie qu'il dit la même chose) les couvre toutes, à
+  graphie près. L'écusson d'un club féminin se lit dans sa table aussi depuis la fiche (`useBlasonCarte(…, feminin)`).
+- AC Bobigny 93 → Élite 1 Féminine : le rattachement existait ; seul le logo manquait.
+
+**Bancs** : `npm run verify:correctif40` (13 148 contrôles : gestes et amorces, demande → contact à toutes les allures,
+instants figés, double appui, orientation, plaquage pendant l'amorce, niveau 7 intact, matchs entiers, clips préchargés,
+1 803 cartes de joueuses) ; `npm run mesure:frappes` ; `npx vite-node scripts/sonderFrappesIA40.ts` (les coups de pied de
+l'IA, par sorte) ; depuis `../analyse-rn26` : `node verifier_frappes.mjs`, `node mesurer_clips_frappe.mjs`. Aperçu :
+`/scripts/apercuCorrectif40.html` (fiches de 18 vraies joueuses ; `?vue=cartes`). Adaptés : `verify:responsabilites` (le
+drop contré lit `contactA`), `verify:correctif37` (la caméra n'est plus imposée).
+
+**En ligue, règles 10** : `verify:film-direct` (5 565 pas rejoués identiques au moteur), `verify:chronologie` et
+`verify:reprises-match` (133 contrôles : l'état du moteur, ses nouveaux champs compris, se dépose et se reprend) passent.
+
+⚠️ **Échecs qui ne viennent pas de ce correctif** (rejoués au niveau 7, sans son code) : `node verifier_duels.mjs` (« trop de gros
+impacts » : 21 pour 128 au niveau 7, 27 pour 127 au niveau 8, seuil 14 %) ; `node verifier_destiny.mjs` (« posture de ruck
+ancrée », déjà noté plus haut) ; `npm run verify:direct-3d` (« touches jouées avant que l'alignement soit formé » : 5 sur 13 au
+niveau 7, 3 sur 14 au niveau 8, 3 sur 8 en règles 2 — il passe toujours avec `--ia=2`) ; `npm run verify:assets` (quatre
+portraits détourés d'amateurs, dont le nom de fichier contient une espace).
+
+**Pas fait / pas vu** : un drop, une boîte et le 9 de la chenille n'ont pas été REGARDÉS à l'image (leurs instants sont
+mesurés ; seul un dégagement a été suivi pas à pas) ; aucun vrai téléphone, aucune manette, aucun direct de ligue réel (le
+film transporte `piedPrepare` et `frappeFaite`, vérifié au banc) ; la vue de haut (2D) ne montre pas ces gestes ; le
+marché et l'ouverture de pack passent par la carte (source unique) mais n'ont pas été ouverts à l'écran ; les 616 joueuses
+sans portrait gardent la silhouette.
 
 ## ⚠️ Équilibrage : ce qui ne se retouche pas sans mesurer
 

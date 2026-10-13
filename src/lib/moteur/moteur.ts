@@ -101,6 +101,7 @@ import {
   type OptionsResponsabilites, type QualiteLancer, type RolesEquipe,
 } from './responsabilites.js';
 import { CADENCE_TOUCHE, FRAPPE_VIVE, MELEE_VIVE, REGLAGES_CONQUETE, RITUEL_VIF, conqueteLisible, jeuVivant } from './conquete.js';
+import { SUIVI_DE_FRAPPE, aLaSortieDuRuck, frappeFranche, planDeFrappe, type GesteDeFrappe } from './frappe.js';
 import { apportDuGeste, appuyerPack, choisirSortieDuPack, majPack } from './pack.js';
 import { REGLAGES_ENDURANCE, coutEffort, enduranceDeuxReserves, sprintMaxDe } from './endurance.js';
 import { lectureLocale, ligneDePasseCoupee, lireLeSurnombre, niveauDeLecture, regarderDevant } from './ia/vision.js';
@@ -1034,7 +1035,11 @@ function tick(e: EtatMatch): void {
     // multiplient (poursuite, rythme « intense », soutien) : un demi rapide et frais
     // atteignait 12,7 m/s. La pointe de vitesse reste celle d'un sprinteur de rugby.
     if (iaParPoste(e)) p.effort = Math.min(p.effort, 10.9 / Math.max(1, vitesseDisponible(p)));
-    deplacer(p, dt, !!e.cadenceDetaillee && (p.role === 'ruck' || (e.vol?.type === 'passe' && e.vol.receveur === p)));
+    // Niveau 8 : celui qui vient de taper finit sa jambe avant de repartir (`frappeFaite.finA`).
+    if (e.frappeFaite && e.frappeFaite.auteurId === p.id && e.sim < e.frappeFaite.finA) p.effort = Math.min(p.effort, 0.7);
+    deplacer(p, dt, !!e.cadenceDetaillee && (p.role === 'ruck' || (e.vol?.type === 'passe' && e.vol.receveur === p)
+      // Niveau 8 : celui qui va taper un ballon posé s'arrête SUR sa marque, au lieu de la dépasser et d'y revenir.
+      || (e.piedPrepare?.id !== undefined && e.piedPrepare.auteurId === p.id)));
   }
   // Avec ballon porté, la collision est résolue APRÈS la course du porteur.
   // La résoudre ici utilisait sa position de l'image précédente : il pouvait
@@ -1057,49 +1062,117 @@ function tick(e: EtatMatch): void {
   if (e.piedPrepare) {
     const attente = e.piedPrepare;
     const auteur = e.pions.find((p) => p.id === attente.auteurId && p.surLeTerrain && p.sanction <= 0);
-    if (!auteur || auteur.battu > 0 || (attente.avaitBallon && e.porteur !== auteur)) {
+    // Niveau 8 : seul un NOUVEAU coup reçu abandonne le geste — pas le déséquilibre qu'il avait déjà en le demandant (`remisA`).
+    const sonne = !!auteur && auteur.battu > (attente.contactA !== undefined ? Math.max(0, (attente.remisA ?? 0) - e.sim) + DT + 1e-6 : 0);
+    if (!auteur || sonne || (attente.avaitBallon && e.porteur !== auteur)) {
       annulerFrappe(e, attente.auteurId);
       return;
     }
     attente.debut ??= e.sim;
-    // Sans porteur (pénaltouche, renvoi), le ballon attend au sol : le botteur
-    // doit le rejoindre. Forcer la frappe au bout d'une seconde le faisait
-    // taper de l'endroit où il se trouvait, ballon téléporté à ses pieds.
-    const forceFrappe = e.sim - attente.debut >= (attente.rapideArcade ? .55
-      : e.cadenceDetaillee && auteur !== e.porteur ? 12 : 1.2);
-    auteur.cible = { ...attente.depuis };
-    // Le porteur est exclu de la boucle de déplacement normale. Lorsqu'un
-    // contact le décalait de son appui, attendre ici figeait toute la phase.
-    if (auteur === e.porteur) {
-      deplacer(auteur, dt);
-      e.ballon = { ...auteur.pos };
-    }
-    if (!forceFrappe && (distance(auteur.pos, attente.depuis) > .75 || auteur.corps)) {
-      delete attente.pretDepuis;
-      return;
-    }
-    const { frappe, contestable } = armerFrappe(e, auteur, attente);
-    // ═══ CELUI QUI ARME UN COUP DE PIED N'EST PAS INTOUCHABLE (niveau 5) ══════
-    // Tant qu'il tient le ballon, un défenseur arrivé à temps le plaque : le geste est abandonné et le contact se joue
-    // comme n'importe quel autre (il peut être raté). À la frappe, le contact peut encore gêner ou contrer (plus bas).
-    if (contestable && e.phase === 'jeuCourant' && e.sim - attente.pretDepuis! < frappe) {
-      const presse = plaqueurDuBotteur(e, auteur);
-      if (presse) {
-        annulerFrappe(e, auteur.id);
-        dire(e, 'plaquage', presse.cote, `${presse.nom} arrive sur ${auteur.nom} avant qu'il ait pu taper.`, 0, presse.moi || auteur.moi);
-        return resoudrePlaquage(e, auteur, presse);
+    let contestable: boolean;
+    if (attente.contactA !== undefined) {
+      // ═══ NIVEAU 8 : UNE DEMANDE, UN ARMÉ, UN CONTACT (`moteur/frappe.ts`) ════════════════════════════════════════════
+      // Il ne revient pas où le coup de pied a été demandé : il tape sur sa course, à l'instant écrit à la demande.
+      // Rien, ici, ne remet l'armé à zéro. Avant le contact il reste plaquable ; au contact le ballon part.
+      conduireLeBotteur(e, auteur, attente, dt);
+      if (e.sim >= attente.armeA! - 1e-6) armerFranche(e, auteur, attente);
+      if (e.sim < attente.contactA - 1e-6) {
+        if (e.phase === 'jeuCourant') {
+          const presse = plaqueurDuBotteur(e, auteur, attente.manques);
+          if (presse) {
+            // Le contact se joue comme n'importe quel autre — et il peut être manqué.
+            delete e.piedPrepare;
+            resoudrePlaquage(e, auteur, presse);
+            // ⚠️ UN PLAQUAGE MANQUÉ NE RELANCE PAS LE COUP DE PIED. Le geste était abandonné puis redemandé au pas suivant :
+            // jusqu'à trois armés en six dixièmes de seconde pour une boîte tapée au pied d'un regroupement. Si le botteur
+            // est encore debout, ballon en main, c'est la MÊME action qui continue, au même instant de contact ; celui qui
+            // vient de le manquer ne le reprend pas (`manques`).
+            if (e.porteur === auteur && !auteur.corps && auteur.battu <= Math.max(0, (attente.remisA ?? 0) - e.sim) + DT && e.phase === 'jeuCourant' && !e.piedPrepare && !e.vol && !e.ruck) {
+              (attente.manques ??= []).push(presse.id);
+              e.piedPrepare = attente;
+              return;
+            }
+            const repris = e.piedPrepare;
+            annulerFrappe(e, auteur.id);
+            if (repris && repris !== attente) e.piedPrepare = repris;
+            if (e.porteur !== auteur || auteur.corps) dire(e, 'plaquage', presse.cote, `${presse.nom} arrive sur ${auteur.nom} avant qu'il ait pu taper.`, 0, presse.moi || auteur.moi);
+            return;
+          }
+        }
+        return;
       }
+      // LE CONTACT. Le suivi du geste commence : la scène le lit, et le botteur ne repart pas à pleine allure avant `finA`.
+      contestable = true;
+      e.frappeFaite = { id: attente.id!, auteurId: auteur.id, geste: attente.geste!, contactA: e.sim, finA: e.sim + SUIVI_DE_FRAPPE };
+      if (auteur.moi && e.direct?.actif) e.direct.tenuJusqua = Math.max(e.direct.tenuJusqua, e.sim + SUIVI_DE_FRAPPE);
+    } else {
+      // Sans porteur (pénaltouche, renvoi), le ballon attend au sol : le botteur
+      // doit le rejoindre. Forcer la frappe au bout d'une seconde le faisait
+      // taper de l'endroit où il se trouvait, ballon téléporté à ses pieds.
+      const forceFrappe = e.sim - attente.debut >= (attente.rapideArcade ? .55
+        : e.cadenceDetaillee && auteur !== e.porteur ? 12 : 1.2);
+      auteur.cible = { ...attente.depuis };
+      // Le porteur est exclu de la boucle de déplacement normale. Lorsqu'un
+      // contact le décalait de son appui, attendre ici figeait toute la phase.
+      if (auteur === e.porteur) {
+        deplacer(auteur, dt);
+        e.ballon = { ...auteur.pos };
+      }
+      // ⚠️ NIVEAU 8 : UN ARMÉ NE SE RELANCE PLUS, MÊME POUR UN BALLON AU SOL. Le botteur d'une pénaltouche arrivait lancé sur le
+      // ballon, était armé en passant, le dépassait d'un mètre, et l'armé repartait de zéro à son retour — mesuré : 23 armés
+      // pour 9 pénaltouches. Il freine maintenant sur sa marque (`deplacer`, plus haut), n'arme qu'une fois presque arrêté,
+      // et une fois armé il tape.
+      const dejaArme = attente.id !== undefined && attente.pretDepuis !== undefined;
+      const lance = attente.id !== undefined && auteur !== e.porteur && Math.hypot(auteur.vitesse.x, auteur.vitesse.y) > 2.4;
+      if (!forceFrappe && !dejaArme && (distance(auteur.pos, attente.depuis) > .75 || auteur.corps || lance)) {
+        delete attente.pretDepuis;
+        return;
+      }
+      const arme = armerFrappe(e, auteur, attente);
+      const frappe = arme.frappe;
+      contestable = arme.contestable;
+      // ═══ CELUI QUI ARME UN COUP DE PIED N'EST PAS INTOUCHABLE (niveau 5) ══════
+      // Tant qu'il tient le ballon, un défenseur arrivé à temps le plaque : le geste est abandonné et le contact se joue
+      // comme n'importe quel autre (il peut être raté). À la frappe, le contact peut encore gêner ou contrer (plus bas).
+      if (contestable && e.phase === 'jeuCourant' && e.sim - attente.pretDepuis! < frappe) {
+        const presse = plaqueurDuBotteur(e, auteur);
+        if (presse) {
+          annulerFrappe(e, auteur.id);
+          dire(e, 'plaquage', presse.cote, `${presse.nom} arrive sur ${auteur.nom} avant qu'il ait pu taper.`, 0, presse.moi || auteur.moi);
+          return resoudrePlaquage(e, auteur, presse);
+        }
+      }
+      // ⚠️ MÊME FORCÉE, LA FRAPPE ATTEND SON ARMÉ (cadence détaillée). Un botteur
+      // gêné qui n'atteignait pas sa marque tapait à l'instant où l'attente
+      // expirait : le ballon partait avant que le geste ait commencé, donc sans
+      // que le corps se soit tourné — un coup de pied sur vingt-cinq partait dans
+      // le dos du botteur (mesuré sur 45 coups de pied).
+      if ((!forceFrappe || e.cadenceDetaillee) && e.sim - attente.pretDepuis! < frappe) return;
     }
-    // ⚠️ MÊME FORCÉE, LA FRAPPE ATTEND SON ARMÉ (cadence détaillée). Un botteur
-    // gêné qui n'atteignait pas sa marque tapait à l'instant où l'attente
-    // expirait : le ballon partait avant que le geste ait commencé, donc sans
-    // que le corps se soit tourné — un coup de pied sur vingt-cinq partait dans
-    // le dos du botteur (mesuré sur 45 coups de pied).
-    if ((!forceFrappe || e.cadenceDetaillee) && e.sim - attente.pretDepuis! < frappe) return;
     delete e.piedPrepare;
     if (e.placement) {
       delete e.placement[auteur.id];
       if (Object.keys(e.placement).length === 0) e.placement = null;
+    }
+    // Niveau 8 — la boîte contrée derrière la chenille : décidée à la demande, jouée ICI, quand le pied touche le ballon.
+    const contreurChenille = attente.contrePar ? e.pions.find((q) => q.id === attente.contrePar && q.surLeTerrain && q.sanction <= 0 && !q.corps) : undefined;
+    if (contreurChenille) {
+      if (e.chenilleTenue) { delete e.chenilleTenue; e.ruck = null; e.placement = null; }
+      jouerGeste(e, contreurChenille, 'charge_down', 1.4, jeuPhysique(e) && e.cadenceDetaillee ? 'bras' : undefined);
+      const sDef = sens(contreurChenille.cote);
+      dire(e, 'franchissement', contreurChenille.cote,
+        `💥 CONTRE SUR LA CHENILLE ! ${contreurChenille.nom} monte en flèche et contre la boîte de ${auteur.nom} ! Ballon libre !`,
+        0, contreurChenille.moi || auteur.moi);
+      poserVol(e, {
+        de: { ...auteur.pos },
+        vers: { x: borner(auteur.pos.x + sDef * (3 + e.rng() * 4), 2, LONGUEUR - 2), y: borner(auteur.pos.y + (e.rng() - 0.5) * 5, 2, LARGEUR - 2) },
+        duree: 0.7, ecoule: 0, hauteur: 0.35, type: 'pied', intention: 'chandelle', auteur, receveur: null,
+      });
+      e.porteur = null;
+      e.phase = 'ballonEnLAir';
+      e.minuteur = 0.9;
+      e.derniereTouche = contreurChenille;
+      return;
     }
     // ═══ LE DROP DU JOUEUR PEUT ÊTRE CONTRÉ À LA FRAPPE (Correctif 17) ═══════
     let { arrivee, duree, hauteur, courbe } = attente;
@@ -1140,6 +1213,7 @@ function tick(e: EtatMatch): void {
           dire(e, 'pied', contreur.cote, `Contré ! ${contreur.nom} se jette sur le coup de pied de ${auteur.nom} : le ballon est vivant.`, 0, contreur.moi || auteur.moi);
           const sC = sens(contreur.cote);
           const de = visible ? contactDuContre(e, contreur, auteur) : { x: auteur.pos.x, y: auteur.pos.y };
+          if (attente.id !== undefined && e.frappeFaite?.id === attente.id) e.frappeFaite.contre = true;
           e.ballon = { ...de };
           return demarrerBallonLibre(e, {
             de, vers: { x: borner(de.x + sC * (2 + e.rng() * 5), 1, LONGUEUR - 1), y: borner(de.y + (e.rng() - 0.5) * 7, 1, LARGEUR - 1) },
@@ -1422,6 +1496,8 @@ function piloterDirect(e: EtatMatch): void {
       executerDemande(e, p, dem);
     }
   }
+  // L'annonce du coup de pied a fait son office : la demande vient d'être jouée (`piedPrepare` a pris le relais) ou refusée.
+  if (d.frappeAnnoncee && e.sim >= d.frappeAnnoncee.depuis - 1e-6) d.frappeAnnoncee = null;
   compterLeJeu(e, DT);
 }
 
@@ -1437,6 +1513,8 @@ function executerDemande(e: EtatMatch, p: Pion, dem: DemandeDirecte): boolean {
     case 'passe': return passeDirecte(e, p, dem, false);
 
     case 'drop': {
+      // Une seule commande : tant qu'un coup de pied se prépare, une seconde demande ne relance rien.
+      if (e.piedPrepare) return retourDirect(e, 'drop', false);
       if (e.porteur !== p || e.phase !== 'jeuCourant' || e.vol || p.corps) return retourDirect(e, 'drop', false, 'pasDeBallon');
       if (!v.possible.drop) return retourDirect(e, 'drop', false, (d.recharges.drop ?? 0) > 0 ? 'recharge' : 'horsPortee');
       e.lancement = null;
@@ -1447,6 +1525,9 @@ function executerDemande(e: EtatMatch, p: Pion, dem: DemandeDirecte): boolean {
     }
 
     case 'coupDePied': {
+      // ⚠️ UNE SEULE COMMANDE DE COUP DE PIED. Deux appuis dans le même pas (0,15 s) passaient tous les deux : le second
+      // remplaçait le premier, comptait un second coup de pied et relançait le geste.
+      if (e.piedPrepare) return retourDirect(e, 'coupDePied', false);
       if (e.porteur !== p || e.phase !== 'jeuCourant' || e.vol || p.corps) return retourDirect(e, 'coupDePied', false, 'pasDeBallon');
       const plan = classerCoupDePied(e, p, dem);
       e.lancement = null;
@@ -1756,10 +1837,10 @@ function contactDuContre(e: EtatMatch, contreur: Pion, botteur: Pion): Vec {
   return { x: botteur.pos.x + dx * 0.6, y: botteur.pos.y + dy * 0.6 };
 }
 
-function plaqueurDuBotteur(e: EtatMatch, botteur: Pion): Pion | null {
+function plaqueurDuBotteur(e: EtatMatch, botteur: Pion, manques?: string[]): Pion | null {
   let meilleur: Pion | null = null, plusProche = Infinity;
   for (const q of surLeTerrain(e, adverse(botteur.cote))) {
-    if (q.sanction > 0 || q.corps || q.battu > 0) continue;
+    if (q.sanction > 0 || q.corps || q.battu > 0 || manques?.includes(q.id)) continue;
     const d = distance(q.pos, botteur.pos);
     // ⚠️ AU CONTACT, PAS « À PORTÉE ». Un coup de pied se décide justement quand le défenseur arrive : avec le rayon de
     // plaquage ordinaire, un quart des coups de pied de l'IA étaient avortés (mesuré : 13,8 → 10,7 par match). Il faut
@@ -1796,7 +1877,9 @@ function taperAuPiedVise(e: EtatMatch, p: Pion, plan: PlanDePied): void {
   const gene = pression < 2 ? 0.2 : pression < 3.5 ? 0.1 : pression < 6 ? 0.04 : 0;
   const alea = (e.rng() + e.rng()) / 2;
   const frappe = borner((0.58 + 0.4 * pied) * fraicheur + (alea - 0.5) * 0.46 - gene, 0.22, 1);
-  const contre = plan.intention !== 'parDessus' && pression < 1.7 && e.rng() < 0.11 + (0.55 - frappe) * 0.1;
+  // Niveau 8 : un contre se juge AU CONTACT, d'après qui est sur le botteur à cet instant (`contreurDuDrop`). Le tirer à la
+  // demande annonçait « contré ! » avant que la jambe soit partie.
+  const contre = !frappeFranche(e) && plan.intention !== 'parDessus' && pression < 1.7 && e.rng() < 0.11 + (0.55 - frappe) * 0.1;
   const nom = p.nom;
   if (contre) {
     const s = sens(p.cote);
@@ -2400,12 +2483,50 @@ function poserVol(e: EtatMatch, vol: Vol): void {
 
 function annulerFrappe(e: EtatMatch, auteurId: string): void {
   delete e.piedPrepare;
+  if (e.direct?.frappeAnnoncee?.auteurId === auteurId) e.direct.frappeAnnoncee = null;
   if (e.placement) { delete e.placement[auteurId]; if (!Object.keys(e.placement).length) e.placement = null; }
   e.gestes = e.gestes?.filter(g => g.joueurId !== auteurId || !['grubber', 'chip', 'punt', 'box_kick', 'drop'].includes(g.clip));
   if (e.dropEnCours?.auteurId === auteurId) {
     if (e.dropEnCours.humain && e.dropEnCours.reussi && e.responsabilites) e.responsabilites.stats.dropsReussis = Math.max(0, e.responsabilites.stats.dropsReussis - 1);
     delete e.dropEnCours;
   }
+}
+
+/** Le geste que le moteur inscrit pour chaque coup de pied (lu par la scène et par `annulerFrappe`). */
+const CLIP_DU_GESTE: Record<GesteDeFrappe, string> = { rasant: 'grubber', parDessus: 'chip', course: 'punt', boite: 'box_kick', drop: 'drop' };
+
+/**
+ * Niveau 8 — L'ARMÉ, UNE SEULE FOIS. `etat` passe de « demande » à « arme » et n'en revient pas : aucun chemin ne rejoue
+ * le geste de frappe d'une même action (`piedPrepare.id`).
+ */
+function armerFranche(e: EtatMatch, auteur: Pion, attente: NonNullable<EtatMatch['piedPrepare']>): void {
+  if (attente.etat === 'arme') return;
+  attente.etat = 'arme';
+  attente.pretDepuis = e.sim;
+  // Posé, tapé en pleine course, ou arraché sous la pression d'un défenseur qui arrive — comme au niveau 6.
+  const style = jeuPhysique(e) && e.cadenceDetaillee ? choisirFrappe(auteur, pressionSur(e, auteur)) : undefined;
+  jouerGeste(e, auteur, CLIP_DU_GESTE[attente.geste!], 1.4, style && style !== 'pose' ? style : undefined);
+}
+
+/**
+ * Niveau 8 — le botteur pendant son geste. Un drop et une boîte se tapent sur ses appuis : il freine. Les autres se tapent
+ * dans la course : il continue droit devant lui, un peu moins vite. Il ne revient jamais sur ses pas.
+ */
+function conduireLeBotteur(e: EtatMatch, auteur: Pion, attente: NonNullable<EtatMatch['piedPrepare']>, dt: number): void {
+  if (auteur.corps || auteur !== e.porteur) return;
+  const v = Math.hypot(auteur.vitesse.x, auteur.vitesse.y);
+  const plante = attente.geste === 'drop' || attente.geste === 'boite' || v < 0.6;
+  if (plante) auteur.cible = { ...auteur.pos };
+  else {
+    const avance = 0.4 + 0.35 * 0.75 * v;
+    auteur.cible = {
+      x: borner(auteur.pos.x + auteur.vitesse.x / v * avance, 0.5, LONGUEUR - 0.5),
+      y: borner(auteur.pos.y + auteur.vitesse.y / v * avance, 0.4, LARGEUR - 0.4),
+    };
+  }
+  auteur.effort = 1;
+  deplacer(auteur, dt, plante);
+  e.ballon = { ...auteur.pos };
 }
 
 /** L'appui commence au même pas que la demande. L'arcade conserve sa rapidité et reste contestable. */
@@ -2436,8 +2557,29 @@ function lancerVol(
 ): void {
   if (!pret) {
     depuis ??= { ...auteur.pos };
+    // ═══ NIVEAU 8 : LE COUP DE PIED TAPÉ BALLON EN MAIN EST UNE SEULE ACTION ══════════════════════════════════════════
+    // Un numéro, et deux instants écrits ICI pour ne plus bouger : l'armé (`armeA`) et le contact pied-ballon (`contactA`).
+    // Un renvoi, ou un ballon posé au sol qu'il faut aller chercher (pénaltouche), gardent leur placement d'avant.
+    if (frappeFranche(e) && auteur === e.porteur && !auteur.corps && intention !== 'renvoi' && distance(auteur.pos, depuis) <= .75) {
+      const plan = planDeFrappe(intention, auteur.numero, auteur.vitesse, auteur.pos, arrivee, sens(auteur.cote), e.sim, DT, aLaSortieDuRuck(e));
+      // ⚠️ IL RETROUVE D'ABORD SES APPUIS. Un 9 qui sort d'un regroupement est encore « battu » quelques dixièmes de seconde :
+      // son coup de pied était annulé au pas suivant, redemandé, annulé encore — jusqu'à trois armés pour une boîte. Ce délai
+      // est maintenant DANS l'action : l'armé commence quand il est d'aplomb (`remisA`), une seule fois.
+      const retard = Math.ceil(Math.max(0, auteur.battu) / DT - 1e-6) * DT;
+      e.frappes = (e.frappes ?? 0) + 1;
+      e.piedPrepare = {
+        auteurId: auteur.id, arrivee: { ...arrivee }, intention, duree, hauteur, depuis: { ...depuis }, debut: e.sim, avaitBallon: true,
+        ...(courbe ? { courbe } : {}), id: e.frappes, etat: 'demande', geste: plan.geste, armeA: plan.armeA + retard, contactA: plan.contactA + retard,
+        ...(retard > 0 ? { remisA: e.sim + auteur.battu } : {}),
+      };
+      plan.armeA += retard;
+      if (e.sim >= plan.armeA - 1e-6) armerFranche(e, auteur, e.piedPrepare);
+      return;
+    }
     e.piedPrepare = { auteurId: auteur.id, arrivee: { ...arrivee }, intention, duree, hauteur, depuis: { ...depuis }, debut: e.sim,
       rapideArcade: !!auteur.moi && !!e.controleArcadeCamps?.includes(auteur.cote), avaitBallon: auteur === e.porteur, ...(courbe ? { courbe } : {}) };
+    // Niveau 8 : ce coup de pied-là aussi est une action numérotée (un renvoi, un ballon au sol qu'il rejoint) — un seul armé.
+    if (frappeFranche(e)) { e.frappes = (e.frappes ?? 0) + 1; e.piedPrepare.id = e.frappes; }
     auteur.cible = { ...depuis };
     (e.placement ??= {})[auteur.id] = { ...depuis };
     if (jeuVivant(e) && auteur === e.porteur && !auteur.corps && distance(auteur.pos, depuis) <= .75) armerFrappe(e, auteur, e.piedPrepare);
@@ -5825,6 +5967,20 @@ function phaseRuck(e: EtatMatch): void {
       const contreur = defenseurs[0];
 
       if (contreur && e.rng() < 1 / 12) {
+        if (frappeFranche(e)) {
+          // ═══ NIVEAU 8 : LE CONTRE SUR LA CHENILLE SE JOUE AU CONTACT ══════════════════════════════════════════════════
+          // Le ballon partait contré à l'instant même de la décision : le 9 n'avait pas bougé la jambe, le défenseur n'était
+          // pas arrivé. Le 9 arme maintenant sa boîte comme une autre, le défenseur monte pendant le geste, et c'est quand le
+          // pied touche le ballon que le contre tombe (`piedPrepare.contrePar`, lu à la frappe).
+          if (tenue) e.chenilleTenue = true;
+          taperAuPied(e, neuf, 'chandelle');
+          if (e.piedPrepare?.auteurId === neuf.id) {
+            e.piedPrepare.contrePar = contreur.id;
+            contreur.effort = 1.15;
+            contreur.cible = { ...neuf.pos };
+          } else if (tenue) { delete e.chenilleTenue; if (e.phase !== 'ruck') { e.ruck = null; e.placement = null; } }
+          return;
+        }
         e.ruck = null; e.placement = null;
         jouerGeste(e, contreur, 'charge_down', 1.4);
         jouerGeste(e, neuf, 'kick', 0.8);

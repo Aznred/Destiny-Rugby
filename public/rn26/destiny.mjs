@@ -80,8 +80,27 @@ const jouerSuite=(clip,suite,t)=>{
   let reste=t;
   for(let k=0;k<suite.length;k++){const [nom,duree,depart=0,cadence=1]=suite[k];if(reste<duree||k===suite.length-1){clip(nom,depart+Math.min(reste,duree)*cadence);return;}reste-=duree;}
 };
-// Instant du contact pied-ballon dans chaque clip, et délai du moteur entre l'armé et la frappe.
-const FRAPPES={kick_restart:1.15,kick_box:1.05,kick_running:.4,kick_grubber:.4,kick_grubber_loose:.36};
+// Correctif 40 — L'IMAGE DE CONTACT DE CHAQUE CLIP DE FRAPPE (secondes depuis le début du clip), relue sur les os : l'instant
+// où le pied droit passe sous le bassin au sommet de sa vitesse (`node mesurer_clips_frappe.mjs`). ⚠️ Le rasant arraché
+// (`kick_grubber_loose`) était noté à 0,36 s : son pied touche à 0,16 s — vingt centièmes d'écart à chaque rasant pressé.
+const FRAPPES={kick_restart:1.12,kick_restart_fast:.6,kick_box:1.06,kick_running:.37,kick_grubber:.4,kick_grubber_loose:.16,extending_ruck_kick_box_from_feet:.5};
+/** Le clip ne se joue jamais plus vite que cela : au-delà, on y entre en cours de route plutôt que de l'accélérer. */
+const CADENCE_FRAPPE_MAX=1.6;
+/** Le suivi du geste, après le contact (secondes) : la jambe finit sa course, puis le joueur reprend sa foulée. */
+const SUIVI_FRAPPE=.42;
+/**
+ * Où et quand le pied rencontre le ballon, par clip : `lacher` secondes avant le contact le ballon quitte les mains (lu sur
+ * l'écartement des mains) ; `devant` et `hauteur` donnent le point de contact, devant le joueur et au-dessus de la pelouse.
+ */
+const CONTACT_FRAPPE={
+  kick_running:{lacher:.22,devant:.38,hauteur:.32},kick_grubber:{lacher:.16,devant:.32,hauteur:.17},kick_grubber_loose:{lacher:.12,devant:.3,hauteur:.17},
+  kick_box:{lacher:.14,devant:.12,hauteur:.72},extending_ruck_kick_box_from_feet:{lacher:.17,devant:.1,hauteur:.68},
+  kick_restart:{lacher:.28,devant:.38,hauteur:.27},kick_restart_fast:{lacher:.23,devant:.38,hauteur:.27},
+};
+/** Les gestes de frappe du moteur : c'est `frappeDe` qui les joue, jamais la branche générique des gestes. */
+const GESTES_DE_FRAPPE=new Set(['restart','grubber','punt','box_kick','chip','drop']);
+/** Délai d'avant le niveau 8, pour un hôte qui ne fournit pas `outils.contactDeFrappe`. */
+const delaiHistorique=(pied,numero)=>pied.intention==='drop'?1.12:pied.intention==='renvoi'?1.05:numero===9?.84:.7;
 /** Durée d'une suite sans son dernier temps tenu. */
 const dureeSuite=suite=>suite.reduce((n,x)=>n+(x[1]<50?x[1]:0),0);
 const IMPACT_TIR=2.25,LACHER_PASSE=.27,PRISE_PASSE=.42,COLLECTE=.6;
@@ -409,6 +428,91 @@ export class DestinyMatch {
     }
     return {x:this.ball.x,y:1,z:this.ball.z};
   }
+  /**
+   * Correctif 40 — LE COUP DE PIED DE CE JOUEUR, S'IL EN TAPE UN.
+   *
+   * Une action (le numéro du moteur au niveau 8, sinon l'instant de sa demande), un clip choisi UNE fois, une horloge de
+   * clip (`tau`) qui ne recule jamais, et une seule image de contact : celle où `tau` vaut `FRAPPES[clip]`, à l'instant
+   * de contact du moteur. Rend `null` quand il ne tape pas, `{regard}` quand il se place ou attend son heure, sinon le clip.
+   *
+   * ⚠️ L'INSTANT DU CONTACT VIENT DU MOTEUR, JAMAIS D'UNE MINUTERIE D'ICI : `contactA` écrit à la demande (niveau 8),
+   * l'annonce du pilote avant même le pas du moteur, le délai des niveaux d'avant sinon — puis, dès qu'il existe, le
+   * départ réel du vol, qui fait foi. Tant que le moteur n'a pas tapé, le clip ne dépasse pas son image de contact.
+   */
+  frappeDe(p,now,recent){
+    const e=this.e,id=p.id,cle='pied:'+id;
+    let K=this.memo.get(cle);if(K&&K.fini)K=null;
+    const pied=e.piedPrepare?.auteurId===id?e.piedPrepare:null;
+    const annonce=!pied&&e.direct?.frappeAnnoncee?.auteurId===id?e.direct.frappeAnnoncee:null;
+    if(!pied&&!annonce&&!K)return null;
+    let contact,vers=null;
+    if(pied){
+      // Le même coup de pied que celui déjà en cours ? (L'annonce du pilote, puis le moteur qui prend le relais.)
+      if(K&&!(pied.id!==undefined?(K.numero===pied.id||(K.annonce&&K.numero===undefined)):(K.numero===undefined&&!K.annonce&&K.debut===pied.debut))){K.fini=true;K=null;}
+      contact=this.outils.contactDeFrappe?this.outils.contactDeFrappe(e,pied,p.number):pied.pretDepuis===undefined?undefined:pied.pretDepuis+delaiHistorique(pied,p.number);
+      vers=xyz(pied.arrivee);
+      if(contact===undefined){
+        // Il rejoint encore sa marque : rien n'est armé, il regarde seulement où il va taper.
+        if(K)K.fini=true;
+        return {regard:{x:vers.x,y:2.2,z:vers.z}};
+      }
+    }else if(annonce){
+      if(K&&!(K.annonce&&K.numero===undefined)){K.fini=true;K=null;}
+      contact=annonce.contactA;vers=xyz(annonce.vers);
+    }else{
+      // Le geste est parti, ou il a été abandonné (plaqué avant d'avoir tapé).
+      const vol=e.vol?.type==='pied'&&e.vol.auteur?.id===id&&!e.tir&&this.flightStart>=K.t0-.02?e.vol:null;
+      const faite=K.numero!==undefined&&e.frappeFaite?.id===K.numero?e.frappeFaite:null;
+      if(vol){contact=this.flightStart;vers=xyz(vol.vers);}
+      else if(faite)contact=faite.contactA;
+      else if(K.parti!==undefined)contact=K.parti;
+      else{K.fini=true;return null;}
+    }
+    if(!K){
+      const geste=pied?.geste??annonce?.geste,intention=pied?.intention,reste=Math.max(.05,contact-now);
+      // Correctif 30 : sous la pression, un rasant part d'un geste arraché, et le buste tombe en arrière sur toutes les frappes.
+      const presse=recent?.variante==='presse'&&GESTES_DE_FRAPPE.has(recent.clip);
+      const rasant=presse&&this.dispo('kick_grubber_loose')?'kick_grubber_loose':'kick_grubber';
+      // Le 9 derrière sa chenille : le ballon est à ses pieds, il le ramasse et tape par-dessus le regroupement.
+      const chenille=e.phase==='ruck'&&e.ruck?.organisation?.chenille?.neufId===id&&this.dispo('extending_ruck_kick_box_from_feet');
+      // Un drop se lâche et se reprend : le clip court quand le moteur le tape vite, le long quand il lui laisse plus d'une seconde.
+      const drop=reste>.95?'kick_restart':'kick_restart_fast';
+      // Le petit par-dessus n'existe pas dans l'APK : c'est le coup de pied en course, buste en arrière et bras écartés.
+      const name=chenille?'extending_ruck_kick_box_from_feet'
+        :geste?(geste==='drop'?drop:geste==='rasant'?rasant:geste==='boite'?'kick_box':'kick_running')
+        :intention==='renvoi'?'kick_restart':intention==='drop'?drop:intention==='rasant'?rasant:intention==='parDessus'?'kick_running':intention==='chandelle'||p.number===9?'kick_box':'kick_running';
+      const F=FRAPPES[name],cadence=clamp(F/reste,1,CADENCE_FRAPPE_MAX);
+      K={joueurId:id,numero:pied?.id,debut:pied?.debut,annonce:!!annonce,name,F,cadence,chip:geste?geste==='parDessus':intention==='parDessus',presse,drop:name.startsWith('kick_restart'),chenille:!!chenille,
+        t0:now,vu:now,tau:Math.max(0,F-cadence*reste)};
+      this.memo.set(cle,K);
+      (this.journalFrappes??=[]).push(K);if(this.journalFrappes.length>12)this.journalFrappes.shift();
+    }
+    // Le moteur a pris le relais de l'annonce : la même action, qui reçoit son numéro.
+    if(pied&&K.annonce){K.annonce=false;K.numero=pied.id;K.debut=pied.debut;}
+    if(vers)K.vers=vers;
+    const ecoule=clamp(now-K.vu,0,.25),tenu=!!pied||!!annonce;K.vu=now;K.contact=contact;
+    if(tenu||now<contact){
+      // L'horloge du clip ne recule jamais. Si le contact a été rapproché d'un pas, elle rattrape vite, sans saut d'image ;
+      // s'il tarde (le moteur n'a pas encore tapé), elle attend SUR son image de contact, sans la dépasser.
+      const cible=Math.max(0,K.F-K.cadence*Math.max(0,contact-now));
+      K.tau=Math.max(K.tau,Math.min(cible,K.tau+ecoule*K.cadence*2.5));
+    }else{
+      // (`retardClip` : ce qu'il manquait au clip pour être sur son image de contact — le banc exige presque rien.)
+      if(K.parti===undefined){K.parti=contact;K.retardClip=Math.max(0,K.F-K.tau);K.contactAffiche=typeof performance!=='undefined'?performance.now():0;}
+      K.tau=Math.max(K.tau,K.F+(now-contact));
+      if(now-contact>SUIVI_FRAPPE){K.fini=true;return null;}
+    }
+    // Ce que le ballon doit savoir (`renderBall`) : qui tape, quand et où le pied le touche, quand il quitte les mains.
+    const C=CONTACT_FRAPPE[K.name]||CONTACT_FRAPPE.kick_running;
+    this.frappeAffichee={id,contact:tenu?Math.max(contact,now+1e-3):contact,lacher:C.lacher,devant:C.devant,hauteur:C.hauteur,drop:K.drop,parti:!tenu,vu:now};
+    const v=K.vers,regard=v?{x:v.x,y:2.2,z:v.z}:null;
+    // Le moteur lui laisse plus de temps que son clip n'en demande : il attend debout, les yeux sur sa cible, puis part.
+    if(K.tau<=0&&contact-now>K.F/K.cadence+.12)return {regard,attente:true};
+    K.animA??=typeof performance!=='undefined'?performance.now():0;
+    return {name:K.name,tau:K.tau,cap:v?cap(v.x-p.x,v.z-p.z):null,avant:tenu||now<contact,chip:K.chip,presse:K.presse,t0:K.t0,contact};
+  }
+  /** Les derniers coups de pied montrés : quand le geste a commencé à l'image, quand le contact a été affiché (`performance.now()`). */
+  frappesAffichees(){return (this.journalFrappes||[]).map(K=>({id:K.numero,joueurId:K.joueurId,clip:K.name,animA:K.animA??null,contactA:K.contactAffiche??null}));}
   motion(p,offset=0){
     const e=this.e,s=p.source,now=e.sim+offset,recent=this.recent.get(p.id),speed=Math.hypot(p.vx,p.vz),progress=this.progress(offset);
     const d={name:null,time:0,loop:true,normalized:false,loco:true,idle:p.number%3===0?'idle_alt_01':p.number<=8?'heavy_idle':'light_idle',heading:null,upper:null,anchor:null,air:false,carry:false,watch:false,raise:0};
@@ -781,6 +885,9 @@ export class DestinyMatch {
         if(ecartPlace>.5||vPion>1.3||p.arrival>.6)return done();
         d.heading=cap(this.ball.x-p.x,this.ball.z-p.z);
         if(o.chenille){
+          // Correctif 40 — LE 9 TAPE. Sa boucle d'attente durait jusqu'au départ du ballon : il ne bougeait pas la jambe.
+          const boite=this.frappeDe(p,now,recent);
+          if(boite?.name){clip(boite.name,boite.tau);d.heading=face;d.fondu=.12;return done();}
           clip(o.chenille.pretDepuis!==undefined?'extending_ruck_scrum_half_foot_loop':'extending_ruck_scrum_half_foot_get_ball',now-o.chenille.debut,o.chenille.pretDepuis!==undefined);
           d.heading=face;return done();
         }
@@ -837,32 +944,15 @@ export class DestinyMatch {
     // restait dans sa posture de relayeur, tourné vers le regroupement : le
     // ballon partait dans son dos, sans geste de frappe.
     // ── Jeu au pied dans le jeu courant : l'armé précède la frappe ──────────
-    const pied=e.piedPrepare?.auteurId===p.id&&!e.vol?e.piedPrepare:null;
-    // ⚠️ ON FRAPPE DANS L'AXE OÙ L'ON REGARDE. Le botteur gardait le cap de sa
-    // course et le ballon partait ailleurs. Pendant qu'il se place il regarde sa
-    // cible ; à l'armé, bassin et épaules se tournent vers elle.
-    const viseePied=pied?xyz(pied.arrivee):null;
-    if(pied&&pied.pretDepuis===undefined&&viseePied)d.regard={x:viseePied.x,y:2.2,z:viseePied.z};
-    if(pied&&pied.pretDepuis!==undefined){
-      d.heading=cap(viseePied.x-p.x,viseePied.z-p.z);d.pivot=5;
-      // Le petit par-dessus n'existe pas dans l'APK : c'est le coup de pied en course, le buste
-      // en arrière et les bras écartés (construit par la scène), sur une frappe plus courte.
-      const chip=pied.intention==='parDessus';
-      // Correctif 30 : sous la pression, un rasant part d'un geste arraché, et le buste tombe en arrière sur toutes les frappes.
-      const presse=recent?.variante==='presse'&&['punt','grubber','box_kick','chip','drop'].includes(recent.clip);
-      const name=pied.intention==='renvoi'||pied.intention==='drop'?'kick_restart':pied.intention==='rasant'?(presse&&this.dispo('kick_grubber_loose')?'kick_grubber_loose':'kick_grubber'):chip?'kick_running':pied.intention==='chandelle'||p.number===9?'kick_box':'kick_running';
-      if(presse)d.raise=B.FRAPPES30.presse.penche;
-      const delai=pied.intention==='drop'?1.12:pied.intention==='renvoi'?1.05:p.number===9?.84:.7;
-      clip(name,Math.max(0,now-pied.pretDepuis+FRAPPES[name]-delai));
-      this.memo.set('pied:'+p.id,{name,debut:pied.pretDepuis+delai-FRAPPES[name],chip});
-      if(chip)d.proc={type:'parDessus',t:now-pied.pretDepuis,duree:delai+.55};
-      return done();
-    }
-    const frappe=this.memo.get('pied:'+p.id);
-    if(frappe&&e.vol?.type==='pied'&&e.vol.auteur?.id===p.id&&now-frappe.debut<FRAPPES[frappe.name]+.7){
-      clip(frappe.name,now-frappe.debut);
-      const ou=xyz(e.vol.vers);d.heading=cap(ou.x-p.x,ou.z-p.z);d.pivot=5;
-      if(frappe.chip)d.proc={type:'parDessus',t:now-frappe.debut-FRAPPES[frappe.name]+.7,duree:1.25};
+    // ── Correctif 40 — LE COUP DE PIED : UNE ACTION, UN CLIP, UNE IMAGE DE CONTACT (`frappeDe`) ──
+    // ⚠️ ON FRAPPE DANS L'AXE OÙ L'ON REGARDE. Pendant qu'il se place il regarde sa cible ; dès le geste, bassin et
+    // épaules se tournent vers elle — avant le contact, jamais après.
+    const frappe=s.corps?null:this.frappeDe(p,now,recent);
+    if(frappe?.regard)d.regard=frappe.regard;
+    if(frappe?.name){
+      clip(frappe.name,frappe.tau);d.heading=frappe.cap;d.pivot=frappe.avant?9:5;d.fondu=.1;
+      if(frappe.presse)d.raise=B.FRAPPES30.presse.penche;
+      if(frappe.chip)d.proc={type:'parDessus',t:now-frappe.t0,duree:frappe.contact-frappe.t0+.5};
       return done();
     }
     // Remise en jeu d'une touche rapide : le ballon part à deux mains, au-dessus de la tête.
@@ -1064,7 +1154,9 @@ export class DestinyMatch {
       if(C.haut)d.upper={name:C.clip,time:C.depart+t*C.cadence,weight:clamp(t/.1,0,1)*clamp((1.1-t)/.3,0,1)};
       else{clip(C.clip,C.depart+t*C.cadence);d.heading=speed>.6?cap(p.vx,p.vz):null;d.fondu=.1;return done();}
     }else
-    if(recent&&gestures[recent.clip]&&now-recent.debut<=recent.duree&&!(STATIQUES.has(recent.clip)&&speed>1.6&&e.phase!=='ruck')){clip(gestures[recent.clip],now-recent.debut);return done();}
+    // Correctif 40 : un geste de frappe appartient à `frappeDe`. Le rejouer ici, depuis le début du geste, c'était le coup de
+    // pied « joué deux fois » — une fois dans le vide quand l'armé du moteur était annulé, une fois pour de bon.
+    if(recent&&gestures[recent.clip]&&!GESTES_DE_FRAPPE.has(recent.clip)&&now-recent.debut<=recent.duree&&!(STATIQUES.has(recent.clip)&&speed>1.6&&e.phase!=='ruck')){clip(gestures[recent.clip],now-recent.debut);return done();}
     // ── Feinte de passe : le haut du corps arme la passe vers le partenaire, puis ramène le ballon ──
     // Aucun clip de feinte dans l'APK : on joue le DÉBUT de la passe courte, à l'endroit puis à
     // l'envers, sur le buste seul. Les jambes ne ralentissent pas.

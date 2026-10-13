@@ -472,7 +472,9 @@ console.log('— Le drop à la main : lâcher, rebond, frappe — et le contre �
     let garde = 0;
     while (e.piedPrepare && garde++ < 100) {
       const a = e.piedPrepare;
-      if (a.pretDepuis !== undefined && FRAPPE_VIVE.drop - (e.sim - a.pretDepuis) <= MARGE_DE_FRAPPE) {
+      // Correctif 40 : l'instant du contact est écrit dans l'action (`contactA`) — le défenseur arrive un pas avant lui.
+      const juste = a.contactA !== undefined ? a.contactA - e.sim <= DT + 1e-6 : a.pretDepuis !== undefined && FRAPPE_VIVE.drop - (e.sim - a.pretDepuis) <= MARGE_DE_FRAPPE;
+      if (juste) {
         poser(defenseur, botteur.pos.x + (botteur.cote === 'A' ? 0.6 : -0.6), botteur.pos.y);
       }
       pas(e);

@@ -24,7 +24,10 @@
 // Niveau 7 (Correctif 39) : l'essai qui garde son élan — le marqueur vole puis glisse à la vitesse où il est arrivé, et sa
 // façon de marquer se lit sur la situation (`planifierEssai`, `lancerEssaiVivant`). Rien d'autre ne change : le niveau 6
 // rejoue à l'identique (empreinte `90b6ea8a`).
-export const IA_MATCH_DE_CARRIERE = 7;
+// Niveau 8 (Correctif 40) : le coup de pied en une seule action — un numéro, un armé, un contact (`moteur/frappe.ts`). Le
+// botteur ne revient plus où le coup de pied a été demandé : il tape sur sa course, à l'instant écrit à la demande. Le
+// niveau 7 rejoue à l'identique (empreinte `6c96f0b0`).
+export const IA_MATCH_DE_CARRIERE = 8;
 
 export const REGLAGES_IA = {
   // ── Le duel porteur / plaqueur (`avantageDuPorteur`) ──────────────────────

@@ -32,6 +32,7 @@ import { lirePreferencesControle, ecrirePreferencesControle } from './prefs';
 import { tutorielsDesactives } from '../tutoriel/memoire';
 import { ExplicationsContextuelles, TutorielDirect, type SnapContexte, type SnapTuto } from './tutoriel';
 import { LARGEUR, sens } from '../moteur/terrain';
+import { noterAppuiFrappe, suivreFrappes } from './latenceFrappe';
 import { PiloteResp, TOUCHES_BRUTES, type SnapResp } from './responsabilites';
 
 export type Appareil = 'clavier' | 'tactile' | 'manette';
@@ -320,7 +321,9 @@ export class PilotageDirect {
 
   /** La caméra réellement affichée : le choix du joueur, sauf sur les phases qui ne lui appartiennent pas. */
   cameraPour(choix: Camera3D, e: EtatMatch, maintenant = performance.now()): Camera3D {
-    if (e.controleEquipe?.actif && e.controleEquipe.selectionId && !e.fini) return 'joueur';
+    // ⚠️ LE CONTRÔLE DE TOUTE L'ÉQUIPE N'A PAS SA CAMÉRA (Correctif 40). Il passait ici en premier et imposait le plan
+    // « joueur » quoi qu'il arrive : ni vue d'ensemble sur une touche, ni réalisation sur un essai, et le choix du joueur
+    // ne comptait plus. C'est la même logique que la Carrière Joueur — seul le joueur suivi change (`scene.moi`).
     if (choix !== 'joueur') return choix;
     // La touche : on voit l'alignement entier, pas le dos du lanceur.
     if (e.responsabilites?.attente?.type === 'touche') { this.enTV = true; this.tvJusqua = maintenant + 900; return 'tv'; }
@@ -527,6 +530,8 @@ export class PilotageDirect {
     } else poserViseur(e, null);
 
     for (const i of intentions) this.appliquer(e, scene, moi, i, rep, sx, sy);
+    // Correctif 40 : la latence d'un coup de pied (appui → animation → contact), pour le profileur.
+    suivreFrappes(scene, maintenant);
 
     // ── Le tutoriel regarde ce que le joueur fait, et l'aide ──────────────
     this.tuto?.surImage(e, moi, { dt, sprint: sprint && vue.libre, appareil: this.appareil, bouge: Math.hypot(mx, my) > 0.2 });
@@ -734,7 +739,7 @@ export class PilotageDirect {
       case 'changerJoueur': changerJoueurEquipe(e,{x:rep.avant.x*sy+rep.droite.x*sx,y:rep.avant.y*sy+rep.droite.y*sx}); return;
       case 'optionNeuf': choisirOptionNeuf(e,i.option); return;
       case 'ordreEquipe': donnerOrdreEquipe(e,i.ordre); return;
-      case 'piedPrecis': demanderDirect(e,{action:'coupDePied',intentionPied:i.intention}); return;
+      case 'piedPrecis': if (vue.possible.coupDePied) noterAppuiFrappe(moi.id); demanderDirect(e,{action:'coupDePied',intentionPied:i.intention}); return;
       case 'pause': this.rappels.surPause(); return;
       case 'aide': ecrirePreferencesControle({ aidePlacement: !lirePreferencesControle().aidePlacement }); return;
       default: break;
@@ -762,6 +767,7 @@ export class PilotageDirect {
         demanderDirect(e, { action: 'passe', vers: this.vers(rep, i.cote), longue: i.longue });
         break;
       case 'pied': {
+        if (vue.possible.coupDePied) noterAppuiFrappe(moi.id);
         if (i.auto) demanderDirect(e, { action: 'coupDePied', auto: true, intentionPied:e.controleEquipe?this.piedChoisi:undefined });
         else {
           const v = aEcran(i.x, i.y);
@@ -781,6 +787,7 @@ export class PilotageDirect {
         break;
       }
       case 'drop': {
+        if (vue.possible.drop) noterAppuiFrappe(moi.id);
         if (i.auto) demanderDirect(e, { action: 'drop', auto: true });
         else {
           const v = aEcran(i.x, i.y);

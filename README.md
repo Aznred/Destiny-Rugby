@@ -1,5 +1,15 @@
 # Destiny Rugby 🏉
 
+- **Correctif 40 — jeu au pied, caméra d'équipe, fiches des joueuses** : un coup de pied est une seule action (un
+  armé, un contact) : le botteur tape sur sa course au lieu de revenir où il a appuyé, en 0,30 s pour un rasant ou un petit
+  par-dessus, 0,45 s pour un dégagement, 0,60 s pour un drop (1,65 à 1,80 s et deux gestes auparavant, en course). À l'image,
+  le clip de frappe est calé sur l'instant où le ballon part et le ballon quitte le pied ; le 9 tape enfin sa boîte derrière
+  la chenille. Le contrôle de toute l'équipe a la caméra de la Carrière Joueur (360°, ballon gardé à l'image, glissé de
+  0,4 s au changement de joueur). En ligue et en collection, la fiche d'une joueuse montre son portrait, l'écusson de son
+  club et le logo de sa ligue (douze championnats féminins). Le profileur affiche « appui → animation → contact ».
+  Niveau 8 du moteur en carrière, règles 10 en ligue pour les matchs créés désormais. Contrôles : `npm run verify:correctif40`,
+  `npm run mesure:frappes`, et `node verifier_frappes.mjs` depuis `../analyse-rn26` ; aperçu `/scripts/apercuCorrectif40.html`.
+
 - **Correctif 37 — matchs jouables en Carrière Entraîneur** : choix Jouer / Regarder avant le match, contrôle de tout
   le XV avec sélection automatique ou manuelle, caméra équipe et réglages Mêlées Manuel/Auto, Touches Manuel/Auto,
   Rucks Manuel/Assisté. Le coach conserve sa carrière et les responsabilités passent aux vrais joueurs du XV.

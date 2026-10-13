@@ -814,7 +814,29 @@ export interface EtatMatch {
     /** Courbe déjà calculée pour ce coup de pied (drop : dérive du vent, poteau). */
     courbe?: Pick<Vol, 'derive' | 'ricochet'>;
     /** Pénalité tapée vers la touche : le vol gardera le lancer au botteur (`Vol.dePenalite`). */
-    dePenalite?: boolean };
+    dePenalite?: boolean;
+    // ── Niveau 8 (Correctif 40) : le coup de pied en une seule action — voir `moteur/frappe.ts` ──
+    /** Le numéro de l'action : un numéro, un armé, un contact. Absent : le coup de pied des niveaux d'avant. */
+    id?: number;
+    /** « demande » : il se tourne vers sa visée ; « arme » : le geste est parti et ne se relance plus. */
+    etat?: 'demande' | 'arme';
+    geste?: import('./frappe.js').GesteDeFrappe;
+    /** Quand l'armé commence et quand le pied touche le ballon : écrits à la demande, jamais déplacés ensuite. */
+    armeA?: number;
+    contactA?: number;
+    /** La boîte derrière la chenille sera contrée par ce défenseur — au contact, pas avant. */
+    contrePar?: string;
+    /** Ceux qui ont manqué leur plaquage sur le botteur pendant son geste : ils ne le reprennent pas, le geste continue. */
+    manques?: string[];
+    /** Il était encore déséquilibré en demandant son coup de pied : l'instant où il retrouve ses appuis (l'armé l'attend). */
+    remisA?: number };
+  /** Niveau 8 : le compteur des actions de coup de pied du match (`piedPrepare.id`). */
+  frappes?: number;
+  /**
+   * Niveau 8 : le dernier coup de pied PARTI — qui, quel geste, à quel instant le pied a touché le ballon, et jusqu'à quand
+   * le botteur finit son geste (`finA`). La scène y lit le suivi ; le moteur n'y lit que la reprise du botteur.
+   */
+  frappeFaite?: { id: number; auteurId: string; geste: import('./frappe.js').GesteDeFrappe; contactA: number; finA: number; contre?: boolean };
   clubA: string;
   clubB: string;
 

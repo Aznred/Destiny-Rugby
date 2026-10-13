@@ -15,6 +15,7 @@ import { porteurPourAffichage } from './moteur/dynamique';
 import { signalArbitre } from './moteur/animations';
 import type { EtatMatch } from './moteur/etat';
 import { positionVol } from './moteur/trajectoire';
+import { contactDeFrappe } from './moteur/frappe';
 import { apparenceJoueurMatch, maillotDeSecours, type ApparenceMatch, type MaillotMatch } from './moteur/apparenceMatch';
 import { sourceEcusson } from './ecussons';
 import type { PosteId } from '../types';
@@ -154,6 +155,11 @@ export interface Scene3D {
   entreeEnCours(id: string): boolean;
   /** Fond la pose de la caméra avec la précédente : un changement de point de vue sans coupe sèche. */
   glisser(duree?: number): void;
+  /**
+   * Correctif 40 — les derniers coups de pied montrés : quand le geste a commencé à l'image et quand le contact pied-ballon
+   * a été affiché (instants `performance.now()`, `contactA` nul tant que le pied n'a pas touché). Absent d'un lecteur plus ancien.
+   */
+  frappesAffichees?(): { id?: number; joueurId?: string; clip: string; animA: number | null; contactA: number | null }[];
 }
 
 const OUTILS_3D = {
@@ -163,6 +169,8 @@ const OUTILS_3D = {
   positionVol, geometrieMelee, TEMPS_MELEE, RITUEL_TIR,
   // Correctif 30 : le geste de l'arbitre correspond à la décision — lue sur l'état, en carrière comme dans un direct.
   signalArbitre,
+  // Correctif 40 : l'instant du contact pied-ballon, par la règle du moteur — le clip de frappe de la scène s'y cale.
+  contactDeFrappe,
 };
 
 const CLE_PREFERENCE = 'destiny-rugby:match-3d';

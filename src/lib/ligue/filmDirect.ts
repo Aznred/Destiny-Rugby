@@ -204,6 +204,10 @@ const IDENTITES = [
   // (variante de plaquage, séquence de grattage, combinaison de touche, style d'essai) voyage DANS `ruck`, `conquete`, `tir`
   // et `aplatissage`, et dans la variante des gestes : rien d'autre à transporter.
   'altercation',
+  // Correctif 40 (règles 10) : le dernier coup de pied parti — son numéro et l'instant où le pied a touché le ballon. Le geste
+  // en préparation voyage déjà dans `piedPrepare` (numéro, armé, contact) ; ceci dit à l'écran qu'un coup de pied CONTRÉ a
+  // bien été tapé, alors qu'aucun vol ne porte le nom du botteur.
+  'frappeFaite',
 ] as const;
 /** Ceux dont le décompte (`restant`) part en date de fin : une valeur fixe ne se renvoie pas à chaque pas. */
 const A_ECHEANCE = new Set<string>(['sifflet', 'grosImpact', 'echappee', 'tmo', 'dernierReplayEssai']);

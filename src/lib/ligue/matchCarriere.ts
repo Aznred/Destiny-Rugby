@@ -571,7 +571,12 @@ export interface EtatMatchEnLigne {
 // après rebonds (`reglesPenaltouche`). Même IA (niveau 6) : seul le sort de ce ballon change.
 // Règles 9 (Correctif 39) : l'essai qui garde son élan (IA 7). Un match créé avant garde ses règles ; revenir en arrière =
 // remettre 8. ⚠️ À METTRE EN LIGNE QUAND AUCUN MATCH NE SE JOUE, comme toute nouvelle règle.
-export const REGLES_MATCH_EN_LIGNE = 9;
+// Règles 10 (Correctif 40) : le coup de pied en une seule action (IA 8, `moteur/frappe.ts`) — un armé par coup de pied, le
+// botteur ne revient plus sur ses pas, le contre de la chenille se joue au contact. Mesuré sur 72 matchs de quatre-vingts
+// minutes (`npm run mesure:rugby -- 72 ligue 7` puis `8`) : 80,1 → 81,3 points, 10,9 → 11,1 essais, 30,3 → 29,7 pénalités,
+// 77,5 → 80,2 coups de pied dans le jeu, durée 81,2 → 81,1 min — dans le bruit. Un match créé avant garde ses règles ;
+// revenir en arrière = remettre 9. ⚠️ À METTRE EN LIGNE QUAND AUCUN MATCH NE SE JOUE.
+export const REGLES_MATCH_EN_LIGNE = 10;
 /**
  * Défense resserrée des règles 2 : la cadence détaillée marque davantage, ce
  * réglage ramène le nombre d'essais à celui des matchs de ligue d'avant
@@ -585,7 +590,8 @@ export const RESSERREMENT_REGLES_2 = 1;
  */
 // Règles 4 : le porteur lit ce qu'il a devant lui (`moteur/ia/vision.ts`, IA de niveau 3).
 // Règles 9 : l'essai qui garde son élan (`moteur/animations.ts`, IA de niveau 7).
-export const iaDesRegles = (regles: number | undefined): number | undefined => ((regles ?? 1) >= 9 ? 7 : (regles ?? 1) >= 7 ? 6 : (regles ?? 1) >= 5 ? 5 : (regles ?? 1) >= 4 ? 3 : (regles ?? 1) >= 3 ? 2 : undefined);
+// Règles 10 : le coup de pied en une seule action (`moteur/frappe.ts`, IA de niveau 8).
+export const iaDesRegles = (regles: number | undefined): number | undefined => ((regles ?? 1) >= 10 ? 8 : (regles ?? 1) >= 9 ? 7 : (regles ?? 1) >= 7 ? 6 : (regles ?? 1) >= 5 ? 5 : (regles ?? 1) >= 4 ? 3 : (regles ?? 1) >= 3 ? 2 : undefined);
 
 /** Ce que le client reçoit : jamais la graine, jamais le plan d'en face. */
 export interface VueMatchEnLigne {

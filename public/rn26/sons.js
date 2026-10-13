@@ -173,7 +173,10 @@ export function creerSons(options={}){
     // ── Ballon : frappes, rebonds ──────────────────────────────────────────
     if(e.vol&&e.vol!==vu.vol&&e.vol.type==='pied'){
       const tir=e.tir&&e.tir.volLance;
-      frappe(tir?'place':e.vol.intention||'degagement');
+      // Correctif 40 : l'image a un pas de retard sur le moteur — le bruit attend le contact AFFICHÉ, pas le départ calculé.
+      // (`attente` se compte en secondes de match : le retard d'affichage aussi.)
+      const retard=Math.max(0,-(vu.match?.offset?.()??0)-(e.vol.ecoule||0)),type=tir?'place':e.vol.intention||'degagement';
+      if(retard>.02)plusTard(retard,()=>frappe(type));else frappe(type);
       if(tir&&e.tir.reussi===false){
         // Le ballon passe à côté : le stade le voit arriver avant le drapeau.
         const chezNous=e.tir.buteur?.cote==='A';

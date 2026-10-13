@@ -42,7 +42,7 @@ export function selectionnerPionEquipe(e: EtatMatch, pion: Pion): boolean {
   if (c.selectionId) c.reserves[c.selectionId] = { recharges: { ...d.recharges } };
   for (const p of e.pions) p.moi = p === pion;
   c.selectionId = pion.id; c.dernierChangement = e.sim;
-  d.file = []; d.arme = null; d.pasDeCote = null; d.appel = null; d.pack = undefined;
+  d.file = []; d.arme = null; d.pasDeCote = null; d.appel = null; d.pack = undefined; d.frappeAnnoncee = null;
   d.recharges = { ...c.reserves[pion.id]?.recharges }; d.tenuJusqua = 0; d.suggestion = null;
   d.plaquageOffensifJusqua = undefined;
   e.intention = null;

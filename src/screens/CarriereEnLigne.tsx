@@ -81,7 +81,7 @@ import { onlineRules, standingsStatuses } from '../lib/competitionRules';
 import { TableauClassement } from '../components/TableauClassement';
 import type { VueMarchePartage } from '../lib/ligue/marchePartage';
 import { appliquerDeltaVue, estReponseDelta } from '../lib/ligue/deltaVue';
-import { photoReelle } from '../lib/avatars';
+import { portraitsDe } from '../lib/imageJoueur';
 import type { AfficheDirect } from '../components/match/TerrainEnDirect';
 
 type Onglet = 'club' | 'calendrier' | 'composition' | 'effectif' | 'collection' | 'packs' | 'marche' | 'competitions' | 'histoire' | 'wiki' | 'laboratoire' | 'secret' | 'administration' | 'atelier' | 'combinaisons';
@@ -153,6 +153,9 @@ const carteEnJoueur = (c: CarteCarriere): Coequipier => ({
   potentiel: c.potentiel, jeuAuPied: c.statistiques.JDP,
   nation: c.nation, regen: c.origine === 'formation', horsGeneration: true,
   clubReel: c.clubReel, championnat: c.championnat,
+  // ⚠️ LE PORTRAIT ET LE GENRE VOYAGENT AVEC LE JOUEUR (Correctif 40). Sans eux la fiche de composition cherchait un visage
+  // par le nom, dans l'index des joueurs : une joueuse n'y avait rien — ou le portrait d'un homonyme masculin.
+  photo: c.photo, gender: c.gender,
 });
 
 // Les options de consignes traduites dynamiquement.
@@ -1384,7 +1387,8 @@ function Direct({ vue, rencontre: r, agir, occupe, fermer }: { vue: VueCarriereE
   const portraits = useMemo(() => {
     const p: Record<string, string | null> = {};
     for (const c of vue.cartes) {
-      if (c.proprietaire === r.domicile || c.proprietaire === r.exterieur) p[c.nom] = c.photo ?? photoReelle(c.nom, c.clubReel) ?? null;
+      // La même source que la carte et la fiche (`lib/imageJoueur.ts`) : une joueuse ne reçoit jamais le visage d'un homonyme.
+      if (c.proprietaire === r.domicile || c.proprietaire === r.exterieur) p[c.nom] = portraitsDe(c)[0] ?? null;
     }
     return p;
   }, [vue.cartes, r.domicile, r.exterieur]);

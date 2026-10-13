@@ -30,3 +30,5 @@ export { preparerChenille, designerRelayeur } from './regroupements';
 export { positionVol, passageAuxPoteaux, tirPasseEntreLesPoteaux } from './trajectoire';
 // Correctif 30 : le signal de l'arbitre se lit sur l'état, par la même fonction que le moteur.
 export { signalArbitre } from './animations';
+// Correctif 40 : l'instant du contact pied-ballon se lit par la règle du moteur (le clip de frappe s'y cale).
+export { contactDeFrappe } from './frappe';

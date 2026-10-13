@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Scene3D } from '../../lib/match3D';
 import { garderSeance, memoireJs, observerReseau, resumerSeance, type MesuresScene, type ReleveReseau } from '../../lib/profileur';
 import { profilAppareil } from '../../lib/profilAppareil';
+import { latenceFrappes, oublierLatenceFrappes, type LatenceFrappes } from '../../lib/controleDirect/latenceFrappe';
 import './Profileur.css';
 
 const nombre = (n: number) => n.toLocaleString('fr-FR');
@@ -14,6 +15,7 @@ const ms = (n: number) => `${n.toLocaleString('fr-FR', { maximumFractionDigits: 
 export function Profileur({ scene }: { scene: Scene3D }) {
   const [m, setM] = useState<MesuresScene | null>(null);
   const [reseau, setReseau] = useState<ReleveReseau>({ requetes: 0, octets: 0, latenceTotal: 0, terminees: 0, erreurs: 0 });
+  const [frappes, setFrappes] = useState<LatenceFrappes | null>(null);
   const derniere = useRef<MesuresScene | null>(null);
   const compte = useRef<ReleveReseau>({ requetes: 0, octets: 0, latenceTotal: 0, terminees: 0, erreurs: 0 });
 
@@ -21,11 +23,12 @@ export function Profileur({ scene }: { scene: Scene3D }) {
     const debut = Date.now();
     compte.current = { requetes: 0, octets: 0, latenceTotal: 0, terminees: 0, erreurs: 0 };
     const arreterReseau = observerReseau(compte.current);
+    oublierLatenceFrappes();
     scene.mesurerGpu?.(true);
     const lire = () => {
       const lu = scene.mesures?.();
       if (!lu) return;
-      derniere.current = lu; setM(lu); setReseau({ ...compte.current });
+      derniere.current = lu; setM(lu); setReseau({ ...compte.current }); setFrappes(latenceFrappes());
     };
     lire();
     const minuteur = window.setInterval(lire, 500);
@@ -72,6 +75,11 @@ export function Profileur({ scene }: { scene: Scene3D }) {
       <div><dt>Requêtes du match</dt><dd>{nombre(reseau.requetes)} <small>· {nombre(Math.round(reseau.octets / 1024))} Ko</small></dd></div>
       <div><dt>Latence API moyenne</dt><dd>{reseau.terminees ? ms(reseau.latenceTotal / reseau.terminees) : '—'}</dd></div>
       <div><dt>Erreurs réseau</dt><dd>{nombre(reseau.erreurs)}</dd></div>
+      {/* Correctif 40 — la latence d'un coup de pied tapé à la main : où part le temps entre le geste et le ballon. */}
+      {frappes && <>
+        <div><dt>Appui → animation</dt><dd>{ms(frappes.appuiAnimation.dernier)} <small>· moyenne {ms(frappes.appuiAnimation.moyenne)} · pire {ms(frappes.appuiAnimation.max)}</small></dd></div>
+        <div><dt>Animation → contact</dt><dd>{ms(frappes.animationContact.dernier)} <small>· moyenne {ms(frappes.animationContact.moyenne)} · {frappes.n} coup{frappes.n > 1 ? 's' : ''} de pied · {frappes.dernierClip}</small></dd></div>
+      </>}
     </dl>
   </aside>;
 }

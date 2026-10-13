@@ -155,7 +155,9 @@ for(const option of ['gauche','droite','dix','pick','box','depart'] as const) {
   ok(!optionsNeufDisponibles(e).includes('dix'),'Un joueur sanctionné ne peut pas être proposé');
   const pilote=new PilotageDirect({surCamera:()=>{},surPause:()=>{},vibrer:()=>{},surPrise:()=>{}});
   selectionnerPionEquipe(e,neuf);
-  for(const camera of ['tv','equipe','joueur'] as const)ok(pilote.cameraPour(camera,e)==='joueur','Le contrôle collectif garde la caméra derrière le joueur');
+  // Correctif 40 : le contrôle collectif n'a plus sa caméra à part — c'est la logique de la Carrière Joueur, joueur suivi compris.
+  ok(pilote.cameraPour('joueur',e)==='joueur','Le contrôle collectif suit le joueur contrôlé, caméra de la Carrière Joueur');
+  for(const camera of ['tv','equipe'] as const)ok(pilote.cameraPour(camera,e)===camera,'Une autre caméra choisie à la main est respectée, comme en Carrière Joueur');
   delete e.controleEquipe!.sortie;e.porteur=e.pions.find(p=>p.cote==='B'&&p.numero===10)!;poser(e.porteur,90,35);
   const d=e.direct!;d.suggestion={x:65,y:35};d.suggestionA=e.sim;e.controleEquipe!.mouvementLe=e.sim-1;
   commanderDirect(e,0,0,false);const aide=aidePlacementEquipe(e,neuf);

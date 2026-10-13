@@ -6,6 +6,8 @@
   "scripts": {
     "verify:correctif36": "vite-node scripts/verifierCorrectif36.ts",
     "verify:correctif37": "vite-node scripts/verifierCorrectif37.ts",
+    "verify:correctif40": "vite-node scripts/verifierCorrectif40.ts",
+    "mesure:frappes": "vite-node scripts/sonderFrappes40.ts",
     "verify:correctif38": "node --loader ./scripts/chargeurTests36.mjs scripts/verifierCorrectif38.ts && node --loader ./scripts/chargeurTests38.mjs scripts/verifierApiClassement38.ts",
     "audit:classement38": "node --loader ./scripts/chargeurTests36.mjs scripts/auditerClassement38.ts",
     "revalider:classement38": "node --loader ./scripts/chargeurTests36.mjs scripts/auditerClassement38.ts --revalider",

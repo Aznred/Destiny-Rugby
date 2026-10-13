@@ -48,6 +48,8 @@ export interface Coequipier {
   postesSecondaires?: PosteId[];
   /** Portrait officiel attaché au licencié, conservé lors des transferts. */
   photo?: string;
+  /** Joueuse ou joueur, quand la carte d'origine le dit : la fiche choisit la bonne silhouette, le bon écusson (`lib/imageJoueur.ts`). */
+  gender?: 'male' | 'female';
   age: number;
   note: number; // note générale À CET ÂGE
   potentiel: number; // note visée au pic de carrière (27 ans)

@@ -44,7 +44,7 @@ import {
 import type { Automatismes } from '../lib/cohesion';
 import type { Coequipier } from '../lib/effectif';
 import type { CompositionManager, PosteId } from '../types';
-import { photoReelle } from '../lib/avatars';
+import { usePortrait, type PorteurDImage } from '../lib/imageJoueur';
 import { useBlasonCarte } from '../lib/useBlasonCarte';
 import { logoChampionnat } from '../lib/logoChampionnat';
 import { clubParNom } from '../data/clubs';
@@ -164,15 +164,16 @@ const ICONE_BADGE: Record<BadgeCarte, NomIcone> = {
  * calé sur le haut de l'image : c'est la géométrie qui règle le problème, pas
  * un réglage de recadrage.
  */
-function PortraitComposition({ nom, photo: portrait, panneau = false }: { nom: string; photo?: string; panneau?: boolean }) {
-  const photo = portrait ?? photoReelle(nom);
-  const [erreur, setErreur] = useState(false);
-  useEffect(() => setErreur(false), [photo, nom]);
+function PortraitComposition({ joueur, panneau = false }: { joueur: PorteurDImage; panneau?: boolean }) {
+  // ⚠️ LA MÊME SOURCE QUE LA CARTE (`lib/imageJoueur.ts`). Ce portrait cherchait le joueur par son NOM dans l'index des
+  // photos : une joueuse, dont le portrait n'existe que sur sa carte, y restait sans visage.
+  const portrait = usePortrait(joueur);
 
   return (
     <span className={`ct-portrait${panneau ? ' ct-portrait-panneau' : ''}`} aria-hidden="true">
-      {photo && !erreur ? (
-        <img src={photo} alt="" decoding="async" onError={() => setErreur(true)} />
+      {portrait.reel || joueur.gender === 'female' ? (
+        // Un vrai portrait — ou, pour une joueuse qui n'en a pas, la silhouette d'une joueuse.
+        <img src={portrait.src} alt="" decoding="async" onError={portrait.surErreur} />
       ) : (
         <svg className="ct-portrait-vide" viewBox="0 0 48 48">
           <circle cx="24" cy="17" r="9" />
@@ -278,7 +279,7 @@ function CarteJoueur({
             ambiguïté et en deux caractères. */}
         <em className="ct-numero">{numero}</em>
       </span>
-      {joueur && <PortraitComposition nom={joueur.nom} photo={joueur.photo} />}
+      {joueur && <PortraitComposition joueur={joueur} />}
       <b className="ct-nom">{joueur ? nomCarte(joueur.nom) : t('compo.vide')}</b>
       {joueur && (
         <span className="ct-sous">
@@ -341,7 +342,8 @@ function PanneauJoueur({
   onFermer: () => void;
 }) {
   const attributs = attributsDe(joueur);
-  const blasonClub = useBlasonCarte(joueur.clubReel ?? '');
+  // L'écusson d'un club féminin se lit d'abord dans SA table (`useBlasonCarte`) : même logique que la carte.
+  const blasonClub = useBlasonCarte(joueur.clubReel ?? '', undefined, joueur.gender === 'female');
   const logoLigue = logoChampionnat(joueur.championnat);
   const rarete = rareteDe(joueur);
   const adequation = posteSlot
@@ -361,7 +363,7 @@ function PanneauJoueur({
         <Icone nom="croix" taille={16} />
       </button>
       <header>
-        <PortraitComposition nom={joueur.nom} photo={joueur.photo} panneau />
+        <PortraitComposition joueur={joueur} panneau />
         <b>{joueur.nom}</b>
         <strong>{joueur.note}</strong>
       </header>
@@ -890,7 +892,7 @@ export function CompositionTerrainManager({
                 aria-disabled={indisponible}
                 title={`${joueur.nom} · ${NOM_RARETE[rareteDe(joueur)]}${raison ? ` · ${raison}` : ''}`}
               >
-                {!rendreCarte && <PortraitComposition nom={joueur.nom} photo={joueur.photo} />}
+                {!rendreCarte && <PortraitComposition joueur={joueur} />}
                 {rendreCarte ? <>{rendreCarte(joueur)}<b className="ct-fut-nom">{joueur.nom}</b><small>{nomPoste(joueur.poste)}</small>{raison && <small className="ct-fut-raison">{raison}</small>}</> : <>
                 <strong>{joueur.note}</strong>
                 <span>

@@ -41,6 +41,7 @@ import { sortiesPossibles } from './pack.js';
 import { attaquantLibre } from './ia/lecture.js';
 import { ligneDePasseCoupee } from './ia/vision.js';
 import { humainTientLe } from './responsabilites.js';
+import { aLaSortieDuRuck, frappeFranche, planDeFrappe, type GesteDeFrappe } from './frappe.js';
 import {
   AXE, LARGEUR, LIGNE_A, LIGNE_B, LONGUEUR, borner, dansSes22, dansSonCamp, distance, distance2,
   metresAvantLaLigne, sens, type Vec,
@@ -311,6 +312,13 @@ export interface EtatDirect {
   stats: StatsDirectes;
   /** Un coup de pied se prépare (viseur affiché) : visée courante, pour la scène. */
   viseur: { x: number; y: number; puissance: number } | null;
+  /**
+   * LE COUP DE PIED ANNONCÉ (Correctif 40, niveau 8). Le joueur vient de relâcher son geste ; le moteur ne jouera sa demande
+   * qu'à son prochain pas (jusqu'à 0,15 s plus tard). La scène lit CECI pour partir tout de suite : même geste et mêmes
+   * instants que le moteur écrira (`planDeFrappe`), puis `piedPrepare` prend le relais sans que rien ne redémarre.
+   * Jamais lu par le jeu : c'est un avis pour l'image, effacé dès que la demande est jouée ou refusée.
+   */
+  frappeAnnoncee?: { auteurId: string; geste: GesteDeFrappe; armeA: number; contactA: number; vers: Vec; depuis: number } | null;
   /** Ce que le tutoriel force (aucun effet hors tutoriel). */
   assistance?: { appelAssure?: boolean };
   /** Le saut ou le lift que le joueur vient de minuter en touche (Correctif 23) : de 0 (raté) à 1 (parfait), consommé quand la touche se tranche. */
@@ -421,6 +429,7 @@ export function activerDirect(e: EtatMatch, actif: boolean): void {
     d.arme = null;
     d.pasDeCote = null;
     d.viseur = null;
+    d.frappeAnnoncee = null;
     d.vue = vueVide();
     return;
   }
@@ -445,9 +454,38 @@ export function commanderDirect(e: EtatMatch, mx: number, my: number, sprint: bo
 export function demanderDirect(e: EtatMatch, demande: DemandeDirecte): void {
   const d = e.direct;
   if (!d?.actif) return;
+  const pied = demande.action === 'coupDePied' || demande.action === 'drop';
+  // Une annonce que le moteur n'a pas relevée (le pilotage s'est tu : bagarre, sortie du terrain) ne bloque pas la suite.
+  if (d.frappeAnnoncee && e.sim > d.frappeAnnoncee.contactA + 0.5) d.frappeAnnoncee = null;
+  // ⚠️ UN INPUT = UNE ACTION DE COUP DE PIED (Correctif 40). Tant qu'un coup de pied attend son pas ou se prépare, un second
+  // appui n'entre même pas dans la file : il n'y a rien à relancer.
+  if (pied && (e.piedPrepare || d.frappeAnnoncee || d.file.some((x) => x.action === 'coupDePied' || x.action === 'drop'))) return;
   // Une file courte : un joueur qui martèle un bouton ne planifie pas dix passes.
   if (d.file.length >= 4) d.file.shift();
-  d.file.push({ ...demande, t: e.sim, tr: e.sim + Math.min(e.reliquat ?? 0, 0.15) });
+  const tr = e.sim + Math.min(e.reliquat ?? 0, PAS_DU_MOTEUR);
+  d.file.push({ ...demande, t: e.sim, tr });
+  if (pied && frappeFranche(e)) annoncerFrappe(e, demande, tr);
+}
+
+/** Le pas du moteur (`DT` de `moteur.ts`, que ce module ne peut pas importer sans boucle). */
+const PAS_DU_MOTEUR = 0.15;
+
+/**
+ * Niveau 8 — ce que le moteur fera de cette demande à son prochain pas, écrit tout de suite pour l'image. Mêmes conditions
+ * que `executerDemande`, même plan que `lancerVol` ; si le pas décide autrement (plaqué entre-temps), l'annonce est effacée.
+ */
+function annoncerFrappe(e: EtatMatch, demande: DemandeDirecte, tr: number): void {
+  const d = e.direct!;
+  const p = pionHumain(e);
+  if (!p || e.porteur !== p || e.phase !== 'jeuCourant' || e.vol || p.corps || !humainPilote(e, p)) return;
+  if (demande.action === 'drop' && !d.vue.possible.drop) return;
+  const s = sens(p.cote);
+  const intention: IntentionPied = demande.action === 'drop' ? 'drop' : classerCoupDePied(e, p, demande).intention;
+  const vers = demande.action === 'drop' ? { x: s > 0 ? LIGNE_B : LIGNE_A, y: AXE } : classerCoupDePied(e, p, demande).arrivee;
+  const plan = planDeFrappe(intention, p.numero, p.vitesse, p.pos, vers, s, e.sim + PAS_DU_MOTEUR, PAS_DU_MOTEUR, aLaSortieDuRuck(e));
+  // Encore déséquilibré au prochain pas ? L'armé l'attendra (`remisA`, dans `lancerVol`) : l'annonce le dit aussi.
+  const retard = Math.ceil(Math.max(0, p.battu - PAS_DU_MOTEUR) / PAS_DU_MOTEUR - 1e-6) * PAS_DU_MOTEUR;
+  d.frappeAnnoncee = { auteurId: p.id, geste: plan.geste, armeA: plan.armeA + retard, contactA: plan.contactA + retard, vers: { ...vers }, depuis: tr };
 }
 
 /** Le viseur d'un coup de pied en préparation (scène) ; `null` pour l'éteindre. */

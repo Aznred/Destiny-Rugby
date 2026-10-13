@@ -1,12 +1,11 @@
-import { useId, useState } from 'react';
+import { useId } from 'react';
 import type { CarteCarriere } from '../lib/ligue/typesCarriere';
 import { nomRaretePack } from '../lib/presentationPacks';
 import { locale, t } from '../lib/i18n';
 import { nomPoste, POSTE_PAR_ID } from '../data/rugby';
-import { photoReelle } from '../lib/avatars';
 import { formatTempsBlessure, formatTempsBlessureDetaille } from '../lib/carteJoueur';
 import { Drapeau } from './Drapeau';
-import { choixImage } from '../lib/avatars';
+import { usePortrait } from '../lib/imageJoueur';
 import { useBlasonCarte } from '../lib/useBlasonCarte';
 import { EcussonClub } from './EcussonClub';
 import { Blason } from './Blason';
@@ -36,9 +35,7 @@ const SILHOUETTE = 'M120 7 C107 23 83 21 65 29 L15 47 L15 282 Q15 314 57 326 Q10
  * `photos/maj/`. Un seul exemplaire subsiste donc, sous un nom qui ne
  * revendique personne, et il ne sert que quand on n'a vraiment rien.
  */
-const SANS_PHOTO = '/photos/silhouette.webp';
-/** La même silhouette grise, pour une joueuse : une carte féminine sans portrait ne montre pas un homme. */
-const SANS_PHOTO_FEMME = '/photos/silhouette-femme.webp';
+// (La silhouette, celle d'une joueuse pour une joueuse, et l'ordre des portraits : `lib/imageJoueur.ts`, la source unique.)
 
 // ═══════════════════════════════════════════════════════════════════════════
 // LES CARTES SPÉCIALES
@@ -186,17 +183,13 @@ export function CarteJoueurEnLigne({ carte, proprietaire, logoClub, onClick, com
   carte: CarteCarriere; proprietaire?: string; logoClub?: string; onClick?: () => void; compacte?: boolean; etatCollection?: 'inconnue' | 'decouverte';
 }) {
   const id = useId().replaceAll(':', '');
-  const [photosRatees, setPhotosRatees] = useState<Set<string>>(() => new Set());
   const blason = useBlasonCarte(carte.clubReel, logoClub, carte.gender === 'female');
   const competition = logoChampionnat(carte.championnat);
-  // ⚠️ UNE CARTE SPÉCIALE N'EMPRUNTE JAMAIS LE PORTRAIT ORDINAIRE DU JOUEUR :
-  // une Halloween de Dupont avec sa photo de club ne serait qu'un faux.
-  const photoIndexee = carte.speciale ? undefined : photoReelle(carte.nom, carte.clubReel);
-  // Les cartes déjà distribuées peuvent conserver une ancienne URL. Si elle
-  // échoue, on retente le portrait actuellement indexé avant le repli neutre.
-  // « Mon image » : un portrait retiré à la demande du joueur ne s'affiche plus ; celui qu'il a proposé passe devant.
-  const choix = choixImage(carte.nom);
-  const photo = choix === null ? undefined : [choix, carte.photo, photoIndexee].find((candidate) => candidate && !photosRatees.has(candidate));
+  // ⚠️ LE PORTRAIT VIENT DE LA SOURCE UNIQUE (`lib/imageJoueur.ts`), la même que la fiche et la composition : « Mon image »,
+  // puis le portrait porté par la carte, puis l'index — jamais pour une carte spéciale (une Halloween de Dupont avec sa
+  // photo de club ne serait qu'un faux) ni pour une joueuse (l'index est celui des joueurs). Une ancienne adresse qui ne
+  // charge plus cède la place au candidat suivant, puis à la silhouette.
+  const portrait = usePortrait(carte);
   const [clair, couleur, sombre, bord] = PALETTES[carte.rarete];
   const speciale = carte.speciale;
   const design = speciale?.type === 'influencer' ? 'influencer' : speciale?.type === 'halloween' ? 'halloween' : speciale?.type === 'octobre-rose' ? 'octobre-rose' : speciale ? 'icon' : null;
@@ -234,7 +227,7 @@ export function CarteJoueurEnLigne({ carte, proprietaire, logoClub, onClick, com
       // lieu (ICON, citrouille). Un joueur actif garde l'écusson de son club.
       speciale ? <>{!speciale.retraite && blason && <EcussonClub logo={blason} nom={carte.clubReel} taille={25} />}<span className="dr-player-embleme" title={nomFamilleSpeciale(speciale.type)}><EmblemeSpecial logo={speciale.logo} /></span></>
       : <>{blason ? <EcussonClub logo={blason} nom={carte.clubReel} taille={25} /> : <span className="dr-player-blason-fallback"><Blason club={clubParNom(carte.clubReel) ?? { nom: carte.clubReel, c1: '#0a2a6b', c2: '#c1121f' }} taille={25} /></span>}{competition && <img className="dr-player-compet" src={competition} alt="" title={carte.championnat} loading="lazy" decoding="async" draggable={false} />}</>}</span>
-    <span className="dr-player-photo">{photo ? <img draggable={false} src={photo} alt="" loading="lazy" onError={() => setPhotosRatees((ratees) => new Set(ratees).add(photo))} /> : <img draggable={false} src={carte.gender === 'female' ? SANS_PHOTO_FEMME : SANS_PHOTO} alt={t('online.card.defaultPortrait')} />}</span>
+    <span className="dr-player-photo">{portrait.reel ? <img draggable={false} src={portrait.src} alt="" loading="lazy" onError={portrait.surErreur} /> : <img draggable={false} src={portrait.src} alt={t('online.card.defaultPortrait')} />}</span>
     <span className="dr-player-identity"><strong>{carte.nom}</strong><small>{speciale?.retraite ? carte.nation : carte.clubReel || (speciale?.type === 'influencer' ? 'Creator / Influencer' : '')}</small></span>
     <span className="dr-player-stats">{stats.map(([cle, valeur]) => <span key={cle}><b>{valeur}</b><small>{cle}</small></span>)}</span>
     {speciale
