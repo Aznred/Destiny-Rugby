@@ -9,6 +9,7 @@ import { useGame } from '../src/store/useGame';
 import { chargerTextes, LANGUES } from '../src/lib/i18n';
 import { TEXTES } from '../src/data/textes';
 import { definirCleGroqJoueur } from '../src/lib/groq';
+import { SEMAINES_PAR_SAISON } from '../src/data/calendrier';
 
 chargerTextes(TEXTES);
 // L'aperçu n'écrit aucune sauvegarde, quel que soit le port utilisé.
@@ -27,6 +28,28 @@ useGame.setState({
 });
 useGame.getState().setLangue('en');
 useGame.getState().setTheme('bleu');
+// Parcours de clôture reproductible, hors réseau et sans sauvegarde réelle.
+const cloture = new URLSearchParams(location.search).get('cloture');
+if (cloture === 'scenario' || cloture === 'evenement') {
+  useGame.getState().setLangue('fr');
+  useGame.setState((s) => ({
+    joueur: { ...s.joueur!, semaine: SEMAINES_PAR_SAISON }, iaActivee: false,
+  }));
+  if (cloture === 'scenario') useGame.getState().poserSituation({
+    id: 'apercu-cloture', emoji: '', titre: 'Bilan de la saison',
+    situation: 'Le staff te demande comment préparer la saison prochaine. Quel axe souhaites-tu travailler ?',
+    choix: [
+      'Je travaille ma passe et ma vision avec les autres joueurs pour mieux comprendre leurs courses et préparer la prochaine saison.',
+      'Je reprends mon travail physique avec le préparateur, en gardant assez de récupération pour arriver en forme à la reprise.',
+      'Je regarde mes derniers matchs avec le staff pour comprendre mes erreurs et construire un programme de travail adapté à mon poste.',
+    ].map((texte) => ({ texte, issue: { recit: 'Le staff retient ton choix pour préparer la prochaine saison.', deltas: {}, ovas: 0 } })),
+  });
+  else useGame.getState().poserEvenementHebdo({
+    id: 'apercu-cloture', emoji: '', titre: 'Bilan de la saison',
+    texte: 'Le staff te demande ce que tu retiens de ta saison et comment tu souhaites préparer la prochaine.',
+    risque: false, semaine: SEMAINES_PAR_SAISON,
+  });
+}
 export function Apercu() {
   const langue = useGame(s => s.langue);
   const [reglages, setReglages] = useState(false);

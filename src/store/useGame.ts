@@ -2263,8 +2263,11 @@ export const useGame = create<GameState>()(
         // ---- PHASE FINALE : le bracket, match par match ----
         const bracket = pyramide.phase.matchs;
         if (bracket.length) {
-          const lesNotres = bracket.filter((m) => m.domicile === joueur.club || m.exterieur === joueur.club);
-          const finale = bracket.find((m) => m.tour === 'finale')!;
+          const lesNotres = bracket.filter((m) => m.status === 'completed'
+            && (m.domicile === joueur.club || m.exterieur === joueur.club));
+          // Le tableau progressif peut s'arrêter avant la finale : les tours
+          // suivants n'existent qu'après les résultats du tour précédent.
+          const finale = bracket.find((m) => m.tour === 'finale');
           entrees.push({
             id: idUnique(),
             saison: joueur.saison,
@@ -2279,7 +2282,7 @@ export const useGame = create<GameState>()(
                         .join(' ')
                     : '')
                 : `${joueur.club} n'était pas qualifié pour la phase finale. `) +
-              (finale.status === 'completed' ? ` Le titre revient à ${finale.vainqueur}, vainqueur ${Math.max(finale.scoreD!, finale.scoreE!)}-${Math.min(finale.scoreD!, finale.scoreE!)} de ${finale.perdant} en finale.` : '') +
+              (finale?.status === 'completed' ? ` Le titre revient à ${finale.vainqueur}, vainqueur ${Math.max(finale.scoreD!, finale.scoreE!)}-${Math.min(finale.scoreD!, finale.scoreE!)} de ${finale.perdant} en finale.` : '') +
               (bilan.champion ? ' 🏆 Et ce champion, c’est TOI.' : ''),
           });
         }

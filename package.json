@@ -49,6 +49,7 @@
     "verify:effectifs-catalogue": "vite-node scripts/verifierEffectifsCatalogue.ts",
     "verify:saison-manager": "vite-node scripts/verifierSaisonManager.ts",
     "verify:cloture-saison": "vite-node scripts/verifierClotureSaison.ts",
+    "verify:cloture-joueur": "vite-node scripts/verifierClotureJoueur.ts",
     "verify:montees": "vite-node scripts/verifierMontees.ts",
     "verify:essais": "vite-node scripts/verifierEssais39.ts",
     "verify:tournoi-final": "vite-node scripts/verifierTournoiFinal.ts",

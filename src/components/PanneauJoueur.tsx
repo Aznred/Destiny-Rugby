@@ -65,12 +65,12 @@ const ICONE_SEMAINE: Record<string, NomIcone> = {
   phaseFinale: 'flamme', treve: 'calendrier',
 };
 
-export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
+export function PanneauJoueur({ joueur, onRepondre }: { joueur: Joueur; onRepondre: () => void }) {
   const semaineSuivante = useGame((s) => s.semaineSuivante);
   // ⚠️ ON N'AVANCE PAS EN LAISSANT UNE QUESTION EN PLAN. Depuis que le récit
   // tombe CHAQUE semaine, pouvoir enchaîner sans répondre remplissait le journal
   // de scènes orphelines — et le MJ ne posait plus rien, puisqu'une scène
-  // attendait déjà. Le bouton se bloque donc tant qu'on n'a pas répondu.
+  // attendait déjà. Une réponse attendue ouvre le récit sans avancer le jeu.
   const scenarioActif = useGame((s) => s.scenarioActif);
   const evenementHebdo = useGame((s) => s.evenementHebdo);
   const aRepondre = !!scenarioActif || !!evenementHebdo;
@@ -89,7 +89,8 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
   // La semaine tourne juste après la fermeture d'un match (Correctif 26) : rien ne s'actionne pendant ce court instant.
   const [passage, setPassage] = useState(false);
   const bloque = aRepondre || sansContrat || passage;
-  const motifBlocage = sansContrat ? t('pj.sansContrat') : motifAttente;
+  const actionBloquee = passage || (sansContrat && !aRepondre);
+  const motifBlocage = aRepondre ? motifAttente : t('pj.sansContrat');
   const semaineActuelle = semaine(joueur.semaine ?? 1);
   const vecu = joueur.saisonEnCours;
   const prendreRetraite = useGame((s) => s.prendreRetraite);
@@ -189,6 +190,14 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
   // Déjà suivi cette semaine ? Alors on repasse sur les boutons classiques.
   const matchAJouer = !!affiche && !blesse && situation.role !== 'horsGroupe'
     && (matchRegarde !== `${joueur.saison}#${joueur.semaine ?? 1}` || encoreUnTour);
+
+  const agirSemaine = () => {
+    if (aRepondre) onRepondre();
+    else if (!actionBloquee) {
+      if (matchAJouer) setMatchOuvert(true);
+      else semaineSuivante();
+    }
+  };
 
   return (
     <aside id="carriere-joueur" className="carte panneau-joueur">
@@ -440,17 +449,14 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
               On ne propose plus « Semaine suivante » à côté : on joue le match,
               et la semaine passe toute seule à la sirène. */}
           {matchAJouer ? (
-            // ⚠️ LE MATCH EST BLOQUÉ LUI AUSSI TANT QU'UNE SCÈNE ATTEND. Il ne
-            // l'était pas : « Semaine suivante » se verrouillait, mais le match
-            // — qui fait passer la semaine à la sirène — restait cliquable. Il
-            // suffisait donc d'avoir un match au programme pour enjamber la
-            // question du MJ, et le journal se remplissait de scènes orphelines.
+            // Une scène attendue ouvre la réponse, jamais le match : on ne
+            // peut pas enjamber la question du MJ pour avancer la semaine.
             <button
               type="button"
               className="btn match-semaine"
               data-tuto="car-match"
-              onClick={() => setMatchOuvert(true)}
-              disabled={bloque}
+              onClick={agirSemaine}
+              disabled={actionBloquee}
               title={bloque ? motifBlocage : t('pj.suivreDirect', { domicile: affiche!.match.domicile, exterieur: affiche!.match.exterieur })}
             >
               ▶️ <b>{aRepondre
@@ -466,11 +472,11 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
             <div className="pj-avancer" data-tuto="car-semaine">
               <button
                 className="btn vert"
-                onClick={semaineSuivante}
-                disabled={bloque}
+                onClick={agirSemaine}
+                disabled={actionBloquee}
                 title={bloque ? motifBlocage : t('pj.jouerSemaineAide')}
               >
-                {semaineActuelle.numero >= SEMAINES_PAR_SAISON ? t('pj.cloreSaison') : t('pj.semaineSuivante')}
+                {aRepondre ? t('pj.reponds') : semaineActuelle.numero >= SEMAINES_PAR_SAISON ? t('pj.cloreSaison') : t('pj.semaineSuivante')}
               </button>
               {/* ⚠️ « ⏩ FIN DE SAISON » A ÉTÉ SUPPRIMÉ (demande explicite : « il
                   faut pas qu'on puisse simuler la saison »). Il sautait à un
@@ -662,8 +668,8 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
             <button
               type="button"
               className="btn primaire"
-              onClick={() => setMatchOuvert(true)}
-              disabled={bloque}
+              onClick={agirSemaine}
+              disabled={actionBloquee}
               title={bloque ? motifBlocage : undefined}
             >
               {aRepondre
@@ -674,8 +680,8 @@ export function PanneauJoueur({ joueur }: { joueur: Joueur }) {
             <button
               type="button"
               className="btn vert"
-              onClick={semaineSuivante}
-              disabled={bloque}
+              onClick={agirSemaine}
+              disabled={actionBloquee}
               title={bloque ? motifBlocage : undefined}
             >
               {aRepondre ? t('pj.reponds') : semaineActuelle.numero >= SEMAINES_PAR_SAISON ? t('pj.cloreSaison') : t('pj.semaineSuivanteCourte')}

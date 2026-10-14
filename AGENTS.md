@@ -384,6 +384,12 @@ Banc du mode : `npm run verify:carriere` (208 contrôles, ~3 min).
    + action. Sortie JSON stricte.
 3. `appliquerReponse()` applique les deltas et écrit deux entrées au journal.
 
+La clôture accepte un tableau progressif dont la finale n'est pas encore construite :
+le bilan ne raconte que les matchs terminés et un champion établi, puis applique le pré-accord à l'intersaison.
+`verify:cloture-joueur` couvre Gaillac en saison 4 avec un accord à Valence Romans.
+Sur mobile et tablette, les réponses restent au-dessus des barres fixes, même en paysage ;
+« Réponds d'abord » ramène au récit et place le focus sur le choix ou le champ de réponse, sans avancer la semaine.
+
 **Deltas autorisés** : `vitesse, force, endurance, plaquage, passe, jeuAuPied,
 vision, mental` (±3) · `forme, moral, reputation` (0-100, ±20) · `argent`.
 Toute clé inconnue est ignorée par `nettoyerDeltas()`.

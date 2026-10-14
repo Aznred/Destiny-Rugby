@@ -1,6 +1,25 @@
 /* La fiche, le récit et la barre d'action partagent le même espace mobile. */
+.carriere .scenario-choix {
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: 46%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.carriere .choix-scenario { flex: none; }
+.carriere .saisie, .carriere .scenario-consigne { flex: none; }
 @media (max-width: 900px) {
-  .carriere { height: auto; }
+  /* Même en paysage ou sur tablette, les réponses restent au-dessus des
+     deux barres fixes. Le journal cède la place aux commandes et défile. */
+  .carriere {
+    display: flex;
+    flex-direction: column;
+    height: calc(100dvh - 68px - 68px - var(--nav-mobile-hauteur, 64px) - env(safe-area-inset-bottom, 0px) - 10px);
+    min-height: 0;
+    overflow: hidden;
+    padding-bottom: 0;
+  }
+  .carriere > .carriere-entete, .carriere .carriere-mobile-vues { flex: none; }
   .carriere .carriere-mobile-vues {
     position: static;
     width: 100%;
@@ -18,11 +37,16 @@
     min-height: 0;
     overflow: hidden;
   }
+  .carriere[data-mobile-vue='jeu'] > .jeu,
+  .carriere[data-mobile-vue='joueur'] > .panneau-joueur,
+  .carriere[data-mobile-vue='classement'] > .classement-lateral { flex: 1 1 0; min-height: 0; height: auto; }
+  .carriere[data-mobile-vue='joueur'] > .panneau-joueur,
+  .carriere[data-mobile-vue='classement'] > .classement-lateral { overflow-y: auto; overscroll-behavior: contain; }
   .carriere .jeu .journal {
-    flex: none;
+    flex: 1 1 0;
     height: auto;
-    min-height: 180px;
-    max-height: clamp(240px, calc(100dvh - 420px), 540px);
+    min-height: 0;
+    max-height: none;
     justify-content: flex-start;
     overflow-y: auto;
     overscroll-behavior: contain;
@@ -106,7 +130,7 @@
     display: flex; flex-direction: column; gap: .4rem;
     /* Écran − barre du haut (68) − barre « Jouer » (68) − navigation − marges. */
     height: calc(100dvh - 68px - 68px - var(--nav-mobile-hauteur, 64px) - env(safe-area-inset-bottom, 0px) - 10px);
-    min-height: 420px; overflow: hidden; padding-top: .35rem;
+    min-height: 0; overflow: hidden; padding-top: .35rem;
     /* La place des deux barres fixes est déjà retirée de la hauteur : plus de marge basse à réserver. */
     padding-bottom: 0; margin-top: 0; margin-bottom: 0;
   }
@@ -162,10 +186,16 @@
     scroll-snap-type: x proximity; scrollbar-width: none; }
   .carriere .choix-rapides::-webkit-scrollbar { display: none; }
   .carriere .choix-rapides button { flex: 0 0 74%; width: auto; min-height: 44px; font-size: .78rem; scroll-snap-align: start; }
-  .carriere .scenario-choix { flex: none; max-height: 46%; overflow-y: auto; }
   .carriere .saisie { flex: none; padding: .45rem .6rem .55rem; }
 }
 @media (max-width: 700px) and (max-height: 640px) {
   /* Petit téléphone : le résumé perd sa dernière ligne, le match est déjà dans la barre du bas. */
   .cr-bas .cr-stats { display: none; }
+}
+@media (max-width: 900px) and (max-height: 560px) {
+  /* Le clavier ou le paysage réduisent la hauteur disponible : la réponse
+     reste accessible, le résumé complet se retrouve dans l'onglet Profil. */
+  .carriere > .carriere-entete, .cr-jauges, .cr-bas { display: none; }
+  .carriere .scenario-choix { max-height: 70%; }
+  .carriere .jeu .journal { padding-block: .4rem; }
 }

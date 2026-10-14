@@ -72,6 +72,8 @@ export function Carriere({ onReglages }: Props) {
   // est la porte d'entrée : la fiche et le classement restent à un toucher,
   // sans imposer plusieurs écrans de défilement avant de pouvoir jouer.
   const [vueMobile, setVueMobile] = useState<'jeu' | 'joueur' | 'classement'>('jeu');
+  const [demandeReponse, setDemandeReponse] = useState(0);
+  const jeuRef = useRef<HTMLDivElement>(null);
   const journalRef = useRef<HTMLDivElement>(null);
   // ⚠️ Verrou de ré-entrée. Sans lui, le moindre re-rendu pendant la génération
   // relançait une génération : deux scènes pour la même semaine, et deux fois
@@ -93,6 +95,15 @@ export function Carriere({ onReglages }: Props) {
     const fil = journalRef.current;
     if (fil) fil.scrollTo({ top: fil.scrollHeight, behavior: 'smooth' });
   }, [journal, enCours]);
+
+  // Le bouton « Réponds d'abord » ramène au récit, y compris depuis Profil
+  // ou Classement sur mobile, puis place le focus sur la réponse attendue.
+  useEffect(() => {
+    if (!demandeReponse) return;
+    const reponse = jeuRef.current?.querySelector<HTMLElement>('.choix-scenario, textarea');
+    reponse?.focus({ preventScroll: true });
+    reponse?.scrollIntoView({ block: 'nearest' });
+  }, [demandeReponse]);
 
   // ═══ LA SCÈNE DE LA SEMAINE ═════════════════════════════════════════════
   useEffect(() => {
@@ -254,9 +265,12 @@ export function Carriere({ onReglages }: Props) {
           <Icone nom="trophee" taille={17} />{t('nav.classement')}
         </button>
       </nav>
-      <PanneauJoueur joueur={joueur} />
+      <PanneauJoueur joueur={joueur} onRepondre={() => {
+        setVueMobile('jeu');
+        setDemandeReponse((n) => n + 1);
+      }} />
 
-      <div id="carriere-jeu" className="carte jeu">
+      <div ref={jeuRef} id="carriere-jeu" className="carte jeu">
         <div ref={journalRef} className="journal" role="log" aria-live="polite" aria-relevant="additions text" aria-label={t('car.vueJeu')}>
           <AnimatePresence initial={false}>
             {journal.map((e) => (
@@ -317,7 +331,7 @@ export function Carriere({ onReglages }: Props) {
             réglages, ou quota épuisé), la semaine se joue aux situations à
             choix : on neutralise la barre au lieu de laisser le joueur écrire
             dans le vide. Aucun message d'alerte — juste une invite différente. */}
-        <div className="saisie">
+        {!scenarioActif && <div className="saisie">
           <textarea
             aria-label={
               evenementHebdo
@@ -325,9 +339,7 @@ export function Carriere({ onReglages }: Props) {
                 : avecIA ? t('car.placeholder') : t('car.placeholderSansMJ')
             }
             placeholder={
-              scenarioActif
-                ? t('car.placeholderChoix')
-                : evenementHebdo
+              evenementHebdo
                   ? t('car.placeholderEvenement')
                   : avecIA
                     ? t('car.placeholder')
@@ -338,18 +350,18 @@ export function Carriere({ onReglages }: Props) {
             onKeyDown={gererClavier}
             enterKeyHint="send"
             rows={1}
-            disabled={enCours || !!scenarioActif || (!avecIA && !evenementHebdo)}
+            disabled={enCours || (!avecIA && !evenementHebdo)}
           />
           <button
             className="btn primaire"
             onClick={() => envoyer(texte)}
             disabled={
-              enCours || !!scenarioActif || !texte.trim() || (!avecIA && !evenementHebdo)
+              enCours || !texte.trim() || (!avecIA && !evenementHebdo)
             }
           >
             {enCours ? '…' : evenementHebdo ? t('car.repondre') : t('car.jouer')}
           </button>
-        </div>
+        </div>}
       </div>
 
       {/* Le classement du championnat, en permanence sous les yeux. */}

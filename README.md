@@ -455,6 +455,12 @@ Inspiré des jeux de carrière type *Destin Eleven*, mais pour l'**ovalie**.
   finir en suspension, en garde à vue, à l'hôpital — ou pire.
   *Si l'IA est désactivée ou son quota épuisé, le jeu reste entier : la même
   scène arrive chaque semaine, avec des réponses à choix multiples.*
+- **Clôture de saison solo.** Un tableau de playoffs dont la finale n'est pas
+  encore construite n'empêche plus de passer à la saison suivante et d'appliquer
+  le pré-accord signé. Le bilan conserve les résultats réellement terminés.
+  Sur mobile et tablette, « Réponds d'abord » ouvre le récit et les réponses
+  restent accessibles au-dessus des barres de navigation, y compris en paysage.
+  Vérification : `npm run verify:cloture-joueur`.
 - **Maître du Jeu servi par Groq**, avec la clé du site : rien à installer,
   rien à télécharger, rien à saisir, et une réponse en une fraction de seconde.
   **Quand le quota est atteint, le jeu ne le dit pas** — il bascule sur ses
