@@ -30,7 +30,7 @@ export function definitionsDepart(): readonly DefinitionCarteSpeciale[] {
   graineCache = [
     ...ICONS_DEPART.map(([nom, numeros, nation, overall]): DefinitionCarteSpeciale => ({
       ...commun, id: `icon:${slugSpecial(nom)}`, cardType: 'icon', specialEventId: icon.evenementDefaut, nom,
-      ...postesDepuisNumeros(numeros), overall, designId: icon.designId, nation, club: icon.clubDefaut,
+      ...postesDepuisNumeros(numeros), overall, collectif: icon.collectifDefaut, designId: icon.designId, nation, club: icon.clubDefaut,
       league: icon.ligueDefaut, specialLogo: icon.specialLogo, retraite: true, age: 30, lot: 'ICONS · Pool initial',
     })),
     ...HALLOWEEN_DEPART.map(([nom, numeros, nation, overall, role, base]): DefinitionCarteSpeciale => ({

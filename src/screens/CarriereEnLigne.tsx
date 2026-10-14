@@ -130,15 +130,16 @@ function legendeAffinite(a: AffiniteCarte): string {
     nation: String(a.nation), natAff: nomAffinite('nation'),
     league: String(a.championnat), leagueAff: nomAffinite('championnat'),
   });
+  const icones = a.icones ? `\n${t('special.chemistry.icons', { points: String(a.icones) })}` : '';
   if (a.speciale) return `${entete}\n${t('special.chemistry.floor', { points: String(a.points), max: String(COLLECTIF_MAX) })}\n${detail}`;
-  if (!a.meilleure) return `${entete}\n${t('online.affinity.none')}\n${detail}`;
+  if (!a.meilleure) return `${entete}${icones}\n${t('online.affinity.none')}\n${detail}`;
   const tailles: Record<Affinite, number> = { club: a.club, nation: a.nation, championnat: a.championnat };
   const compte = t('online.affinity.startersCount', { count: String(tailles[a.meilleure]), affinity: nomAffinite(a.meilleure) });
   // ⚠️ ON NE PROPOSE PAS DE PROGRÈS À QUI EST DÉJÀ AU MAXIMUM. « Il manque 3
   // joueurs de son club » sous un 10/10 se lit comme un reproche absurde.
   const manque = a.points < COLLECTIF_MAX && a.club > 0 && a.club < 3
     ? `\n${t('online.affinity.missingForMax', { count: String(3 - a.club) })}` : '';
-  return `${entete}\n${compte}${manque}\n${detail}`;
+  return `${entete}${icones}\n${compte}${manque}\n${detail}`;
 }
 
 /**

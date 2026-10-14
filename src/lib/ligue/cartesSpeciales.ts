@@ -169,7 +169,7 @@ export interface FamilleSpeciale {
 export const FAMILLES_SPECIALES: Readonly<Record<string, FamilleSpeciale>> = {
   icon: {
     type: 'icon', nom: 'ICON', designId: 'icon-hall-of-fame', specialLogo: 'icon', evenementDefaut: 'icons',
-    overallMin: 75, overallMax: 99, retraitesSeulement: true, clubDefaut: 'ICON', ligueDefaut: 'ICONS',
+    collectifDefaut: 10, overallMin: 75, overallMax: 99, retraitesSeulement: true, clubDefaut: 'ICON', ligueDefaut: 'ICONS',
   },
   halloween: {
     type: 'halloween', nom: 'HALLOWEEN', designId: 'halloween-citrouilles', specialLogo: 'citrouille', evenementDefaut: 'halloween-2026',

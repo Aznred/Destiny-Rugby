@@ -59,6 +59,11 @@ export const TEXTES_CARTES_SPECIALES: Record<string, Traduction> = {
   'special.shop.until': { fr: 'Jusqu’au {date}', en: 'Until {date}', es: 'Hasta el {date}', it: 'Fino al {date}', de: 'Bis {date}', pt: 'Até {date}', ja: '{date}まで' },
   'special.shop.guaranteed': { fr: 'Une carte {name} garantie', en: 'One {name} card guaranteed', es: 'Una carta {name} garantizada', it: 'Una carta {name} garantita', de: 'Eine {name}-Karte garantiert', pt: 'Uma carta {name} garantida', ja: '{name}カード1枚確定' },
   'special.shop.perCard': { fr: '{name} : {n} % par carte', en: '{name}: {n}% per card', es: '{name}: {n} % por carta', it: '{name}: {n}% per carta', de: '{name}: {n} % pro Karte', pt: '{name}: {n} % por carta', ja: '{name}：1枚あたり{n}%' },
+  'special.chemistry.icons': {
+    fr: 'ICONS dans le XV : +{points} de collectif.', en: 'ICONS in the XV: +{points} chemistry.',
+    es: 'ICONS en el XV: +{points} de colectivo.', it: 'ICONS nel XV: +{points} di collettivo.',
+    de: 'ICONS in der Startelf: +{points} Teamgeist.', pt: 'ICONS no XV: +{points} de coletivo.', ja: 'XVのICONS：連携 +{points}。',
+  },
   'special.chemistry.floor': {
     fr: 'Carte spéciale : collectif garanti {points}/{max}.', en: 'Special card: guaranteed chemistry {points}/{max}.',
     es: 'Carta especial: colectivo garantizado {points}/{max}.', it: 'Carta speciale: collettivo garantito {points}/{max}.',

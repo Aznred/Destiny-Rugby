@@ -297,7 +297,9 @@ publiées (`specialesPubliques`, avec `/api/carriere?catalogueSolo=1`), ajoutée
 de tableau et hors des bandes de rareté. `cartesSpeciales.ts` reste LÉGER (le store
 l'importe via `collectionSolo.ts`) ; la graine et la fusion avec le Labo sont dans
 `catalogueSpecial.ts`, `rareteCarriere`/`carteDansPack` dans `raretesCartes.ts`.
-`collectif` est un PLANCHER (Halloween 10) ; la carte compte normalement pour ses
+`collectif` est un PLANCHER (Halloween, Octobre Rose et ICONS : 10) ; une ICON titulaire DONNE aussi +1 de collectif à
+chacun de ses coéquipiers du XV, jusqu’à +2 quel que soit le nombre d’ICONS (`DON_ICON`, `DON_ICONS_MAX` dans
+`collectifCarriere.ts`, jamais au-delà de 10). La carte compte normalement pour ses
 coéquipiers. Deux cartes du même joueur (`identiteJoueur`) ne vont pas sur une feuille.
 Labo : `serveur/atelierSpeciales.ts`, `components/LaboCartesSpeciales.tsx`. Imports
 joueurs : `ligue/importsJoueurs.ts` (nom + naissance, nom + club, fiche source unique,

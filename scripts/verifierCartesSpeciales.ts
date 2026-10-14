@@ -71,6 +71,7 @@ egal(new Set(graine.map(d => d.id)).size, graine.length, 'identifiants uniques')
 ok(icons.some(d => d.nom === 'Fabien Galthié'), 'Fabien Galthié est une ICON');
 egal(Math.max(...icons.map(d => d.overall)), 97, 'les ICONS montent jusqu’à 97');
 ok(icons.every(d => d.retraite && !d.basePlayerId), 'une ICON est toujours un retraité');
+ok(icons.every(d => d.collectif === 10), 'ICONS : COL 10');
 ok(halloween.every(d => d.overall >= 82 && d.overall <= 92 && d.collectif === 10), 'Halloween : GEN 82-92 et COL 10');
 ok(halloween.some(d => d.basePlayerId) && halloween.some(d => d.retraite), 'Halloween : actifs ET retraités');
 ok(graine.every(d => statutCarteSpeciale(d) === (d.cardType === 'octobre-rose' ? 'ready' : 'image_missing') && !d.published), 'aucune carte publiée ; seules les Octobre Rose ont déjà leur image');
@@ -242,6 +243,23 @@ contexteAtelier.run(PUBLIEE, () => {
   if (halloweenMienne) {
     const compo = { ...club.composition, titulaires: [halloweenMienne.id, ...club.composition.titulaires.filter(i => i !== halloweenMienne.id).slice(0, 14)] };
     egal(collectifCarriere(mesCartes, compo).parCarte[halloweenMienne.id].points, 10, 'COL 10 : collectif maximal même isolé');
+  }
+  // ICONS : COL 10 garanti, et +1 par ICON titulaire pour chaque coéquipier du XV (jusqu'à +2, jamais au-delà de 10).
+  {
+    const carte = (id: string, extra: object = {}) => ({ id, nation: `N-${id}`, clubReel: `C-${id}`, championnat: `L-${id}`, ...extra }) as never;
+    const icon = (id: string) => carte(id, { nation: 'Nouvelle-Zélande', clubReel: 'ICON', championnat: 'ICONS', speciale: { type: 'icon', evenement: 'icons' } });
+    const tous = [icon('i1'), icon('i2'), icon('i3'), ...Array.from({ length: 14 }, (_, i) => carte(`j${i}`)), carte('a1', { clubReel: 'Toulouse' }), carte('a2', { clubReel: 'Toulouse' })];
+    const xv = (ids: string[]) => collectifCarriere(tous, { titulaires: ids });
+    const seuls = Array.from({ length: 14 }, (_, i) => `j${i}`);
+    egal(xv(['i1', ...seuls]).parCarte.i1.points, 10, 'ICON : COL 10 même isolée');
+    egal([xv(['i1', ...seuls]).parCarte.j0.points, xv(['i1', ...seuls]).parCarte.j0.icones], [1, 1], 'une ICON donne +1 à un coéquipier sans affinité');
+    egal(xv(['i1', 'i2', ...seuls.slice(1)]).parCarte.j1.points, 2, 'deux ICONS : +2');
+    egal(xv(['i1', 'i2', 'i3', ...seuls.slice(2)]).parCarte.j2.points, 2, 'trois ICONS : toujours +2 au plus');
+    egal(xv([...seuls, 'a1']).parCarte.j0.points, 0, 'sans ICON : rien');
+    egal(xv(['i1', 'a1', 'a2', ...seuls.slice(2)]).parCarte.a1.points, 7, 'deux Toulousains (6) + une ICON : 7');
+    egal(xv(['i1', 'i2', 'a1', 'a2', ...seuls.slice(3)]).parCarte.a1.points, 8, 'deux Toulousains (6) + deux ICONS : 8');
+    ok(!('i1' in collectifCarriere(tous, { titulaires: seuls.slice(0, 14).concat('a1') }).parCarte), 'une ICON hors du XV ne compte pas');
+    ok(xv(['i1', ...seuls]).total > xv(['a1', ...seuls]).total, 'le total d’équipe monte avec une ICON');
   }
   const dupont = ouverte.cartes.find(c => c.sourceId === 'reel:antoine dupont');
   const e2 = structuredClone(ouverte);

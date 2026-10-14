@@ -47,12 +47,13 @@ function legendeAffinite(a: AffiniteCarte): string {
     nation: String(a.nation), natAff: nomAffinite('nation'),
     league: String(a.championnat), leagueAff: nomAffinite('championnat'),
   });
-  if (!a.meilleure) return `${entete}\n${t('online.affinity.none')}\n${detail}`;
+  const icones = a.icones ? `\n${t('special.chemistry.icons', { points: String(a.icones) })}` : '';
+  if (!a.meilleure) return `${entete}${icones}\n${t('online.affinity.none')}\n${detail}`;
   const tailles: Record<Affinite, number> = { club: a.club, nation: a.nation, championnat: a.championnat };
   const compte = t('online.affinity.startersCount', { count: String(tailles[a.meilleure]), affinity: nomAffinite(a.meilleure) });
   const manque = a.points < COLLECTIF_MAX && a.club > 0 && a.club < 3
     ? `\n${t('online.affinity.missingForMax', { count: String(3 - a.club) })}` : '';
-  return `${entete}\n${compte}${manque}\n${detail}`;
+  return `${entete}${icones}\n${compte}${manque}\n${detail}`;
 }
 
 const carteEnJoueur = (c: CarteCarriere): Coequipier => ({

@@ -40,6 +40,17 @@ export const COLLECTIF_MAX = 10;
 export type Affinite = 'club' | 'nation' | 'championnat';
 
 /**
+ * ⚠️ LES ICONS. Une légende arrive avec son collectif (plancher de 10, comme Halloween), et elle EN DONNE : chaque ICON
+ * titulaire ajoute `DON_ICON` point au collectif de chacun de ses coéquipiers du XV, jusqu'à `DON_ICONS_MAX` quelle
+ * que soit la quantité d'ICONS alignées, et jamais au-delà de `COLLECTIF_MAX`. Le banc ne donne ni ne reçoit rien.
+ * Un plancher saisi dans le Labo pour une ICON reste celui-là ; sans plancher, c'est `PLANCHER_ICON`.
+ */
+export const PLANCHER_ICON = 10;
+export const DON_ICON = 1;
+export const DON_ICONS_MAX = 2;
+const estIcon = (c: CarteCarriere) => c.speciale?.type === 'icon';
+
+/**
  * ⚠️ LES PALIERS, ET ILS SE LISENT DE HAUT EN BAS. Chaque ligne est
  * `[taille du groupe, points]`, la première atteinte gagne. La taille COMPTE LE
  * JOUEUR LUI-MÊME : « club 3 » veut dire trois joueurs du même club sur la
@@ -63,8 +74,10 @@ export interface AffiniteCarte {
   championnat: number;
   /** Celle qui a donné les points — pour que l'écran puisse dire POURQUOI. */
   meilleure: Affinite | null;
-  /** Les points viennent du plancher d'une carte spéciale (Halloween : COL 10). */
+  /** Les points viennent du plancher d'une carte spéciale (Halloween, ICONS : COL 10). */
   speciale?: true;
+  /** Ce que les ICONS titulaires lui ont ajouté (de 1 à `DON_ICONS_MAX`), déjà compté dans `points`. */
+  icones?: number;
 }
 
 export interface CollectifEquipe {
@@ -115,6 +128,7 @@ export function collectifCarriere(
   const tailleNation = compter((c) => influenceurSansClub(c) && c.speciale?.sansClub === 'neutre' ? undefined : nationCollectif(c));
   const tailleChampionnat = compter((c) => influenceurSansClub(c) ? undefined : c.championnat);
 
+  const nombreIcons = titulaires.filter(estIcon).length;
   const parCarte: Record<string, AffiniteCarte> = {};
   for (const carte of titulaires) {
     const club = tailleClub(carte);
@@ -136,12 +150,15 @@ export function collectifCarriere(
     // COL 10). C'est SON collectif, pas celui des autres : elle compte toujours
     // dans les groupes de ses coéquipiers par son club, sa nation et son
     // championnat, comme n'importe quelle carte.
-    const plancher = carte.speciale?.collectif;
-    if (typeof plancher === 'number' && Math.min(COLLECTIF_MAX, plancher) > points) {
-      parCarte[carte.id] = { points: Math.max(0, Math.min(COLLECTIF_MAX, plancher)), club, nation, championnat, meilleure, speciale: true };
-      continue;
-    }
-    parCarte[carte.id] = { points, club, nation, championnat, meilleure };
+    const plancher = carte.speciale?.collectif ?? (estIcon(carte) ? PLANCHER_ICON : undefined);
+    const affinite: AffiniteCarte = typeof plancher === 'number' && Math.min(COLLECTIF_MAX, plancher) > points
+      ? { points: Math.max(0, Math.min(COLLECTIF_MAX, plancher)), club, nation, championnat, meilleure, speciale: true }
+      : { points, club, nation, championnat, meilleure };
+    // Le don des ICONS : celles des AUTRES titulaires (une ICON ne se donne rien à elle-même).
+    const don = Math.min(DON_ICONS_MAX, (nombreIcons - (estIcon(carte) ? 1 : 0)) * DON_ICON);
+    const recu = Math.min(don, COLLECTIF_MAX - affinite.points);
+    if (recu > 0) { affinite.points += recu; affinite.icones = recu; }
+    parCarte[carte.id] = affinite;
   }
 
   const total = titulaires.length
