@@ -67,7 +67,7 @@
 
 ### Carrière en ligne — le troisième mode, jouable de bout en bout
 
-- **Cahier de combinaisons, en bêta privée Kiri** : onglet « Combinaisons · bêta »,
+- **Cahier de combinaisons, ouvert à tous les comptes (bêta)** : onglet « Combinaisons · bêta »,
   éditeur libre sur terrain 2D agrandissable, zoom sur le jeu ou sur le lancer,
   navigation sans joueur sélectionné, déplacement avec un doigt et pincement
   avec deux doigts, y compris pendant l’animation. Un tap sélectionne un joueur ;
@@ -2080,6 +2080,54 @@ place dans Safari est déduit du code de son moteur, pas mesuré. Mesuré mais p
 78 000 joueurs bloque la page 3,6 secondes sur ordinateur (bien plus sur téléphone).
 
 
+## Correctifs 41 et 42 (13/10/2026)
+
+### Correctif 41 — l'adjoint qui compose, les contrats réglés par l'assistant
+
+- **L'adjoint** choisit sur la **note effective au poste** (note × rendement au poste × condition physique, selon l'enjeu
+  du match) et attribue les vingt-trois places ensemble : un ailier de 69 passe devant un centre de 71 à l'aile, un joueur
+  à 54 % de condition laisse sa place — sauf en finale. Le banc couvre la première ligne, la cage, la troisième ligne, la
+  charnière et les lignes arrière. Consignes par joueur (toujours titulaire, ne pas sélectionner) et priorité aux jeunes.
+  Sous la composition, le **rapport de l'adjoint** dit pourquoi chaque joueur est là, et qui a été laissé au repos.
+  Mesuré sur les 1 187 clubs : meilleur XV dans 1 044, jamais moins bon.
+- **Contrats** (Marché mondial → Contrats de l'effectif) : « Gérer automatiquement » montre le plan (qui prolonger, qui
+  laisser partir, pourquoi), une politique réglable, puis lance de vraies négociations dans la limite du budget ; « Tout
+  régler maintenant » fait tout d'un geste. À la clôture de la saison, l'assistant règle les contrats oubliés
+  (désactivable).
+- `npm run verify:correctif41` ; aperçu `/scripts/apercuCorrectif41.html`.
+
+### Correctif 41, suite — atelier de combinaisons, marché, IA communautaire
+
+Le cahier de combinaisons et son marché sont ouverts à tous les comptes connectés depuis le 14 octobre 2026 (onglet
+« Combinaisons · bêta » d'une ligue) ; la modération reste au compte interne.
+
+- **Tester en 3D** : la combinaison se joue dans la scène des matchs, sur le moteur d'une rencontre de ligue — sans
+  défense, ou contre une défense faible, normale ou forte, en glissée, en montée agressive ou en repli. La chronologie
+  est mesurée sur le moteur : personne ne saisit un temps.
+- **Dessiner par ordres** (niveau Simple) : on touche un joueur, on lui donne un ordre — recevoir, course, fixer, leurre,
+  croisée, soutien, rester large, cellule, passe derrière la cellule, jeu au pied. Le jeu calcule départ, profondeur et
+  ligne de course ; le niveau Avancé garde le réglage geste par geste.
+- **Options de jeu** : « si la défense monte vite → petit jeu au pied », « si le receveur est marqué → passe au 13 ». Le
+  porteur lit la défense au moment de jouer ; la défense, elle, ne connaît jamais la combinaison.
+- **Touche, mêlée, ruck, zone des 10 mètres** : 23 exemples prêts à retoucher (double faux saut, changement de bloc,
+  maul puis sortie pour le 9, départ du 8, croisée, cellule, pick and go…), et des emplacements tactiques par situation.
+- **Marché** : publier, voir une combinaison en 3D, l'ajouter à un emplacement, noter, signaler. L'« efficacité » d'une
+  combinaison vient des matchs réels (mètres, franchissements, essais, ballons perdus, pénalités) — jamais des
+  téléchargements — et n'apparaît qu'après 25 utilisations sur 3 matchs. Versions successives sans rien écraser.
+- **IA communautaire** : les clubs sans entraîneur prennent, selon leur style et leur niveau, les combinaisons qui ont
+  fait leurs preuves, et retiennent pendant le match ce qui marche.
+- Règles 11 en ligue pour les matchs créés désormais (le « cahier vivant » ; même moteur de jeu que les règles 10).
+  Table `combinaisons_publiees` à poser (`npm run base:appliquer`) ; sans elle le marché est fermé, rien d'autre ne change.
+- `npm run verify:combinaisons41` ; aperçu `/scripts/apercuCombinaisonsMatch.html`.
+
+### Correctif 42 — publicités récompensées étendues
+
+- **Ligue** : un pack qu'on ne peut pas payer propose une publicité, sur le même compteur que le Pack Pub (deux par jour).
+- **Boutique** : « Pack Premium gratuit », cinq par jour, tiré par le serveur dans une roulette à part.
+- **Cosmétiques** : certains objets se débloquent en une, trois ou cinq publicités ; le serveur compte la progression.
+- **Labo** : réglages par usage et statistiques séparées. La roulette ne marque plus de faux arrêt avant le pack gagné.
+- `npm run verify:correctif42` ; aperçu simulé `/scripts/apercuCorrectif42.html`.
+
 ## Intégration FFR 2026_10_FFR_FULL
 
 Base privée de 470 742 profils, retrait des identités jeunesse, agrégats de formation et bêta féminine réservée au compte Kiri par autorisation serveur. Voir [serveur/FFR-INTEGRATION.md](serveur/FFR-INTEGRATION.md) pour les seuils, snapshots, commandes et limites de validation.
@@ -2096,7 +2144,7 @@ La boutique propose des Ovas volontaires ; les ligues proposent deux Packs Pub p
 
 Le catalogue publicitaire utilise le vivier mixte, avec les pochettes dédiées masculines, les championnats féminins, Bronze, Argent, Or et Élite. Les variantes sans texture propre sont exclues. Mythique est une récompense distincte du pack privé Kiri ; ICON et Créateurs sont exclus de la roulette. Halloween et Octobre Rose suivent la publication, les dates et le stock des cartes. Les cartes spéciales respectent l'autorisation de la ligue. Par défaut : Bronze 25 %, Argent 20 %, Or 10 %, autres packs 45 % ; les poids personnalisés du Labo remplacent ces valeurs. Les rayons payants restent indépendants.
 
-Les vignettes WebP sont rendues hors ligne depuis les GLB et leurs textures par `npm run data:vignettes-packs`, sans scènes 3D supplémentaires dans la roulette. L'animation conserve le résultat serveur, avec un ralentissement suivi d'un second élan et des étincelles ; le mouvement réduit supprime ces effets.
+Les vignettes WebP sont rendues hors ligne depuis les GLB et leurs textures par `npm run data:vignettes-packs`, sans scènes 3D supplémentaires dans la roulette. L'animation conserve le résultat serveur : une seule décélération jusqu'au pack tiré, puis des étincelles (le faux arrêt d'avant, « second élan », a été retiré au Correctif 42) ; le mouvement réduit supprime ces effets.
 
 Bancs : `npm run verify:publicites` (serveur et SDK), `npm run verify:publicites-sql` (transaction Neon, données d'essai annulées). Aperçu local : `/scripts/apercuPublicites.html`, exclusivement simulé. Configuration serveur et étapes de mise en ligne : [PUBLICITES-APPLIXIR.md](serveur/PUBLICITES-APPLIXIR.md). Le 12 octobre, l'override et le webhook global sont enregistrés en MD5 + TID ; le visionnage complet réel reste sans reçu signé accepté. [Diagnostic fournisseur](serveur/DIAGNOSTIC-PUBLICITES-2026-10-12.md).
 

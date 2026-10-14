@@ -1156,6 +1156,10 @@ export interface ReponseJeuneManager {
 export type ActionAcademieManager = 'u18' | 'espoirs' | 'pret' | 'senior' | 'liberer' | 'entrainement_senior';
 
 export interface Manager {
+  /** Ce que l'entraîneur impose à son adjoint quand celui-ci compose (`lib/adjointComposition.ts`). Absent : aucune consigne. */
+  consignesAdjoint?: import('./lib/adjointComposition').ConsignesAdjoint;
+  /** La politique que l'assistant sportif applique aux contrats (`lib/contratsAutomatiques.ts`). Absente : celle par défaut. */
+  politiqueContrats?: import('./lib/contratsAutomatiques').PolitiqueContrats;
   /** Snapshot réel épinglé et décisions de cette timeline ; les sources restent dans IndexedDB. */
   mondeJeunes?: import('./lib/mondeJeunes').MondeJeunesCarriere;
   jeunesSuivis?: Record<string, boolean>;

@@ -1,0 +1,85 @@
+/* Le rapport de l'adjoint (Correctif 41) : un carnet de vestiaire, pas un tableau de bord. */
+.rapport-adjoint { padding: 1rem 1.1rem 1.1rem; display: grid; gap: .8rem; }
+.ra-tete { display: flex; align-items: flex-start; justify-content: space-between; gap: .8rem; flex-wrap: wrap; }
+.ra-tete > div { display: grid; gap: .15rem; }
+.ra-tete b { display: inline-flex; align-items: center; gap: .45rem; font-family: var(--police-forte); letter-spacing: .01em; }
+.ra-tete small { color: var(--craie-dim); font-size: .74rem; }
+.ra-enjeu {
+  padding: .32rem .7rem; border-radius: var(--rayon-pilule); font-size: .7rem; font-family: var(--police-forte);
+  border: 1px solid var(--bordure-forte); color: var(--or-400); background: rgba(232, 178, 58, .08); white-space: nowrap;
+}
+.ra-enjeu-finale { color: #1a1206; background: linear-gradient(180deg, var(--or-400), var(--or-500)); border-color: transparent; }
+.ra-enjeu-decisif { color: #ffd9a8; border-color: rgba(179, 101, 58, .7); background: rgba(138, 75, 42, .28); }
+.ra-enjeu-mineur, .ra-enjeu-amical { color: var(--craie-dim); border-color: rgba(255, 255, 255, .14); background: rgba(255, 255, 255, .04); }
+
+.ra-actions { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: .7rem .9rem; }
+.ra-actions p { margin: 0; color: var(--craie-dim); font-size: .78rem; }
+.ra-bascule { display: inline-flex; align-items: center; gap: .5rem; cursor: pointer; font-size: .78rem; color: var(--craie); }
+.ra-bascule input { position: absolute; opacity: 0; pointer-events: none; }
+.ra-bascule span {
+  display: inline-flex; align-items: center; gap: .4rem; padding: .42rem .7rem; border-radius: var(--rayon-controle);
+  border: 1px solid rgba(255, 255, 255, .14); background: rgba(255, 255, 255, .03); transition: border-color .18s, background .18s, color .18s;
+}
+.ra-bascule input:checked + span { border-color: var(--pelouse-400); background: rgba(52, 163, 90, .16); color: #bff0cf; }
+.ra-bascule input:focus-visible + span { outline: 2px solid var(--or-400); outline-offset: 2px; }
+
+.ra-bloc { border-top: 1px solid rgba(255, 255, 255, .07); padding-top: .55rem; }
+.ra-bloc > summary {
+  list-style: none; cursor: pointer; display: flex; align-items: center; gap: .6rem; font-family: var(--police-forte);
+  font-size: .72rem; letter-spacing: .09em; text-transform: uppercase; color: var(--brume); padding: .2rem 0;
+}
+.ra-bloc > summary::-webkit-details-marker { display: none; }
+.ra-bloc > summary svg { margin-left: auto; transition: transform .2s; }
+.ra-bloc[open] > summary svg { transform: rotate(180deg); }
+.ra-bloc > summary em { font-style: normal; text-transform: none; letter-spacing: 0; color: var(--or-400); font-size: .72rem; }
+
+.ra-liste { list-style: none; margin: .45rem 0 0; padding: 0; display: grid; gap: .22rem; }
+.ra-ligne {
+  display: grid; grid-template-columns: 1.7rem minmax(8rem, 15rem) 3.6rem 4.2rem minmax(9rem, 1fr); align-items: center; gap: .6rem;
+  padding: .38rem .55rem; border-radius: 9px; background: rgba(255, 255, 255, .022); border: 1px solid transparent; font-size: .8rem;
+}
+.ra-numero { display: grid; place-items: center; width: 1.6rem; height: 1.6rem; border-radius: 50%; font-family: var(--police-forte); font-size: .7rem; color: var(--craie-dim); background: rgba(0, 0, 0, .28); }
+.ra-qui { display: grid; min-width: 0; }
+.ra-qui b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
+.ra-qui small { color: var(--brume); font-size: .68rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ra-notes { display: inline-flex; align-items: baseline; gap: .3rem; font-family: var(--police-forte); }
+.ra-notes i { font-style: normal; font-size: .7rem; color: var(--or-400); }
+.ra-condition { display: inline-flex; align-items: center; gap: .25rem; font-size: .72rem; color: var(--craie-dim); }
+.ra-condition.basse { color: #ffb0a3; }
+.ra-raison { color: var(--craie-dim); font-size: .76rem; }
+.ra-ligne.ra-consigne { border-color: rgba(232, 178, 58, .3); }
+.ra-ligne.ra-consigne .ra-raison { color: var(--or-400); }
+.ra-ligne.ra-rotation .ra-raison, .ra-ligne.ra-jeune .ra-raison { color: #bff0cf; }
+.ra-ligne.ra-depannage .ra-raison { color: #ffb0a3; }
+.ra-ecartes .ra-ligne { background: transparent; border-color: rgba(255, 255, 255, .06); }
+.ra-ecart-repos .ra-raison { color: #bff0cf; }
+
+.ra-aide { margin: .45rem 0 0; color: var(--craie-dim); font-size: .76rem; }
+.ra-recherche { display: flex; align-items: center; gap: .5rem; margin-top: .55rem; padding: .45rem .65rem; border-radius: var(--rayon-controle); border: 1px solid rgba(255, 255, 255, .12); background: rgba(0, 0, 0, .22); color: var(--brume); }
+.ra-recherche input { flex: 1; min-width: 0; border: 0; background: none; color: var(--craie); font: inherit; font-size: .82rem; outline: none; }
+.ra-liste-consignes { max-height: 19rem; overflow-y: auto; padding-right: .2rem; }
+.ra-liste-consignes .ra-ligne { grid-template-columns: 1.7rem minmax(8rem, 15rem) 2.4rem 1fr; }
+.ra-liste-consignes .ra-choix { justify-self: end; }
+.ra-liste-consignes .ra-ligne.posee { border-color: rgba(232, 178, 58, .3); background: rgba(232, 178, 58, .05); }
+.ra-choix { display: inline-flex; border: 1px solid rgba(255, 255, 255, .13); border-radius: 9px; overflow: hidden; }
+.ra-choix button { display: grid; place-items: center; width: 2.4rem; height: 2.1rem; border: 0; background: transparent; color: var(--brume); cursor: pointer; transition: background .15s, color .15s; }
+.ra-choix button + button { border-left: 1px solid rgba(255, 255, 255, .1); }
+.ra-choix button:hover { color: var(--craie); background: rgba(255, 255, 255, .05); }
+.ra-choix button.actif { color: #1a1206; background: var(--or-500); }
+.ra-choix button:last-child.actif { color: #fff; background: #a8483c; }
+.ra-choix button:first-child.actif { color: var(--craie); background: rgba(255, 255, 255, .12); }
+.ra-choix button:focus-visible { outline: 2px solid var(--or-400); outline-offset: -2px; }
+.ra-legende { display: flex; flex-wrap: wrap; gap: .4rem 1rem; margin: .55rem 0 0; color: var(--brume); font-size: .7rem; }
+.ra-legende span { display: inline-flex; align-items: center; gap: .3rem; }
+
+@media (max-width: 760px) {
+  .ra-actions { grid-template-columns: 1fr; }
+  .ra-actions .btn { width: 100%; justify-content: center; }
+  .ra-ligne { grid-template-columns: 1.7rem minmax(0, 1fr) auto auto; row-gap: .15rem; }
+  .ra-ligne .ra-raison { grid-column: 2 / -1; }
+  .ra-liste-consignes .ra-ligne { grid-template-columns: 1.7rem minmax(0, 1fr) 2.2rem auto; }
+  .ra-choix button { width: 2.6rem; height: 2.5rem; }
+}
+@media (min-width: 1121px) {
+  .rapport-adjoint { padding: 1.15rem 1.3rem 1.25rem; }
+}

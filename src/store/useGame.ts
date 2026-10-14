@@ -220,6 +220,11 @@ import { nouerRelations, bonusVestiaire, meriteLeBrassard } from '../lib/vestiai
 import { evaluerResponsabilites, ligneDeJournal, responsabilitesInitiales } from '../lib/responsabilites';
 import { compositionMedicale, niveauMedical, CENTRES_MEDICAUX, evoluerSoin, dateMedicale } from '../lib/infirmerieManager';
 import { suivreConseil, bilanContrat, offreDeSecours } from '../lib/conseilManager';
+import { compositionDeLAdjoint } from '../lib/adjointManager';
+import {
+  politiqueContrats, reglerLesContrats, type OptionsContrats, type PolitiqueContrats, type ResultatContrat,
+} from '../lib/contratsAutomatiques';
+import { composerParLAdjoint, type ConsigneAdjoint } from '../lib/adjointComposition';
 import {
   afficheSure, contratsExpirants, diagnostiquerCloture, estSemaineDeCloture, prolongationsAcceptees, texteDiagnostic,
   tracerCloture, type RapportCloture, type VerrouCloture,
@@ -1087,6 +1092,15 @@ interface GameState {
   repondreSelectionManager: (accepter: boolean) => void;
   enregistrerMatchSelectionManager: (scorePour: number, scoreContre: number) => void;
   configurerDelegationManager: (domaine: DomaineDelegation, delegue: boolean) => void;
+  /** Consigne à l'adjoint sur un joueur : toujours titulaire, ne pas sélectionner, ou `null` pour le laisser juge. */
+  definirConsigneAdjointManager: (joueurId: string, consigne: ConsigneAdjoint | null) => void;
+  definirPrioriteJeunesAdjointManager: (actif: boolean) => void;
+  /** La politique que l'assistant sportif applique aux contrats du groupe. */
+  definirPolitiqueContratsManager: (politique: Partial<PolitiqueContrats>) => void;
+  /** L'assistant négocie les contrats qui demandent une décision ; rend ce qu'il a obtenu, dossier par dossier. */
+  reglerContratsManager: (options?: OptionsContrats) => ResultatContrat[];
+  /** L'entraîneur acte lui-même un départ en fin de contrat (ou revient dessus avec `false`). */
+  acterDepartContratManager: (joueurId: string, acte: boolean) => void;
   definirHierarchieCapitainesManager: (capitaineId: string, viceCapitaineId: string, troisiemeCapitaineId: string) => void;
   repondreDecisionStrategiqueManager: (decisionId: string, choixId: string) => void;
   /** Raccrocher : la carrière part au Hall et au classement. */
@@ -1374,6 +1388,12 @@ async function personnaliserReponseNegociation(pseudo: string, id: string, conte
  * LE RÉSULTAT D'UN MATCH QUE L'ENTRAÎNEUR NE JOUE PAS LUI-MÊME (avance déléguée, match en retard à la clôture).
  * Le même tirage que le monde simulé, pesé par les absents du groupe : rien d'autre qu'un match ordinaire.
  */
+/** La feuille d'un banc qu'on vient de prendre : celle de l'adjoint ; l'ancien choix poste par poste si le groupe est trop court. */
+function feuilleDeDepart(effectif: Coequipier[], indisponibles: ReadonlySet<string> = new Set()): CompositionManager {
+  const rapport = composerParLAdjoint(effectif, { indisponibles });
+  return rapport.complet ? rapport.composition : compositionManagerParDefaut(effectif, indisponibles);
+}
+
 function resultatDelegue(avant: Manager, affiche: AfficheComplete): ResultatMatchManager {
   const { domicile, exterieur } = affiche.match;
   const groupe = effectifDuClub(avant.club, avant.saison);
@@ -4011,7 +4031,7 @@ export const useGame = create<GameState>()(
           budgetStructure: budgets.structure,
           contrat: { saisons: 3, salaire: salaireManager(force) },
           decision: null,
-          composition: compositionManagerParDefaut(effectifDuClub(club, 1)),
+          composition: feuilleDeDepart(effectifDuClub(club, 1)),
           tactique: { ...TACTIQUE_MANAGER_DEFAUT },
           resultats: {},
           negociations: [],
@@ -4336,7 +4356,7 @@ export const useGame = create<GameState>()(
           budgetStructure: budgets.structure,
           contrat: { saisons: offre ? Math.max(2, Math.min(3, offre.duree)) : 3, salaire: offre?.salaire ?? salaireManager(force) },
           decision: null,
-          composition: compositionManagerParDefaut(effectifDuClub(club, m.saison), new Set(indisponiblesCarriereAvancee(m.avancee, m.semaine))),
+          composition: feuilleDeDepart(effectifDuClub(club, m.saison), new Set(indisponiblesCarriereAvancee(m.avancee, m.semaine))),
           tactique: { ...TACTIQUE_MANAGER_DEFAUT },
           negociations: m.negociations.map((n) => (
             n.etat === 'ouverte' || n.etat === 'accord' ? { ...n, etat: 'rompue' as const } : n
@@ -4651,6 +4671,52 @@ export const useGame = create<GameState>()(
         set({ manager: { ...m, avancee: enregistrerMatchSelectionAvance(m.avancee, m, scorePour, scoreContre) } });
       },
 
+      definirPolitiqueContratsManager: (politique) => {
+        const m = get().manager;
+        if (!m) return;
+        set({ manager: { ...m, politiqueContrats: { ...politiqueContrats(m), ...politique } } });
+      },
+      reglerContratsManager: (options = {}) => {
+        const m = get().manager;
+        if (!m?.club) return [];
+        const groupe = effectifDuClub(m.club, m.saison);
+        const avancee = assurerEtatCarriereAvancee(m, groupe);
+        const { manager, resultats } = reglerLesContrats({ ...m, avancee }, groupe, politiqueContrats(m), options);
+        if (!resultats.length) return resultats;
+        const signes = resultats.filter((r) => r.issue === 'signe');
+        const departs = resultats.filter((r) => r.issue === 'depart' || ((options.toutRegler || options.cloture) && (r.issue === 'echec' || r.issue === 'refus')));
+        const lignes = [
+          ...(signes.length ? [`Prolongés : ${signes.map((r) => `${r.nom} (${r.duree} an${(r.duree ?? 0) > 1 ? 's' : ''}${r.salaire ? `, ${nombre(r.salaire)} €` : ''})`).join(', ')}.`] : []),
+          ...(departs.length ? [`Laissés libres en fin de saison : ${departs.map((r) => r.nom).join(', ')}.`] : []),
+        ];
+        set((s) => ({
+          manager,
+          journal: lignes.length ? [...s.journal, { id: idUnique(), saison: m.saison, role: 'mj' as const,
+            titre: options.cloture ? 'Contrats · réglés par l’assistant à la clôture' : 'Contrats · gestion automatique',
+            texte: lignes.join(' ') }] : s.journal,
+        }));
+        return resultats;
+      },
+      acterDepartContratManager: (joueurId, acte) => {
+        const m = get().manager;
+        if (!m?.club) return;
+        const avancee = assurerEtatCarriereAvancee(m, effectifDuClub(m.club, m.saison));
+        const decisionsContrats = { ...(avancee.decisionsContrats ?? {}) };
+        if (acte) decisionsContrats[joueurId] = { saison: m.saison, decision: 'depart' }; else delete decisionsContrats[joueurId];
+        set({ manager: { ...m, avancee: { ...avancee, decisionsContrats } } });
+      },
+      definirConsigneAdjointManager: (joueurId, consigne) => {
+        const m = get().manager;
+        if (!m) return;
+        const joueurs = { ...(m.consignesAdjoint?.joueurs ?? {}) };
+        if (consigne) joueurs[joueurId] = consigne; else delete joueurs[joueurId];
+        set({ manager: { ...m, consignesAdjoint: { ...m.consignesAdjoint, joueurs } } });
+      },
+      definirPrioriteJeunesAdjointManager: (actif) => {
+        const m = get().manager;
+        if (!m) return;
+        set({ manager: { ...m, consignesAdjoint: { ...m.consignesAdjoint, prioriteJeunes: actif } } });
+      },
       configurerDelegationManager: (domaine, delegue) => {
         const m = get().manager;
         if (!m?.club || !m.avancee?.profonde) return;
@@ -4766,7 +4832,17 @@ export const useGame = create<GameState>()(
           // ⚠️ ET ON LIT L’ÉTAT NEUF, pas l’ancien : `avancee` et `suivante`
           //    portent les blessures qui viennent de tomber cette semaine.
           const absents = new Set(indisponiblesCarriereAvancee(avancee, suivante));
-          const composition = compositionMedicale(groupe, delegations.compositions ? undefined : m.composition, avancee.medical, absents);
+          // ⚠️ DÉLÉGUÉE, LA FEUILLE EST CELLE DE L'ADJOINT (Correctif 41) : note effective au poste, condition physique,
+          //    enjeu de l'affiche qui arrive, consignes de l'entraîneur. Elle repasse ensuite par le même contrôle
+          //    médical que la feuille de l'entraîneur.
+          let feuilleDeLAdjoint: CompositionManager | undefined;
+          if (delegations.compositions) {
+            try {
+              const prochain = { ...m, semaine: suivante, avancee };
+              feuilleDeLAdjoint = compositionDeLAdjoint(prochain, groupe, { avancee, semaine: suivante, affiche: afficheSure(prochain).affiche });
+            } catch { /* la feuille de la semaine d'avant est réconciliée ci-dessous */ }
+          }
+          const composition = compositionMedicale(groupe, feuilleDeLAdjoint ?? m.composition, avancee.medical, absents);
           // ⚠️ UNE APPROCHE QUI N'OUVRE PAS DE CONVERSATION N'EXISTE PAS. Elle
           // naît dans la couche pure (`avancerSemaineCarriereAvancee`), qui ne
           // connaît ni les messages ni les notifications : c'est ici, et
@@ -5678,6 +5754,13 @@ export const useGame = create<GameState>()(
         for (const n of prolongationsAcceptees(depart)) {
           tenter(`prolongation de ${n.joueur.nom}`, () => get().signerJoueurManager(n.id), () => undefined);
           if (get().manager?.negociations.find((x) => x.id === n.id)?.etat === 'signee') signees.push(n.joueur.nom);
+        }
+        // ═══ LES CONTRATS RESTÉS SANS DÉCISION (Correctif 41) ═════════════════
+        // Demande : « si un contrat reste sans décision à la clôture, le système automatique doit pouvoir le résoudre ».
+        // L'assistant sportif négocie pour ceux que la politique veut garder (budget et plafond salarial respectés) ;
+        // les autres vont au bout de leur contrat, comme avant. Désactivable dans la politique des contrats.
+        if (politiqueContrats(depart).cloture) {
+          tenter('contrats automatiques', () => { get().reglerContratsManager({ cloture: true, toutRegler: true }); }, () => undefined);
         }
         const m = get().manager ?? depart;
 

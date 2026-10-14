@@ -1,4 +1,6 @@
 import { catalogueAdmin } from './atelierCatalogue.js';
+import { rangerEnTrop } from './combinaisons.js';
+import { ajouterStats, STATS_VIDES, type RemonteeCombinaisons } from './marcheCombinaisons.js';
 import { packPropose } from '../presentationPacks.js';
 import { carteSeniorAutorisee, poolFfrCourant, sourceRetireeFfr } from './eligibiliteJoueurs.js';
 import { migrerCartesJeunesse } from './migrationJeunesse.js';
@@ -1272,9 +1274,38 @@ function lancerRencontre(etat: EtatCarriereEnLigne, r: RencontreCarriere, mainte
   });
 }
 
+/**
+ * Les combinaisons du match rejoignent leurs clubs (statistiques privées du cahier) et la file du marché (plans qui en
+ * viennent). Le détail est retiré du match : il n'a plus à voyager.
+ */
+function crediterCombinaisons(etat: EtatCarriereEnLigne, r: RencontreCarriere) {
+  const bilans = r.match?.combinaisons;
+  if (!bilans) return;
+  const lignes: RemonteeCombinaisons['lignes'] = [];
+  for (const cote of ['domicile', 'exterieur'] as const) {
+    const club = etat.clubs.find(c => c.id === r[cote]);
+    for (const b of bilans[cote] ?? []) {
+      if (club) {
+        const presents = new Set((club.strategie.combinaisons ?? []).map(p => p.id));
+        const stats = Object.fromEntries(Object.entries(club.statsCombinaisons ?? {}).filter(([id]) => presents.has(id)));
+        if (presents.has(b.id)) stats[b.id] = ajouterStats(stats[b.id] ?? STATS_VIDES, b.stats);
+        club.statsCombinaisons = stats;
+      }
+      if (b.publication && b.version) {
+        const ligne = lignes.find(l => l.publication === b.publication && l.version === b.version);
+        if (ligne) ligne.stats = { ...ajouterStats(ligne.stats, b.stats), matchs: 1 };
+        else lignes.push({ publication: b.publication, version: b.version, stats: { ...b.stats, matchs: 1 } });
+      }
+    }
+  }
+  if (lignes.length) etat.remonteesCombinaisons = [...(etat.remonteesCombinaisons ?? []), { match: `${etat.id}:${r.id}`, lignes }].slice(-40);
+  delete r.match!.combinaisons;
+}
+
 function enregistrerResultat(etat: EtatCarriereEnLigne, r: RencontreCarriere, maintenant: number, graine: string) {
   if (r.resultat || !r.match?.termine) return;
   const m = r.match;
+  crediterCombinaisons(etat, r);
   r.resultat = { pointsD: m.score.domicile, pointsE: m.score.exterieur, essaisD: m.essais.domicile, essaisE: m.essais.exterieur, penalitesD: m.penalites.domicile, penalitesE: m.penalites.exterieur, joueLe: dateServeur(maintenant), origine: m.debut >= Date.parse(r.ferme) ? 'absence' : 'direct' };
 
   if (estMatchElimination(etat, r)) {
@@ -1692,6 +1723,9 @@ export function agirCarriere(etat: EtatCarriereEnLigne, compteId: string, comman
       // fonction que le match en direct, donc un seul endroit décide.
       case 'strategie': {
         club.strategie = strategieValide(commande.strategie);
+        // Les emplacements tactiques : ce qui dépasse est rangé à l'ENREGISTREMENT. ⚠️ Pas dans `strategieValide`, que les
+        // rejoues de match relisent — un cahier gelé d'avant la règle garderait sinon d'autres plans à la rejoue.
+        if (club.strategie.combinaisons?.length) club.strategie.combinaisons = rangerEnTrop(club.strategie.combinaisons);
         if (accesCombinaisonsBeta) for (const r of nouveau.rencontres) {
           if (!r.match || r.resultat || ![r.domicile, r.exterieur].includes(club.id)) continue;
           r.match = actualiserCahierMatchEnLigne(r.match, club.id, {
@@ -2119,12 +2153,12 @@ export function operationMarcheCarriere(etat: EtatCarriereEnLigne, op: Operation
  * Un écran d'avant ne le demande pas et reçoit tout, comme avant.
  */
 function construireVueCarriere(etat: EtatCarriereEnLigne, club?: ClubCarriere, leger = false): VueCarriereEnLigne {
-  const { packsPubReserves: _packsPubReserves, graine: _secret, migrationsFfr: _migrationsFfr, clubs: _clubs, cartes: _cartes, rencontres: _rencontres, objectifs: _objectifs, transactions: _transactions, echanges: _echanges, ...publics } = etat;
+  const { packsPubReserves: _packsPubReserves, remonteesCombinaisons: _remontees, graine: _secret, migrationsFfr: _migrationsFfr, clubs: _clubs, cartes: _cartes, rencontres: _rencontres, objectifs: _objectifs, transactions: _transactions, echanges: _echanges, ...publics } = etat;
   return copier({ ...publics, packsActifs: packsActifsLigue(etat), monClubId: club?.id ?? '', observateur: club ? undefined : true,
     competitions: etat.competitions.map(c => c.format === 'poules' && c.poules
       ? { ...c, classementsPoules: c.poules.map(poule => classementCompetition(etat, c.id, poule, c.journeesRegulieres)) }
       : c),
-    clubs: etat.clubs.map(c => { const { compteId: _compte, composition, strategie, compositionsSauvegardees, packsGratuits, packsGratuitsProgrammes: _programmes, dernierLotPacksGratuits, buteurManuel: _buteurManuel, ...reste } = c; return c.id === club?.id ? { ...reste, composition, strategie, compositionsSauvegardees, packsGratuits, dernierLotPacksGratuits } : reste; }),
+    clubs: etat.clubs.map(c => { const { compteId: _compte, composition, strategie, statsCombinaisons, compositionsSauvegardees, packsGratuits, packsGratuitsProgrammes: _programmes, dernierLotPacksGratuits, buteurManuel: _buteurManuel, ...reste } = c; return c.id === club?.id ? { ...reste, composition, strategie, ...(statsCombinaisons ? { statsCombinaisons } : {}), compositionsSauvegardees, packsGratuits, dernierLotPacksGratuits } : reste; }),
     cartes: etat.cartes.filter(c => c.proprietaire !== null && !c.retiree && carteSeniorAutorisee(c, etat.playerPool ?? 'men')),
     rencontres: etat.rencontres.map(r => { const { match, ...reste } = r; return match ? { ...reste, match: leger && match.termine ? resumeMatchEnLigne(match) : vueMatchEnLigne(match, club?.id ?? '') } : reste; }),
     objectifs: club ? etat.objectifs.filter(o => o.clubId === club.id) : [],

@@ -108,6 +108,29 @@ export function validerConfigPublicites(v: unknown): ConfigPublicites {
   sortie.rewardedAdOvasAmount = entier(p.rewardedAdOvasAmount,1,10000);
   sortie.ovasDailyLimit = entier(p.ovasDailyLimit,0,20);
   sortie.packsDailyLimit = entier(p.packsDailyLimit,0,2);
+  // ── Correctif 42 : les trois usages ajoutés. Un Labo d'avant ne les envoie pas : les valeurs du jeu restent.
+  const booleen = (cle: 'leagueFallbackEnabled' | 'premiumEnabled' | 'cosmeticsEnabled') => {
+    if (p[cle] === undefined) return;
+    if (typeof p[cle] !== 'boolean') refuser('Activation publicitaire invalide.');
+    sortie[cle] = p[cle] as boolean;
+  };
+  booleen('leagueFallbackEnabled'); booleen('premiumEnabled'); booleen('cosmeticsEnabled');
+  // Cinq packs Premium par jour au plus : c'est le plafond du jeu, le Labo ne peut que le baisser.
+  if (p.premiumDailyLimit !== undefined) sortie.premiumDailyLimit = entier(p.premiumDailyLimit,0,5);
+  if (p.premiumPacks !== undefined) {
+    const poids = Object.entries(objet(p.premiumPacks));
+    if (poids.length > 200) refuser('Trop de packs Premium.');
+    sortie.premiumPacks = Object.fromEntries(poids.map(([id, valeur]) => [texte(id,80), nombre(valeur,0,1000000)]));
+  }
+  if (p.cosmetiques !== undefined) {
+    const reglages = Object.entries(objet(p.cosmetiques));
+    if (reglages.length > 200) refuser('Trop de cosmétiques publicitaires.');
+    sortie.cosmetiques = Object.fromEntries(reglages.map(([id, valeur]) => {
+      const r = objet(valeur);
+      if (typeof r.actif !== 'boolean') refuser('Activation du cosmétique invalide.');
+      return [texte(id,80), { actif: r.actif as boolean, requis: entier(r.requis,1,20), limiteJour: entier(r.limiteJour,1,10) }];
+    }));
+  }
   return sortie;
 }
 const COULEUR = /^#[0-9a-fA-F]{6}$/;

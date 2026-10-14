@@ -26,6 +26,7 @@ import { actualiserSelectionEquipe, aidePlacementEquipe, choisirOptionNeuf, cibl
 import { t as traduire } from '../i18n.js';
 import type { Coequipier } from '../effectif.js';
 import { cibleCourseCombinaison, combinaisonSituation, demarrerCombinaison, joueurCombinaison, lancerAppelsCombinaison, pointSurTerrain, preparerCombinaison } from './combinaisons.js';
+import { cahierVivant, lireCondition, optionsDeLEtape, suivreCombinaison } from './lectureCombinaison.js';
 import type { PlanAttaqueManager, PosteId, TactiqueManager } from '../../types.js';
 import { POSTE_PAR_ID } from '../../data/rugby.js';
 import {
@@ -445,6 +446,8 @@ export interface OptionsMatch {
   vent?: Vent | null;
   /** Niveau de l'IA de jeu (2 : IA par poste) : voir `EtatMatch.ia`. */
   ia?: number;
+  /** Le cahier vivant (options lues, touche enrichie, mémoire tactique) : voir `EtatMatch.cahierVivant`. */
+  cahierVivant?: boolean;
   /**
    * Les responsabilités (Correctif 17) : capitaine, buteur, lanceur, engagement, drop. Absent : le
    * moteur rejoue à l'identique. Voir `responsabilites.ts`.
@@ -618,6 +621,7 @@ export function creerMatch(
     placementJoue: options.placementJoue,
     resserrement: options.resserrement,
     ia: options.ia,
+    ...(options.cahierVivant ? { cahierVivant: true } : {}),
     // Le vent : seulement avec l'IA par poste, et tiré à part des tirages du match.
     ...((options.ia ?? 1) >= 2 && options.vent !== null ? ventDuMatch(options.vent ?? creerVent(cle)) : {}),
     styles: options.cadenceDetaillee || (options.ia ?? 1) >= 2 ? { A: styleDuClub(clubA), B: styleDuClub(clubB) } : undefined,
@@ -688,6 +692,8 @@ export function avancer(e: EtatMatch, secondesSimulees: number): void {
     if (e.controleEquipe?.actif) actualiserSelectionEquipe(e);
     jouerSortieEquipe(e);
     tick(e);
+    // Cahier vivant : ce que la combinaison en cours a donné (observation seule).
+    if (e.suiviCombinaison) suivreCombinaison(e);
     // Le pilotage direct : ce que l'écran et la scène lisent (peut-il conduire, que peut-il jouer).
     if (e.direct?.actif) majVueDirecte(e);
     // Le botteur peut encore reculer pendant le vol. Réajuster le repli à sa
@@ -3914,6 +3920,26 @@ function executerCombinaison(e: EtatMatch, porteur: Pion, pression: number): boo
     c.courses[action.numero] = action.destination;
     suivante();
     return true;
+  }
+  // ── CAHIER VIVANT : avant de jouer le geste prévu, le porteur lit ce que son cahier lui a dit de regarder ──────────
+  // Une lecture par étape, après un temps de regard (0,3 s). La première option vraie ET jouable l'emporte : il joue sa
+  // réponse, et la combinaison s'arrête là — le jeu libre reprend avec ce qu'il a créé.
+  if (cahierVivant(e) && c.variante.options?.length && (c.lue ?? -1) < c.index && e.sim - c.depuis >= .3) {
+    c.lue = c.index;
+    const prevu = action.type === 'passe' ? joueurCombinaison(e, c.cote, action.destinataire) : undefined;
+    for (const option of optionsDeLEtape(c)) {
+      const r = option.reponse;
+      const cible = r.type === 'passe' ? joueurCombinaison(e, c.cote, r.destinataire) : undefined;
+      if (r.type === 'passe' && (!cible || cible === porteur || (cible.pos.x - porteur.pos.x) * sens(porteur.cote) > .4 || distance(porteur.pos, cible.pos) > 28)) continue;
+      if (!lireCondition(e, c, porteur, option.condition, prevu, cible)) continue;
+      if (e.suiviCombinaison) e.suiviCombinaison.option = option.condition;
+      e.combinaisonEnCours = undefined;
+      e.lancement = null;
+      if (r.type === 'passe') { passerLeBallon(e, porteur, cible!, pression); return true; }
+      if (r.type === 'pied') { taperAuPied(e, porteur, r.intention); return true; }
+      // « Garder » : il attaque ce qu'il voit — la suite appartient au jeu.
+      return false;
+    }
   }
   if (action.type === 'course') {
     if (distance(porteur.pos, pointSurTerrain(c, action.destination)) < 1.5 || e.sim - c.depuis > 4) suivante();
@@ -7599,12 +7625,16 @@ function conclureLaTouche(e: EtatMatch): void {
   const style = e.cadenceDetaillee ? e.styles?.[cote] : undefined;
   const goutDuMaul = style === 'avants' ? 1.35 : style === 'large' || style === 'leurres' ? 0.7 : 1;
   const maulAnnonce = iaParPoste(e) && !horsAlignement ? sortie === 'maul' : null;
-  if (!e.combinaisonPreparee && (maulAnnonce ?? e.rng() < (pres ? .62 : .18) * goutDuMaul)) {
+  // Cahier vivant : le plan du club demande un maul. Il se forme sans tirage de plus, et la combinaison reste prête —
+  // elle reprendra au geste de celui qui tiendra le ballon à sa sortie (`demarrerCombinaison`).
+  const maulDuCahier = cahierVivant(e) && !horsAlignement && !!e.combinaisonPreparee?.variante.touche?.maul && e.combinaisonPreparee.cote === cote;
+  if (maulDuCahier || (!e.combinaisonPreparee && (maulAnnonce ?? e.rng() < (pres ? .62 : .18) * goutDuMaul))) {
     e.phase = 'maul';
     e.minuteur = 6 + e.rng() * 3;
     e.porteur = null;
     e.ballon = { x: sauteur.pos.x, y: sauteur.pos.y };
     e.maul = { receveurId: sauteur.id, debut: e.sim };
+    if (maulDuCahier) { e.maul.suite = 'maul-sortie'; e.maul.suiteA = e.sim + 2.7; }
     // Niveau 6 : le maul qui n'est qu'un temps de la combinaison — il démarre, avance, puis le ballon ressort ou l'on contourne.
     if (suite === 'maul-sortie' || suite === 'maul-peel') { e.maul.suite = suite; e.maul.suiteA = e.sim + 2.7; }
     dire(e, 'maul', cote, C.phrase(e.rng, C.MAUL, { club: nomClub(e, cote) }));

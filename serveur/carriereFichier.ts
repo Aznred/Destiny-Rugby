@@ -50,7 +50,10 @@ interface BaseLocale {
   /** « Mon image » : la même table que la base, en mémoire. */
   demandesImage?: (DemandeImage & { compte: string })[];
   demandesCartes?: (DemandeCarte & { compte: string })[];
+  /** Le marché des combinaisons : la même table que la base, en mémoire. */
+  combinaisonsPubliees?: { fiche: import('../src/lib/ligue/marcheCombinaisons.js').FichePubliee; revision: number }[];
 }
+import { marcheCombinaisonsMemoire } from './marcheCombinaisons.js';
 import { DEMANDES_EN_ATTENTE_MAX, type DemandeImage } from '../src/lib/demandesImage.js';
 export function stockageFichier(fichier: string): StockageCarriere {
   mkdirSync(dirname(fichier), { recursive: true });
@@ -110,6 +113,13 @@ export function stockageFichier(fichier: string): StockageCarriere {
         }
         sauver(); return true;
       },
+      async octroyerCosmetique(compte, article) {
+        const coffre = base.boutiques?.[compte];
+        if (!coffre) return false;
+        coffre.achatsEquipements = [...new Set([...(coffre.achatsEquipements ?? []), article])];
+        coffre.equipements = [...new Set([...(coffre.equipements ?? []), article])];
+        sauver(); return true;
+      },
       async refus() {
         const registres = Object.values(base.publicites ?? {});
         return { total: registres.reduce((n, r) => n + (r.stats.callbacksRefuses ?? 0), 0),
@@ -123,6 +133,7 @@ export function stockageFichier(fichier: string): StockageCarriere {
           if (r.stats.completed) stats.joueurs++;
           for (const [id,n] of Object.entries(r.stats.distribution)) stats.distribution[id] = (stats.distribution[id] ?? 0) + n;
           for (const [id,n] of Object.entries(r.stats.distributionAttendue ?? {})) stats.distributionAttendue![id] = (stats.distributionAttendue![id] ?? 0) + n;
+          for (const [cle,n] of Object.entries(r.stats.contextes ?? {})) (stats.contextes ??= {})[cle] = (stats.contextes[cle] ?? 0) + n;
         }
         return stats;
       },
@@ -230,6 +241,7 @@ export function stockageFichier(fichier: string): StockageCarriere {
         return (base.demandesImage ?? []).filter(d => d.statut === 'acceptee').map(d => ({ id: d.id, type: d.type, joueur: d.joueur, decideLe: d.decideLe }));
       },
     },
+    marcheCombinaisons: marcheCombinaisonsMemoire(base.combinaisonsPubliees ??= [], () => sauver()),
     joueurs: joueursLocaux(undefined, () => base.comptes.find(c => c.identifiant === 'kiri')?.id),
     async snapshotFfr(l,migration) {
       const directory=dirname(fichier)+'/snapshots-ffr';mkdirSync(directory,{recursive:true});

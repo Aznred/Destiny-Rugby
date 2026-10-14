@@ -1,4 +1,5 @@
 import { momentsDepuisFil } from './momentsForts.js';
+import { ajouterStats, statsDUnBilan, STATS_VIDES, type StatsCombinaison } from './marcheCombinaisons.js';
 import { exclusionsDepuisEtat, type ExclusionTV } from '../habillageTV.js';
 // LE MATCH DE LA CARRIÈRE EN LIGNE — 80 minutes de rugby arbitrées par le serveur
 //
@@ -507,6 +508,8 @@ export interface ParametresCreationMatch {
 
 export type Paire = Record<CoteEnLigne, number>;
 
+/** Ce qu'un plan du cahier a donné dans un match : ses compteurs, et d'où il vient s'il sort du marché. */
+export interface BilanPlanMatch { id: string; publication?: string; version?: number; stats: StatsCombinaison }
 export interface EtatMatchEnLigne {
   departage?: DrawResolution;
   /** Issue décidée par le terrain, conservée après l'archivage des équipes. */
@@ -544,6 +547,11 @@ export interface EtatMatchEnLigne {
   stats: Record<CoteEnLigne, StatsEquipeMatch>;
   feuille?: LigneFeuilleMatch[];
   /**
+   * Cahier vivant (règles 11) : ce que les combinaisons de chaque camp ont donné, relevé à la sirène. ⚠️ PRIVÉ : la vue
+   * d'une ligue ne le montre jamais (il dirait le cahier de l'adversaire) ; la ligue en crédite le club, puis le marché.
+   */
+  combinaisons?: Partial<Record<CoteEnLigne, BilanPlanMatch[]>>;
+  /**
    * Les règles du moteur pour CETTE rencontre, gelées au coup d'envoi.
    *
    * ⚠️ UN MATCH SE REJOUE AVEC LES RÈGLES QUI L'ONT VU NAÎTRE. Absent (ou 1) :
@@ -576,7 +584,11 @@ export interface EtatMatchEnLigne {
 // minutes (`npm run mesure:rugby -- 72 ligue 7` puis `8`) : 80,1 → 81,3 points, 10,9 → 11,1 essais, 30,3 → 29,7 pénalités,
 // 77,5 → 80,2 coups de pied dans le jeu, durée 81,2 → 81,1 min — dans le bruit. Un match créé avant garde ses règles ;
 // revenir en arrière = remettre 9. ⚠️ À METTRE EN LIGNE QUAND AUCUN MATCH NE SE JOUE.
-export const REGLES_MATCH_EN_LIGNE = 10;
+// Règles 11 (Correctif 41) : le cahier vivant (`cahierVivant` du moteur) — options conditionnelles d'une combinaison, double
+// faux saut, changement de bloc et maul en touche, mémoire tactique, bilan de chaque combinaison jouée. Même IA (niveau 8) :
+// un match sans cahier se joue exactement comme en règles 10 (empreinte du moteur inchangée). Un match créé avant garde ses
+// règles ; revenir en arrière = remettre 10. ⚠️ À METTRE EN LIGNE QUAND AUCUN MATCH NE SE JOUE.
+export const REGLES_MATCH_EN_LIGNE = 11;
 /**
  * Défense resserrée des règles 2 : la cadence détaillée marque davantage, ce
  * réglage ramène le nombre d'essais à celui des matchs de ligue d'avant
@@ -991,35 +1003,49 @@ function appliquerAuMoteur(e: EtatMatch, a: Annexe, ev: EvenementMatchEnLigne): 
   }
 }
 
+/**
+ * CE QUE LES RÈGLES D'UN MATCH DE LIGUE DEMANDENT AU MOTEUR : cadence, placement joué, niveau d'IA, sirène, pénaltouche.
+ *
+ * ⚠️ UNE SEULE DÉFINITION, LUE PAR LE MATCH ET PAR L'ATELIER DE COMBINAISONS (Correctif 41, point 2 : « le preview ne doit
+ * surtout pas être une animation différente »). L'exercice de l'éditeur montait le moteur d'origine (règles 1) alors que
+ * les matchs se jouent en règles 10 : une combinaison réglée dans l'atelier ne se jouait pas pareil en rencontre.
+ */
+export function optionsMoteurDesRegles(regles: number | undefined = REGLES_MATCH_EN_LIGNE) {
+  const regles2 = (regles ?? 1) >= 2;
+  const niveauIA = iaDesRegles(regles);
+  return {
+    // ⚠️ LE CŒUR DU DIRECT. Les déplacements restent à vitesse naturelle et
+    // chaque arrêt utilise sa durée directe, courte mais lisible.
+    tempsReel: true,
+    scoreSurTerrain: true,
+    reglesSirene: (regles ?? 1) >= 6 ? 'transformation' as const : 'historique' as const,
+    // ⚠️ UN MATCH COMMENCÉ AVANT LES RÈGLES 8 SE REJOUE AVEC SA PÉNALTOUCHE D'ORIGINE : sinon le lancer d'une touche
+    // déjà jouée changerait de camp à la rejoue, et le score annoncé avec lui.
+    ...((regles ?? 1) < 8 ? { reglesPenaltouche: 'historique' as const } : {}),
+    ...((regles ?? 1) >= 11 ? { cahierVivant: true } : {}),
+    // Règles 2 : voir `EtatMatchEnLigne.regles`.
+    cadenceDetaillee: regles2, placementJoue: regles2,
+    resserrement: regles2 ? RESSERREMENT_REGLES_2 : undefined,
+    // Règles 3 : l'IA par poste. Le niveau est figé avec la règle du match.
+    ...(niveauIA ? { ia: niveauIA } : {}),
+  };
+}
+
 function monter(etat: EtatMatchEnLigne): EntreeCacheMoteur {
   const equipes = etat.equipes;
   if (!equipes) throw new Error('Ce match est terminé : ses feuilles ont été archivées.');
   const strategieD = strategieA(etat, 'domicile', 0);
   const strategieE = strategieA(etat, 'exterieur', 0);
-  const regles2 = (etat.regles ?? 1) >= 2;
-  const niveauIA = iaDesRegles(etat.regles);
   const e = creerMatch(
     equipes.domicile.nom, equipes.exterieur.nom,
     equipes.domicile.feuille, equipes.exterieur.feuille,
     etat.cibles.domicile, etat.cibles.exterieur, etat.cle, undefined,
     {
       rng: rngReprenable(`match#${etat.cle}`),
-      // ⚠️ LE CŒUR DU DIRECT. Les déplacements restent à vitesse naturelle et
-      // chaque arrêt utilise sa durée directe, courte mais lisible.
-      tempsReel: true,
-      scoreSurTerrain: true,
-      reglesSirene: (etat.regles ?? 1) >= 6 ? 'transformation' : 'historique',
-      // ⚠️ UN MATCH COMMENCÉ AVANT LES RÈGLES 8 SE REJOUE AVEC SA PÉNALTOUCHE D'ORIGINE : sinon le lancer d'une touche
-      // déjà jouée changerait de camp à la rejoue, et le score annoncé avec lui.
-      ...((etat.regles ?? 1) < 8 ? { reglesPenaltouche: 'historique' as const } : {}),
+      ...optionsMoteurDesRegles(etat.regles ?? 1),
       ...((etat.regles ?? 1) >= 6 && etat.departage?.extraTime ? {
         departage: { ...etat.departage.extraTime, criteres: etat.departage.thenCompetitionSpecificTiebreak },
       } : {}),
-      // Règles 2 : voir `EtatMatchEnLigne.regles`.
-      cadenceDetaillee: regles2, placementJoue: regles2,
-      resserrement: regles2 ? RESSERREMENT_REGLES_2 : undefined,
-      // Règles 3 : l'IA par poste. Le niveau est figé avec la règle du match.
-      ...(niveauIA ? { ia: niveauIA } : {}),
       compositionA: equipes.domicile.feuille, compositionB: equipes.exterieur.feuille,
       tactiqueA: tactiqueDepuisStrategie(strategieD), tactiqueB: tactiqueDepuisStrategie(strategieE),
       capitaineAId: equipes.domicile.capitaineId, capitaineBId: equipes.exterieur.capitaineId,
@@ -1589,6 +1615,16 @@ function clore(etat: EtatMatchEnLigne, e: EtatMatch): void {
   };
   etat.termine = true;
   etat.feuille = extraireFeuille(e);
+  if (e.bilansCombinaisons?.length) {
+    const parCote: Partial<Record<CoteEnLigne, BilanPlanMatch[]>> = {};
+    for (const b of e.bilansCombinaisons) {
+      const liste = (parCote[MOTEUR_VERS_COTE[b.cote]] ??= []);
+      let ligne = liste.find((l) => l.id === b.id);
+      if (!ligne) liste.push(ligne = { id: b.id, ...(b.publication && b.version ? { publication: b.publication, version: b.version } : {}), stats: { ...STATS_VIDES, matchs: 1 } });
+      ligne.stats = ajouterStats(ligne.stats, statsDUnBilan(b));
+    }
+    etat.combinaisons = parCote;
+  }
   delete etat.decision;
   delete etat.equipes;
   etat.journal = [];

@@ -18,7 +18,10 @@ import {
 import { TRAITS_A_DEBLOQUER, descriptionTrait, nomTrait } from '../data/traits';
 import { nombre, t, texteTraduit } from '../lib/i18n';
 import { BoutonDeblocageParPub } from '../components/Pub';
-import { CarteOvasGratuits } from '../components/PublicitesRecompensees';
+import { CarteOvasGratuits, DeblocageCosmetiqueParPub, OffrePublicitaire } from '../components/PublicitesRecompensees';
+import { chargerPublicites, type CosmetiquePubRecu } from '../lib/rewardedAdsService';
+import type { VuePublicites } from '../lib/publicitesRecompensees';
+import { deposerPackPremium } from '../lib/packPremiumPub';
 import { ApercuJoueur3D } from '../components/ApercuJoueur3D';
 import { MiniatureArticle, PastilleRarete, PrixBoutons } from '../components/CartesCosmetiques';
 import { SoldesMonnaies } from '../components/SoldesMonnaies';
@@ -64,7 +67,23 @@ export function Boutique() {
   const traitsDebloques = useGame((s) => s.traitsDebloques);
   const acheterCosmetique = useGame((s) => s.acheterCosmetique);
   const debloquerTrait = useGame((s) => s.debloquerTrait);
+  const octroyerCosmetique = useGame((s) => s.octroyerCosmetique);
   const setEcran = useGame((s) => s.setEcran);
+  // ── Les cosmétiques qui se débloquent par publicité (Correctif 42) : c'est le Labo qui dit lesquels, et combien.
+  const [pubs, setPubs] = useState<VuePublicites | null>(null);
+  const [filtrePub, setFiltrePub] = useState(false);
+  useEffect(() => {
+    let vivant = true;
+    const lire = () => { void chargerPublicites().then((v) => { if (vivant) setPubs(v); }).catch(() => { /* sans compte, la boutique reste entière */ }); };
+    lire();
+    window.addEventListener('destiny:publicites', lire);
+    return () => { vivant = false; window.removeEventListener('destiny:publicites', lire); };
+  }, []);
+  const parPublicite = (a: ArticleEquipement) => !!pubs?.config.cosmeticsEnabled && !!pubs.config.cosmetiques?.[a.id]?.actif;
+  /** Le serveur a compté une publicité : s'il a débloqué l'objet, il entre dans l'inventaire de cet appareil. */
+  const cosmetiqueRecu = (etat: CosmetiquePubRecu, nom: string) => {
+    if (etat.debloque && octroyerCosmetique(etat.id, 'pub')) message(t('bo.debloque', { article: texteTraduit(nom) }));
+  };
   const maintenant = Date.now();
 
   const message = (m: string) => { setFlash(m); setTimeout(() => setFlash(null), 2600); };
@@ -116,10 +135,16 @@ export function Boutique() {
         ) : a.parPub ? (
           <>
             <div className="article-detail etiquette-pub"><Icone nom="video" taille={14} /> {t('pub.gratuitPub')}</div>
-            <BoutonDeblocageParPub id={a.id} onDebloque={() => message(t('bo.debloque', { article: texteTraduit(a.nom) }))} />
+            {parPublicite(a)
+              ? <DeblocageCosmetiqueParPub article={a.id} possede={mien} onCosmetique={(etat) => cosmetiqueRecu(etat, a.nom)} />
+              : <BoutonDeblocageParPub id={a.id} />}
           </>
         ) : (
-          <PrixBoutons prix={prix} onAcheter={(d) => void acheter(a.id, a.nom, prix, d)} />
+          <>
+            <PrixBoutons prix={prix} onAcheter={(d) => void acheter(a.id, a.nom, prix, d)} />
+            {/* Un article en vente que le Labo ouvre AUSSI à la publicité : les deux chemins se lisent côte à côte. */}
+            {parPublicite(a) && <DeblocageCosmetiqueParPub article={a.id} possede={mien} onCosmetique={(etat) => cosmetiqueRecu(etat, a.nom)} />}
+          </>
         )}
       </div>
     );
@@ -160,17 +185,24 @@ export function Boutique() {
       </div>
 
       <CarteOvasGratuits />
+      {/* Le pack Premium gagné s'ouvre dans la Collection, là où vivent le catalogue et l'ouverture des packs solo. */}
+      <OffrePublicitaire contexte="SHOP_PREMIUM_PACK" onPack={async (rewardSessionId) => { deposerPackPremium(rewardSessionId); setEcran('collectionSolo'); }} />
 
       {flash && <div className="flash-boutique" role="status">{flash}</div>}
 
       <div className="bo-rayons" role="tablist" aria-label={t('bo.rayons')}>
         {RAYONS.map((r) => (
-          <button key={r.id} type="button" role="tab" aria-selected={rayon === r.id} className={rayon === r.id ? 'actif' : undefined}
+          <button key={r.id} type="button" role="tab" aria-selected={!filtrePub && rayon === r.id} className={!filtrePub && rayon === r.id ? 'actif' : undefined}
             // « Packs » ouvre la roue d'origine (collection) : la boutique de packs garde son affichage, avec ses deux monnaies.
-            onClick={() => (r.id === 'packs' ? setEcran('collectionSolo') : setRayon(r.id))} data-tuto={`bo-rayon-${r.id}`}>
+            onClick={() => { if (r.id === 'packs') setEcran('collectionSolo'); else { setFiltrePub(false); setRayon(r.id); } }} data-tuto={`bo-rayon-${r.id}`}>
             {t(r.cle)}
           </button>
         ))}
+        {EQUIPEMENTS.some(parPublicite) && (
+          <button type="button" role="tab" aria-selected={filtrePub} className={filtrePub ? 'actif bo-filtre-pub' : 'bo-filtre-pub'} onClick={() => setFiltrePub((f) => !f)}>
+            <Icone nom="video" taille={15} /> Récompenses Pub
+          </button>
+        )}
         <button type="button" className="bo-perso" onClick={() => ouvrirPersonnalisation('joueur')}><Icone nom="reglages" taille={16} /> {t('bo.mesCosmetiques')}</button>
       </div>
 
@@ -196,7 +228,12 @@ export function Boutique() {
               </div>
             )}
 
-            {rayon === 'joueur' ? (
+            {filtrePub ? (
+              // Tout ce qui s'obtient en regardant des publicités, tous rayons confondus.
+              <div className="grille-boutique">
+                {EQUIPEMENTS.filter(parPublicite).map(carte)}
+              </div>
+            ) : rayon === 'joueur' ? (
               <>
                 {(['crampons', 'casque', 'sac', 'bouclier'] as const).map((cat) => {
                   const liste = articlesDuRayon('joueur').filter((x) => x.categorie === cat);

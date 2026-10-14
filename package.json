@@ -5,6 +5,9 @@
   "type": "module",
   "scripts": {
     "verify:correctif36": "vite-node scripts/verifierCorrectif36.ts",
+    "verify:correctif41": "vite-node scripts/verifierCorrectif41.ts",
+    "verify:correctif42": "vite-node scripts/verifierCorrectif42.ts",
+    "verify:combinaisons41": "vite-node scripts/verifierCombinaisons41.ts",
     "verify:correctif37": "vite-node scripts/verifierCorrectif37.ts",
     "verify:correctif40": "vite-node scripts/verifierCorrectif40.ts",
     "mesure:frappes": "vite-node scripts/sonderFrappes40.ts",

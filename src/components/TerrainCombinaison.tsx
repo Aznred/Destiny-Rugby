@@ -23,7 +23,7 @@ function TerrainAgrandi({ children, fermer }: { children: ReactNode; fermer: () 
   </div>, document.body);
 }
 
-export function TerrainCombinaison({ combinaison: c, variante: v, joueurs, effectif, maillot, joueur, actionIndex, etapeIndex, choisirEtape, bloque, selectionner, placer, modifierAction, modifierVariante }: {
+export function TerrainCombinaison({ combinaison: c, variante: v, joueurs, effectif, maillot, joueur, actionIndex, etapeIndex, choisirEtape, bloque, selectionner, placer, modifierAction, modifierVariante, ordres = false }: {
   combinaison: Combinaison;
   variante: VarianteCombinaison;
   joueurs: Record<number, string>;
@@ -35,6 +35,12 @@ export function TerrainCombinaison({ combinaison: c, variante: v, joueurs, effec
   choisirEtape: (index: number | null) => void;
   bloque: boolean;
   selectionner: (numero: number | null, placementLibre?: boolean) => void;
+  /**
+   * Atelier « Simple » (Correctif 41) : toucher un joueur le SÉLECTIONNE pour lui donner un ordre. Sans ce drapeau, toucher
+   * un joueur pendant qu'un appel ou une passe est sélectionné lui réaffecte ce geste — le n° 12 partait en leurre, on
+   * touchait le 13 pour lui parler, et c'est le 13 qui héritait du leurre.
+   */
+  ordres?: boolean;
   placer: (numero: number, point: PointCombinaison) => void;
   modifierAction: (action: ActionCombinaison) => void;
   modifierVariante: (variante: VarianteCombinaison) => void;
@@ -208,14 +214,17 @@ export function TerrainCombinaison({ combinaison: c, variante: v, joueurs, effec
       if (g.placement && g.numero !== null) {
         const p = pointDuClic(e);
         const cible = { x: borner(p.x + g.decalageJoueur.x, .7, 99.3), y: borner(p.y + g.decalageJoueur.y, .7, 69.3) };
-        selectionner(g.numero);
-        if (destination && action) modifierAction({ ...action, ...(action.type === 'leurre' ? { numero: g.numero } : {}), destination: destinationDepuis(cible) });
+        // En mode ordres, on ne trace que la course de CELUI qui la court : glisser un autre joueur le replace.
+        const autreCoureur = ordres && action?.type === 'leurre' && action.numero !== g.numero;
+        selectionner(g.numero, autreCoureur);
+        if (destination && action && !autreCoureur) modifierAction({ ...action, ...(action.type === 'leurre' ? { numero: g.numero } : {}), destination: destinationDepuis(cible) });
         else placerSurTerrain(g.numero, cible);
       }
       return;
     }
     if (g.numero !== null) {
       if (verrouilles.includes(g.numero)) return;
+      if (ordres) { selectionner(joueur === g.numero && actionIndex === null ? null : g.numero, !(action?.type === 'leurre' && action.numero === g.numero)); return; }
       selectionner(joueur === g.numero && actionIndex === null ? null : g.numero);
       if (action?.type === 'passe') modifierAction({ ...action, destinataire: g.numero });
       if (action?.type === 'leurre') modifierAction({ ...action, numero: g.numero });
@@ -286,7 +295,7 @@ export function TerrainCombinaison({ combinaison: c, variante: v, joueurs, effec
               if (lie || bloque || temps !== null || avecOpposition || adverse) return;
               if (e.key === 'Escape') { if (!navigationLibre) { e.stopPropagation(); selectionner(null, true); } return; }
               e.stopPropagation();
-              if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectionner(joueur === n && actionIndex === null ? null : n); if (action?.type === 'passe') modifierAction({ ...action, destinataire: n }); if (action?.type === 'leurre') modifierAction({ ...action, numero: n }); }
+              if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (ordres) { selectionner(joueur === n && actionIndex === null ? null : n, !(action?.type === 'leurre' && action.numero === n)); return; } selectionner(joueur === n && actionIndex === null ? null : n); if (action?.type === 'passe') modifierAction({ ...action, destinataire: n }); if (action?.type === 'leurre') modifierAction({ ...action, numero: n }); }
               const directions: Record<string, PointCombinaison> = { ArrowLeft: { x: -1, y: 0 }, ArrowRight: { x: 1, y: 0 }, ArrowUp: { x: 0, y: -1 }, ArrowDown: { x: 0, y: 1 } };
               const direction = directions[e.key]; if (direction) {
                 e.preventDefault();
@@ -337,6 +346,10 @@ export function TerrainCombinaison({ combinaison: c, variante: v, joueurs, effec
             modifierVariante({ ...v, sauteur: distance <= 15 && v.sauteur > 8 ? 4 : v.sauteur, touche: { ...touche, distance } });
           }} /></label>
           <label className="ec-case"><input type="checkbox" checked={touche.feinte} onChange={e => modifierVariante({ ...v, touche: { ...touche, feinte: e.target.checked } })} />{t("ui.ba42aae1dbd3")}</label>
+          {/* Cahier vivant : ce que le moteur sait jouer en plus dans l'alignement (pas sur un lancer long). */}
+          {(['doubleFeinte', 'glissement', 'maul'] as const).map(cle => <label className="ec-case" key={cle}><input type="checkbox" disabled={lancerLong} checked={!lancerLong && !!touche[cle]}
+            onChange={e => { const suite = { ...touche }; if (e.target.checked) suite[cle] = true; else delete suite[cle]; modifierVariante({ ...v, touche: suite }); }} />{t(`cb.touche.${cle}`)}</label>)}
+          <p className="ec-info">{t('cb.touche.aide')}</p>
           <p className="ec-info">{t("ui.d4ab90909b7b", { v0: lancerLong ? t("ui.44ad76fcc29f", { v0: v.sauteur, v1: touche.distance }) : t("ui.d00743cae2e8", { v0: lifteurs.map(p => `n° ${p.numero}`).join(' et '), v1: touche.distance }) })}</p>
         </fieldset>}
         {preparation && !avecOpposition ? <p className="ec-info ec-contexte-etape">{t("ui.785e94384d78", { v0: etapeIndex! + 1 })}</p> : <fieldset disabled={bloque || temps !== null || avecOpposition} className="ec-placement"><legend>{t("ui.4937d6631197")}</legend><label>{t("ui.54e8d3c2ca8c")}<select value={joueur ?? ''} onChange={e => selectionner(e.target.value ? Number(e.target.value) : null, true)}><option value="">{t("ui.1cdf95ab45ef")}</option>{Array.from({ length: 15 }, (_, i) => i + 1).map(n => <option key={n} value={n} disabled={verrouilles.includes(n)}>N° {n}{joueurs[n] ? ` · ${joueurs[n]}` : ''}{verrouilles.includes(n) ? t("ui.00ed01fa1607") : ''}</option>)}</select></label>

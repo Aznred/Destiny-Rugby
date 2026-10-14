@@ -69,7 +69,7 @@ import { collectifCarriere, paliersCollectif, bonusCollectif, COLLECTIF_MAX } fr
 import type { Affinite, AffiniteCarte } from '../lib/ligue/collectifCarriere';
 import { ModaleMarche } from '../components/ModaleMarche';
 import { PACKS_CARRIERE, packsBoutiqueDuJour } from '../lib/ligue/catalogueCarriere';
-import { OffrePublicitaire } from '../components/PublicitesRecompensees';
+import { ManqueOvasLigue, OffrePublicitaire } from '../components/PublicitesRecompensees';
 import { nomFamilleSpeciale } from '../lib/ligue/cartesSpeciales';
 import { Citrouille, EmblemeIcon } from '../components/EmblemesSpeciaux';
 import { tn, texteTraduit, locale, nombre, t } from '../lib/i18n';
@@ -731,6 +731,8 @@ export function CarriereEnLigne() {
   const rencontre = vue?.rencontres.find(r => r.id === matchId);
   const navigation = onglets().filter(o => !vue?.observateur || ['calendrier', 'competitions', 'histoire', 'wiki'].includes(o.id));
 
+  // Le serveur dit si ce compte a le cahier (ouvert à tous, ou bêta du compte interne) ; un serveur d'avant ne le dit pas.
+  const cahierOuvert = Boolean(session?.compte.featureFlags?.combinaisons ?? session?.compte.administrateur);
   return <section className="cel" aria-label={t("online.title")} data-publique={vue?.publique ? '1' : undefined}>
     <div className="cel-fil">
       <button className="btn fantome" onClick={() => vue ? retourLigues() : setEcran('accueil')}><Icone nom="fleche-droite" className="cel-retour" taille={15} />{vue ? t('online.myLeagues') : t('online.home')}</button>
@@ -769,16 +771,16 @@ export function CarriereEnLigne() {
             qui ramène exactement là d'où l'on vient. */}
         {!rencontre && <header className="cel-entete" data-tuto="cel-entete"><Ecusson nom={club?.nom ?? vue.nom} logo={club?.embleme ?? vue.logo} grand /><div><div className="eyebrow cel-nom-ligue">{vue.logo && <img className="cel-logo-ligue" src={vue.logo} alt="" />}{vue.nom} <span> / {t('online.season', { n: vue.saison })}</span></div><h1>{vue.observateur ? t('online.spectator.mode') : club?.nom}</h1><p>{vue.rythme === 7 ? t('online.clubsDaily', { clubs: vue.clubs.length }) : t('online.clubsRate', { clubs: vue.clubs.length, matches: vue.rythme })} · {t(`online.phase.${vue.phase === 'salon' ? 'lobby' : vue.phase === 'saison' ? 'season' : 'break'}`)}</p></div>{vue.observateur ? <div className="cel-portefeuille"><Icone nom="oeil" taille={26} /><strong>{t('online.spectator.mode')}</strong><span>{t('online.spectator.readOnly')}</span></div> : <div className="cel-portefeuille" data-tuto="cel-ovas"><PieceOvas taille={26} /><strong>{montant(club?.ovas ?? 0)}</strong><span>{t('online.balance')}</span></div>}</header>}
         {!rencontre && vue.publique && <div className="cel-public-bandeau"><b>{t("ui.7b01bddcbc1e", { v0: vue.publique.division, v1: vue.phase === 'salon' ? t("ui.51ad9aaf31c2", { v0: vue.clubs.length }) : t("ui.1eef20a3cbfc") })}</b><span>{vue.phase === 'salon' ? t("ui.4cef8f746e10") : t("ui.3d43ea16876f")}</span>{vue.publique.barrage && <strong>{vue.publique.barrage}</strong>}</div>}
-        {!rencontre && <nav className="cel-onglets" aria-label={t('online.title')} data-tuto="cel-onglets">{[...navigation, ...(!vue.observateur && session.compte.administrateur ? [{ id: 'combinaisons' as const, label: 'Combinaisons · bêta', icone: 'sifflet' as NomIcone }] : []), ...(!vue.observateur && session.compte.administrateur && vue.laboratoire ? [{ id: 'laboratoire' as const, label: 'Laboratoire', icone: 'eclair' as NomIcone }] : []), ...(session.compte.administrateur ? [{ id: 'atelier' as const, label: 'Atelier Kiri', icone: 'medaille' as NomIcone }, { id: 'secret' as const, label: 'Kiri stats', icone: 'medaille' as NomIcone }, { id: 'administration' as const, label: 'Comptes & ligues', icone: 'profil' as NomIcone }] : [])].map(o => <button key={o.id} data-tuto={`cel-onglet-${o.id}`} className={onglet === o.id && !matchId ? 'actif' : ''} aria-current={onglet === o.id && !matchId ? 'page' : undefined} onClick={() => { setOnglet(o.id); setMatchId(null); }}><Icone nom={o.icone} taille={18} />{texteTraduit(o.label)}</button>)}</nav>}
+        {!rencontre && <nav className="cel-onglets" aria-label={t('online.title')} data-tuto="cel-onglets">{[...navigation, ...(!vue.observateur && cahierOuvert ? [{ id: 'combinaisons' as const, label: 'Combinaisons · bêta', icone: 'sifflet' as NomIcone }] : []), ...(!vue.observateur && session.compte.administrateur && vue.laboratoire ? [{ id: 'laboratoire' as const, label: 'Laboratoire', icone: 'eclair' as NomIcone }] : []), ...(session.compte.administrateur ? [{ id: 'atelier' as const, label: 'Atelier Kiri', icone: 'medaille' as NomIcone }, { id: 'secret' as const, label: 'Kiri stats', icone: 'medaille' as NomIcone }, { id: 'administration' as const, label: 'Comptes & ligues', icone: 'profil' as NomIcone }] : [])].map(o => <button key={o.id} data-tuto={`cel-onglet-${o.id}`} className={onglet === o.id && !matchId ? 'actif' : ''} aria-current={onglet === o.id && !matchId ? 'page' : undefined} onClick={() => { setOnglet(o.id); setMatchId(null); }}><Icone nom={o.icone} taille={18} />{texteTraduit(o.label)}</button>)}</nav>}
         {rencontre ? <Direct vue={vue} rencontre={rencontre} agir={agir} occupe={occupe} fermer={() => setMatchId(null)} /> : <>
           <CelebrationLigue key={vue.id} vue={vue} agir={agir} />
           {onglet === 'club' && <Bureau vue={vue} proprietaire={!vue.publique && session.compte.id === vue.createurId} agir={agir} occupe={occupe} suivre={setMatchId} notifier={setNotification} />}
           {onglet === 'calendrier' && <Calendrier vue={vue} agir={agir} occupe={occupe} suivre={setMatchId} proprietaire={!vue.publique && session.compte.id === vue.createurId} notifier={setNotification} />}
           {onglet === 'composition' && <Composition key={vue.id} vue={vue} agir={agir} occupe={occupe} erreur={erreur} />}
-          {onglet === 'combinaisons' && session.compte.administrateur && !vue.observateur && <CombinaisonsLigue key={vue.id} vue={vue} agir={agir} occupe={occupe} />}
+          {onglet === 'combinaisons' && cahierOuvert && !vue.observateur && <CombinaisonsLigue key={vue.id} vue={vue} agir={agir} occupe={occupe} moderateur={Boolean(session.compte.administrateur)} />}
           {onglet === 'effectif' && <Effectif vue={vue} agir={agir} occupe={occupe} />}
           {onglet === 'collection' && <CollectionLigue vue={vue} />}
-          {onglet === 'packs' && <Packs vue={vue} agir={agir} occupe={occupe} />}
+          {onglet === 'packs' && <Packs vue={vue} agir={agir} occupe={occupe} allerAuClub={() => setOnglet('club')} />}
           {onglet === 'marche' && <Marche vue={vue} agir={agir} occupe={occupe} />}
           {onglet === 'competitions' && <Competitions vue={vue} agir={agir} occupe={occupe} proprietaire={!vue.publique && session.compte.id === vue.createurId} suivre={setMatchId} />}
           {onglet === 'histoire' && <Histoire vue={vue} />}
@@ -1542,7 +1544,7 @@ function Direct({ vue, rencontre: r, agir, occupe, fermer }: { vue: VueCarriereE
 // du mode en ligne, c'est d'où vient l'effectif — les cartes possédées dans
 // CETTE ligue — et le fait que la feuille part au serveur au lieu du store.
 
-function CombinaisonsLigue({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; occupe: boolean }) {
+function CombinaisonsLigue({ vue, agir, occupe, moderateur }: { vue: VueCarriereEnLigne; agir: Agir; occupe: boolean; moderateur: boolean }) {
   const club = vue.clubs.find(c => c.id === vue.monClubId);
   const secours = useMemo(() => couleursDirect(club?.id ?? 'atelier', 'atelier-opposition').maillots!.domicile, [club?.id]);
   const [maillot, setMaillot] = useState(secours);
@@ -1556,7 +1558,7 @@ function CombinaisonsLigue({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agi
   const strategie = club.strategie;
   const joueurs = Object.fromEntries(club.composition.titulaires.map((id, i) => [i + 1, vue.cartes.find(c => c.id === id)?.nom ?? `N° ${i + 1}`]));
   const effectif = club.composition.titulaires.map(id => vue.cartes.find(c => c.id === id)).filter((c): c is CarteCarriere => Boolean(c)).map(carteEnJoueur);
-  return <Suspense fallback={<p className="ec-info">{t("ui.973bbd3f0e93")}</p>}><EditeurCombinaisons combinaisons={strategie.combinaisons} mode={strategie.modeCombinaisons} joueurs={joueurs} effectif={effectif.length === 15 ? effectif : undefined} maillot={maillot} occupe={occupe}
+  return <Suspense fallback={<p className="ec-info">{t("ui.973bbd3f0e93")}</p>}><EditeurCombinaisons combinaisons={strategie.combinaisons} mode={strategie.modeCombinaisons} joueurs={joueurs} effectif={effectif.length === 15 ? effectif : undefined} maillot={maillot} occupe={occupe} moderateur={moderateur} statsCombinaisons={club.statsCombinaisons}
     enregistrer={async (combinaisons, modeCombinaisons) => Boolean(await agir({ type: 'strategie', strategie: { ...strategie, combinaisons, modeCombinaisons } }))} /></Suspense>;
 }
 
@@ -1917,8 +1919,12 @@ function Effectif({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; 
  * qu'on retient son souffle avant de savoir. Une révélation qui n'annonce rien
  * n'a pas de suspense.
  */
-export function Packs({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; occupe: boolean }) {
+export function Packs({ vue, agir, occupe, allerAuClub }: { vue: VueCarriereEnLigne; agir: Agir; occupe: boolean; allerAuClub?: () => void }) {
   const club = vue.clubs.find(c => c.id === vue.monClubId);
+  // ── Un pack qu'on ne peut pas payer (Correctif 42) : la fenêtre propose la publicité, sur le compteur du Pack Pub.
+  const [manque, setManque] = useState<{ pack: string; manque: number } | null>(null);
+  // La carte « Pack Pub » relit son compteur quand la fenêtre a servi : les deux affichent le même plafond.
+  const [revisionPub, setRevisionPub] = useState(0);
   const instant = Date.now();
   const packsDuJour = (vue.packsActifs
     ? vue.packs.filter(pack => vue.packsActifs!.includes(pack.id))
@@ -1981,8 +1987,11 @@ export function Packs({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Ag
       <div className="cel-portefeuille"><PieceOvas taille={26} /><strong>{montant(solde)}</strong><span>{t('online.shop.available')}</span></div>
     </section>
 
-    <OffrePublicitaire contexte="DAILY_PACK" ligue={vue.id} disabled={occupe || ouverture !== null}
+    <OffrePublicitaire key={revisionPub} contexte="DAILY_PACK" ligue={vue.id} disabled={occupe || ouverture !== null}
       onPack={async (rewardSessionId,pack) => { await lancerOuverture({type:'ouvrirPackPub',rewardSessionId},pack.nom,pack.id,' · Pack Pub'); }} />
+    {manque && <ManqueOvasLigue ligue={vue.id} pack={manque.pack} manque={manque.manque} onObtenir={allerAuClub}
+      onFermer={() => { setManque(null); setRevisionPub(n => n + 1); }}
+      onPack={async (rewardSessionId,pack) => { await lancerOuverture({type:'ouvrirPackPub',rewardSessionId},pack.nom,pack.id,' · Pack Pub'); }} />}
     <section className="cel-packs-quotidiens" data-tuto="cel-packs-quotidiens">
       <div className="cel-packs-quotidiens-tete"><div><div className="eyebrow">{t('online.shop.dailyBoost')}</div><h3>{t('online.shop.freePacksCount', { count: packsGratuits.length })}</h3><p>{vue.phase === 'salon' ? t('online.shop.dailyLobbyHelp') : t('online.shop.dailySeasonHelp')}</p></div><strong>{t("ui.9bebe85925f3", { v0: vue.packsGratuitsParJour ?? 10 })}</strong></div>
       {packsGratuits.length ? <div className="cel-packs-gratuits-liste">{packsGratuits.slice(0, 20).map((attribution, rang) => { const pack = vue.packs.find(p => p.id === attribution.packId); return pack ? <button key={attribution.id} data-tuto={rang === 0 ? 'cel-pack-gratuit' : undefined} disabled={occupe || ouverture !== null} onPointerEnter={() => prechargerOuverturePack(pack)} onFocus={() => prechargerOuverturePack(pack)} onClick={() => { void ouvrirGratuit(attribution.id, pack.id, nomPackCarriere(pack)); }}><span className={`cel-pack-gratuit-sceau ${pack.garantie ?? 'bronze'}`}><Icone nom="cadeau" taille={17} /></span><b>{nomPackCarriere(pack)}</b><small>{t('online.shop.freePackLabel')}</small></button> : null; })}</div> : <p className="cel-note">{vue.phase === 'salon' ? t('online.shop.emptyLobby') : t('online.shop.emptySeason')}</p>}
@@ -1990,7 +1999,8 @@ export function Packs({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Ag
     </section>
 
     <div className="cel-note">{t('online.shop.basePacksNote')}</div>
-    <div data-tuto="cel-boutique-packs"><BoutiquePacks3D packs={packsDuJour} solde={solde} occupe={occupe || ouverture !== null} onOuvrir={ouvrir} chancesSpeciales={chancesSpeciales} /></div>
+    <div data-tuto="cel-boutique-packs"><BoutiquePacks3D packs={packsDuJour} solde={solde} occupe={occupe || ouverture !== null} onOuvrir={ouvrir} chancesSpeciales={chancesSpeciales}
+      avantAchat={async (pack) => { if (solde >= pack.prix) return true; setManque({ pack: pack.nom, manque: pack.prix - solde }); return false; }} /></div>
 
     {ouverture && <OuverturePack cartes={ouverture.cartes} pack={ouverture.pack} modele={ouverture.modele} evolutionElite={ouverture.evolutionElite} garantie={ouverture.garantie} apparenceInitiale={ouverture.apparenceInitiale} rendreCarte={carte => <CarteJoueurEnLigne carte={carte} />} onFermer={() => setOuverture(null)} />}
   </>;

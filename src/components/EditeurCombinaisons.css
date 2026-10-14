@@ -167,3 +167,32 @@
   .ec .btn.ec-retour-edition { margin-left: auto; font-size: 10px; padding: 8px; }
   .ec-zoom { margin-left: auto; }
 }
+
+/* Correctif 41 : l'essai sur le moteur du match. */
+.ec-essai-3d { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem 1rem; margin: .2rem 0 .8rem; padding: .7rem .9rem; border-radius: 12px; border: 1px solid rgba(232, 178, 58, .35); background: linear-gradient(120deg, rgba(109, 58, 31, .28), rgba(18, 52, 32, .5)); }
+.ec-essai-3d .btn { display: inline-flex; align-items: center; gap: .45rem; min-height: 44px; }
+.ec-essai-3d span { color: #c7d1c6; font-size: .82rem; }
+.ec .chrono { margin: .8rem 0; }
+.ec-niveau { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1rem; margin: .4rem 0 .9rem; }
+.ec-niveau small { color: #8ea394; font-size: .76rem; flex: 1; min-width: 14rem; }
+.ec-simple-actions { display: flex; flex-wrap: wrap; gap: .5rem; margin: .2rem 0 .8rem; }
+.ec-simple-actions .btn { display: inline-flex; align-items: center; gap: .4rem; min-height: 42px; }
+.ec-onglets { display: inline-flex; width: fit-content; max-width: 100%; justify-self: start; gap: 2px; padding: 3px; margin: .2rem 0 .9rem; border-radius: 11px; border: 1px solid #354d3e; background: #0b1813; }
+.ec-onglets button { display: inline-flex; align-items: center; gap: .45rem; min-height: 2.6rem; padding: .35rem 1rem; border-radius: 8px; border: 1px solid transparent; background: none; color: #c8d3c8; font: inherit; font-size: .86rem; cursor: pointer; }
+.ec-onglets button[aria-selected=true] { border-color: #7e794f; color: #f3ddb0; background: #334134; }
+.ec-onglets button:focus-visible { outline: 2px solid #f4cd63; outline-offset: 2px; }
+.ec-atelier[hidden] { display: none; }
+.ec-emplacements { display: flex; flex-wrap: wrap; gap: .3rem .4rem; margin: .7rem 0 .5rem; font-size: .72rem; color: #c8d3c8; }
+.ec-emplacements b { flex: 1 1 100%; font-size: .74rem; color: #f3ddb0; }
+.ec-emplacements span { display: inline-flex; align-items: center; gap: .35rem; padding: .16rem .5rem; border-radius: 999px; border: 1px solid #354d3e; }
+.ec-emplacements span i { font-style: normal; font-variant-numeric: tabular-nums; color: #8fe0a7; }
+.ec-emplacements span.plein { border-color: rgba(232, 178, 58, .5); }
+.ec-emplacements span.plein i { color: #f4cd63; }
+.ec-emplacements small { flex: 1 1 100%; color: #8ea394; line-height: 1.35; }
+.ec-exemples { flex-wrap: wrap; align-items: center; }
+.ec-exemples > span { flex: 1 1 100%; margin-top: .45rem; font-size: .68rem; text-transform: uppercase; letter-spacing: .07em; color: #8ea394; }
+.ec-maj { color: #f4cd63 !important; }
+.ec-plein { color: #f4cd63; font-size: .74rem; }
+.ec-stats-plan { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem .7rem; margin: .2rem 0 .8rem; font-size: .8rem; color: #c8d3c8; }
+.ec-stats-plan b { display: inline-flex; align-items: center; gap: .35rem; color: #f3ddb0; font-size: .74rem; text-transform: uppercase; letter-spacing: .06em; }
+@media (max-width: 560px) { .ec-onglets { display: flex; width: 100%; } .ec-onglets button { flex: 1; justify-content: center; } }

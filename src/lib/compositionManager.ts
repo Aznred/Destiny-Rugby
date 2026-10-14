@@ -4,7 +4,7 @@ import type {
 } from '../types.js';
 import type { Coequipier } from './effectif.js';
 import type { RolesEquipe } from './moteur/responsabilites.js';
-import { disponible, rendementAuPoste, type EtatDuJoueur } from './carteJoueur.js';
+import { rendementAuPoste } from './carteJoueur.js';
 
 export const POSTES_XV_MANAGER: PosteId[] = [
   'pilier_gauche', 'talonneur', 'pilier_droit', 'deuxieme_ligne_g', 'deuxieme_ligne_d',
@@ -16,6 +16,33 @@ export const POSTES_BANC_MANAGER: PosteId[] = [
   'talonneur', 'pilier_gauche', 'pilier_droit', 'deuxieme_ligne_d',
   'troisieme_aile_d', 'demi_melee', 'demi_ouverture', 'deuxieme_centre',
 ];
+
+/**
+ * CE QUE CHAQUE PLACE DU BANC DOIT COUVRIR, dans l'ordre de `POSTES_BANC_MANAGER` (16 à 23) : première ligne, cage,
+ * troisième ligne, charnière, lignes arrière. Le premier poste de la liste est celui qu'on cherche ; les suivants
+ * dépannent presque aussi bien (un pilier de l'autre côté, un arrière à la place d'un centre).
+ */
+export const COUVERTURE_BANC: readonly (readonly PosteId[])[] = [
+  ['talonneur'],
+  ['pilier_gauche', 'pilier_droit'],
+  ['pilier_droit', 'pilier_gauche'],
+  ['deuxieme_ligne_d', 'deuxieme_ligne_g'],
+  ['troisieme_aile_d', 'troisieme_aile_g', 'numero_8'],
+  ['demi_melee'],
+  ['demi_ouverture'],
+  ['deuxieme_centre', 'premier_centre', 'ailier_gauche', 'ailier_droit', 'arriere'],
+];
+
+/** Le mieux placé pour ces postes : la note, pesée par le rendement au poste (`rendementAuPoste`). */
+function meilleurPour(candidats: Coequipier[], postes: readonly PosteId[]): Coequipier | undefined {
+  let choisi: Coequipier | undefined;
+  let valeur = -Infinity;
+  for (const j of candidats) {
+    const v = Math.max(...postes.map((p, rang) => j.note * rendementAuPoste(j.poste, p, j.postesSecondaires) * (rang ? .97 : 1)));
+    if (v > valeur) { valeur = v; choisi = j; }
+  }
+  return choisi;
+}
 
 export const TACTIQUE_MANAGER_DEFAUT: TactiqueManager = {
   attaque: 'equilibre',
@@ -78,135 +105,8 @@ export function compositionManagerParDefaut(
   };
 }
 
-/**
- * Sélectionne la composition optimale pour le mode entraîneur :
- * - XV de départ (15) et banc équilibré (8) choisis parmi les joueurs disponibles.
- * - Respect strict des postes déclarés (naturel et secondaires exacts à 100% de rendement, hors-poste à 82%).
- * - Règle de rugby pour la 1ère ligne remplaçante : présence obligatoire de piliers et talonneur.
- * - Choix du meilleur buteur selon son adresse réelle au pied et du capitaine selon l'expérience et l'autorité.
- * - Prise en compte de la forme et fatigue si fournies dans `etats`.
- */
-export function meilleureCompositionManager(
-  effectif: Coequipier[],
-  indisponibles: ReadonlySet<string> = new Set(),
-  etats?: ReadonlyMap<string, EtatDuJoueur>,
-): CompositionManager {
-  const dispo = effectif
-    .filter((j) => !indisponibles.has(j.id) && disponible(etats?.get(j.id) ?? {}))
-    .sort((a, b) => b.note - a.note);
-
-  // Si l'effectif disponible compte moins de 23 joueurs, repli par défaut
-  if (dispo.length < 23) {
-    return compositionManagerParDefaut(dispo, new Set());
-  }
-
-  const postes = [...POSTES_XV_MANAGER, ...POSTES_BANC_MANAGER];
-  const n = 23;
-  const m = dispo.length;
-
-  const couts = postes.map((poste, i) =>
-    dispo.map((j) => {
-      // Postes 1..3 et 16..18 : 1ère ligne impérative (piliers / talonneurs)
-      const estSlotPremiereLigne = i < 3 || (i >= 15 && i < 18);
-      const familleDuSlot = POSTE_PAR_ID[poste]?.famille;
-      if (estSlotPremiereLigne) {
-        const peutJouerPremiereLigne = [j.poste, ...(j.postesSecondaires ?? [])].some(
-          (p) => POSTE_PAR_ID[p]?.famille === familleDuSlot,
-        );
-        if (!peutJouerPremiereLigne) return 1e9;
-      }
-
-      const facteur = rendementAuPoste(j.poste, poste, j.postesSecondaires);
-      const etat = etats?.get(j.id);
-      const fatigue = etat?.fatigue ?? 0;
-      const forme = etat?.forme ?? 50;
-
-      // Légère modulation : la fraîcheur départage les notes proches
-      const bonusForme = (forme - 50) * 0.04;
-      const malusFatigue = fatigue > 70 ? (fatigue - 70) * 0.25 : 0;
-      const noteAjustee = (j.note + bonusForme - malusFatigue) * facteur;
-
-      // Titulaires prioritaires (facteur 100) par rapport au banc
-      return -(noteAjustee * (i < 15 ? 100 : 1) - fatigue * 0.001);
-    }),
-  );
-
-  // Algorithme hongrois (Kuhn-Munkres) rectangulaire
-  const u = Array(n + 1).fill(0);
-  const v = Array(m + 1).fill(0);
-  const p = Array(m + 1).fill(0);
-  const way = Array(m + 1).fill(0);
-
-  for (let i = 1; i <= n; i++) {
-    p[0] = i;
-    let j0 = 0;
-    const minv = Array(m + 1).fill(Infinity);
-    const used = Array(m + 1).fill(false);
-    do {
-      used[j0] = true;
-      const i0 = p[j0];
-      let delta = Infinity;
-      let j1 = 0;
-      for (let j = 1; j <= m; j++) {
-        if (!used[j]) {
-          const cur = couts[i0 - 1][j - 1] - u[i0] - v[j];
-          if (cur < minv[j]) {
-            minv[j] = cur;
-            way[j] = j0;
-          }
-          if (minv[j] < delta) {
-            delta = minv[j];
-            j1 = j;
-          }
-        }
-      }
-      for (let j = 0; j <= m; j++) {
-        if (used[j]) {
-          u[p[j]] += delta;
-          v[j] -= delta;
-        } else {
-          minv[j] -= delta;
-        }
-      }
-      j0 = j1;
-    } while (p[j0] !== 0);
-    do {
-      const j1 = way[j0];
-      p[j0] = p[j1];
-      j0 = j1;
-    } while (j0 !== 0);
-  }
-
-  const choix = Array<number>(23).fill(-1);
-  for (let j = 1; j <= m; j++) {
-    if (p[j]) choix[p[j] - 1] = j - 1;
-  }
-
-  // Si l'affectation stricte a échoué (pénurie de joueurs spécialisés en première ligne), repli par défaut
-  if (choix.some((j, i) => j < 0 || couts[i][j] >= 1e9)) {
-    return compositionManagerParDefaut(dispo, new Set());
-  }
-
-  const titulairesIds = choix.slice(0, 15).map((idx) => dispo[idx].id);
-  const remplacantsIds = choix.slice(15, 23).map((idx) => dispo[idx].id);
-
-  const titulaires = titulairesIds.map((id) => dispo.find((j) => j.id === id)!);
-  const capitaine = [...titulaires].sort(
-    (a, b) => (b.age * 1.4 + b.note) - (a.age * 1.4 + a.note),
-  )[0];
-
-  const tousAlignes = [...titulairesIds, ...remplacantsIds].map((id) => dispo.find((j) => j.id === id)!);
-  const buteur = [...tousAlignes].sort(
-    (a, b) => (b.jeuAuPied ?? b.note) - (a.jeuAuPied ?? a.note),
-  )[0];
-
-  return {
-    titulaires: titulairesIds,
-    remplacants: remplacantsIds,
-    capitaineId: capitaine?.id ?? titulairesIds[0] ?? '',
-    buteurId: buteur?.id ?? titulairesIds[9] ?? titulairesIds[0] ?? '',
-  };
-}
+// « Meilleure équipe » et la composition déléguée : `composerParLAdjoint` (lib/adjointComposition.ts), une seule
+// affectation pour le bouton de l'écran et pour l'adjoint (Correctif 41).
 
 /**
  * Répare une ancienne composition quand l'effectif a vieilli, qu'une recrue
@@ -222,19 +122,39 @@ export function reconcilerCompositionManager(
   // ⚠️ UN BLESSÉ SORT DE LA FEUILLE, même s'il y était la semaine d'avant :
   //    sinon la composition sauvegardée le réintroduisait à chaque réconciliation.
   const ids = new Set(effectif.filter((x) => !indisponibles.has(x.id)).map((x) => x.id));
-  const pris = new Set<string>();
-  const remplir = (source: string[] | undefined, postes: PosteId[], secours: string[], titulaire = false) => postes.map((_, i) => {
-    const permis = (id: string) => ids.has(id) && !pris.has(id) && (!titulaire || !bancSeulement.has(id));
-    const souhaite = source?.[i];
-    if (souhaite && permis(souhaite)) { pris.add(souhaite); return souhaite; }
-    const propose = secours.find(permis);
-    if (propose) { pris.add(propose); return propose; }
-    const libre = effectif.find((j) => permis(j.id));
-    if (libre) pris.add(libre.id);
-    return libre?.id ?? '';
-  }).filter(Boolean);
-  const titulaires = remplir(composition.titulaires, POSTES_XV_MANAGER, defaut.titulaires, true);
-  const remplacants = remplir(composition.remplacants, POSTES_BANC_MANAGER, defaut.remplacants);
+  // ⚠️ UN TROU SE COMBLE PAR LE MEILLEUR AU POSTE (Correctif 41). Il était comblé par le premier titulaire de la feuille
+  //    par défaut encore libre, sans regarder la place à tenir : sur une feuille retouchée par l'entraîneur, l'ouvreur
+  //    blessé pouvait être remplacé par un talonneur. Les choix encore valides restent où ils sont ; un remplaçant
+  //    monte dans le XV s'il est le mieux placé, et sa place sur le banc est comblée à son tour.
+  const vus = new Set<string>();
+  const garder = (source: string[] | undefined, postes: PosteId[], titulaire: boolean) => postes.map((_, i) => {
+    const id = source?.[i];
+    if (!id || !ids.has(id) || vus.has(id) || (titulaire && bancSeulement.has(id))) return '';
+    vus.add(id);
+    return id;
+  });
+  const xv = garder(composition.titulaires, POSTES_XV_MANAGER, true);
+  const banc = garder(composition.remplacants, POSTES_BANC_MANAGER, false);
+  const dansLeXV = new Set(xv.filter(Boolean));
+  xv.forEach((id, i) => {
+    if (id) return;
+    const choisi = meilleurPour(effectif.filter((j) => ids.has(j.id) && !dansLeXV.has(j.id) && !bancSeulement.has(j.id)), [POSTES_XV_MANAGER[i]]);
+    if (!choisi) return;
+    xv[i] = choisi.id;
+    dansLeXV.add(choisi.id);
+    const place = banc.indexOf(choisi.id);
+    if (place >= 0) banc[place] = '';
+  });
+  const pris = new Set([...dansLeXV, ...banc.filter(Boolean)]);
+  banc.forEach((id, i) => {
+    if (id) return;
+    const choisi = meilleurPour(effectif.filter((j) => ids.has(j.id) && !pris.has(j.id)), COUVERTURE_BANC[i] ?? COUVERTURE_BANC[COUVERTURE_BANC.length - 1]);
+    if (!choisi) return;
+    banc[i] = choisi.id;
+    pris.add(choisi.id);
+  });
+  const titulaires = xv.filter(Boolean);
+  const remplacants = banc.filter(Boolean);
   const feuille = new Set([...titulaires, ...remplacants]);
   // Les autres rôles (Correctif 17) : on garde ceux dont le joueur est toujours sur la feuille, les autres retombent en « automatique ».
   const autres: Partial<CompositionManager> = {};

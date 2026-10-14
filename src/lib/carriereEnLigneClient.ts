@@ -4,7 +4,7 @@ import type { VueMarchePartage } from './ligue/marchePartage';
 import type { EtatBoutiqueCompte, ModificationsBoutiqueCompte } from './boutiqueCompte.js';
 import type { DeltaEchangeSolo, LotCartesSolo, PageOffresSolo } from './echangesSolo.js';
 
-export interface CompteCarriere { id: string; pseudo: string; administrateur?: boolean; featureFlags?: { womensRugby: boolean } }
+export interface CompteCarriere { id: string; pseudo: string; administrateur?: boolean; featureFlags?: { womensRugby: boolean; combinaisons?: boolean } }
 export interface SessionCarriere {
   compte: CompteCarriere;
   ligues: {

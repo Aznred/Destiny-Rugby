@@ -398,6 +398,11 @@ export interface EtatCarriereAvancee {
   profilsMedicaux: Record<string, ProfilMedicalJoueur>;
   chargeEntrainement: PlanChargeHebdo;
   contratsJoueurs: Record<string, ContratJoueurAvance>;
+  /**
+   * Les contrats qu'on a décidé de NE PAS prolonger cette saison (`lib/contratsAutomatiques.ts`) : le joueur ira au
+   * bout de son contrat. Une signature efface la décision. Facultatif : absent des sauvegardes d'avant le Correctif 41.
+   */
+  decisionsContrats?: Record<string, { saison: number; decision: 'depart' }>;
   /** Les clubs qui viennent chercher un joueur qu'on n'a pas mis en vente. */
   approches: ApprocheClubManager[];
   convocations: ConvocationClub[];
@@ -1358,7 +1363,9 @@ export function signerRenegociationJoueur(
       depart: contexte.feuilles ?? 0, progression: 0, etat: 'active' as const,
     }]
     : a.promesses;
-  return { ...a, promesses, contratsJoueurs: { ...a.contratsJoueurs, [nego.joueur.id]: {
+  const decisionsContrats = { ...(a.decisionsContrats ?? {}) };
+  delete decisionsContrats[nego.joueur.id];
+  return { ...a, promesses, decisionsContrats, contratsJoueurs: { ...a.contratsJoueurs, [nego.joueur.id]: {
     ...contrat, debut: nego.saison,
     // La durée d'une prolongation couvre les saisons à venir après la saison en cours.
     fin: nego.nature === 'revalorisation' ? contrat.fin : Math.max(contrat.fin, nego.saison + 1 + nego.offre.duree),

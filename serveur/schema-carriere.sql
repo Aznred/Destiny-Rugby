@@ -233,3 +233,18 @@ create index if not exists packs_internes_journal_compte_idx on packs_internes_j
 alter table compte_permissions enable row level security;
 alter table packs_internes enable row level security;
 alter table packs_internes_journal enable row level security;
+
+-- ═══ LE MARCHÉ DES COMBINAISONS (Correctif 41) ═══════════════════════════════════════════════════════════════════════
+-- Une ligne par publication. `donnees` porte la fiche entière (versions, notes, signalements, statistiques de match) ;
+-- `revision` sert à l'écriture par comparaison : deux instances qui écrivent la même fiche ne s'écrasent pas.
+-- Sans cette table le marché est fermé (liste vide, publication refusée) et rien d'autre ne change.
+create table if not exists combinaisons_publiees (
+  id text primary key,
+  auteur uuid not null,
+  donnees jsonb not null,
+  revision integer not null default 0,
+  maj_le timestamptz not null default now()
+);
+create index if not exists combinaisons_publiees_maj_idx on combinaisons_publiees (maj_le desc);
+create index if not exists combinaisons_publiees_auteur_idx on combinaisons_publiees (auteur);
+alter table combinaisons_publiees enable row level security;

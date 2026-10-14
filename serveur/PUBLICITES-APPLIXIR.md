@@ -26,6 +26,28 @@ npm run verify:publicites contrôle notamment l'authentification, le quota inter
 
 /scripts/apercuPublicites.html est un banc Vite de simulation : il affiche aussi un inventaire spécial simulé comme publié pour examiner toutes les textures, sans publier de cartes ni créditer de compte réel. Le mode simulé peut vérifier complete, no-fill, skipped et error avec les événements de fin de lecteur du SDK v6.1. L'audit initial du 12 octobre a trouvé 44 tentatives conservées et aucun reçu signé. Après correction de l'URL et enregistrement du webhook global, un nouveau visionnage sur le site public a émis start, les trois quartiles, complete à 10 h 17 min 44 s (Europe/Paris), puis allAdsCompleted. La base conserve bien started=true et videoTerminee=true, mais aucun reçu signé accepté : le solde reste à 19 Ovas et l'interface propose la vérification. La réception réelle de la récompense reste donc non validée. Voir DIAGNOSTIC-PUBLICITES-2026-10-12.md pour le constat à transmettre au fournisseur.
 
+## Trois usages de plus (Correctif 42, 13 octobre 2026)
+
+Le registre du compte (`pub_comptes.donnees`) tient désormais quatre contextes : `SHOP_OVAS`, `DAILY_PACK` (ligue),
+`SHOP_PREMIUM_PACK` (Boutique, cinq par jour) et `COSMETIC` (un article, son propre plafond par jour). La fenêtre « pas
+assez d'Ovas » d'une ligue ouvre une session `DAILY_PACK` : elle partage le plafond du Pack Pub, il n'existe pas de second
+compteur. Le pack Premium est tiré au reçu signé et rendu une seule fois par `ouvrirPremium` (la Collection solo tire ses
+cartes dans le navigateur). La progression d'un cosmétique vit dans `RegistrePublicites.cosmetiques` ; au dernier pas,
+l'article est ajouté à `achatsEquipements` du coffre (`octroyerCosmetique`), et la livraison est retentée à chaque lecture
+de la vue tant qu'elle n'a pas abouti.
+
+**Aucune migration.** Le registre est du JSON ; la livraison est une mise à jour de `compte_boutique` ; les statistiques
+par usage (`stats.contextes`, clés à plat « LEAGUE.completed ») se somment comme `distribution`. ⚠️ Ces deux requêtes n'ont
+pas été essayées sur la vraie base. En cas d'échec de la livraison, le déblocage reste acquis dans le registre et l'écran
+l'applique à la lecture de la vue.
+
+Réglages (Labo → Publicités, opération `publicites`) : `leagueFallbackEnabled`, `premiumEnabled`,
+`premiumDailyLimit` (0 à 5), `premiumPacks` (poids par pack ; vide = automatique), `cosmeticsEnabled`,
+`cosmetiques[article] = { actif, requis (1 à 20), limiteJour (1 à 10) }`. Un Labo d'avant qui n'envoie pas ces champs
+garde les valeurs du jeu.
+
+Banc : `npm run verify:correctif42` (97 contrôles). Aperçu simulé : `/scripts/apercuCorrectif42.html`.
+
 ## Le reçu qui n'arrivait pas (12 octobre 2026, seconde passe)
 
 Signalé en jeu : « on ne récupère pas la récompense quand on regarde la vidéo en entier ». Le navigateur voit bien la vidéo finie (`videoTerminee`), mais la récompense n'est créditée que sur le reçu SIGNÉ qu'AppLixir envoie à notre serveur — et aucun n'a jamais été accepté.

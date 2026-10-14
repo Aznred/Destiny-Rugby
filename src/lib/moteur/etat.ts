@@ -694,6 +694,15 @@ export interface EtatMatch {
   plansCombinaisons?: Partial<Record<Cote, import('../ligue/combinaisons.js').Combinaison[]>>;
   combinaisonPreparee?: import('./combinaisons.js').CombinaisonPreparee;
   combinaisonEnCours?: import('./combinaisons.js').CombinaisonEnCours;
+  /**
+   * LE CAHIER VIVANT (Correctif 41, règles 11 d'une ligue) : les options conditionnelles d'une combinaison sont lues, la
+   * touche connaît le double faux saut, le changement de bloc et le maul, et le match retient ce que chaque plan a donné.
+   * Absent : le moteur rejoue exactement comme avant. Voir `lectureCombinaison.ts`.
+   */
+  cahierVivant?: boolean;
+  suiviCombinaison?: import('./lectureCombinaison.js').SuiviCombinaison | null;
+  bilansCombinaisons?: import('./lectureCombinaison.js').BilanCombinaisonMatch[];
+  memoireCombinaisons?: Partial<Record<Cote, Record<string, import('./lectureCombinaison.js').MemoireCombinaison>>>;
   /** Solo : mouvements naturels, horloge sportive sur dix minutes. */
   carriereDixMinutes?: boolean;
   /** Durée réelle d'un match arcade complet, en secondes. */

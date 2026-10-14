@@ -10,13 +10,21 @@ export interface SessionPub extends RecompensePub {
 }
 /** Les derniers callbacks refusés, tous comptes confondus : jamais d'identité, seulement la date et la raison. */
 export interface RefusPublicites { total: number; derniers: { le: number; refus: string; videoTerminee: boolean }[] }
-export interface RegistrePublicites { revision: number; sessions: SessionPub[]; stats: StatsPublicites }
+/** La progression d'un cosmétique « par publicité » : le serveur seul la fait avancer. `livre` : l'article est dans le coffre. */
+export interface EtatCosmetiquePub { progres: number; debloqueLe?: number; livre?: boolean }
+export interface RegistrePublicites { revision: number; sessions: SessionPub[]; stats: StatsPublicites; cosmetiques?: Record<string, EtatCosmetiquePub> }
 export interface StockagePublicites {
   lire(compte: string): Promise<RegistrePublicites | null>;
   trouver(session: string): Promise<SessionPub | null>;
   /** CAS, reçu AppLixir et crédit du coffre : une seule transaction. */
   ecrire(compte: string, revision: number | null, registre: RegistrePublicites, credit?: number, tid?: string): Promise<boolean>;
   statistiques(): Promise<StatsPublicites>;
+  /**
+   * Ajoute un cosmétique débloqué au coffre du compte (`achatsEquipements`, que la synchronisation du coffre réunit
+   * toujours à l'inventaire). Idempotent. Rend faux si le compte n'a pas encore de coffre : la livraison sera retentée.
+   * Facultatif : sans lui, le déblocage reste acquis dans le registre et l'écran l'applique à la lecture de la vue.
+   */
+  octroyerCosmetique?(compte: string, article: string): Promise<boolean>;
   /** Facultatif : le Labo s'en passe si la lecture échoue. */
   refus?(): Promise<RefusPublicites>;
 }
@@ -36,6 +44,16 @@ export function publicitesSql(sql: ExecuterSql): StockagePublicites {
       const lignes = await sql`select pub_ecrire(${compte}::uuid, ${revision}::int, ${JSON.stringify(registre)}::jsonb,
         ${credit}::bigint, ${tid ?? null}::text) as ok`;
       return lignes[0]?.ok === true;
+    },
+    async octroyerCosmetique(compte, article) {
+      // Une simple mise à jour du coffre, sans nouvelle table ni fonction : la même réunion que `sauvegarderBoutique`.
+      const lignes = await sql`update compte_boutique set donnees = donnees || jsonb_build_object(
+          'achatsEquipements', to_jsonb(array(select distinct v from jsonb_array_elements_text(
+            coalesce(donnees->'achatsEquipements','[]'::jsonb) || to_jsonb(array[${article}]::text[])) as a(v))),
+          'equipements', to_jsonb(array(select distinct v from jsonb_array_elements_text(
+            coalesce(donnees->'equipements','[]'::jsonb) || to_jsonb(array[${article}]::text[])) as a(v)))
+        ), modifie_le = now() where compte = ${compte}::uuid returning 1 as ok`;
+      return lignes.length > 0;
     },
     async refus() {
       const total = await sql`select coalesce(sum((donnees->'stats'->>'callbacksRefuses')::bigint),0) as n from pub_comptes`;
@@ -60,10 +78,15 @@ export function publicitesSql(sql: ExecuterSql): StockagePublicites {
         ) d) as distribution,
         (select coalesce(jsonb_object_agg(k, n),'{}'::jsonb) from (
           select k,sum(v::numeric) n from pub_comptes, jsonb_each_text(coalesce(donnees->'stats'->'distributionAttendue','{}'::jsonb)) d(k,v) group by k
-        ) d) as "distributionAttendue" from pub_comptes`;
+        ) d) as "distributionAttendue",
+        (select coalesce(jsonb_object_agg(k, n),'{}'::jsonb) from (
+          select k,sum(v::numeric) n from pub_comptes, jsonb_each_text(coalesce(donnees->'stats'->'contextes','{}'::jsonb)) d(k,v) group by k
+        ) d) as contextes from pub_comptes`;
       const l = lignes[0];
-      return { ...Object.fromEntries(Object.entries(l).filter(([k]) => k !== 'distribution' && k !== 'distributionAttendue').map(([k,v]) => [k,Number(v)])),
-        distribution: l.distribution, distributionAttendue: l.distributionAttendue } as StatsPublicites;
+      const objets = ['distribution', 'distributionAttendue', 'contextes'];
+      return { ...Object.fromEntries(Object.entries(l).filter(([k]) => !objets.includes(k)).map(([k,v]) => [k,Number(v)])),
+        distribution: l.distribution, distributionAttendue: l.distributionAttendue,
+        contextes: Object.fromEntries(Object.entries((l.contextes ?? {}) as Record<string, unknown>).map(([k, v]) => [k, Number(v)])) } as StatsPublicites;
     },
   };
 }

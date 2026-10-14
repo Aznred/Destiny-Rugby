@@ -39,9 +39,11 @@ export function RoulettePacksPub({ recompense,chances,onOuvrir,onFermer,audioIni
     const avancer = (instant: number) => {
       debut ??= instant;
       const t = Math.min(1,(instant-debut)/duree);
-      // Deux élans avec une courte suspension : pure mise en scène, résultat serveur fixe.
-      const progression = reduit ? courbe(t) : t < .7 ? .83*courbe(t/.7) : t < .76 ? .83 : .83+.17*courbe((t-.76)/.24);
-      if(fenetre.current) fenetre.current.dataset.feinte = !reduit && t>=.69 && t<.8 ? 'true' : 'false';
+      // ⚠️ UNE SEULE DÉCÉLÉRATION, JUSQU'AU PACK QUE LE SERVEUR A TIRÉ (Correctif 42). L'animation marquait un faux arrêt,
+      // repère allumé, sur une pochette prise au hasard six cases avant la bonne, puis repartait : quand cette case
+      // était un pack rare, c'était un « presque jackpot » fabriqué. Les pochettes qui défilent restent tirées aux vraies
+      // chances ; plus aucune n'est mise en avant à la place de celle qui a été gagnée.
+      const progression = courbe(t);
       position = 2 + (CIBLE-2)*progression;
       centrer();
       const pas = Math.floor(position);

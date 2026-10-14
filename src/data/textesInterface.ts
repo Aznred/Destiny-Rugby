@@ -7869,13 +7869,13 @@ export const TEXTES_INTERFACE: Record<string, Traduction> = {
     "ja": "ゲームノート "
   },
   "ui.37bd64e1da34": {
-    "fr": "Bêta Kiri",
-    "en": "Beta Kiri",
-    "es": "Beta Kiri",
-    "it": "Beta Kiri",
-    "de": "Beta Kiri",
-    "pt": "Beta Kiri",
-    "ja": "ベータ キリ"
+    "fr": "Bêta",
+    "en": "Beta",
+    "es": "Beta",
+    "it": "Beta",
+    "de": "Beta",
+    "pt": "Beta",
+    "ja": "ベータ"
   },
   "ui.6088dc3c7ad2": {
     "fr": "Crée tes combinaisons",

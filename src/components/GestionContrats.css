@@ -1,0 +1,83 @@
+/* L'assistant sportif des contrats (Correctif 41). */
+.assistant-contrats {
+  grid-column: span 12; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: .8rem 1.2rem; padding: 1rem 1.1rem;
+  border-color: var(--bordure-forte); background: linear-gradient(135deg, rgba(109, 58, 31, .22), rgba(18, 52, 32, .5));
+}
+.gc-entete { display: grid; gap: .2rem; min-width: 0; }
+.gc-entete b { display: inline-flex; align-items: center; gap: .45rem; font-family: var(--police-forte); }
+.gc-entete small { color: var(--or-400); font-size: .78rem; }
+.gc-entete p { margin: 0; color: var(--craie-dim); font-size: .76rem; }
+.gc-boutons { display: flex; gap: .55rem; flex-wrap: wrap; justify-content: flex-end; }
+.gc-boutons .btn { display: inline-flex; align-items: center; gap: .4rem; white-space: nowrap; }
+
+.carte.modale.gc-fenetre { width: min(46rem, calc(100vw - 1.5rem)); max-width: none; max-height: min(88vh, 54rem); display: flex; flex-direction: column; gap: .7rem; overflow: hidden; }
+.gc-tete { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.gc-tete h2 { display: inline-flex; align-items: center; gap: .5rem; margin: 0; }
+.gc-fermer { display: grid; place-items: center; width: 2.4rem; height: 2.4rem; border-radius: 50%; border: 1px solid rgba(255, 255, 255, .14); background: rgba(0, 0, 0, .25); color: var(--craie-dim); cursor: pointer; }
+.gc-fermer:hover { color: var(--craie); border-color: var(--bordure-forte); }
+.gc-resume { margin: 0; font-family: var(--police-forte); font-size: 1.02rem; color: var(--or-400); }
+.gc-compte, .gc-budget { display: flex; flex-wrap: wrap; gap: .4rem .6rem; margin: 0; font-size: .78rem; }
+.gc-compte span { padding: .28rem .6rem; border-radius: var(--rayon-pilule); background: rgba(255, 255, 255, .05); border: 1px solid rgba(255, 255, 255, .09); }
+.gc-budget { color: var(--craie-dim); gap: .4rem 1.1rem; }
+.gc-budget span { display: inline-flex; align-items: center; gap: .3rem; }
+.gc-budget .juste { color: #ffb0a3; }
+
+/* Un seul défilement pour toute la fenêtre : le pied (annuler, lancer) reste toujours à portée. */
+.gc-corps { flex: 1; min-height: 0; overflow-y: auto; display: grid; grid-auto-rows: min-content; align-content: start; gap: .65rem; padding-right: .25rem; }
+.gc-politique { margin: 0; padding: .55rem .8rem; border: 1px solid rgba(255, 255, 255, .09); border-radius: var(--rayon-sm); background: rgba(0, 0, 0, .18); }
+.gc-politique[open] { padding-bottom: .8rem; }
+.gc-politique > summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; min-height: 1.9rem; font-family: var(--police-forte); font-size: .68rem; letter-spacing: .1em; text-transform: uppercase; color: var(--brume); }
+.gc-politique > summary::-webkit-details-marker { display: none; }
+.gc-politique > summary svg { transition: transform .2s; }
+.gc-politique[open] > summary svg { transform: rotate(180deg); }
+.gc-politique label { margin-top: .45rem; }
+.gc-politique label { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: .7rem; font-size: .8rem; }
+.gc-choix { display: inline-flex; border: 1px solid rgba(255, 255, 255, .14); border-radius: 9px; overflow: hidden; flex-wrap: wrap; }
+.gc-choix button { min-height: 2.1rem; padding: .3rem .7rem; border: 0; background: transparent; color: var(--craie-dim); font: inherit; font-size: .74rem; cursor: pointer; transition: background .15s, color .15s; }
+.gc-choix button + button { border-left: 1px solid rgba(255, 255, 255, .1); }
+.gc-choix button:hover { color: var(--craie); background: rgba(255, 255, 255, .05); }
+.gc-choix button.actif { color: #1a1206; background: var(--or-500); font-weight: 600; }
+.gc-choix button:focus-visible { outline: 2px solid var(--or-400); outline-offset: -2px; }
+
+.gc-liste { list-style: none; margin: 0; padding: 0; display: grid; grid-auto-rows: min-content; align-content: start; gap: .25rem; }
+.gc-ligne { display: grid; grid-template-columns: minmax(9rem, 1.2fr) 6.2rem minmax(10rem, 1.6fr) 7rem; align-items: center; gap: .6rem; padding: .45rem .6rem; border-radius: 9px; background: rgba(255, 255, 255, .025); border: 1px solid rgba(255, 255, 255, .06); font-size: .8rem; }
+.gc-qui, .gc-decision, .gc-chiffre { display: grid; min-width: 0; }
+.gc-qui b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gc-ligne small { color: var(--brume); font-size: .68rem; }
+.gc-chiffre { text-align: right; font-family: var(--police-forte); font-size: .76rem; }
+.gc-statut { justify-self: start; padding: .18rem .55rem; border-radius: var(--rayon-pilule); font-size: .66rem; font-family: var(--police-forte); border: 1px solid rgba(255, 255, 255, .14); color: var(--craie-dim); }
+.gc-statut-cadre { color: var(--or-400); border-color: var(--bordure-forte); }
+.gc-statut-jeune { color: #bff0cf; border-color: rgba(52, 163, 90, .5); }
+.gc-statut-inutilise { color: #ffb0a3; border-color: rgba(224, 90, 77, .4); }
+.gc-ligne.gc-depart { border-color: rgba(224, 90, 77, .22); }
+.gc-ligne.gc-depart .gc-decision b { color: #ffb0a3; }
+.gc-ligne.gc-attendre .gc-decision b { color: var(--craie-dim); }
+.gc-ligne.gc-prolonger .gc-decision b, .gc-ligne.gc-revaloriser .gc-decision b { color: #bff0cf; }
+
+.gc-liste .gc-ligne[class*='gc-issue-'] { grid-template-columns: 1.9rem minmax(8rem, 1fr) minmax(12rem, 2fr); }
+.gc-marque { display: grid; place-items: center; width: 1.8rem; height: 1.8rem; border-radius: 50%; background: rgba(0, 0, 0, .3); color: var(--craie-dim); }
+.gc-issue-signe { border-color: rgba(52, 163, 90, .35); }
+.gc-issue-signe .gc-marque { color: #1a1206; background: var(--succes); }
+.gc-issue-echec .gc-marque, .gc-issue-refus .gc-marque { color: #ffb0a3; }
+.gc-issue-echec .gc-decision b, .gc-issue-refus .gc-decision b { color: #ffb0a3; font-weight: 500; }
+.gc-issue-depart .gc-decision b, .gc-issue-attente .gc-decision b { color: var(--craie-dim); font-weight: 500; }
+.gc-vide { margin: .6rem 0; color: var(--craie-dim); }
+.gc-fenetre .rangee-fin { margin-top: .2rem; }
+
+.contrats-effectif-manager article.depart-acte { opacity: .72; border-style: dashed; }
+.contrats-effectif-manager .marque-depart { color: #ffb0a3; }
+
+@media (max-width: 760px) {
+  .assistant-contrats { grid-template-columns: 1fr; }
+  .gc-boutons { justify-content: stretch; }
+  .gc-boutons .btn { flex: 1; justify-content: center; min-height: 44px; }
+  .gc-politique label { grid-template-columns: 1fr; gap: .3rem; }
+  .gc-choix { width: 100%; }
+  .gc-choix button { flex: 1; min-height: 2.6rem; }
+  .gc-ligne { grid-template-columns: minmax(0, 1fr) auto; }
+  .gc-ligne .gc-decision { grid-column: 1 / -1; }
+  .gc-ligne .gc-chiffre { grid-row: 1; grid-column: 2; }
+  .gc-ligne .gc-statut { grid-row: 2; grid-column: 2; justify-self: end; }
+  .gc-liste .gc-ligne[class*='gc-issue-'] { grid-template-columns: 1.9rem minmax(0, 1fr); }
+  .gc-liste .gc-ligne[class*='gc-issue-'] .gc-decision { grid-column: 2; }
+}

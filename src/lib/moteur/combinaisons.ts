@@ -1,4 +1,5 @@
-import { choisirCombinaison, choisirVariante, etapesCombinaison, lancerApresBloc, placementsPersonnalises, receptionTouche, toucheValide, type Combinaison, type EtapeCombinaison, type PhaseCombinaison, type PointCombinaison, type VarianteCombinaison } from '../ligue/combinaisons.js';
+import { alignementCombinaison, choisirCombinaison, choisirVariante, etapesCombinaison, lancerApresBloc, placementsPersonnalises, porteursParEtape, receptionTouche, toucheValide, type Combinaison, type EtapeCombinaison, type PhaseCombinaison, type PointCombinaison, type VarianteCombinaison } from '../ligue/combinaisons.js';
+import { cahierVivant, candidatsDeLaSituation, memoireTactique, ouvrirSuivi } from './lectureCombinaison.js';
 import type { EtatMatch } from './etat.js';
 import { stopper, type Pion } from './entites.js';
 import { placementTouche } from './phasesArretees.js';
@@ -13,6 +14,8 @@ export interface CombinaisonEnCours extends CombinaisonPreparee {
   debut: number;
   courses: Record<number, PointCombinaison>;
   etapes: EtapeCombinaison[];
+  /** Cahier vivant : la dernière étape dont les options ont été lues (une lecture par étape). */
+  lue?: number;
 }
 export function joueurCombinaison(e: EtatMatch, cote: Cote, numero: number): Pion | undefined {
   return e.pions.find(p => p.cote === cote && p.numero === numero && p.surLeTerrain && p.sanction <= 0);
@@ -20,12 +23,18 @@ export function joueurCombinaison(e: EtatMatch, cote: Cote, numero: number): Pio
 /** Vérifie la situation sans tirer de variante ni consommer l'aléatoire. */
 export function combinaisonSituation(e: EtatMatch, phase: PhaseCombinaison): Combinaison | undefined {
   const cote = e.possession;
+  const jouables = (plan: Combinaison) => plan.variantes.filter(v => joueurCombinaison(e, cote, phase === 'touche' ? v.sauteur : v.depart)
+    && (phase !== 'touche' || joueurCombinaison(e, cote, 2))
+    && v.actions.every(a => a.type !== 'passe' || joueurCombinaison(e, cote, a.destinataire)));
+  if (cahierVivant(e)) {
+    // Parmi les plans aussi adaptés à la situation, celui que le match a vu marcher — ou qu'il n'a pas encore essayé.
+    const candidats = candidatsDeLaSituation(e, phase).flatMap(plan => { const variantes = jouables(plan); return variantes.length ? [{ ...plan, variantes }] : []; });
+    return memoireTactique(e.memoireCombinaisons?.[cote], candidats);
+  }
   const plan = choisirCombinaison(e.plansCombinaisons?.[cote] ?? [], phase,
     cote === 'A' ? e.ballon.x - LIGNE_A : LIGNE_B - e.ballon.x, sens(cote) === 1 ? e.ballon.y : 70 - e.ballon.y);
   if (!plan) return undefined;
-  const variantes = plan.variantes.filter(v => joueurCombinaison(e, cote, phase === 'touche' ? v.sauteur : v.depart)
-    && (phase !== 'touche' || joueurCombinaison(e, cote, 2))
-    && v.actions.every(a => a.type !== 'passe' || joueurCombinaison(e, cote, a.destinataire)));
+  const variantes = jouables(plan);
   return variantes.length ? { ...plan, variantes } : undefined;
 }
 export function preparerCombinaison(e: EtatMatch, phase: PhaseCombinaison): void {
@@ -52,6 +61,27 @@ export function preparerCombinaison(e: EtatMatch, phase: PhaseCombinaison): void
     e.conquete.cibleId = sauteur.id;
     if (lancerApresBloc(variante)) { e.conquete.horsAlignement = true; e.conquete.reception = receptionTouche(e.ballon, variante, s); }
     else { delete e.conquete.horsAlignement; delete e.conquete.reception; }
+    if (cahierVivant(e)) {
+      // L'annonce de l'IA pour cette touche (faux sauts, sauteur qui vient d'ailleurs, peel) ne déborde pas sur le plan
+      // du club : son sauteur n'est pas celui qu'elle visait, et il courrait à une place qui n'est pas la sienne.
+      delete e.conquete.feintes; delete e.conquete.glissement; delete e.conquete.leurreId; delete e.conquete.peelId;
+    }
+    if (cahierVivant(e) && !e.conquete.horsAlignement) {
+      // Les autres alignés, du premier bloc au fond : ce sont eux qui montent pour de faux, ou dont le sauteur emprunte le bloc.
+      const autres = alignementCombinaison(variante).map(a => joueurCombinaison(e, cote, a.numero)).filter((p): p is Pion => !!p && p !== sauteur);
+      if (t.doubleFeinte && autres.length >= 2) {
+        const feintes = [autres[0].id, autres[autres.length - 1].id];
+        e.conquete.feintes = feintes; e.conquete.leurreId = feintes[0];
+      }
+      const voisin = autres.length ? autres.reduce((loin, p) => Math.abs(p.pos.y - sauteur.pos.y) > Math.abs(loin.pos.y - sauteur.pos.y) ? p : loin) : undefined;
+      if (t.glissement && voisin && e.placement?.[sauteur.id]) {
+        // Changement de bloc : il attend à hauteur d'un autre bloc, en retrait, et n'entre à sa place qu'au dernier moment.
+        const vers = { ...e.placement[sauteur.id] };
+        const de = { x: borner(vers.x - s * 1.6, LIGNE_A - 2, LIGNE_B + 2), y: (e.placement[voisin.id] ?? voisin.pos).y };
+        e.conquete.glissement = { de, vers, jusqua: 0.14 };
+        e.placement[sauteur.id] = { ...de }; sauteur.pos = { ...de }; sauteur.cible = { ...de };
+      }
+    }
   }
 }
 
@@ -64,10 +94,20 @@ export function demarrerCombinaison(e: EtatMatch, lieu: Vec, porteurImpose?: Pio
   if (!premier) return false;
   const origine = preparee.origineConquete ?? lieu;
   const localY = sens(preparee.cote) === 1 ? origine.y : 70 - origine.y;
+  const etapes = etapesCombinaison(preparee.variante.actions);
+  let index = 0;
+  if (cahierVivant(e) && preparee.plan.phase === 'touche' && premier.numero !== preparee.variante.sauteur) {
+    // Le ballon ne sort pas des mains du sauteur (il ressort d'un maul, servi au 9) : la combinaison reprend au geste de
+    // celui qui le tient. Si personne, dans la suite, ne part de lui, il n'y a rien à raccorder : jeu libre.
+    const attendus = porteursParEtape('touche', preparee.variante);
+    index = etapes.findIndex((_, i) => i > 0 && attendus[i] === premier.numero);
+    if (index < 0) return false;
+  }
   const enCours: CombinaisonEnCours = { ...preparee, origine: { ...origine },
     miroir: preparee.plan.couloir === 'tous' && localY > 35 ? -1 : 1,
-    index: 0, depuis: e.sim, debut: e.sim, courses: {}, etapes: etapesCombinaison(preparee.variante.actions) };
+    index, depuis: e.sim, debut: e.sim, courses: {}, etapes };
   e.combinaisonEnCours = enCours;
+  ouvrirSuivi(e, enCours);
   const chaine = [premier, ...preparee.variante.actions.flatMap(a => a.type === 'passe' ? [joueurCombinaison(e, preparee.cote, a.destinataire)!] : [])];
   e.lancement = { type: 'large', chaine, index: 0, libelle: `${preparee.plan.nom} · ${preparee.variante.nom}` };
   e.porteur = premier;

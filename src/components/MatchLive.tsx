@@ -103,6 +103,7 @@ import { situationInternationale } from '../lib/rassemblements';
 // ⚠️ `createPortal(document.body)` obligatoire : le `backdrop-filter` des
 // `.carte` crée un bloc conteneur qui piège les `position: fixed`.
 
+import { equiperLesClubsIA, metaDisponible } from '../lib/iaCommunautaire';
 import { MONDE_FEMININ } from '../lib/mondeActif';
 import { Icone } from './Icone';
 import { IconeEmoji, TexteIcones } from './TexteIcones';
@@ -589,8 +590,14 @@ export function MatchLive({
           compositionB: feuilleManager, tactiqueB: manager.tactique,
           capitaineBId: compoManager.capitaineId, buteurBId: compoManager.buteurId,
         } : {}),
+        // L'IA COMMUNAUTAIRE (Correctif 41) : s'il existe des combinaisons qui ont fait leurs preuves en match, les clubs
+        // que personne n'entraîne en reçoivent un cahier. Sans méta, le match se crée et se joue exactement comme avant.
+        ...(metaDisponible() ? { cahierVivant: true } : {}),
       },
     );
+    // Jamais le camp du joueur : celui qu'il conduit ou qu'il entraîne garde son jeu.
+    const cotesHumains = [coteManager, monEquipe === match.domicile ? 'A' as const : monEquipe === match.exterieur ? 'B' as const : null].filter((c): c is 'A' | 'B' => c !== null);
+    equiperLesClubsIA(moteur.current, { A: effectifA, B: effectifB }, cle.split('#').slice(0, 2).join('#'), cotesHumains);
   }
   const e = moteur.current;
   const equipeConfiguree = useRef(false);

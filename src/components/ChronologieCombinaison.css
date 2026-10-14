@@ -1,0 +1,22 @@
+/* La chronologie d'une combinaison (Correctif 41) : une frise, pas un tableau. */
+.chrono { display: grid; gap: .5rem; padding: .8rem .9rem; border: 1px solid rgba(255, 255, 255, .09); border-radius: var(--rayon-sm); background: rgba(0, 0, 0, .2); }
+.chrono.compacte { padding: .55rem .7rem; }
+.chrono header { display: flex; flex-wrap: wrap; align-items: baseline; gap: .3rem .8rem; }
+.chrono header b { display: inline-flex; align-items: center; gap: .4rem; font-family: var(--police-forte); }
+.chrono header small { color: var(--brume); font-size: .72rem; }
+.chrono ol { list-style: none; margin: 0; padding: 0; display: flex; gap: .35rem; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin; padding-bottom: .2rem; }
+.chrono li { flex: none; position: relative; min-width: 8.6rem; border-radius: 9px; border: 1px solid rgba(255, 255, 255, .08); background: rgba(255, 255, 255, .03); }
+.chrono li::before { content: ''; position: absolute; left: 0; top: 0; height: 2px; width: var(--chrono-position, 0%); max-width: 100%; background: linear-gradient(90deg, var(--pelouse-400), var(--or-500)); border-radius: 2px; }
+.chrono li > button, .chrono li:not(:has(> button)) { display: grid; gap: .15rem; padding: .45rem .6rem; text-align: left; }
+.chrono li > button { width: 100%; }
+.chrono li > button { border: 0; background: none; color: inherit; font: inherit; cursor: pointer; border-radius: 9px; }
+.chrono li > button:hover { background: rgba(255, 255, 255, .05); }
+.chrono li > button:focus-visible { outline: 2px solid var(--or-400); outline-offset: -2px; }
+.chrono li.active { border-color: var(--bordure-forte); background: rgba(232, 178, 58, .09); }
+.chrono-depart { border-style: dashed !important; }
+.chrono-temps { font-family: var(--police-forte); font-size: .8rem; color: var(--or-400); font-variant-numeric: tabular-nums; }
+.chrono-temps i { font-style: normal; font-family: var(--police); font-size: .66rem; color: var(--brume); }
+.chrono-geste { display: inline-flex; align-items: center; gap: .35rem; font-size: .74rem; color: var(--craie-dim); }
+.chrono-note, .chrono-vide { margin: 0; color: var(--brume); font-size: .72rem; }
+@media (max-width: 560px) { .chrono li { min-width: 7.6rem; } }
+.chrono-recu { font-size: .66rem; color: var(--brume); }

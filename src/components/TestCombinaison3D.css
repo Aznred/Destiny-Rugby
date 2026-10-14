@@ -1,0 +1,51 @@
+/* « Tester en 3D » (Correctif 41) : la scène du match prend la place, les réglages restent à portée de pouce. */
+.t3-fond { position: fixed; inset: 0; z-index: 1200; background: #060d09; overflow: auto; overscroll-behavior: contain; }
+.t3 {
+  min-height: 100dvh; display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto auto auto auto; gap: .7rem;
+  padding: .9rem clamp(.8rem, 2.4vw, 1.6rem) 1.1rem; color: var(--craie);
+  background: radial-gradient(ellipse at 78% 0, rgba(32, 56, 43, .9), transparent 62%), #0a1410;
+}
+.t3-tete { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+.t3-tete h2 { margin: .15rem 0 0; font-family: var(--police-forte); font-size: clamp(1.15rem, 2.2vw, 1.5rem); }
+.t3-fermer { display: grid; place-items: center; width: 2.6rem; height: 2.6rem; flex: none; border-radius: 50%; border: 1px solid rgba(255, 255, 255, .16); background: rgba(0, 0, 0, .3); color: var(--craie-dim); cursor: pointer; }
+.t3-fermer:hover { color: var(--craie); border-color: var(--bordure-forte); }
+
+.t3-reglages, .t3-commandes { display: flex; flex-wrap: wrap; align-items: center; gap: .55rem 1rem; }
+.t3-reglages label, .t3-commandes label { display: inline-flex; align-items: center; gap: .5rem; font-size: .74rem; color: var(--brume); }
+.t3-segments { display: inline-flex; flex-wrap: wrap; border: 1px solid rgba(255, 255, 255, .15); border-radius: 10px; overflow: hidden; }
+.t3-segments button { min-height: 2.2rem; padding: .3rem .75rem; border: 0; background: rgba(0, 0, 0, .22); color: var(--craie-dim); font: inherit; font-size: .76rem; cursor: pointer; transition: background .15s, color .15s; }
+.t3-segments button + button { border-left: 1px solid rgba(255, 255, 255, .1); }
+.t3-segments button:hover { color: var(--craie); background: rgba(255, 255, 255, .06); }
+.t3-segments button.actif { color: #1a1206; background: var(--or-500); font-weight: 600; }
+.t3-segments button:focus-visible, .t3-fermer:focus-visible { outline: 2px solid var(--or-400); outline-offset: -2px; }
+.t3-case { cursor: pointer; }
+.t3-case input { width: 1.05rem; height: 1.05rem; accent-color: var(--or-500); }
+.t3-case span { color: var(--craie-dim); }
+
+.t3-scene { position: relative; min-height: 46dvh; border-radius: var(--rayon); overflow: hidden; border: 1px solid var(--bordure); background: #071108; box-shadow: var(--ombre-3); }
+.t3-scene .terrain-3d { position: absolute; inset: 0; }
+.t3-message { position: absolute; inset: 0; display: grid; place-items: center; margin: 0; padding: 1.5rem; text-align: center; color: var(--craie-dim); }
+.t3-issue {
+  position: absolute; left: 50%; bottom: .8rem; transform: translateX(-50%); max-width: calc(100% - 1.6rem); padding: .4rem .9rem;
+  border-radius: var(--rayon-pilule); font-size: .78rem; text-align: center; color: var(--craie-dim);
+  background: rgba(6, 13, 9, .78); border: 1px solid rgba(255, 255, 255, .12); pointer-events: none;
+}
+.t3-issue.finie { color: var(--craie); border-color: rgba(224, 90, 77, .5); background: rgba(40, 14, 12, .86); font-family: var(--police-forte); }
+.t3-issue.finie.reussie { border-color: rgba(72, 196, 122, .6); background: rgba(12, 44, 26, .9); color: #d5ffe3; }
+
+.t3-commandes .btn { display: inline-flex; align-items: center; gap: .4rem; }
+.t3-bilan { display: flex; flex-wrap: wrap; gap: .4rem .55rem; margin: 0; font-size: .78rem; }
+.t3-bilan span { padding: .28rem .65rem; border-radius: var(--rayon-pilule); background: rgba(255, 255, 255, .05); border: 1px solid rgba(255, 255, 255, .09); }
+.t3-note { margin: 0; color: var(--brume); font-size: .72rem; }
+
+@media (max-width: 760px) {
+  .t3 { gap: .55rem; padding: .7rem .7rem 1rem; }
+  .t3-scene { min-height: 40dvh; }
+  .t3-reglages label, .t3-commandes label { width: 100%; justify-content: space-between; }
+  .t3-commandes .btn { flex: 1; justify-content: center; min-height: 44px; }
+  .t3-segments button { min-height: 2.6rem; flex: 1; }
+}
+@media (min-width: 1121px) {
+  .t3-scene { min-height: 58dvh; }
+}
+.t3-bilan .t3-option { border-color: rgba(232, 178, 58, .55); color: #f4cd63; }

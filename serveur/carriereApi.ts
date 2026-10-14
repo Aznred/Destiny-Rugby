@@ -14,6 +14,8 @@ import { configurationPush, envoyerPush, idPush, notifierMatchs, validerAbonneme
 import { agirCarriere, avancerCarriere as actualiserCarriere, avancerCarrierePourDirect, creerCarriere, creerDivisionPublique, creerLaboratoireCarriere, memeEtatDurable, vueCarriere, vueCarriereObservateur, vueRencontreCarriere, vueRencontreCarriereObservateur } from '../src/lib/ligue/carriere.js';
 import { planifierDivisionsPubliques } from './divisionsPubliques.js';
 import { creerMarcheCommun } from './marcheCommun.js';
+import { creerMarcheCombinaisons, RefusMarche } from './marcheCombinaisons.js';
+import { MOTIFS_SIGNALEMENT, type MotifSignalement } from '../src/lib/ligue/marcheCombinaisons.js';
 import { creerReprises } from './reprisesMatch.js';
 import { differenceVue } from '../src/lib/ligue/deltaVue.js';
 import { assemblerStatistiques, jourUTC, validerEnvoi, type PeriodeUsage } from '../src/lib/usage/agregats.js';
@@ -36,7 +38,7 @@ import { cleJoueurImage, imagesDepuisDemandes, validerDemandeImage, type ImagesJ
 import { apparencePackInterne, contenuPackInterne, detailPackInterne, rechercherCartes, resoudreCartes, universCartes } from './packsInternes.js';
 import { creerServicePublicites, configPublicites, raisonModePublicites, packPourPublicites, parametresCallbackAppLixir, resumeCallback, type RefusCallback } from './publicitesRecompensees.js';
 import { ouvrirPackPublicitaire, reserverPackPublicitaire, packPublicitaireDisponible } from '../src/lib/ligue/carriere.js';
-import { chancesPacksPub, PUBLICITES_PAR_DEFAUT } from '../src/lib/publicitesRecompensees.js';
+import { chancesPacksPremium, chancesPacksPub, completerConfigPublicites, CONTEXTES_PUB, type ContextePub } from '../src/lib/publicitesRecompensees.js';
 import { creerServiceValidation, dossierPublic } from './validationClassement.js';
 
 export interface RequeteCarriere {
@@ -56,6 +58,16 @@ export interface ReponseCarriere {
   envoyer?(donnees: Uint8Array): unknown;
 }
 class ErreurHttp extends Error { constructor(public statut: number, message: string) { super(message); } }
+/**
+ * LE CAHIER DE COMBINAISONS ET SON MARCHÉ sont ouverts à tous les comptes connectés (14 octobre 2026). Les deux vont
+ * ensemble : un marché sans cahier n'aurait rien à publier, un cahier sans marché priverait l'IA communautaire de sa
+ * méta. Remettre les deux à `false` rend la bêta du compte interne : l'onglet disparaît (`featureFlags.combinaisons`),
+ * le serveur refuse un cahier configuré (`accesCombinaisonsBeta` dans `agirCarriere`) et le marché répond 403. La
+ * modération (retirer, rétablir) reste au compte interne dans tous les cas.
+ */
+const CAHIER_COMBINAISONS_OUVERT = true;
+const MARCHE_COMBINAISONS_OUVERT = true;
+const accesCahier = (c: { identifiant: string }) => CAHIER_COMBINAISONS_OUVERT || c.identifiant === 'kiri';
 const COOKIE = 'destiny_carriere';
 const DUREE_SESSION = 30 * 24 * 60 * 60_000;
 const DEUX_SEMAINES = 14 * 24 * 60 * 60_000;
@@ -196,7 +208,7 @@ function allegerDirect(rencontre: { match?: unknown }, annonce: string | null): 
 }
 
 /** Aucune empreinte, graine ou identité privée ne part dans la vue. */
-const publicCompte = (c: CompteStocke) => ({ id: c.id, pseudo: c.pseudo, administrateur: c.identifiant === 'kiri', featureFlags: { womensRugby: contexteFfr.getStore()?.authorized === true } });
+const publicCompte = (c: CompteStocke) => ({ id: c.id, pseudo: c.pseudo, administrateur: c.identifiant === 'kiri', featureFlags: { womensRugby: contexteFfr.getStore()?.authorized === true, combinaisons: accesCahier(c) } });
 const comptesEtat = (e: EtatCarriereEnLigne) => e.clubs.map(c => c.compteId);
 
 export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer?: (etat: EtatCarriereEnLigne) => Promise<void>) {
@@ -363,6 +375,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
   const permissionsPacks = new Map<string, { valeur: boolean; jusqua: number }>();
   // La liste publique des portraits retirés ou remplacés : une lecture de la base par instance et par cinq minutes au plus.
   let imagesJoueurs: { jusqua: number; liste: ImagesJoueurs } | null = null;
+  const marcheCombinaisons = stockage.marcheCombinaisons ? creerMarcheCombinaisons(stockage.marcheCombinaisons) : null;
   /** `comptes.vu_le` sert à repérer les comptes inactifs depuis deux semaines : dix minutes de précision suffisent. */
   const PAS_VU_LE_MS = 10 * 60_000;
   const lireSalonAmical = async (code: string): Promise<SalonAmicalServeur | null> => {
@@ -573,6 +586,10 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         await stockage.snapshotFfr(ligne,VERSION_PROTECTION_FFR);
       }
       const suivant = await ffr.avecPool(presence.etat.publique ? 'mixed' : presence.etat.playerPool ?? 'men', () => operation(presence.etat, maintenant, randomBytes(24).toString('hex')));
+      // Les matchs terminés versent au marché ce que ses combinaisons ont donné. Le marché refuse un match déjà compté :
+      // si l'écriture de la ligue échoue et qu'on recommence, rien n'est compté deux fois. Marché fermé : la file attend.
+      if (suivant.remonteesCombinaisons?.length && marcheCombinaisons
+        && await marcheCombinaisons.verser(suivant.remonteesCombinaisons).catch(() => false)) delete suivant.remonteesCombinaisons;
       // Une présence extérieure sert au calcul de la décision, puis disparaît
       // du gros agrégat. Sa petite ligne dédiée reste la seule source durable.
       const durable = presence.externes ? sansPresences(suivant) : suivant;
@@ -934,6 +951,13 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         if (definition?.imageReady && (definition.published || definition.publieeLe)) return await servirImageSpeciale(true);
       }
 
+      // ═══ L'IA COMMUNAUTAIRE — lecture publique ═════════════════════════════
+      // Les combinaisons qui ont fait leurs preuves en match (échantillon minimum, score issu des résultats). Sans compte :
+      // les clubs sans entraîneur des carrières solo s'en servent. Dix minutes de cache, ici comme chez le navigateur.
+      if (req.method === 'GET' && url.searchParams.has('metaCombinaisons')) {
+        res.setHeader('Cache-Control', 'public, max-age=600, s-maxage=600');
+        return res.status(200).json({ meta: marcheCombinaisons ? await marcheCombinaisons.meta().catch(() => []) : [] });
+      }
       // ═══ « MON IMAGE » — lectures publiques ════════════════════════════════
       // La liste des portraits retirés ou remplacés à la demande des joueurs, et les portraits ACCEPTÉS eux-mêmes. Sans
       // compte : chaque écran du jeu les applique. L'adresse d'un portrait porte la révision de la liste, donc le cache long ne ment pas.
@@ -961,7 +985,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
 
       const corps = req.method === 'POST' ? objet(typeof req.body === 'string' ? JSON.parse(req.body) : req.body) : {};
       // Le Labo envoie des images de cartes (350 Ko) et des lots d'import ; « Mon image », un portrait de 600 px.
-      const tailleMax = corps.action === 'sauvegarderBoutique' ? 4_000_000 : corps.action === 'atelier' ? 1_000_000 : corps.action === 'demandeImage' ? 300_000 : corps.action === 'demandesCartes' ? 110_000 : 24_000;
+      const tailleMax = corps.action === 'sauvegarderBoutique' ? 4_000_000 : corps.action === 'atelier' ? 1_000_000 : corps.action === 'demandeImage' ? 300_000 : corps.action === 'demandesCartes' ? 110_000 : corps.action === 'marcheCombinaisons' ? 60_000 : 24_000;
       const corpsJson = JSON.stringify(corps);
       if (corpsJson.length > tailleMax) throw new ErreurHttp(413, 'Demande trop volumineuse.');
       const action = corps.action;
@@ -1168,6 +1192,44 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
           return res.status(200).json({ demandes: await depot.lister(null), revisionCatalogue: corps.operation === 'approuver' ? catalogueAdmin().revision + 1 : catalogueAdmin().revision });
         } catch (e) { if (e instanceof ErreurHttp) throw e; throw new ErreurHttp(400,(e as Error).message); }
       }
+      // ═══ LE MARCHÉ DES COMBINAISONS ════════════════════════════════════════
+      // Lire, publier (nouvelle fiche ou nouvelle version), ajouter à ses tactiques, noter, signaler, retirer. Tout ce qui
+      // arrive du navigateur repasse par les règles de `lib/ligue/marcheCombinaisons.ts` ; il n'envoie jamais de statistique.
+      if (url.searchParams.has('marcheCombinaisons') || action === 'marcheCombinaisons') {
+        const moderateur = compte.identifiant === 'kiri';
+        if (!moderateur && !MARCHE_COMBINAISONS_OUVERT) throw new ErreurHttp(403, 'FORBIDDEN');
+        if (!marcheCombinaisons) throw new ErreurHttp(503, 'Marché indisponible sur ce serveur.');
+        res.setHeader('Cache-Control', 'private, no-store');
+        const idFiche = (v: unknown) => (typeof v === 'string' && /^[0-9a-f-]{36}$/.test(v) ? v : null);
+        if (req.method === 'GET') {
+          const id = idFiche(url.searchParams.get('marcheCombinaisons'));
+          if (!id) return res.status(200).json({ fiches: await marcheCombinaisons.liste(compte.id, moderateur) });
+          const detail = await marcheCombinaisons.detail(id, compte.id, moderateur);
+          if (!detail) throw new ErreurHttp(404, 'Combinaison introuvable.');
+          return res.status(200).json({ detail });
+        }
+        const operation = corps.operation;
+        try {
+          if (operation === 'publier') {
+            if (!await stockage.limiter(`marche-combinaisons:${compte.id}`, 10, 3_600_000, maintenant)) throw new ErreurHttp(429, 'quotaJour');
+            return res.status(200).json({ detail: await marcheCombinaisons.publier(compte.id, compte.pseudo, corps, maintenant) });
+          }
+          const id = idFiche(corps.id);
+          if (!id) throw new ErreurHttp(400, 'Combinaison invalide.');
+          if (!await stockage.limiter(`marche-actions:${compte.id}`, 120, 3_600_000, maintenant)) throw new ErreurHttp(429, 'Trop de demandes. Réessaie plus tard.');
+          const detail = operation === 'ajouter' ? await marcheCombinaisons.ajouter(id, compte.id)
+            : operation === 'noter' ? await marcheCombinaisons.noter(id, compte.id, Number(corps.note))
+            : operation === 'signaler' && MOTIFS_SIGNALEMENT.includes(corps.motif as MotifSignalement) ? await marcheCombinaisons.signaler(id, compte.id, corps.motif as MotifSignalement)
+            : operation === 'retirer' || operation === 'retablir' ? await marcheCombinaisons.moderer(id, operation, compte.id, moderateur)
+            : null;
+          if (!detail) throw new ErreurHttp(operation === 'retablir' && !moderateur ? 403 : 409, 'Action impossible sur cette combinaison.');
+          return res.status(200).json({ detail });
+        } catch (erreur) {
+          // Le refus porte sa raison : l'écran la traduit (« déjà publiée », « copie », « nom refusé »…).
+          if (erreur instanceof RefusMarche) return res.status(409).json({ erreur: 'Publication refusée.', refus: erreur.raison });
+          throw erreur;
+        }
+      }
       // ═══ « MON IMAGE » — demandes et décisions ═════════════════════════════
       // Un compte demande le retrait de son portrait, ou propose le sien ; RIEN ne s'applique avant la décision du compte
       // interne (n'importe qui peut prétendre être n'importe qui). ⚠️ Décider est réservé à l'identifiant serveur `kiri`.
@@ -1306,18 +1368,25 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         const packs = ligne ? await ffr.avecPool('mixed', () =>
           cataloguePacksPublicitaires()
             .map(packPourPublicites).filter(p => packPublicitaireDisponible(ligne.etat,p,maintenant))) : [];
-        if (req.method === 'GET') return res.status(200).json(await pubs.vue(compte.id, packs, ligueId, maintenant));
+        // ── Correctif 42 : la roulette Premium tire dans les packs de la Collection solo. Elle ne se calcule que hors
+        // d'une ligue (Boutique, Collection) : un sondage de ligue ne paie pas ce catalogue.
+        const premium = async () => (ligne ? [] : await ffr.avecPool('mixed', () => cataloguePacksPublicitaires().map(packPourPublicites)));
+        if (req.method === 'GET') return res.status(200).json(await pubs.vue(compte.id, packs, ligueId, maintenant, { packsPremium: await premium() }));
         if (!await stockage.limiter(`pub:${compte.id}`,60,60000,maintenant)) throw new ErreurHttp(429, 'Patiente quelques instants.');
         if (corps.operation === 'commencer') {
-          if (corps.contexte !== 'SHOP_OVAS' && corps.contexte !== 'DAILY_PACK') throw new ErreurHttp(400, 'Récompense invalide.');
-          if (corps.contexte === 'SHOP_OVAS' && !await stockage.boutique(compte.id)) throw new ErreurHttp(409, 'La synchronisation du compte est en cours.');
-          return res.status(200).json(await pubs.commencer(compte.id, corps.contexte, packs, ligueId, maintenant));
+          const contexte = (CONTEXTES_PUB as readonly unknown[]).includes(corps.contexte) ? corps.contexte as ContextePub : null;
+          if (!contexte) throw new ErreurHttp(400, 'Récompense invalide.');
+          // Des Ovas, un cosmétique : la récompense va dans le coffre du compte, qui doit exister.
+          if ((contexte === 'SHOP_OVAS' || contexte === 'COSMETIC') && !await stockage.boutique(compte.id)) throw new ErreurHttp(409, 'La synchronisation du compte est en cours.');
+          const article = contexte === 'COSMETIC' ? texte(corps.article,1,80,'Cosmétique') : undefined;
+          return res.status(200).json(await pubs.commencer(compte.id, contexte, packs, ligueId, maintenant,
+            { article, packsPremium: contexte === 'SHOP_PREMIUM_PACK' ? await premium() : [] }));
         }
         const id = texte(corps.rewardSessionId,36,36,'Publicité');
         if (!idValide(id)) throw new ErreurHttp(400, 'Publicité invalide.');
         if (corps.operation === 'evenement') return res.status(200).json({ ok: await pubs.evenement(compte.id,id,String(corps.evenement)) });
         if (corps.operation === 'reclamer') {
-          const resultat = await pubs.reclamer(compte.id,id);
+          const resultat = await pubs.reclamer(compte.id,id,maintenant);
           const r = resultat.recompense;
           if (resultat.statut === 'RESERVED' && r.pack && r.ligue) {
             await appliquer(r.ligue,compte.id,`reserve-pub-${id}`,
@@ -1325,6 +1394,8 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
           }
           return res.status(200).json(resultat);
         }
+        // Le pack Premium gagné : rendu une seule fois, à l'instant où il est marqué ouvert.
+        if (corps.operation === 'ouvrirPremium') return res.status(200).json(await pubs.ouvrirPremium(compte.id,id));
         throw new ErreurHttp(400, 'Opération publicitaire inconnue.');
       }
       if (url.searchParams.has('atelier') || action === 'atelier') {
@@ -1334,7 +1405,8 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
           if (section === 'publicites') {
             if (!stockage.publicites) throw new ErreurHttp(503, 'Publicités indisponibles.');
             const packs = await ffr.avecPool('mixed', () => cataloguePacksPublicitaires().map(packPourPublicites));
-            return res.status(200).json({ revision: catalogueAdmin().revision, config: { ...PUBLICITES_PAR_DEFAUT, ...catalogueAdmin().publicites },
+            return res.status(200).json({ revision: catalogueAdmin().revision, config: completerConfigPublicites(catalogueAdmin().publicites),
+              chancesPremium: chancesPacksPremium(packs, completerConfigPublicites(catalogueAdmin().publicites), maintenant),
               modeEffectif: configPublicites().mode, raisonMode: raisonModePublicites(), callbackConfigure: Boolean(process.env.APPLIXIR_CALLBACK_SECRET),
               packs, chances: chancesPacksPub(packs,maintenant), statistiques: await stockage.publicites.statistiques(),
               // Le journal des callbacks refusés : facultatif, il ne doit jamais retirer la page au Labo.
@@ -1900,9 +1972,9 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         const e = await appliquer(id, compte.id, requete, (e, n, g) => {
           avantCommande = e;
           if (commande.type === 'reglerPool' && (commande.pool === 'men' || commande.pool === 'women' || commande.pool === 'mixed')) {
-            return ffr.avecPool(commande.pool, () => agirCarriere(e, compte.id, commande as unknown as CommandeCarriere, n, g, compte.identifiant === 'kiri'));
+            return ffr.avecPool(commande.pool, () => agirCarriere(e, compte.id, commande as unknown as CommandeCarriere, n, g, accesCahier(compte)));
           }
-          return agirCarriere(e, compte.id, commande as unknown as CommandeCarriere, n, g, compte.identifiant === 'kiri');
+          return agirCarriere(e, compte.id, commande as unknown as CommandeCarriere, n, g, accesCahier(compte));
         });
         return await repondre(avantCommande, e);
       }

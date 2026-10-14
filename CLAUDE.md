@@ -159,7 +159,11 @@ navigateur. Les plus structurants :
 
 ### `src/lib/ligue/` — la Carrière en ligne
 
-Le cahier de combinaisons est une **bêta privée du compte authentifié `kiri`**.
+Le cahier de combinaisons est **ouvert à tous les comptes connectés depuis le 14 octobre 2026** (bêta privée du compte
+authentifié `kiri` auparavant ; `CAHIER_COMBINAISONS_OUVERT` à `false` dans `serveur/carriereApi.ts` la rend).
+⚠️ Depuis le Correctif 41 il se teste en 3D sur le moteur du match, se dessine par ordres, porte des options
+conditionnelles (règles 11) et s'échange sur un marché : voir « L'atelier de combinaisons, le cahier vivant, le marché et
+l'IA communautaire ». Ce qui suit décrit l'atelier 2D et l'exécution du cahier, toujours en place.
 `combinaisons.ts` valide les plans, sélectionne les situations (phase, zone,
 côté) et tire les variantes pondérées. `components/EditeurCombinaisons.tsx`
 offre un bac à sable 2D : placements, passes par numéro, courses, leurres et
@@ -201,7 +205,7 @@ gestes et les états du direct. Les coordonnées sont traduites vers le terrain
 déterministes ; « Nouvel essai » change la graine. Arrêt au premier plaquage,
 perte, faute, essai ou après 45 secondes, avec bilan passes/plaquages/mètres.
 Cet exercice n'écrit aucun score ni état dans la ligue. Le cahier enregistré
-reste exécuté par le serveur en mode configuré, uniquement pour la bêta Kiri.
+reste exécuté par le serveur en mode configuré, pour tout compte qui a le cahier.
 La sauvegarde de stratégie du club synchronise aussi son cahier dans les matchs
 en cours via `actualiserCahierMatchEnLigne` : un ordre daté ne modifie que les deux
 champs du cahier, conserve les consignes du banc et n’ajoute aucune présence.
@@ -569,7 +573,8 @@ que l'affichage lise exactement la version du moteur qui joue.
   **Depuis : règles 4 = lecture locale (IA 3), règles 5 = jeu vivant (IA 5, Correctifs 24-25), règles 6 = transformation après la
   sirène et prolongations jouées (Correctif 29), règles 7 = jeu physique (IA 6, Correctif 30), règles 8 = pénaltouche qui garde son lancer
   (Correctif 33), règles 9 = essai qui garde son élan (IA 7, Correctif 39), règles 10 = coup de pied en une seule action (IA 8,
-  Correctif 40 — celles des matchs créés aujourd'hui).**
+  Correctif 40), règles 11 = cahier vivant (même IA 8 : options d'une combinaison, touche enrichie, mémoire tactique,
+  Correctif 41 — celles des matchs créés aujourd'hui).**
   ⚠️ Toute retouche du moteur détaillé change la rejoue des matchs en règles 2
   DÉJÀ COMMENCÉS : la passer sous une règle 3, ou la mettre en ligne quand aucun
   match ne se joue.
@@ -2205,6 +2210,295 @@ film transporte `piedPrepare` et `frappeFaite`, vérifié au banc) ; la vue de h
 marché et l'ouverture de pack passent par la carte (source unique) mais n'ont pas été ouverts à l'écran ; les 616 joueuses
 sans portrait gardent la silhouette.
 
+### L'adjoint qui compose, les contrats réglés par l'assistant (Correctif 41 — carrière entraîneur)
+
+⚠️ La demande est arrivée en deux fois : d'abord la fin de son point 14 et ses points 15 à 46, puis ses points 1 à 32.
+Cette section couvre les points 33 à 46 et le point 15 ; l'atelier de combinaisons, le marché et l'IA communautaire
+(points 1 à 32) ont la section suivante.
+
+**L'adjoint** (`lib/adjointComposition.ts`, `lib/adjointManager.ts`, `components/RapportAdjoint.tsx`)
+
+- ⚠️ **CE QUE FAISAIT L'ANCIEN CHOIX** (`compositionManagerParDefaut`, toujours utilisé pour les clubs que personne ne dirige
+  et par la ligue) : poste par poste, le mieux noté parmi ceux qui portent EXACTEMENT ce poste, quel que soit son niveau. Un
+  ailier gauche de 58 passait devant trois ailiers droits de 72 ; ni condition physique, ni enjeu. Et une feuille retouchée
+  par l'entraîneur voyait un blessé remplacé par le premier titulaire « par défaut » encore libre, sans regarder la place :
+  l'ouvreur blessé pouvait être remplacé par un talonneur (`reconcilerCompositionManager`).
+- **Une seule grandeur décide : la note effective au poste** (`noteEffectiveAuPoste`) = note − pénalité de soins + forme,
+  × `rendementAuPoste` (le barème du jeu : 1 / 0,82 / 0,64 / 0,6 / 0,5) × `facteurPhysique` (rien au-dessus de 80 % de
+  condition, 0,45 % par point en dessous, pesé par l'enjeu ; jamais moins de 0,6). Un centre de 71 à l'aile vaut 58,2 :
+  l'ailier de 69 passe devant.
+- **Les vingt-trois places sont attribuées ensemble** (affectation optimale, le XV pesant cent fois le banc), et le banc
+  COUVRE (`COUVERTURE_BANC`, dans `compositionManager.ts`) : talonneur, deux piliers, cage, troisième ligne, 9, 10, un
+  trois-quarts. Six ailiers de 77 en réserve ne donnent qu'un ailier sur le banc.
+- **L'enjeu** (`importanceDeLAffiche`, `importanceDuMatchManager`) : `finale` (la fatigue ne pèse presque plus), `decisif`
+  (match couperet, adversaire plus fort de 3 points, trois dernières journées contre un adversaire à sa portée),
+  `ordinaire`, `mineur` (adversaire plus faible de 6 points : on ménage plus tôt), `amical` (clé `prepa#` : les jeunes
+  jouent). ⚠️ Le mode entraîneur n'a pas d'affiche amicale : ce niveau existe dans la bibliothèque, pas dans une carrière.
+- **Les consignes** (`Manager.consignesAdjoint`, facultatif, sans migration) : « toujours titulaire si disponible » passe
+  avant la fatigue — mais ne force ni un blessé ni un joueur que le médecin réserve au banc ; « ne pas sélectionner » cède
+  si le groupe tombe sous vingt-trois ; « priorité jeunes » préfère, à niveau proche, le jeune de 23 ans au plus qui a de
+  la marge — jamais en finale.
+- **Le rapport** (`RapportAdjoint`, sous la composition) : la raison de chaque place (meilleur niveau effectif, rotation
+  « pour faire souffler X », jeune lancé, consigne, couverture du banc, dépannage hors poste) et ceux qu'on s'attendait à
+  voir (repos avec leur condition, indisponible, consigne, devancé par Y). ⚠️ L'écran ne décide de rien : il affiche
+  `rapportAdjointManager`, la fonction que lit la composition déléguée. C'est aussi le moyen de repérer une décision absurde.
+- ⚠️ **LA CONDITION LUE EST CELLE QUE L'ÉCRAN AFFICHE** : `ProfilMedicalJoueur.condition` (−3 par match joué, +2 par
+  semaine sans surcharge), posée sur chaque joueur de la composition (`etatsPhysiquesManager`). PAS `fatigue`, qui sert au
+  risque de blessure et monte à 100 chez tout titulaire régulier en six matchs (+15 par titularisation, −1 par semaine) :
+  s'en servir ferait tourner l'effectif entier une semaine sur deux.
+- **Branchements** : « Meilleure équipe » et le bouton du terrain appellent l'adjoint ; « Compositions » déléguée
+  (`semaineManager`) refait la feuille chaque semaine pour l'affiche qui arrive ; la feuille d'un banc qu'on prend
+  (`feuilleDeDepart`) est celle de l'adjoint. `meilleureCompositionManager` a disparu (un seul algorithme).
+  `reconcilerCompositionManager` comble maintenant un trou par le meilleur AU POSTE (un remplaçant monte s'il est le mieux
+  placé) — c'est aussi ce que lit la ligue en ligne quand un joueur aligné part.
+- ⚠️ **LE MOTEUR DU MODE ENTRAÎNEUR NE FAIT PAS PAYER UN HORS-POSTE** (seule la ligue le fait, `feuilleGeleeEnLigne`) : la
+  feuille donne au titulaire le poste de sa place et garde sa note. L'adjoint suit le barème que l'écran affiche ; le
+  résultat d'un match n'en dépend pas encore.
+- **Mesuré** (`npm run verify:correctif41`, les 1 187 clubs du jeu, saison 1) : le XV de l'adjoint vaut plus que l'ancien
+  choix dans 1 044 clubs, autant dans 143, moins dans aucun (+5,4 points de note effective cumulée en moyenne) ; titulaires
+  hors poste 626 → 463. ⚠️ Vingt et un clubs ont deux licenciés sous le même identifiant (« DE CLERCQ » / « DECLERCQ ») :
+  défaut de données antérieur, l'adjoint n'en garde qu'un.
+
+**Les contrats** (`lib/contratsAutomatiques.ts`, `components/GestionContrats.tsx`, Marché mondial → Contrats de l'effectif)
+
+- Un groupe qu'on reprend a un contrat sur quatre qui s'arrête à la fin de la première saison (un sur deux après 31 ans,
+  `contratJoueurInitial`) : 16 sur 45 à Toulouse, 30 sur 91 à Bourg-en-Bresse.
+- ⚠️ **L'ASSISTANT NÉGOCIE POUR DE VRAI.** Chaque dossier passe par la négociation de L'Ovale (`ouvrirRenegociationJoueur`,
+  `negocierAvecJoueur`, `signerRenegociationJoueur`) : exigences cachées, patience, refus de prolonger s'il veut partir,
+  marge sous le plafond salarial, prime à la signature prise sur le budget. Trois offres sous la demande (90 %, 94 %, 98 %
+  du salaire ; 60 %, 80 %, 100 % de la prime), puis la contre-proposition du joueur acceptée si elle tient dans la
+  politique, sinon une dernière offre au plafond. Mesuré : Toulouse, 15 signés pour 3 320 k€ contre 3 495 k€ demandés,
+  2,3 tours en moyenne. ⚠️ Les salaires s'arrondissent à 5 000 € : sous 100 000 € par an, il n'y a souvent rien à gagner.
+- **Deux temps** : `planContrats` (qui garder, qui laisser partir, pourquoi — pure, sans effet : c'est ce que la fenêtre
+  montre avant de valider) puis `executerPlan`, dans l'ordre d'importance (les cadres négocient avant que la marge soit
+  entamée). ⚠️ Le plan affiché est celui qui sera exécuté.
+- **Le statut sportif se lit dans le groupe** (`statutSportif`), pas sur l'étiquette du contrat : `cadre` (dans les
+  titulaires de sa famille de poste), `jeune` (23 ans au plus, 4 points de marge), `remplacant` (doublure), `complement`
+  (troisième choix de moins de 30 ans qui joue un peu), `inutilise` (au-delà, ou moins de 15 % de temps de jeu après six
+  matchs — rapporté aux matchs qu'il POUVAIT jouer, `tempsDeJeuReclamable`).
+- **La politique** (`Manager.politiqueContrats`, facultative) : conserver les cadres, prolonger les jeunes, les remplaçants
+  (oui / si le salaire reste raisonnable / non), durée maximale après 32 ans (1 ou 2 ans), plafond (selon le budget /
+  hausses mesurées / presque aucune hausse), laisser partir les inutilisés, régler à la clôture. « Tout régler
+  maintenant » = le même plan, sans rien laisser « à l'entraîneur ».
+- ⚠️ **L'ASSISTANT NE PROMET PAS UN STATUT DE CADRE** à un joueur qui n'est pas titulaire à son poste (signer « cadre »
+  inscrit une promesse de temps de jeu) : la négociation échoue alors sur le statut.
+- **Un départ acté** (`EtatCarriereAvancee.decisionsContrats`, facultatif) : le joueur ira au bout de son contrat ; la
+  ligne le dit, l'alerte de fin de saison ne le réclame plus, une signature efface la décision, l'entraîneur peut revenir
+  dessus.
+- ⚠️ **À LA CLÔTURE, L'ASSISTANT RÈGLE CE QUI RESTE** (`saisonManager`, par défaut) : il prolonge ceux que la politique veut
+  garder, les autres partent libres. C'EST UN CHANGEMENT par rapport aux Correctifs 36 et 39 (« aucun renouvellement
+  automatique ») : `politiqueContrats.cloture = false` rend l'ancien comportement, et `verify:cloture-saison` teste ce
+  chemin-là. Dans les deux cas la saison se clôt.
+- Un contrat amateur (sans salaire, défraiement par match) ne peut pas atteindre le seuil d'accord sous la demande (le
+  barème de la négociation ne compte pas ses primes de performance) : l'assistant y accepte la demande au quatrième tour.
+
+**Le point 15, vérifié** : la défense ne lit pas le cahier adverse. Seule l'équipe en possession exécute une combinaison
+(`moteur/combinaisons.ts`, `moteur.ts`) ; aucun module de `moteur/ia/` ne référence le plan préparé ou en cours. Le banc
+le garde (contrôle statique).
+
+**Bancs et aperçu** : `npm run verify:correctif41` (1 825 contrôles, ~90 s) ; `/scripts/apercuCorrectif41.html`
+(`?club=prod2`, `&fatigue=1` pour voir une rotation, `&langue=en`). Textes : `data/textesCorrectif41.ts` (`adj.*`,
+`ctr.*`, sept langues). Essayé dans le navigateur à 1 366 px et à 375 px.
+
+**Pas fait** : le hors-poste ne pèse pas sur le match du mode entraîneur ; pas de tutoriel ; le journal de la gestion
+automatique est en français seulement.
+
+### L'atelier de combinaisons, le cahier vivant, le marché et l'IA communautaire (Correctif 41, points 1 à 32)
+
+Demande : « le joueur imagine une combinaison → la dessine facilement → la voit en 3D → la teste contre une défense →
+l'équipe → l'utilise en match → la publie → d'autres l'utilisent », et les clubs sans entraîneur finissent par jouer ce
+qui marche vraiment. ⚠️ Depuis le 14 octobre 2026 le cahier ET le marché sont **ouverts à tous les comptes
+connectés** (`CAHIER_COMBINAISONS_OUVERT`, `MARCHE_COMBINAISONS_OUVERT`, `serveur/carriereApi.ts`) ; l'écran lit
+`featureFlags.combinaisons` dans le compte public, et le serveur passe `accesCahier(compte)` à `agirCarriere`. Les deux
+vont ensemble : ouvrir l'un sans l'autre n'a pas de sens. Les remettre à `false` rend la bêta du compte `kiri`. La
+modération (retirer, rétablir) reste au compte interne dans tous les cas.
+
+**Tester en 3D, sur le vrai moteur** (`lib/ligue/essaiCombinaisons.ts`, `components/TestCombinaison3D.tsx`)
+
+- ⚠️ **CE N'EST PAS UNE ANIMATION DE L'ÉDITEUR.** L'essai crée un match avec `optionsMoteurDesRegles()` — LA définition des
+  options de moteur d'une rencontre de ligue, que `monter()` lit aussi —, installe la situation
+  (`installerSituationCombinaison`), charge le cahier d'un seul plan et laisse jouer. La fenêtre monte `Terrain3D`, la
+  scène des matchs, et lui branche cet `EtatMatch` : courses, passes, cellules, contacts et erreurs sont ceux d'une
+  rencontre. ⚠️ L'exercice 2D « avec opposition » de l'atelier (`oppositionCombinaisons.ts`) monte toujours le moteur
+  d'origine : c'est l'essai 3D qui fait foi.
+- Défense : sans défense (la conquête reste disputée contre un pack très inférieur, puis les défenseurs quittent le
+  terrain au départ de la combinaison), faible (−10), normale, forte (+10) ; système glissée, montée agressive, repli.
+  « Passer la mise en place » avance en silence jusqu'à la sortie du ballon (une mêlée dure 9,6 s, une touche 18,75 s).
+- **Chronologie** (`ChronologieCombinaison`) : personne ne saisit un temps. Elle est MESURÉE sur un essai sans défense
+  (le tirage qui va le plus loin, sur six) : « 0,5 s le 9 passe au 10, reçu à 1,4 s ». Un geste que le moteur n'a pas
+  atteint est marqué « estimé ».
+
+**Dessiner par ordres** (`lib/ligue/ordresCombinaisons.ts`, `OrdresCombinaison`, niveau Simple / Avancé)
+
+- On touche un joueur, on lui donne un ordre : recevoir, course, fixer, leurre, croisée, soutien, rester large, cellule,
+  passe derrière la cellule, jeu au pied, retirer ses ordres. ⚠️ **UN ORDRE N'EST PAS UN NOUVEAU GESTE** : `donnerOrdre`
+  le traduit dans les gestes du cahier (passe, course, appel, pied) en calculant départ, profondeur et ligne de course.
+  Le résultat est un cahier ordinaire — retouchable en Avancé, validé par `combinaisonsValides`, joué par le même moteur.
+  Un ordre n'est jamais appliqué à moitié (cahier plein ou invalide : refus, variante d'origine rendue).
+- `ordresPossibles` ne montre que ce qui a un sens (le porteur court, fixe ou tape ; après un coup de pied, plus rien).
+- ⚠️ En Simple, **toucher un joueur le SÉLECTIONNE** (`TerrainCombinaison`, prop `ordres`). Sans elle, toucher un joueur
+  pendant qu'un appel est sélectionné lui réaffecte cet appel : on donnait un leurre au 12, on touchait le 13 pour lui
+  parler, et c'est le 13 qui héritait du leurre.
+- La palette est posée APRÈS le terrain et collée au bas de l'écran (`position: sticky; bottom`) : tant qu'on regarde le
+  terrain elle reste sous le pouce. Le niveau (Simple par défaut) est un goût de l'appareil (`localStorage`).
+- **Bibliothèque d'exemples** (`exemplesCombinaisons.ts`, 23 plans : 4 ruck, 7 mêlée, 9 touche, 3 dix mètres) : bâtis avec
+  les mêmes ordres, donc avec les vraies positions du moteur. **Zone des 10 mètres** (`zone: 'ligne10'`, à dix mètres de
+  la ligne adverse) : ⚠️ un cahier sans plan de cette zone choisit exactement comme avant (vérifié sur 2 214 situations).
+- **Emplacements tactiques** (`EMPLACEMENTS` : ruck 4, mêlée 3, touche 3, dix mètres 2 — douze, la taille du cahier) :
+  le nombre de plans ACTIFS par situation. Ce qui dépasse est rangé (inactif), jamais supprimé. ⚠️ `rangerEnTrop`
+  s'applique à l'ENREGISTREMENT (écran et commande `strategie`), pas dans `strategieValide`, que les rejoues relisent.
+  Il n'existe pas de situation « coup franc » dans le cahier.
+
+**Le cahier vivant — règles 11** (`moteur/lectureCombinaison.ts`, `EtatMatch.cahierVivant`)
+
+⚠️ **TOUT EST DERRIÈRE `cahierVivant`**, posé par `optionsMoteurDesRegles` à partir des règles 11 (`REGLES_MATCH_EN_LIGNE`
+= 11 ; même IA 8 que les règles 10). Un match créé avant garde ses règles ; revenir en arrière = remettre 10. Vérifié :
+empreinte du moteur au niveau 8 inchangée (`ba4d9477`), et en règles 10 un cahier QUI PORTE des options se joue à
+l'identique du même cahier sans elles. ⚠️ À METTRE EN LIGNE QUAND AUCUN MATCH NE SE JOUE.
+
+- **Options et conditions** (`VarianteCombinaison.options`, six au plus) : `{ etape, condition, reponse }`. Au moment où le
+  porteur de l'étape doit jouer (une lecture par étape, 0,3 s de regard), la première condition vraie ET jouable
+  l'emporte : il joue la réponse (passe à un autre, jeu au pied, ou « il garde et attaque »), et **la combinaison
+  s'arrête là** — le jeu libre reprend. Sans option vraie : le geste du cahier, l'« option principale ».
+- Sept conditions : la défense monte vite, le receveur prévu est marqué, intervalle intérieur / extérieur ouvert, le
+  joueur visé est libre, l'ailier adverse est monté, surnombre à l'extérieur. ⚠️ **AUCUN TIRAGE** : ce sont des géométries
+  lues sur l'état (intervalles et surnombre sont ceux que le porteur de l'IA lit déjà, `ia/vision.ts`).
+  ⚠️ **LES SEUILS SONT ÉTALONNÉS SUR LE MOTEUR** (`scripts/etalonnerConditions.ts`) : quand un ouvreur doit donner, son
+  vis-à-vis est à 3 à 5,5 m et presque à l'arrêt, le défenseur le plus proche de son centre à 8 à 11 m. Une première
+  version réglée « à vue » donnait des conditions toujours vraies (ailier monté, joueur libre) ou jamais (receveur
+  marqué). Mesuré (ruck, 9 → 10 → 12) : montée rapide 20 à 30 %, receveur marqué 7 à 30 %, intervalle intérieur 6 à 45 %,
+  joueur libre 0 % contre une montée agressive et 90 % contre une glissée, ailier monté 100 % contre une montée et 0 %
+  contre un repli. Le surnombre ne se voit pas en première main (0 %) : il vient après une cellule.
+- ⚠️ **C'EST L'ATTAQUE QUI LIT** : aucun module de `moteur/ia/` ne référence le cahier (contrôle statique de
+  `verify:correctif41`). La défense défend ce qu'elle voit.
+- **Touche** (`ToucheCombinaison`) : `doubleFeinte` (deux blocs montent pour de faux), `glissement` (le sauteur vient
+  d'un autre bloc), `maul` (le pack porte ; le ballon ressort pour le 9 et **la combinaison reprend au geste de celui qui
+  le tient** — `demarrerCombinaison` raccorde). Ils posent `conquete.feintes` / `glissement` / `maul.suite`, que le duel
+  aérien et la scène lisaient déjà. ⚠️ Trouvé au passage : l'annonce de l'IA pour la touche (faux saut, sauteur qui
+  glisse) débordait sur le plan du club — elle est effacée quand le cahier vivant prépare la sienne.
+- **Mémoire tactique** (`memoireTactique`) : parmi les plans AUSSI adaptés à la situation (`candidatesCombinaison`), celui
+  qui marche est rejoué, celui que l'adversaire contre laisse sa place, un plan pas encore essayé a sa chance :
+  `(réussies + 1) / (jouées + 2) + 0,6 / √(jouées + 1)`. Un calcul par conquête, rien par image, aucun tirage.
+- **Bilan de chaque combinaison** (`suivreCombinaison`, `e.bilansCombinaisons`) : essai, franchissement, ballon conservé,
+  coup de pied, perdu, pénalité pour ou contre, avec mètres, passes et défenseurs battus. ⚠️ N'OBSERVE QUE.
+- Abandon : receveur absent, quatre secondes sans pouvoir donner, ou réponse « garder » — le plan s'efface, le jeu libre
+  reprend (c'était déjà le cas ; les options en font un choix).
+
+**Le marché** (`lib/ligue/marcheCombinaisons.ts`, `serveur/marcheCombinaisons.ts`, `components/MarcheCombinaisons.tsx`)
+
+- Onglets « Mon cahier / Marché » dans l'atelier. **Publier** : nom, description, type (jeu d'avants, au large, leurres
+  et croisées, jeu au pied, lancement simple — proposé par `typeDuPlan`), difficulté ; la situation vient du plan.
+  **Fiche** : auteur, version, date, ajouts, note des entraîneurs, et les chiffres des MATCHS — utilisations, matchs,
+  mètres par utilisation, franchissements, défenseurs battus, conservation, essais, ballons perdus, pénalités concédées.
+  « Voir la combinaison » ouvre l'essai 3D sur le plan publié ; « Ajouter à mes tactiques » fait choisir l'emplacement
+  (libre, à la place d'une autre qui est alors rangée, ou rangée sans l'activer).
+- ⚠️ **LE SERVEUR FAIT AUTORITÉ ET LE NAVIGATEUR N'ENVOIE JAMAIS UNE STATISTIQUE.** Elles sortent du moteur : à la sirène,
+  `clore` agrège les bilans par plan (`EtatMatchEnLigne.combinaisons`, privé), `crediterCombinaisons` en crédite le club
+  (`ClubCarriere.statsCombinaisons`, privé comme le cahier) et pose ce qui vient du marché dans
+  `remonteesCombinaisons` ; `appliquer` (serveur) le verse puis l'efface. Le marché refuse un match déjà compté
+  (`matchsVus`) : une écriture de ligue rejouée ne compte rien deux fois.
+- **Score d'efficacité** (`scoreCommunautaire`, 0 à 100) : mètres, franchissements, essais, pénalités obtenues, moins les
+  ballons perdus et les pénalités concédées ; tiré vers 50 tant que le volume est faible. ⚠️ **NI LES AJOUTS NI LES
+  ÉTOILES N'Y ENTRENT**, et il n'existe pas avant 25 utilisations sur 3 matchs (`ECHANTILLON_MINIMUM`).
+- **Modération** : nom et description passent un filtre (mots comparés UN À UN après normalisation — « contre » ne
+  contient pas d'injure —, liens, répétitions) ; `empreintePlan` (le DESSIN au mètre près, sans le nom ni la zone) refuse
+  la copie identique d'un autre auteur et le doublon d'une des siennes ; douze publications par compte, trois par jour
+  (retirées comprises). Validation automatique sinon. Un signalement par compte ; au troisième compte, la fiche passe
+  « en attente » et quitte la liste jusqu'à la décision du compte interne (retirer / rétablir).
+- **Versions** : cinq gardées, chacune avec ses statistiques et sa note de changement. ⚠️ **RIEN N'EST ÉCRASÉ** : la copie
+  rangée dans un cahier reste celle qu'on a prise ; le marché dit « nouvelle version disponible » et `mettreAJour`
+  garde la place, l'état, la zone et le côté du plan.
+- **Stockage** : table `combinaisons_publiees` (une ligne par fiche, écrite par comparaison de `revision`). ⚠️ SANS LA
+  TABLE le marché est fermé, pas cassé (`npm run base:appliquer`) : liste vide, publication refusée, et les matchs
+  gardent ce qu'ils doivent au marché (quarante au plus) jusqu'à ce qu'elle existe. La liste est gardée en mémoire par
+  instance ; une sonde de quelques octets dit s'il faut la relire.
+- Routes : `GET ?marcheCombinaisons=1` (liste), `=<id>` (fiche), `POST action: 'marcheCombinaisons'` (`publier`,
+  `ajouter`, `noter`, `signaler`, `retirer`, `retablir`), `GET ?metaCombinaisons=1` (public, dix minutes de cache).
+
+**L'IA communautaire** (`cahierCommunautaire`, `lib/iaCommunautaire.ts`)
+
+- La **méta** = les fiches publiées qui ont dépassé l'échantillon minimum, classées par score. Un club sans entraîneur
+  reçoit au coup d'envoi un cahier court (la moitié des emplacements) tiré dedans : poids = (score / 50)² × ce que son
+  style aime (une équipe d'avants prend cellules, mauls, départs de mêlée ; une équipe joueuse le large et les leurres)
+  × ce que son niveau sait jouer (sous 62, des plans simples ; à partir de 78, les plus riches). La graine (club,
+  saison) lui garde son identité ; ce sont les SCORES qui bougent — donc la méta.
+- Carrières solo : `MatchLive` appelle `equiperLesClubsIA`. ⚠️ **JAMAIS LE CAMP DU JOUEUR** (celui qu'il conduit ou
+  entraîne). ⚠️ **SANS MÉTA RIEN NE CHANGE** : ni cahier, ni cahier vivant. La méta est lue au repos
+  (`chargerMetaCombinaisons`, `main.tsx`) et gardée six heures sur l'appareil.
+- En ligue tous les clubs ont un entraîneur ; les clubs-robots du Laboratoire ne reçoivent pas encore ce cahier.
+
+**Bancs et aperçu** : `npm run verify:combinaisons41` (329 contrôles, ~1 min ; `--rapide`) — dont le vrai gestionnaire
+HTTP et un match du Laboratoire joué jusqu'à la sirène, qui crédite le club et le marché une seule fois.
+`scripts/sonderCahierVivant.ts` (fréquence des conditions, chaque exemple joué), `scripts/etalonnerConditions.ts`,
+`scripts/sonderOrdresCombinaisons.ts`, `scripts/sonderEssaiCombinaisons.ts`. Aperçu :
+`/scripts/apercuCombinaisonsMatch.html` (le vrai service du marché sur un tableau en mémoire ; `?marche=vide`,
+`?moderateur=1`, `?langue=en`). Textes : `data/textesCombinaisons41.ts`, `data/textesMarche41.ts` (sept langues).
+Essayé dans le navigateur à 1 366 px et 375 px : ordres, options, bibliothèque, essai 3D avec option jouée, liste et
+fiche du marché, ajout à un emplacement, note, signalement, publication et nouvelle version.
+
+⚠️ `npm run verify:carriere` s'arrête sur une erreur d'avant ce chantier (`verifCarriere.ts` demande un pack « avants » que
+le catalogue n'a plus) : il ne couvre donc ni la sauvegarde du cahier ni la fin d'un match. C'est `verify:combinaisons41` qui
+les joue, par le vrai gestionnaire HTTP. `verify:laboratoire` échoue toujours sur les objectifs crédités une commande plus tard.
+
+**Pas fait / à dire** : le SQL de `combinaisons_publiees` n'a pas été essayé sur la vraie base (tableau en mémoire et
+banc seulement) ; la méta reste vide — et l'IA communautaire sans effet — tant qu'aucune combinaison publiée n'a joué
+25 fois sur 3 matchs ; aucun cahier communautaire pour les robots du Laboratoire ;
+pas de situation « coup franc » ; l'exercice 2D de l'atelier n'a pas les règles 11 ; pas de recherche d'auteur ni de
+pagination (six cents fiches au plus) ; le filtre de noms est une courte liste, pas un service de modération ; les
+sélecteurs natifs et quelques libellés français d'avant restent dans l'atelier ; rien n'a été essayé sur un vrai
+téléphone ; pas de tutoriel.
+
+### Les publicités récompensées étendues (Correctif 42)
+
+Trois usages s'ajoutent aux Ovas de la Boutique, chacun avec SON plafond quotidien (minuit, heure de Paris), tenu par le
+serveur dans le registre du compte (`pub_comptes`) — jamais dans `localStorage`. Le principe ne change pas : clic
+volontaire → publicité complète → reçu signé → récompense.
+
+- **Quatre contextes** (`ContextePub`, `lib/publicitesRecompensees.ts`) : `SHOP_OVAS`, `DAILY_PACK` (ligue),
+  `SHOP_PREMIUM_PACK` (Boutique), `COSMETIC` (avec `article`). `plafond()` et `memeUsage()` (serveur) disent ce qui
+  partage un compteur.
+- ⚠️ **LA LIGUE N'A QU'UN COMPTEUR.** Un pack qu'on ne peut pas payer ouvre `ManqueOvasLigue` (« Pas assez d'Ovas — il te
+  manque N ») : si une récompense reste, « Regarder une pub et gagner un pack — 1 / 2 restantes » ; sinon « Tes 2
+  récompenses publicitaires de Ligue ont déjà été utilisées aujourd'hui ». La fenêtre ouvre la MÊME session `DAILY_PACK`
+  que la carte « Pack Pub » : deux par jour au total, toutes ligues confondues. « Obtenir des Ovas » mène à l'onglet du
+  club. Coupable dans le Labo (`leagueFallbackEnabled`).
+- **Pack Premium gratuit** (Boutique et Collection) : cinq par jour, indépendants des deux de la ligue. La roulette
+  (`chancesPacksPremium`) tire dans les packs publicitaires ; sans réglage, tous sauf Bronze et Argent, d'autant plus
+  rares qu'ils sont chers ; dès qu'un poids est saisi dans le Labo, seuls les packs qui en ont un. Le serveur tire au reçu
+  signé. ⚠️ **IL S'OUVRE UNE FOIS** (`ouvrirPremium`) : la Collection solo tire ses cartes dans le navigateur, comme tous
+  ses packs ; le serveur rend donc le pack à l'instant où il le marque ouvert, et un second appel reçoit
+  `ALREADY_CLAIMED`, sans pack. Gagné dans la Boutique, il s'ouvre dans la Collection (`lib/packPremiumPub.ts`).
+- **Cosmétiques** : `ConfigPublicites.cosmetiques[article] = { actif, requis, limiteJour }`. Par défaut les quatre
+  articles `parPub` de la boutique, fermés depuis le retrait des pubs maison : casque rose 1 publicité, crampons graffiti
+  3, maillots Vannes et Italie 5. ⚠️ **LE SERVEUR SEUL COMPTE** (`RegistrePublicites.cosmetiques`) : chaque réclamation
+  validée ajoute un pas ; au dernier, l'objet est acquis, définitivement et sans répétition, puis LIVRÉ au coffre du
+  compte (`octroyerCosmetique` → `achatsEquipements`, que la synchronisation réunit toujours à l'inventaire). Une
+  livraison manquée est retentée à chaque lecture de la vue. Le Labo peut ouvrir à la publicité un article qui a aussi un
+  prix : les deux chemins s'affichent côte à côte (`DeblocageCosmetiqueParPub`).
+- **La Boutique** : la carte « Pack Premium gratuit », le filtre « Récompenses Pub », la jauge « Regarder 3 pubs — 1 / 3 ».
+- **Une seule lecture par écran** (`chargerPublicites`, quatre secondes ; `publicitesModifiees`) : six offres ne font plus
+  six requêtes, et une publicité regardée dans une offre met à jour les autres.
+- **Une publicité à la fois par compte**, tous usages confondus ; une récompense validée mais pas ouverte se retrouve à la
+  reconnexion (`enAttente` : « Tu as une récompense publicitaire non ouverte »).
+- ⚠️ **LA ROULETTE NE FEINT PLUS.** Elle marquait un faux arrêt, repère allumé, sur une pochette prise au hasard six cases
+  avant la bonne : quand c'était un pack rare, c'était un « presque jackpot » fabriqué. Une seule décélération jusqu'au
+  pack tiré par le serveur ; les pochettes qui défilent restent tirées aux vraies chances, consultables.
+- **Labo → Publicités** : Ligue (repli quand il manque des Ovas), pack Premium (activation, limite 0 à 5, poids par pack
+  avec la chance obtenue), cosmétiques (activation, publicités requises, limite par jour, recherche d'article), et les
+  statistiques par usage (`StatsPublicites.contextes`, à plat : `LEAGUE.completed`, `PREMIUM.rewards`…) : demandées,
+  démarrées, terminées, complétion, récompenses, valeur en Ovas, utilisateurs uniques. ⚠️ Le revenu par publicité n'est
+  pas transmis au serveur par AppLixir : il se lit dans leur tableau de bord.
+- **Aucune migration** : le registre est du JSON, la livraison d'un cosmétique une simple mise à jour de
+  `compte_boutique`, les statistiques par usage une somme de la même forme que `distribution`.
+- **Bancs et aperçu** : `npm run verify:correctif42` (97 contrôles : vrai gestionnaire HTTP, reçus signés, compteur de
+  ligue partagé, cinq packs Premium, ouverture unique, reprise après redémarrage, progression et livraison d'un
+  cosmétique, lendemain, Labo) ; `verify:publicites` inchangé (94). `/scripts/apercuCorrectif42.html` (simulé ;
+  `?epuise=1`, `?vue=labo`). ⚠️ Un panneau de navigateur caché ne tire pas `requestAnimationFrame` : la roulette y reste
+  sur « Le pack arrive… ».
+- ⚠️ **Non essayé** : la mise à jour SQL du coffre et la somme SQL des statistiques sur la vraie base (stockage fichier et
+  banc seulement) ; une vraie publicité AppLixir (le reçu signé réel n'était toujours pas confirmé le 12 octobre) ;
+  les textes des offres publicitaires sont en français seulement, comme avant.
+
 ## ⚠️ Équilibrage : ce qui ne se retouche pas sans mesurer
 
 ### Difficulté
@@ -2454,6 +2748,10 @@ npm run verify:propositions-collection # propositions de cartes : reçues, envoy
 npm run verify:demandes-image    # « Mon image » : saisie, décision, liste publique, application aux portraits (29 contrôles)
 npm run verify:correctif40       # coup de pied en une seule action (niveau 8), fiche des joueuses : portrait, écusson, logo de ligue (13 148 contrôles, ~3 min)
 npm run mesure:frappes            # demande → armé → contact d'un coup de pied conduit, à l'arrêt et en course (IA_EMPREINTE=7 pour le moteur d'avant)
+
+npm run verify:correctif41       # l'adjoint compose (note effective au poste, condition, enjeu, consignes, banc couvert) sur les 1 187 clubs ; contrats réglés par l'assistant, clôture comprise
+npm run verify:correctif42       # publicités récompensées étendues : compteur de ligue partagé, cinq packs Premium ouverts une fois, cosmétiques comptés par le serveur (97 contrôles)
+npm run verify:combinaisons41    # atelier (ordres, exemples, emplacements), cahier vivant (options, touche, mémoire), marché (HTTP, match joué), IA communautaire (329 contrôles, ~1 min)
 
 npx vite-node scripts/verif.ts    # banc général : divisions, effectifs, 8 saisons
 ```

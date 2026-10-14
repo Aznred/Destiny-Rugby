@@ -1,0 +1,24 @@
+/* Les ordres rapides de l'atelier (Correctif 41) : une ardoise d'entraîneur, pas un formulaire. */
+/* ⚠️ Posée APRÈS le terrain et collée au bas de l'écran : tant qu'on regarde le terrain (elle est alors sous la fenêtre),
+   elle reste visible sous le pouce. Fond opaque : elle passe par-dessus le bas du terrain. */
+.ordres { position: sticky; bottom: .5rem; z-index: 4; display: grid; gap: .5rem; margin: .6rem 0 .8rem; padding: .8rem .9rem; border-radius: 12px; border: 1px solid rgba(232, 178, 58, .28); background: #0c1a13; box-shadow: 0 -10px 30px rgba(0, 0, 0, .45); }
+.ordres header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .3rem .8rem; }
+.ordres header b { display: inline-flex; align-items: center; gap: .4rem; font-family: var(--police-forte); }
+.ordres-ballon { display: inline-flex; align-items: center; gap: .35rem; padding: .22rem .6rem; border-radius: 999px; font-size: .74rem; color: #f4cd63; border: 1px solid rgba(232, 178, 58, .35); background: rgba(232, 178, 58, .08); }
+.ordres-aide { margin: 0; color: #8ea394; font-size: .78rem; }
+.ordres-joueur { margin: 0; font-size: .86rem; display: flex; flex-wrap: wrap; align-items: baseline; gap: .15rem .5rem; }
+.ordres-joueur em { font-style: normal; font-size: .7rem; color: #f4cd63; }
+.ordres-liste, .ordres-pieds { display: flex; flex-wrap: wrap; gap: .4rem; }
+.ordre { display: inline-flex; align-items: center; gap: .4rem; min-height: 2.5rem; padding: .35rem .8rem; border-radius: 10px; border: 1px solid rgba(255, 255, 255, .14); background: rgba(255, 255, 255, .04); color: #f5f7f2; font: inherit; font-size: .8rem; cursor: pointer; transition: border-color .15s, background .15s, transform .1s; }
+.ordre:hover:not(:disabled) { border-color: rgba(232, 178, 58, .55); background: rgba(232, 178, 58, .1); }
+.ordre:active:not(:disabled) { transform: translateY(1px); }
+.ordre:disabled { opacity: .5; cursor: not-allowed; }
+.ordre:focus-visible { outline: 2px solid #f4cd63; outline-offset: 2px; }
+.ordre-recevoir, .ordre-course { border-color: rgba(52, 163, 90, .55); background: rgba(52, 163, 90, .12); }
+.ordre-annuler { color: #ffb0a3; border-color: rgba(224, 90, 77, .35); margin-left: auto; }
+.ordres-pieds { padding: .5rem; border-radius: 10px; background: rgba(0, 0, 0, .25); }
+.ordres-refus { margin: 0; color: #ffb0a3; font-size: .78rem; }
+@media (max-width: 560px) {
+  .ordre { flex: 1 1 calc(50% - .4rem); justify-content: center; min-height: 2.9rem; }
+  .ordre-annuler { margin-left: 0; }
+}

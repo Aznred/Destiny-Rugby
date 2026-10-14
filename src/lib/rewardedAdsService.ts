@@ -1,4 +1,5 @@
-import type { ConfigPublicites, ContextePub, RecompensePub, VuePublicites } from './publicitesRecompensees';
+import type { ConfigPublicites, ContextePub, ProgresCosmetiquePub, RecompensePub, VuePublicites } from './publicitesRecompensees';
+import type { PackCarriere } from './ligue/typesCarriere';
 
 type StatutAppLixir = { type: string };
 interface OptionsAppLixir {
@@ -15,8 +16,23 @@ export async function appelerPublicites<T>(corps?: unknown, ligue?: string, sign
     body: corps ? JSON.stringify({ action: 'publicites', ...corps as object }) : undefined,
   });
   const d = await r.json();
+  // Toute écriture périme les vues gardées : la prochaine lecture repart du serveur.
+  if (corps) vues.clear();
   if (!r.ok) throw new Error(r.status === 401 ? 'Connectez-vous à votre compte pour recevoir la récompense.' : d.erreur ?? 'Publicité indisponible.');
   return d as T;
+}
+
+/**
+ * LA VUE EST PARTAGÉE ENTRE LES OFFRES D'UN MÊME ÉCRAN (Correctif 42). La Boutique affiche la carte des Ovas, celle du
+ * pack Premium et un bouton par cosmétique : chacune relisait la vue pour elle-même — six requêtes identiques à
+ * l'ouverture de l'écran. Elles partagent maintenant la même lecture pendant quatre secondes, et une écriture la périme.
+ */
+const vues = new Map<string, { le: number; promesse: Promise<VuePublicites> }>();
+const DUREE_VUE = 4000;
+/** Une offre vient de changer quelque chose : les autres offres de l'écran relisent (une seule requête pour toutes). */
+export function publicitesModifiees(): void {
+  vues.clear();
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event('destiny:publicites'));
 }
 
 /** Un SDK partagé, aucun téléchargement de vidéo avant le geste explicite. */
@@ -96,8 +112,24 @@ class ServicePublicitesRecompensees {
   }
 }
 export const RewardedAdsService = new ServicePublicitesRecompensees();
-export const chargerPublicites = (ligue?: string, signal?: AbortSignal) => appelerPublicites<VuePublicites>(undefined,ligue,signal);
-export async function claimRewardedAdReward(id: string, signal?: AbortSignal): Promise<RecompensePub | null> {
+export function chargerPublicites(ligue?: string): Promise<VuePublicites> {
+  const cle = ligue ?? '', connue = vues.get(cle);
+  if (connue && Date.now() - connue.le < DUREE_VUE) return connue.promesse;
+  const promesse = appelerPublicites<VuePublicites>(undefined, ligue).catch((e) => { if (vues.get(cle)?.promesse === promesse) vues.delete(cle); throw e; });
+  vues.set(cle, { le: Date.now(), promesse });
+  return promesse;
+}
+/** Où en est le cosmétique après la publicité qu'on vient de réclamer : c'est le serveur qui a compté. */
+export type CosmetiquePubRecu = { id: string } & ProgresCosmetiquePub;
+/**
+ * Le pack Premium gagné, rendu UNE fois par le serveur à l'instant où il le marque ouvert. `null` : déjà ouvert
+ * (double clic, autre onglet) — il n'y a rien à tirer une seconde fois.
+ */
+export async function ouvrirPackPremium(id: string): Promise<PackCarriere | null> {
+  const d = await appelerPublicites<{ statut: string; pack?: PackCarriere }>({ operation: 'ouvrirPremium', rewardSessionId: id });
+  return d.statut === 'OPENED' && d.pack ? d.pack : null;
+}
+export async function claimRewardedAdReward(id: string, signal?: AbortSignal): Promise<(RecompensePub & { cosmetique?: CosmetiquePubRecu }) | null> {
   // Reconciliation bornée, uniquement après une vidéo terminée ou une reprise manuelle.
   for (const delai of [0,1000,2000,4000,6000]) {
     if (signal?.aborted) return null;
@@ -106,8 +138,8 @@ export async function claimRewardedAdReward(id: string, signal?: AbortSignal): P
       const timer = setTimeout(finir,delai); signal?.addEventListener('abort',finir,{once:true});
     });
     if (signal?.aborted) return null;
-    const d = await appelerPublicites<{statut:string;recompense:RecompensePub}>({operation:'reclamer',rewardSessionId:id},undefined,signal);
-    if (['CLAIMED','RESERVED','ALREADY_CLAIMED'].includes(d.statut)) return d.recompense;
+    const d = await appelerPublicites<{statut:string;recompense:RecompensePub;cosmetique?:CosmetiquePubRecu}>({operation:'reclamer',rewardSessionId:id},undefined,signal);
+    if (['CLAIMED','RESERVED','ALREADY_CLAIMED'].includes(d.statut)) return { ...d.recompense, ...(d.cosmetique ? { cosmetique: d.cosmetique } : {}) };
   }
   return null;
 }

@@ -20,6 +20,9 @@ import { apparencePack, modelePackParNom, packAvecSkin, evolutionEliteFrancaise 
 import { chargerPacksPrivesSolo, ouvrirPackPriveSolo } from '../lib/carriereEnLigneClient';
 import type { PackInterneBoutique } from '../lib/packsInternes';
 import { appliquerCollectionSoloDistante, attendreBoutiqueSoloEnregistree } from '../lib/synchronisationBoutiqueCompte';
+import { OffrePublicitaire } from '../components/PublicitesRecompensees';
+import { ouvrirPackPremium } from '../lib/rewardedAdsService';
+import { prendrePackPremium } from '../lib/packPremiumPub';
 import './CollectionSolo.css';
 import { fournirCatalogueUsage } from '../lib/usage/collection';
 
@@ -180,6 +183,45 @@ export function CollectionSolo() {
     } finally { controleurOuverture.current = null; verrouOuverture.current = false; setOccupe(false); }
   };
 
+  /**
+   * LE PACK PREMIUM GAGNÉ PAR PUBLICITÉ (Correctif 42) : gratuit, et ouvert comme n'importe quel pack de la Collection.
+   * ⚠️ LE SERVEUR LE REND UNE FOIS, à l'instant où il le marque ouvert : un double clic ou un second onglet ne reçoit
+   * rien. Le tirage des cartes, lui, se fait ici, comme pour tous les packs solo.
+   */
+  const ouvrirPackPremiumGagne = async (rewardSessionId: string) => {
+    if (verrouOuverture.current || ouverture) return;
+    verrouOuverture.current = true; setOccupe(true);
+    try {
+      const catalogueActuel = await synchroniserCatalogueSolo();
+      await attendreBoutiqueSoloEnregistree();
+      const gagne = await ouvrirPackPremium(rewardSessionId);
+      if (!gagne) { setBilan('Ce pack Premium a déjà été ouvert.'); return; }
+      const tirer = (pack: PackCarriere) => acheterPack(0, precedent => ouvrirPackSolo(pack, catalogueActuel, precedent, undefined,
+        { speciales: catalogueSpecialSolo(), maintenant: Date.now() }), 'ovas');
+      // Le pack tel que la Collection le connaît ; à défaut celui du serveur ; à défaut un pack payant de la roue, pour
+      // qu'une récompense validée ne soit jamais perdue sur un tirage impossible.
+      const candidats = [packsRoue.find(candidat => candidat.id === gagne.id), gagne, ...packsPayants].filter((p): p is PackCarriere => Boolean(p));
+      for (const pack of candidats) {
+        const resultat = tirer(pack);
+        if (!resultat) continue;
+        setBilan(`Pack Premium gratuit : ${resultat.indices.length} carte(s), dont ${resultat.nouvelles} nouvelle(s).`);
+        setOuverture({ pack, indices: resultat.indices, catalogue: catalogueActuel });
+        return;
+      }
+      setBilan(t('solo.noPlayerInPack'));
+    } catch (erreur) {
+      setBilan(erreur instanceof Error ? erreur.message : 'Impossible d’ouvrir ce pack.');
+    } finally { verrouOuverture.current = false; setOccupe(false); }
+  };
+  // Gagné dans la Boutique un instant plus tôt : on l'ouvre en arrivant.
+  const premiumDepose = useRef(prendrePackPremium());
+  useEffect(() => {
+    const session = premiumDepose.current;
+    premiumDepose.current = null;
+    if (session) void ouvrirPackPremiumGagne(session);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- une seule fois, à l'arrivée sur l'écran
+  }, []);
+
   return <section className="solo-collection">
     <header className="solo-entete">
       <button type="button" className="btn fantome" onClick={() => setEcran('accueil')}><Icone nom="fleche-droite" className="solo-retour" taille={16} /> {t('online.home')}</button>
@@ -218,6 +260,8 @@ export function CollectionSolo() {
       <BoutiquePacks3D packs={packsPrives} solde={coins} occupe={occupe || Boolean(ouverture)} gratuit
         onOuvrir={ouvrirDepuisRoue} chancesSpeciales={() => [{ nom: 'ICON', chance: 100 }]} />
     </section>}
+
+    <OffrePublicitaire contexte="SHOP_PREMIUM_PACK" disabled={occupe || Boolean(ouverture)} onPack={ouvrirPackPremiumGagne} />
 
     <section className="solo-rayon" aria-labelledby="solo-packs-titre">
       <div className="solo-titre-ligne"><div><div className="eyebrow">{t('solo.allPacks')}</div><h2 id="solo-packs-titre">{t('solo.choosePack')}</h2></div><span>{categoriePacks === 'gratuits' ? t('solo.freePacksHelp') : t('solo.paidPacksHelp')}</span></div>

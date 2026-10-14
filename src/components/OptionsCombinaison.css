@@ -1,0 +1,20 @@
+/* Les options d'une combinaison (Correctif 41) : chaque ligne se lit comme une phrase — quand, si, alors. */
+.opt { display: grid; gap: .6rem; margin: .8rem 0; padding: .85rem .95rem; border-radius: 12px; border: 1px solid rgba(232, 178, 58, .22); background: linear-gradient(180deg, rgba(232, 178, 58, .05), rgba(8, 22, 15, .55)); }
+.opt header { display: grid; gap: .2rem; }
+.opt header b { display: inline-flex; align-items: center; gap: .4rem; font-family: var(--police-forte); }
+.opt header small, .opt footer small { color: #8ea394; font-size: .74rem; line-height: 1.35; }
+.opt-vide { margin: 0; color: #8ea394; font-size: .8rem; }
+.opt-liste { list-style: none; margin: 0; padding: 0; display: grid; gap: .5rem; }
+.opt-ligne { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.3fr) minmax(0, 1.2fr) auto; gap: .5rem .6rem; align-items: end; padding: .6rem .65rem; border-radius: 10px; border: 1px solid rgba(255, 255, 255, .09); background: rgba(0, 0, 0, .22); }
+.opt-ligne label { display: grid; gap: .22rem; min-width: 0; font-size: .7rem; color: #9db2a3; text-transform: uppercase; letter-spacing: .06em; }
+.opt-ligne label .opt-mot { color: #f4cd63; font-family: var(--police-forte); letter-spacing: .1em; }
+.opt-retirer { display: grid; place-items: center; width: 2.6rem; height: 2.6rem; padding: 0; color: #ffb0a3; }
+.opt-principale { grid-column: 1 / -1; margin: 0; display: flex; flex-wrap: wrap; gap: .25rem .55rem; align-items: baseline; font-size: .76rem; color: #c8d3c8; }
+.opt-principale span { font-size: .66rem; text-transform: uppercase; letter-spacing: .08em; color: #8ea394; }
+.opt footer { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .9rem; }
+@media (max-width: 760px) {
+  .opt-ligne { grid-template-columns: minmax(0, 1fr) auto; }
+  .opt-ligne label { grid-column: 1 / -1; }
+  .opt-ligne label:first-of-type { grid-column: 1; }
+  .opt-retirer { grid-column: 2; grid-row: 1; align-self: end; }
+}

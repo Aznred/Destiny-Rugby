@@ -123,6 +123,11 @@ export interface ClubCarriere {
   /** Affectation initiale du logo demandé pour le compte Kiri, appliquée une seule fois. */
   emblemeKiriInitialise?: boolean;
   composition: CompositionManager; strategie: StrategieEnLigne;
+  /**
+   * Ce que chaque plan du cahier a donné en match (règles 11), par identifiant de plan. Privé, comme le cahier : seul
+   * son club le voit. Borné aux plans encore présents dans le cahier.
+   */
+  statsCombinaisons?: Record<string, import('./marcheCombinaisons.js').StatsCombinaison>;
   /** Compositions privées du manager, conservées même après une modification de la feuille. */
   compositionsSauvegardees?: { id: string; nom: string; composition: CompositionManager }[];
   /** Absent/faux tant que le jeu choisit lui-même le buteur. */
@@ -243,6 +248,11 @@ export interface HistoireCarriere {
 export interface EtatCarriereEnLigne {
   /** Coffre serveur des packs publicitaires : contenu invisible avant ouverture. */
   packsPubReserves?: Record<string, { compte: string; pack: PackCarriere; cartes: CarteCarriere[] }>;
+  /**
+   * Ce que les matchs terminés doivent encore au marché des combinaisons (une ligne par rencontre). Le serveur les verse
+   * puis les retire ; le marché refuse un match déjà compté. Jamais dans la vue.
+   */
+  remonteesCombinaisons?: import('./marcheCombinaisons.js').RemonteeCombinaisons[];
   playerPool?: 'men' | 'women' | 'mixed';
   migrationsFfr?: { version: string; carteId: string; owner: string | null; compensation: number; le: string }[];
   catalogueRevision?: number;
@@ -276,7 +286,7 @@ export interface VueCarriereEnLigne extends Omit<EtatCarriereEnLigne, 'packsPubR
   monClubId: string;
   /** Vue publique sans club, accessible uniquement au compte administrateur kiri. */
   observateur?: true;
-  clubs: (Omit<ClubCarriere, 'compteId' | 'composition' | 'strategie' | 'compositionsSauvegardees' | 'packsGratuits' | 'packsGratuitsProgrammes' | 'dernierLotPacksGratuits' | 'buteurManuel'> & { composition?: CompositionManager; strategie?: StrategieEnLigne; compositionsSauvegardees?: ClubCarriere['compositionsSauvegardees']; packsGratuits?: PackGratuitCarriere[]; dernierLotPacksGratuits?: string })[];
+  clubs: (Omit<ClubCarriere, 'compteId' | 'composition' | 'strategie' | 'compositionsSauvegardees' | 'packsGratuits' | 'packsGratuitsProgrammes' | 'dernierLotPacksGratuits' | 'buteurManuel' | 'statsCombinaisons'> & { composition?: CompositionManager; strategie?: StrategieEnLigne; statsCombinaisons?: ClubCarriere['statsCombinaisons']; compositionsSauvegardees?: ClubCarriere['compositionsSauvegardees']; packsGratuits?: PackGratuitCarriere[]; dernierLotPacksGratuits?: string })[];
   /** Vue courante : cartes distribuées seulement. Le catalogue public est consulté séparément, par pages. */
   cartes: CarteCarriere[];
   rencontres: (Omit<RencontreCarriere, 'match'> & { match?: VueMatchEnLigne })[];

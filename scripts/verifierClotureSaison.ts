@@ -135,6 +135,12 @@ const negoOuverte = manager().negociations.findLast((n) => n.joueur.id === ouver
 ok(gardeSigne || negoGarde.refusProlongation, 'une prolongation se signe (ou le joueur la refuse d’emblée)');
 ok(accordPret || negoAcceptee.refusProlongation, 'une prolongation peut rester à l’état « accord »');
 
+// ⚠️ SANS L'ASSISTANT (Correctif 41). Par défaut, l'assistant sportif règle désormais à la clôture les contrats restés
+// sans décision (`politiqueContrats.cloture`) : il reprendrait la négociation ouverte et prolongerait une partie des
+// contrats oubliés — c'est ce que mesure `verify:correctif41`. Ce banc garde le chemin d'origine : rien n'est négocié
+// d'office, l'offre expire et les contrats échus partent. Dans les deux cas, la saison se clôt.
+etat().definirPolitiqueContratsManager({ cloture: false });
+
 // 6. Une étape annexe qui lève : l'académie n'est pas lisible.
 retoucher((m) => ({ ...m, semaine: SEMAINES_PAR_SAISON, academie: 12 as unknown as Manager['academie'] }));
 const avant = diagnostiquerCloture(manager());

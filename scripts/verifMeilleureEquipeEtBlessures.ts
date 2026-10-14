@@ -1,5 +1,5 @@
 import { formatTempsBlessure, formatTempsBlessureDetaille } from '../src/lib/carteJoueur';
-import { meilleureCompositionManager } from '../src/lib/compositionManager';
+import { composerParLAdjoint } from '../src/lib/adjointComposition';
 import type { JoueurClub } from '../src/types/manager';
 
 console.log('=== Test Formatage Blessures ===');
@@ -50,7 +50,7 @@ const effectif: JoueurClub[] = postes.map((poste, i) => ({
   jeuAuPied: poste === 'demi_ouverture' ? 88 : 50,
 }));
 
-const compo = meilleureCompositionManager(effectif, new Set(['j-1']), new Map());
+const compo = composerParLAdjoint(effectif, { indisponibles: new Set(['j-1']) }).composition;
 console.log('Titulaires retenus:', compo.titulaires.length);
 console.log('Remplaçants retenus:', compo.remplacants.length);
 console.log('Buteur ID:', compo.buteurId);

@@ -48,6 +48,10 @@ import {
   noteMaximale, salaireManager,
 } from '../lib/manager';
 import { libelleAfficheManager, type AfficheComplete } from '../lib/matchLive';
+import { RapportAdjoint } from '../components/RapportAdjoint';
+import { GestionContrats } from '../components/GestionContrats';
+import { compositionDeLAdjoint, etatsPhysiquesManager, rapportAdjointManager } from '../lib/adjointManager';
+import { departActe } from '../lib/contratsAutomatiques';
 import { afficheSure, contratsExpirants, diagnostiquerCloture, estSemaineDeCloture, prolongationsAcceptees, type VerrouCloture } from '../lib/clotureSaison';
 import { VerrousSaison } from '../components/VerrousSaison';
 import { porteeSportive } from '../lib/recrutementManager';
@@ -63,7 +67,7 @@ import {
   tableauDetectionManager, motifObservationJeune, vivierFiltre,
 } from '../lib/formationManager';
 import {
-  compositionManagerParDefaut, meilleureCompositionManager, noteCompositionManager, POSTES_XV_MANAGER,
+  compositionManagerParDefaut, noteCompositionManager, POSTES_XV_MANAGER,
 } from '../lib/compositionManager';
 import {
   assurerEtatCarriereAvancee, chargeTotaleEntrainement, disponibiliteJoueur,
@@ -137,6 +141,9 @@ export function Manager() {
   const signerBanc = useGame((s) => s.signerBanc);
   const quitterBanc = useGame((s) => s.quitterBanc);
   const definirComposition = useGame((s) => s.definirCompositionManager);
+  const definirConsigneAdjoint = useGame((s) => s.definirConsigneAdjointManager);
+  const definirPrioriteJeunesAdjoint = useGame((s) => s.definirPrioriteJeunesAdjointManager);
+  const acterDepartContrat = useGame((s) => s.acterDepartContratManager);
   const verifierSucces = useGame((s) => s.verifierSucces);
   const definirTactique = useGame((s) => s.definirTactiqueManager);
   const ameliorerInstallation = useGame((s) => s.ameliorerInstallation);
@@ -447,7 +454,7 @@ export function Manager() {
   const verrous: VerrouCloture[] = montrerVerrous ? diagnostiquerCloture(manager, effectifBrut) : [];
   // Les contrats qui s'arrêtent à la fin de CETTE saison, annoncés dès le palier « danger » (six mois).
   const prolonges = new Set(prolongationsAcceptees(manager).map((n) => n.joueur.id));
-  const expirants = manager.club && avancee ? contratsExpirants(manager, effectifBrut, avancee).filter((j) => !prolonges.has(j.id)) : [];
+  const expirants = manager.club && avancee ? contratsExpirants(manager, effectifBrut, avancee).filter((j) => !prolonges.has(j.id) && !departActe(avancee, j.id, manager.saison)) : [];
   const alerteContrats = expirants.length > 0
     && ['danger', 'libre'].includes(palierContrat(moisRestantsContrat(manager.saison + 1, manager.saison, manager.semaine)));
   const academieClub = manager.academie.filter((j) => j.clubCentre === manager.club);
@@ -471,8 +478,14 @@ export function Manager() {
   const profonde = avancee?.profonde;
   const vieProfonde = vieClubProfonde(profonde, manager.club);
   const etatsComposition = new Map<string, EtatDuJoueur>();
+  // ⚠️ L'ADJOINT NE DÉCIDE PAS SUR UN CHIFFRE CACHÉ : la condition qu'il lit (`etatsPhysiquesManager`) est affichée
+  //    sur chaque joueur de la composition (Correctif 41).
+  for (const [id, etat] of etatsPhysiquesManager(avancee ?? undefined, effectifBrut)) {
+    if (etat.fraicheur !== undefined) etatsComposition.set(id, { condition: etat.fraicheur });
+  }
   for (const dossier of dossiersMedicaux) {
     etatsComposition.set(dossier.joueurId, {
+      ...etatsComposition.get(dossier.joueurId),
       condition: dossier.condition, forme: dossier.rythme,
       blesse: autorisationMedicale(dossier) === 'aucune',
       tempsBlessure: `${dossier.type} · ${STATUTS_MEDICAUX[bilanMedical(dossier, manager).statut]} · ${bilanMedical(dossier, manager).absence} j`,
@@ -484,6 +497,14 @@ export function Manager() {
       enSelection: true,
     });
   }
+  // La feuille de l'adjoint pour l'affiche à venir : la même fonction que la composition déléguée.
+  const managerAvecEtat = avancee ? { ...manager, avancee } : manager;
+  const afficheAVenir = afficheManager && !resultatManager ? afficheManager : null;
+  const rapportAdjoint = manager.club && vue === 'equipe' ? rapportAdjointManager(managerAvecEtat, effectifBrut, { affiche: afficheAVenir }) : null;
+  const laisserLAdjointComposer = () => {
+    if (!manager.club) return;
+    definirComposition(compositionDeLAdjoint(managerAvecEtat, effectifBrut, { affiche: afficheAVenir }));
+  };
   const automatismesComposition = profonde ? Object.fromEntries(
     SECTEURS_COHESION.map((secteur) => {
       let total = 0;
@@ -981,10 +1002,7 @@ export function Manager() {
                   <button
                     type="button"
                     className="btn btn-meilleure-equipe"
-                    onClick={() => {
-                      const comp = meilleureCompositionManager(effectif, indisponiblesSet, etatsComposition);
-                      definirComposition(comp);
-                    }}
+                    onClick={laisserLAdjointComposer}
                     title={t('compo.meilleureEquipeAide')}
                   >
                     <Icone nom="eclair" taille={15} /> {t('compo.meilleureEquipe')}
@@ -1009,13 +1027,22 @@ export function Manager() {
                 automatismes={automatismesComposition}
                 onCapitaine={(id) => definirComposition({ ...composition, capitaineId: id })}
                 onButeur={(id) => definirComposition({ ...composition, buteurId: id })}
-                onMeilleureEquipe={() => {
-                  const comp = meilleureCompositionManager(effectif, indisponiblesSet, etatsComposition);
-                  definirComposition(comp);
-                }}
+                onMeilleureEquipe={laisserLAdjointComposer}
               />
 
               </CadreCompositionManager>
+              {rapportAdjoint && (
+                <RapportAdjoint
+                  rapport={rapportAdjoint}
+                  effectif={effectifBrut}
+                  composition={composition}
+                  consignes={manager.consignesAdjoint}
+                  delegue={!!profonde?.delegations.compositions}
+                  onAppliquer={laisserLAdjointComposer}
+                  onConsigne={definirConsigneAdjoint}
+                  onPrioriteJeunes={definirPrioriteJeunesAdjoint}
+                />
+              )}
               <section className="carte manager-roles-visuels" data-tuto="mgr-roles">
                 <div><b><Icone nom="profil" taille={16} />{t("ui.3cd9c1881580")}</b><span>{t("ui.b9e3c6abe1e3")}</span></div>
                 <label data-tuto="mgr-role-capitaine">
@@ -1504,6 +1531,7 @@ export function Manager() {
           {vue === 'marche' && (
             <div className="manager-marche" data-tuto="mgr-marche" tabIndex={0} role="region" aria-label={t('mgr.marche')}>
           {avancee && <details className="carte manager-contrats-marche"><summary>{t('staff.manager.squadContracts')}</summary>
+              <GestionContrats effectif={effectifBrut} />
               <section className="carte contrats-effectif-manager">
                 <div className="comp-tete"><div><b><Icone nom="signature" taille={16} />{t("ui.8cf044680897")}</b><small>{t("ui.909420981e2f")}</small></div><span className="comp-count">{Object.values(avancee.contratsJoueurs).filter((c) => c.club === manager.club).length}</span></div>
                 <div className="barre-poules"><button className={`chip-poule${contratsARenouveler ? ' actif' : ''}`} onClick={() => setContratsARenouveler(true)}>{t('staff.contract.renewals')}</button><button className={`chip-poule${!contratsARenouveler ? ' actif' : ''}`} onClick={() => setContratsARenouveler(false)}>{t('staff.contract.all')}</button></div>
@@ -1513,7 +1541,8 @@ export function Manager() {
                   const palier = palierContrat(mois);
                   const dispo = disponibiliteJoueur(avancee.profilsMedicaux[j.id], manager.saison);
                   const refus = avisProlongation(avancee, manager, j);
-                  return <article key={j.id} className={`${c.demandeRevalorisation ? 'revalorisation ' : ''}palier-${palier}`}>
+                  const partant = departActe(avancee, j.id, manager.saison);
+                  return <article key={j.id} className={`${c.demandeRevalorisation ? 'revalorisation ' : ''}palier-${palier}${partant ? ' depart-acte' : ''}`}>
                     <span><b>{j.nom}</b><small>{t("ui.6d13dd4d9743", { v0: c.role, v1: c.fin, v2: c.option === 'aucune' ? t("ui.0300a63d8988") : t("ui.cd2d99d756f4", { v0: c.option }) })}</small></span>
                     {/* ⚠️ LE COMPTE À REBOURS EST LA VRAIE INFORMATION. « Fin
                         S4 » ne dit pas s'il faut agir cette semaine ; « 6 mois »
@@ -1526,7 +1555,8 @@ export function Manager() {
                     <div><small>{t("online.collection.status")}</small><strong>{dispo.possibles ? `${dispo.part}%` : '—'}</strong></div>
                     <div><small>{t("ui.57028eb9694d")}</small><strong>{t("ui.168b895b1689", { v0: c.interetExterieur, v1: c.offresExterieures })}</strong></div>
                     <small className="motivations-contrat">{c.motivations.map((m) => `${m.type} ${m.importance}`).join(' · ')}{palier === 'danger' ? t("ui.dc2fe6d10248") : palier === 'libre' ? t("ui.1d7c27822bda") : ''}</small>
-                    <small>{refus ? t(`staff.contract.refusal.${refus}`) : t('staff.contract.willing')}</small>
+                    <small className={partant ? 'marque-depart' : ''}>{partant ? t('ctr.departActe') : refus ? t(`staff.contract.refusal.${refus}`) : t('staff.contract.willing')}</small>
+                    {partant && <button onClick={() => acterDepartContrat(j.id, false)}>{t('ctr.revenir')}</button>}
                     <button className={c.demandeRevalorisation ? 'danger' : ''} disabled={nego?.etat === 'signee' && nego.saison === manager.saison} onClick={() => ouvrirRenegociationJoueur(j.id)}>{nego?.etat === 'ouverte' || nego?.etat === 'accord' ? t("ui.302b36b46694") : c.demandeRevalorisation ? t("ui.05bdbd2100e7") : c.fin <= manager.saison + 1 ? t("ui.dc943ee62ae4") : t("ui.e79b4886f0ac")}</button>
                   </article>;
                 })}</div>

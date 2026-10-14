@@ -555,11 +555,14 @@ try {
   longue.variantes[0].sauteur = 15; longue.variantes[0].touche = { alignes: 4, distance: 25, feinte: false };
   const strategie = { ...STRATEGIE_EN_LIGNE_DEFAUT, combinaisons: [base, touche, longue, parallele], modeCombinaisons: 'configure' };
   const commande = (jeton: string, action: unknown) => appel(jeton, '/api/carriere', { action: 'commande', ligue, requeteId: randomUUID(), commande: action });
-  const refuse = await commande(visiteur, { type: 'strategie', strategie });
-  assert.equal(refuse.statut, 400);
-  assert.match(refuse.donnees.erreur, /bêta privée/);
-  const refuseDirect = await commande(visiteur, { type: 'match', matchId: 'faux', action: { type: 'strategie', strategie } });
-  assert.equal(refuseDirect.statut, 400); assert.match(refuseDirect.donnees.erreur, /bêta privée/);
+  // Le cahier est ouvert à tous les comptes (Correctif 41) : le visiteur enregistre le sien comme le compte interne.
+  const compteVisiteur = (await appel(visiteur, '/api/carriere')).donnees.compte;
+  assert.deepEqual([compteVisiteur.administrateur, compteVisiteur.featureFlags.combinaisons], [false, true]);
+  const ouvert = await commande(visiteur, { type: 'strategie', strategie });
+  assert.equal(ouvert.statut, 200, 'Un compte ordinaire enregistre un cahier configuré');
+  assert.equal(ouvert.donnees.clubs.find((c: any) => c.id === ouvert.donnees.monClubId).strategie.modeCombinaisons, 'configure');
+  const directInconnu = await commande(visiteur, { type: 'match', matchId: 'faux', action: { type: 'strategie', strategie } });
+  assert.equal(directInconnu.statut, 400); assert.doesNotMatch(directInconnu.donnees.erreur, /bêta privée/);
   const accepte = await commande(kiri, { type: 'strategie', strategie });
   assert.equal(accepte.statut, 200);
   assert.deepEqual(accepte.donnees.clubs.find((c: any) => c.id === accepte.donnees.monClubId).strategie.combinaisons, [base, touche, longue, parallele]);
@@ -574,4 +577,4 @@ try {
 } finally {
   rmSync(dossier, { recursive: true, force: true });
 }
-console.log('Combinaisons : étapes simultanées et premier tick A/B, opposition 15v15 et vrais plaquages animés, défenses glissée/blitz/repli, joueurs liés, sorties 8/9, navigation, lancers 5–25 m, moteur en ligne, sauvegarde et bêta Kiri vérifiés.');
+console.log('Combinaisons : étapes simultanées et premier tick A/B, opposition 15v15 et vrais plaquages animés, défenses glissée/blitz/repli, joueurs liés, sorties 8/9, navigation, lancers 5–25 m, moteur en ligne, sauvegarde et cahier ouvert à tous vérifiés.');

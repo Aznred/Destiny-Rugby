@@ -37,6 +37,10 @@ async function demarrer() {
 const lireImagesJoueurs = () => { void import('./lib/imagesJoueurs').then(m => m.chargerImagesJoueurs()).catch(() => {}) }
 if ('requestIdleCallback' in window) requestIdleCallback(lireImagesJoueurs, { timeout: 6000 }); else setTimeout(lireImagesJoueurs, 2500)
 
+// L'IA communautaire : les combinaisons qui ont fait leurs preuves, lues au repos et gardées six heures sur l'appareil.
+const lireMetaCombinaisons = () => { void import('./lib/marcheCombinaisonsClient').then(m => m.chargerMetaCombinaisons()).catch(() => {}) }
+if ('requestIdleCallback' in window) requestIdleCallback(lireMetaCombinaisons, { timeout: 9000 }); else setTimeout(lireMetaCombinaisons, 4000)
+
 void demarrer().catch((erreur) => {
   if (moduleObsolete(erreur) && rechargerPourModuleObsolete()) return
   throw erreur
