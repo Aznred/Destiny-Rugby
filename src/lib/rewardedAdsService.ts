@@ -35,6 +35,28 @@ export function publicitesModifiees(): void {
   if (typeof window !== 'undefined') window.dispatchEvent(new Event('destiny:publicites'));
 }
 
+/**
+ * LA PUBLICITÉ OUVERTE, POUR LA FERMER SI LA PAGE PART (15 octobre 2026). Une session préparée ou une vidéo en cours qu'on
+ * quitte en fermant l'onglet, en changeant d'application ou en rechargeant ne disait rien au serveur : elle restait « en
+ * cours » un quart d'heure. Au départ de la page, un dernier envoi la ferme (`sendBeacon` : il part même page fermée).
+ * Une vidéo terminée n'est jamais fermée ainsi — son reçu peut encore arriver.
+ */
+let ouverte: string | null = null, ecoute = false;
+export function sessionOuverte(id: string | null): void {
+  ouverte = id;
+  if (ecoute || typeof window === 'undefined' || typeof window.addEventListener !== 'function') return;
+  ecoute = true;
+  window.addEventListener('pagehide', () => {
+    if (!ouverte) return;
+    const corps = JSON.stringify({ action: 'publicites', operation: 'evenement', rewardSessionId: ouverte, evenement: 'CLOSED' });
+    ouverte = null;
+    try {
+      if (!navigator.sendBeacon?.('/api/carriere?publicites=1', new Blob([corps], { type: 'application/json' })))
+        void fetch('/api/carriere?publicites=1', { method: 'POST', credentials: 'same-origin', keepalive: true, headers: { 'Content-Type': 'application/json' }, body: corps }).catch(() => {});
+    } catch { /* la session expirera d'elle-même, et la publicité suivante la remplace */ }
+  });
+}
+
 /** Un SDK partagé, aucun téléchargement de vidéo avant le geste explicite. */
 class ServicePublicitesRecompensees {
   private chargement?: Promise<void>;
@@ -67,20 +89,24 @@ class ServicePublicitesRecompensees {
     for (const a of audios) a.pause();
     return new Promise<boolean>((resolve) => {
       let finie = false, complete = false, fermeture: ReturnType<typeof setTimeout> | undefined;
-      const signaler = (evenement: string) => { void appelerPublicites({operation:'evenement',rewardSessionId:session.rewardSessionId,evenement}).catch(() => {}); };
+      const signaler = (evenement: string) => appelerPublicites({operation:'evenement',rewardSessionId:session.rewardSessionId,evenement}).catch(() => {});
       const finir = (ok: boolean, evenement?: string) => {
         if (finie) return; finie = true; clearTimeout(delai); clearTimeout(fermeture); this.terminer = undefined;
-        if (evenement) signaler(evenement);
+        // ⚠️ LA FIN EST ENREGISTRÉE AVANT QUE L'ÉCRAN NE RELISE SES COMPTEURS. Rendue tout de suite, la relecture partait avant
+        // la fermeture : le serveur voyait encore la pub « en cours », l'écran affichait « Revenez demain » et n'y revenait plus.
+        const envoi: Promise<unknown> = evenement ? signaler(evenement) : Promise.resolve();
+        sessionOuverte(complete ? null : session.rewardSessionId);
         for (const media of conteneur.querySelectorAll<HTMLMediaElement>('video,audio')) { media.pause(); media.removeAttribute('src'); media.load(); }
         conteneur.replaceChildren();
         for (const a of audios) { if (a.isConnected) void a.play().catch(() => {}); }
-        resolve(ok);
+        void Promise.race([envoi, new Promise(fin => setTimeout(fin, 4000))]).then(() => { sessionOuverte(null); resolve(ok); });
       };
       // Les callbacks locaux précèdent le traitement interne du SDK (reçu et télémétrie).
       // Ne pas retirer son lecteur au milieu de cette pile d'appels.
       const finirApresSdk = (evenement?: string) => queueMicrotask(() => finir(complete,complete ? undefined : evenement));
       const attendreFinSdk = () => { fermeture ??= setTimeout(() => finir(complete,complete ? undefined : 'NO_FILL'),5000); };
       this.terminer = () => finir(complete,complete ? undefined : 'CLOSED');
+      sessionOuverte(session.rewardSessionId);
       const delai = setTimeout(() => finir(complete,complete ? undefined : 'FAILED'),180000);
       try {
         // Appel synchrone dans le clic « Lancer la vidéo » : conserve le geste Safari/iOS.
@@ -89,10 +115,10 @@ class ServicePublicitesRecompensees {
           adStatusCallbackFn: s => {
             if (finie) return;
             // IMA émet « start » ; certains adaptateurs exposent « started ».
-            if (s.type === 'start' || s.type === 'started') signaler('STARTED');
+            if (s.type === 'start' || s.type === 'started') void signaler('STARTED');
             else if (s.type === 'complete') {
-              if (!complete) signaler('WATCHED'); // Reprise durable, jamais une preuve de récompense.
-              complete = true;
+              if (!complete) void signaler('WATCHED'); // Reprise durable, jamais une preuve de récompense.
+              complete = true; sessionOuverte(null);
               attendreFinSdk();
             } else if (s.type === 'allAdsCompleted' || s.type === 'skipped') attendreFinSdk();
             else if (['thankYouModalClosed','adSkippedNoReward'].includes(s.type)) finirApresSdk(s.type === 'adSkippedNoReward' ? 'CLOSED' : 'NO_FILL');

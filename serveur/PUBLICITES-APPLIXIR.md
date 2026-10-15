@@ -78,3 +78,13 @@ La signature, l'unicité du TID, l'expiration, le plafond et la propriété de l
 À faire après déploiement, dans l'ordre : regarder une vidéo en entier ; lire le Labo et les journaux Vercel (`[applixir]`) ; si rien n'arrive, enregistrer l'adresse sans « ? » chez AppLixir et recommencer ; si rien n'arrive encore, pointer provisoirement le callback sur une adresse d'inspection pour voir ce qu'AppLixir envoie vraiment, puis écrire au support (message prêt dans `DIAGNOSTIC-PUBLICITES-2026-10-12.md`).
 
 Banc : `npm run verify:publicites` (94 contrôles, dont les quatre formes du reçu, le journal sans secret et la protection d'origine des autres routes). ⚠️ Non essayé : la réécriture `/api/applixir` en production, la lecture SQL des refus sur Neon (à la moindre erreur le Labo affiche « Journal indisponible » et rien d'autre ne change).
+
+## Une publicité abandonnée ne bloque plus la journée (15 octobre 2026)
+
+Signalé : « on regarde une pub et on ne la valide pas, ou on change de pub : plus de pub jusqu'au lendemain ». Trois défauts se cumulaient :
+
+- une session préparée mais jamais lancée occupait le plafond du jour pendant ses quinze minutes : avec deux publicités par jour (ou une pour un cosmétique), l'écran affichait « 0 / 2 — Revenez demain » ;
+- toute nouvelle publicité était refusée (« déjà en cours ») tant qu'une session restait ouverte, y compris une session que l'écran n'avait pas pu fermer (onglet fermé, application quittée, autre offre ouverte) ;
+- l'écran relisait ses compteurs AVANT que le serveur ait enregistré la fermeture, et restait sur le faux « Revenez demain ».
+
+Désormais : seule une vidéo réellement commencée (`started`, ou terminée en attente de reçu) réserve sa place ; une nouvelle publicité ferme celles qu'on a laissées en plan (jamais une vidéo terminée qui attend son reçu) ; la fin d'une publicité est enregistrée avant la relecture des compteurs ; une session ouverte est fermée quand l'offre disparaît de l'écran ou quand la page part (`sendBeacon`). Le plafond ne craint rien : chaque reçu signé reste recompté contre les récompenses du jour. Banc : `npm run verify:publicites`.

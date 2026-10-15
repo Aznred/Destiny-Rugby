@@ -79,7 +79,15 @@ function publicSession(s: SessionPub) {
     rewardStatus: s.rewardStatus, pack: s.pack, montant: s.montant, ...(s.article ? { article: s.article } : {}) };
 }
 const recompensee = (s: SessionPub) => ['VERIFIED','RESERVED','CLAIMED'].includes(s.rewardStatus);
-const occupeQuota = (s: SessionPub, maintenant: number) => recompensee(s) || (s.rewardStatus === 'REQUESTED' && s.expireLe > maintenant);
+/**
+ * ⚠️ UNE PUBLICITÉ ABANDONNÉE NE COMPTE PAS (signalé le 15 octobre 2026 : « on regarde une pub, on ne la valide pas, ou on
+ * change de pub : plus de pub jusqu'au lendemain »). Une session préparée mais jamais lancée occupait le plafond du jour
+ * pendant ses quinze minutes de validité — avec une ou deux publicités par jour, l'écran affichait « Revenez demain ».
+ * Seule une vidéo réellement commencée réserve sa place, le temps que son reçu arrive. Le plafond lui-même ne craint
+ * rien : chaque reçu signé est recompté contre les récompenses du jour (`callback`).
+ */
+const occupeQuota = (s: SessionPub, maintenant: number) => recompensee(s)
+  || (s.rewardStatus === 'REQUESTED' && s.expireLe > maintenant && Boolean(s.started || s.videoTerminee));
 const avecPack = (contexte: ContextePub) => contexte === 'DAILY_PACK' || contexte === 'SHOP_PREMIUM_PACK';
 
 /**
@@ -184,8 +192,14 @@ export function creerServicePublicites(stockage: StockagePublicites) {
       rewardStatus: 'REQUESTED', jour, creeLe: maintenant, expireLe: maintenant + 15 * MINUTE,
       config, chances, montant: contexte === 'SHOP_OVAS' ? config.rewardedAdOvasAmount : 0, ...(article ? { article } : {}) };
     await modifier(compte, r => {
-      // Une seule publicité à la fois par compte : ni double clic, ni deux fenêtres, ni deux onglets.
-      if (r.sessions.some(s => s.rewardStatus === 'REQUESTED' && s.expireLe > maintenant)) erreur('Une publicité est déjà en cours sur ce compte.');
+      // ⚠️ UNE NOUVELLE PUBLICITÉ REMPLACE CELLE QU'ON A LAISSÉE EN PLAN. On refusait tant qu'une session était « en cours » :
+      // une publicité fermée sans que l'écran ait pu le dire (onglet fermé, réseau coupé, autre offre ouverte) bloquait
+      // tout pendant quinze minutes. Elle est close ici. Celle dont la vidéo est terminée attend encore son reçu : on la
+      // garde. Un reçu signé arrivé plus tard pour une session close reste accepté, dans le plafond du jour.
+      for (const s of r.sessions) {
+        if (s.rewardStatus !== 'REQUESTED' || s.expireLe <= maintenant || s.videoTerminee) continue;
+        s.rewardStatus = 'FAILED'; s.failure = 'CLOSED'; r.stats.failed++;
+      }
       if (article && r.cosmetiques?.[article]?.debloqueLe) erreur('Ce cosmétique est déjà débloqué.');
       if (r.sessions.filter(s => s.jour === jour && memeUsage(s, contexte, article) && occupeQuota(s, maintenant)).length >= plafond(config, contexte, article)) erreur('DAILY_LIMIT — Revenez demain.');
       // Les packs réservés et crédits vérifiés ne sont jamais purgés avant réception.

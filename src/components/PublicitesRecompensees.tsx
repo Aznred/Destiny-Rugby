@@ -6,7 +6,7 @@ import { PieceOvas } from './PieceOvas';
 import { useModalDialog } from '../lib/useModalDialog';
 import { chargerBoutiqueCompte } from '../lib/carriereEnLigneClient';
 import { attendreBoutiqueSoloEnregistree, recevoirOvasPublicitaires } from '../lib/synchronisationBoutiqueCompte';
-import { RewardedAdsService, appelerPublicites, chargerPublicites, claimRewardedAdReward, publicitesModifiees, type CosmetiquePubRecu, type SessionNavigateurPub } from '../lib/rewardedAdsService';
+import { RewardedAdsService, appelerPublicites, chargerPublicites, claimRewardedAdReward, publicitesModifiees, sessionOuverte, type CosmetiquePubRecu, type SessionNavigateurPub } from '../lib/rewardedAdsService';
 import { etatDeLOffre, type ChancePackPub, type ContextePub, type RecompensePub, type VuePublicites } from '../lib/publicitesRecompensees';
 import { RoulettePacksPub } from './RoulettePacksPub';
 import './PublicitesRecompensees.css';
@@ -48,6 +48,14 @@ function useOffrePublicitaire({ contexte, ligue, article, onPack, onCosmetique }
     try { if(!audioRoulette.current || audioRoulette.current.state==='closed') audioRoulette.current=new AudioContext(); void audioRoulette.current.resume().catch(()=>{}); } catch { /* Le son reste facultatif. */ }
   };
   const vivant = useRef(true), bloque = useRef(false), abort = useRef<AbortController | null>(null);
+  // La session préparée mais pas encore lancée : si l'offre disparaît (autre onglet de la Boutique, autre écran), on la ferme.
+  const preparee = useRef<string | null>(null);
+  const fermerPreparee = () => {
+    const id = preparee.current; preparee.current = null;
+    if (!id) return Promise.resolve();
+    sessionOuverte(null);
+    return appelerPublicites({operation:'evenement',rewardSessionId:id,evenement:'CLOSED'}).catch(() => {});
+  };
   const charger = useCallback(async () => {
     try { const d = await chargerPublicites(ligue); if (vivant.current) { setVue(d); setErreur(''); } }
     catch (e) { if (vivant.current) setErreur((e as Error).message); }
@@ -60,7 +68,7 @@ function useOffrePublicitaire({ contexte, ligue, article, onPack, onCosmetique }
     // Une autre offre du même écran a regardé une publicité : les plafonds affichés ici ont pu bouger.
     const autre = () => { void charger(); };
     window.addEventListener('destiny:publicites',autre);
-    return () => { vivant.current=false; abort.current?.abort(); void audioRoulette.current?.close().catch(()=>{}); document.removeEventListener('visibilitychange',reveil); window.removeEventListener('destiny:publicites',autre); };
+    return () => { vivant.current=false; void fermerPreparee().then(publicitesModifiees); abort.current?.abort(); void audioRoulette.current?.close().catch(()=>{}); document.removeEventListener('visibilitychange',reveil); window.removeEventListener('destiny:publicites',autre); };
   },[charger]);
   const recevoir = async (id: string) => {
     setVerification(id); // La reprise reste possible si la confirmation réseau échoue.
@@ -90,8 +98,9 @@ function useOffrePublicitaire({ contexte, ligue, article, onPack, onCosmetique }
       if (contexte === 'SHOP_OVAS' || contexte === 'COSMETIC') await attendreBoutiqueSoloEnregistree();
       await RewardedAdsService.initialize(vue.config);
       creee = await appelerPublicites<SessionNavigateurPub>({ operation:'commencer',contexte,ligue,...(article ? { article } : {}) });
+      preparee.current = creee.rewardSessionId; sessionOuverte(creee.rewardSessionId);
       if (vivant.current) setSession(creee);
-      else void appelerPublicites({operation:'evenement',rewardSessionId:creee.rewardSessionId,evenement:'CLOSED'}).catch(() => {});
+      else void fermerPreparee();
     } catch (e) {
       if (vivant.current) setErreur((e as Error).message);
     } finally { bloque.current=false; if (vivant.current) setOccupe(false); }
@@ -100,6 +109,8 @@ function useOffrePublicitaire({ contexte, ligue, article, onPack, onCosmetique }
     if (!session || bloque.current) return;
     amorcerSon();
     bloque.current=true; setOccupe(true);
+    // Lancée, elle appartient au lecteur : c'est lui qui dira au serveur comment elle s'est terminée.
+    preparee.current = null;
     try {
       const terminee = await RewardedAdsService.showRewardedAd(contexte,session);
       if (!vivant.current) return;
@@ -112,7 +123,7 @@ function useOffrePublicitaire({ contexte, ligue, article, onPack, onCosmetique }
   const fermer = () => {
     if (!session) return;
     if (occupe) RewardedAdsService.cancel();
-    else void appelerPublicites({operation:'evenement',rewardSessionId:session.rewardSessionId,evenement:'CLOSED'}).then(charger).catch(() => {});
+    else void fermerPreparee().then(() => { publicitesModifiees(); });
     setSession(null);
   };
   const reprendre = async (id: string) => {

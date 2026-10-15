@@ -63,9 +63,15 @@ try {
   const avecPoids=chancesPacksPub(labo.donnees.packs.map((p:any)=>({...p,rewardedAdWeight:1})),maintenant);
   ok(Math.abs(avecPoids[0].chance-100/avecPoids.length)<1e-9,'les poids personnalisés du Labo remplacent la répartition initiale');
 
-  const premiere=await commencer('SHOP_OVAS'); egal(premiere.statut,200,'session Ovas créée');
+  // 15 octobre 2026 : une publicité préparée puis laissée en plan (onglet fermé, autre offre) ne bloque ni ne compte.
+  const abandonnee=await commencer('SHOP_OVAS'); egal(abandonnee.statut,200,'session Ovas préparée');
+  egal((await appel('joueur','?publicites=1')).donnees.ovasRestantes,2,'une publicité préparée mais pas lancée ne prend pas de place dans le plafond');
+  await action('joueur','evenement',{rewardSessionId:abandonnee.donnees.rewardSessionId,evenement:'STARTED'});
+  egal((await appel('joueur','?publicites=1')).donnees.ovasRestantes,1,'une vidéo lancée réserve sa place le temps du reçu');
+  const premiere=await commencer('SHOP_OVAS'); egal(premiere.statut,200,'une publicité laissée en plan ne bloque plus la suivante');
   const id=premiere.donnees.rewardSessionId;
-  egal((await commencer('SHOP_OVAS')).statut,400,'un seul lecteur actif par compte, même entre onglets');
+  egal((await appel('joueur','?publicites=1')).donnees.ovasRestantes,2,'la publicité abandonnée est close : elle ne compte plus');
+  egal((await action('joueur','reclamer',{rewardSessionId:abandonnee.donnees.rewardSessionId})).donnees.statut,'PENDING','une publicité abandonnée ne rapporte rien');
   egal((await db.boutique(joueur))!.ovas,50,'aucun gain au clic');
   egal((await action('joueur','reclamer',{rewardSessionId:id,videoComplete:true,montant:10000})).donnees.statut,'PENDING','une fausse complétion client ne récompense pas');
   egal((await action('autre','reclamer',{rewardSessionId:id})).statut,400,'session privée, inaccessible à un autre compte');
@@ -73,6 +79,8 @@ try {
   egal((await action('joueur','evenement',{rewardSessionId:id,evenement:'WATCHED'})).statut,200,'complétion locale conservée pour la reprise');
   egal((await action('joueur','reclamer',{rewardSessionId:id})).donnees.statut,'PENDING','WATCHED seul ne crédite aucun gain');
   egal((await appel('joueur','?publicites=1')).donnees.aVerifier.map((s:any)=>s.rewardSessionId),[id],'récompense à vérifier retrouvée après rechargement');
+  egal((await commencer('SHOP_OVAS')).statut,200,'une vidéo terminée qui attend son reçu ne bloque pas une nouvelle publicité');
+  egal((await appel('joueur','?publicites=1')).donnees.aVerifier.map((s:any)=>s.rewardSessionId),[id],'et elle n’est pas close : son reçu peut encore arriver');
   const q=signature(id), fausse=new URLSearchParams(q); fausse.set('signature','0'.repeat(32));
   egal((await callback(fausse)).statut,403,'signature falsifiée refusée');
   const autreId=new URLSearchParams(q); autreId.set('userId',randomUUID());
