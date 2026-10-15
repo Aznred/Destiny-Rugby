@@ -1,3 +1,4 @@
+import { anonymiserPersonnesRetirees } from '../src/lib/retraitsPersonnes.js';
 import { programmerMatchsVercel } from '../serveur/horlogeVercel.js';
 import { creerGestionnaireCarriere } from '../serveur/carriereApi.js';
 import type { RequeteCarriere, ReponseCarriere } from '../serveur/carriereApi.js';
@@ -21,7 +22,7 @@ export default async function handler(req: RequeteCarriere, res: ReponseHote) {
   const reponse: ReponseCarriere = {
     status: (code) => { res.status(code); return reponse; },
     setHeader: (nom, valeur) => res.setHeader(nom, valeur),
-    json: (contenu) => res.json(contenu),
+    json: (contenu) => res.json(anonymiserPersonnesRetirees(contenu)),
     envoyer: (donnees) => res.end(donnees),
   };
   if (!process.env.DATABASE_URL) {

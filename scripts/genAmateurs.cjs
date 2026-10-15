@@ -527,7 +527,7 @@ out += `// Effectifs réels amateurs. Encodage compact « nom|indice de poste »
 export const EFFECTIFS_AMATEURS: Record<string, string> = {
 `;
 for (const [nom, enc] of Object.entries(EFFECTIFS)) {
-  out += `  ${JSON.stringify(nom)}: ${JSON.stringify(enc)},\n`;
+  out += `  ${JSON.stringify(nom)}: ${JSON.stringify(enc.split('~').map(entree => /^(?:Gauthier M[eé]tais|M[eé]tais Gauthier)\|/i.test(entree) || entree.split('|')[3] === '191423' ? '' : entree).join('~'))},\n`;
 }
 out += '};\n';
 fs.writeFileSync(path.join(RACINE, 'src/data/amateurs.ts'), out);

@@ -3170,3 +3170,7 @@ Recette : scripts/verifierConfortMatch.ts, verify:vitesse-match,
 verify:responsabilites, verify:penaltouche. L'aperçu du contrôle direct accepte
 confort=penalite ou confort=box. Les manettes physiques restent à essayer sur
 matériel réel ; le lecteur a été vérifié avec des entrées Gamepad simulées.
+
+### Retraits explicites de personnes
+
+`src/lib/retraitsPersonnes.ts` bloque les profils retirés par nom et identifiant source, indépendamment des imports générés. Les catalogues et portraits appliquent ce blocage ; les anciennes carrières sont anonymisées à la lecture et les ligues retirent les cartes avec le mécanisme de compensation existant. Les réponses de l’API de production anonymisent aussi les anciens récits. Les références de match et les scores restent stables. Les imports FFR et de portraits ne doivent pas réintroduire ces profils. Banc : `node --loader ./scripts/chargeurTests36.mjs scripts/verifierRetraitPersonne.ts`. Les archives privées et les appareils hors ligne ne sont pas effacés à distance.

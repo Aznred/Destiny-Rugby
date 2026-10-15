@@ -1,3 +1,4 @@
+import { personneRetiree } from './retraitsPersonnes.js';
 import { PHOTOS_NEW_MAJ } from '../data/photosNewMaj.js';
 import { cleJoueurImage } from './demandesImage.js';
 import { photoJoueurFfr } from './joueursFfr.js';
@@ -263,6 +264,7 @@ export function definirChoixImages(retirees: readonly string[], ajoutees: Readon
 }
 /** `null` : le joueur a fait retirer son portrait. Une adresse : celui qu'il a choisi. `undefined` : il n'a rien demandé. */
 export function choixImage(nom: string): string | null | undefined {
+  if (personneRetiree(nom)) return null;
   if (!portraitsRetires.size && !portraitsChoisis.size) return undefined;
   const cle = cleJoueurImage(nom);
   return portraitsRetires.has(cle) ? null : portraitsChoisis.get(cle);

@@ -152,7 +152,6 @@ export const PHOTOS_FFR_PAR_ID: Record<number, string> = {
   "190328": "/photos/ffr/cs-bourgoin-jallieu/190328_pierre_segui.webp",
   "191170": "/photos/ffr/co-berre-xv/191170_ethan_perrin.webp",
   "191323": "/photos/ffr/coquelicots-montechois-rugby/191323_lucas_giry.webp",
-  "191423": "/photos/ffr/as-tournefeuille/191423_gauthier_metais.webp",
   "192727": "/photos/ffr/us-coarraze-nay/192727_baptiste_gaubert.webp",
   "194459": "/photos/ffr/us-issoirienne/194459_arthur_stebernjak.webp",
   "194941": "/photos/ffr/coquelicots-montechois-rugby/194941_rafael_kozlowski.webp",

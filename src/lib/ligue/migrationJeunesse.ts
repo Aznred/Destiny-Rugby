@@ -1,3 +1,4 @@
+import { personneRetiree } from '../retraitsPersonnes.js';
 import { sourceRetireeFfr, empreinteSourceFfr } from './eligibiliteJoueurs.js';
 import { VERSION_PROTECTION_FFR } from '../../data/protectionFfr.generated.js';
 import { graine } from './aleatoire.js';
@@ -7,7 +8,7 @@ import type { EtatCarriereEnLigne } from './typesCarriere.js';
 const first=['Mathis','Adam','Noé','Louis','Arthur','Hugo','Gabriel','Jules','Raphaël','Léo'];
 const last=['Bernard','Laurent','Morel','Garnier','Fontaine','Roux','Leroy','Faure','Perrin','Blanc'];
 export const cartesJeunesseARetirer = (etat: EtatCarriereEnLigne) => etat.cartes.filter(c => !c.retiree && c.origine !== 'formation'
-  && (sourceRetireeFfr(c.sourceId) || sourceRetireeFfr(c.speciale?.base ?? c.sourceId) || c.age < 18));
+  && (personneRetiree(c.nom) || sourceRetireeFfr(c.sourceId) || sourceRetireeFfr(c.speciale?.base ?? c.sourceId) || c.age < 18));
 /** Nettoie les instantanés et récits en conservant leurs références primaires. */
 export function anonymiseurJeunesse(identites: readonly {nom:string;photo?:string}[]) {
   const photos = new Set(identites.map(c => c.photo).filter(Boolean));
@@ -49,7 +50,7 @@ export function migrerCartesJeunesse(etat: EtatCarriereEnLigne,now:number): void
         gender:'male' as const,verrou:undefined,speciale:undefined,retiree:undefined,datasetVersion:undefined};
       etat.cartes.push(replacement);replacements.set(c.id,id);
       etat.transactions.push({id:`${etat.id}:migration-ffr:${empreinteSourceFfr(c.id)}`,clubId:owner,nature:'dotation',ovas:0,
-        cartes:[id],libelle:'Retrait jeunesse : carte fictive de compensation équivalente',date});
+        cartes:[id],libelle:'Retrait de profil : carte fictive de compensation équivalente',date});
     }
     c.retiree=true;c.proprietaire=null;delete c.verrou;delete c.photo;c.nom='Joueur retiré';
     (etat.migrationsFfr??=[]).push({version:VERSION_PROTECTION_FFR,carteId:c.id,owner,compensation:0,le:date});
@@ -69,7 +70,7 @@ export function migrerCartesJeunesse(etat: EtatCarriereEnLigne,now:number): void
     if(emetteur&&e.ovasDonnes){
       emetteur.ovas+=e.ovasDonnes;
       etat.transactions.push({id:`${etat.id}:migration-ffr-echange:${e.id}`,clubId:emetteur.id,nature:'echange',ovas:e.ovasDonnes,
-        cartes:[],libelle:'Retrait jeunesse : Ovas réservés à l’échange restitués',date});
+        cartes:[],libelle:'Retrait de profil : Ovas réservés à l’échange restitués',date});
     }
   }
   for(const club of etat.clubs){

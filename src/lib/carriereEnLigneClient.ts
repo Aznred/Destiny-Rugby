@@ -1,3 +1,4 @@
+import { anonymiserPersonnesRetirees } from './retraitsPersonnes.js';
 import type { AdministrationCarriere, CommandeCarriere, VueCarriereEnLigne, PageCollection, StatistiquesGlobalesCarriere } from './ligue/typesCarriere.js';
 import type { ReponseDelta } from './ligue/deltaVue';
 import type { VueMarchePartage } from './ligue/marchePartage';
@@ -63,7 +64,7 @@ async function requete<T>(corps?: unknown, ligue?: string, signal?: AbortSignal,
       (reponse.status === 401 ? 'Connecte-toi pour retrouver tes ligues.' :
         'Le service de carrière en ligne est indisponible sur ce serveur. Réessaie dans un instant.'), reponse.status);
   }
-  return donnees;
+  return anonymiserPersonnesRetirees(donnees);
 }
 export interface GroupeEmblemes { groupe: string; pays: string; emblemes: { nom: string; logo: string }[] }
 export interface LogoCompetition { id: string; nom: string; logo: string }

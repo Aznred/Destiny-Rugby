@@ -1,3 +1,4 @@
+import { anonymiserPersonnesRetirees } from '../retraitsPersonnes.js';
 import { catalogueAdmin } from './atelierCatalogue.js';
 import { rangerEnTrop } from './combinaisons.js';
 import { ajouterStats, STATS_VIDES, type RemonteeCombinaisons } from './marcheCombinaisons.js';
@@ -1540,6 +1541,7 @@ function reprendre(etat: EtatCarriereEnLigne, maintenant: number): EtatCarriereE
   }
   actualiserCartesCatalogue(nouveau.cartes);
   migrerCartesJeunesse(nouveau, maintenant);
+  Object.assign(nouveau, anonymiserPersonnesRetirees(nouveau));
   nouveau.catalogueRevision = catalogueAdmin().revision;
   nouveau.rotationPacks = catalogueAdmin().rotationPacks === true;
   for (const club of nouveau.clubs) ajusterComposition(nouveau, club, maintenant);

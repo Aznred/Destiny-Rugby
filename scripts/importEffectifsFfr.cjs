@@ -250,7 +250,7 @@ function chaineEffectif(club, canonique) {
     if (numeros.length) postesImportes++;
     joueurs.push(`${nom}|${famille}|${numeros.join(',')}|${joueur.id}`);
   }
-  return joueurs.join('~');
+  return joueurs.map(entree => /^(?:Gauthier M[eé]tais|M[eé]tais Gauthier)\|/i.test(entree) || entree.split('|')[3] === '191423' ? '' : entree).join('~');
 }
 
 function longitudeLatitude(position) {

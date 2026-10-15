@@ -1,3 +1,4 @@
+import { personneRetiree, sourcePersonneRetiree } from './retraitsPersonnes.js';
 import { CLUBS_AMATEURS, POSTES_AMATEURS } from '../data/amateurs.js';
 import { EFFECTIFS_AMATEURS } from '../data/sourcesDuMonde.js';
 import { PHOTOS_FFR_PAR_ID, PHOTOS_FFR_SUPPLEMENTAIRES } from '../data/photosFfr.js';
@@ -51,7 +52,8 @@ export function joueursFfrDuClub(club: string): readonly JoueurFfr[] {
   }
   // Les effectifs et le catalogue attribuent un poste de jeu déterministe
   // aux profils non renseignés, sans modifier leur identité dans la source.
-  cache.set(club, liste); return liste;
+  const autorises = liste.filter(j => !personneRetiree(j.nom) && !sourcePersonneRetiree(String(j.ffrId ?? '')));
+  cache.set(club, autorises); return autorises;
 }
 
 let profilsParNom: Map<string, JoueurFfr | null> | undefined;

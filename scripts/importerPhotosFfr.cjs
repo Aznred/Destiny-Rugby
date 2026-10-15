@@ -29,6 +29,7 @@ async function importer({ dossier, fichier }) {
     const candidats = (club?.joueurs ?? []).filter(j => signature(`${j.prenom} ${j.nom}`) === signature(nomFichier));
     if (candidats.length === 1) { joueur = candidats[0]; bilan.lieesParNom++; }
   }
+  if (id === 191423 || joueur?.id === 191423 || signature(nomFichier) === 'gauthier|metais') return;
   const nomSortie = `${path.basename(fichier, path.extname(fichier))}.webp`;
   const destination = path.join(root, 'public/photos/ffr', dossier, nomSortie);
   fs.mkdirSync(path.dirname(destination), { recursive: true });

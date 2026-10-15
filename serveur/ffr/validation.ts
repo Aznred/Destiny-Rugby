@@ -1,3 +1,4 @@
+import { personneRetiree, sourcePersonneRetiree } from '../../src/lib/retraitsPersonnes.js';
 import { classifierFfr } from './classification.js';
 import type { ProfilFfr } from './classification.js';
 export function editionProfil(p: ProfilFfr, edit: Record<string, unknown> = {}): ProfilFfr {
@@ -37,6 +38,7 @@ export function editionProfil(p: ProfilFfr, edit: Record<string, unknown> = {}):
   return next;
 }
 export function exigerPublication(p: ProfilFfr) {
+  if (personneRetiree(p.name) || sourcePersonneRetiree(p.id)) throw new Error('Ce profil a été retiré du jeu.');
   if(p.senior_status!=='senior'||p.usage==='YOUTH_REGEN_SOURCE'||p.card_status!=='ACTIVE_CARD'||p.duplicate)
     throw new Error('Ce profil ne remplit pas les critères senior. Les doublons doivent être résolus avant approbation.');
 }

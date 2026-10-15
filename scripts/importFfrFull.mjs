@@ -1,3 +1,4 @@
+import { personneRetiree, sourcePersonneRetiree } from '../src/lib/retraitsPersonnes.ts';
 import { createReadStream, existsSync, mkdirSync, writeFileSync, copyFileSync, readFileSync } from 'node:fs';
 import { createInterface } from 'node:readline';
 import { createHash } from 'node:crypto';
@@ -61,6 +62,7 @@ for await (const line of createInterface({ input: createReadStream(input, { enco
   if(importComplet){rows++;continue;}
   if (!text.startsWith('{') || !text.endsWith('}')) throw new Error(`Format FFR inattendu à la ligne ${rows + 2}.`);
   const raw = JSON.parse(text), p = classifierFfr(raw, dateReference);
+  if (personneRetiree(p.name) || sourcePersonneRetiree(p.id)) continue;
   if (!raw.player_id && !raw.ffr_id) throw new Error('Profil sans identifiant source : import interrompu.');
   if (vus.has(p.id)) sameId++; vus.add(p.id);
   insert.run(p.id,p.identity_key,p.gender,p.usage,p.card_status,p.club,p.competition,p.primary_position,p.overall,p.data_confidence,JSON.stringify(p));

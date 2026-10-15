@@ -1,3 +1,4 @@
+import { anonymiserPersonnesRetirees } from './retraitsPersonnes.js';
 import { createJSONStorage, type PersistStorage, type StorageValue } from 'zustand/middleware';
 import { CLE_STOCKAGE_SERRE, cleDe, emplacementActif, stockageParEmplacement } from './sauvegardes';
 
@@ -122,6 +123,11 @@ export function stockageCarriereOptimise<T extends object>(): PersistStorage<T> 
     getItem(nom) {
       const valeur = json.getItem(nom) as StorageValue<T> | null;
       if (valeur) {
+        const nettoyee = anonymiserPersonnesRetirees(valeur.state);
+        if (nettoyee !== valeur.state) {
+          valeur.state = nettoyee;
+          ecrireSansFaillir(() => { json.setItem(nom, valeur); });
+        }
         try {
           const navigation = JSON.parse(brut.getItem(`${cle()}:navigation`) ?? 'null');
           if (Array.isArray(navigation) && navigation.every(v => typeof v === 'string')) {
