@@ -1,3 +1,4 @@
+import { definirRetraitsCartesSolo } from './ligue/atelierCatalogue.js';
 import { appliquerLocalisations, type LocalisationClub, type RivaliteHistorique } from './localisationClub';
 import { useEffect, useState } from 'react';
 import { catalogueBaseCarriere, catalogueMondialCarriere } from './ligue/catalogueCarriere';
@@ -37,6 +38,7 @@ export const catalogueSpecialSolo = (): CatalogueSpecial | null => speciales;
  * Et elles n'entrent jamais dans les bandes de rareté (`rayonsDuPack`).
  */
 interface ReponseCatalogue {
+  retraitsCartes?: string[];
   revisionFfr?: string; ffr?: SourceCarte[];
   revision?: number; joueurs?: Record<string, EditionJoueur>; ajouts?: Record<string, AjoutJoueur>;
   clubs?: Record<string, LocalisationClub>; rivalitesHistoriques?: RivaliteHistorique[];
@@ -46,12 +48,13 @@ interface ReponseCatalogue {
 /** Une réponse COMPLÈTE du serveur devient le catalogue courant. Rend faux si elle ne porte que sa révision. */
 function appliquerReponse(donnees: ReponseCatalogue): boolean {
   if (!Number.isInteger(donnees.revision) || !donnees.joueurs || typeof donnees.joueurs !== 'object') return false;
+  const retraits = definirRetraitsCartesSolo(donnees.retraitsCartes ?? []);
   revision = donnees.revision!;
   revisionFfr = donnees.revisionFfr ?? '';
   const sourcesFfr = (donnees.ffr ?? []).filter(c => carteSeniorAutorisee(c, 'mixed'));
   fournirPoolFfr(() => ({pool:'mixed',joueurs:sourcesFfr}));
   appliquerLocalisations(donnees.clubs ?? {}, donnees.rivalitesHistoriques ?? []);
-  const mondial = catalogueMondialCarriere({ revision, joueurs: donnees.joueurs, ajouts: donnees.ajouts, packs: {}, rotationPacks: false });
+  const mondial = catalogueMondialCarriere({ revision, retraitsCartes: retraits, joueurs: donnees.joueurs, ajouts: donnees.ajouts, packs: {}, rotationPacks: false });
   fournirCatalogueEffectifs(mondial);
   const definitions = Array.isArray(donnees.speciales?.definitions) ? donnees.speciales!.definitions : [];
   const evenements = Array.isArray(donnees.speciales?.evenements) ? donnees.speciales!.evenements : [];

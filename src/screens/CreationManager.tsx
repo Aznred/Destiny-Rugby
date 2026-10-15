@@ -26,9 +26,6 @@ const AGE_MAX = LIMITES.ageDebutManagerMax;
 const AGE_DEFAUT = 34;
 const bornerAge = (n: number) => Math.max(AGE_MIN, Math.min(AGE_MAX, n));
 
-/** Combien de clubs on propose dans la liste. Au-delà, on cherche. */
-const CLUBS_AFFICHES = 400;
-
 export function CreationManager() {
   const creerManager = useGame((s) => s.creerManager);
   const setEcran = useGame((s) => s.setEcran);
@@ -68,9 +65,10 @@ export function CreationManager() {
   );
 
   const optionsClubs: OptionSelecteur[] = useMemo(
-    () => accessibles.slice(0, CLUBS_AFFICHES).map((c) => ({
+    () => accessibles.map((c) => ({
       valeur: c.club.nom,
       label: c.club.nom,
+      recherche: c.club.ville ?? '',
       sous: t('mgr.creation.clubSous', {
         competition: c.competition.nom, force: c.force.toFixed(1),
         ambition: c.ambitieux ? ` · ${t('mgr.creation.ambitieux')}` : '',
@@ -224,8 +222,6 @@ export function CreationManager() {
                 prestige, note: (noteMaximale(prestige) + MARGE_AMBITION).toFixed(0),
                 niveau: etage?.nom ?? t('mgr.amateur'),
               })}
-            {optionsClubs.length < accessibles.length
-              && ` ${t('mgr.creation.limiteClubs', { n: CLUBS_AFFICHES })}`}
           </span>
         </div>
 

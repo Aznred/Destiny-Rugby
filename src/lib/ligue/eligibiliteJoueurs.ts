@@ -1,3 +1,4 @@
+import { carteRetireeDuCatalogue, catalogueAdmin, retraitsCartes, type CatalogueAdmin } from './atelierCatalogue.js';
 import { personneRetiree, sourcePersonneRetiree } from '../retraitsPersonnes.js';
 import { SOURCES_FFR_RETIREES } from '../../data/protectionFfr.generated.js';
 import type { SourceCarte } from './catalogueCarriere.js';
@@ -10,8 +11,8 @@ export function empreinteSourceFfr(id: string): string {
   return `${(a >>> 0).toString(36)}.${(b >>> 0).toString(36)}`;
 }
 export const sourceRetireeFfr = (id: string) => sourcePersonneRetiree(id) || retirees.has(empreinteSourceFfr(id));
-export function carteSeniorAutorisee(c: Pick<SourceCarte, 'sourceId' | 'age' | 'origine' | 'gender' | 'retiree' | 'speciale'> & { nom?: string }, pool: 'men' | 'women' | 'mixed' = 'men') {
-  return !personneRetiree(c.nom) && !c.retiree && !sourceRetireeFfr(c.sourceId) && !sourceRetireeFfr(c.speciale?.base ?? c.sourceId) && (c.origine === 'formation' || c.age >= 18)
+export function carteSeniorAutorisee(c: Pick<SourceCarte, 'sourceId' | 'age' | 'origine' | 'gender' | 'retiree' | 'speciale'> & { nom?: string }, pool: 'men' | 'women' | 'mixed' = 'men', config: CatalogueAdmin = catalogueAdmin()) {
+  return !carteRetireeDuCatalogue(c.sourceId, c.speciale?.base, config) && !personneRetiree(c.nom) && !c.retiree && !sourceRetireeFfr(c.sourceId) && !sourceRetireeFfr(c.speciale?.base ?? c.sourceId) && (c.origine === 'formation' || c.age >= 18)
     // Une carte SPÉCIALE est une carte de collection : elle sort et se joue dans toutes les ligues (Octobre Rose chez
     // les joueurs, ICONS chez les joueuses). Seules les cartes ordinaires suivent le genre de la ligue.
     && (pool === 'mixed' || Boolean(c.speciale) || (c.gender === 'female' ? pool === 'women' : pool === 'men'));
@@ -21,22 +22,22 @@ export function fournirPoolFfr(f: typeof fournisseur) { fournisseur = f; }
 /** Sans ligue en cours : le monde chargé décide (carrière solo de joueuse → les joueuses sont admises). */
 const POOL_PAR_DEFAUT = MONDE_FEMININ ? 'mixed' as const : 'men' as const;
 export const poolFfrCourant = () => fournisseur()?.pool ?? POOL_PAR_DEFAUT;
-const caches = new WeakMap<readonly SourceCarte[], Map<string, { ajouts: readonly SourceCarte[] | undefined; resultat: readonly SourceCarte[] }>>();
-export function filtrerCatalogueFfr(base: readonly SourceCarte[]): readonly SourceCarte[] {
+const caches = new WeakMap<readonly SourceCarte[], Map<string, { ajouts: readonly SourceCarte[] | undefined; resultat: readonly SourceCarte[]; retraits: ReturnType<typeof retraitsCartes> }>>();
+export function filtrerCatalogueFfr(base: readonly SourceCarte[], config: CatalogueAdmin = catalogueAdmin()): readonly SourceCarte[] {
   const contexte = fournisseur();
   const pool = contexte?.pool ?? POOL_PAR_DEFAUT;
   const ajouts = contexte?.joueurs;
   const cle = `${pool}`;
   // Cache by identity of both immutable revisions, never by a mutable global flag.
   let cache = caches.get(base); if (!cache) { cache = new Map(); caches.set(base, cache); }
-  const existant = cache.get(cle); if (existant && existant.ajouts === ajouts) return existant.resultat;
+  const existant = cache.get(cle); if (existant && existant.ajouts === ajouts && existant.retraits === retraitsCartes(config)) return existant.resultat;
   const liste = [...base, ...(ajouts ?? [])];
   const parId = new Map<string, SourceCarte>();
-  for (const c of liste.filter(c => carteSeniorAutorisee(c, pool))) {
+  for (const c of liste.filter(c => carteSeniorAutorisee(c, pool, config))) {
     // Une correction validée dans le Labo reste prioritaire sur le profil FFR chargé ensuite.
     if (parId.get(c.sourceId)?.editionManuelle && !c.editionManuelle) continue;
     parId.set(c.sourceId,c);
   }
   const resultat = [...parId.values()];
-  cache.set(cle, { ajouts, resultat }); return resultat;
+  cache.set(cle, { ajouts, resultat, retraits: retraitsCartes(config) }); return resultat;
 }

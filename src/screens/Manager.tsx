@@ -228,7 +228,7 @@ export function Manager() {
   const prestige = manager?.prestige ?? 0;
   const libre = manager?.libre ?? false;
   const bancsLibres = useMemo(
-    () => clubsAccessibles(prestige, saison, { triche: libre, limite: 60 }),
+    () => clubsAccessibles(prestige, saison, { triche: libre, limite: libre ? undefined : 60 }),
     [prestige, saison, libre],
   );
   const classement = useMemo(() => {
@@ -547,6 +547,7 @@ export function Manager() {
   const optionsBancs: OptionSelecteur[] = bancsLibres.map((c) => ({
     valeur: c.club.nom,
     label: c.club.nom,
+    recherche: c.club.ville ?? '',
     sous: t('mgr.banc.sous', {
       competition: c.competition.nom, force: c.force.toFixed(1), objectif: c.objectif,
       salaire: nombre(salaireManager(c.force)),

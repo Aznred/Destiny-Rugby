@@ -1,3 +1,4 @@
+import { catalogueSpecial } from '../src/lib/ligue/catalogueSpecial.js';
 import { clubParNom } from '../src/data/clubs.js';
 import { verifierDonneesClubs } from '../src/lib/donneesClubs.js';
 import { coordonneesValides } from '../src/lib/localisationClub.js';
@@ -240,7 +241,28 @@ export async function enregistrerAtelier(stockage: StockageAtelier, corps: Recor
   if(corps.revision !== courant.revision) refuser('Le catalogue a changé. Recharge l’atelier avant d’enregistrer.');
   const suivant=structuredClone(courant);
   let compteRendu: Record<string, unknown> | undefined;
-  if (corps.operation === 'localisationClub') {
+  if (corps.operation === 'retirerCarte') {
+    const id = texte(corps.sourceId, 250);
+    if (Object.hasOwn(courant.retraitsCartes ?? {}, id)) refuser('Cette carte est déjà retirée.');
+    const source = catalogueMondialCarriere().find(c => c.sourceId === id) ?? catalogueSpecial().sources.get(id);
+    if (!source) refuser('Carte introuvable. Recharge la recherche.');
+    if (corps.confirmation !== id) refuser('Confirme la carte sélectionnée avant de la retirer.');
+    const motif = texte(corps.motif, 500);
+    suivant.retraitsCartes = { ...suivant.retraitsCartes };
+    const liees = [...catalogueSpecial().sources.values()].filter(c => c.speciale?.base === id);
+    const retireLe = new Date().toISOString();
+    for (const c of [source, ...liees]) suivant.retraitsCartes[c.sourceId] = { sourceId: c.sourceId, nom: c.nom, club: c.clubReel, type: c.speciale ? 'Spéciale' : 'Normale', motif, retireLe };
+    compteRendu = { retrait: suivant.retraitsCartes[id] };
+  } else if (corps.operation === 'reintegrerCarte') {
+    const id = texte(corps.sourceId, 250);
+    if (!Object.hasOwn(courant.retraitsCartes ?? {}, id)) refuser('Cette carte n’est pas retirée.');
+    suivant.retraitsCartes = { ...suivant.retraitsCartes };
+    delete suivant.retraitsCartes[id];
+    for (const [sid] of Object.entries(suivant.retraitsCartes)) {
+      if (catalogueSpecial().sources.get(sid)?.speciale?.base === id) delete suivant.retraitsCartes[sid];
+    }
+    compteRendu = { reintegre: id };
+  } else if (corps.operation === 'localisationClub') {
     const club = clubParNom(texte(corps.club, 150)); if (!club) refuser('Club introuvable.');
     suivant.clubs = { ...suivant.clubs, [club.nom]: validerLocalisation(corps.localisation) };
   } else if (corps.operation === 'rivaliteHistorique') {

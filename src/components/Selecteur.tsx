@@ -23,6 +23,7 @@ export interface OptionSelecteur {
   sous?: string; // ligne secondaire (ville…)
   vignette?: React.ReactNode; // drapeau SVG, emoji, blason…
   groupe?: string;
+  recherche?: string; // mots-clés additionnels pour la recherche (ville, alias...)
 }
 
 interface Props {
@@ -102,7 +103,7 @@ export function Selecteur({
       .normalize('NFD')
       .replace(/[̀-ͯ]/g, '');
     return options.filter((o) =>
-      `${o.label} ${o.sous ?? ''}`
+      `${o.label} ${o.sous ?? ''} ${o.recherche ?? ''}`
         .toLowerCase()
         .normalize('NFD')
         .replace(/[̀-ͯ]/g, '')

@@ -1,3 +1,4 @@
+import { carteRetireeDuCatalogue } from './atelierCatalogue.js';
 // LE CATALOGUE DES CARTES SPÉCIALES — la graine, fusionnée avec le Labo
 //
 // La partie LOURDE du système (voir `cartesSpeciales.ts` pour les règles) :
@@ -82,7 +83,7 @@ export function catalogueSpecial(config: CatalogueAdmin = catalogueAdmin()): Cat
   const mondial = new Map(catalogueMondialCarriere(config).map(s => [s.sourceId, s]));
   const definitions: DefinitionCarteSpeciale[] = [];
   for (const brut of bruts.values()) {
-    if (supprimees.has(brut.id!) || CHAMPS_REQUIS.some(c => brut[c] === undefined || brut[c] === '')) continue;
+    if (carteRetireeDuCatalogue(brut.id!, brut.basePlayerId, config) || supprimees.has(brut.id!) || CHAMPS_REQUIS.some(c => brut[c] === undefined || brut[c] === '')) continue;
     if (!POSTE_PAR_ID[brut.poste as PosteId]) continue;
     if (sourceRetireeFfr(brut.id!) || (brut.basePlayerId && sourceRetireeFfr(brut.basePlayerId)) || (Number(brut.age)>0 && Number(brut.age)<18)) continue;
     const famille = FAMILLES_SPECIALES[brut.cardType!];
@@ -128,6 +129,7 @@ export function specialesPubliques(config: CatalogueAdmin = catalogueAdmin(), ma
 
 /** Une carte spéciale peut-elle être mise ou rester en vente ? Une carte ordinaire, toujours. */
 export function carteSurMarcheAutorisee(carte: Pick<CarteCarriere, 'sourceId' | 'speciale'>, ligueAutorise: boolean, config: CatalogueAdmin = catalogueAdmin()): boolean {
+  if (carteRetireeDuCatalogue(carte.sourceId, carte.speciale?.base, config)) return false;
   if (!carte.speciale) return true;
   if (!ligueAutorise) return false;
   const cat = catalogueSpecial(config);
@@ -139,6 +141,7 @@ export function carteSurMarcheAutorisee(carte: Pick<CarteCarriere, 'sourceId' | 
 
 /** L'autorisation est relue lors de la proposition et de son acceptation. */
 export function carteEchangeAutorise(carte: Pick<CarteCarriere, 'sourceId' | 'speciale'>, ligueAutorise: boolean, config: CatalogueAdmin = catalogueAdmin()): boolean {
+  if (carteRetireeDuCatalogue(carte.sourceId, carte.speciale?.base, config)) return false;
   if (!carte.speciale) return true;
   if (!ligueAutorise) return false;
   const def = catalogueSpecial(config).parId.get(carte.sourceId);

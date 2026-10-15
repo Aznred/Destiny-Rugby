@@ -1,3 +1,4 @@
+import { retraitsCartes } from './ligue/atelierCatalogue.js';
 import type { PackCarriere, RareteCarriere } from './ligue/typesCarriere.js';
 import type { SourceCarte } from './ligue/catalogueCarriere.js';
 import { packEvenementOuvert, preparerTirageSpecial, tirerSpeciale, type CatalogueSpecial } from './ligue/cartesSpeciales.js';
@@ -6,7 +7,13 @@ import { OVAS_PAR_CREDIT, prixLesDeux, prixOvas, type PrixArticle } from './monn
 import { SOURCES_FFR_RETIREES } from '../data/protectionFfr.generated.js';
 
 const CLES_JEUNES_RETIREES = new Set(SOURCES_FFR_RETIREES.map(cle => cle.replace('.', '-')));
-export const cleSoloRetireeFfr = (cle: string): boolean => CLES_JEUNES_RETIREES.has(cle);
+const clesRetireesAdmin = new WeakMap<object, Set<string>>();
+export const cleSoloRetireeFfr = (cle: string): boolean => {
+  const retraits = retraitsCartes();
+  let cles = clesRetireesAdmin.get(retraits);
+  if (!cles) { cles = new Set(Object.keys(retraits).map(cleCarteSolo)); clesRetireesAdmin.set(retraits, cles); }
+  return CLES_JEUNES_RETIREES.has(cle) || cles.has(cle);
+};
 
 export interface EtatCollectionSolo {
   /** Nombre d'exemplaires possedes, indexe par l'empreinte stable du joueur. */

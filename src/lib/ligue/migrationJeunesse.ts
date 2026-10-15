@@ -1,3 +1,4 @@
+import { carteRetireeDuCatalogue } from './atelierCatalogue.js';
 import { personneRetiree } from '../retraitsPersonnes.js';
 import { sourceRetireeFfr, empreinteSourceFfr } from './eligibiliteJoueurs.js';
 import { VERSION_PROTECTION_FFR } from '../../data/protectionFfr.generated.js';
@@ -7,8 +8,8 @@ import { statistiquesCarte } from './statistiquesCarte.js';
 import type { EtatCarriereEnLigne } from './typesCarriere.js';
 const first=['Mathis','Adam','Noé','Louis','Arthur','Hugo','Gabriel','Jules','Raphaël','Léo'];
 const last=['Bernard','Laurent','Morel','Garnier','Fontaine','Roux','Leroy','Faure','Perrin','Blanc'];
-export const cartesJeunesseARetirer = (etat: EtatCarriereEnLigne) => etat.cartes.filter(c => !c.retiree && c.origine !== 'formation'
-  && (personneRetiree(c.nom) || sourceRetireeFfr(c.sourceId) || sourceRetireeFfr(c.speciale?.base ?? c.sourceId) || c.age < 18));
+export const cartesJeunesseARetirer = (etat: EtatCarriereEnLigne) => etat.cartes.filter(c => !c.retiree && (carteRetireeDuCatalogue(c.sourceId, c.speciale?.base) || c.origine !== 'formation'
+  && (personneRetiree(c.nom) || sourceRetireeFfr(c.sourceId) || sourceRetireeFfr(c.speciale?.base ?? c.sourceId) || c.age < 18)));
 /** Nettoie les instantanés et récits en conservant leurs références primaires. */
 export function anonymiseurJeunesse(identites: readonly {nom:string;photo?:string}[]) {
   const photos = new Set(identites.map(c => c.photo).filter(Boolean));
@@ -47,7 +48,7 @@ export function migrerCartesJeunesse(etat: EtatCarriereEnLigne,now:number): void
       const replacement={...c,id,sourceId,nom:`${first[Math.floor(rng()*first.length)]} ${last[Math.floor(rng()*last.length)]}`,
         photo:undefined,age:18+Math.floor(rng()*3),note,potentiel:Math.min(99,Math.max(note,c.potentiel)+Math.floor(rng()*3)),
         origine:'formation' as const,rarete:rareteCarriere(note),statistiques:statistiquesCarte(note,c.famille,sourceId),
-        gender:'male' as const,verrou:undefined,speciale:undefined,retiree:undefined,datasetVersion:undefined};
+        gender:c.gender ?? 'male' as const,verrou:undefined,speciale:undefined,retiree:undefined,datasetVersion:undefined};
       etat.cartes.push(replacement);replacements.set(c.id,id);
       etat.transactions.push({id:`${etat.id}:migration-ffr:${empreinteSourceFfr(c.id)}`,clubId:owner,nature:'dotation',ovas:0,
         cartes:[id],libelle:'Retrait de profil : carte fictive de compensation équivalente',date});

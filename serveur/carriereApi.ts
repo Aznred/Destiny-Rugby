@@ -1,3 +1,4 @@
+import { vueRetraitsCartes } from './retraitsCartes.js';
 import { contexteFfr, serviceFfr } from './ffr/contexte.js';
 import { cartesJeunesseARetirer } from '../src/lib/ligue/migrationJeunesse.js';
 import { VERSION_PROTECTION_FFR } from '../src/data/protectionFfr.generated.js';
@@ -869,7 +870,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         // jamais un brouillon ni une carte sans image.
         return res.status(200).json(connue === config.revision && url.searchParams.get('revisionFfr') === revisionFfr && !influenceurs.length
           ? { revision: config.revision, revisionFfr }
-          : { revision: config.revision, revisionFfr, ffr: (contexteCatalogue?.joueurs ?? []).filter(c=>!c.retiree), joueurs: Object.fromEntries(Object.entries(config.joueurs).filter(([id])=>actifs.has(id))), ajouts: Object.fromEntries(Object.entries(config.ajouts ?? {}).filter(([,c])=>actifs.has(c.sourceId))), speciales: specialesPubliques(config, maintenant, possedees),
+          : { retraitsCartes: Object.keys(config.retraitsCartes ?? {}), revision: config.revision, revisionFfr, ffr: (contexteCatalogue?.joueurs ?? []).filter(c=>!c.retiree), joueurs: Object.fromEntries(Object.entries(config.joueurs).filter(([id])=>actifs.has(id))), ajouts: Object.fromEntries(Object.entries(config.ajouts ?? {}).filter(([,c])=>actifs.has(c.sourceId))), speciales: specialesPubliques(config, maintenant, possedees),
               // Les cosmétiques du Labo : SEULS les publiés quittent le serveur, dans la même réponse (aucune requête de plus).
               clubs: config.clubs ?? {}, rivalitesHistoriques: config.rivalitesHistoriques ?? [],
               boutique: Object.values(config.boutique ?? {}).filter(a => a.publie) });
@@ -1412,6 +1413,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
               // Le journal des callbacks refusés : facultatif, il ne doit jamais retirer la page au Labo.
               refus: await stockage.publicites.refus?.().catch(() => null) ?? null });
           }
+          if (section === 'retraitsCartes') return res.status(200).json(await ffr.avecPool('mixed', () => vueRetraitsCartes(url.searchParams.get('q') ?? '')));
           if (section === 'clubs') return res.status(200).json(vueDonneesClubs());
           if (section === 'speciales') return res.status(200).json(vueSpeciales(maintenant));
           if (section === 'imports') return res.status(200).json(vueImports(await lotImport(url.searchParams.get('lot') ?? '')));
@@ -1419,7 +1421,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         }
         if (!stockage.atelier) throw new ErreurHttp(503, 'Atelier indisponible sur ce serveur.');
         catalogueLuLe = -Infinity;
-        return res.status(200).json(await (['publicitesPack','carteNormale'].includes(String(corps.operation)) ? ffr.avecPool('mixed', () => enregistrerAtelier(stockage.atelier!, corps)) : enregistrerAtelier(stockage.atelier, corps)));
+        return res.status(200).json(await (['publicitesPack','carteNormale','retirerCarte','reintegrerCarte'].includes(String(corps.operation)) ? ffr.avecPool('mixed', () => enregistrerAtelier(stockage.atelier!, corps)) : enregistrerAtelier(stockage.atelier, corps)));
       }
       if (action === 'deconnexion') {
         await stockage.fermerSession(empreinteSession); sessionsChaudes.delete(empreinteSession); cookie(req, res, '', true);

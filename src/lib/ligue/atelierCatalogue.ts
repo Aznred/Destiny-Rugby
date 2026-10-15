@@ -23,6 +23,8 @@ export type ArticleLabo = Pick<import('../../data/boutique.js').ArticleEquipemen
   'id' | 'nom' | 'categorie' | 'emoji' | 'glb' | 'teinte' | 'prixDef' | 'rarete' | 'kit' | 'detail' | 'dispoDu' | 'dispoAu' | 'publie'>;
 
 export interface CatalogueAdmin {
+  /** Retraits explicites, conservés lors des imports et modifications de cartes. */
+  retraitsCartes?: Record<string, RetraitCarte>;
   publicites?: import('../publicitesRecompensees.js').ConfigPublicites;
   revision: number;
   clubs?: Record<string, import('../localisationClub.js').LocalisationClub>;
@@ -52,3 +54,15 @@ export const CATALOGUE_ADMIN_VIDE: CatalogueAdmin = { revision: 0, rotationPacks
 let contexte = () => CATALOGUE_ADMIN_VIDE;
 export function fournirCatalogueAdmin(fournisseur: () => CatalogueAdmin) { contexte = fournisseur; }
 export function catalogueAdmin() { return contexte(); }
+
+export interface RetraitCarte { sourceId: string; nom: string; club: string; type: string; motif: string; retireLe: string }
+let retraitsSolo: Record<string, RetraitCarte> = {};
+export function definirRetraitsCartesSolo(ids: string[]) {
+  retraitsSolo = Object.fromEntries(ids.filter(id => typeof id === 'string').map(sourceId => [sourceId, { sourceId, nom: '', club: '', type: '', motif: '', retireLe: '' }]));
+  return retraitsSolo;
+}
+export function retraitsCartes(config: CatalogueAdmin = catalogueAdmin()) { return config.retraitsCartes ?? retraitsSolo; }
+export function carteRetireeDuCatalogue(sourceId: string, base?: string, config: CatalogueAdmin = catalogueAdmin()): boolean {
+  const retraits = retraitsCartes(config);
+  return Object.hasOwn(retraits, sourceId) || !!base && Object.hasOwn(retraits, base);
+}

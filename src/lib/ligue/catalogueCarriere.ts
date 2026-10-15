@@ -282,7 +282,7 @@ function sourceDepuisAjout(a: AjoutJoueur): SourceCarte {
 }
 
 export function catalogueMondialCarriere(config: CatalogueAdmin = catalogueAdmin()): readonly SourceCarte[] {
-  return filtrerCatalogueFfr(catalogueAvantProtection(config));
+  return filtrerCatalogueFfr(catalogueAvantProtection(config), config);
 }
 function catalogueAvantProtection(config: CatalogueAdmin): readonly SourceCarte[] {
   const ajouts = Object.values(config.ajouts ?? {}).filter(a => POSTE_PAR_ID[a.poste]);
