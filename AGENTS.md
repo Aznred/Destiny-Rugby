@@ -1421,6 +1421,8 @@ en une phrase → faire faire l'action → passer à la suivante**, sur les VRAI
 - **Tutoriel** (`lib/controleDirect/tutoriel.ts`) : dix étapes validées par l'action (déplacement, sprint, placement sur l'anneau vert, réclamer, passe, crochet, raffut, pied, plaquer, gratter), rejouables par SECTION (Réglages → Tutoriels : commandes générales, attaque, défense, coups de pied, rôles spéciaux). `ExplicationsContextuelles` : offload, rôle au ruck, passe au pied, placement selon le poste — une fois, sans figer, jamais pendant le guide ; les rôles (lanceur, buteur, capitaine, drop) gardent leurs cartes du Correctif 17. Textes : `data/textesTutorielJoueur20.ts`.
 - **Apparence** (`lib/apparenceJoueur.ts`, `Joueur.apparence`, `EditeurApparence`, `ApercuJoueur3D`) : teint (7), coupe (les 23 maillages de l'APK, par famille), couleur de cheveux, barbe (15) et sa couleur, morphologie (taille, poids, épaules, muscle, torse, bras, jambes) **bornée à ±12 %** (`morphoPourScene`) avec physique conseillé par poste. Étape « Apparence » à la création, **Personnalisation** dans la fenêtre « Ton joueur » du Profil (taille/poids/carrure figés après la création, `morphoFigee`). Aperçu 3D = `creerApercuJoueur` (`scene.js`) : le même code que le match (`habiller`, `appliquerMorpho`), reconstruit à chaque changement, tournable face/profil/dos.
 - **Équipement réellement porté** : `equipementPourScene` traduit `equipementActif` en modèles ; le registre `definirSurchargeApparence` (`moteur/apparenceMatch.ts`, alimenté par `useSynchroApparenceJoueur` dans `App`) fait que `apparenceJoueurMatch(nom, poste)` — lu par le moteur, la scène, les sprites — rend casque, crampons, coupe, morphologie ET la taille/le poids qui font les collisions. Les modèles se chargent à la demande (`chargerEquipement`, cache de session) : uniquement ceux portés + deux casques et deux paires pour les adversaires. Banc visuel : `/scripts/apercuCreation.html?achats=1`, `/scripts/apercuProfil.html`.
+- **Curseur Taille** : le cadrage du corps garde une hauteur de référence de 1,85 m pour rendre la croissance visible, pieds au même endroit. Le gros plan du visage continue de suivre la tête. Source rejouable : `../analyse-rn26/correctif_taille_apercu.cjs`, puis `installer_apercu.mjs`.
+- **Physique et attributs de départ** (`lib/attributsCreation.ts`) : à la création seulement, taille, poids, musculature, épaules, torse, bras et jambes redistribuent force/vitesse/endurance/plaquage, au plus ±6 points par attribut. Le physique conseillé au poste est neutre ; somme des points, technique et mental conservés. Un tirage stable (`CreationInput.graineAttributs`) rend identiques les huit valeurs affichées dans l'onglet Physique et celles enregistrées par `creerJoueur`, y compris l'ajustement au club du monde féminin. Aucun recalcul des carrières existantes ni des cartes incarnées ; la morphologie reste figée après création. Banc : `npm run verify:physique-creation` (monde féminin : poser `globalThis.__DESTINY_MONDE = 'F'` avant l'import).
 - ⚠️ **Le joueur du jeu ne reçoit ni casque ni bandeau tiré au sort** : s'il a un équipement (même vide), c'est ce qu'il porte.
 - ⚠️ **Sources du lecteur hors git** : `analyse-rn26/correctif_20_scene.cjs` et `correctif_20_camera.cjs` (sauvegarde d'avant : `sauvegarde-avant-correctif-20/`), puis `node installer_apercu.mjs`.
 - **Pas fait / à essayer** : un vrai iPhone et la PWA (le bug d'orientation) ; les crampons de la boutique paraissent clairs sur certains modèles (textures allégées) ; pas de tutoriel dédié pour la personnalisation.
@@ -3141,3 +3143,30 @@ Les photos ne traversent pas les listes de demandes. Banc : `verify:cartes-norma
 aperçu sans publication : `/scripts/apercuCartesNormales.html`.
 
 Migration atomique : `npm run migrer:classement38`. Audit/revalidation : `npm run audit:classement38`, `npm run revalider:classement38`. Le 11 octobre 2026 : 1 304 lignes existantes conservées, revalidées et visibles provisoirement ; les anciennes projections ne stockaient pas l'âge initial/version, 80 ont seulement un score. Les anciens refus ne sont pas quantifiables puisqu'ils n'étaient pas enregistrés. Aucun changement de sauvegarde. Détails et limites : [VALIDATION-CORRECTIF-38.md](VALIDATION-CORRECTIF-38.md). Banc : `npm run verify:correctif38` ; aperçu desktop/mobile `/scripts/apercuCorrectif38.html`.
+
+
+### Confort des matchs solo — 15 octobre 2026
+
+Les carrières joueur et entraîneur condensent désormais le chronomètre à ×12,
+arrêts compris. Le budget actif est plafonné à dix minutes (réserve répartie
+entre les périodes, prolongations comprises). La dernière action dispose de
+trente secondes ; une transformation acquise est résolue par le même moteur,
+avec mise en scène abrégée si le plafond est atteint. Les pauses volontaires
+et la visée humaine sont hors budget. Le placement des touches, mêlées et
+renvois passe à ×2, sauf pendant une responsabilité ou un duel de pack.
+
+Les pénaltouches humaines et sorties « box » ouvrent une cible sur un plan du
+terrain, réglable à la souris, au doigt, au clavier ou au stick. Le moteur attend
+la frappe ; la portée dépend du botteur, et la possession après pénaltouche
+reste régie par les règles existantes. Les tirs au but, engagements et charges
+de coups de pied suspendent également le jeu pendant la visée.
+
+Réglages → Manette propose la réassignation des boutons, avec échange des
+conflits, sauvegarde locale et réinitialisation ; les indications du HUD suivent
+la disposition. Réglages → Mon image affiche un accès par e-mail au retrait,
+même sans compte, en plus du formulaire connecté soumis à vérification.
+
+Recette : scripts/verifierConfortMatch.ts, verify:vitesse-match,
+verify:responsabilites, verify:penaltouche. L'aperçu du contrôle direct accepte
+confort=penalite ou confort=box. Les manettes physiques restent à essayer sur
+matériel réel ; le lecteur a été vérifié avec des entrées Gamepad simulées.

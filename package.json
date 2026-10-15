@@ -4,6 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "verify:physique-creation": "node --loader ./scripts/chargeurTests36.mjs scripts/verifierPhysiqueCreation.ts",
     "verify:correctif36": "vite-node scripts/verifierCorrectif36.ts",
     "verify:correctif41": "vite-node scripts/verifierCorrectif41.ts",
     "verify:correctif42": "vite-node scripts/verifierCorrectif42.ts",

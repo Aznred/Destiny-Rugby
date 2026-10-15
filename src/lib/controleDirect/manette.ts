@@ -6,6 +6,8 @@
 // Xbox, PlayStation et les génériques « compatibles navigateur » passent donc par le
 // même chemin. Le TYPE ne sert qu'à choisir les symboles qu'on affiche.
 
+import { lirePreferencesControle } from './prefs';
+
 export type TypeManette = 'xbox' | 'playstation' | 'generique';
 
 export type NomBouton = 'a' | 'b' | 'x' | 'y' | 'lb' | 'rb' | 'lt' | 'rt' | 'start';
@@ -77,7 +79,7 @@ export class LecteurManette {
   lire(): EtatManette {
     const g = this.trouver();
     if (!g) { this.avant = []; return MANETTE_ABSENTE; }
-    const boutons = g.buttons.map((b) => b.pressed || b.value > 0.55);
+    const boutons = lirePreferencesControle().boutonsManette.map(i => { const b = g.buttons[i]; return !!b && (b.pressed || b.value > 0.55); });
     const fronts: number[] = [], relaches: number[] = [];
     boutons.forEach((p, i) => {
       if (p && !this.avant[i]) fronts.push(i);
@@ -104,4 +106,13 @@ export class LecteurManette {
       // Pas de retour de force sur cette manette : ce n'est pas une erreur.
     }
   }
+}
+
+export function libelleBoutonPhysique(index: number, type: TypeManette): string {
+  const nom = (Object.keys(INDEX_BOUTON) as NomBouton[]).find(n => INDEX_BOUTON[n] === index);
+  return nom ? LIBELLES_MANETTE[type][nom] : ({ 8: 'Select', 10: 'L3', 11: 'R3', 12: '↑', 13: '↓', 14: '←', 15: '→', 16: 'Home' }[index] ?? String(index));
+}
+export function libellesManette(type: TypeManette): Record<NomBouton, string> {
+  const table = lirePreferencesControle().boutonsManette;
+  return Object.fromEntries(Object.entries(INDEX_BOUTON).map(([nom, i]) => [nom, libelleBoutonPhysique(table[i], type)])) as Record<NomBouton, string>;
 }

@@ -20,7 +20,8 @@ import {
 import {
   DEFINITIONS_TOUCHES, copierTouches, libelleDeTouche, toucheRisquee, touchePermise, type ActionClavier,
 } from '../lib/controleDirect/touches';
-import { typeDeManette, type TypeManette } from '../lib/controleDirect/manette';
+import { BOUTONS_PAR_DEFAUT, reassignerBouton } from '../lib/controleDirect/boutons';
+import { typeDeManette, libelleBoutonPhysique, type TypeManette } from '../lib/controleDirect/manette';
 import './ReglagesControleDirect.css';
 
 interface Retour { cle: string; vars?: Record<string, string>; ton: 'info' | 'alerte' }
@@ -60,7 +61,29 @@ export function ReglagesControleDirect() {
   const prefs = usePreferencesControle();
   const manette = useManetteDetectee();
   const [ecoute, setEcoute] = useState<ActionClavier | null>(null);
+  const [ecouteManette, setEcouteManette] = useState<number | null>(null);
   const [retour, setRetour] = useState<Retour | null>(null);
+
+  useEffect(() => {
+    if (ecouteManette === null) return;
+    let avant: boolean[] | null = null;
+    const sonde = window.setInterval(() => {
+      const pad = Array.from(navigator.getGamepads?.() ?? []).find(g => g?.connected);
+      if (!pad) { avant = null; return; }
+      const boutons = Array.from({length: 17}, (_, i) => !!pad.buttons[i] && (pad.buttons[i].pressed || pad.buttons[i].value > .55));
+      if (avant) {
+        const index = boutons.findIndex((b,i) => i < 16 && b && !avant![i]);
+        if (index >= 0) {
+          ecrirePreferencesControle({ boutonsManette: reassignerBouton(prefs.boutonsManette, ecouteManette, index) });
+          setEcouteManette(null);
+        }
+      }
+      avant = boutons;
+    }, 40);
+    const annuler = (ev: KeyboardEvent) => { if (ev.code === 'Escape') { ev.preventDefault(); ev.stopImmediatePropagation(); setEcouteManette(null); } };
+    window.addEventListener('keydown', annuler, true);
+    return () => { clearInterval(sonde); window.removeEventListener('keydown', annuler, true); };
+  }, [ecouteManette, prefs.boutonsManette]);
 
   // Une touche à réassigner : on l'écoute AVANT la fenêtre (capture sur `window`), pour qu'Échap annule l'écoute sans fermer le panneau.
   useEffect(() => {
@@ -219,7 +242,7 @@ export function ReglagesControleDirect() {
               </span>
               <button
                 type="button" className="btn fantome mini"
-                onClick={() => { setRetour(null); setEcoute(ecoute === d.id ? null : d.id); }}
+                onClick={() => { setEcouteManette(null); setRetour(null); setEcoute(ecoute === d.id ? null : d.id); }}
               >
                 {ecoute === d.id ? t('cd.reg.annuler') : t('cd.reg.modifier')}
               </button>
@@ -242,7 +265,17 @@ export function ReglagesControleDirect() {
         <Icone nom="manette" taille={16} />
         {manette ? t('cd.reg.manette.detectee', { nom: manette.nom }) : t('cd.reg.manette.aucune')}
       </p>
-      <p className="aide">{t('cd.reg.manette.aide')}</p>
+      <p className="aide">Choisis une commande puis appuie sur le bouton souhaité. Si le bouton est déjà utilisé, les deux commandes sont échangées. Les combinaisons suivent tes nouveaux boutons.</p>
+      <ul className="rcd-touches">
+        {['Passe / action / valider', 'Coup de pied / choix touche', 'Passe opposée / grattage', 'Feinte / appel', 'Crochet / modificateur drop', 'Raffut', 'Modificateur sorties du 9 / sprint', 'Sprint', 'Ordre collectif', 'Pause', 'Changer de joueur', 'Type de coup de pied', 'Direction haut', 'Direction bas', 'Direction gauche', 'Direction droite'].map((nom, i) => (
+          <li key={i} data-ecoute={ecouteManette === i ? 'oui' : undefined}>
+            <span className="rcd-action">{nom}</span>
+            <span className="rcd-cles">{ecouteManette === i ? <em>Appuie sur un bouton…</em> : <kbd className="rcd-touche">{libelleBoutonPhysique(prefs.boutonsManette[i], manette?.type ?? 'xbox')}</kbd>}</span>
+            <button type="button" className="btn fantome mini" onClick={() => { setEcoute(null); setEcouteManette(ecouteManette === i ? null : i); }}>{t(ecouteManette === i ? 'cd.reg.annuler' : 'cd.reg.modifier')}</button>
+          </li>
+        ))}
+      </ul>
+      <button type="button" className="btn fantome mini" onClick={() => { setEcouteManette(null); ecrirePreferencesControle({ boutonsManette: [...BOUTONS_PAR_DEFAUT] }); }}>{t('cd.reg.reinitialiser')}</button>
 
       {/* ⚠️ « Rejouer le tutoriel » a quitté cette section : les Réglages ont désormais un bloc « Tutoriels » (Correctif 18) qui rejoue chaque guide. */}
     </section>

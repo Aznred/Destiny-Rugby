@@ -28,7 +28,7 @@ import type { PilotageDirect, SnapPilotage } from '../../lib/controleDirect/pilo
 import type { SnapResp } from '../../lib/controleDirect/responsabilites';
 import type { PreferencesControle } from '../../lib/controleDirect/prefs';
 import { libelleDeTouche } from '../../lib/controleDirect/touches';
-import { LIBELLES_MANETTE, type NomBouton, type TypeManette } from '../../lib/controleDirect/manette';
+import { libellesManette, type NomBouton, type TypeManette } from '../../lib/controleDirect/manette';
 import type { ChoixPenalite, CombinaisonTouche } from '../../lib/moteur/responsabilites';
 import './Responsabilites.css';
 
@@ -40,7 +40,7 @@ const borner = (v: number, min: number, max: number) => Math.min(max, Math.max(m
 
 /** Un bouton de manette, avec les formes d'une PlayStation ou les lettres d'une Xbox. */
 function Bouton({ b, type }: { b: NomBouton; type: TypeManette }) {
-  const libelle = LIBELLES_MANETTE[type][b];
+  const libelle = libellesManette(type)[b];
   if (type === 'playstation' && ['croix', 'rond', 'carre', 'triangle'].includes(libelle)) {
     return (
       <svg className="cd-glyphe" data-forme={libelle} viewBox="0 0 24 24" aria-label={libelle} role="img">
@@ -57,7 +57,7 @@ function Bouton({ b, type }: { b: NomBouton; type: TypeManette }) {
 /** Le nom d'un bouton dans une phrase : la lettre d'une Xbox, la forme d'une PlayStation (□, pas le mot « carre »). */
 const FORMES_PLAYSTATION: Record<string, string> = { croix: '✕', rond: '○', carre: '□', triangle: '△' };
 function nomDuBouton(type: TypeManette, b: NomBouton): string {
-  const libelle = LIBELLES_MANETTE[type][b];
+  const libelle = libellesManette(type)[b];
   return FORMES_PLAYSTATION[libelle] ?? libelle;
 }
 
@@ -101,7 +101,7 @@ export function Responsabilites({ pilotage, snap, prefs }: { pilotage: PilotageD
       {r.conseil && !r.tuto && (
         <div className="rv-conseil" role="status" key={r.conseil}>
           <Icone nom="drop" taille={18} />
-          <span>{t(`rv.conseil.${r.conseil}.${snap.appareil}`, { touche: libelleDeTouche(prefs.touches.drop[0]), bouton: `${LIBELLES_MANETTE[snap.manette].lb} + ${LIBELLES_MANETTE[snap.manette].b}` })}</span>
+          <span>{t(`rv.conseil.${r.conseil}.${snap.appareil}`, { touche: libelleDeTouche(prefs.touches.drop[0]), bouton: `${libellesManette(snap.manette).lb} + ${libellesManette(snap.manette).b}` })}</span>
         </div>
       )}
       {r.tuto && <CarteTuto pilotage={pilotage} snap={snap} prefs={prefs} />}
@@ -437,7 +437,7 @@ function PanneauTouche({ pilotage, snap, prefs }: { pilotage: PilotageDirect; sn
           {manette && <Bouton b="y" type={snap.manette} />}
         </button>
       )}
-      {manette && !d.pret && <p className="rv-aide rv-aide-petit">{t('rv.tch.manette.croix', { a: LIBELLES_MANETTE[snap.manette].a })}</p>}
+      {manette && !d.pret && <p className="rv-aide rv-aide-petit">{t('rv.tch.manette.croix', { a: libellesManette(snap.manette).a })}</p>}
       {d.pret && v && (
         <div className="rv-lancer">
           <JaugeForce p={v.p} aide={false} charge={manette && v.arme} />
@@ -470,8 +470,8 @@ function CarteTuto({ pilotage, snap, prefs }: { pilotage: PilotageDirect; snap: 
     valider: nomDuBouton(snap.manette, 'a'),
     charge: nomDuBouton(snap.manette, 'x'),
     drop: libelleDeTouche(prefs.touches.drop[0]),
-    lb: LIBELLES_MANETTE[snap.manette].lb,
-    b: LIBELLES_MANETTE[snap.manette].b,
+    lb: libellesManette(snap.manette).lb,
+    b: libellesManette(snap.manette).b,
   };
   return (
     <div className="cd-tuto-voile rv-tuto" role="dialog" aria-modal="true" aria-label={t(`rv.tuto.${id}.titre`)}>

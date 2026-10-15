@@ -34,7 +34,7 @@ import { ecrirePreferencesControle, lirePreferencesControle, usePreferencesContr
 import {
   DEFINITIONS_TOUCHES, libelleDeTouche, type ActionClavier, type TouchesDirectes,
 } from '../../lib/controleDirect/touches';
-import { LIBELLES_MANETTE, type NomBouton, type TypeManette } from '../../lib/controleDirect/manette';
+import { libellesManette, type NomBouton, type TypeManette } from '../../lib/controleDirect/manette';
 import { Responsabilites } from './Responsabilites';
 import { CommandesEquipe } from './CommandesEquipe';
 import { optionNeufBalayage } from '../../lib/controleDirect/sortiesNeuf';
@@ -1081,7 +1081,7 @@ function PuceTouche({ codes, max = 2 }: { codes: string[]; max?: number }) {
 
 /** Un symbole de manette : les quatre formes d'une PlayStation, les lettres colorées d'une Xbox. */
 function Glyphe({ bouton, type }: { bouton: NomBouton; type: TypeManette }) {
-  const libelle = LIBELLES_MANETTE[type][bouton];
+  const libelle = libellesManette(type)[bouton];
   if (type === 'playstation' && ['croix', 'rond', 'carre', 'triangle'].includes(libelle)) {
     return (
       <svg className="cd-glyphe" data-forme={libelle} viewBox="0 0 24 24" aria-label={libelle} role="img">
@@ -1166,13 +1166,13 @@ function Tuto({ pilotage, snap, touches }: { pilotage: PilotageDirect; snap: Sna
   const libelles = (codes: string[]) => codes.slice(0, 1).map(libelleDeTouche).join('');
   const vars = {
     deplacer: [touches.haut[0], touches.gauche[0], touches.bas[0], touches.droite[0]].map(libelleDeTouche).join(' '),
-    sprint: variante === 'manette' ? LIBELLES_MANETTE[snap.manette].rt : libelles(touches.sprint),
+    sprint: variante === 'manette' ? libellesManette(snap.manette).rt : libelles(touches.sprint),
     appel: variante === 'manette' ? glypheTexte(snap.manette, 'y') : libelles(touches.appel),
     passeG: variante === 'manette' ? glypheTexte(snap.manette, 'x') : libelles(touches.passeGauche),
     passeD: variante === 'manette' ? glypheTexte(snap.manette, 'a') : libelles(touches.passeDroite),
     pied: variante === 'manette' ? glypheTexte(snap.manette, 'b') : libelles(touches.coupDePied),
-    raffut: variante === 'manette' ? LIBELLES_MANETTE[snap.manette].rb : libelles(touches.raffut),
-    crochet: variante === 'manette' ? LIBELLES_MANETTE[snap.manette].lb : libelles(touches.crochet),
+    raffut: variante === 'manette' ? libellesManette(snap.manette).rb : libelles(touches.raffut),
+    crochet: variante === 'manette' ? libellesManette(snap.manette).lb : libelles(touches.crochet),
     action: variante === 'manette' ? glypheTexte(snap.manette, 'a') : libelles(touches.action),
   };
 
@@ -1222,7 +1222,7 @@ function Tuto({ pilotage, snap, touches }: { pilotage: PilotageDirect; snap: Sna
 
 /** Le symbole d'un bouton, en texte, pour les phrases du tutoriel (les formes PlayStation y deviennent des mots). */
 function glypheTexte(type: TypeManette, bouton: NomBouton): string {
-  const l = LIBELLES_MANETTE[type][bouton];
+  const l = libellesManette(type)[bouton];
   const formes: Record<string, string> = { croix: '✕', rond: '○', carre: '□', triangle: '△' };
   return formes[l] ?? l;
 }

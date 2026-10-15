@@ -1935,8 +1935,11 @@ export async function creerApercuJoueur(conteneur,options={}){
     const l=Math.max(1,conteneur.clientWidth),h=Math.max(1,conteneur.clientHeight);
     if(l!==largeur||h!==hauteur){largeur=l;hauteur=h;camera.aspect=l/h;renderer.setSize(l,h,false);}
     // Le corps entier, ou le visage de près (pour choisir une coupe) ; plus de recul sur un écran étroit.
-    const H=hauteurCorps,marge=camera.aspect<.75?1.18:1;
     const visage=cadrage==='visage';
+    // Taille visible : le cadrage du corps garde une hauteur de référence fixe.
+    // Reculer avec la taille annulait sa hauteur à l'écran et ne montrait que la variation de carrure.
+    // Le gros plan continue de suivre la tête ; les pieds gardent leur place dans la vue corps.
+    const H=visage?hauteurCorps:1.85,marge=camera.aspect<.75?1.18:1;
     const dist=(visage?H*.34:H*.84)/Math.tan(THREE.MathUtils.degToRad(camera.fov/2))*marge/(visage?1.55:1);
     const cy=visage?H*.9:H*.5;
     camera.position.set(0,cy+(visage?.02:H*.06),dist);camera.lookAt(0,cy,0);camera.updateProjectionMatrix();

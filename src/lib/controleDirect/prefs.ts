@@ -8,6 +8,7 @@
 
 import { useSyncExternalStore } from 'react';
 import { assainirTouches, copierTouches, type TouchesDirectes } from './touches';
+import { assainirBoutons, BOUTONS_PAR_DEFAUT } from './boutons';
 import type { SectionTuto } from './tutoriel';
 
 const CLE = 'destiny-rugby:controle';
@@ -55,6 +56,7 @@ export interface PreferencesControle {
   /** Les explications contextuelles déjà vues (offload, ruck, passe au pied, placement). */
   tutosContext: string[];
   touches: TouchesDirectes;
+  boutonsManette: number[];
   // ── Les responsabilités (Correctif 17) ──────────────────────────────────
   /** L'aide de visée légère : la ligne vers les poteaux, le repère de force utile, le vent. Jamais le résultat. */
   aideTir: boolean;
@@ -67,6 +69,7 @@ export interface PreferencesControle {
 export const PREFERENCES_PAR_DEFAUT: Readonly<PreferencesControle> = {
   mode: 'direct', aidePlacement: true, tailleHud: 1, opaciteHud: 0.5, joystick: 'flottant', sprintAuBord: true,
   gaucher: false, positionJoystick: 'gauche', positionActions: 'droite', hudSimple: true, reculCamera: 1, cameraMode: 'assistee', sensibiliteCamera: 1, souris: false, vibrations: true, indications: true, tutorielVu: false, tutoSection: 'tout', tutosContext: [], touches: copierTouches(),
+  boutonsManette: [...BOUTONS_PAR_DEFAUT],
   aideTir: true, conseilCapitaine: true, tutosResp: [],
 };
 
@@ -101,6 +104,7 @@ function assainir(brut: unknown): PreferencesControle {
     tutoSection: (['general', 'attaque', 'defense', 'pied'] as const).find((x) => x === b.tutoSection) ?? 'tout',
     tutosContext: Array.isArray(b.tutosContext) ? b.tutosContext.filter((x): x is string => typeof x === 'string').slice(0, 12) : [],
     touches: assainirTouches(b.touches),
+    boutonsManette: assainirBoutons(b.boutonsManette),
     aideTir: b.aideTir !== false,
     conseilCapitaine: b.conseilCapitaine !== false,
     tutosResp: Array.isArray(b.tutosResp) ? b.tutosResp.filter((x): x is string => typeof x === 'string').slice(0, 12) : [],

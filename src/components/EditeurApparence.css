@@ -22,6 +22,17 @@
 .edap-curseur { display: grid; grid-template-columns: minmax(110px, 0.9fr) 2fr 64px; gap: 10px; align-items: center; font-size: 0.9rem; }
 .edap-curseur input[type='range'] { width: 100%; min-height: 36px; accent-color: var(--or, #d8a94a); }
 .edap-curseur output { text-align: right; font-variant-numeric: tabular-nums; color: var(--craie-dim, #cfd8c8); }
+.edap-stats { padding-top: 1rem; border-top: 1px solid rgba(240, 230, 200, 0.14); }
+.edap-stats h3 { margin: 0 0 .4rem; font-size: 1rem; }
+.edap-stats-grille { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem 1rem; margin: .8rem 0 0; }
+.edap-stat { padding: .45rem 0; border-bottom: 1px solid rgba(240, 230, 200, 0.08); }
+.edap-stat dt { color: var(--craie-dim, #cfd8c8); font-size: .82rem; }
+.edap-stat dd { display: flex; gap: .5rem; align-items: baseline; margin: .25rem 0 0; font-variant-numeric: tabular-nums; }
+.edap-stat output { font-size: 1.15rem; font-weight: 700; }
+.edap-stat output small { color: var(--brume); font-size: .72rem; font-weight: 400; }
+.edap-stat-ecart { font-size: .8rem; font-weight: 700; }
+.edap-stat-ecart.gain { color: #8dd5a3; }
+.edap-stat-ecart.perte { color: #efa99b; }
 @media (max-width: 760px) {
   .edap { grid-template-columns: 1fr; }
   .edap-apercu { position: relative; top: 0; height: 320px; }

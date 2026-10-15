@@ -11,7 +11,7 @@
 import assert from 'node:assert/strict';
 import {
   avancer, DT, aideDeTir, choisirCombinaisonTouche, demanderToucheRapide, engagerHumain, installerSituationCombinaison,
-  lancerLaTouche, tirerHumain, trancherPenalite,
+  lancerLaTouche, tirerHumain, trancherPenalite, frapperPiedHumain,
 } from '../src/lib/moteur/moteur';
 import type { EtatMatch } from '../src/lib/moteur/etat';
 import type { Pion } from '../src/lib/moteur/entites';
@@ -528,6 +528,10 @@ console.log('— Des matchs entiers, conduits à la main : ni blocage, ni NaN �
     let garde = 0, sansProgres = 0, dernierSim = -1;
     while (!e.fini && garde++ < 400000) {
       avancer(e, 0.3);
+      if (e.piedHumain) {
+        const p = e.pions.find(p => p.id === e.piedHumain!.auteurId)!;
+        frapperPiedHumain(e, { x: e.piedHumain.origine.x + (p.cote === 'A' ? 20 : -20), y: e.piedHumain.origine.y < 35 ? -1 : 71 });
+      }
       if (e.responsabilites!.attente) { attentes++; repondre(e); }
       // Un match ne se bloque jamais : le temps de simulation avance toujours.
       if (e.sim === dernierSim) { if (++sansProgres > 50) break; } else { sansProgres = 0; dernierSim = e.sim; }

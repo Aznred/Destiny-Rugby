@@ -192,7 +192,8 @@ titre(`2. ${N} matchs de carrière (dix minutes), toutes les pénalités jouées
   const nouveaux = Array.from({ length: N }, (_, k) => jouer(k, 'carriere', {}));
   const apres = somme(nouveaux.map(m => m.bilan));
   console.log(`  ${ligne(apres)}`);
-  dire(apres.tapees >= N * 3, 'assez de pénaltouches pour mesurer', `${apres.tapees}`);
+  // Le format solo dure désormais environ 7–8 minutes au lieu de 15 : même densité minimale par minute.
+  dire(apres.tapees >= N * 2, 'assez de pénaltouches pour mesurer', `${apres.tapees}`);
   dire(apres.rendues === 0, 'AUCUNE pénaltouche sortie en touche n\'est rendue à l\'équipe sanctionnée', `${apres.rendues}`);
   dire(nouveaux.every(m => m.e.fini), 'tous les matchs vont à leur terme');
 }

@@ -1,3 +1,4 @@
+import { ViseePiedArrete } from './match/ViseePiedArrete';
 import { situationInternationale } from '../lib/rassemblements';
 // LE MATCH EN DIRECT — le moteur (lib/moteur/) rendu à l'écran, et JOUABLE.
 //
@@ -1153,6 +1154,11 @@ export function MatchLive({
       // pouvoir le lire (une touche de pause se lit PENDANT la pause, un joueur qui sort rend la main).
       const pilote = pilotage.current!;
       if (e.controleEquipe) e.controleEquipe.actif=enJeu && !simulationRef.current;
+      if (e.piedHumain) {
+        scene?.image(dtReel, { fige: true });
+        redessiner(n => n + 1);
+        return;
+      }
       pilote.surImage(e, scene, dtReel, {
         moi: enJeu ? moi : undefined, pause: enPause, avantMatch: !!presentation.current || simulationRef.current,
         cameraChoisie: camera3DRef.current,
@@ -1279,7 +1285,8 @@ export function MatchLive({
       e.carriereDixMinutes = true;
       // ⚠️ ON NE CONDUIT PAS À ×10 : dès que le joueur entre, le jeu retombe au temps réel — et le tutoriel peut
       // le ralentir tant qu'une invite presse.
-      const allure = (pilote.phase !== 'attente' ? 1 : allureDuTempo(tempo)) * pilote.vitesseTuto;
+      const placementRapide = ['melee', 'touche', 'coupEnvoi', 'renvoi22', 'apresEssai', 'miTemps'].includes(e.phase) && !e.responsabilites?.attente && !e.direct?.pack;
+      const allure = (pilote.phase !== 'attente' ? 1 : allureDuTempo(tempo)) * pilote.vitesseTuto * (placementRapide ? 2 : 1);
       // ⚠️ PAS PLUS D'UNE SECONDE DE MATCH PAR IMAGE (`secondesAAvancer`) : sur un écran lent, ×10 ralentit au lieu de
       // téléporter les joueurs. La scène reçoit la vitesse RÉELLEMENT jouée, pas celle qu'on demandait.
       const pas = secondesAAvancer(dtReel, allure);
@@ -2146,7 +2153,10 @@ export function MatchLive({
                       Le HUD ne se montre qu'une fois le joueur entré et la caméra venue derrière lui ; sur le
                       banc il ne rend rien. Il porte aussi la pause (liste des commandes) et le tutoriel. */}
                   {directVoulu && !e.fini && (
-                    <ControleDirect pilotage={pilotage.current!} surReprendre={() => setEnPause(false)} suspendu={!!e.bagarre} />
+                    <>
+                    <ViseePiedArrete etat={e} />
+                    <ControleDirect pilotage={pilotage.current!} surReprendre={() => setEnPause(false)} suspendu={!!e.bagarre || !!e.piedHumain} />
+                    </>
                   )}
 
                   {/* ---------- LA PREMIÈRE FOIS ---------- */}

@@ -91,6 +91,11 @@ function poser(p: { pos: { x: number; y: number }; cible: { x: number; y: number
     e.tir = null; e.vol = null; e.ballonLibre = null; e.ruck = null; e.conquete = null; e.lancement = null; e.porteur = null;
     delete e.piedPrepare; delete e.dropEnCours; e.choixPenalite = undefined;
     if (e.responsabilites) { e.responsabilites.attente = null; e.responsabilites.touche = null; e.responsabilites.engagement = null; }
+    if (nom === 'box') {
+      poser(h, 45, 20); e.phase = 'jeuCourant'; e.porteur = h; e.possession = cote;
+      e.piedHumain = { type: 'box', auteurId: h.id, origine: { ...h.pos } };
+      return 'box kick prêt';
+    }
     if (nom === 'penalite') {
       e.phase = 'penalite'; e.possession = cote; e.porteur = null; e.vol = null;
       const lieu = { x: cote === 'A' ? LIGNE_B - (option?.distance ?? 30) : LIGNE_A + (option?.distance ?? 30), y: AXE + (option?.ecart ?? 4) };
@@ -163,3 +168,14 @@ function Apercu() {
 }
 
 createRoot(document.getElementById('root')!).render(<Apercu />);
+
+// Situations accessibles sans console pour la recette clavier, souris et tactile.
+if (['penalite', 'box'].includes(adresse.get('confort') ?? '')) {
+  const timer = window.setInterval(() => {
+    const live = (globalThis as { __matchLive?: { e: EtatMatch } }).__matchLive;
+    if (!live?.e.direct?.actif) return;
+    clearInterval(timer);
+    (globalThis as { __apercu?: { situation(nom: string): unknown } }).__apercu?.situation(adresse.get('confort')!);
+    if (adresse.get('confort') === 'penalite') live.e.choixPenalite = 'touche';
+  }, 100);
+}

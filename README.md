@@ -1918,6 +1918,8 @@ La retransmission française utilise F5-TTS sur l'ordinateur via un service loca
 - **Caméra plus large** derrière le joueur, encore plus sur téléphone, avec un zoom qui glisse selon la situation (réception, percée, défense) et un réglage de recul.
 - **Tutoriel de contrôle en dix étapes** (déplacement, sprint, placement, réclamer, passe, crochet, raffut, pied, plaquage, grattage), rejouable par partie depuis les Réglages, et des explications contextuelles (offload, ruck, passe au pied, placement).
 - **Apparence et équipement** : étape « Apparence » à la création (teint, coupes, couleur, barbe, morphologie bornée, aperçu 3D tournable en direct), « Personnaliser mon joueur » dans le profil, casque et crampons réellement portés par le modèle 3D du match comme de l'aperçu.
+- Dans l'onglet **Physique**, changer la taille fait grandir ou rétrécir le personnage à l'écran : le cadrage du corps garde le même recul, tandis que le gros plan du visage suit la tête.
+- À la création, **le gabarit influence les statistiques de départ** : taille, poids et carrure redistribuent force, vitesse, endurance et plaquage. Les huit statistiques et leurs variations s'affichent dans l'onglet Physique ; la carrière reprend exactement ces valeurs. Chaque avantage a sa contrepartie, et le physique reste figé après le lancement.
 
 ### Correctif 21 — boutique, monnaies et maillots d'équipe
 
@@ -2160,3 +2162,30 @@ Bancs : `npm run verify:publicites` (serveur et SDK), `npm run verify:publicites
 Une excellente saison ou une sauvegarde ancienne ne fait plus disparaître une carrière. Le classement distingue les carrières classées, les cas contrôlés, les lignes provisoires et les refus expliqués. Les données manquantes sont réexaminées à la prochaine synchronisation ; seules les incohérences fortes entraînent un blocage automatique. Les carrières volontairement hors classement restent hors compétition.
 
 Le Labo Kiri montre les règles déclenchées et permet de valider, refuser ou réinitialiser les cas ambigus avec autorisation serveur. La migration a conservé les 1 304 lignes de la base et leur revalidation les garde visibles provisoirement ; aucune sauvegarde n'est modifiée. Les anciens refus n'étant pas enregistrés, leur nombre historique reste inconnu. Le nouveau code doit être déployé pour activer cette interface sur le site public. Rapport et vérifications : [VALIDATION-CORRECTIF-38.md](VALIDATION-CORRECTIF-38.md). `npm run verify:correctif38`.
+
+
+### Confort des matchs solo — 15 octobre 2026
+
+Les carrières joueur et entraîneur condensent désormais le chronomètre à ×12,
+arrêts compris. Le budget actif est plafonné à dix minutes (réserve répartie
+entre les périodes, prolongations comprises). La dernière action dispose de
+trente secondes ; une transformation acquise est résolue par le même moteur,
+avec mise en scène abrégée si le plafond est atteint. Les pauses volontaires
+et la visée humaine sont hors budget. Le placement des touches, mêlées et
+renvois passe à ×2, sauf pendant une responsabilité ou un duel de pack.
+
+Les pénaltouches humaines et sorties « box » ouvrent une cible sur un plan du
+terrain, réglable à la souris, au doigt, au clavier ou au stick. Le moteur attend
+la frappe ; la portée dépend du botteur, et la possession après pénaltouche
+reste régie par les règles existantes. Les tirs au but, engagements et charges
+de coups de pied suspendent également le jeu pendant la visée.
+
+Réglages → Manette propose la réassignation des boutons, avec échange des
+conflits, sauvegarde locale et réinitialisation ; les indications du HUD suivent
+la disposition. Réglages → Mon image affiche un accès par e-mail au retrait,
+même sans compte, en plus du formulaire connecté soumis à vérification.
+
+Recette : scripts/verifierConfortMatch.ts, verify:vitesse-match,
+verify:responsabilites, verify:penaltouche. L'aperçu du contrôle direct accepte
+confort=penalite ou confort=box. Les manettes physiques restent à essayer sur
+matériel réel ; le lecteur a été vérifié avec des entrées Gamepad simulées.

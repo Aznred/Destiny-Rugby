@@ -705,6 +705,9 @@ export interface EtatMatch {
   memoireCombinaisons?: Partial<Record<Cote, Record<string, import('./lectureCombinaison.js').MemoireCombinaison>>>;
   /** Solo : mouvements naturels, horloge sportive sur dix minutes. */
   carriereDixMinutes?: boolean;
+  /** Budget solo actif, phases arrêtées comprises ; la visée et les pauses n'appellent pas avancer. */
+  secondesActivesSolo?: number;
+  piedHumain?: { type: 'penaltouche' | 'box'; auteurId: string; origine: Vec };
   /** Durée réelle d'un match arcade complet, en secondes. */
   dureeReelleArcade?: number;
   /** Après la sirène, le jeu se poursuit jusqu'à une touche ou un en-avant. */

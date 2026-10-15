@@ -313,7 +313,7 @@ export class PilotageDirect {
   /** Le joueur veut le contrôle direct et la scène est là pour le porter : les cartes de décision se taisent. */
   get voulu(): boolean { return this.veutDernier; }
   /** La carte d'accueil du tutoriel fige le match derrière elle. */
-  get fige(): boolean { return this.phase === 'actif' && (!!this.tuto?.fige || this.resp.fige); }
+  get fige(): boolean { return this.phase === 'actif' && (!!this.tuto?.fige || this.resp.fige || !!this.pied || !!this.tactile.pied); }
   /** Facteur de vitesse que le tutoriel demande au match (1 : normal). */
   get vitesseTuto(): number { return this.phase === 'actif' ? (this.tuto?.vitesse ?? 1) : 1; }
   /** Échap ou le bouton de pause : c'est l'écran qui décide ce qu'il en fait. */

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { MONDE_FEMININ } from '../lib/mondeActif';
+import { attributsDeCreation } from '../lib/attributsCreation';
 /** La carrière en cours appartient-elle au monde que cette page a chargé ? */
 export const joueurDeCeMonde = (j: { genre?: 'F' } | null | undefined): boolean => !j || (j.genre === 'F') === MONDE_FEMININ;
 import { persist } from 'zustand/middleware';
@@ -265,17 +266,6 @@ const ATTRS_KEYS: (keyof Attributs)[] = [
   'passe', 'jeuAuPied', 'vision', 'mental',
 ];
 
-function attributsDeBase(poste: PosteId): Attributs {
-  const cles = POSTE_PAR_ID[poste].cles;
-  const base = {} as Attributs;
-  for (const k of ATTRS_KEYS) {
-    let v = 26 + Math.floor(Math.random() * 11);
-    if (cles.includes(k)) v += 6 + Math.floor(Math.random() * 5);
-    base[k] = Math.min(60, v);
-  }
-  return base;
-}
-
 function borne(v: number, min = 0, max = 100) {
   return Math.max(min, Math.min(max, v));
 }
@@ -487,6 +477,8 @@ export interface CreationInput {
   age: number;
   traits?: string[];
   apparence?: import('../lib/apparenceJoueur').ApparenceJoueur;
+  /** Maintient le même tirage d'attributs entre l'aperçu du formulaire et la carrière. */
+  graineAttributs?: number;
 }
 
 // Points d'attributs qu'on peut au maximum gagner via le MJ sur une saison.
@@ -1711,9 +1703,7 @@ export const useGame = create<GameState>()(
         // ⚠️ MONDE FÉMININ : la pyramide connue s'arrête à l'Élite 2 (clubs notés de 49 à 66). Une débutante au niveau d'un
         // licencié de Régionale 3 (36) n'y jouerait jamais une minute, et aucune division plus basse n'existe pour l'accueillir.
         // Elle arrive donc en espoir du club : huit points sous sa moyenne, chaque attribut décalé d'autant.
-        const base = attributsDeBase(poste);
-        const ecart = MONDE_FEMININ ? Math.max(0, Math.round(noteDuClub(input.club) - 8 - noteGlobale({ attributs: base }))) : 0;
-        const attributs = ecart ? Object.fromEntries(Object.entries(base).map(([cle, v]) => [cle, Math.min(92, v + ecart)])) as unknown as typeof base : base;
+        const { attributs } = attributsDeCreation({ poste, club: input.club, morpho: input.apparence?.morpho, graine: input.graineAttributs });
         const gen = noteGlobale({ attributs });
         const salaireDepart = Math.max(0, Math.round(noteDuClub(input.club) * 60));
         // ⚠️ LE NOM SE TIRE AVANT TOUT LE RESTE, et ce n’était pas le cas :

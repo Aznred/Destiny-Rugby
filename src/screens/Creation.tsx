@@ -21,6 +21,7 @@ import { prendreLeModeDeCreation } from '../lib/tutoriel/intentions';
 import type { PosteId } from '../types';
 import { EditeurApparence } from '../components/EditeurApparence';
 import { apparencePourPoste, morphoConseillee, type ApparenceJoueur } from '../lib/apparenceJoueur';
+import { attributsDeCreation } from '../lib/attributsCreation';
 import type { SourceCarte } from '../lib/ligue/catalogueCarriere';
 import '../components/SelectionJoueurExistant.css';
 
@@ -195,6 +196,9 @@ export function Creation() {
   // (pilier massif, demi de mêlée petit…) ; dès qu'il le règle lui-même, on n'y touche plus.
   const [apparence, setApparence] = useState<ApparenceJoueur>(() => apparencePourPoste(poste, Math.floor(Math.random() * 99999)));
   const [morphoTouchee, setMorphoTouchee] = useState(false);
+  const [graineAttributs] = useState(() => Math.floor(Math.random() * 4294967296));
+  const statsDepart = useMemo(() => attributsDeCreation({ poste, club, morpho: apparence.morpho, graine: graineAttributs }),
+    [poste, club, apparence.morpho, graineAttributs]);
   const changerDePoste = (id: PosteId) => {
     setPoste(id);
     if (!morphoTouchee) setApparence((a) => ({ ...a, morpho: morphoConseillee(id) }));
@@ -210,7 +214,7 @@ export function Creation() {
   };
 
   const valider = () => {
-    creerJoueur({ nom, poste, nation, club, division: divisionId, age, traits, apparence });
+    creerJoueur({ nom, poste, nation, club, division: divisionId, age, traits, apparence, graineAttributs });
   };
 
   // Options des listes déroulantes (drapeaux, emojis de division, blasons)
@@ -434,6 +438,7 @@ export function Creation() {
             apparence={apparence} poste={poste} nom={nom} club={club} onChange={setApparence}
             equipementActif={equipementActif} equipements={equipementsAchetes} onEquiper={basculerEquipement}
             onMorphoTouchee={() => setMorphoTouchee(true)}
+            attributsDepart={statsDepart.attributs} ecartsPhysique={statsDepart.ecartsPhysique}
           />
         </div>
 

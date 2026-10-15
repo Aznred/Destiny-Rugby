@@ -5,7 +5,7 @@ import { type OrdreEquipe } from '../../lib/moteur/equipeSolo';
 import { libelleDeTouche } from '../../lib/controleDirect/touches';
 import { lirePreferencesControle } from '../../lib/controleDirect/prefs';
 import { ACTIONS_SORTIE_NEUF, GESTES_SORTIE_NEUF, NOMS_MANETTE_NEUF } from '../../lib/controleDirect/sortiesNeuf';
-import { LIBELLES_MANETTE } from '../../lib/controleDirect/manette';
+import { libellesManette } from '../../lib/controleDirect/manette';
 
 const ORDRES_EQUIPE: OrdreEquipe[]=['large','serre','cellules','pick','pied','occupation','rapide','lent'];
 export function CommandesEquipe({ pilotage, snap }: {pilotage:PilotageDirect;snap:SnapPilotage}) {
@@ -24,7 +24,7 @@ export function CommandesEquipe({ pilotage, snap }: {pilotage:PilotageDirect;sna
     {eq.sortie && !snap.resp.panneau && !ouvert && <div className="ce-sortie"><span>{t('ce.sortie')}</span>
       <small>{t(snap.appareil==='tactile'?'ce.balayagesAide':snap.appareil==='manette'?'ce.combinaisonsManette':'ce.combinaisonsClavier',{touche:modificateur})}</small><div>
       {eq.options.map(o=><div key={o} className="ce-combinaison">
-        <kbd>{snap.appareil==='tactile'?GESTES_SORTIE_NEUF[o]:snap.appareil==='manette'?`${LIBELLES_MANETTE[snap.manette].lt} + ${LIBELLES_MANETTE[snap.manette][NOMS_MANETTE_NEUF[o]]}`:`${modificateur} + ${libelleDeTouche(touches[ACTIONS_SORTIE_NEUF[o]][0])}`}</kbd><span>{t(`ce.option.${o}`)}</span>
+        <kbd>{snap.appareil==='tactile'?GESTES_SORTIE_NEUF[o]:snap.appareil==='manette'?`${libellesManette(snap.manette).lt} + ${libellesManette(snap.manette)[NOMS_MANETTE_NEUF[o]]}`:`${modificateur} + ${libelleDeTouche(touches[ACTIONS_SORTIE_NEUF[o]][0])}`}</kbd><span>{t(`ce.option.${o}`)}</span>
       </div>)}
     </div></div>}
     {!eq.sortie && <div className="ce-raccourcis">

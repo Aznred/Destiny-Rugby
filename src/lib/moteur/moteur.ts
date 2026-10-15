@@ -213,13 +213,14 @@ function facteurArretDetaille(e: EtatMatch): number {
   const a = ARRETS[e.phase];
   const vivant = horlogeCondensee(e);
   if (!a) return vivant;
+  if (e.carriereDixMinutes && !e.tempsReel) return e.phase === 'miTemps' ? 0 : vivant;
   const duree = e.phase === 'melee' ? DUREE_MELEE_DETAILLEE : a.visuel;
   return Math.min(vivant, a.horloge / Math.max(1, duree));
 }
 
 /** Secondes d'horloge par seconde d'écran, ballon vivant, dans un match de dix minutes. */
 function horlogeCondensee(e: EtatMatch): number {
-  return iaParPoste(e) ? REGLAGES_IA.horlogeCondensee : 8;
+  return e.carriereDixMinutes && !e.tempsReel ? 12 : iaParPoste(e) ? REGLAGES_IA.horlogeCondensee : 8;
 }
 
 /** Ce qui est déjà écoulé de la phase arrêtée, de 0 à 1. */
@@ -684,14 +685,16 @@ export function creerMatch(
 // ---------------------------------------------------------------------------
 
 export function avancer(e: EtatMatch, secondesSimulees: number): void {
-  if (e.fini) return;
+  if (e.fini || e.piedHumain) return;
   e.reliquat += secondesSimulees;
   let garde = 0;
   while (e.reliquat >= DT && !e.fini && garde++ < 40000) {
     e.reliquat -= DT;
     if (e.controleEquipe?.actif) actualiserSelectionEquipe(e);
     jouerSortieEquipe(e);
+    if (e.piedHumain) { e.reliquat = 0; break; }
     tick(e);
+    if (e.piedHumain) { e.reliquat = 0; break; }
     // Cahier vivant : ce que la combinaison en cours a donné (observation seule).
     if (e.suiviCombinaison) suivreCombinaison(e);
     // Le pilotage direct : ce que l'écran et la scène lisent (peut-il conduire, que peut-il jouer).
@@ -712,7 +715,27 @@ export function avancer(e: EtatMatch, secondesSimulees: number): void {
   }
 }
 
-function tick(e: EtatMatch): void {
+function tick(e: EtatMatch, compterBudget = true): void {
+  if (compterBudget && e.carriereDixMinutes && !e.tempsReel && !e.dureeReelleArcade) {
+    e.secondesActivesSolo = (e.secondesActivesSolo ?? 0) + DT;
+    const total = 4800 + (e.departage?.periodes ?? 0) * (e.departage?.duree ?? 0);
+    const limite = 600 * finDePeriode(e) / total;
+    // La sirène réserve trente secondes à la dernière action et à sa transformation.
+    if (e.secondesActivesSolo >= limite - 30) e.t = Math.max(e.t, finDePeriode(e));
+    if (e.secondesActivesSolo >= limite) {
+      e.secondesActivesSolo = limite;
+      // Une transformation acquise reste due : seule sa mise en scène est abrégée
+      // au plafond, avec le même moteur et le même résultat. La visée humaine reste libre.
+      const periode = e.periode;
+      let garde = 0;
+      while (e.transformationDue && !e.fini && e.periode === periode && garde++ < 4000) {
+        if (e.responsabilites?.attente?.type === 'tir' && !e.tir?.visee) return;
+        tick(e, false);
+      }
+      if (!e.fini && e.periode === periode) return clorePeriode(e);
+      return;
+    }
+  }
   const dt = DT;
   e.sim += dt;
   // Une bagarre qui attend son ordre tient le match : si la phase a bougé sous elle, on y revient (`tenirLaBagarre`).
@@ -8567,6 +8590,10 @@ function phasePenalite(e: EtatMatch): void {
   }
   const chanceTouche = ordrePenalite === 'touche' ? 0.97 : ordrePenalite === 'points' ? 0.42 : 0.72;
   if (choix === 'touche' || (!choix && metresAvantLaLigne(info.lieu, cote) > 8 && (versLaTouche ?? e.rng() < chanceTouche))) {
+    if (e.direct?.actif && (buteur.moi || e.controleEquipe?.cote === cote || e.responsabilites?.derniere?.humain && e.responsabilites.derniere.cote === cote)) {
+      e.piedHumain = { type: 'penaltouche', auteurId: buteur.id, origine: { ...info.lieu } };
+      return;
+    }
     // Pénaltouche : on gagne le terrain ET on garde le ballon.
     const gain = borner(28 + buteur.pied / 3, 20, 48);
     let arrivee = {
@@ -10062,7 +10089,7 @@ function jouerSortieEquipe(e: EtatMatch): void {
   const choix=sortie.choix;
   const cible=e.pions.find(p=>p.id===sortie.cibleId && p.surLeTerrain && p.sanction<=0 && !p.corps);
   if (choix==='depart') { delete c.sortie; return; }
-  if (choix==='box') { executerDemande(e,neuf,{action:'coupDePied',intentionPied:'chandelle'}); delete c.sortie; return; }
+  if (choix==='box') { e.piedHumain={type:'box',auteurId:neuf.id,origine:{...neuf.pos}}; delete c.sortie; return; }
   if (!cible) { delete sortie.choix; return; }
   if (choix==='pick') {
     // L'avant rejoint le ballon avant de le ramasser : aucune passe ou téléportation déguisée.
@@ -11558,4 +11585,24 @@ export function resoudreChoix(e: EtatMatch, p: Pion, action: ActionJoueur, bonus
       demanderAction(e, action);
       return arme();
   }
+}
+
+/** Cible choisie sur le terrain : le vol et les règles de touche restent ceux du moteur. */
+export function frapperPiedHumain(e: EtatMatch, cible: Vec): boolean {
+  const attente = e.piedHumain;
+  if (!attente || e.fini || !Number.isFinite(cible.x) || !Number.isFinite(cible.y)) return false;
+  const p = e.pions.find(q => q.id === attente.auteurId && q.surLeTerrain && q.sanction <= 0);
+  if (!p) { delete e.piedHumain; return false; }
+  const de = attente.origine;
+  const maximum = attente.type === 'box' ? 22 + p.pied * .2 : 30 + p.pied * .35;
+  const dx = cible.x - de.x, dy = cible.y - de.y, longueur = Math.hypot(dx, dy);
+  if (longueur < 1) return false;
+  const ratio = Math.min(1, maximum / longueur);
+  const vers = { x: borner(de.x + dx * ratio, LIGNE_A + 1, LIGNE_B - 1), y: borner(de.y + dy * ratio, -1, LARGEUR + 1) };
+  delete e.piedHumain;
+  e.placement = null;
+  p.stats.coupsDePied += 1;
+  lancerVol(e, p, vers, attente.type === 'box' ? 'chandelle' : 'penaltouche', attente.type === 'box' ? 3.5 : 2.5, .4, de);
+  if (attente.type === 'penaltouche' && e.piedPrepare) e.piedPrepare.dePenalite = true;
+  return true;
 }

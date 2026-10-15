@@ -16,7 +16,8 @@ import {
   BARBES, COUPES, COULEURS_CHEVEUX, LIMITES_MORPHO, TEINTS_PEAU, apparencePourApercu, apparencePourPoste, morphoConseillee, morphoValide,
   type ApparenceJoueur, type FamilleBarbe, type FamilleCoupe, type MorphoJoueur,
 } from '../lib/apparenceJoueur';
-import type { PosteId } from '../types';
+import type { Attributs, PosteId } from '../types';
+import { ATTRIBUTS_CREATION, type EcartsPhysique } from '../lib/attributsCreation';
 import './EditeurApparence.css';
 
 type Onglet = 'visage' | 'physique' | 'equipement';
@@ -41,6 +42,7 @@ const BARBES_NUMEROTEES = numeroter(BARBES);
 
 export function EditeurApparence({
   apparence, poste, nom, club, onChange, morphoFigee = false, equipementActif = {}, equipements = [], onEquiper, onMorphoTouchee,
+  attributsDepart, ecartsPhysique,
 }: {
   apparence: ApparenceJoueur;
   poste: PosteId;
@@ -54,6 +56,8 @@ export function EditeurApparence({
   /** Équipe ou retire un article (boutique). Absent : l'équipement est montré en lecture seule. */
   onEquiper?: (id: string) => void;
   onMorphoTouchee?: () => void;
+  attributsDepart?: Attributs;
+  ecartsPhysique?: EcartsPhysique;
 }) {
   const [onglet, setOnglet] = useState<Onglet>('visage');
   const [cadrage, setCadrage] = useState<'corps' | 'visage'>('corps');
@@ -172,6 +176,28 @@ export function EditeurApparence({
                 </label>
               );
             })}
+            {attributsDepart && (
+              <section className="edap-stats" aria-label={t('ap.statsDepart')}>
+                <h3>{t('ap.statsDepart')}</h3>
+                <p className="edap-note">{t('ap.statsAide')}</p>
+                <dl className="edap-stats-grille">
+                  {ATTRIBUTS_CREATION.map(cle => {
+                    const ecart = ecartsPhysique?.[cle as keyof EcartsPhysique] ?? 0;
+                    const signe = ecart > 0 ? `+${ecart}` : String(ecart);
+                    return (
+                      <div key={cle} className="edap-stat" data-attribut={cle}>
+                        <dt>{t(`attr.${cle}`)}</dt>
+                        <dd>
+                          <output>{attributsDepart[cle]}<small>/100</small></output>
+                          {ecart !== 0 && <span className={`edap-stat-ecart ${ecart > 0 ? 'gain' : 'perte'}`}
+                            aria-label={t('ap.statsEcart', { n: signe })}>{signe}</span>}
+                        </dd>
+                      </div>
+                    );
+                  })}
+                </dl>
+              </section>
+            )}
             {!morphoFigee && (
               <button type="button" className="btn fantome petit" onClick={() => onChange({ ...apparence, morpho: morphoConseillee(poste) })}>
                 {t('ap.morphoReset')}

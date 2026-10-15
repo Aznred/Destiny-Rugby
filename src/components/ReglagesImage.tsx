@@ -59,10 +59,13 @@ export function ReglagesImage() {
 
   return (
     <div className="champ reglages-image">
-      <label>{t('img.titre')}</label>
+      <h3 id="mon-image">{t('img.titre')} · {t('img.retrait')}</h3>
       <p className="aide"><Icone nom="joueur" taille={15} /> {t('img.aide')}</p>
       {etat === 'deconnecte' && <p className="reglages-image-note">{t('img.connexion')}</p>}
       {etat === 'indisponible' && <p className="reglages-image-note">{t('img.indisponible')}</p>}
+      <p><a className="btn fantome mini" href="mailto:contact@destiny-rugby.fr?subject=Demande%20de%20retrait%20de%20mon%20image">Demander le retrait de mon image par e-mail</a></p>
+      <p className="aide">Accessible sans compte. Indique ton nom, ton club et la carte concernée. Pour demander aussi le retrait de ta présence dans le jeu, précise-le dans ton message.</p>
+      {etat === 'chargement' && <p role="status">Chargement de tes demandes…</p>}
       {etat === 'pret' && <>
         <div className="reglages-image-choix" role="radiogroup" aria-label={t('img.titre')}>
           {(['retrait', 'ajout'] as const).map(choix => (

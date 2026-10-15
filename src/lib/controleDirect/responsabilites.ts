@@ -146,7 +146,8 @@ export class PiloteResp {
   /** Le match attend une réponse du joueur (le HUD normal s'éteint) ou un tutoriel est affiché. */
   get occupe(): boolean { return this.snap.panneau !== null; }
   /** Le tutoriel d'une responsabilité fige le match derrière sa carte. */
-  get fige(): boolean { return !!this.tuto; }
+  private attenteVisee = false;
+  get fige(): boolean { return !!this.tuto || this.attenteVisee; }
   get zoneOuverte(): boolean { return this.zone && !this.tuto; }
 
   private dire(cle: string, maintenant: number): void { this.retour = { cle, n: ++this.nRetour, jusqua: maintenant + 1600 }; }
@@ -172,6 +173,7 @@ export class PiloteResp {
   surImage(e: EtatMatch, scene: Scene3D, moi: Pion, ent: EntreesResp): boolean {
     const r = e.responsabilites;
     const a = r?.attente ?? null;
+    this.attenteVisee = a?.type === 'engagement' || a?.type === 'tir' && !e.tir?.visee;
     if (this.conseil && ent.maintenant > this.conseilJusqua) this.conseil = null;
     if (this.retour && ent.maintenant > this.retour.jusqua) this.retour = null;
     // Le dernier choix d'un capitaine IA : un bandeau, même quand rien n'attend.
