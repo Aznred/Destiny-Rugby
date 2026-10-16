@@ -341,13 +341,15 @@ function BlocSelections({
   return (
     <div className="carte bloc-competition">
       <div className="comp-tete">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
           <span className="comp-emoji">{emoji}</span>
           <b>{titre}</b>
         </div>
-        <span className="comp-count">{selections.length} {t('ch.selections')}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', flexWrap: 'wrap' }}>
+          {note && <span className="comp-badge-note">{note}</span>}
+          <span className="comp-count">{selections.length} {t('ch.selections')}</span>
+        </div>
       </div>
-      <div className="comp-note">ℹ️ {note}</div>
 
       <div className="grille-clubs">
         {selections.map((sel) => (

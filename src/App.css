@@ -2429,7 +2429,7 @@
 }
 
 /* ====== CHAMPIONNATS / CLUBS ====== */
-.championnats { width: min(1100px, 92vw); margin: 2rem auto 4rem; }
+.championnats { width: min(1100px, 92vw); margin: 1.5rem auto 7rem; padding-bottom: 2rem; }
 .championnats h1 { font-family: var(--police-titre); text-transform: uppercase; font-size: clamp(1.8rem, 5vw, 3rem); }
 .onglets { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.4rem; }
 .onglets button {
