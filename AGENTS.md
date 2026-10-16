@@ -433,6 +433,15 @@ Monde, Histoire.
 
 **Invariants du mode manager** (détail dans `JOURNAL.md`) :
 
+- **Ne préparer les bancs et leurs objectifs que si leur liste est visible.** Leur calcul caché bloquait chaque
+  rendu pendant environ 17 s. `poulesDe` mémorise les regroupements par composition de division et sources de
+  coordonnées, et rend des copies. Les contrats actifs sont indexés par identité ; `effectifsNationaux` partage
+  un seul parcours des clubs entre les convocations du même calcul, sans conserver le grand vivier.
+  Le registre des jeunes ne se réinstalle que si `mondeJeunes` change. `prochainesAffichesManager` ne projette pas
+  les futures qualifications. Banc : `scripts/verifierFluiditeManager.ts` ; aperçu :
+  `/scripts/apercuFluiditeManager.html`. Mesures locales ordinateur/mobile : bureau 55–74 ms, première semaine
+  0,8–1 s, suivante 64–69 ms. Ce ne sont pas des mesures sur un téléphone physique.
+
 - **Ne pas régénérer le monde au rendu.** Les 833 clubs ne s'initialisent qu'à
   la création ou à la migration.
 - **Une absence doit atteindre le moteur ET les statistiques.** Un convoqué ou

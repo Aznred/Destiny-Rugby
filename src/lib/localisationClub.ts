@@ -20,6 +20,10 @@ let historiquesLocales: RivaliteHistorique[] = [];
 export function appliquerLocalisations(clubs: Record<string, LocalisationClub>, rivalites: RivaliteHistorique[] = []) {
   editionsLocales = clubs; historiquesLocales = rivalites;
 }
+/** Révisions immuables utilisées pour invalider les regroupements géographiques. */
+export function sourcesLocalisationsClubs() {
+  return [editionsLocales, catalogueAdmin().clubs] as const;
+}
 export function enrichirClub(c: Club, pays?: string): Club {
   const enrichi = { ...c, pays: c.pays ?? pays, region: c.region ?? c.ligue,
     ...(c.structureId ? SOURCES_FFR[c.structureId] : {}), ...officielles.get(cleClub(c.nom)) };

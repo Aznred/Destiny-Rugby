@@ -1,9 +1,33 @@
 import type { Manager } from '../types.js';
 import {
-  championnatEnDirect, journeesALaSemaine, nombreJournees, resultatJoue,
+  championnatEnDirect, estJourneeDe, journeesALaSemaine, nombreJournees, resultatJoue,
   type EtatChampionnat,
 } from './championnat.js';
-import { matchDuClubSemaine, type CarriereDeClub } from './matchLive.js';
+import { matchDuClubSemaine, type CarriereDeClub, type AfficheComplete } from './matchLive.js';
+import { CALENDRIER } from '../data/calendrier.js';
+import { afficheSure } from './clotureSaison.js';
+
+/** Les rendez-vous connus : les tours futurs attendent leurs qualifications. */
+export function prochainesAffichesManager(manager: Manager): { semaine: number; affiche: AfficheComplete }[] {
+  if (!manager.club) return [];
+  const visibles: { semaine: number; affiche: AfficheComplete }[] = [];
+  let prochaineCoupe: (typeof visibles)[number] | undefined;
+  let datesCoupe = 0;
+  for (const date of CALENDRIER) {
+    if (date.type === 'coupe') datesCoupe++;
+    if (date.numero < manager.semaine) continue;
+    if (date.numero > manager.semaine && !estJourneeDe(manager.division, date)
+      && !(date.type === 'coupe' && datesCoupe <= 4)) continue;
+    const affiche = afficheSure({ ...manager, semaine: date.numero }).affiche;
+    if (!affiche || manager.resultats[affiche.cle]) continue;
+    const rencontre = { semaine: date.numero, affiche };
+    if (visibles.length < 4) visibles.push(rencontre);
+    if (!prochaineCoupe && affiche.nature === 'coupe') prochaineCoupe = rencontre;
+    if (visibles.length >= 4 && prochaineCoupe) break;
+  }
+  if (prochaineCoupe && !visibles.includes(prochaineCoupe)) visibles.push(prochaineCoupe);
+  return visibles;
+}
 
 /**
  * COMBIEN DE JOURNÉES LE CLASSEMENT DOIT COMPTER, POUR UNE CARRIÈRE DONNÉE.

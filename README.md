@@ -1,5 +1,14 @@
 # Destiny Rugby 🏉
 
+- **Fluidité de la carrière entraîneur (16 octobre 2026)** : les bancs et leurs objectifs se préparent uniquement
+  quand leur liste est affichée ; les poules géographiques sont réutilisées jusqu'à un changement de clubs ou de
+  coordonnées. Les contrats sont indexés par identité et les convocations partagent un seul parcours des effectifs.
+  Une consigne ne réinstalle plus le vivier entier. Le bureau annonce les rendez-vous connus sans calculer les
+  qualifications futures. Vérification locale ordinateur et format mobile : bureau 55–74 ms, première semaine
+  0,8–1 s puis 64–69 ms ; les objectifs de tous les bancs coûtaient auparavant environ 17 s à chaque rendu.
+  Banc : `node --loader ./scripts/chargeurTests36.mjs scripts/verifierFluiditeManager.ts` ; aperçu sans sauvegarde :
+  `/scripts/apercuFluiditeManager.html`.
+
 - **Correctif 40 — jeu au pied, caméra d'équipe, fiches des joueuses** : un coup de pied est une seule action (un
   armé, un contact) : le botteur tape sur sa course au lieu de revenir où il a appuyé, en 0,30 s pour un rasant ou un petit
   par-dessus, 0,45 s pour un dégagement, 0,60 s pour un drop (1,65 à 1,80 s et deux gestes auparavant, en course). À l'image,

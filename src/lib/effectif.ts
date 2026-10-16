@@ -901,11 +901,18 @@ interface ContratEffectifManager {
 }
 let CLUB_MANAGER = '';
 let CONTRATS_MANAGER: ContratEffectifManager[] = [];
+const cacheContratsActifs = new Map<number, {
+  actifs: ContratEffectifManager[];
+  ids: Set<string>;
+  sources: Set<string>;
+  noms: Set<string>;
+}>();
 
 /** Le contrat de la partie commande l'effectif ; les ventes explicites passent ensuite. */
 export function setContratsEffectifManager(club = '', contrats?: Record<string, ContratEffectifManager>): void {
   CLUB_MANAGER = club;
   CONTRATS_MANAGER = Object.values(contrats ?? {}).filter(c => c.club === club);
+  cacheContratsActifs.clear();
   cacheForce.clear();
   cacheReference.clear();
 }
@@ -916,9 +923,21 @@ function appliquerContratsManager(club: string, saison: number, liste: Coequipie
     || j.id.endsWith(`-transfert-${c.joueurId}`)
     || (!!j.sourcePlayerId && j.sourcePlayerId === c.profil?.joueur.sourcePlayerId)
     || normaliser(j.nom) === normaliser(c.nom);
-  const actifs = CONTRATS_MANAGER.filter(c => c.fin > saison);
+  let index = cacheContratsActifs.get(saison);
+  if (!index) {
+    const actifs = CONTRATS_MANAGER.filter(c => c.fin > saison);
+    index = { actifs, ids: new Set(actifs.map(c => c.joueurId)),
+      sources: new Set(actifs.flatMap(c => c.profil?.joueur.sourcePlayerId ? [c.profil.joueur.sourcePlayerId] : [])),
+      noms: new Set(actifs.map(c => normaliser(c.nom))) };
+    cacheContratsActifs.set(saison, index);
+  }
+  const { actifs, ids, sources, noms } = index;
   if (club !== CLUB_MANAGER) {
-    return liste.filter(j => !actifs.some(c => correspond(j, c)));
+    // Les identités se préparent une fois : normaliser chaque nom pour chaque
+    // contrat, dans tous les clubs puis pour chaque sélection, figeait la semaine.
+    return liste.filter(j => !(ids.has(j.id) || (j.sourcePlayerId && sources.has(j.sourcePlayerId))
+      || noms.has(normaliser(j.nom))
+      || (j.id.includes('-transfert-') && actifs.some(c => j.id.endsWith(`-transfert-${c.joueurId}`)))));
   }
   let sortie = liste.filter(j => !CONTRATS_MANAGER.some(c => c.fin <= saison && correspond(j, c)));
   for (const c of actifs) {

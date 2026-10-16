@@ -15,7 +15,7 @@ import type {
 import { approcheAGenerer } from './approchesClubs.js';
 import { graine, enregistrerResultatJoue, type MatchChampionnat } from './championnat.js';
 import { fenetresDeNation, finDeRassemblement, type RassemblementInternational } from './rassemblements.js';
-import { effectifNational, matchInternationalDuJoueur } from './international.js';
+import { effectifsNationaux, matchInternationalDuJoueur } from './international.js';
 import { libelleDate, semaine as dateSemaine, SEMAINES_PAR_SAISON } from '../data/calendrier.js';
 import type { Coequipier } from './effectif.js';
 import { forceEffectif } from './effectif.js';
@@ -1084,11 +1084,15 @@ export function apresResultatCarriereAvancee(
 export function actualiserConvocationsClub(m: Manager, effectif: Coequipier[], numero: number, precedentes: ConvocationClub[]): ConvocationClub[] {
   const convocations = precedentes.map((c) => c.rassemblement
     ? { ...c, fin: finDeRassemblement(c.rassemblement, numero) } : c).filter((c) => c.fin >= numero);
-  for (const nation of new Set(effectif.map((j) => nomNation(j.nation)))) {
-    const groupe = effectifNational(nation, m.saison);
+  const rassemblements = [...new Set(effectif.map(j => nomNation(j.nation)))].map(nation => ({ nation,
+    camps: fenetresDeNation(nation, m.saison)
+      .filter(camp => camp.annonce <= numero && finDeRassemblement(camp, numero) >= numero),
+  })).filter(r => r.camps.length > 0);
+  const groupes = effectifsNationaux(rassemblements.map(r => r.nation), m.saison);
+  for (const { nation, camps } of rassemblements) {
+    const groupe = groupes.get(nation)!;
     const noms = new Set(groupe.map((j) => j.nom));
-    for (const camp of fenetresDeNation(nation, m.saison)) {
-      if (camp.annonce > numero || finDeRassemblement(camp, numero) < numero) continue;
+    for (const camp of camps) {
       for (const j of effectif.filter((p) => noms.has(p.nom))) {
         const id = camp.id + '#' + j.id;
         if (convocations.some((c) => c.id === id)) continue;

@@ -698,8 +698,28 @@ export function matchInternationalDuJoueur(
 // championnat.
 const cacheSelections = new Map<string, Coequipier[]>();
 const CLUBS_SELECTION = [...new Set(COMPETITIONS.flatMap((competition) => competition.clubs.map((club) => club.nom)))];
+/** Un seul parcours des clubs, partagé par les convocations d'une même semaine. */
+function viviersNationaux(saison: number): Map<string, Coequipier[]> {
+  const nations = new Map<string, Coequipier[]>();
+  for (const club of CLUBS_SELECTION) {
+    for (const joueur of effectifDuClub(club, saison)) {
+      const nation = nomNation(joueur.nation);
+      const joueurs = nations.get(nation) ?? [];
+      joueurs.push(joueur);
+      nations.set(nation, joueurs);
+    }
+  }
+  return nations;
+}
 
-export function effectifNational(nation: string, saison: number): Coequipier[] {
+/** Le grand vivier reste local au calcul ; seuls les groupes de 34 sont gardés. */
+export function effectifsNationaux(nations: string[], saison: number): Map<string, Coequipier[]> {
+  const manque = nations.some(n => !cacheSelections.has(`${nomNation(n)}#${saison}#${versionJoueurIncarne()}`));
+  const viviers = manque ? viviersNationaux(saison) : undefined;
+  return new Map(nations.map(n => [n, effectifNational(n, saison, viviers)]));
+}
+
+export function effectifNational(nation: string, saison: number, viviers?: ReadonlyMap<string, readonly Coequipier[]>): Coequipier[] {
   const nom = nomNation(nation);
   // ⚠️ LA VERSION DU JOUEUR INCARNÉ EST DANS LA CLÉ (Correctif 19) : le vivier national se compose depuis les effectifs de club.
   const cle = nom + '#' + saison + '#' + versionJoueurIncarne();
@@ -710,6 +730,7 @@ export function effectifNational(nation: string, saison: number): Coequipier[] {
   // borné à 20 ans : ce sont bien les meilleurs joueurs U20 du pays.
   const u20 = estEquipeU20(nom);
   const paysSource = u20 ? nationDeLEquipeU20(nom) : nom;
+  const sources = (viviers ?? viviersNationaux(saison)).get(paysSource) ?? [];
 
   // Le vivier parcourt les effectifs réellement utilisés par le jeu : bases
   // historiques, nouvelles ligues (dont la Premier League russe), mercato et
@@ -719,27 +740,23 @@ export function effectifNational(nation: string, saison: number): Coequipier[] {
   const construire = (ageMax: number): Coequipier[] => {
     const liste: Coequipier[] = [];
     const dejaPris = new Set<string>();
-    for (const club of CLUBS_SELECTION) {
-      const effectif = effectifDuClub(club, saison);
-      for (const joueur of effectif) {
-        if (nomNation(joueur.nation) !== paysSource) continue;
-        if (joueur.age > ageMax) continue;
-        // Un joueur peut être retrouvé après un transfert : on ne le convoque
-        // qu'une fois, et on conserve la version la mieux notée.
-        const identite = joueur.nom.toLocaleLowerCase('fr');
-        if (dejaPris.has(identite)) continue;
-        dejaPris.add(identite);
-        liste.push({
-          id: `${nom}-${joueur.id}`,
-          nom: joueur.nom,
-          poste: joueur.poste,
-          age: u20 ? Math.min(20, joueur.age) : joueur.age,
-          note: joueur.note,
-          potentiel: joueur.potentiel,
-          nation: joueur.nation,
-          regen: joueur.regen,
-        });
-      }
+    for (const joueur of sources) {
+      if (joueur.age > ageMax) continue;
+      // Un joueur peut être retrouvé après un transfert : on ne le convoque
+      // qu'une fois, et on conserve la version la mieux notée.
+      const identite = joueur.nom.toLocaleLowerCase('fr');
+      if (dejaPris.has(identite)) continue;
+      dejaPris.add(identite);
+      liste.push({
+        id: `${nom}-${joueur.id}`,
+        nom: joueur.nom,
+        poste: joueur.poste,
+        age: u20 ? Math.min(20, joueur.age) : joueur.age,
+        note: joueur.note,
+        potentiel: joueur.potentiel,
+        nation: joueur.nation,
+        regen: joueur.regen,
+      });
     }
     return liste;
   };

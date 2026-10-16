@@ -15,6 +15,7 @@ import { clubsDeDivision } from './divisions.js';
 import { CALENDRIER, NB_JOURNEES, type Semaine, type TypeSemaine } from '../data/calendrier.js';
 import { clubParNom } from '../data/clubs.js';
 import { CHAMPIONNATS_FEMININS } from '../data/mondeFeminin.generated.js';
+import { sourcesLocalisationsClubs } from './localisationClub.js';
 
 export interface MatchChampionnat {
   domicile: string;
@@ -229,8 +230,24 @@ function rattacherPetitesPoules(poulesInitiales: string[][]): string[][] {
 // d'un fichier. En régionale, chaque ligue est traitée séparément ; seuls les
 // groupes isolés de trois clubs ou moins rejoignent la poule jouable la plus
 // proche.
+const cachePoules = new Map<string, {
+  noms: string[];
+  localisations: ReturnType<typeof sourcesLocalisationsClubs>;
+  poules: string[][];
+}>();
 export function poulesDe(divisionId: string): string[][] {
   const noms = clubsDeDivision(divisionId);
+  const localisations = sourcesLocalisationsClubs();
+  const connue = cachePoules.get(divisionId);
+  if (connue?.noms === noms && connue.localisations.every((s, i) => s === localisations[i])) {
+    return connue.poules.map(p => [...p]);
+  }
+  const poules = calculerPoules(divisionId, noms);
+  cachePoules.set(divisionId, { noms, localisations, poules });
+  // Les appelants peuvent trier leur copie sans modifier le calendrier partagé.
+  return poules.map(p => [...p]);
+}
+function calculerPoules(divisionId: string, noms: string[]): string[][] {
   if (!noms.length) return [];
   if (noms.length <= TAILLE_POULE_MAX) return [noms];
   if (estAmateur(divisionId)) {

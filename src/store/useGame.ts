@@ -8285,8 +8285,12 @@ if (import.meta.env.DEV) (globalThis as { __clotureSaison?: unknown }).__cloture
  */
 useGame.subscribe((etat) => ecrireCompte(etat as unknown as Record<string, unknown>));
 useGame.subscribe((etat, avant) => {
-  if (etat.manager !== avant.manager) {
+  if (etat.manager?.club !== avant.manager?.club
+    || etat.manager?.avancee?.contratsJoueurs !== avant.manager?.avancee?.contratsJoueurs) {
     setContratsEffectifManager(etat.manager?.club, etat.manager?.avancee?.contratsJoueurs);
+  }
+  // Une consigne ou une composition ne change pas les 130 000 identités du vivier.
+  if (etat.manager?.mondeJeunes !== avant.manager?.mondeJeunes) {
     installerEffectifsJeunes(etat.manager);
   }
   if (etat.manager?.mondeJeunes && etat.manager.usageId !== avant.manager?.usageId) {

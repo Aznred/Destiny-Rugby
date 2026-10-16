@@ -17,7 +17,7 @@ import { COMPETITIONS, clubParNom } from '../data/clubs';
 import { effectifDuClub, forceEffectif } from '../lib/effectif';
 import { noter } from '../lib/tutoriel/guide';
 import { useCatalogueSolo } from '../lib/catalogueSoloCommun';
-import { classementManagerEnDirect } from '../lib/tableauManager';
+import { classementManagerEnDirect, prochainesAffichesManager } from '../lib/tableauManager';
 import { semaine, libelleDate, libelleSemaine, SEMAINES_PAR_SAISON } from '../data/calendrier';
 import { CalendrierManager } from '../components/CalendrierManager';
 import { TresorerieManager } from '../components/TresorerieManager';
@@ -124,8 +124,12 @@ function initiales(nom: string): string {
 }
 
 export function Manager() {
-  const catalogue = useCatalogueSolo();
   const manager = useGame((s) => s.manager);
+  return manager ? <BureauManager manager={manager} /> : null;
+}
+
+function BureauManager({ manager }: { manager: NonNullable<ReturnType<typeof useGame.getState>['manager']> }) {
+  const catalogue = useCatalogueSolo();
   const setEcran = useGame((s) => s.setEcran);
   const semaineManager = useGame((s) => s.semaineManager);
   const avancerJusquaManager = useGame((s) => s.avancerJusquaManager);
@@ -184,7 +188,7 @@ export function Manager() {
   const placesEntrainement = PLACES_ENTRAINEMENT[Math.min(murs.entrainement, NIVEAU_INSTALLATION_MAX)];
   const rapportsFrais = manager?.rapports?.filter((r) => r.saison >= (manager.saison ?? 0)).length ?? 0;
   // La masse déjà engagée : c'est elle qui bloque une signature, pas le solde.
-  const salaires = manager?.club ? situationSalariale(manager) : null;
+  const salaires = useMemo(() => manager?.club ? situationSalariale(manager) : null, [manager, catalogue]);
   const masseEngagee = salaires?.engagee ?? 0;
   const masseSaturee = !!salaires && masseEngagee >= salaires.plafond * 0.92;
   const [raccrocher, setRaccrocher] = useState(false);
@@ -227,9 +231,10 @@ export function Manager() {
   const saison = manager?.saison ?? 1;
   const prestige = manager?.prestige ?? 0;
   const libre = manager?.libre ?? false;
+  const besoinBancs = !!manager && (!manager.club || vue === 'direction');
   const bancsLibres = useMemo(
-    () => clubsAccessibles(prestige, saison, { triche: libre, limite: libre ? undefined : 60 }),
-    [prestige, saison, libre],
+    () => besoinBancs ? clubsAccessibles(prestige, saison, { triche: libre, limite: libre ? undefined : 60 }) : [],
+    [besoinBancs, prestige, saison, libre, catalogue, manager?.avancee?.contratsJoueurs, manager?.mondeJeunes],
   );
   const classement = useMemo(() => {
     if (!manager) return null;
@@ -287,18 +292,10 @@ export function Manager() {
     () => manager ? afficheSure(manager).affiche : null,
     [manager],
   );
-  const prochainesAffiches = useMemo(() => {
-    if (!manager?.club) return [];
-    const suite: { semaine: number; affiche: AfficheComplete }[] = [];
-    for (let numero = manager.semaine; numero <= SEMAINES_PAR_SAISON; numero++) {
-      const affiche = afficheSure({ ...manager, semaine: numero }).affiche;
-      if (affiche && !manager.resultats[affiche.cle]) suite.push({ semaine: numero, affiche });
-    }
-    const visibles = suite.slice(0, 4);
-    const prochaineCoupe = suite.find(({ affiche }) => affiche.nature === 'coupe');
-    if (prochaineCoupe && !visibles.some(({ affiche }) => affiche.cle === prochaineCoupe.affiche.cle)) visibles.push(prochaineCoupe);
-    return visibles;
-  }, [manager]);
+  const prochainesAffiches = useMemo(
+    () => manager && vue === 'bureau' ? prochainesAffichesManager(manager) : [],
+    [manager, vue, catalogue],
+  );
   /**
    * ⚠️ ON AVANCE JUSQU'AU PROCHAIN RENDEZ-VOUS, PAS D'UN NOMBRE DE SEMAINES.
    * Un « +4 semaines » forcerait à compter soi-même où tombe le prochain match,
@@ -422,8 +419,6 @@ export function Manager() {
       avancee.profilsMedicaux[j.id], j, avancee.chargeEntrainement, 'match', intensite,
     ) * (1 - centreMedical(manager).prevention * .35)]));
   }, [avancee, effectifBrut, manager]);
-
-  if (!manager) return null;
 
   const sansBanc = !manager.club;
   // ⚠️ STRICTEMENT SUPÉRIEUR : on entraîne JUSQU'À `ageManagerMax` inclus. À
@@ -551,7 +546,7 @@ export function Manager() {
     definirTactique({ ...manager.tactique, [cle]: valeur });
   };
 
-  const optionsBancs: OptionSelecteur[] = bancsLibres.map((c) => ({
+  const optionsBancs: OptionSelecteur[] = useMemo(() => bancsLibres.map((c) => ({
     valeur: c.club.nom,
     label: c.club.nom,
     recherche: c.club.ville ?? '',
@@ -560,7 +555,7 @@ export function Manager() {
       salaire: nombre(salaireManager(c.force)),
     }),
     vignette: <Blason club={c.club} taille={22} />,
-  }));
+  })), [bancsLibres]);
   const optionsDivisions: OptionSelecteur[] = COMPETITIONS.map((c) => ({
     valeur: c.id, label: c.nom, sous: `${c.pays} · ${c.clubs.length} ${t('mgr.clubs')}`,
     vignette: <LogoCompet id={c.id} taille={22} />,
