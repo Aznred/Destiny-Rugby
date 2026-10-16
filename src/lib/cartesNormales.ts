@@ -18,14 +18,14 @@ export interface PropositionClub {
   joueurs: SaisieCarteNormale[];
 }
 export interface DemandeCarte {
-  id: string; type: 'creation' | 'correction' | 'club'; sourceId?: string;
+  id: string; type: 'creation' | 'correction' | 'club' | 'retrait'; sourceId?: string;
   carte: SaisieCarteNormale; clubPropose?: PropositionClub; message: string;
   statut: 'attente' | 'acceptee' | 'refusee'; revision: number;
   creeLe: string; decideLe?: string; reponse?: string; pseudo?: string; photoProposee?: boolean;
   droitsCertifies?: boolean;
 }
 export interface SaisieDemandeCarte {
-  type: 'creation' | 'correction' | 'club';
+  type: 'creation' | 'correction' | 'club' | 'retrait';
   sourceId?: string;
   carte: SaisieCarteNormale;
   clubPropose?: PropositionClub;
@@ -101,9 +101,14 @@ export function validerClubPropose(brut: unknown): PropositionClub {
 }
 
 export function validerDemandeCarte(brut: Record<string, unknown>): SaisieDemandeCarte {
-  if (brut.type !== 'creation' && brut.type !== 'correction' && brut.type !== 'club') throw new Error('Type de demande invalide.');
-  if (brut.droitsCertifies === false) throw new Error("Tu dois certifier avoir les droits d'utilisation de l'image postée ou des images postées.");
-  const sourceId = brut.type === 'correction' ? texte(brut.sourceId, 250, 'Carte à corriger') : undefined;
+  if (brut.type !== 'creation' && brut.type !== 'correction' && brut.type !== 'club' && brut.type !== 'retrait') throw new Error('Type de demande invalide.');
+  if (brut.droitsCertifies === false) {
+    if (brut.type === 'retrait') throw new Error("Tu dois certifier sur l'honneur ta demande de retrait de carte.");
+    throw new Error("Tu dois certifier avoir les droits d'utilisation de l'image postée ou des images postées.");
+  }
+  const sourceId = (brut.type === 'correction' || brut.type === 'retrait')
+    ? texte(brut.sourceId, 250, brut.type === 'retrait' ? 'Carte à retirer' : 'Carte à corriger')
+    : undefined;
   let clubPropose: PropositionClub | undefined;
   let carte: SaisieCarteNormale;
 
@@ -122,6 +127,39 @@ export function validerDemandeCarte(brut: Record<string, unknown>): SaisieDemand
         clubReel: clubPropose.nom,
         championnat: clubPropose.division,
         pays: clubPropose.pays || 'France',
+        gender: 'male',
+      };
+    }
+  } else if (brut.type === 'retrait') {
+    if (brut.carte && typeof brut.carte === 'object') {
+      try {
+        carte = validerCarteNormale(brut.carte);
+      } catch {
+        const c = brut.carte as Record<string, unknown>;
+        carte = {
+          nom: typeof c.nom === 'string' && c.nom.trim() ? c.nom.trim().slice(0, 80) : 'Joueur à retirer',
+          poste: 'demi_ouverture',
+          note: typeof c.note === 'number' ? c.note : 50,
+          potentiel: 50,
+          age: 25,
+          nation: 'France',
+          clubReel: typeof c.clubReel === 'string' ? c.clubReel.slice(0, 80) : '',
+          championnat: typeof c.championnat === 'string' ? c.championnat.slice(0, 80) : '',
+          pays: 'France',
+          gender: 'male',
+        };
+      }
+    } else {
+      carte = {
+        nom: 'Joueur à retirer',
+        poste: 'demi_ouverture',
+        note: 50,
+        potentiel: 50,
+        age: 25,
+        nation: 'France',
+        clubReel: '',
+        championnat: '',
+        pays: 'France',
         gender: 'male',
       };
     }

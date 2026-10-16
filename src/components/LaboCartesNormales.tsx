@@ -8,7 +8,7 @@ import { Blason } from './Blason';
 interface Vue { demandes: DemandeCarte[]; cartes: SourceCarte[]; revisionCatalogue: number }
 
 type FiltreStatut = 'attente' | 'acceptee' | 'refusee' | 'toutes';
-type FiltreType = 'tous' | 'joueur' | 'club';
+type FiltreType = 'tous' | 'joueur' | 'club' | 'retrait';
 
 export function LaboCartesNormales({ demandesSeulement = false }: { demandesSeulement?: boolean }) {
   const [vue, setVue] = useState<Vue>();
@@ -85,11 +85,11 @@ export function LaboCartesNormales({ demandesSeulement = false }: { demandesSeul
           id: selection.id,
           revision: selection.revision,
           revisionCatalogue: vue.revisionCatalogue,
-          ...(operation === 'refuser' ? { reponse } : { carte: validerCarteNormale(carte) }),
+          ...(operation === 'refuser' ? { reponse } : selection.type === 'retrait' ? {} : { carte: validerCarteNormale(carte) }),
         });
         setMessage(
           operation === 'approuver'
-            ? 'Demande validée et publiée.'
+            ? (selection.type === 'retrait' ? 'Carte retirée du jeu.' : 'Demande validée et publiée.')
             : operation === 'refuser'
             ? 'Demande refusée.'
             : 'Proposition modifiée.'
@@ -123,7 +123,8 @@ export function LaboCartesNormales({ demandesSeulement = false }: { demandesSeul
     return demandes.filter(d => {
       if (filtreStatut !== 'toutes' && d.statut !== filtreStatut) return false;
       if (filtreType === 'club' && d.type !== 'club') return false;
-      if (filtreType === 'joueur' && d.type === 'club') return false;
+      if (filtreType === 'joueur' && (d.type === 'club' || d.type === 'retrait')) return false;
+      if (filtreType === 'retrait' && d.type !== 'retrait') return false;
       if (filtreRecherche.trim()) {
         const terme = filtreRecherche.toLowerCase().trim();
         const nom = (d.clubPropose ? d.clubPropose.nom : d.carte.nom).toLowerCase();
@@ -279,6 +280,13 @@ export function LaboCartesNormales({ demandesSeulement = false }: { demandesSeul
               >
                 Clubs
               </button>
+              <button
+                type="button"
+                className={filtreType === 'retrait' ? 'actif' : ''}
+                onClick={() => setFiltreType('retrait')}
+              >
+                Retraits
+              </button>
             </div>
           </div>
 
@@ -306,9 +314,14 @@ export function LaboCartesNormales({ demandesSeulement = false }: { demandesSeul
                   </div>
                   <div className="cn-demande-item-meta">
                     <span>Par <b>{d.pseudo ?? 'Anonyme'}</b></span>
-                    <span>· {d.type === 'club' ? 'Nouveau Club' : d.type === 'creation' ? 'Création joueur' : 'Correction'}</span>
+                    <span>· {d.type === 'club' ? 'Nouveau Club' : d.type === 'creation' ? 'Création joueur' : d.type === 'retrait' ? 'Demande de retrait' : 'Correction'}</span>
                     <span>· {dateTxt}</span>
                     <div className="cn-demande-item-pastilles">
+                      {d.type === 'retrait' && (
+                        <span className="cn-pastille-tag" style={{ background: 'rgba(239, 68, 68, 0.2)', color: '#fca5a5' }}>
+                          🚫 Retrait
+                        </span>
+                      )}
                       {d.photoProposee && <span className="cn-pastille-tag tag-image">📷 Photo</span>}
                       {d.droitsCertifies !== false && <span className="cn-pastille-tag tag-droits">⚖️ Droits</span>}
                     </div>
@@ -389,12 +402,38 @@ export function LaboCartesNormales({ demandesSeulement = false }: { demandesSeul
             </div>
           )}
 
-          <FormulaireCarteNormale
-            carte={carte}
-            changer={setCarte}
-            occupe={occupe || (!!selection && selection.statut !== 'attente')}
-            onPreparation={setOccupe}
-          />
+          {selection?.type === 'retrait' ? (
+            <div style={{ background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.35)', borderRadius: '12px', padding: '1.25rem', display: 'grid', gap: '0.8rem', margin: '1rem 0' }}>
+              <h4 style={{ margin: 0, color: '#f87171', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                ⚠️ Demande de retrait / suppression de carte du jeu
+              </h4>
+              <p style={{ margin: 0 }}>
+                Le licencié ou représentant demande le <b>retrait définitif</b> de cette carte de Destiny Rugby.
+              </p>
+              <div style={{ background: 'rgba(0,0,0,0.3)', padding: '0.75rem 1rem', borderRadius: '8px' }}>
+                <p style={{ margin: 0, fontWeight: 700, color: '#fff', fontSize: '1.05rem' }}>{selection.carte.nom}</p>
+                <small style={{ color: 'rgba(255,255,255,0.7)' }}>
+                  {selection.carte.clubReel} · {selection.carte.championnat} · {selection.carte.note} GEN
+                </small>
+              </div>
+              {selection.message && (
+                <div style={{ background: 'rgba(0,0,0,0.25)', padding: '0.65rem 0.85rem', borderRadius: '8px' }}>
+                  <b style={{ color: 'var(--or, #d5b56d)', fontSize: '0.85rem' }}>Motif invoqué par le demandeur :</b>
+                  <p style={{ margin: '0.2rem 0', fontStyle: 'italic', color: '#fff' }}>&laquo; {selection.message} &raquo;</p>
+                </div>
+              )}
+              <p style={{ margin: 0, fontSize: '0.85rem', opacity: 0.85 }}>
+                En validant cette demande, la carte sera immédiatement ajoutée à la table des retraits officiels (retirée du catalogue, des packs et du marché).
+              </p>
+            </div>
+          ) : (
+            <FormulaireCarteNormale
+              carte={carte}
+              changer={setCarte}
+              occupe={occupe || (!!selection && selection.statut !== 'attente')}
+              onPreparation={setOccupe}
+            />
+          )}
 
           {!selection ? (
             <button className="btn primaire" disabled={occupe}>
@@ -412,17 +451,19 @@ export function LaboCartesNormales({ demandesSeulement = false }: { demandesSeul
                 />
               </label>
               <div className="cn-actions">
-                <button className="btn primaire" disabled={occupe}>
-                  Valider et publier la carte
+                <button className={`btn ${selection.type === 'retrait' ? 'ak-supprimer' : 'primaire'}`} disabled={occupe}>
+                  {selection.type === 'retrait' ? 'Valider le retrait de la carte' : 'Valider et publier la carte'}
                 </button>
-                <button
-                  type="button"
-                  className="btn fantome"
-                  disabled={occupe}
-                  onClick={() => void agir('modifier')}
-                >
-                  Enregistrer les modifications
-                </button>
+                {selection.type !== 'retrait' && (
+                  <button
+                    type="button"
+                    className="btn fantome"
+                    disabled={occupe}
+                    onClick={() => void agir('modifier')}
+                  >
+                    Enregistrer les modifications
+                  </button>
+                )}
                 <button
                   type="button"
                   className="btn fantome"

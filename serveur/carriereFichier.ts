@@ -214,6 +214,12 @@ export function stockageFichier(fichier: string): StockageCarriere {
         if (!d) return false;
         d.statut = 'refusee'; d.revision++; d.reponse = reponse; d.decideLe = new Date().toISOString(); sauver(); return true;
       },
+      async annuler(id, compte) {
+        const idx = base.demandesCartes?.findIndex(d => d.id === id && d.compte === compte && d.statut === 'attente') ?? -1;
+        if (idx === -1) return false;
+        base.demandesCartes?.splice(idx, 1);
+        sauver(); return true;
+      },
       async approuver(id, revision, config, revisionCatalogue, carte) {
         const d = base.demandesCartes?.find(d => d.id === id && d.revision === revision && d.statut === 'attente');
         if (!d || (base.atelier?.revision ?? 0) !== revisionCatalogue) return false;

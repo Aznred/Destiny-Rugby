@@ -8,6 +8,7 @@ export interface StockageDemandesCartes {
   lire(id: string, compte: string | null): Promise<DemandeCarte | null>;
   modifier(id: string, revision: number, carte: SaisieCarteNormale): Promise<boolean>;
   refuser(id: string, revision: number, reponse: string, par: string): Promise<boolean>;
+  annuler(id: string, compte: string): Promise<boolean>;
   /** L'approbation et le catalogue sont inscrits ensemble, avec leurs deux révisions. */
   approuver(id: string, revision: number, config: CatalogueAdmin, revisionCatalogue: number, carte: SaisieCarteNormale, par: string): Promise<boolean>;
 }
@@ -29,10 +30,16 @@ export function demandesCartesSql(sql: ExecuterSql): StockageDemandesCartes {
   const preparer = async () => {
     preparation ??= (async () => {
       await sql`create table if not exists demandes_cartes (
-        id uuid primary key, compte uuid not null references comptes(id), type text not null check(type in ('creation','correction','club')),
+        id uuid primary key, compte uuid not null references comptes(id), type text not null check(type in ('creation','correction','club','retrait')),
         source_id text, carte jsonb not null, message text not null default '', statut text not null default 'attente' check(statut in ('attente','acceptee','refusee')),
         revision integer not null default 0, place integer not null check(place between 1 and 5), cree_le timestamptz not null default now(),
         decide_le timestamptz, decide_par text, reponse text)`;
+      try {
+        await sql`alter table demandes_cartes drop constraint if exists demandes_cartes_type_check`;
+        await sql`alter table demandes_cartes add constraint demandes_cartes_type_check check(type in ('creation','correction','club','retrait'))`;
+      } catch {
+        /* ignorer si table inexistante ou contrainte déjà à jour */
+      }
       await sql`create unique index if not exists demandes_cartes_places on demandes_cartes(compte, place) where statut='attente'`;
       await sql`alter table demandes_cartes enable row level security`;
     })().catch(e => { preparation = undefined; throw e; });
@@ -67,6 +74,10 @@ export function demandesCartesSql(sql: ExecuterSql): StockageDemandesCartes {
       await preparer();
       return (await sql`update demandes_cartes set statut='refusee',revision=revision+1,reponse=${reponse},decide_le=now(),decide_par=${par}
         where id=${id}::uuid and revision=${revision} and statut='attente' returning id`).length > 0;
+    },
+    async annuler(id, compte) {
+      await preparer();
+      return (await sql`delete from demandes_cartes where id=${id}::uuid and compte=${compte}::uuid and statut='attente' returning id`).length > 0;
     },
     async approuver(id, revision, config, revisionCatalogue, carte, par) {
       await preparer();

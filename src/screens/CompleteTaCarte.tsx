@@ -13,7 +13,7 @@ import {
   type PropositionClub,
   type SaisieCarteNormale,
 } from '../lib/cartesNormales';
-import { rareteCarriere, statistiquesCarte, type SourceCarte } from '../lib/ligue/catalogueCarriere';
+import { carteDepuisSource, rareteCarriere, statistiquesCarte, type SourceCarte } from '../lib/ligue/catalogueCarriere';
 import { POSTE_PAR_ID, POSTES } from '../data/rugby';
 import { preparerPortrait } from '../lib/imagesJoueurs';
 import { useGame } from '../store/useGame';
@@ -52,7 +52,7 @@ const PALETTES_COULEURS = [
 
 export function CompleteTaCarte() {
   const setEcran = useGame((s) => s.setEcran);
-  const [onglet, setOnglet] = useState<'correction' | 'creation' | 'club' | 'mesDemandes'>('correction');
+  const [onglet, setOnglet] = useState<'correction' | 'creation' | 'club' | 'retrait' | 'mesDemandes'>('correction');
   const [filtreMesDemandes, setFiltreMesDemandes] = useState<'toutes' | 'attente' | 'acceptee' | 'refusee'>('toutes');
 
   // État commun
@@ -75,6 +75,14 @@ export function CompleteTaCarte() {
   // Onglet Création de joueur
   const [carteCreation, setCarteCreation] = useState<SaisieCarteNormale>(carteNormaleVide);
   const [messageCreation, setMessageCreation] = useState('');
+
+  // Onglet Retrait de carte
+  const [qRetrait, setQRetrait] = useState('');
+  const [sourcesRetrait, setSourcesRetrait] = useState<SourceCarte[]>([]);
+  const [carteRetraitSelectionnee, setCarteRetraitSelectionnee] = useState<SourceCarte | null>(null);
+  const [motifRetrait, setMotifRetrait] = useState("Droit à l'image / Vie privée");
+  const [detailsRetrait, setDetailsRetrait] = useState('');
+  const [certificationRetrait, setCertificationRetrait] = useState(false);
 
   // Onglet Proposer un club
   const [nomClub, setNomClub] = useState('');
@@ -295,6 +303,81 @@ export function CompleteTaCarte() {
     [nomClub, villeClub, couleur1, couleur2, logoClub],
   );
 
+  // Recherche de carte à retirer
+  const chercherCarteRetrait = async () => {
+    if (!qRetrait.trim()) return;
+    setOccupe(true);
+    setErreur('');
+    try {
+      const rep = await appelCartes<{ cartes: SourceCarte[] }>(undefined, `&q=${encodeURIComponent(qRetrait)}`);
+      setSourcesRetrait(rep.cartes);
+    } catch (e) {
+      setErreur((e as Error).message);
+    } finally {
+      setOccupe(false);
+    }
+  };
+
+  // Soumission d'une demande de retrait
+  const soumettreRetrait = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!carteRetraitSelectionnee) {
+      setErreur('Sélectionne la carte que tu souhaites retirer.');
+      return;
+    }
+    if (!certificationRetrait) {
+      setErreur("Tu dois certifier sur l'honneur ta demande de retrait.");
+      return;
+    }
+    setOccupe(true);
+    setErreur('');
+    setSucces('');
+    const messageFinal = detailsRetrait.trim()
+      ? `${motifRetrait} : ${detailsRetrait.trim()}`
+      : motifRetrait;
+    try {
+      const d = await appelCartes<{ demandes: DemandeCarte[] }>({
+        action: 'demandesCartes',
+        operation: 'soumettre',
+        type: 'retrait',
+        sourceId: carteRetraitSelectionnee.sourceId,
+        carte: saisieDepuisSource(carteRetraitSelectionnee),
+        message: messageFinal,
+        droitsCertifies: true,
+      });
+      setDemandes(d.demandes);
+      setSucces('Ta demande de retrait a été envoyée avec succès au Labo pour validation.');
+      setCarteRetraitSelectionnee(null);
+      setDetailsRetrait('');
+      setCertificationRetrait(false);
+    } catch (err) {
+      setErreur((err as Error).message);
+    } finally {
+      setOccupe(false);
+    }
+  };
+
+  // Annulation d'une demande par son auteur
+  const annulerDemande = async (id: string) => {
+    if (!window.confirm('Es-tu sûr de vouloir retirer / annuler cette proposition ?')) return;
+    setOccupe(true);
+    setErreur('');
+    setSucces('');
+    try {
+      const d = await appelCartes<{ demandes: DemandeCarte[] }>({
+        action: 'demandesCartes',
+        operation: 'annuler',
+        id,
+      });
+      setDemandes(d.demandes);
+      setSucces('Demande annulée avec succès.');
+    } catch (err) {
+      setErreur((err as Error).message);
+    } finally {
+      setOccupe(false);
+    }
+  };
+
   return (
     <div className="complete-carte-page">
       <header className="complete-carte-entete">
@@ -305,7 +388,7 @@ export function CompleteTaCarte() {
           <h1>Complète ta carte</h1>
           <p>
             Participe à l&apos;évolution de Destiny Rugby ! Propose un nouveau club avec sa division et son effectif,
-            ajoute un joueur manquant ou corrige les statistiques et le portrait d&apos;une carte existante.
+            ajoute un joueur manquant, corrige une carte existante ou demande le retrait d&apos;une carte.
           </p>
         </div>
 
@@ -358,6 +441,18 @@ export function CompleteTaCarte() {
           >
             <Icone nom="clubs" taille={17} />
             <span>Proposer un club</span>
+          </button>
+          <button
+            type="button"
+            className={onglet === 'retrait' ? 'actif' : ''}
+            onClick={() => {
+              setOnglet('retrait');
+              setErreur('');
+              setSucces('');
+            }}
+          >
+            <Icone nom="corbeille" taille={17} />
+            <span>Retirer sa carte</span>
           </button>
           <button
             type="button"
@@ -967,12 +1062,152 @@ export function CompleteTaCarte() {
         </section>
       )}
 
+      {/* ONGLET 3 BIS : RETIRER SA CARTE */}
+      {onglet === 'retrait' && (
+        <section className="complete-carte-section">
+          <div className="cn-retrait-avertissement">
+            <Icone nom="bouclier" taille={28} />
+            <div>
+              <h3>Droit à l&apos;image & retrait d&apos;une carte joueur</h3>
+              <p>
+                Tu es joueur licencié, joueuse licenciée ou représentant d&apos;un club et tu souhaites que ta carte soit retirée du jeu ?
+                Conformément à la protection des données personnelles et au droit à l&apos;image, tu peux demander son retrait officiel du catalogue,
+                des packs et du marché des transferts.
+              </p>
+            </div>
+          </div>
+
+          <div className="complete-carte-bloc-recherche">
+            <h2>1. Rechercher la carte à retirer</h2>
+            <p>Saisis ton prénom, ton nom ou ton club pour retrouver la carte concernée dans la base.</p>
+            <div className="cn-recherche-barre">
+              <input
+                type="search"
+                value={qRetrait}
+                onChange={(e) => setQRetrait(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') void chercherCarteRetrait();
+                }}
+                placeholder="Ex : Dupont, Penaud, Ntamack..."
+              />
+              <button
+                type="button"
+                className="btn primaire"
+                disabled={occupe || !qRetrait.trim()}
+                onClick={() => void chercherCarteRetrait()}
+              >
+                <Icone nom="loupe" taille={16} /> Rechercher
+              </button>
+            </div>
+
+            {sourcesRetrait.length > 0 && (
+              <div className="cn-resultats-grille">
+                {sourcesRetrait.map((s) => (
+                  <button
+                    type="button"
+                    key={s.sourceId}
+                    className={`cn-carte-choix ${carteRetraitSelectionnee?.sourceId === s.sourceId ? 'choisie' : ''}`}
+                    onClick={() => {
+                      setCarteRetraitSelectionnee(s);
+                      setSucces('');
+                      setErreur('');
+                    }}
+                  >
+                    <b>{s.nom}</b>
+                    <small>
+                      {s.clubReel} · {s.note} GEN · {s.age} ans
+                    </small>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {carteRetraitSelectionnee ? (
+            <form onSubmit={soumettreRetrait} className="complete-carte-formulaire-conteneur">
+              <div className="complete-carte-sous-titre">
+                <h2>2. Confirmer le retrait de la carte</h2>
+                <p>Vérifie les informations ci-dessous et indique le motif de ta demande.</p>
+              </div>
+
+              <div className="cn-carte-retrait-apercu">
+                <CarteJoueurEnLigne carte={carteDepuisSource(carteRetraitSelectionnee, 'retrait', 'retrait', 1)} />
+                <div className="cn-carte-retrait-infos">
+                  <h3>{carteRetraitSelectionnee.nom}</h3>
+                  <p><b>Club actuel :</b> {carteRetraitSelectionnee.clubReel} ({carteRetraitSelectionnee.championnat})</p>
+                  <p><b>Poste :</b> {POSTE_PAR_ID[carteRetraitSelectionnee.poste]?.nom ?? carteRetraitSelectionnee.poste}</p>
+                  <p><b>Général :</b> {carteRetraitSelectionnee.note} GEN · <b>Âge :</b> {carteRetraitSelectionnee.age} ans</p>
+                </div>
+              </div>
+
+              <div className="complete-carte-champ">
+                <b>Motif principal de la demande *</b>
+                <Selecteur
+                  valeur={motifRetrait}
+                  options={[
+                    { valeur: "Droit à l'image / Vie privée", label: "Droit à l'image / Respect de la vie privée" },
+                    { valeur: "Arrêt de la pratique sportive", label: "Arrêt de la pratique sportive / Fin de carrière" },
+                    { valeur: "Demande personnelle du licencié", label: "Demande personnelle du licencié" },
+                    { valeur: "Erreur d'identité ou doublon", label: "Erreur d'identité ou doublon" },
+                    { valeur: "Autre motif", label: "Autre motif" },
+                  ]}
+                  onChange={(v) => setMotifRetrait(v)}
+                />
+              </div>
+
+              <div className="complete-carte-champ">
+                <label htmlFor="details-retrait">
+                  <b>Précisions complémentaires (facultatif)</b>
+                  <small>Ajoute toute information utile pour faciliter le traitement de la demande par le Labo.</small>
+                </label>
+                <textarea
+                  id="details-retrait"
+                  rows={3}
+                  maxLength={400}
+                  placeholder="Ex : Je suis le joueur représenté sur cette carte et je demande le retrait définitif..."
+                  value={detailsRetrait}
+                  onChange={(e) => setDetailsRetrait(e.target.value)}
+                />
+              </div>
+
+              {/* Case obligatoire de certification d'identité */}
+              <label className="cn-droits">
+                <input
+                  type="checkbox"
+                  required
+                  checked={certificationRetrait}
+                  onChange={(e) => setCertificationRetrait(e.target.checked)}
+                />
+                <span>
+                  Je certifie sur l&apos;honneur être le joueur concerné par cette carte (ou son représentant légal / club) et demander son retrait officiel du jeu Destiny Rugby.
+                </span>
+              </label>
+
+              <div className="complete-carte-actions-fin">
+                <button
+                  type="submit"
+                  className="btn primaire grande"
+                  style={{ background: '#dc2626', borderColor: '#b91c1c' }}
+                  disabled={occupe || !certificationRetrait}
+                >
+                  <Icone nom="corbeille" taille={18} /> Confirmer et demander le retrait
+                </button>
+              </div>
+            </form>
+          ) : (
+            <div style={{ textAlign: 'center', padding: '1rem', color: 'rgba(255,255,255,0.6)' }}>
+              <p>Recherche et sélectionne une carte ci-dessus pour préparer sa demande de retrait.</p>
+            </div>
+          )}
+        </section>
+      )}
+
       {/* ONGLET 4 : MES PROPOSITIONS */}
       {onglet === 'mesDemandes' && (
         <section className="complete-carte-section">
           <div className="complete-carte-sous-titre">
             <h2>Mes propositions soumises</h2>
-            <p>Retrouve ici l&apos;état d&apos;examen de tes demandes de création, de correction ou de club.</p>
+            <p>Retrouve ici l&apos;état d&apos;examen de tes demandes de création, de correction, de retrait ou de club.</p>
           </div>
 
           {demandes.length > 0 && (
@@ -1015,7 +1250,7 @@ export function CompleteTaCarte() {
                   <header className="cn-demande-tete">
                     <div className="cn-demande-titre-group">
                       <span className={`cn-demande-type type-${d.type}`}>
-                        {d.type === 'club' ? 'Club' : d.type === 'creation' ? 'Création' : 'Correction'}
+                        {d.type === 'club' ? 'Club' : d.type === 'creation' ? 'Création' : d.type === 'retrait' ? 'Retrait' : 'Correction'}
                       </span>
                       <h3>{d.clubPropose ? d.clubPropose.nom : d.carte.nom}</h3>
                     </div>
@@ -1038,6 +1273,12 @@ export function CompleteTaCarte() {
                           </p>
                         )}
                       </div>
+                    ) : d.type === 'retrait' ? (
+                      <div className="cn-demande-details-joueur">
+                        <p>
+                          <b style={{ color: '#fca5a5' }}>Demande de retrait du jeu :</b> {d.carte.clubReel} · <b>Poste :</b> {POSTE_PAR_ID[d.carte.poste]?.nom ?? d.carte.poste} · <b>GEN :</b> {d.carte.note}
+                        </p>
+                      </div>
                     ) : (
                       <div className="cn-demande-details-joueur">
                         <p>
@@ -1056,8 +1297,27 @@ export function CompleteTaCarte() {
                     )}
 
                     <footer className="cn-demande-pied">
-                      <small>Soumise le {new Date(d.creeLe).toLocaleDateString('fr-FR')}</small>
-                      {d.decideLe && <small>Décidée le {new Date(d.decideLe).toLocaleDateString('fr-FR')}</small>}
+                      <div>
+                        <small>Soumise le {new Date(d.creeLe).toLocaleDateString('fr-FR')}</small>
+                        {d.decideLe && <small> · Décidée le {new Date(d.decideLe).toLocaleDateString('fr-FR')}</small>}
+                      </div>
+                      {d.statut === 'attente' && (
+                        <button
+                          type="button"
+                          className="btn fantome"
+                          style={{
+                            fontSize: '0.8rem',
+                            color: '#f87171',
+                            borderColor: 'rgba(239,68,68,0.3)',
+                            padding: '0.25rem 0.65rem',
+                            cursor: 'pointer',
+                          }}
+                          disabled={occupe}
+                          onClick={() => void annulerDemande(d.id)}
+                        >
+                          <Icone nom="croix" taille={12} /> Annuler ma demande
+                        </button>
+                      )}
                     </footer>
                   </div>
                 </article>

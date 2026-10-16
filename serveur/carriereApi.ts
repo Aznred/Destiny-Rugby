@@ -1166,9 +1166,15 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
           if (corps.operation === 'soumettre') {
             if (!await stockage.limiter(`demande-carte:${compte.id}`,6,3_600_000,maintenant)) throw new ErreurHttp(429, 'Trop de demandes. Réessaie plus tard.');
             const saisie = validerDemandeCarte(corps);
-            if (saisie.type === 'correction' && !await ffr.avecPool('mixed', async () => catalogueMondialCarriere().some(c => c.sourceId === saisie.sourceId && !c.speciale)))
-              throw new ErreurHttp(404, 'Carte à corriger introuvable.');
+            if ((saisie.type === 'correction' || saisie.type === 'retrait') && !await ffr.avecPool('mixed', async () => catalogueMondialCarriere().some(c => c.sourceId === saisie.sourceId)))
+              throw new ErreurHttp(404, saisie.type === 'retrait' ? 'Carte à retirer introuvable.' : 'Carte à corriger introuvable.');
             if (!await depot.creer(compte.id,randomUUID(),saisie)) throw new ErreurHttp(409, 'Tu as déjà cinq demandes en attente.');
+            return res.status(200).json({ demandes: await depot.lister(auteur) });
+          }
+          if (corps.operation === 'annuler') {
+            if (typeof corps.id !== 'string' || !idValide(corps.id)) throw new ErreurHttp(400, 'Demande invalide.');
+            const fait = await depot.annuler(corps.id, compte.id);
+            if (!fait) throw new ErreurHttp(404, 'Demande introuvable ou déjà traitée.');
             return res.status(200).json({ demandes: await depot.lister(auteur) });
           }
           if (!interne) throw new ErreurHttp(403, 'FORBIDDEN');
@@ -1178,12 +1184,49 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
           let fait = false;
           if (corps.operation === 'refuser') fait = await depot.refuser(demande.id,demande.revision,String(corps.reponse ?? '').slice(0,500),compte.identifiant);
           else {
-            const carte = validerCarteNormale(corps.carte);
+            const carte = demande.type === 'retrait'
+              ? (corps.carte ? validerCarteNormale(corps.carte) : demande.carte)
+              : validerCarteNormale(corps.carte);
             if (corps.operation === 'modifier') fait = await depot.modifier(demande.id,demande.revision,carte);
             else if (corps.operation === 'approuver') {
               const courant = catalogueAdmin();
               if (corps.revisionCatalogue !== courant.revision) throw new ErreurHttp(409, 'Le catalogue a changé. Recharge les demandes.');
-              const suivant = await ffr.avecPool('mixed', async () => catalogueAvecCarteNormale(courant,demande.sourceId ?? `normale-${demande.id}`,carte));
+              let suivant: CatalogueAdmin;
+              if (demande.type === 'retrait') {
+                const id = demande.sourceId ?? '';
+                suivant = structuredClone(courant);
+                suivant.retraitsCartes = { ...suivant.retraitsCartes };
+                const source = catalogueMondialCarriere(courant).find(c => c.sourceId === id) ?? catalogueSpecial().sources.get(id);
+                const liees = [...catalogueSpecial().sources.values()].filter(c => c.speciale?.base === id);
+                const retireLe = new Date().toISOString();
+                const motif = demande.message ? demande.message.slice(0, 500) : 'Demande de retrait validée par le Labo';
+                if (source) {
+                  for (const c of [source, ...liees]) {
+                    suivant.retraitsCartes[c.sourceId] = {
+                      sourceId: c.sourceId,
+                      nom: c.nom,
+                      club: c.clubReel,
+                      type: c.speciale ? 'Spéciale' : 'Normale',
+                      motif,
+                      retireLe,
+                    };
+                  }
+                } else if (id) {
+                  suivant.retraitsCartes[id] = {
+                    sourceId: id,
+                    nom: demande.carte.nom || id,
+                    club: demande.carte.clubReel || '',
+                    type: 'Normale',
+                    motif,
+                    retireLe,
+                  };
+                }
+                if (suivant.ajouts?.[id]) {
+                  delete suivant.ajouts[id];
+                }
+              } else {
+                suivant = await ffr.avecPool('mixed', async () => catalogueAvecCarteNormale(courant,demande.sourceId ?? `normale-${demande.id}`,carte));
+              }
               suivant.revision = courant.revision + 1;
               fait = await depot.approuver(demande.id,demande.revision,suivant,courant.revision,carte,compte.identifiant);
               if (fait) catalogueLuLe = -Infinity;

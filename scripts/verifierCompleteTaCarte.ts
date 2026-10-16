@@ -174,4 +174,85 @@ eg(
   'Motif visible par le proposant',
 );
 
-console.log(`OK · ${controles} contrôles réussis pour CompleteTaCarte, clubs et droits d'images.`);
+// 4. Test du retrait de sa carte et annulation de demande
+console.log('--- Test de retrait de carte & annulation ---');
+
+// 4.1 Validation unitaire du type retrait
+assert.throws(
+  () => validerDemandeCarte({ type: 'retrait', sourceId: 'normale-test', droitsCertifies: false }),
+  /certifier sur l'honneur ta demande de retrait/,
+  'droitsCertifies: false est rejeté pour un retrait',
+);
+controles++;
+
+const demandeRetraitValidee = validerDemandeCarte({
+  type: 'retrait',
+  sourceId: 'normale-test',
+  droitsCertifies: true,
+  message: 'Demande de retrait pour respect du droit à l’image',
+});
+eg(demandeRetraitValidee.type, 'retrait', 'Type retrait validé');
+eg(demandeRetraitValidee.sourceId, 'normale-test', 'sourceId préservé');
+
+// 4.2 Recherche d'une carte existante dans le catalogue mondial
+const catalogue = repKiri.donnees.cartes;
+const repRecherche = await appel(joueur, undefined, '&q=dupont');
+const carteARetirer = repRecherche.donnees.cartes[0] ?? catalogue[0];
+assert.ok(carteARetirer, 'Une carte normale existe pour le test de retrait');
+
+// 4.3 Soumission d'une demande de retrait
+const repSoumissionRetrait = await appel(joueur, {
+  action: 'demandesCartes',
+  operation: 'soumettre',
+  type: 'retrait',
+  sourceId: carteARetirer.sourceId,
+  carte: carteARetirer,
+  message: 'Arrêt définitif de l’activité sportive',
+  droitsCertifies: true,
+});
+eg(repSoumissionRetrait.statut, 200, 'Demande de retrait enregistrée');
+const demandeRetraitId = repSoumissionRetrait.donnees.demandes.find((d: any) => d.type === 'retrait')?.id;
+assert.ok(demandeRetraitId, 'ID de la demande de retrait trouvé');
+
+// 4.4 Test de l’annulation de demande par le joueur
+const repAnnuler = await appel(joueur, {
+  action: 'demandesCartes',
+  operation: 'annuler',
+  id: demandeRetraitId,
+});
+eg(repAnnuler.statut, 200, 'Annulation réussie par l’auteur');
+eg(repAnnuler.donnees.demandes.some((d: any) => d.id === demandeRetraitId), false, 'La demande annulée n’est plus dans la liste');
+
+// 4.5 Soumission d’une nouvelle demande de retrait et approbation par Kiri
+const repSoumissionRetrait2 = await appel(joueur, {
+  action: 'demandesCartes',
+  operation: 'soumettre',
+  type: 'retrait',
+  sourceId: carteARetirer.sourceId,
+  carte: carteARetirer,
+  message: 'Demande officielle de retrait',
+  droitsCertifies: true,
+});
+eg(repSoumissionRetrait2.statut, 200, 'Deuxième demande de retrait enregistrée');
+const demandeRetraitId2 = repSoumissionRetrait2.donnees.demandes.find((d: any) => d.type === 'retrait')?.id;
+assert.ok(demandeRetraitId2, 'Deuxième ID de retrait trouvé');
+
+const vueKiriAvantRetrait = await appel(kiri);
+const revCat = vueKiriAvantRetrait.donnees.revisionCatalogue;
+
+const repApprouverRetrait = await appel(kiri, {
+  action: 'demandesCartes',
+  operation: 'approuver',
+  id: demandeRetraitId2,
+  revision: 0,
+  revisionCatalogue: revCat,
+});
+eg(repApprouverRetrait.statut, 200, 'Approbation du retrait par Kiri réussie');
+
+// Vérification que la carte est bien retirée dans le catalogue atelier
+const atelierApres = await db.atelier!.lire();
+assert.ok(atelierApres.retraitsCartes?.[carteARetirer.sourceId], 'La carte figure bien dans retraitsCartes du catalogue');
+eg(atelierApres.retraitsCartes[carteARetirer.sourceId].sourceId, carteARetirer.sourceId, 'Identifiant de carte retirée correct');
+controles += 2;
+
+console.log(`OK · ${controles} contrôles réussis pour CompleteTaCarte, clubs, retraits de cartes et droits d'images.`);

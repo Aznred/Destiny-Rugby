@@ -116,10 +116,19 @@
 .cn-demande-type.type-club{background:rgba(59,130,246,.2);color:#60a5fa}
 .cn-demande-type.type-creation{background:rgba(34,197,94,.2);color:#4ade80}
 .cn-demande-type.type-correction{background:rgba(213,181,109,.2);color:var(--or,#d5b56d)}
+.cn-demande-type.type-retrait{background:rgba(239,68,68,.2);color:#fca5a5}
 .cn-demande-statut-badge{font-size:.85rem;font-weight:600;padding:.25rem .7rem;border-radius:20px}
 .cn-demande-statut-badge.statut-attente{background:rgba(213,181,109,.15);color:var(--or,#d5b56d)}
 .cn-demande-statut-badge.statut-acceptee{background:rgba(34,197,94,.15);color:#4ade80}
 .cn-demande-statut-badge.statut-refusee{background:rgba(239,68,68,.15);color:#f87171}
+.cn-retrait-avertissement{display:flex;gap:1rem;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:12px;padding:1.15rem;align-items:flex-start}
+.cn-retrait-avertissement div{flex:1;min-width:0}
+.cn-retrait-avertissement h3{margin:0 0 .3rem;color:#fca5a5;font-size:1.05rem}
+.cn-retrait-avertissement p{margin:0;font-size:.9rem;color:rgba(255,255,255,.85);line-height:1.4}
+.cn-carte-retrait-apercu{display:flex;gap:1.25rem;background:rgba(0,0,0,.3);border:1px solid var(--bordure,#294236);border-radius:14px;padding:1.25rem;align-items:center;flex-wrap:wrap}
+.cn-carte-retrait-infos{flex:1;min-width:200px;display:grid;gap:.35rem}
+.cn-carte-retrait-infos h3{margin:0;font-size:1.25rem;color:#fff}
+.cn-carte-retrait-infos p{margin:0;color:rgba(255,255,255,.75);font-size:.9rem}
 .cn-demande-contenu{display:grid;gap:.5rem;font-size:.9rem}
 .cn-demande-contenu p{margin:0;color:rgba(255,255,255,.85)}
 .cn-demande-message{font-style:italic;color:rgba(255,255,255,.7)!important;background:rgba(255,255,255,.04);padding:.5rem .75rem;border-radius:8px}
