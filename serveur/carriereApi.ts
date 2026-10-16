@@ -688,7 +688,10 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
       while (index < ids.length) {
         const id = ids[index++];
         try {
-          await appliquer(id, 'horloge', `tick-${randomUUID()}`, (e, n, g) => actualiserCarriere(e, n, g), false, false);
+          await appliquer(id, 'horloge', `tick-${randomUUID()}`, (e, n, g) => {
+            const pool = e.publique ? 'mixed' : e.playerPool ?? 'men';
+            return ffr.avecPool(pool, () => actualiserCarriere(e, n, g));
+          }, false, false);
           traitees++;
         } catch { console.warn('[horloge] Une ligue sera reprise au prochain passage'); }
       }
@@ -1890,7 +1893,10 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         const autorisationKiri = accesObservateurKiri ? enteteConnue ?? await stockage.entete(id) : undefined;
         if (accesObservateurKiri && !autorisationKiri) throw new ErreurHttp(404, 'Ligue introuvable.');
         const observateur = Boolean(autorisationKiri && !autorisationKiri.comptes.includes(compte.id));
-        const e = await appliquer(id, observateur ? 'horloge' : compte.id, `lecture-${Math.floor(maintenant / 2000)}-catalogue-${catalogueAdmin().revision}`, (e, n, g) => actualiserCarriere(e, n, g), false, false, enteteConnue ?? autorisationKiri);
+        const e = await appliquer(id, observateur ? 'horloge' : compte.id, `lecture-${Math.floor(maintenant / 2000)}-catalogue-${catalogueAdmin().revision}`, (e, n, g) => {
+          const pool = e.publique ? 'mixed' : e.playerPool ?? 'men';
+          return ffr.avecPool(pool, () => actualiserCarriere(e, n, g));
+        }, false, false, enteteConnue ?? autorisationKiri);
         // `leger=1` : l'écran demandera le détail d'un match terminé à son ouverture (`VueMatchEnLigne.resume`).
         const leger = url.searchParams.get('leger') === '1';
         return res.status(200).json(observateur ? await completerVuePublique(vueCarriereObservateur(e, leger)) : await vueCompte(e, compte.id, leger));
@@ -1938,7 +1944,10 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         // erreur, pour quelqu'un qui voulait simplement entrer chez lui.
         // Membre déjà inscrit : on ouvre la ligue, c'est tout ce qu'il demande.
         if (ligne.comptes.includes(compte.id)) {
-          const e = await appliquer(ligne.id, compte.id, `lecture-${Math.floor(maintenant / 2000)}-catalogue-${catalogueAdmin().revision}`, (e, n, g) => actualiserCarriere(e, n, g));
+          const e = await appliquer(ligne.id, compte.id, `lecture-${Math.floor(maintenant / 2000)}-catalogue-${catalogueAdmin().revision}`, (e, n, g) => {
+            const pool = e.publique ? 'mixed' : e.playerPool ?? 'men';
+            return ffr.avecPool(pool, () => actualiserCarriere(e, n, g));
+          });
           return res.status(200).json(await vueCompte(e, compte.id));
         }
         const e = await appliquer(ligne.id, compte.id, `adhesion-${compte.id}`, (e, n, g) => agirCarriere(e, compte.id,
@@ -2019,7 +2028,8 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
           if (commande.type === 'reglerPool' && (commande.pool === 'men' || commande.pool === 'women' || commande.pool === 'mixed')) {
             return ffr.avecPool(commande.pool, () => agirCarriere(e, compte.id, commande as unknown as CommandeCarriere, n, g, accesCahier(compte)));
           }
-          return agirCarriere(e, compte.id, commande as unknown as CommandeCarriere, n, g, accesCahier(compte));
+          const pool = e.publique ? 'mixed' : e.playerPool ?? 'men';
+          return ffr.avecPool(pool, () => agirCarriere(e, compte.id, commande as unknown as CommandeCarriere, n, g, accesCahier(compte)));
         });
         return await repondre(avantCommande, e);
       }
@@ -2080,7 +2090,10 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
     const maintenant = Date.now();
     const sonde = await lireSondageDirect(id, maintenant);
     if (!sonde) return;
-    return appliquer(id, 'horloge', `queue-${randomUUID()}`, (e,n,g) => actualiserCarriere(e,n,g), false, false,
+    return appliquer(id, 'horloge', `queue-${randomUUID()}`, (e,n,g) => {
+      const pool = e.publique ? 'mixed' : e.playerPool ?? 'men';
+      return ffr.avecPool(pool, () => actualiserCarriere(e,n,g));
+    }, false, false,
       sonde.entete, sonde.presences === undefined ? 0 : 1_000);
   }) };
 }

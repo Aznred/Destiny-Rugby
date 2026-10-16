@@ -1500,8 +1500,10 @@ export function MatchLive({
     inscrireIssueJouee(cle, e.issue ? {
       vainqueur: e.issue.vainqueur === 'A' ? e.clubA : e.clubB, critere: e.issue.critere, ...(vainqueurTirs ? { tirs: vainqueurTirs } : {}),
     } : null);
-    const final = { scoreA: e.scoreA, scoreB: e.scoreB, essaisA: e.essaisA, essaisB: e.essaisB, blessures: blessuresManager.current, minutesJouees: Object.fromEntries(e.pions.map(p => [p.sourceId, p.minutes])) };
-    const etapes: (() => void)[] = [() => onTermine?.(final)];
+    const final = { scoreA: e.scoreA, scoreB: e.scoreB, essaisA: e.essaisA, essaisB: e.essaisB, blessures: blessuresManager.current, minutesJouees: Object.fromEntries(e.pions.filter(p => p.sourceId).map(p => [p.sourceId, p.minutes ?? 0])) };
+    const etapes: (() => void)[] = [() => {
+      try { onTermine?.(final); } catch (err) { console.error('[MatchLive] onTermine:', err); }
+    }];
     if (monPion && !manager) {
       const maFeuille = statsPourLaNote(monPion, e.direct?.stats);
       const discipline = { citation: e.discipline.citation, blessure: e.discipline.blessure, jaunes: e.discipline.jaunes, rouges: e.discipline.rouges };

@@ -133,12 +133,12 @@ const RAYON_PLAQUAGE = 1.6;
 const ARRETS: Record<string, { visuel: number; horloge: number; direct: number }> = {
   // Le direct garde assez de temps pour lire les formations, sans reproduire
   // les longues attentes télévisées où rien ne bouge.
-  melee: { visuel: 6.2, horloge: 0, direct: 9.5 },
-  touche: { visuel: 6.5, horloge: 0, direct: 8.5 },
+  melee: { visuel: 6.2, horloge: 45, direct: 9.5 },
+  touche: { visuel: 6.5, horloge: 30, direct: 8.5 },
   transformation: { visuel: 45, horloge: 45, direct: 45 },
   tirAuBut: { visuel: 45, horloge: 45, direct: 45 },
-  coupEnvoi: { visuel: 4.5, horloge: 0, direct: 5 },
-  renvoi22: { visuel: 7, horloge: 0, direct: 7 },
+  coupEnvoi: { visuel: 4.5, horloge: 18, direct: 5 },
+  renvoi22: { visuel: 7, horloge: 18, direct: 7 },
   apresEssai: { visuel: 3, horloge: 8, direct: 3 },
   penalite: { visuel: 2.5, horloge: 12, direct: 3 },
   tmo: { visuel: 3.6, horloge: 0, direct: 3.6 },
@@ -751,21 +751,10 @@ function tick(e: EtatMatch, compterBudget = true): void {
     e.secondesActivesSolo = (e.secondesActivesSolo ?? 0) + DT;
     const total = 4800 + (e.departage?.periodes ?? 0) * (e.departage?.duree ?? 0);
     const limite = DUREE_MATCH_SOLO * finDePeriode(e) / total;
-    // La sirène réserve trente secondes à la dernière action et à sa transformation.
-    if (e.secondesActivesSolo >= limite - 30) e.t = Math.max(e.t, finDePeriode(e));
-    if (e.secondesActivesSolo >= limite) {
-      e.secondesActivesSolo = limite;
-      // Une transformation acquise reste due : seule sa mise en scène est abrégée
-      // au plafond, avec le même moteur et le même résultat. La visée humaine reste libre.
-      const periode = e.periode;
-      let garde = 0;
-      while (e.transformationDue && !e.fini && e.periode === periode && garde++ < 4000) {
-        if (e.responsabilites?.attente?.type === 'tir' && !e.tir?.visee) return;
-        tick(e, false);
-        e.apresPas?.(e);
-      }
-      if (!e.fini && e.periode === periode) return clorePeriode(e);
-      return;
+    // Filet de sécurité ultime (15 min actives) uniquement si la sirène a déjà retenti et aucun tir n'est dû.
+    // L'horloge progresse naturellement jusqu'à 80' sans saut artificiel ni coupure brutale en pleine attaque.
+    if (e.secondesActivesSolo >= limite + 180 && e.sirene && !coupDePiedDu(e) && !e.transformationDue) {
+      return clorePeriode(e);
     }
   }
   const dt = DT;
