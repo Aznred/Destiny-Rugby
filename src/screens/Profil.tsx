@@ -173,6 +173,9 @@ export function Profil() {
             message={t('prof.confirmMessage')}
             libelleOui={t('prof.confirmOui')}
             libelleNon={t('prof.confirmNon')}
+            texteCaseConfirmation={t('prof.confirmCase')}
+            danger
+            delaiSecuriteMs={600}
             onOui={() => {
               setConfirmerReset(false);
               reinitialiser();

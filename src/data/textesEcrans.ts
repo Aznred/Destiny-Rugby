@@ -59,6 +59,15 @@ export const TEXTES_ECRANS: Record<string, Traduction> = {
     pt: 'Esta carreira será abandonada e o teu progresso apagado (NÃO irá para o Hall da Fama, para isso, retira-te no ecrã Carreira). Continuar?',
     ja: 'このキャリアを破棄し、進行状況を消去します（殿堂には入りません。そのためにはキャリア画面から引退してください）。続けますか？',
   },
+  'prof.confirmCase': {
+    fr: 'Je confirme vouloir abandonner définitivement cette carrière.',
+    en: 'I confirm that I want to permanently abandon this career.',
+    es: 'Confirmo que deseo abandonar definitivamente esta carrera.',
+    it: 'Confermo di voler abbandonare definitivamente questa carriera.',
+    de: 'Ich bestätige, dass ich diese Karriere endgültig aufgeben möchte.',
+    pt: 'Confirmo que pretendo abandonar definitivamente esta carreira.',
+    ja: 'このキャリアを完全に破棄することを確認します。',
+  },
   'prof.confirmOui': { fr: 'Tout recommencer', en: 'Wipe and restart', es: 'Empezar de cero', it: 'Ricomincia tutto', de: 'Alles neu starten', pt: 'Recomeçar tudo', ja: 'すべてやり直す' },
   'prof.confirmNon': { fr: 'Garder ma carrière', en: 'Keep my career', es: 'Conservar mi carrera', it: 'Tieni la carriera', de: 'Karriere behalten', pt: 'Manter a carreira', ja: 'キャリアを残す' },
 

@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import { t } from '../lib/i18n';
@@ -12,6 +13,9 @@ interface Props {
   libelleNon?: string;
   onOui: () => void;
   onNon: () => void;
+  danger?: boolean;
+  texteCaseConfirmation?: string;
+  delaiSecuriteMs?: number;
 }
 
 export function Confirmation({
@@ -21,8 +25,22 @@ export function Confirmation({
   libelleNon,
   onOui,
   onNon,
+  danger,
+  texteCaseConfirmation,
+  delaiSecuriteMs,
 }: Props) {
   const { overlayRef, dialogRef } = useModalDialog(onNon);
+  const [coche, setCoche] = useState(!texteCaseConfirmation);
+  const [pret, setPret] = useState(!delaiSecuriteMs);
+
+  useEffect(() => {
+    if (!delaiSecuriteMs) return;
+    const minuterie = setTimeout(() => setPret(true), delaiSecuriteMs);
+    return () => clearTimeout(minuterie);
+  }, [delaiSecuriteMs]);
+
+  const actif = coche && pret;
+
   // Portal vers <body> : sans ça, le backdrop-filter des cartes parentes
   // crée un bloc conteneur et la modale reste piégée dans le panneau.
   return createPortal(
@@ -41,9 +59,25 @@ export function Confirmation({
       >
         <h2 id="confirmation-titre">{titre}</h2>
         <p className="aide" style={{ marginTop: '0.6rem' }}>{message}</p>
+        {texteCaseConfirmation && (
+          <label className="confirmation-case-label">
+            <input
+              type="checkbox"
+              checked={coche}
+              onChange={(e) => setCoche(e.target.checked)}
+            />
+            <span>{texteCaseConfirmation}</span>
+          </label>
+        )}
         <div className="rangee-fin">
           <button className="btn fantome" onClick={onNon}>{libelleNon ?? t('gen.annuler')}</button>
-          <button className="btn primaire" onClick={onOui}>{libelleOui ?? t('gen.confirmer')}</button>
+          <button
+            className={`btn ${danger ? 'danger' : 'primaire'}`}
+            onClick={actif ? onOui : undefined}
+            disabled={!actif}
+          >
+            {libelleOui ?? t('gen.confirmer')}
+          </button>
         </div>
       </motion.div>
     </div>,

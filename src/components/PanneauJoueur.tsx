@@ -538,31 +538,7 @@ export function PanneauJoueur({ joueur, onRepondre }: { joueur: Joueur; onRepond
             <Icone nom="mentor" /><span>{t('pj.mentor')} <Icone nom="check" taille={12} /></span>
           </button>
         )}
-        <button
-          onClick={() => setConfirmerRetraite(true)}
-          title={t('pj.retraiteAide')}
-        >
-          <Icone nom="retraite" /><span>{t('pj.retraite')}</span>
-        </button>
       </div>
-
-      {/* Reconversion : on choisit ce qu'on deviendra AVANT de raccrocher */}
-      {finDeCarriere && (
-        <div className="champ pj-reconversion">
-          <label htmlFor="reconversion">
-            {t('pj.apresCarriere')} {joueur.age >= AGE_RETRAITE_FORCEE && `- ${t('pj.derniereSaison')}`}
-          </label>
-          <Selecteur
-            id="reconversion"
-            options={RECONVERSIONS.map((r) => ({
-              valeur: r.id,
-              label: t(`pj.reconversion.${r.id}`),
-            }))}
-            valeur={reconversion}
-            onChange={setReconversion}
-          />
-        </div>
-      )}
 
       <AnimatePresence>
         {confirmerRetraite && (
@@ -571,6 +547,9 @@ export function PanneauJoueur({ joueur, onRepondre }: { joueur: Joueur; onRepond
             message={t('pj.confirmerRetraite.message')}
             libelleOui={t('pj.confirmerRetraite.oui')}
             libelleNon={t('pj.confirmerRetraite.non')}
+            texteCaseConfirmation={t('pj.confirmerRetraite.case')}
+            danger
+            delaiSecuriteMs={600}
             onOui={() => {
               setConfirmerRetraite(false);
               prendreRetraite(
@@ -605,6 +584,47 @@ export function PanneauJoueur({ joueur, onRepondre }: { joueur: Joueur; onRepond
           : t("ui.960cdd275769")}</p>
         {situation.camp && <small>{t("ui.c63a285ea5af")}</small>}
       </section>}
+
+      {/* ⚠️ ZONE DANGER / FIN DE CARRIÈRE :
+          Repliée par défaut dans un <details> tout en bas du panneau joueur,
+          loin des boutons d'action rapide pour éviter tout clic involontaire sur mobile. */}
+      <details className="pj-zone-retraite">
+        <summary className="pj-zone-retraite-sommaire">
+          <Icone nom="retraite" taille={14} />
+          <span>{t('pj.retraiteZoneTitre')}</span>
+        </summary>
+        <div className="pj-zone-retraite-contenu">
+          <p className="pj-zone-retraite-aide">
+            {t('pj.retraiteZoneAide')}
+          </p>
+
+          {finDeCarriere && (
+            <div className="champ pj-reconversion">
+              <label htmlFor="reconversion">
+                {t('pj.apresCarriere')} {joueur.age >= AGE_RETRAITE_FORCEE && `- ${t('pj.derniereSaison')}`}
+              </label>
+              <Selecteur
+                id="reconversion"
+                options={RECONVERSIONS.map((r) => ({
+                  valeur: r.id,
+                  label: t(`pj.reconversion.${r.id}`),
+                }))}
+                valeur={reconversion}
+                onChange={setReconversion}
+              />
+            </div>
+          )}
+
+          <button
+            type="button"
+            className="btn danger pj-btn-retraite"
+            onClick={() => setConfirmerRetraite(true)}
+          >
+            <Icone nom="retraite" taille={15} />
+            <span>{t('pj.retraiteBouton')}</span>
+          </button>
+        </div>
+      </details>
       {calendrierOuvert && createPortal(<CalendrierMondial onFermer={() => setCalendrierOuvert(false)} />, document.body)}
 
       {matchOuvert && affiche && (

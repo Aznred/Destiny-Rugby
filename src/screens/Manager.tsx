@@ -1772,10 +1772,32 @@ export function Manager() {
         />
       )}
 
-      <button className="btn fantome manager-raccrocher" onClick={() => setRaccrocher(true)}>
-        <Icone nom="retraite" taille={17} /> {t('mgr.raccrocher')}
-      </button>
-      {raccrocher && <Confirmation titre={t('mgr.raccrocherTitre')} message={manager.horsClassement ? t('mgr.raccrocherHorsClassement') : libre ? t('mgr.raccrocherLibre') : t('mgr.raccrocherClasse')} libelleOui={t('mgr.raccrocher')} onOui={() => { setRaccrocher(false); quitterBanc(); }} onNon={() => setRaccrocher(false)} />}
+      <details className="manager-zone-retraite">
+        <summary className="manager-zone-retraite-sommaire">
+          <Icone nom="retraite" taille={14} />
+          <span>{t('mgr.zoneRetraiteTitre')}</span>
+        </summary>
+        <div className="manager-zone-retraite-contenu">
+          <p className="manager-zone-retraite-aide">
+            {t('mgr.zoneRetraiteAide')}
+          </p>
+          <button type="button" className="btn danger manager-raccrocher" onClick={() => setRaccrocher(true)}>
+            <Icone nom="retraite" taille={17} /> {t('mgr.raccrocher')}
+          </button>
+        </div>
+      </details>
+      {raccrocher && (
+        <Confirmation
+          titre={t('mgr.raccrocherTitre')}
+          message={manager.horsClassement ? t('mgr.raccrocherHorsClassement') : libre ? t('mgr.raccrocherLibre') : t('mgr.raccrocherClasse')}
+          libelleOui={t('mgr.raccrocher')}
+          texteCaseConfirmation={t('mgr.raccrocherCase')}
+          danger
+          delaiSecuriteMs={600}
+          onOui={() => { setRaccrocher(false); quitterBanc(); }}
+          onNon={() => setRaccrocher(false)}
+        />
+      )}
       {jeuneALiberer && (
         <Confirmation
           titre={t("ui.371cc4251fc5")}

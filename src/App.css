@@ -1972,7 +1972,9 @@
 .direction-contrat h3 { margin:.2rem 0; }
 .direction-contrat p { margin:.2rem 0; color:var(--craie-dim); }
 .direction-contrat > div:last-child { display:flex; gap:.55rem; flex-wrap:wrap; }
-.btn.danger,.direction-contrat .danger { border-color:rgba(222,92,74,.42); color:#ffb0a3; }
+.btn.danger,.direction-contrat .danger { border-color:rgba(222,92,74,.42); color:#ffb0a3; background:rgba(222,92,74,.12); }
+.btn.danger:hover:not(:disabled) { border-color:rgba(222,92,74,.75); background:rgba(222,92,74,.25); color:#fff; }
+.btn.danger:disabled { opacity:.4; cursor:not-allowed; }
 .direction-marche-coachs { grid-column:span 7; padding:1rem; }
 .direction-selection { grid-column:span 5; padding:1rem; }
 .direction-candidature { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:.65rem; margin:.85rem 0; }
@@ -3631,6 +3633,109 @@
 }
 .pj-actions button:disabled { opacity: 0.55; cursor: default; }
 .pj-actions .badge-offres { position: absolute; top: -6px; right: -4px; }
+/* Zone danger repliée pour la fin de carrière (évite les clics accidentels sur mobile) */
+.pj-zone-retraite,
+.manager-zone-retraite {
+  margin-top: 1rem;
+  border: 1px dashed rgba(222, 92, 74, 0.35);
+  border-radius: var(--rayon-sm);
+  background: rgba(222, 92, 74, 0.04);
+  overflow: hidden;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.pj-zone-retraite[open],
+.manager-zone-retraite[open] {
+  border-style: solid;
+  border-color: rgba(222, 92, 74, 0.5);
+  background: rgba(222, 92, 74, 0.08);
+}
+
+.pj-zone-retraite-sommaire,
+.manager-zone-retraite-sommaire {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 0.8rem;
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--craie-dim);
+  user-select: none;
+  list-style: none;
+}
+
+.pj-zone-retraite-sommaire::-webkit-details-marker,
+.manager-zone-retraite-sommaire::-webkit-details-marker {
+  display: none;
+}
+
+.pj-zone-retraite-sommaire:hover,
+.manager-zone-retraite-sommaire:hover {
+  color: var(--craie);
+}
+
+.pj-zone-retraite-sommaire svg,
+.manager-zone-retraite-sommaire svg {
+  opacity: 0.7;
+}
+
+.pj-zone-retraite-contenu,
+.manager-zone-retraite-contenu {
+  padding: 0 0.8rem 0.8rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.pj-zone-retraite-aide,
+.manager-zone-retraite-aide {
+  font-size: 0.75rem;
+  line-height: 1.35;
+  color: var(--craie-dim);
+  margin: 0;
+}
+
+.pj-btn-retraite,
+.manager-zone-retraite .manager-raccrocher {
+  align-self: flex-start;
+  font-size: 0.82rem;
+  padding: 0.5rem 0.8rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+/* Case à cocher obligatoire dans les modales de confirmation sensibles */
+.confirmation-case-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  margin: 1.1rem 0 0.6rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: var(--rayon-sm);
+  background: rgba(222, 92, 74, 0.08);
+  border: 1px solid rgba(222, 92, 74, 0.28);
+  cursor: pointer;
+  text-align: left;
+  user-select: none;
+}
+
+.confirmation-case-label input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  margin-top: 2px;
+  cursor: pointer;
+  accent-color: #de5c4a;
+}
+
+.confirmation-case-label span {
+  font-size: 0.85rem;
+  line-height: 1.35;
+  color: var(--craie);
+}
+
 .pj-reconversion { margin: 0.5rem 0 0; }
 .pj-reconversion label { font-size: 0.72rem; }
 .pj-reconversion .sel-declencheur { padding: 0.35rem 0.5rem; font-size: 0.8rem; }
