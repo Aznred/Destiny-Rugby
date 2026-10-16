@@ -34,7 +34,7 @@ export function competitionDepuisChampionnat(c: ChampionnatFeminin): Competition
   const rang = c.france ? pyramideFrancaise().findIndex(p => p.id === c.id) + 1 : 0;
   const drapeaux = c.id === 'f-celtic' ? ['ie', 'gb-sct', 'gb-wls'] : [c.drapeau];
   const reelles = c.clubs.reduce((acc, k) => acc + (k.reelles ?? 0), 0);
-  const note = `${c.clubs.length} clubs · ${reelles} joueuses réelles`;
+  const note = `${reelles} joueuses réelles`;
   return {
     id: c.id, nom: c.nom, pays: c.pays, drapeaux, emoji: '', niveau: rang, zone: c.france ? 'France' : 'Monde',
     clubs: c.clubs.map((k): Club => ({ nom: k.nom, c1: k.c1, c2: k.c2, ...(k.logo ? { logo: k.logo } : {}) })),

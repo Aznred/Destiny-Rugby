@@ -2441,6 +2441,221 @@
    650. `content-visibility: auto` laisse le navigateur sauter le rendu des
    blocs hors écran (Firefox y était particulièrement lent : le flou de
    `backdrop-filter` était recalculé sur toute la hauteur de la page). */
+
+.championnats-onglets {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+  margin-bottom: 1.2rem;
+}
+@media (max-width: 640px) {
+  .championnats-onglets {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.45rem;
+  }
+}
+.championnats-onglets button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.65rem 0.9rem;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 0.92rem;
+  border: 1px solid var(--bordure);
+  background: rgba(0, 0, 0, 0.28);
+  color: var(--craie-dim);
+  cursor: pointer;
+  transition: all 0.18s ease;
+  white-space: nowrap;
+}
+.championnats-onglets button:hover {
+  border-color: rgba(232, 178, 58, 0.4);
+  color: var(--craie);
+  background: rgba(0, 0, 0, 0.42);
+}
+.championnats-onglets button.actif {
+  color: #10240f;
+  background: linear-gradient(180deg, var(--or-400), var(--or-500));
+  border-color: var(--or-500);
+  box-shadow: 0 3px 12px rgba(232, 178, 58, 0.25);
+}
+
+/* Barre d'outils (recherche + filtres) */
+.ch-barre-outils {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1.4rem;
+  background: rgba(10, 26, 16, 0.55);
+  border: 1px solid rgba(232, 178, 58, 0.16);
+  border-radius: 16px;
+  padding: 0.85rem 1rem;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.3);
+}
+
+.ch-recherche-champ {
+  position: relative;
+  display: flex;
+  align-items: center;
+  background: rgba(4, 14, 8, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  padding: 0.45rem 0.8rem 0.45rem 1rem;
+  gap: 0.65rem;
+  transition: all 0.2s ease;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+.ch-recherche-champ:focus-within {
+  border-color: var(--or-400);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.4), 0 0 0 3px rgba(232, 178, 58, 0.18);
+  background: rgba(4, 14, 8, 0.95);
+}
+.ch-loupe-icone {
+  color: var(--or-400);
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+.ch-recherche-champ input {
+  flex: 1;
+  min-width: 0;
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  color: var(--craie);
+  font-size: 0.92rem;
+  font-weight: 500;
+  padding: 0.2rem 0;
+}
+.ch-recherche-champ input::placeholder {
+  color: rgba(255, 255, 255, 0.42);
+}
+.ch-recherche-champ input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+}
+.ch-recherche-clear {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--craie-dim);
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.15s ease;
+}
+.ch-recherche-clear:hover {
+  background: rgba(255, 255, 255, 0.25);
+  color: var(--craie);
+}
+
+.ch-filtres-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  align-items: center;
+}
+.ch-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  background: rgba(0, 0, 0, 0.32);
+  border: 1px solid var(--bordure);
+  color: var(--craie-dim);
+  border-radius: 999px;
+  padding: 0.4rem 0.85rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.16s ease;
+}
+.ch-chip:hover {
+  border-color: rgba(232, 178, 58, 0.35);
+  color: var(--craie);
+  background: rgba(0, 0, 0, 0.48);
+}
+.ch-chip.actif {
+  background: linear-gradient(145deg, rgba(232, 178, 58, 0.2), rgba(232, 178, 58, 0.08));
+  border-color: var(--or-400);
+  color: var(--or-300);
+  font-weight: 700;
+}
+.ch-chip-badge {
+  font-size: 0.72rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--craie);
+  line-height: 1.2;
+}
+.ch-chip.actif .ch-chip-badge {
+  background: rgba(232, 178, 58, 0.3);
+  color: var(--or-200);
+}
+
+.ch-recherche-resume {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.82rem;
+  color: var(--craie-dim);
+  padding: 0 0.3rem;
+}
+.ch-lien-reset {
+  background: none;
+  border: none;
+  color: var(--or-400);
+  font-size: 0.82rem;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0;
+}
+.ch-lien-reset:hover {
+  color: var(--or-200);
+}
+
+.comp-badge-note {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--craie-dim);
+  white-space: nowrap;
+}
+
+.ch-aucun-resultat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.6rem;
+  padding: 2.8rem 1.5rem;
+  color: var(--craie-dim);
+}
+.ch-aucun-resultat svg {
+  color: var(--or-400);
+  opacity: 0.7;
+  margin-bottom: 0.3rem;
+}
+.ch-aucun-resultat h3 {
+  font-family: var(--police-titre);
+  color: var(--craie);
+  font-size: 1.25rem;
+  margin: 0;
+}
+.ch-aucun-resultat p {
+  margin: 0 0 0.6rem;
+  font-size: 0.92rem;
+  max-width: 44ch;
+}
+
 .bloc-competition {
   padding: 1.2rem 1.4rem; margin-bottom: 1.2rem;
   content-visibility: auto;
