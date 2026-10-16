@@ -241,6 +241,7 @@ export function stockageNeon(url: string): StockageCarriere {
       poidsCache -= blocsChauds.get(cle)!.poids; blocsChauds.delete(cle);
     }
   };
+  let cacheStatsGlobales: { expire: number; valeur: StatistiquesGlobalesCarriere } | undefined;
   const ligne = (r: Record<string, unknown>): LigueStockee => ({
     id: String(r.id), code: String(r.code), version: Number(r.version),
     comptes: r.comptes as string[], etat: r.donnees as EtatCarriereEnLigne,
@@ -577,6 +578,8 @@ export function stockageNeon(url: string): StockageCarriere {
       return Number(r[0]?.n ?? 0);
     },
     async statistiquesGlobales() {
+      const maintenant = Date.now();
+      if (cacheStatsGlobales && cacheStatsGlobales.expire > maintenant) return cacheStatsGlobales.valeur;
       const [
         totaux,
         packsAgg,
@@ -589,120 +592,126 @@ export function stockageNeon(url: string): StockageCarriere {
         sql`select
           (select count(*)::int from carriere_ligues) as ligues,
           (select count(*)::int from comptes) as comptes,
-          (select coalesce(sum(jsonb_array_length(coalesce(donnees->'clubs','[]'::jsonb))),0)::int from carriere_ligues) as clubs,
-          (select count(*)::int from carriere_ligues l cross join lateral jsonb_array_elements(coalesce(l.donnees->'rencontres','[]'::jsonb)) m where m ? 'resultat') as matchs_joues`,
+          (select coalesce(sum(case when jsonb_typeof(donnees->'clubs') = 'array' then jsonb_array_length(donnees->'clubs') else 0 end),0)::int from carriere_ligues) as clubs,
+          (select count(*)::int from carriere_ligues l cross join lateral jsonb_array_elements(case jsonb_typeof(l.donnees->'rencontres') when 'array' then l.donnees->'rencontres' else '[]'::jsonb end) m where m ? 'resultat') as matchs_joues`,
 
         sql`select
           count(*)::int as packs_ouverts,
-          coalesce(sum(abs((t->>'ovas')::bigint)) filter (where (t->>'ovas')::bigint < 0), 0)::bigint as ovas_packs
+          coalesce(sum(case when t->>'ovas' ~ '^-?[0-9]+$' and (t->>'ovas')::bigint < 0 then abs((t->>'ovas')::bigint) else 0 end), 0)::bigint as ovas_packs
         from carriere_ligues l
-        cross join lateral jsonb_array_elements(coalesce(l.donnees->'transactions', '[]'::jsonb)) t
+        cross join lateral jsonb_array_elements(case jsonb_typeof(l.donnees->'transactions') when 'array' then l.donnees->'transactions' else '[]'::jsonb end) t
         where t->>'nature' = 'pack'`,
 
         sql`select
-          coalesce(sum(case when v->>'type'='enchere' then coalesce((v->'enchere'->>'montant')::bigint, (v->>'prix')::bigint) else (v->>'prix')::bigint end), 0)::bigint as volume
+          coalesce(sum(case when v->>'type'='enchere'
+            then coalesce(case when v->'enchere'->>'montant' ~ '^[0-9]+$' then (v->'enchere'->>'montant')::bigint end, case when v->>'prix' ~ '^[0-9]+$' then (v->>'prix')::bigint end, 0)
+            else coalesce(case when v->>'prix' ~ '^[0-9]+$' then (v->>'prix')::bigint end, 0) end), 0)::bigint as volume
         from carriere_ligues l
-        cross join lateral jsonb_array_elements(coalesce(l.donnees->'ventes', '[]'::jsonb)) v
+        cross join lateral jsonb_array_elements(case jsonb_typeof(l.donnees->'ventes') when 'array' then l.donnees->'ventes' else '[]'::jsonb end) v
         where v->>'etat' = 'vendue' and v->>'acheteurId' is not null`,
 
-        sql`with top_clubs as (
+        sql`with packs_par_club as (
           select
             l.id as ligue_id,
-            coalesce(l.donnees->>'nom', 'Ligue') as ligue,
             t->>'clubId' as club_id,
             count(*)::int as packs
           from carriere_ligues l
-          cross join lateral jsonb_array_elements(coalesce(l.donnees->'transactions', '[]'::jsonb)) t
+          cross join lateral jsonb_array_elements(case jsonb_typeof(l.donnees->'transactions') when 'array' then l.donnees->'transactions' else '[]'::jsonb end) t
           where t->>'nature' = 'pack' and t->>'clubId' is not null
-          group by l.id, coalesce(l.donnees->>'nom', 'Ligue'), t->>'clubId'
+          group by l.id, t->>'clubId'
           order by packs desc
           limit 10
         )
         select
-          tc.packs,
-          tc.ligue,
-          coalesce(c->>'pseudo', c->>'nom', 'Manager') as pseudo
-        from top_clubs tc
-        left join carriere_ligues l on l.id = tc.ligue_id
+          p.packs,
+          coalesce(l.donnees->>'nom', 'Ligue') as ligue,
+          coalesce(c.club->>'pseudo', c.club->>'nom', 'Manager') as pseudo
+        from packs_par_club p
+        join carriere_ligues l on l.id = p.ligue_id
         left join lateral (
-          select club from jsonb_array_elements(coalesce(l.donnees->'clubs', '[]'::jsonb)) club
-          where club->>'id' = tc.club_id
+          select club from jsonb_array_elements(case jsonb_typeof(l.donnees->'clubs') when 'array' then l.donnees->'clubs' else '[]'::jsonb end) club
+          where club->>'id' = p.club_id
           limit 1
         ) c on true
-        order by tc.packs desc`,
+        order by p.packs desc`,
 
-        sql`select
-          coalesce(l.donnees->>'nom', 'Ligue') as ligue,
-          count(*)::int as packs
-        from carriere_ligues l
-        cross join lateral jsonb_array_elements(coalesce(l.donnees->'transactions', '[]'::jsonb)) t
-        where t->>'nature' = 'pack'
-        group by l.id, coalesce(l.donnees->>'nom', 'Ligue')
-        order by packs desc
-        limit 10`,
-
-        sql`with packs_candidats as (
+        sql`with packs_par_ligue as (
           select
             l.id as ligue_id,
-            coalesce(l.donnees->>'nom', 'Ligue') as ligue,
-            t->>'clubId' as club_id,
-            t,
-            coalesce((t->'meta'->>'meilleureNote')::int, 0) as note_meta
+            count(*)::int as packs
           from carriere_ligues l
-          cross join lateral jsonb_array_elements(coalesce(l.donnees->'transactions', '[]'::jsonb)) t
+          cross join lateral jsonb_array_elements(case jsonb_typeof(l.donnees->'transactions') when 'array' then l.donnees->'transactions' else '[]'::jsonb end) t
           where t->>'nature' = 'pack'
-          order by note_meta desc, t->>'date' desc
+          group by l.id
+          order by packs desc
+          limit 10
+        )
+        select
+          coalesce(l.donnees->>'nom', 'Ligue') as ligue,
+          p.packs
+        from packs_par_ligue p
+        join carriere_ligues l on l.id = p.ligue_id
+        order by p.packs desc`,
+
+        sql`with top_pack as (
+          select
+            l.id as ligue_id,
+            t->>'clubId' as club_id,
+            t
+          from carriere_ligues l
+          cross join lateral jsonb_array_elements(case jsonb_typeof(l.donnees->'transactions') when 'array' then l.donnees->'transactions' else '[]'::jsonb end) t
+          where t->>'nature' = 'pack'
+          order by coalesce(case when t->'meta'->>'meilleureNote' ~ '^[0-9]+$' then (t->'meta'->>'meilleureNote')::int end, 0) desc, t->>'date' desc
           limit 1
         )
         select
-          p.ligue,
+          coalesce(l.donnees->>'nom', 'Ligue') as ligue,
           p.t,
-          coalesce(c->>'pseudo', c->>'nom', 'Manager') as pseudo,
+          coalesce(c.club->>'pseudo', c.club->>'nom', 'Manager') as pseudo,
           carte.c as carte
-        from packs_candidats p
-        left join carriere_ligues l on l.id = p.ligue_id
+        from top_pack p
+        join carriere_ligues l on l.id = p.ligue_id
         left join lateral (
-          select club from jsonb_array_elements(coalesce(l.donnees->'clubs', '[]'::jsonb)) club
+          select club from jsonb_array_elements(case jsonb_typeof(l.donnees->'clubs') when 'array' then l.donnees->'clubs' else '[]'::jsonb end) club
           where club->>'id' = p.club_id
           limit 1
         ) c on true
         left join lateral (
-          select c from jsonb_array_elements(coalesce(l.donnees->'cartes', '[]'::jsonb)) c
-          where c->>'id' in (select jsonb_array_elements_text(coalesce(p.t->'cartes', '[]'::jsonb)))
-          order by (c->>'note')::int desc limit 1
+          select c from jsonb_array_elements(case jsonb_typeof(l.donnees->'cartes') when 'array' then l.donnees->'cartes' else '[]'::jsonb end) c
+          where c->>'id' in (select jsonb_array_elements_text(case jsonb_typeof(p.t->'cartes') when 'array' then p.t->'cartes' else '[]'::jsonb end))
+          order by case when c->>'note' ~ '^[0-9]+$' then (c->>'note')::int else 0 end desc limit 1
         ) carte on true`,
 
         sql`with top_ventes as (
           select
             l.id as ligue_id,
-            coalesce(l.donnees->>'nom', 'Ligue') as ligue,
             v,
             v->>'carteId' as carte_id,
             v->>'acheteurId' as acheteur_id,
             v->>'joueurNom' as joueur_nom,
             case when v->>'type'='enchere'
-                 then coalesce((v->'enchere'->>'montant')::bigint, (v->>'prix')::bigint)
-                 else (v->>'prix')::bigint end as montant
+                 then coalesce(case when v->'enchere'->>'montant' ~ '^[0-9]+$' then (v->'enchere'->>'montant')::bigint end, case when v->>'prix' ~ '^[0-9]+$' then (v->>'prix')::bigint end, 0)
+                 else coalesce(case when v->>'prix' ~ '^[0-9]+$' then (v->>'prix')::bigint end, 0) end as montant
           from carriere_ligues l
-          cross join lateral jsonb_array_elements(coalesce(l.donnees->'ventes', '[]'::jsonb)) v
+          cross join lateral jsonb_array_elements(case jsonb_typeof(l.donnees->'ventes') when 'array' then l.donnees->'ventes' else '[]'::jsonb end) v
           where v->>'etat' = 'vendue' and v->>'acheteurId' is not null
           order by montant desc
           limit 10
         )
         select
-          tv.ligue,
+          coalesce(l.donnees->>'nom', 'Ligue') as ligue,
           tv.montant,
           coalesce(tv.joueur_nom, carte.c->>'nom', 'Joueur du marché') as joueur,
-          coalesce(c->>'pseudo', c->>'nom', tv.v->>'acheteurNom', 'Acheteur') as pseudo
+          coalesce(c.club->>'pseudo', c.club->>'nom', tv.v->>'acheteurNom', 'Acheteur') as pseudo
         from top_ventes tv
-        left join carriere_ligues l on l.id = tv.ligue_id
+        join carriere_ligues l on l.id = tv.ligue_id
         left join lateral (
-          select club from jsonb_array_elements(coalesce(l.donnees->'clubs', '[]'::jsonb)) club
+          select club from jsonb_array_elements(case jsonb_typeof(l.donnees->'clubs') when 'array' then l.donnees->'clubs' else '[]'::jsonb end) club
           where club->>'id' = tv.acheteur_id
           limit 1
         ) c on true
         left join lateral (
-          select c from jsonb_array_elements(coalesce(l.donnees->'cartes', '[]'::jsonb)) c
+          select c from jsonb_array_elements(case jsonb_typeof(l.donnees->'cartes') when 'array' then l.donnees->'cartes' else '[]'::jsonb end) c
           where c->>'id' = tv.carte_id
           limit 1
         ) carte on true
@@ -742,7 +751,7 @@ export function stockageNeon(url: string): StockageCarriere {
         ligue: String(mp.ligue ?? ''),
       } : undefined;
 
-      return {
+      const resultat: StatistiquesGlobalesCarriere = {
         ligues: Number(t0.ligues ?? 0),
         comptes: Number(t0.comptes ?? 0),
         clubs: Number(t0.clubs ?? 0),
@@ -757,6 +766,8 @@ export function stockageNeon(url: string): StockageCarriere {
         topLiguesPacks,
         topVentes,
       };
+      cacheStatsGlobales = { expire: maintenant + 60_000, valeur: resultat };
+      return resultat;
     },
     async administration() {
       const limite = 2000;
