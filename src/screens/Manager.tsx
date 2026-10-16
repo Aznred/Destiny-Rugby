@@ -350,7 +350,7 @@ export function Manager() {
   );
   const cartesManagerCache = useMemo(() => {
     const map = new Map<string, CarteCarriere>();
-    if (!manager) return map;
+    if (!manager || vue !== 'equipe') return map;
     const comp = competitionEffective(manager.club, manager.division);
     const ch = comp?.nom || manager.divisionNom || manager.division || 'Top 14';
     for (const j of effectifComplet) {
@@ -380,7 +380,7 @@ export function Manager() {
       });
     }
     return map;
-  }, [effectifComplet, manager]);
+  }, [effectifComplet, manager, vue]);
   const compositionMemo = useMemo(
     () => compositionMedicale(effectif, manager?.composition, avancee?.medical),
     [effectif, manager?.composition, avancee?.medical],
@@ -477,26 +477,30 @@ export function Manager() {
   const rencontreSelection = selectionManager?.matchEnAttente;
   const profonde = avancee?.profonde;
   const vieProfonde = vieClubProfonde(profonde, manager.club);
-  const etatsComposition = new Map<string, EtatDuJoueur>();
   // ⚠️ L'ADJOINT NE DÉCIDE PAS SUR UN CHIFFRE CACHÉ : la condition qu'il lit (`etatsPhysiquesManager`) est affichée
   //    sur chaque joueur de la composition (Correctif 41).
-  for (const [id, etat] of etatsPhysiquesManager(avancee ?? undefined, effectifBrut)) {
-    if (etat.fraicheur !== undefined) etatsComposition.set(id, { condition: etat.fraicheur });
-  }
-  for (const dossier of dossiersMedicaux) {
-    etatsComposition.set(dossier.joueurId, {
-      ...etatsComposition.get(dossier.joueurId),
-      condition: dossier.condition, forme: dossier.rythme,
-      blesse: autorisationMedicale(dossier) === 'aucune',
-      tempsBlessure: `${dossier.type} · ${STATUTS_MEDICAUX[bilanMedical(dossier, manager).statut]} · ${bilanMedical(dossier, manager).absence} j`,
-    });
-  }
-  for (const convocation of convocationsActives) {
-    etatsComposition.set(convocation.joueurId, {
-      ...etatsComposition.get(convocation.joueurId),
-      enSelection: true,
-    });
-  }
+  const etatsComposition = useMemo(() => {
+    const map = new Map<string, EtatDuJoueur>();
+    if (vue !== 'equipe') return map;
+    for (const [id, etat] of etatsPhysiquesManager(avancee ?? undefined, effectifBrut)) {
+      if (etat.fraicheur !== undefined) map.set(id, { condition: etat.fraicheur });
+    }
+    for (const dossier of dossiersMedicaux) {
+      map.set(dossier.joueurId, {
+        ...map.get(dossier.joueurId),
+        condition: dossier.condition, forme: dossier.rythme,
+        blesse: autorisationMedicale(dossier) === 'aucune',
+        tempsBlessure: `${dossier.type} · ${STATUTS_MEDICAUX[bilanMedical(dossier, manager).statut]} · ${bilanMedical(dossier, manager).absence} j`,
+      });
+    }
+    for (const convocation of convocationsActives) {
+      map.set(convocation.joueurId, {
+        ...map.get(convocation.joueurId),
+        enSelection: true,
+      });
+    }
+    return map;
+  }, [vue, avancee, effectifBrut, dossiersMedicaux, manager, convocationsActives]);
   // La feuille de l'adjoint pour l'affiche à venir : la même fonction que la composition déléguée.
   const managerAvecEtat = avancee ? { ...manager, avancee } : manager;
   const afficheAVenir = afficheManager && !resultatManager ? afficheManager : null;
@@ -505,21 +509,24 @@ export function Manager() {
     if (!manager.club) return;
     definirComposition(compositionDeLAdjoint(managerAvecEtat, effectifBrut, { affiche: afficheAVenir }));
   };
-  const automatismesComposition = profonde ? Object.fromEntries(
-    SECTEURS_COHESION.map((secteur) => {
-      let total = 0;
-      let poids = 0;
-      composition.titulaires.forEach((id, index) => {
-        const integration = profonde.integrations[id];
-        const posteAligne = POSTES_XV_MANAGER[index];
-        if (!integration || !posteAligne) return;
-        const p = poidsDansSecteur(posteAligne, secteur);
-        total += integration.cohesion * p;
-        poids += p;
-      });
-      return [secteur, Math.round(poids > 0 ? total / poids : 45)];
-    }),
-  ) as Automatismes : undefined;
+  const automatismesComposition = useMemo(() => {
+    if (!profonde || vue !== 'equipe') return undefined;
+    return Object.fromEntries(
+      SECTEURS_COHESION.map((secteur) => {
+        let total = 0;
+        let poids = 0;
+        composition.titulaires.forEach((id, index) => {
+          const integration = profonde.integrations[id];
+          const posteAligne = POSTES_XV_MANAGER[index];
+          if (!integration || !posteAligne) return;
+          const p = poidsDansSecteur(posteAligne, secteur);
+          total += integration.cohesion * p;
+          poids += p;
+        });
+        return [secteur, Math.round(poids > 0 ? total / poids : 45)];
+      }),
+    ) as Automatismes;
+  }, [profonde, vue, composition.titulaires]);
   const decisionStrategique = profonde?.decisionsStrategiques.find((d) => !d.choisie);
   const saisonsMemoire = saisonsChronologie(profonde);
   const chronologieVisible = profonde?.chronologie.filter((e) => e.saison === saisonChronologie).sort((a, b) => a.semaine - b.semaine) ?? [];
@@ -569,23 +576,43 @@ export function Manager() {
     { valeur: '', label: t('mgr.marche.tousPostes') },
     ...POSTES.map((p) => ({ valeur: p.id, label: nomPoste(p.id), sous: `n° ${p.numero}` })),
   ];
-  const optionRole = (id: string): OptionSelecteur[] => {
-    const joueur = effectif.find((j) => j.id === id);
-    return joueur ? [{
-      valeur: joueur.id,
-      label: joueur.nom,
-      sous: `${nomPoste(joueur.poste)} · ${joueur.age} ${t('compo.ans')}`,
-      vignette: <span className="manager-role-note">{joueur.note}</span>,
-    }] : [];
-  };
-  const optionsCapitaines = composition.titulaires.flatMap(optionRole);
-  const optionsButeurs = [...composition.titulaires, ...composition.remplacants].flatMap(optionRole);
+  const optionsCapitaines = useMemo(() => {
+    if (vue !== 'equipe') return [];
+    return composition.titulaires.flatMap((id) => {
+      const joueur = effectif.find((j) => j.id === id);
+      return joueur ? [{
+        valeur: joueur.id,
+        label: joueur.nom,
+        sous: `${nomPoste(joueur.poste)} · ${joueur.age} ${t('compo.ans')}`,
+        vignette: <span className="manager-role-note">{joueur.note}</span>,
+      }] : [];
+    });
+  }, [vue, composition.titulaires, effectif]);
+
+  const optionsButeurs = useMemo(() => {
+    if (vue !== 'equipe') return [];
+    const ids = [...composition.titulaires, ...composition.remplacants];
+    return ids.flatMap((id) => {
+      const joueur = effectif.find((j) => j.id === id);
+      return joueur ? [{
+        valeur: joueur.id,
+        label: joueur.nom,
+        sous: `${nomPoste(joueur.poste)} · ${joueur.age} ${t('compo.ans')}`,
+        vignette: <span className="manager-role-note">{joueur.note}</span>,
+      }] : [];
+    });
+  }, [vue, composition.titulaires, composition.remplacants, effectif]);
+
   // Les autres rôles (Correctif 17) : toute la feuille peut les tenir, et « Automatique » laisse le staff choisir.
-  const optionsAutresRoles: OptionSelecteur[] = [
-    { valeur: '', label: t('rv.roles.auto'), sous: t('rv.roles.autoAide') },
-    ...optionsButeurs,
-  ];
-  const optionsTactiques: Record<keyof TactiqueManager, OptionSelecteur[]> = {
+  const optionsAutresRoles: OptionSelecteur[] = useMemo(() => {
+    if (vue !== 'equipe') return [];
+    return [
+      { valeur: '', label: t('rv.roles.auto'), sous: t('rv.roles.autoAide') },
+      ...optionsButeurs,
+    ];
+  }, [vue, optionsButeurs]);
+
+  const optionsTactiques: Record<keyof TactiqueManager, OptionSelecteur[]> = useMemo(() => ({
     attaque: [
       { valeur: 'equilibre', label: 'Équilibré', sous: 'Alterner jeu au près et au large', vignette: <Icone nom="ballon" taille={16} /> },
       { valeur: 'avants', label: 'Jeu d’avants', sous: 'Insister dans l’axe et les duels', vignette: <Icone nom="equipe" taille={16} /> },
@@ -612,7 +639,7 @@ export function Manager() {
       { valeur: 'standard', label: 'Standards', sous: 'Changer au moment habituel', vignette: <Icone nom="chrono" taille={16} /> },
       { valeur: 'tardifs', label: 'Tardifs', sous: 'Conserver les titulaires plus longtemps', vignette: <Icone nom="batterie" taille={16} /> },
     ],
-  };
+  }), []);
 
   return (
     <motion.section className="carriere-manager" initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}>

@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import type { Manager } from '../types';
 import type { Coequipier } from '../lib/effectif';
 import type { EtatCarriereAvancee, ReponseDiscussion } from '../lib/carriereAvancee';
@@ -5,7 +6,7 @@ import { Selecteur } from './Selecteur';
 import { t } from '../lib/i18n';
 import './InfirmerieManager.css';
 
-export function VestiaireManagerSimple({ manager, effectif, avancee, capitaines, repondre, demande }: {
+export const VestiaireManagerSimple = memo(function VestiaireManagerSimple({ manager, effectif, avancee, capitaines, repondre, demande }: {
   manager: Manager; effectif: Coequipier[]; avancee: EtatCarriereAvancee;
   capitaines: (a: string, b: string, c: string) => void;
   repondre: (id: string, r: ReponseDiscussion) => void;
@@ -32,4 +33,4 @@ export function VestiaireManagerSimple({ manager, effectif, avancee, capitaines,
     <section className="carte"><h3>{t('staff.dressing.importantIssues')}</h3>{problemes.length ? <ul>{problemes.map(r => <li key={r.id}>{t('staff.dressing.conflict', { a: effectif.find(j => j.id === r.joueurA)?.nom ?? '', b: effectif.find(j => j.id === r.joueurB)?.nom ?? '' })}</li>)}</ul> : <p>{t('staff.dressing.noConflict')}</p>}{avancee.promesses.filter(p => p.etat === 'active' && presents.has(p.joueurId)).map(p => <p key={p.id}>{t('staff.dressing.promise', { name: p.nom, progress: p.progression, target: p.objectif, week: p.echeance })}</p>)}</section>
     {(discussions.length > 0 || demandes.length > 0) && <section className="carte"><h3>{t('staff.dressing.importantTalks')}</h3>{discussions.map(d => <article className="discussion-joueur" key={d.id}><b>{d.nom} — {motifs[d.type]}</b><p>{d.texte}</p><div><button onClick={() => repondre(d.id, 'promettre')}>{t('staff.dressing.promiseAction')}</button><button onClick={() => repondre(d.id, 'merite')}>{t('staff.dressing.explainChoices')}</button><button onClick={() => repondre(d.id, 'aucunePromesse')}>{t('staff.dressing.noPromise')}</button></div></article>)}{demandes.map(d => <article className="discussion-joueur" key={d.id}><b>{d.nom} — {motifs[d.type]}</b><div><button onClick={() => demande(d.id, true)}>{t('staff.dressing.accept')}</button><button onClick={() => demande(d.id, false)}>{t('staff.dressing.explainRefusal')}</button></div></article>)}</section>}
   </div>;
-}
+});

@@ -108,15 +108,14 @@ export function meilleureComposition(
 
   const clusters: (ClusterAffinite | null)[] = [null]; // null = note brute
 
-  for (const [valeur, count] of compteursClubs.entries()) {
-    if (count >= 2) clusters.push({ type: 'club', valeur });
-  }
-  for (const [valeur, count] of compteursNations.entries()) {
-    if (count >= 3) clusters.push({ type: 'nation', valeur });
-  }
-  for (const [valeur, count] of compteursChampionnats.entries()) {
-    if (count >= 3) clusters.push({ type: 'championnat', valeur });
-  }
+  // Conserver les clusters dominants pour un calcul rapide et performant
+  const topClubs = [...compteursClubs.entries()].filter(([, c]) => c >= 2).sort((a, b) => b[1] - a[1]).slice(0, 4);
+  const topNations = [...compteursNations.entries()].filter(([, c]) => c >= 3).sort((a, b) => b[1] - a[1]).slice(0, 3);
+  const topChamps = [...compteursChampionnats.entries()].filter(([, c]) => c >= 3).sort((a, b) => b[1] - a[1]).slice(0, 3);
+
+  for (const [valeur] of topClubs) clusters.push({ type: 'club', valeur });
+  for (const [valeur] of topNations) clusters.push({ type: 'nation', valeur });
+  for (const [valeur] of topChamps) clusters.push({ type: 'championnat', valeur });
 
   // Fonction d'évaluation globale : Collectif + Note du XV, pénalisant tout malus hors-poste
   const evaluerFeuille = (selection: number[]): number => {
@@ -253,7 +252,7 @@ export function meilleureComposition(
     }
   }
 
-  if (!meilleurChoixGlobal) return null;
+  if (!meilleurChoixGlobal || meilleurScoreGlobal < 0) return null;
 
   const feuille = meilleurChoixGlobal.map((j) => joueurs[j]);
   const xv = feuille.slice(0, 15);

@@ -1,4 +1,4 @@
-import { useId } from 'react';
+import { memo, useId } from 'react';
 import type { CarteCarriere } from '../lib/ligue/typesCarriere';
 import { nomRaretePack } from '../lib/presentationPacks';
 import { locale, t } from '../lib/i18n';
@@ -179,7 +179,7 @@ function ArtInfluenceur({ id }: { id: string }) {
   </svg>;
 }
 
-export function CarteJoueurEnLigne({ carte, proprietaire, logoClub, onClick, compacte = false, etatCollection }: {
+export const CarteJoueurEnLigne = memo(function CarteJoueurEnLigne({ carte, proprietaire, logoClub, onClick, compacte = false, etatCollection }: {
   carte: CarteCarriere; proprietaire?: string; logoClub?: string; onClick?: () => void; compacte?: boolean; etatCollection?: 'inconnue' | 'decouverte';
 }) {
   const id = useId().replaceAll(':', '');
@@ -248,4 +248,4 @@ export function CarteJoueurEnLigne({ carte, proprietaire, logoClub, onClick, com
       );
     })()}
   </Balise>;
-}
+});

@@ -22,7 +22,7 @@ import { useGlisserDeposer } from './GlisserDeposer';
 // de ne rien montrer. `etats` est donc facultatif, et les deux jauges du bas de
 // carte disparaissent quand il est absent.
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, memo } from 'react';
 import type { DragEvent, RefObject, ReactNode } from 'react';
 import { nomPoste, POSTE_PAR_ID } from '../data/rugby';
 import { t } from '../lib/i18n';
@@ -184,7 +184,7 @@ function PortraitComposition({ joueur, panneau = false }: { joueur: PorteurDImag
   );
 }
 
-function CarteJoueur({
+const CarteJoueur = memo(function CarteJoueur({
   joueur, numero, posteSlot, selectionne, capitaine, buteur, etat, compact,
   poignee, depot, rendreCarte, rendreSousCarte, enGlisse, cibleDepot, surSelection, surDrag, surDragFin, surSurvolDepot, surDrop,
 }: {
@@ -322,7 +322,7 @@ function CarteJoueur({
       </>}
     </button>
   );
-}
+});
 
 /** Le panneau latéral, ouvert quand une carte est sélectionnée. */
 function PanneauJoueur({

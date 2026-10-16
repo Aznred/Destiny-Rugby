@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Icone } from './Icone';
 import { CarteJoueurEnLigne } from './CarteJoueurEnLigne';
 import { Selecteur } from './Selecteur';
@@ -140,7 +140,7 @@ export function CompositionCollectionSolo({ cartes, onFermer, onEnregistrer }: P
         }
       } catch {}
     }
-    return meilleureComposition(cartes, Date.now()) ?? COMPOSITION_VIDE;
+    return COMPOSITION_VIDE;
   }, [cartes]);
 
   const composition = useMemo(
@@ -149,7 +149,20 @@ export function CompositionCollectionSolo({ cartes, onFermer, onEnregistrer }: P
   );
 
   const modifie = brouillon !== null;
-  const optimale = useMemo(() => meilleureComposition(cartes, Date.now()), [cartes]);
+  const [assemblageEnCours, setAssemblageEnCours] = useState(false);
+  const assemblerMeilleureEquipe = useCallback(() => {
+    if (assemblageEnCours || cartes.length < 23) return;
+    setAssemblageEnCours(true);
+    setTimeout(() => {
+      try {
+        const opt = meilleureComposition(cartes, Date.now());
+        if (opt) setBrouillon(opt);
+      } finally {
+        setAssemblageEnCours(false);
+      }
+    }, 16);
+  }, [assemblageEnCours, cartes]);
+  const cartesMap = useMemo(() => new Map(cartes.map(c => [c.id, c])), [cartes]);
 
   const effectifComplet = useMemo(() => cartes.map(carteEnJoueur), [cartes]);
   const indisponibles = useMemo(() => new Set<string>(), []);
@@ -361,14 +374,12 @@ export function CompositionCollectionSolo({ cartes, onFermer, onEnregistrer }: P
         <button
           type="button"
           className="btn primaire cel-btn-assembler"
-          disabled={!optimale}
-          onClick={() => {
-            if (optimale) setBrouillon(optimale);
-          }}
+          disabled={assemblageEnCours || cartes.length < 23}
+          onClick={assemblerMeilleureEquipe}
           title={t('compoSolo.buildBestHelp')}
         >
           <Icone nom="eclair" taille={16} />
-          <span>{t('compoSolo.buildBest')}</span>
+          <span>{assemblageEnCours ? 'Assemblage...' : t('compoSolo.buildBest')}</span>
         </button>
 
         <details className="cel-details-outils">
@@ -508,7 +519,7 @@ export function CompositionCollectionSolo({ cartes, onFermer, onEnregistrer }: P
 
       <CompositionTerrainManager
         rendreCarte={(joueur: Coequipier) => {
-          const carte = cartes.find((c) => c.id === joueur.id);
+          const carte = cartesMap.get(joueur.id);
           if (!carte) return null;
           return <CarteJoueurEnLigne carte={carte} compacte proprietaire={t('compoSolo.myCollection')} />;
         }}
@@ -533,9 +544,7 @@ export function CompositionCollectionSolo({ cartes, onFermer, onEnregistrer }: P
         indisponibles={indisponibles}
         onCapitaine={(id: string) => setBrouillon({ ...composition, capitaineId: id })}
         onButeur={(id: string) => setBrouillon({ ...composition, buteurId: id })}
-        onMeilleureEquipe={() => {
-          if (optimale) setBrouillon(optimale);
-        }}
+        onMeilleureEquipe={assemblerMeilleureEquipe}
       />
     </div>
     </div>
