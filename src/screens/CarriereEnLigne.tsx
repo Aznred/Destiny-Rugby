@@ -2533,6 +2533,8 @@ function PochetteRecord({ rarete }: { rarete: CarteCarriere['rarete'] }) {
 function StatistiquesSecretes() {
   const [stats, setStats] = useState<StatistiquesGlobalesCarriere | null>(null);
   const [erreur, setErreur] = useState('');
+  const [section, setSection] = useState<'packeurs' | 'ligues' | 'ventes'>('packeurs');
+
   useEffect(() => {
     const controleur = new AbortController();
     void chargerStatistiquesGlobales(controleur.signal).then(setStats).catch(e => {
@@ -2540,8 +2542,21 @@ function StatistiquesSecretes() {
     });
     return () => controleur.abort();
   }, []);
+
   if (erreur) return <Vide icone="alerte" titre={t("online.records.errorTitle")}>{erreur}</Vide>;
   if (!stats) return <Vide icone="chrono" titre={t("online.records.calculatingTitle")}>{t("online.records.calculatingHelp")}</Vide>;
+
+  const topOuvreurs = stats.topOuvreurs ?? (stats.meilleurOuvreur ? [stats.meilleurOuvreur] : []);
+  const topLiguesPacks = stats.topLiguesPacks ?? [];
+  const topVentes = stats.topVentes ?? (stats.plusGrosAchat ? [stats.plusGrosAchat] : []);
+
+  const medaille = (index: number) => {
+    if (index === 0) return '🥇';
+    if (index === 1) return '🥈';
+    if (index === 2) return '🥉';
+    return `${index + 1}.`;
+  };
+
   return <section className="cel-panneau cel-stats-secret">
     <div className="cel-titre-ligne"><div><div className="eyebrow">{t("ui.d9fee1faad63")}</div><h2>{t("ui.4d1902a92629")}</h2></div><Icone nom="medaille" taille={28} /></div>
     <div className="cel-stats-compteurs">
@@ -2558,6 +2573,98 @@ function StatistiquesSecretes() {
       <article>{stats.meilleurPack && <PochetteRecord rarete={stats.meilleurPack.apparence} />}<div><small>{t("online.history.bestPack")}</small><b>{stats.meilleurPack?.joueur ?? t("online.history.noRecordYet")}</b><span>{stats.meilleurPack ? t("ui.a56e004fedea", { v0: stats.meilleurPack.note, v1: stats.meilleurPack.pseudo, v2: stats.meilleurPack.ligue }) : '—'}</span></div></article>
       <article><Icone nom="poignee" taille={24} /><div><small>{t("online.history.biggestBuy")}</small><b>{stats.plusGrosAchat?.joueur || t("online.history.noSalesYet")}</b><span>{stats.plusGrosAchat ? t("ui.bdf0c247a2ad", { v0: montant(stats.plusGrosAchat.montant), v1: stats.plusGrosAchat.pseudo, v2: stats.plusGrosAchat.ligue }) : '—'}</span></div></article>
     </div>
+
+    <div className="cel-admin-outils" style={{ marginTop: '1.8rem', marginBottom: '0.8rem' }}>
+      <nav className="cel-onglets secondaires" aria-label="Classements Top 10">
+        <button className={section === 'packeurs' ? 'actif' : ''} onClick={() => setSection('packeurs')}>
+          {t('ks.topPackeurs')} {topOuvreurs.length > 0 && `(${topOuvreurs.length})`}
+        </button>
+        <button className={section === 'ligues' ? 'actif' : ''} onClick={() => setSection('ligues')}>
+          {t('ks.topLigues')} {topLiguesPacks.length > 0 && `(${topLiguesPacks.length})`}
+        </button>
+        <button className={section === 'ventes' ? 'actif' : ''} onClick={() => setSection('ventes')}>
+          {t('ks.topVentes')} {topVentes.length > 0 && `(${topVentes.length})`}
+        </button>
+      </nav>
+    </div>
+
+    {section === 'packeurs' && (
+      <div className="cel-table-scroll">
+        <table className="cel-table cel-admin-table">
+          <thead>
+            <tr>
+              <th style={{ width: '3.5rem' }}>{t('ks.rang')}</th>
+              <th>{t('ui.dacd47619a72')}</th>
+              <th>{t('compoSolo.league')}</th>
+              <th style={{ textAlign: 'right' }}>{t('ks.packsOuverts')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {topOuvreurs.map((o, idx) => (
+              <tr key={`${o.pseudo}-${o.ligue}-${idx}`}>
+                <td><b>{medaille(idx)}</b></td>
+                <th>{o.pseudo}</th>
+                <td>{o.ligue}</td>
+                <td style={{ textAlign: 'right' }}><b>{montant(o.packs)}</b></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {!topOuvreurs.length && <p className="cel-note">{t('ks.aucun')}</p>}
+      </div>
+    )}
+
+    {section === 'ligues' && (
+      <div className="cel-table-scroll">
+        <table className="cel-table cel-admin-table">
+          <thead>
+            <tr>
+              <th style={{ width: '3.5rem' }}>{t('ks.rang')}</th>
+              <th>{t('compoSolo.league')}</th>
+              <th style={{ textAlign: 'right' }}>{t('ks.packsOuverts')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {topLiguesPacks.map((l, idx) => (
+              <tr key={`${l.ligue}-${idx}`}>
+                <td><b>{medaille(idx)}</b></td>
+                <th>{l.ligue}</th>
+                <td style={{ textAlign: 'right' }}><b>{montant(l.packs)}</b></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {!topLiguesPacks.length && <p className="cel-note">{t('ks.aucun')}</p>}
+      </div>
+    )}
+
+    {section === 'ventes' && (
+      <div className="cel-table-scroll">
+        <table className="cel-table cel-admin-table">
+          <thead>
+            <tr>
+              <th style={{ width: '3.5rem' }}>{t('ks.rang')}</th>
+              <th>{t('ui.44fb4db9dbb5')}</th>
+              <th style={{ textAlign: 'right' }}>{t('ks.montant')}</th>
+              <th>{t('ks.acheteur')}</th>
+              <th>{t('compoSolo.league')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {topVentes.map((v, idx) => (
+              <tr key={`${v.joueur}-${v.ligue}-${idx}`}>
+                <td><b>{medaille(idx)}</b></td>
+                <th>{v.joueur}</th>
+                <td style={{ textAlign: 'right' }}><b>{montant(v.montant)} ovas</b></td>
+                <td>{v.pseudo}</td>
+                <td>{v.ligue}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {!topVentes.length && <p className="cel-note">{t('ks.aucun')}</p>}
+      </div>
+    )}
   </section>;
 }
 

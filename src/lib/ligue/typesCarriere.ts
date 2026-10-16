@@ -218,6 +218,9 @@ export interface StatistiquesGlobalesCarriere {
   meilleurOuvreur?: { pseudo: string; packs: number; ligue: string };
   meilleurPack?: { pseudo: string; pack: string; apparence: RareteCarriere; note: number; joueur: string; portrait?: string; ligue: string };
   plusGrosAchat?: { pseudo: string; joueur: string; montant: number; ligue: string };
+  topOuvreurs?: { pseudo: string; packs: number; ligue: string }[];
+  topLiguesPacks?: { ligue: string; packs: number }[];
+  topVentes?: { pseudo: string; joueur: string; montant: number; ligue: string }[];
 }
 export interface AdministrationCarriere {
   comptes: {

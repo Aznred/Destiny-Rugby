@@ -464,21 +464,42 @@ export function stockageFichier(fichier: string): StockageCarriere {
     async statistiquesGlobales() {
       const vues = base.ligues.flatMap(l => l.etat.clubs[0] ? [{ ligue: l.etat.nom, etat: l.etat, stats: vueCarriere(l.etat, l.etat.clubs[0].compteId).statistiques }] : []);
       const ouvreurs = vues.flatMap(v => v.stats.parClub.map(c => ({ pseudo: c.pseudo, packs: c.packs, ligue: v.ligue }))).sort((a, b) => b.packs - a.packs);
+      const topOuvreurs = ouvreurs.slice(0, 10);
       const meilleurs = vues.flatMap(v => v.stats.meilleurPack ? [{ ...v.stats.meilleurPack, ligue: v.ligue }] : []).sort((a, b) => b.note - a.note);
-      const achats = vues.flatMap(v => v.stats.plusGrosAchat ? [{ ...v.stats.plusGrosAchat, ligue: v.ligue }] : []).sort((a, b) => b.montant - a.montant);
-      const transactions = base.ligues.flatMap(l => l.etat.transactions);
+      const ventes = base.ligues.flatMap(l => (l.etat.ventes ?? []).filter(v => v.etat === 'vendue' && v.acheteurId).map(v => {
+        const montant = v.type === 'enchere' ? v.enchere?.montant ?? v.prix : v.prix;
+        const club = l.etat.clubs.find(c => c.id === v.acheteurId);
+        const carte = l.etat.cartes?.find(c => c.id === v.carteId);
+        return {
+          pseudo: club?.pseudo ?? club?.nom ?? v.acheteurNom ?? 'Acheteur',
+          joueur: v.joueurNom ?? carte?.nom ?? 'Joueur du marché',
+          montant,
+          ligue: l.etat.nom,
+        };
+      })).sort((a, b) => b.montant - a.montant);
+      const topVentes = ventes.slice(0, 10);
+      const liguesPacks = base.ligues.map(l => ({
+        ligue: l.etat.nom,
+        packs: (l.etat.transactions ?? []).filter(t => t.nature === 'pack').length,
+      })).filter(l => l.packs > 0).sort((a, b) => b.packs - a.packs).slice(0, 10);
+      const transactions = base.ligues.flatMap(l => l.etat.transactions ?? []);
       return {
         ligues: base.ligues.length, comptes: base.comptes.length,
         clubs: base.ligues.reduce((n, l) => n + l.etat.clubs.length, 0),
         packsOuverts: transactions.filter(t => t.nature === 'pack').length,
-        matchsJoues: base.ligues.reduce((n, l) => n + l.etat.rencontres.filter(m => m.resultat).length, 0),
+        matchsJoues: base.ligues.reduce((n, l) => n + (l.etat.rencontres ?? []).filter(m => m.resultat).length, 0),
         ovasDepensesPacks: transactions.filter(t => t.nature === 'pack' && t.ovas < 0).reduce((n, t) => n - t.ovas, 0),
-        volumeMarche: base.ligues.flatMap(l => l.etat.ventes).filter(v => v.etat === 'vendue').reduce((n, v) => n + (v.type === 'enchere' ? v.enchere?.montant ?? v.prix : v.prix), 0),
-        meilleurOuvreur: ouvreurs[0], meilleurPack: meilleurs[0], plusGrosAchat: achats[0],
+        volumeMarche: ventes.reduce((n, v) => n + v.montant, 0),
+        meilleurOuvreur: topOuvreurs[0],
+        meilleurPack: meilleurs[0],
+        plusGrosAchat: topVentes[0],
+        topOuvreurs,
+        topLiguesPacks: liguesPacks,
+        topVentes,
       };
     },
     async administration() {
-      const limite = 500;
+      const limite = 2000;
       return {
         comptes: base.comptes.slice(-limite).reverse().map(c => ({
           id: c.id, identifiant: c.identifiant, pseudo: c.pseudo, creeLe: c.creeLe, vuLe: c.vuLe,
