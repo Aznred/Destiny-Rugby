@@ -1,22 +1,23 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 
 import { useGame } from '../store/useGame';
-import { COMPETITIONS } from '../data/clubs';
+import { COMPETITIONS_MASCULINES } from '../data/clubs';
 import { COUPES_EUROPE } from '../data/mondeReel';
 import { SELECTIONS_SENIOR, SELECTIONS_U20, type Selection } from '../data/selections';
 import { Drapeau } from '../components/Drapeau';
 import { aDrapeau, nomNationTraduit } from '../lib/nations';
 import { LogoCompet } from '../components/LogoCompet';
 import { NOTE_CLUB_REEL, NOTE_CLUB_NOUVEAU } from '../data/sourcesDuMonde';
+import { competitionsFeminines, noteClubFeminin } from '../lib/mondeFeminin';
 import { noteAmateur } from '../lib/effectif';
 import { Blason, LogoEquipe } from '../components/Blason';
 import { FicheClub } from '../components/FicheClub';
-import type { Club } from '../types';
+import type { Club, Competition } from '../types';
 import { t, tn } from '../lib/i18n';
 
 import { Icone } from '../components/Icone';
-type Zone = 'France' | 'Monde' | 'Nations';
+type Zone = 'France' | 'Monde' | 'Feminin' | 'Nations';
 
 // La note affichée sur la carte d'un club : celle de la base d'origine, sinon
 // celle des nouvelles ligues, sinon celle qu'on tire pour lui.
@@ -28,17 +29,48 @@ type Zone = 'France' | 'Monde' | 'Nations';
 // du nom du club, de façon déterministe, et c'est LA MÊME qui sert à composer
 // son effectif — la note affichée et l'équipe qu'on voit dans la fiche disent
 // donc la même chose.
-function noteAffichee(nom: string, niveau: number): number {
+function noteAffichee(nom: string, niveau: number, feminin = false): number {
+  if (feminin) {
+    return noteClubFeminin(nom) ?? 70;
+  }
   return NOTE_CLUB_REEL[nom] ?? NOTE_CLUB_NOUVEAU[nom] ?? noteAmateur(nom, niveau);
 }
 
 export function Championnats() {
   const [zone, setZone] = useState<Zone>('France');
   // Club dont on affiche l'effectif (clic sur une carte).
-  const [fiche, setFiche] = useState<{ club: Club; competition: string } | null>(null);
+  const [fiche, setFiche] = useState<{ club: Club; competition: string; feminin?: boolean } | null>(null);
   // L'effectif est celui de la saison en cours si une carrière tourne.
   const saison = useGame((s) => s.joueur?.saison ?? s.manager?.saison ?? 1);
-  const comps = COMPETITIONS.filter((c) => c.zone === zone);
+  const comps = COMPETITIONS_MASCULINES.filter((c) => c.zone === zone);
+
+  const [filtreFeminin, setFiltreFeminin] = useState<'toutes' | 'france' | 'monde'>('toutes');
+  const [rechercheFeminin, setRechercheFeminin] = useState('');
+  const compsFeminines = useMemo(() => competitionsFeminines(), []);
+
+  const compsFemininesAffichees = useMemo(() => {
+    let liste = compsFeminines;
+    if (filtreFeminin === 'france') {
+      liste = liste.filter((c) => c.pays.toLowerCase() === 'france' || c.zone === 'France');
+    } else if (filtreFeminin === 'monde') {
+      liste = liste.filter((c) => c.pays.toLowerCase() !== 'france' && c.zone !== 'France');
+    }
+    const q = rechercheFeminin.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    if (!q) return liste;
+    return liste
+      .map((c) => {
+        const matchComp =
+          c.nom.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').includes(q) ||
+          c.pays.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').includes(q);
+        const matchingClubs = c.clubs.filter((k) =>
+          k.nom.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').includes(q)
+        );
+        if (matchComp) return c;
+        if (matchingClubs.length > 0) return { ...c, clubs: matchingClubs };
+        return null;
+      })
+      .filter((c): c is Competition => c !== null);
+  }, [compsFeminines, filtreFeminin, rechercheFeminin]);
 
   return (
     <motion.section
@@ -60,12 +92,15 @@ export function Championnats() {
         <button className={zone === 'Monde' ? 'actif' : ''} onClick={() => setZone('Monde')}>
           <Icone nom="monde" taille={16} /> {t('ch.monde')}
         </button>
+        <button className={zone === 'Feminin' ? 'actif' : ''} onClick={() => setZone('Feminin')}>
+          <Icone nom="etoile" taille={16} /> {t('ch.feminin') || 'Féminin'}
+        </button>
         <button className={zone === 'Nations' ? 'actif' : ''} onClick={() => setZone('Nations')}>
           <Icone nom="drapeau" taille={16} /> {t('ch.selections')}
         </button>
       </div>
 
-      {zone !== 'Nations' &&
+      {(zone === 'France' || zone === 'Monde') &&
         comps.map((comp) => (
           <BlocCompetition
             key={comp.id}
@@ -97,6 +132,71 @@ export function Championnats() {
           />
         ))}
 
+      {zone === 'Feminin' && (
+        <>
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', marginBottom: '1.2rem' }}>
+            <div className="onglets-classement" style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', margin: 0 }}>
+              <button
+                type="button"
+                className={`chip-comp ${filtreFeminin === 'toutes' ? 'actif' : ''}`}
+                onClick={() => setFiltreFeminin('toutes')}
+              >
+                {t('ch.toutes') || 'Toutes'} ({compsFeminines.length})
+              </button>
+              <button
+                type="button"
+                className={`chip-comp ${filtreFeminin === 'france' ? 'actif' : ''}`}
+                onClick={() => setFiltreFeminin('france')}
+              >
+                {t('ch.france')} ({compsFeminines.filter((c) => c.pays.toLowerCase() === 'france' || c.zone === 'France').length})
+              </button>
+              <button
+                type="button"
+                className={`chip-comp ${filtreFeminin === 'monde' ? 'actif' : ''}`}
+                onClick={() => setFiltreFeminin('monde')}
+              >
+                {t('ch.international') || 'International'} ({compsFeminines.filter((c) => c.pays.toLowerCase() !== 'france' && c.zone !== 'France').length})
+              </button>
+            </div>
+
+            <div style={{ position: 'relative', minWidth: '220px', flex: '1 1 220px', maxWidth: '360px' }}>
+              <input
+                type="search"
+                className="champ"
+                style={{ width: '100%', padding: '0.45rem 0.8rem 0.45rem 2.2rem', borderRadius: '999px', fontSize: '0.88rem' }}
+                placeholder={t('ch.rechercherClub') || 'Rechercher un club, championnat...'}
+                value={rechercheFeminin}
+                onChange={(e) => setRechercheFeminin(e.target.value)}
+              />
+              <span style={{ position: 'absolute', left: '0.8rem', top: '50%', transform: 'translateY(-50%)', opacity: 0.5, pointerEvents: 'none' }}>
+                <Icone nom="loupe" taille={15} />
+              </span>
+            </div>
+          </div>
+
+          {compsFemininesAffichees.length === 0 ? (
+            <div className="carte" style={{ padding: '2rem', textAlign: 'center', color: 'var(--craie-dim)' }}>
+              {t('ch.aucunResultat') || 'Aucun club ou championnat féminin trouvé.'}
+            </div>
+          ) : (
+            compsFemininesAffichees.map((comp) => (
+              <BlocCompetition
+                key={comp.id}
+                id={comp.id}
+                nom={comp.nom}
+                pays={comp.pays}
+                drapeaux={comp.drapeaux}
+                clubs={comp.clubs}
+                note={comp.note}
+                niveau={comp.niveau}
+                feminin={true}
+                onClub={(club) => setFiche({ club, competition: comp.nom, feminin: true })}
+              />
+            ))
+          )}
+        </>
+      )}
+
       {zone === 'Nations' && (
         <>
           <BlocSelections
@@ -119,6 +219,7 @@ export function Championnats() {
           club={fiche.club}
           competition={fiche.competition}
           saison={saison}
+          feminin={fiche.feminin}
           onFermer={() => setFiche(null)}
         />
       )}
@@ -164,7 +265,7 @@ function BlocSelections({
 }
 
 function BlocCompetition({
-  id, nom, pays, drapeaux, clubs, note, niveau, onClub,
+  id, nom, pays, drapeaux, clubs, note, niveau, feminin = false, onClub,
 }: {
   id: string;
   nom: string;
@@ -175,6 +276,7 @@ function BlocCompetition({
   /** Étage de la compétition (0 = Top 14, 10 = Régionale 3) : c'est autour de
    *  lui que se tire la note d'un club amateur. */
   niveau: number;
+  feminin?: boolean;
   onClub: (club: Club) => void;
 }) {
   return (
@@ -215,7 +317,7 @@ function BlocCompetition({
                 classement : la Didi 10 et la Serie A Elite s'affichaient donc
                 sans aucune note. */}
             <span className="club-note" title={t('ch.noteClub')}>
-              {noteAffichee(club.nom, niveau)}
+              {noteAffichee(club.nom, niveau, feminin)}
             </span>
           </button>
         ))}

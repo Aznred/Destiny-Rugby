@@ -1,9 +1,12 @@
 import { useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
-import { effectifDuClub, forceEffectif, noteDuClub, estEspoir, estDeclinant } from '../lib/effectif';
+import { effectifDuClub, forceEffectif, noteDuClub, estEspoir, estDeclinant, type Coequipier } from '../lib/effectif';
 import { aEffectifReel, EFFECTIFS_AMATEURS } from '../data/sourcesDuMonde';
 import { generationDuClub, libelleGeneration } from '../lib/generations';
+import { MONDE_FEMININ } from '../lib/mondeActif';
+import { effectifFeminin } from '../data/mondeFeminin.generated';
+import { noteClubFeminin } from '../lib/mondeFeminin';
 import { POSTES, nomPoste } from '../data/rugby';
 import { t } from '../lib/i18n';
 import { Blason } from './Blason';
@@ -20,20 +23,61 @@ export function FicheClub({
   club,
   competition,
   saison,
+  feminin,
   onFermer,
 }: {
   club: Club;
   competition?: string;
   saison: number;
+  feminin?: boolean;
   onFermer: () => void;
 }) {
+  const isFeminin = feminin ?? MONDE_FEMININ;
   const catalogue = useCatalogueSolo();
-  const effectif = useMemo(() => effectifDuClub(club.nom, saison), [club.nom, saison, catalogue]);
-  const noteClub = noteDuClub(club.nom);
-  const force = Math.round(forceEffectif(club.nom, saison));
-  const reel = aEffectifReel(club.nom) || club.nom in EFFECTIFS_AMATEURS;
-  const gen = generationDuClub(club.nom, saison, noteDuClub(club.nom));
-  const generation = libelleGeneration(gen);
+  const effectif = useMemo(() => {
+    if (isFeminin) {
+      const brut = effectifFeminin(club.nom) ?? [];
+      return brut.map((j, idx): Coequipier => ({
+        id: `fem-${club.nom}-${idx}-${j.nom}`,
+        nom: j.nom,
+        poste: j.poste,
+        age: j.age,
+        note: j.note,
+        potentiel: j.potentiel,
+        nation: j.nation,
+        regen: false,
+        gender: 'female',
+        photo: j.photo,
+        clubReel: club.nom,
+        championnat: competition,
+      }));
+    }
+    return effectifDuClub(club.nom, saison);
+  }, [club.nom, saison, catalogue, isFeminin, competition]);
+
+  const noteClub = useMemo(() => {
+    if (isFeminin) {
+      const noteDef = noteClubFeminin(club.nom);
+      if (noteDef !== undefined) return noteDef;
+      if (effectif.length > 0) {
+        return Math.round(effectif.reduce((acc, j) => acc + j.note, 0) / effectif.length);
+      }
+      return 70;
+    }
+    return noteDuClub(club.nom);
+  }, [club.nom, isFeminin, effectif]);
+
+  const force = useMemo(() => {
+    if (isFeminin) {
+      if (effectif.length === 0) return noteClub;
+      return Math.round(effectif.reduce((acc, j) => acc + j.note, 0) / effectif.length);
+    }
+    return Math.round(forceEffectif(club.nom, saison));
+  }, [isFeminin, effectif, noteClub, club.nom, saison]);
+
+  const reel = isFeminin ? true : (aEffectifReel(club.nom) || club.nom in EFFECTIFS_AMATEURS);
+  const gen = isFeminin ? null : generationDuClub(club.nom, saison, noteDuClub(club.nom));
+  const generation = gen ? libelleGeneration(gen) : null;
 
   // Échap ferme la fiche.
   useEffect(() => {
@@ -65,13 +109,13 @@ export function FicheClub({
             <h2>{club.nom}</h2>
             <p className="fiche-club-stats">
               {t('eff.noteClub')} <b>{noteClub}</b> · {t('eff.effectifNote')} <b>{force}</b> ·{' '}
-              {effectif.length} {t('gen.joueurs')}{reel ? ` · ${t('fc.effectifReel')}` : ` · ${t('fc.effectifSimule')}`}
+              {effectif.length} {isFeminin ? (t('gen.joueuses') || 'joueuses') : t('gen.joueurs')}{reel ? ` · ${t('fc.effectifReel')}` : ` · ${t('fc.effectifSimule')}`}
             </p>
             {/* ⚠️ LA GÉNÉRATION DU CLUB SE VOIT. Un effectif qui prend cinq
                 points sans explication, c'est du bruit ; annoncé, c'est une
                 histoire — et c'est ce qui rend un outsider crédible quand il
                 vient chercher le Bouclier. */}
-            {generation && (
+            {gen && generation && (
               <p className={`pastille-generation${gen.doree ? ' doree' : ' creuse'}`}>
                 {generation}
                 <span>

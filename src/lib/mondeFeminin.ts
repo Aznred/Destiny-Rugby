@@ -20,12 +20,25 @@ export function championnatDuClubFeminin(club: string): ChampionnatFeminin | und
   return CHAMPIONNATS_FEMININS.find(c => c.clubs.some(k => k.nom === club));
 }
 
+/** Table des notes des clubs féminins indexée par nom. */
+export const NOTE_CLUB_FEMININ: Record<string, number> = Object.fromEntries(
+  CHAMPIONNATS_FEMININS.flatMap((c) => c.clubs.map((k) => [k.nom, k.note]))
+);
+
+export function noteClubFeminin(nom: string): number | undefined {
+  return NOTE_CLUB_FEMININ[nom];
+}
+
 /** Un championnat féminin comme une `Competition` du jeu : même forme que le Top 14 ou la Premiership. */
 export function competitionDepuisChampionnat(c: ChampionnatFeminin): Competition {
   const rang = c.france ? pyramideFrancaise().findIndex(p => p.id === c.id) + 1 : 0;
+  const drapeaux = c.id === 'f-celtic' ? ['ie', 'gb-sct', 'gb-wls'] : [c.drapeau];
+  const reelles = c.clubs.reduce((acc, k) => acc + (k.reelles ?? 0), 0);
+  const note = `${c.clubs.length} clubs · ${reelles} joueuses réelles`;
   return {
-    id: c.id, nom: c.nom, pays: c.pays, drapeaux: [c.drapeau], emoji: '', niveau: rang, zone: c.france ? 'France' : 'Monde',
+    id: c.id, nom: c.nom, pays: c.pays, drapeaux, emoji: '', niveau: rang, zone: c.france ? 'France' : 'Monde',
     clubs: c.clubs.map((k): Club => ({ nom: k.nom, c1: k.c1, c2: k.c2, ...(k.logo ? { logo: k.logo } : {}) })),
+    note,
   };
 }
 export const competitionsFeminines = (): Competition[] => championnatsJouables().map(competitionDepuisChampionnat);

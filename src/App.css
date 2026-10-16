@@ -2431,7 +2431,7 @@
 /* ====== CHAMPIONNATS / CLUBS ====== */
 .championnats { width: min(1100px, 92vw); margin: 2rem auto 4rem; }
 .championnats h1 { font-family: var(--police-titre); text-transform: uppercase; font-size: clamp(1.8rem, 5vw, 3rem); }
-.onglets { display: flex; gap: 0.5rem; margin-bottom: 1.4rem; }
+.onglets { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.4rem; }
 .onglets button {
   padding: 0.55rem 1.2rem; border-radius: 999px; font-weight: 700; font-size: 0.95rem;
   border: 1px solid var(--bordure); background: transparent; color: var(--craie-dim);
