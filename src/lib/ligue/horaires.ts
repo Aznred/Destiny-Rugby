@@ -24,3 +24,26 @@ export function horairesChampionnat(lancement: number, rythme: number, ronde: nu
   const creneaux = soiree(jour).filter(heure => heure >= lancement);
   return Array.from({ length: nombre }, (_, i) => creneaux[(i + ronde) % creneaux.length]);
 }
+
+/**
+ * Une saison accélérée ne doit pas transformer chaque match en dette physique.
+ * La base reste exigeante à un rendez-vous hebdomadaire ; chaque cran de rythme
+ * rend trois points de fatigue supplémentaires entre deux rencontres.
+ */
+export function recuperationFatigueSelonRythme(rythme: number): number {
+  const cadence = Math.max(1, Math.min(7, Math.round(rythme)));
+  return 22 + (cadence - 1) * 3;
+}
+
+/**
+ * Récupération passive par jour de repos entre les matchs.
+ * À un rythme hebdomadaire (rythme 1), les joueurs regagnent ~5 points de fatigue
+ * par jour de repos (~35 points sur 7 jours, effaçant les 32 points d'un match de 80 min).
+ * Plus le rythme de la ligue est accéléré, plus la récupération par jour augmente.
+ */
+export function recuperationFatigueParJour(rythme: number): number {
+  const cadence = Math.max(1, Math.min(7, Math.round(rythme)));
+  const joursParMatch = Math.max(1, 7 / cadence);
+  const total = recuperationFatigueSelonRythme(cadence);
+  return Math.max(5, Math.round(total / joursParMatch));
+}

@@ -138,3 +138,224 @@
   .cn-recherche-barre button{width:100%}
   .complete-carte-onglets button{flex:1 1 140px;justify-content:center}
 }
+
+
+/* ── Cases de tri des demandes (Labo Kiri) ── */
+.cn-cases-filtres {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: .75rem;
+  margin: 1rem 0;
+}
+.cn-case-filtre {
+  display: flex;
+  flex-direction: column;
+  gap: .35rem;
+  padding: .85rem 1rem;
+  background: var(--fond-carte, #101e17);
+  border: 1px solid var(--bordure, #294236);
+  border-radius: 12px;
+  cursor: pointer;
+  text-align: left;
+  transition: all .15s ease;
+  color: inherit;
+}
+.cn-case-filtre:hover {
+  border-color: rgba(255, 255, 255, .3);
+  background: rgba(255, 255, 255, .04);
+}
+.cn-case-filtre.actif {
+  border-color: var(--or, #d5b56d);
+  background: rgba(213, 181, 109, .12);
+}
+.cn-case-filtre.case-attente.actif {
+  border-color: #f59e0b;
+  background: rgba(245, 158, 11, .12);
+}
+.cn-case-filtre.case-acceptee.actif {
+  border-color: #22c55e;
+  background: rgba(34, 197, 94, .12);
+}
+.cn-case-filtre.case-refusee.actif {
+  border-color: #ef4444;
+  background: rgba(239, 68, 68, .12);
+}
+.cn-case-entete {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .5rem;
+}
+.cn-case-titre {
+  font-weight: 700;
+  font-size: .95rem;
+}
+.cn-case-badge {
+  font-size: .8rem;
+  font-weight: 800;
+  padding: .15rem .55rem;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, .1);
+  color: #fff;
+}
+.cn-case-filtre.actif .cn-case-badge {
+  background: var(--or, #d5b56d);
+  color: #08160f;
+}
+.cn-case-filtre.case-attente.actif .cn-case-badge {
+  background: #f59e0b;
+  color: #08160f;
+}
+.cn-case-filtre.case-acceptee.actif .cn-case-badge {
+  background: #22c55e;
+  color: #08160f;
+}
+.cn-case-filtre.case-refusee.actif .cn-case-badge {
+  background: #ef4444;
+  color: #fff;
+}
+.cn-case-desc {
+  font-size: .75rem;
+  color: rgba(255, 255, 255, .6);
+}
+
+.cn-demande-recherche-ligne {
+  display: flex;
+  gap: .6rem;
+  align-items: center;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+.cn-demande-recherche-ligne input {
+  flex: 1 1 200px;
+  background: rgba(0, 0, 0, .25);
+  border: 1px solid var(--bordure, #294236);
+  border-radius: 8px;
+  padding: .6rem .8rem;
+  color: inherit;
+  font-size: .9rem;
+}
+.cn-demande-filtre-types {
+  display: flex;
+  gap: .35rem;
+}
+.cn-demande-filtre-types button {
+  padding: .45rem .75rem;
+  border-radius: 7px;
+  border: 1px solid var(--bordure, #294236);
+  background: var(--fond-carte, #101e17);
+  color: inherit;
+  font-size: .8rem;
+  cursor: pointer;
+}
+.cn-demande-filtre-types button.actif {
+  border-color: var(--or, #d5b56d);
+  color: var(--or, #d5b56d);
+  background: rgba(213, 181, 109, .15);
+}
+
+.cn-demande-item-btn {
+  display: grid;
+  gap: .4rem;
+  text-align: left;
+  padding: .8rem 1rem;
+  background: var(--fond-carte, #101e17);
+  color: inherit;
+  border: 1px solid var(--bordure, #294236);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all .15s ease;
+  width: 100%;
+}
+.cn-demande-item-btn:hover {
+  border-color: rgba(255, 255, 255, .3);
+}
+.cn-demande-item-btn[aria-pressed=true] {
+  border-color: var(--or, #d5b56d);
+  background: rgba(213, 181, 109, .08);
+}
+.cn-demande-item-tete {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .5rem;
+}
+.cn-demande-item-titre {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #fff;
+}
+.cn-demande-item-meta {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  flex-wrap: wrap;
+  font-size: .8rem;
+  color: rgba(255, 255, 255, .65);
+}
+.cn-demande-item-pastilles {
+  display: flex;
+  gap: .35rem;
+  align-items: center;
+}
+.cn-pastille-tag {
+  font-size: .75rem;
+  padding: .15rem .45rem;
+  border-radius: 5px;
+  font-weight: 600;
+}
+.cn-pastille-tag.tag-image {
+  background: rgba(59, 130, 246, .2);
+  color: #93c5fd;
+}
+.cn-pastille-tag.tag-droits {
+  background: rgba(16, 185, 129, .2);
+  color: #6ee7b7;
+}
+
+.cn-decision-banner {
+  display: grid;
+  gap: .5rem;
+  padding: 1rem 1.25rem;
+  border-radius: 12px;
+  margin-bottom: 1rem;
+}
+.cn-decision-banner.b-attente {
+  background: rgba(245, 158, 11, .1);
+  border: 1px solid rgba(245, 158, 11, .35);
+}
+.cn-decision-banner.b-acceptee {
+  background: rgba(34, 197, 94, .1);
+  border: 1px solid rgba(34, 197, 94, .35);
+}
+.cn-decision-banner.b-refusee {
+  background: rgba(239, 68, 68, .1);
+  border: 1px solid rgba(239, 68, 68, .35);
+}
+.cn-decision-banner-titre {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+}
+.cn-decision-banner-titre h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  color: #fff;
+}
+.cn-decision-banner-corps {
+  font-size: .9rem;
+  color: rgba(255, 255, 255, .85);
+  display: grid;
+  gap: .35rem;
+}
+.cn-decision-banner-corps b {
+  color: #fff;
+}
+.cn-decision-motif-boite {
+  background: rgba(0, 0, 0, .3);
+  padding: .65rem .85rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, .1);
+  margin-top: .3rem;
+}

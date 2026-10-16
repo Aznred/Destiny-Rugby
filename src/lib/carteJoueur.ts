@@ -277,6 +277,8 @@ export interface EtatDuJoueur {
   suspendu?: boolean;
   enSelection?: boolean;
   tempsBlessure?: string;
+  /** Pourcentage de condition récupéré par jour de repos sans match */
+  recupPassiveParJour?: number;
 }
 
 /**

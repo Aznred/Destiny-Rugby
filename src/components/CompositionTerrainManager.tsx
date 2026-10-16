@@ -431,6 +431,13 @@ function PanneauJoueur({
               <progress value={etat.fatigue} max={100} /><i>{etat.fatigue}</i>
             </label>
           )}
+          {etat.fatigue !== undefined && etat.fatigue > 0 && (
+            <div className="ct-recup-passive-ligne" title="Entre les matchs, tes joueurs au repos régénèrent passivement leur condition chaque jour.">
+              <span className="ct-recup-etiquette">⚡ Récupération passive</span>
+              <span className="ct-recup-valeur">+{etat.recupPassiveParJour ?? 5}% / jour</span>
+              <small className="ct-recup-delai">100% dans {Math.ceil(etat.fatigue / (etat.recupPassiveParJour ?? 5))} j</small>
+            </div>
+          )}
         </div>
       )}
 

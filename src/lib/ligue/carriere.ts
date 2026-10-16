@@ -48,6 +48,19 @@ export function recuperationFatigueSelonRythme(rythme: number): number {
   return 22 + (cadence - 1) * 3;
 }
 
+/**
+ * Récupération passive par jour de repos entre les matchs.
+ * À un rythme hebdomadaire (rythme 1), les joueurs regagnent ~5 points de fatigue
+ * par jour de repos (~35 points sur 7 jours, effaçant les 32 points d'un match de 80 min).
+ * Plus le rythme de la ligue est accéléré, plus la récupération par jour augmente.
+ */
+export function recuperationFatigueParJour(rythme: number): number {
+  const cadence = Math.max(1, Math.min(7, Math.round(rythme)));
+  const joursParMatch = Math.max(1, 7 / cadence);
+  const total = recuperationFatigueSelonRythme(cadence);
+  return Math.max(5, Math.round(total / joursParMatch));
+}
+
 /** Les indisponibilités suivent le temps de la ligue, pas le calendrier réel. */
 export function dureeBlessureSelonRythme(jours: number, rythme: number): number {
   const cadence = Math.max(1, Math.min(7, Math.round(rythme)));
@@ -260,6 +273,44 @@ function attribuerPacksQuotidiens(etat: EtatCarriereEnLigne, maintenant: number)
     }
     club.dernierLotPacksGratuits = jour;
   }
+}
+
+/**
+ * ⚡ RÉCUPÉRATION PASSIVE QUOTIDIENNE ENTRE LES RENCONTRES.
+ *
+ * Entre deux matchs, les joueurs se reposent et régénèrent passivement leur
+ * condition physique chaque jour (date serveur). Un match plein (80 min)
+ * engendre ~32 points de fatigue ; au rythme hebdomadaire de base (rythme 1),
+ * un joueur au repos récupère ~5 points de fatigue par jour de repos (~35 points
+ * sur la semaine, soit un retour complet à 100% de fraîcheur avant le match
+ * suivant). Les rythmes accélérés augmentent proportionnellement ce gain quotidien.
+ */
+export function recupererFatiguePassivement(etat: EtatCarriereEnLigne, maintenant: number): void {
+  if (etat.phase === 'salon') return;
+  const jour = dateServeur(maintenant).slice(0, 10);
+  if (!etat.dernierJourRecuperation) {
+    etat.dernierJourRecuperation = jour;
+    return;
+  }
+  if (etat.dernierJourRecuperation === jour) return;
+
+  const dernierMs = Date.parse(etat.dernierJourRecuperation + 'T00:00:00Z');
+  const aujourdhuiMs = Date.parse(jour + 'T00:00:00Z');
+  if (Number.isNaN(dernierMs) || Number.isNaN(aujourdhuiMs) || aujourdhuiMs <= dernierMs) {
+    etat.dernierJourRecuperation = jour;
+    return;
+  }
+
+  const joursEcoules = Math.max(1, Math.min(30, Math.round((aujourdhuiMs - dernierMs) / JOUR)));
+  const gainParJour = recuperationFatigueParJour(etat.rythme);
+  const totalRecup = gainParJour * joursEcoules;
+
+  for (const c of etat.cartes) {
+    if (c.fatigue > 0) {
+      c.fatigue = Math.max(0, c.fatigue - totalRecup);
+    }
+  }
+  etat.dernierJourRecuperation = jour;
 }
 /**
  * ⚠️ DEUX CARTES DU MÊME JOUEUR NE JOUENT PAS ENSEMBLE. Dupont et Dupont
@@ -500,7 +551,7 @@ export function creerCarriere(config: CreationCarriere, maintenant: number, grai
     // lui-même : sans plafond, il se donne dix millions et le marché de la
     // ligue n'existe plus. 100 000 Ovas, c'est déjà trois saisons de gains.
     dotationOvas: dotationValide(config.dotationOvas),
-    clubs: [], cartes: [], packs: copier(packsCatalogueAdmin()), competitions: [], rencontres: [], ventes: [], echanges: [], transactions: [], objectifs: [], histoire: [] };
+    clubs: [], cartes: [], packs: copier(packsCatalogueAdmin()), competitions: [], rencontres: [], ventes: [], echanges: [], transactions: [], objectifs: [], histoire: [], dernierJourRecuperation: dateServeur(maintenant).slice(0, 10) };
   ajouterClub(etat, config.compteId, config.pseudo, config.clubNom, maintenant, graine, config.embleme);
   attribuerPacksQuotidiens(etat, maintenant);
   return etat;
@@ -933,7 +984,7 @@ function demarrerSaison(etat: EtatCarriereEnLigne, maintenant: number) {
   exiger(etat.clubs.length >= 2, 'Invitez au moins un autre manager pour commencer.');
   exiger(!etat.publique || etat.clubs.length === etat.maxClubs, 'La division publique démarre à 16 clubs.');
   if (etat.phase === 'intersaison') etat.saison++;
-  etat.phase = 'saison'; etat.debutSaison = dateServeur(maintenant);
+  etat.phase = 'saison'; etat.debutSaison = dateServeur(maintenant); etat.dernierJourRecuperation = dateServeur(maintenant).slice(0, 10);
   if (etat.publique) etat.publique.finLe = dateServeur(maintenant + 30 * JOUR);
   // Le coup d'envoi ouvre le robinet des packs quotidiens, pour tout le monde
   // le même jour.
@@ -1356,7 +1407,8 @@ function enregistrerResultat(etat: EtatCarriereEnLigne, r: RencontreCarriere, ma
     // ne serait crédité à personne. Les minutes réelles décident de tout.
     const minutes = new Map((m.feuille ?? []).map(l => [l.carteId, l]));
     for (const c of cartesClub(etat, club.id)) {
-      c.fatigue = Math.max(0, c.fatigue - recuperationFatigueSelonRythme(etat.rythme));
+      // Léger décrassage post-match (la récupération principale s'opère passivement jour après jour entre les rencontres via recupererFatiguePassivement).
+      c.fatigue = Math.max(0, c.fatigue - 2);
       const ligne = minutes.get(c.id);
       if (!ligne && !titulaires.has(c.id)) continue;
       const jouees = ligne?.minutes ?? 80;
@@ -1488,6 +1540,7 @@ function avancerInterne(etat: EtatCarriereEnLigne, maintenant: number, graine: s
   }
   completerPacks(etat);
   attribuerPacksQuotidiens(etat, maintenant);
+  recupererFatiguePassivement(etat, maintenant);
   renouvelerObjectifs(etat, maintenant);
   // La récupération est attachée aux dates des rencontres, pas au nombre d'actualisations.
   for (const c of etat.cartes) if (c.blesseJusqua && Date.parse(c.blesseJusqua) <= maintenant) delete c.blesseJusqua;

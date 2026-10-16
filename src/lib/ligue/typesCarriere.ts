@@ -280,6 +280,8 @@ export interface EtatCarriereEnLigne {
    * marché de cette ligue. Réglable par le créateur tant qu'aucun club n'en possède.
    */
   cartesSpeciales?: boolean;
+  /** Dernier jour UTC où la récupération passive de fatigue a été appliquée. */
+  dernierJourRecuperation?: string;
   clubs: ClubCarriere[]; cartes: CarteCarriere[]; packs: PackCarriere[];
   competitions: CompetitionCarriere[]; rencontres: RencontreCarriere[];
   ventes: VenteCarriere[]; echanges: EchangeCarriere[]; transactions: TransactionCarriere[];

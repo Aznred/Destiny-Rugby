@@ -8190,6 +8190,10 @@ select:focus {
 .ct-jauges label { display: grid; grid-template-columns: 72px 1fr 38px; align-items: center; gap: 7px; font-size: 11.5px; margin-bottom: 5px; }
 .ct-jauges progress { width: 100%; height: 7px; }
 .ct-jauges i { font-style: normal; text-align: right; font-variant-numeric: tabular-nums; }
+.ct-recup-passive-ligne { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:5px; margin-top:7px; padding:6px 8px; border-radius:7px; background:rgba(213,181,109,.1); border:1px solid rgba(213,181,109,.25); font-size:11px; }
+.ct-recup-etiquette { font-weight:700; color:var(--or,#d5b56d); }
+.ct-recup-valeur { font-weight:600; color:#fff; }
+.ct-recup-delai { color:rgba(255,255,255,.65); font-size:10.5px; }
 .ct-attributs { list-style: none; margin: 10px 0; padding: 10px; border:1px solid rgba(255,255,255,.08); border-radius:10px; background:rgba(0,0,0,.12); }
 .ct-attributs li { display: grid; grid-template-columns: 38px 1fr 30px; align-items: center; gap: 7px; font-size: 11.5px; margin-bottom: 5px; }
 .ct-attributs li:last-child { margin-bottom:0; }

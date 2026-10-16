@@ -53,6 +53,7 @@ const PALETTES_COULEURS = [
 export function CompleteTaCarte() {
   const setEcran = useGame((s) => s.setEcran);
   const [onglet, setOnglet] = useState<'correction' | 'creation' | 'club' | 'mesDemandes'>('correction');
+  const [filtreMesDemandes, setFiltreMesDemandes] = useState<'toutes' | 'attente' | 'acceptee' | 'refusee'>('toutes');
 
   // État commun
   const [demandes, setDemandes] = useState<DemandeCarte[]>([]);
@@ -974,9 +975,42 @@ export function CompleteTaCarte() {
             <p>Retrouve ici l&apos;état d&apos;examen de tes demandes de création, de correction ou de club.</p>
           </div>
 
+          {demandes.length > 0 && (
+            <div className="cn-demande-filtre-types" style={{ marginBottom: '1rem' }}>
+              <button
+                type="button"
+                className={filtreMesDemandes === 'toutes' ? 'actif' : ''}
+                onClick={() => setFiltreMesDemandes('toutes')}
+              >
+                Toutes ({demandes.length})
+              </button>
+              <button
+                type="button"
+                className={filtreMesDemandes === 'attente' ? 'actif' : ''}
+                onClick={() => setFiltreMesDemandes('attente')}
+              >
+                ⏳ En attente ({demandes.filter(d => d.statut === 'attente').length})
+              </button>
+              <button
+                type="button"
+                className={filtreMesDemandes === 'acceptee' ? 'actif' : ''}
+                onClick={() => setFiltreMesDemandes('acceptee')}
+              >
+                ✅ Validées ({demandes.filter(d => d.statut === 'acceptee').length})
+              </button>
+              <button
+                type="button"
+                className={filtreMesDemandes === 'refusee' ? 'actif' : ''}
+                onClick={() => setFiltreMesDemandes('refusee')}
+              >
+                ❌ Refusées ({demandes.filter(d => d.statut === 'refusee').length})
+              </button>
+            </div>
+          )}
+
           {demandes.length > 0 ? (
             <div className="cn-mes-propositions-liste">
-              {demandes.map((d) => (
+              {demandes.filter(d => filtreMesDemandes === 'toutes' || d.statut === filtreMesDemandes).map((d) => (
                 <article key={d.id} className={`cn-demande-carte statut-${d.statut}`}>
                   <header className="cn-demande-tete">
                     <div className="cn-demande-titre-group">

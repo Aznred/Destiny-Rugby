@@ -237,13 +237,13 @@ export function CarteJoueurEnLigne({ carte, proprietaire, logoClub, onClick, com
       const estBlesse = Boolean(carte.blesseJusqua && carte.blesseJusqua > new Date().toISOString());
       const tempsRestant = estBlesse && carte.blesseJusqua ? formatTempsBlessure(carte.blesseJusqua) : '';
       const dateFin = estBlesse && carte.blesseJusqua ? new Date(carte.blesseJusqua).toLocaleString(locale(), { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
-      const bulle = estBlesse && carte.blesseJusqua ? t('online.infirmary.injuredUntilTooltip', { date: dateFin, time: formatTempsBlessureDetaille(carte.blesseJusqua) }) : undefined;
+      const bulle = estBlesse && carte.blesseJusqua ? t('online.infirmary.injuredUntilTooltip', { date: dateFin, time: formatTempsBlessureDetaille(carte.blesseJusqua) }) : carte.fatigue > 0 ? `Condition : ${Math.max(0, 100 - carte.fatigue)}% (Fatigue : ${carte.fatigue}/100) · Récupération passive quotidienne` : undefined;
       return (
         <span
           className={`dr-player-status${estBlesse ? ' dr-player-status-blesse' : ''}`}
           title={bulle}
         >
-          {estBlesse ? `🚑 ${t('compo.badge.blesse')} (${tempsRestant})` : carte.fatigue > 55 ? t('compo.badge.fatigue') : proprietaire ?? t("ui.5d32d136eb83")}
+          {estBlesse ? `🚑 ${t('compo.badge.blesse')} (${tempsRestant})` : carte.fatigue > 55 ? `😴 ${t('compo.badge.fatigue')} (${Math.max(0, 100 - carte.fatigue)}%)` : proprietaire ?? t("ui.5d32d136eb83")}
         </span>
       );
     })()}
