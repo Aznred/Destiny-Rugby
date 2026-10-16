@@ -1,5 +1,27 @@
 # Destiny Rugby 🏉
 
+- **Ligue mondiale** : inscription automatique des comptes (mot de passe, Google et anciens comptes sans club public).
+  Dix niveaux : 1/2/4/8/16/32/64/128/256 poules de 16 en D1–D9, poules illimitées en D10. Les anciennes poules
+  conservent leur identifiant, leurs participants et leurs rencontres ; leur ancien numéro est converti en niveau/poule.
+  Les scores enregistrés initialisent l’Elo (1 500, coefficient 32, nuls inclus), conservé avec les clubs aux renouvellements.
+  Les quatre derniers de D1 sont remplacés par les deux premiers des deux poules de D2 après une saison jouée.
+  Ailleurs, reclassement sportif puis Elo, promotions exceptionnelles de deux ou trois niveaux selon les places ;
+  l’accès à la D1 passe par D2. Les groupes arrivés pendant une saison attendent le prochain départ mensuel.
+  Les saisons déjà lancées vont jusqu’à leur échéance actuelle ; aucune réinitialisation de ligue n’est prévue.
+  Le classement mondial est paginé et indexé ; le renouvellement conserve un plan immuable et reprend quatre poules
+  à la fois. Les tables et index `carriere_public_*` sont ajoutés automatiquement, sans effacer les tables existantes.
+  Banc : `node --loader ./scripts/chargeurTests36.mjs scripts/verifierPyramidePublique.ts` (1 000 / 10 000 / 100 000
+  équipes, inscriptions, Elo, conservation et reprise). Les contrats SQL sont simulés : aucune migration réelle de
+  production n’a été exécutée par ce banc. Aperçu isolé : `/scripts/apercuLigueMondiale.html`.
+  Préparation réelle du déploiement : `scripts/verifierPyramideDbIntegration.ts`, tables/index installés sur Neon,
+  lectures et écritures SQL validées dans une transaction annulée, sans modification des états de ligue existants.
+
+- **Contribution de club** : saisie du XV par poste, remplaçants, modification des fiches et choix des titulaires.
+  Le Labo examine et publie tout l’effectif (jusqu’à 30 cartes) en une seule validation, avec le blason du club
+  distinct des portraits. Les propositions restent complètes après modification et acceptation.
+  Contrôle : `node --loader ./scripts/chargeurTests36.mjs scripts/verifierContributionClub.ts` ; aperçu local
+  `/scripts/apercuContributionClub.html`, sans publication réelle.
+
 - **Fluidité de la carrière entraîneur (16 octobre 2026)** : les bancs et leurs objectifs se préparent uniquement
   quand leur liste est affichée ; les poules géographiques sont réutilisées jusqu'à un changement de clubs ou de
   coordonnées. Les contrats sont indexés par identité et les convocations partagent un seul parcours des effectifs.

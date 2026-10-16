@@ -125,7 +125,7 @@ assert.ok(!statuts.includes('DIRECT_RELEGATION') && !statuts.includes('ACCESS_MA
 assert.equal(statuts[0], 'PROMOTION');
 const vraieDate = Date.now;
 try {
-  limite = 3;
+  limite = 4; // L'ancienne poule 3 appartient aussi à D2 ; la poule 4 ouvre réellement D3.
   const prochain = vraieDate() + 6000;
   Date.now = () => prochain;
   const nouvelle = await lire(`/api/carriere?ligue=${ligueId}&v=${derniere.version}&cycle=1&division=2&derniere=1`);

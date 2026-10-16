@@ -88,10 +88,10 @@ entamee = agirCarriere(entamee, `00000000-0000-4000-8000-${String(5).padStart(12
 assert.equal(entamee.clubs.length, 4);
 assert.equal(entamee.phase, 'salon');
 const plan = planifierDivisionsPubliques(lignes, 1);
-assert.equal(plan.length, 2);
+assert.equal(plan.length, 1, 'Cinq équipes seulement : les places de D1 sont remplies en priorité au renouvellement.');
 assert.equal(new Set(plan.flatMap(p => p.heritiers.map(h => h.club.compteId))).size, 5);
-assert.ok(plan[0].barrage?.includes('Barrage D1/D2'));
-assert.equal(plan[0].heritiers.length, 3);
+assert.equal(plan[0].barrage, undefined, 'Les montées de la pyramide n’utilisent plus de barrage simulé.');
+assert.equal(plan[0].heritiers.length, 5);
 const renouvelee = creerDivisionPublique({ id: identifiants[3], code: 'DR-PUBLIC-C1-D1',
   compteId: plan[0].heritiers[0].club.compteId, pseudo: plan[0].heritiers[0].club.pseudo,
   clubNom: plan[0].heritiers[0].club.nom }, 1, 1, maintenant + 30*86400000, 'graine-nouvelle', plan[0].heritiers);
@@ -193,15 +193,17 @@ assert.ok(ancienCycle.every(l => l.etat.rencontres.every(r => r.resultat)),
 const joueurSource = catalogueBaseCarriere()[0];
 const edition = { note: Math.min(99, joueurSource.note + 1), potentiel: Math.min(99, joueurSource.potentiel + 1), photo: 'https://example.com/joueur-test.png' };
 await stockage.atelier!.ecrire({ revision: 1, rotationPacks: false, packs: {}, joueurs: { [joueurSource.sourceId]: edition } }, 0);
+// Une écriture directe du dépôt n'invalide pas le cache du gestionnaire déjà utilisé plus haut.
+const apiCatalogue = creerGestionnaireCarriere(stockage);
 let catalogueReponse: any;
 const resCatalogue = { status(_n: number) { return resCatalogue; }, setHeader() {}, json(v: unknown) { catalogueReponse = v; } };
-await api.handler({ method: 'GET', url: '/api/carriere?catalogueSolo=1&revision=-1', headers: { host: 'localhost' } }, resCatalogue);
+await apiCatalogue.handler({ method: 'GET', url: '/api/carriere?catalogueSolo=1&revision=-1', headers: { host: 'localhost' } }, resCatalogue);
 assert.deepEqual(catalogueReponse.joueurs[joueurSource.sourceId], edition);
 const sourceSolo = catalogueMondialCarriere({ revision: catalogueReponse.revision, rotationPacks: false, packs: {}, joueurs: catalogueReponse.joueurs })
   .find(c => c.sourceId === joueurSource.sourceId);
 assert.equal(sourceSolo?.note, edition.note);
 assert.equal(sourceSolo?.photo, edition.photo);
-await api.handler({ method: 'GET', url: '/api/carriere?catalogueSolo=1&revision=1', headers: { host: 'localhost' } }, resCatalogue);
+await apiCatalogue.handler({ method: 'GET', url: '/api/carriere?catalogueSolo=1&revision=' + catalogueReponse.revision + '&revisionFfr=' + encodeURIComponent(catalogueReponse.revisionFfr), headers: { host: 'localhost' } }, resCatalogue);
 assert.equal(catalogueReponse.joueurs, undefined, 'Une révision inchangée ne renvoie pas les données du catalogue.');
 rmSync(chemin);
 rmdirSync(dossier);

@@ -90,6 +90,21 @@
 .cn-input-couleur-wrap code{font-size:.85rem;color:rgba(255,255,255,.8)}
 
 /* Effectif club */
+.cn-effectif-club{display:grid;gap:1rem;min-width:0}
+.cn-effectif-entete{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+.cn-effectif-entete h3,.cn-effectif-entete p{margin:0}
+.cn-effectif-entete p,.cn-effectif-club>p{font-size:.85rem;color:var(--texte-doux,#b5c5b9);line-height:1.6}
+.cn-terrain-proposition{display:grid;gap:.8rem;padding:1.25rem .75rem;border:1px solid #456b52;border-radius:14px;background:repeating-linear-gradient(0deg,#102e22 0,#102e22 16.6%,#173a29 16.6%,#173a29 33.2%)}
+.cn-ligne-xv{display:flex;justify-content:center;gap:.6rem}
+.cn-ligne-xv button{display:grid;justify-items:center;align-content:start;gap:.25rem;flex:0 1 160px;min-width:0;padding:.5rem .3rem;border:1px dashed #6b8e76;border-radius:10px;background:#0b201bd9;color:#e4eae4;font:inherit;text-align:center;cursor:pointer}
+.cn-ligne-xv button.renseigne{border:1px solid var(--or,#d5b56d);background:#10271eed}
+.cn-ligne-xv button:disabled{cursor:default;opacity:1}
+.cn-ligne-xv button b{display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--or,#d5b56d);color:#142219;font-size:.85rem}
+.cn-ligne-xv button span{font-size:.8rem;font-weight:700;overflow-wrap:anywhere}
+.cn-ligne-xv button small{font-size:.65rem;line-height:1.3;color:#afc9b8}
+.cn-joueur-carte-mini>header{display:grid;gap:.25rem}
+.cn-joueur-carte-mini>header small{color:var(--or,#d5b56d)}
+@media(max-width:560px){.cn-terrain-proposition{padding:.7rem .35rem;gap:.6rem}.cn-ligne-xv{gap:.25rem}.cn-ligne-xv-quatre{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.cn-ligne-xv button{padding:.5rem .15rem}.cn-ligne-xv button span{font-size:.7rem}.cn-ligne-xv button small{font-size:.6rem}.cn-effectif-club .cn-formulaire{grid-template-columns:minmax(0,1fr)}.cn-joueurs-section{padding:.75rem}}
 .cn-joueurs-section{border-color:rgba(213,181,109,.3)}
 .cn-joueurs-grille{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1rem;margin-bottom:1rem}
 .cn-joueur-carte-mini{background:rgba(0,0,0,.3);border:1px solid var(--bordure,#294236);border-radius:12px;padding:.75rem;display:grid;gap:.5rem}

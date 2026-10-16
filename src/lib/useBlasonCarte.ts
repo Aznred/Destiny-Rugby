@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { chargerEmblemesCarriere } from './carriereEnLigneClient';
 import { clubParNom } from '../data/clubs';
 import { cleClub } from './cleClub';
+import { identiteClubPubliee } from './localisationClub';
 import { LOGOS_CLUBS_FEMININS } from '../data/logosFeminins.generated';
 const cle = (nom: string) => nom.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
 const logosFeminins = new Map(Object.entries(LOGOS_CLUBS_FEMININS).map(([nom, logo]) => [cle(nom), logo]));
@@ -63,9 +64,10 @@ let demande: Promise<Map<string, string>> | undefined;
  */
 export function useBlasonCarte(club: string, explicite?: string, feminin = false) {
   const desFilles = feminin ? blasonCarteFeminine(club) : undefined;
+  const publie = identiteClubPubliee(club)?.logo;
   const [table, setTable] = useState(logos);
   useEffect(() => {
-    if (explicite || desFilles || logos) { if (logos) setTable(logos); return; }
+    if (explicite || publie || desFilles || logos) { if (logos) setTable(logos); return; }
     let actif = true;
     demande ??= chargerEmblemesCarriere().then(r => {
       logos = new Map(r.groupes.flatMap(g => g.emblemes.map(e => [cle(e.nom), e.logo] as const)));
@@ -73,7 +75,7 @@ export function useBlasonCarte(club: string, explicite?: string, feminin = false
     }).catch(e => { demande = undefined; throw e; });
     void demande.then(t => { if (actif) setTable(t); }).catch(() => {});
     return () => { actif = false; };
-  }, [explicite, desFilles]);
+  }, [explicite, publie, desFilles]);
   const duJeu = clubParNom(club)?.logo;
-  return explicite ?? desFilles ?? (table && blasonDuClub(table, club)) ?? duJeu;
+  return explicite ?? publie ?? desFilles ?? (table && blasonDuClub(table, club)) ?? duJeu;
 }

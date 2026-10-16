@@ -1,4 +1,5 @@
 import type { DemandeCarte, PropositionClub, SaisieCarteNormale, SaisieDemandeCarte } from '../src/lib/cartesNormales.js';
+import { demandeCarteSansImages } from '../src/lib/cartesNormales.js';
 import type { CatalogueAdmin } from '../src/lib/ligue/atelierCatalogue.js';
 import type { ExecuterSql } from './packsInternesStockage.js';
 
@@ -6,11 +7,11 @@ export interface StockageDemandesCartes {
   creer(compte: string, id: string, saisie: SaisieDemandeCarte): Promise<boolean>;
   lister(compte: string | null): Promise<DemandeCarte[]>;
   lire(id: string, compte: string | null): Promise<DemandeCarte | null>;
-  modifier(id: string, revision: number, carte: SaisieCarteNormale): Promise<boolean>;
+  modifier(id: string, revision: number, carte: SaisieCarteNormale, club?: PropositionClub): Promise<boolean>;
   refuser(id: string, revision: number, reponse: string, par: string): Promise<boolean>;
   annuler(id: string, compte: string): Promise<boolean>;
   /** L'approbation et le catalogue sont inscrits ensemble, avec leurs deux révisions. */
-  approuver(id: string, revision: number, config: CatalogueAdmin, revisionCatalogue: number, carte: SaisieCarteNormale, par: string): Promise<boolean>;
+  approuver(id: string, revision: number, config: CatalogueAdmin, revisionCatalogue: number, carte: SaisieCarteNormale, par: string, club?: PropositionClub): Promise<boolean>;
 }
 const versDemande = (r: Record<string, unknown>): DemandeCarte => {
   const carteObj = (r.carte ?? {}) as Record<string, unknown>;
@@ -59,16 +60,16 @@ export function demandesCartesSql(sql: ExecuterSql): StockageDemandesCartes {
       await preparer();
       return (await sql`select d.id,d.type,d.source_id,d.carte - 'photo' as carte,d.carte ? 'photo' as photo_proposee,
         d.message,d.statut,d.revision,d.cree_le,d.decide_le,d.reponse,c.pseudo from demandes_cartes d join comptes c on c.id=d.compte
-        where (${compte}::uuid is null or d.compte=${compte}::uuid) order by (d.statut='attente') desc,d.cree_le desc limit 200`).map(versDemande);
+        where (${compte}::uuid is null or d.compte=${compte}::uuid) order by (d.statut='attente') desc,d.cree_le desc limit 200`).map(r => demandeCarteSansImages(versDemande(r)));
     },
     async lire(id, compte) {
       await preparer();
       const r = await sql`select * from demandes_cartes where id=${id}::uuid and (${compte}::uuid is null or compte=${compte}::uuid)`;
       return r.length ? versDemande(r[0]) : null;
     },
-    async modifier(id, revision, carte) {
+    async modifier(id, revision, carte, club) {
       await preparer();
-      return (await sql`update demandes_cartes set carte=${JSON.stringify(carte)}::jsonb,revision=revision+1 where id=${id}::uuid and revision=${revision} and statut='attente' returning id`).length > 0;
+      return (await sql`update demandes_cartes set carte=${JSON.stringify(club ? { ...carte, clubPropose: club } : carte)}::jsonb,revision=revision+1 where id=${id}::uuid and revision=${revision} and statut='attente' returning id`).length > 0;
     },
     async refuser(id, revision, reponse, par) {
       await preparer();
@@ -79,7 +80,7 @@ export function demandesCartesSql(sql: ExecuterSql): StockageDemandesCartes {
       await preparer();
       return (await sql`delete from demandes_cartes where id=${id}::uuid and compte=${compte}::uuid and statut='attente' returning id`).length > 0;
     },
-    async approuver(id, revision, config, revisionCatalogue, carte, par) {
+    async approuver(id, revision, config, revisionCatalogue, carte, par, club) {
       await preparer();
       await sql`create table if not exists carriere_catalogue_admin (id integer primary key check(id=1), revision integer not null, donnees jsonb not null)`;
       await sql`alter table carriere_catalogue_admin enable row level security`;
@@ -91,7 +92,7 @@ export function demandesCartesSql(sql: ExecuterSql): StockageDemandesCartes {
             and (${revisionCatalogue}=0 or exists(select 1 from carriere_catalogue_admin where id=1 and revision=${revisionCatalogue}))
         on conflict(id) do update set revision=excluded.revision,donnees=excluded.donnees where carriere_catalogue_admin.revision=${revisionCatalogue}
         returning id
-      ) update demandes_cartes set statut='acceptee',revision=revision+1,carte=${JSON.stringify(carte)}::jsonb,decide_le=now(),decide_par=${par}
+      ) update demandes_cartes set statut='acceptee',revision=revision+1,carte=${JSON.stringify(club ? { ...carte, clubPropose: club } : carte)}::jsonb,decide_le=now(),decide_par=${par}
         where id in(select id from demande) and exists(select 1 from publication) returning id`;
       return r.length > 0;
     },

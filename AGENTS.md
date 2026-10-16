@@ -91,6 +91,33 @@ puis à la racine. Le jeu ne lit que `public/m3d/` (**85 `.glb`, 114 Mo**).
 
 ## Architecture
 
+### Pyramide publique et classement mondial
+
+- `lib/ligue/pyramidePublique.ts` distingue niveau D1–D10 et numéro de poule. Sans `publique.poule`, l’ancien
+  `division` est un indice global : 1 → D1/P1, 2–3 → D2/P1–2, 512+ → D10. Ne jamais déplacer ni recréer les
+  clubs/matchs d’une saison en cours pour migrer ses étiquettes.
+- `serveur/eloPublic.ts` rejoue chronologiquement les résultats enregistrés, départ 1 500 et K=32, sans prime
+  arbitraire de niveau. `publique.eloDepart` et `empreinteElo` rendent le calcul reproductible et idempotent ;
+  seul `club.eloPublic` suit le club au cycle suivant. Ces bases internes ne sont pas envoyées dans la vue.
+- `serveur/divisionsPubliques.ts` planifie à partir de résumés sans cartes : D1 unique de 16, quatre remplacements
+  par les quatre qualifiés de D2 ; autres niveaux limités à 2^(d−1) poules sauf D10. Résultats sportifs avant Elo,
+  champions exceptionnels éligibles à +2/+3 (10 matchs minimum, ≥85 % gagnés et différence moyenne ≥14 ; +3 si
+  ≥90 % et Elo ≥ moyenne de poule +200), sous réserve de capacité. La D1 reste accessible par D2 uniquement.
+- `serveur/pyramideStockage.ts` fournit les index Elo, les plans mensuels immuables et les baux d’inscription,
+  en SQL et en local. Les lectures du portail cherchent un seul compte/une poule libre, sans rapatrier tous les
+  comptes ni états. `pyramidePublique.ts` clôt et matérialise par lots de quatre ; ne jamais remplacer un plan
+  partiellement réalisé, supprimer les sources, ou accepter une mutation d’un ancien cycle après son plan figé.
+- L’inscription publique se fait avant ouverture de session, pour mot de passe et Google, et au portail pour
+  les anciens comptes. Bail par compte contre les doubles inscriptions, bail de cycle contre une adhésion pendant
+  le gel du plan. Les homonymes reçoivent un nom de club disponible. `attenteProchainCycle` empêche les nouveaux
+  groupes de repousser indéfiniment l’échéance mensuelle ; les calendriers existants restent intacts.
+- `components/LigueMondiale.tsx` explique les capacités et montées et charge 50 lignes Elo à la demande. Le
+  classement public ne renvoie pas les identifiants de comptes. Contrôles : `scripts/verifierPyramidePublique.ts`,
+  `scripts/apercuLigueMondiale.html` sur ordinateur et mobile. Le banc SQL vérifie des requêtes simulées, pas une
+  connexion Neon de production. Les ajouts de tables sont idempotents et ne réinitialisent aucun état de ligue.
+  `scripts/verifierPyramideDbIntegration.ts` vérifie séparément la vraie base configurée : préparation des tables/index,
+  lectures réelles et écritures temporaires annulées par savepoint. Ne modifie aucun compte ou état de ligue existant.
+
 ### Wiki et mises à jour
 
 Les pages publiques sont générées par `scripts/genPages.cjs`, depuis
@@ -3135,6 +3162,16 @@ Bancs : `npm run verify:publicites` (serveur et SDK), `npm run verify:publicites
 `serveur/validationClassement.ts` conserve les dossiers et leur journal avec révisions concurrentes. Le Labo `LaboValidationClassement` est dans AtelierKiri : règles, risques, identifiants et dates, filtres et décisions. `/api/carriere` et le service autorisent les décisions uniquement à l'identifiant authentifié `kiri`. Un score inférieur nouvellement envoyé ne masque pas le record précédent de l'installation. Le store conserve le résultat réel de synchronisation et réessaie les cas en attente sans exiger une hausse du score.
 
 ### Cartes normales et propositions de cartes
+
+Contribution → Proposer un club utilise `EffectifClubPropose` : XV par poste, effectif partiel jusqu’à 30 joueurs,
+remplaçants et changement de titulaire, avec la même revue côté Labo. `catalogueAvecClubPropose` prépare toutes les
+cartes et l’identité visuelle avant l’unique écriture atomique d’approbation. Une correspondance nom + club conserve
+la carte existante ; les nouveaux identifiants sont stables. Un club sans joueurs ne crée aucune fausse carte.
+Le blason est partagé dans `CatalogueAdmin.clubs` et résolu par `useBlasonCarte`, sans remplacer `photo` ni recopier
+le logo dans chaque portrait. Les listes retirent aussi les images imbriquées ; modifier/accepter conserve le club
+complet dans le JSON de la demande (stockage fichier et SQL). La limite d’envoi est 3 Mo pour 30 portraits de 90 Ko.
+Banc : `scripts/verifierContributionClub.ts` ; test historique `scripts/verifierCompleteTaCarte.ts` ; aperçu
+`/scripts/apercuContributionClub.html`. SQL vérifié par requêtes simulées, pas sur la base de production.
 
 Labo → Cartes normales crée ou modifie une carte ordinaire via `CatalogueAdmin.ajouts`,
 avec la même identité pour les corrections. GEN, potentiel, poste, âge senior,

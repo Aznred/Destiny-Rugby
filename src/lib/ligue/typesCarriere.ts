@@ -116,6 +116,8 @@ export interface PackGratuitCarriere {
   id: string; packId: IdPackCarriere; recuLe: string;
 }
 export interface ClubCarriere {
+  eloPublic?: import('./pyramidePublique.js').EloPublic;
+  mouvementPublic?: { divisionPrecedente: number; division: number; motif: string };
   tropheesVus?: string[];
   id: string; compteId: string; pseudo: string; nom: string; ovas: number;
   /** Chemin d'un vrai écusson de club (`emblemeValide` fait foi). */
@@ -265,7 +267,8 @@ export interface EtatCarriereEnLigne {
   /** Espace de développement privé, créé et commandé uniquement par le compte kiri. */
   laboratoire?: true;
   /** Championnat public ouvert, renouvelé par cycles de trente jours. */
-  publique?: { cycle: number; division: number; barrage?: string; finLe?: string; derniereDivision?: boolean };
+  publique?: { cycle: number; division: number; poule?: number; barrage?: string; finLe?: string; derniereDivision?: boolean;
+    eloDepart?: Record<string, import('./pyramidePublique.js').EloPublic>; empreinteElo?: string; attenteProchainCycle?: boolean };
   version: number; saison: number; phase: 'salon' | 'saison' | 'intersaison';
   rythme: number; maxClubs: number; graine: string; debutSaison?: string;
   /** L'identité de la ligue : son logo, son trophée, sa phase finale. */

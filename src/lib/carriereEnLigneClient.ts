@@ -6,13 +6,17 @@ import type { EtatBoutiqueCompte, ModificationsBoutiqueCompte } from './boutique
 import type { DeltaEchangeSolo, LotCartesSolo, PageOffresSolo } from './echangesSolo.js';
 
 export interface CompteCarriere { id: string; pseudo: string; administrateur?: boolean; featureFlags?: { womensRugby: boolean; combinaisons?: boolean } }
+export interface EquipeClassementMondial { clubId: string; nom: string; division: number; poule: number; elo: number; rangMondial: number; joues: number; gagnes: number; nuls: number; perdus: number }
+export interface ClassementMondialPublic { cycle: number; page: number; total: number; equipes: EquipeClassementMondial[]; moi?: EquipeClassementMondial }
+export const chargerClassementMondial = (page: number, signal?: AbortSignal) =>
+  requete<ClassementMondialPublic>(undefined, undefined, signal, '?classementMondial=1&page=' + page);
 export interface SessionCarriere {
   compte: CompteCarriere;
   ligues: {
     playerPool?: 'men' | 'women' | 'mixed';
     id: string; nom: string; etat: string; clubNom: string; ovas: number;
     clubEmbleme?: string; logo?: string; laboratoire?: boolean; createur?: boolean;
-    publique?: { cycle: number; division: number };
+    publique?: { cycle: number; division: number; poule?: number };
   }[];
 }
 export interface MiseAJourDirectCarriere {

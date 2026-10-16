@@ -1,4 +1,6 @@
 import { CATALOGUE_ADMIN_VIDE, type CatalogueAdmin } from '../src/lib/ligue/atelierCatalogue.js';
+import { pyramideLocale, resumePoule, type BasePyramideLocale } from './pyramideStockage.js';
+import { demandeCarteSansImages } from '../src/lib/cartesNormales.js';
 import { joueursLocaux } from './ffr/stockageLocal.js';
 import { fusionnerEnvoi, matiereDepuisLignes, type CompteurUsage, type LigneUsage } from '../src/lib/usage/agregats.js';
 import { bilanCarrieres, fusionnerCarrieres, type CarriereUsage } from '../src/lib/usage/carrieres.js';
@@ -23,6 +25,7 @@ import { modifierCollectionSolo, possedeDoublons } from '../src/lib/echangesSolo
 import type { DemandeCarte } from '../src/lib/cartesNormales.js';
 
 interface BaseLocale {
+  pyramide?: BasePyramideLocale;
   classementsValidation?: Record<string, DossierClassement>;
   publicites?: Record<string, RegistrePublicites>;
   transactionsPub?: Record<string, boolean>;
@@ -97,6 +100,7 @@ export function stockageFichier(fichier: string): StockageCarriere {
   };
   const sansCompte = ({ compte: _compte, ...pack }: PackInterne & { compte: string }): PackInterne => copie(pack);
   return {
+    pyramide: pyramideLocale(base.pyramide ??= { verrous: {}, plans: {}, equipes: {} }, () => base.ligues, sauver),
     classementValidation: stockageValidationLocal(base.classementsValidation ??= {}, sauver),
     publicites: {
       async lire(compte) { return base.publicites?.[compte] ? copie(base.publicites[compte]) : null; },
@@ -189,12 +193,12 @@ export function stockageFichier(fichier: string): StockageCarriere {
             const carteObj = (d.carte ?? {}) as Record<string, unknown>;
             const clubPropose = d.clubPropose ?? (carteObj.clubPropose as import('../src/lib/cartesNormales.js').PropositionClub | undefined);
             const { photo, ...carte } = d.carte;
-            return copie({
+            return copie(demandeCarteSansImages({
               ...d, carte,
               clubPropose: clubPropose ? { ...clubPropose, logo: undefined } : undefined,
               photoProposee: Boolean(photo || clubPropose?.logo || clubPropose?.joueurs?.some(j => j.photo)),
               pseudo: base.comptes.find(c => c.id === auteur)?.pseudo,
-            });
+            }));
           });
       },
       async lire(id, compte) {
@@ -204,10 +208,12 @@ export function stockageFichier(fichier: string): StockageCarriere {
         const clubPropose = d.clubPropose ?? (carteObj.clubPropose as import('../src/lib/cartesNormales.js').PropositionClub | undefined);
         const { compte: _compte, ...publique } = d; return copie({ ...publique, clubPropose });
       },
-      async modifier(id, revision, carte) {
+      async modifier(id, revision, carte, club) {
         const d = base.demandesCartes?.find(d => d.id === id && d.revision === revision && d.statut === 'attente');
         if (!d) return false;
-        d.carte = copie(carte); d.revision++; sauver(); return true;
+        d.carte = copie(club ? { ...carte, clubPropose: club } : carte);
+        if (club) d.clubPropose = copie(club);
+        d.revision++; sauver(); return true;
       },
       async refuser(id, revision, reponse) {
         const d = base.demandesCartes?.find(d => d.id === id && d.revision === revision && d.statut === 'attente');
@@ -220,10 +226,12 @@ export function stockageFichier(fichier: string): StockageCarriere {
         base.demandesCartes?.splice(idx, 1);
         sauver(); return true;
       },
-      async approuver(id, revision, config, revisionCatalogue, carte) {
+      async approuver(id, revision, config, revisionCatalogue, carte, _par, club) {
         const d = base.demandesCartes?.find(d => d.id === id && d.revision === revision && d.statut === 'attente');
         if (!d || (base.atelier?.revision ?? 0) !== revisionCatalogue) return false;
-        base.atelier = copie(config); d.carte = copie(carte); d.statut = 'acceptee'; d.revision++; d.decideLe = new Date().toISOString();
+        base.atelier = copie(config); d.carte = copie(club ? { ...carte, clubPropose: club } : carte);
+        if (club) d.clubPropose = copie(club);
+        d.statut = 'acceptee'; d.revision++; d.decideLe = new Date().toISOString();
         sauver(); return true;
       },
     },
@@ -559,9 +567,8 @@ export function stockageFichier(fichier: string): StockageCarriere {
     async ligueParCode(code) { return copie(base.ligues.find(l => l.code === code) ?? null); },
     async divisionsPubliques(cycle) { return copie(base.ligues.filter(l => l.etat.publique?.cycle === cycle).sort((a,b) => a.etat.publique!.division - b.etat.publique!.division)); },
     async resumesDivisionsPubliques(cycle) { return copie(base.ligues.filter(l => l.etat.publique?.cycle === cycle)
-      .map(l => ({ id: l.id, code: l.code, comptes: l.comptes, division: l.etat.publique!.division, nombreClubs: l.etat.clubs.length,
-        phase: l.etat.phase, finLe: l.etat.publique?.finLe }))
-      .sort((a,b) => a.division - b.division)); },
+      .map(resumePoule)
+      .sort((a,b) => a.division - b.division || (a.poule ?? 1) - (b.poule ?? 1))); },
     async dernierCyclePublic() { return base.ligues.reduce<number | null>((cycle,l) => l.etat.publique ? Math.max(cycle ?? 0,l.etat.publique.cycle) : cycle,null); },
     async creerLigue(l) {
       if (base.ligues.some(x => x.id === l.id || x.code === l.code)) return false;

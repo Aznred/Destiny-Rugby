@@ -33,6 +33,42 @@ export interface SaisieDemandeCarte {
   droitsCertifies: boolean;
 }
 
+export const MAX_JOUEURS_CLUB_PROPOSE = 30;
+
+/** L'identité du club reste commune à tout l'effectif, même après une correction du nom. */
+export function joueurDuClubPropose(joueur: SaisieCarteNormale, club: Pick<PropositionClub, 'nom' | 'division' | 'pays'>): SaisieCarteNormale {
+  return { ...joueur, clubReel: club.nom, championnat: club.division, pays: club.pays || 'France' };
+}
+
+/** Le premier joueur de chaque poste occupe le XV ; les autres restent dans le groupe. */
+export function compositionClubPropose(joueurs: SaisieCarteNormale[]) {
+  const postes = new Set<string>();
+  const titulaires: number[] = [], remplacants: number[] = [];
+  joueurs.forEach((joueur, index) => {
+    if (postes.has(joueur.poste)) remplacants.push(index);
+    else { postes.add(joueur.poste); titulaires.push(index); }
+  });
+  return { titulaires, remplacants };
+}
+
+export function titulariserJoueurClubPropose(joueurs: SaisieCarteNormale[], index: number): SaisieCarteNormale[] {
+  if (!joueurs[index]) return joueurs;
+  const suivants = [...joueurs];
+  const [joueur] = suivants.splice(index, 1);
+  const titulaire = suivants.findIndex(j => j.poste === joueur.poste);
+  suivants.splice(titulaire < 0 ? 0 : titulaire, 0, joueur);
+  return suivants;
+}
+
+/** Les listes gardent les effectifs et leurs compteurs ; les images se lisent dans le détail. */
+export function demandeCarteSansImages(demande: DemandeCarte): DemandeCarte {
+  const { photo, clubPropose: embarque, ...carte } = demande.carte as SaisieCarteNormale & { clubPropose?: PropositionClub };
+  const club = demande.clubPropose ?? embarque;
+  return { ...demande, carte,
+    photoProposee: demande.photoProposee || !!photo || !!club?.logo || !!club?.joueurs.some(j => j.photo),
+    clubPropose: club ? { ...club, logo: undefined, joueurs: club.joueurs.map(({ photo: _photo, ...joueur }) => joueur) } : undefined };
+}
+
 const texte = (v: unknown, max: number, nom: string) => {
   if (typeof v !== 'string' || !v.trim() || v.length > max) throw new Error(`${nom} manquant ou trop long.`);
   return v.replace(/\s+/g, ' ').trim();
@@ -85,14 +121,13 @@ export function validerClubPropose(brut: unknown): PropositionClub {
   const c2 = typeof b.c2 === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(b.c2) ? b.c2 : '#ffd700';
   const joueurs: SaisieCarteNormale[] = [];
   if (Array.isArray(b.joueurs)) {
-    for (const j of b.joueurs.slice(0, 30)) {
+    if (b.joueurs.length > MAX_JOUEURS_CLUB_PROPOSE) throw new Error('Un effectif proposé peut contenir 30 joueurs maximum.');
+    for (const j of b.joueurs) {
       if (j && typeof j === 'object') {
         const jObj = j as Record<string, unknown>;
         joueurs.push(validerCarteNormale({
           ...jObj,
-          clubReel: typeof jObj.clubReel === 'string' && jObj.clubReel.trim() ? jObj.clubReel : nom,
-          championnat: typeof jObj.championnat === 'string' && jObj.championnat.trim() ? jObj.championnat : division,
-          pays: typeof jObj.pays === 'string' && jObj.pays.trim() ? jObj.pays : pays,
+          clubReel: nom, championnat: division, pays,
         }));
       }
     }

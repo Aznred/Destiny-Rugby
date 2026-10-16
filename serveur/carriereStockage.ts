@@ -1,4 +1,6 @@
 import { atelierNeon, type StockageAtelier } from './atelierStockage.js';
+import { pyramideSql, type StockagePyramide } from './pyramideStockage.js';
+import { positionPublique } from '../src/lib/ligue/pyramidePublique.js';
 import { joueursNeon } from './ffr/stockageNeon.js';
 import type { StockageJoueurs } from './ffr/stockage.js';
 import { debutPeriode, decaler, MODES_USAGE, type EnvoiUsage, type MatiereUsage, type ModeUsage, type PeriodeUsage } from '../src/lib/usage/agregats.js';
@@ -24,7 +26,7 @@ export interface CompteStocke {
 }
 
 export interface LigueStockee { id: string; code: string; version: number; comptes: string[]; etat: EtatCarriereEnLigne; echeance?: number | null }
-export interface ResumeDivisionPublique { id: string; code: string; division: number; comptes: string[]; nombreClubs: number; phase: string; finLe?: string }
+export interface ResumeDivisionPublique { id: string; code: string; division: number; poule?: number; comptes: string[]; nombreClubs: number; phase: string; finLe?: string }
 export interface PresenceMatchStockee { match: string; compte: string; vu: number }
 export interface MarcheStocke { id: string; revision: number; donnees: unknown }
 export interface SalonAmicalStocke {
@@ -45,14 +47,16 @@ export interface ResumeLigue {
   playerPool?: 'men' | 'women' | 'mixed';
   id: string; nom: string; phase: string; logo?: string;
   clubNom: string; ovas: number; clubEmbleme?: string; laboratoire?: boolean; createurId?: string;
-  publique?: { cycle: number; division: number };
+  publique?: { cycle: number; division: number; poule?: number };
 }
 const resumeEtat = (etat: EtatCarriereEnLigne) => ({
   playerPool: etat.playerPool ?? 'men',
-  nom: etat.nom, phase: etat.phase, logo: etat.logo, laboratoire: etat.laboratoire === true, createurId: etat.createurId, publique: etat.publique,
+  nom: etat.nom, phase: etat.phase, logo: etat.logo, laboratoire: etat.laboratoire === true, createurId: etat.createurId,
+  publique: etat.publique ? { cycle: etat.publique.cycle, ...positionPublique(etat.publique), finLe: etat.publique.finLe } : undefined,
   clubs: etat.clubs.map(c => ({ compteId: c.compteId, nom: c.nom, ovas: c.ovas, embleme: c.embleme })),
 });
 export interface StockageCarriere {
+  pyramide?: StockagePyramide;
   classementValidation?: StockageValidationClassement;
   publicites?: StockagePublicites;
   snapshotFfr?(ligue: LigueStockee, migration: string): Promise<void>;
@@ -322,6 +326,7 @@ export function stockageNeon(url: string): StockageCarriere {
     }
   }
   return {
+    pyramide: pyramideSql(sql),
     classementValidation: stockageValidationNeon(sql),
     echangesSolo: {
       async lister(compte, offset) {
@@ -857,10 +862,10 @@ export function stockageNeon(url: string): StockageCarriere {
     },
     async resumesDivisionsPubliques(cycle) {
       const lignes = await sql`select id,code,comptes,cardinality(comptes) as nombre,
-        (resume->'publique'->>'division')::integer as division,phase,resume->'publique'->>'finLe' as fin_le from carriere_ligues
+        (resume->'publique'->>'division')::integer as division,(resume->'publique'->>'poule')::integer as poule,phase,resume->'publique'->>'finLe' as fin_le from carriere_ligues
         where resume ? 'publique' and resume->'publique'->>'cycle'=${String(cycle)} order by division`;
       return lignes.map(l => ({ id: String(l.id), code: String(l.code), comptes: l.comptes as string[],
-        division: Number(l.division), nombreClubs: Number(l.nombre), phase: String(l.phase),
+        ...positionPublique({ division: Number(l.division), poule: l.poule == null ? undefined : Number(l.poule) }), nombreClubs: Number(l.nombre), phase: String(l.phase),
         finLe: l.fin_le == null ? undefined : String(l.fin_le) }));
     },
     async dernierCyclePublic() {

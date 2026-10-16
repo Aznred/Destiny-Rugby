@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Icone } from '../components/Icone';
 import { Blason } from '../components/Blason';
+import { EffectifClubPropose } from '../components/EffectifClubPropose';
 import { Selecteur } from '../components/Selecteur';
 import { FormulaireCarteNormale } from '../components/FormulaireCarteNormale';
 import { CarteJoueurEnLigne } from '../components/CarteJoueurEnLigne';
@@ -13,8 +14,8 @@ import {
   type PropositionClub,
   type SaisieCarteNormale,
 } from '../lib/cartesNormales';
-import { carteDepuisSource, rareteCarriere, statistiquesCarte, type SourceCarte } from '../lib/ligue/catalogueCarriere';
-import { POSTE_PAR_ID, POSTES } from '../data/rugby';
+import { carteDepuisSource, type SourceCarte } from '../lib/ligue/catalogueCarriere';
+import { POSTE_PAR_ID } from '../data/rugby';
 import { preparerPortrait } from '../lib/imagesJoueurs';
 import { useGame } from '../store/useGame';
 import '../components/CartesNormales.css';
@@ -96,13 +97,6 @@ export function CompleteTaCarte() {
   const [joueursClub, setJoueursClub] = useState<SaisieCarteNormale[]>([]);
   const [messageClub, setMessageClub] = useState('');
   const [formulaireJoueurClubOuvert, setFormulaireJoueurClubOuvert] = useState(false);
-  const [nouveauJoueurClub, setNouveauJoueurClub] = useState<SaisieCarteNormale>(() => ({
-    ...carteNormaleVide(),
-    clubReel: '',
-    championnat: '',
-    pays: 'France',
-  }));
-
   const divisionFinale = divisionChoisie === 'Autre division' ? divisionAutre.trim() || 'Division personnalisée' : divisionChoisie;
 
   // Charger les demandes existantes
@@ -210,38 +204,15 @@ export function CompleteTaCarte() {
     }
   };
 
-  // Ajouter un joueur à la liste du club proposé
-  const validerAjoutJoueurClub = () => {
-    if (!nouveauJoueurClub.nom.trim()) {
-      setErreur('Renseigne au moins le nom du joueur à ajouter.');
-      return;
-    }
-    try {
-      const valide = validerCarteNormale({
-        ...nouveauJoueurClub,
-        clubReel: nomClub.trim() || 'Club proposé',
-        championnat: divisionFinale,
-        pays: paysClub.trim() || 'France',
-      });
-      setJoueursClub((prev) => [...prev, valide]);
-      setNouveauJoueurClub({
-        ...carteNormaleVide(),
-        clubReel: nomClub.trim() || 'Club proposé',
-        championnat: divisionFinale,
-        pays: paysClub.trim() || 'France',
-      });
-      setFormulaireJoueurClubOuvert(false);
-      setErreur('');
-    } catch (err) {
-      setErreur((err as Error).message);
-    }
-  };
-
   // Soumission d'une proposition de club
   const soumettrePropositionClub = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!nomClub.trim()) {
       setErreur('Renseigne le nom du club.');
+      return;
+    }
+    if (formulaireJoueurClubOuvert) {
+      setErreur('Ajoute le joueur en cours à l’effectif ou annule sa saisie avant d’envoyer le club.');
       return;
     }
     if (!divisionFinale.trim()) {
@@ -657,7 +628,7 @@ export function CompleteTaCarte() {
             <div className="complete-carte-grille-club">
               <div className="complete-carte-colonne-formulaire">
                 <fieldset className="cn-club-fieldset">
-                  <legend>Identité du club</legend>
+                  <legend>1. Identité du club</legend>
 
                   <label className="complete-carte-champ">
                     <b>Nom du club *</b>
@@ -831,196 +802,11 @@ export function CompleteTaCarte() {
               </aside>
             </div>
 
-            {/* JOUEURS DU CLUB */}
             <fieldset className="cn-club-fieldset cn-joueurs-section">
-              <legend>
-                <Icone nom="equipe" taille={18} /> Joueurs du club à compléter ({joueursClub.length})
-              </legend>
-              <p>
-                Complète l&apos;effectif du club en ajoutant un ou plusieurs joueurs. Tu peux en renseigner autant que souhaité !
-              </p>
-
-              {joueursClub.length > 0 && (
-                <div className="cn-joueurs-grille">
-                  {joueursClub.map((j, idx) => {
-                    const fam = POSTE_PAR_ID[j.poste].famille;
-                    return (
-                      <article key={`${j.nom}-${idx}`} className="cn-joueur-carte-mini">
-                        <div className="cn-joueur-mini-tete">
-                          <b>{j.nom}</b>
-                          <button
-                            type="button"
-                            className="btn fantome mini"
-                            onClick={() => setJoueursClub((prev) => prev.filter((_, i) => i !== idx))}
-                            title="Supprimer ce joueur"
-                          >
-                            <Icone nom="croix" taille={14} />
-                          </button>
-                        </div>
-                        <div className="cn-joueur-mini-corps">
-                          <span>{POSTE_PAR_ID[j.poste].nom}</span>
-                          <b>{j.note} GEN</b>
-                          <small>{j.age} ans · {j.nation}</small>
-                        </div>
-                        <div className="cn-mini-apercu-carte">
-                          <CarteJoueurEnLigne
-                            carte={{
-                              ...j,
-                              id: `joueur-${idx}`,
-                              sourceId: `joueur-${idx}`,
-                              famille: fam,
-                              origine: 'professionnel',
-                              rarete: rareteCarriere(j.note),
-                              statistiques: statistiquesCarte(j.note, fam, `joueur-${idx}`),
-                              proprietaire: null,
-                              fatigue: 0,
-                              matchs: 0,
-                              essais: 0,
-                              clubs: [],
-                            }}
-                          />
-                        </div>
-                      </article>
-                    );
-                  })}
-                </div>
-              )}
-
-              {formulaireJoueurClubOuvert ? (
-                <div className="cn-nouveau-joueur-formulaire">
-                  <h4>Ajouter un joueur à l&apos;effectif</h4>
-                  <div className="cn-champs">
-                    <label className="complete-carte-champ">
-                      <b>Prénom et nom *</b>
-                      <input
-                        type="text"
-                        required
-                        maxLength={80}
-                        placeholder="Ex : Antoine Dupont"
-                        value={nouveauJoueurClub.nom}
-                        onChange={(e) => setNouveauJoueurClub({ ...nouveauJoueurClub, nom: e.target.value })}
-                      />
-                    </label>
-                    <label className="complete-carte-champ">
-                      <b>Poste *</b>
-                      <Selecteur
-                        valeur={nouveauJoueurClub.poste}
-                        options={POSTES.map((p) => ({ valeur: p.id, label: p.nom }))}
-                        onChange={(v) => setNouveauJoueurClub({ ...nouveauJoueurClub, poste: v as SaisieCarteNormale['poste'] })}
-                      />
-                    </label>
-                    <label className="complete-carte-champ">
-                      <b>Général (Note)</b>
-                      <input
-                        type="number"
-                        min={20}
-                        max={99}
-                        value={nouveauJoueurClub.note}
-                        onChange={(e) => {
-                          const n = Number(e.target.value);
-                          setNouveauJoueurClub({
-                            ...nouveauJoueurClub,
-                            note: n,
-                            potentiel: Math.max(nouveauJoueurClub.potentiel, n),
-                          });
-                        }}
-                      />
-                    </label>
-                    <label className="complete-carte-champ">
-                      <b>Potentiel</b>
-                      <input
-                        type="number"
-                        min={nouveauJoueurClub.note}
-                        max={99}
-                        value={nouveauJoueurClub.potentiel}
-                        onChange={(e) => setNouveauJoueurClub({ ...nouveauJoueurClub, potentiel: Number(e.target.value) })}
-                      />
-                    </label>
-                    <label className="complete-carte-champ">
-                      <b>Âge</b>
-                      <input
-                        type="number"
-                        min={18}
-                        max={50}
-                        value={nouveauJoueurClub.age}
-                        onChange={(e) => setNouveauJoueurClub({ ...nouveauJoueurClub, age: Number(e.target.value) })}
-                      />
-                    </label>
-                    <label className="complete-carte-champ">
-                      <b>Nationalité</b>
-                      <input
-                        type="text"
-                        maxLength={80}
-                        value={nouveauJoueurClub.nation}
-                        onChange={(e) => setNouveauJoueurClub({ ...nouveauJoueurClub, nation: e.target.value })}
-                      />
-                    </label>
-                  </div>
-
-                  <div className="cn-champs">
-                    <label className="complete-carte-champ">
-                      <b>Photo du joueur</b>
-                      <input
-                        type="file"
-                        accept="image/png,image/jpeg,image/webp"
-                        onChange={(e) => {
-                          const fichier = e.target.files?.[0];
-                          e.target.value = '';
-                          if (!fichier) return;
-                          setOccupe(true);
-                          void (async () => {
-                            for (const taille of [320, 240, 160]) {
-                              const photo = await preparerPortrait(fichier, taille);
-                              if (photo.length <= 90_000) {
-                                setNouveauJoueurClub({ ...nouveauJoueurClub, photo });
-                                return;
-                              }
-                            }
-                            throw new Error('Photo trop volumineuse.');
-                          })()
-                            .catch((err) => setErreur((err as Error).message))
-                            .finally(() => setOccupe(false));
-                        }}
-                      />
-                    </label>
-                    <label className="complete-carte-champ">
-                      <b>Ou URL de la photo</b>
-                      <input
-                        type="url"
-                        placeholder="https://..."
-                        value={nouveauJoueurClub.photo?.startsWith('https:') ? nouveauJoueurClub.photo : ''}
-                        onChange={(e) => setNouveauJoueurClub({ ...nouveauJoueurClub, photo: e.target.value || undefined })}
-                      />
-                    </label>
-                  </div>
-
-                  <div className="cn-actions">
-                    <button
-                      type="button"
-                      className="btn primaire"
-                      onClick={validerAjoutJoueurClub}
-                      disabled={!nouveauJoueurClub.nom.trim()}
-                    >
-                      <Icone nom="ajouter" taille={16} /> Valider ce joueur
-                    </button>
-                    <button
-                      type="button"
-                      className="btn fantome"
-                      onClick={() => setFormulaireJoueurClubOuvert(false)}
-                    >
-                      Annuler
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  className="btn secondaire"
-                  onClick={() => setFormulaireJoueurClubOuvert(true)}
-                >
-                  <Icone nom="ajouter" taille={16} /> Ajouter un joueur à ce club
-                </button>
-              )}
+              <legend>2. Composition et effectif</legend>
+              <EffectifClubPropose club={{ nom: nomClub.trim() || "Club proposé", division: divisionFinale, pays: paysClub,
+                logo: logoClub, c1: couleur1, c2: couleur2, joueurs: joueursClub }} changer={setJoueursClub}
+                occupe={occupe} onEdition={setFormulaireJoueurClubOuvert} />
             </fieldset>
 
             <div className="complete-carte-champ">
@@ -1053,9 +839,9 @@ export function CompleteTaCarte() {
               <button
                 type="submit"
                 className="btn primaire grande"
-                disabled={occupe || !nomClub.trim() || !droitsCertifies}
+                disabled={occupe || formulaireJoueurClubOuvert || !nomClub.trim() || !droitsCertifies}
               >
-                <Icone nom="check" taille={18} /> Envoyer la proposition de club
+                <Icone nom="check" taille={18} /> Envoyer le club et {joueursClub.length === 1 ? 'son joueur' : `ses ${joueursClub.length} joueurs`}
               </button>
             </div>
           </form>

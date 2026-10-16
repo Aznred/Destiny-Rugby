@@ -1,5 +1,30 @@
 # LIGUES.md — la Carrière en ligne, le troisième mode
 
+## Ligue publique mondiale : pyramide à dix niveaux
+
+Le compte est inscrit automatiquement, y compris après connexion Google. Les comptes existants sans équipe
+publique sont inscrits au portail. Les ligues privées restent indépendantes.
+
+Une division désigne un niveau, une poule contient au plus seize clubs. D1 reste unique ; D2–D9 ont respectivement
+2, 4, 8, 16, 32, 64, 128 et 256 poules ; D10 en accepte autant que nécessaire. Les anciennes poules gardent leurs
+IDs, codes, participants, cartes, soldes, calendriers et scores. Leur numéro séquentiel devient une paire niveau/poule.
+
+Les résultats existants initialisent l’Elo ; le serveur mémorise son point de départ et le reconstruit sans compter
+deux fois un score. Le reclassement mensuel porte sur des résumés, puis transfère les clubs et cartes par petits lots.
+Un plan figé et les poules sources permettent la reprise après interruption. Les nouveaux groupes attendent le
+prochain départ mensuel pour ne pas repousser indéfiniment la clôture. Les saisons déjà entamées gardent leurs dates.
+
+Les quatre derniers de D1 échangent leur place avec les deux premiers de chacune des deux poules de D2, lorsque
+les saisons sont jouées. Ailleurs, les rangs et performances sportives précèdent l’Elo ; les champions exceptionnels
+peuvent gagner deux ou trois divisions selon les places. La D1 reste accessible depuis D2. La dernière division ne
+relègue pas. Les index/tables `carriere_public_*` s’ajoutent à la demande ; aucune suppression ni remise à zéro.
+
+Code : `pyramidePublique.ts`, `pyramideStockage.ts`, `eloPublic.ts`, `divisionsPubliques.ts` et
+`src/lib/ligue/pyramidePublique.ts`. Banc : `scripts/verifierPyramidePublique.ts` ; SQL simulé, pas de connexion réelle
+à Neon. Les indications historiques ci-dessous décrivent aussi les ligues privées.
+Le contrôle réel de préparation est `scripts/verifierPyramideDbIntegration.ts` : installation idempotente des
+tables/index, lectures et écritures d’essai dans une transaction annulée, sans écrire dans les ligues existantes.
+
 > **État : le mode est jouable de bout en bout.** Compte, ligue privée, code
 > d'invitation, trente licenciés de Régionale 3 au départ, championnat, matchs en direct avec
 > décisions du manager, packs, marché, enchères, échanges, coupes maison,

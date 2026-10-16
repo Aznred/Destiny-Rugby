@@ -1,4 +1,5 @@
 import { anonymiserPersonnesRetirees } from '../retraitsPersonnes.js';
+import { eloInitial, nomPoulePublique, positionPoule } from './pyramidePublique.js';
 import { catalogueAdmin } from './atelierCatalogue.js';
 import { rangerEnTrop } from './combinaisons.js';
 import { ajouterStats, STATS_VIDES, type RemonteeCombinaisons } from './marcheCombinaisons.js';
@@ -20,7 +21,7 @@ import { actualiserAncienPackBronze, packsCatalogueAdmin, bandesGaranties, carte
 import { actualiserCahierMatchEnLigne, avancerMatchEnLigne, commanderMatchEnLigne, conclureMatchEnLigne, creerMatchEnLigne, DUREE_REELLE, dureeMatchEnLigne, forceFeuille, MARGE_AUTORITE, STRATEGIE_EN_LIGNE_DEFAUT, strategieValide, resumeMatchEnLigne, vueMatchEnLigne } from './matchCarriere.js';
 import { onlineRules } from '../competitionRules.js';
 import type { RepereChrono } from './filmDirect.js';
-import type { CarteCarriere, ClubCarriere, CommandeCarriere, CompetitionCarriere, CreationCarriere, EtatCarriereEnLigne, LigneClassementCarriere, ObjectifCarriere, PackCarriere, RencontreCarriere, TransactionCarriere, VueCarriereEnLigne } from './typesCarriere.js';
+import type { CarteCarriere, ClubCarriere, CommandeCarriere, CompetitionCarriere, CreationCarriere, EtatCarriereEnLigne, HistoireCarriere, LigneClassementCarriere, ObjectifCarriere, PackCarriere, RencontreCarriere, TransactionCarriere, VueCarriereEnLigne } from './typesCarriere.js';
 import { LOT_VENTE_RAPIDE_MAX, valeurVenteRapide } from './venteRapideCarriere.js';
 import { bonusCollectif, collectifCarriere } from './collectifCarriere.js';
 import { carteEchangeAutorise, carteSurMarcheAutorisee, catalogueSpecial, identiteJoueur, preparerTirageSpecial, resumeSpeciauxLigue, tirerSpeciale } from './catalogueSpecial.js';
@@ -560,11 +561,12 @@ export function creerCarriere(config: CreationCarriere, maintenant: number, grai
 /** Nouveau groupe mensuel : les clubs gardent leur effectif et leur solde. */
 export function creerDivisionPublique(config: Pick<CreationCarriere, 'id' | 'code' | 'compteId' | 'pseudo' | 'clubNom' | 'embleme'>,
   cycle: number, division: number, maintenant: number, graine: string,
-  herites: { club: ClubCarriere; cartes: CarteCarriere[] }[] = []): EtatCarriereEnLigne {
-  const etat = creerCarriere({ ...config, nom: `Destiny Rugby · Division ${division}`, rythme: 7, maxClubs: 16,
+  herites: { club: ClubCarriere; cartes: CarteCarriere[]; histoire?: HistoireCarriere[] }[] = [], poule?: number): EtatCarriereEnLigne {
+  const position = poule === undefined ? positionPoule(division) : { division, poule };
+  const etat = creerCarriere({ ...config, nom: nomPoulePublique(position), rythme: 7, maxClubs: 16,
     dotationOvas: 5000, packsGratuitsParJour: 0, doublonsAutorises: true, playerPool: 'mixed',
     packsActifs: [...PACKS_DIVISION_PUBLIQUE], cartesSpeciales: true, playoffs: false }, maintenant, graine);
-  etat.publique = { cycle, division };
+  etat.publique = { cycle, ...position };
   if (herites.length) {
     // ⚠️ LE MARCHÉ D'UN CYCLE SE FERME AVEC LUI. Une carte restée en vente repart déverrouillée (son annonce est restée
     // dans l'ancienne ligue : elle serait verrouillée pour toujours), et les Ovas réservés pour une enchère sont rendus.
@@ -576,8 +578,11 @@ export function creerDivisionPublique(config: Pick<CreationCarriere, 'id' | 'cod
     });
     etat.cartes = herites.flatMap(({ cartes }) => copier(cartes)).map(c => { delete c.verrou; return c; });
     etat.transactions = []; etat.objectifs = [];
+    etat.histoire = [...new Map(herites.flatMap(h => h.histoire ?? []).map(h => [h.competitionId, copier(h)])).values()];
     if (herites.length === etat.maxClubs) demarrerSaison(etat, maintenant);
   }
+  etat.publique.eloDepart = Object.fromEntries(etat.clubs.map(c => [c.id, { ...(c.eloPublic ?? eloInitial()) }]));
+  etat.clubs = etat.clubs.map(c => ({ ...c, eloPublic: { ...(c.eloPublic ?? eloInitial()) } }));
   return etat;
 }
 
@@ -994,7 +999,7 @@ function demarrerSaison(etat: EtatCarriereEnLigne, maintenant: number) {
   const playoffs = Boolean(etat.playoffs) && etat.clubs.length >= 2;
   const competition: CompetitionCarriere = {
     id: prochainId(etat, 'competition', etat.competitions.length),
-    nom: `Championnat · saison ${etat.saison}`, trophee: nomTrophee(etat.tropheeId),
+    nom: `Championnat · saison ${etat.saison}`, trophee: etat.publique?.division === 1 ? 'Champion mondial Destiny Rugby' : nomTrophee(etat.tropheeId),
     logo: etat.logo, tropheeId: etat.tropheeId,
     format: 'championnat', participants: etat.clubs.map(c => c.id), saison: etat.saison,
     debut: dateServeur(maintenant), etat: 'enCours', playoffs,
@@ -1534,7 +1539,7 @@ function avancerInterne(etat: EtatCarriereEnLigne, maintenant: number, graine: s
   // Un salon privé démarre après 48 heures avec au moins deux managers.
   // Une division publique attend toujours ses 16 clubs, sans limite de temps.
   if (etat.phase === 'salon' && (etat.publique
-    ? etat.clubs.length === etat.maxClubs
+    ? etat.clubs.length === etat.maxClubs && !etat.publique.attenteProchainCycle
     : etat.clubs.length >= 2 && Date.parse(etat.creeLe) + 2 * JOUR <= maintenant)) {
     demarrerSaison(etat, maintenant);
   }
@@ -1666,7 +1671,7 @@ export function agirCarriere(etat: EtatCarriereEnLigne, compteId: string, comman
     ajouterClub(nouveau, compteId, commande.pseudo, commande.clubNom, maintenant, graine, commande.embleme);
     attribuerPacksQuotidiens(nouveau, maintenant);
     if (nouveau.phase === 'salon' && (nouveau.publique
-      ? nouveau.clubs.length === nouveau.maxClubs
+      ? nouveau.clubs.length === nouveau.maxClubs && !nouveau.publique.attenteProchainCycle
       : Date.parse(nouveau.creeLe) + 2 * JOUR <= maintenant)) demarrerSaison(nouveau, maintenant);
   } else {
     const club = monClub(nouveau, compteId); avancerInterne(nouveau, maintenant, graine);
@@ -2210,6 +2215,8 @@ export function operationMarcheCarriere(etat: EtatCarriereEnLigne, op: Operation
 function construireVueCarriere(etat: EtatCarriereEnLigne, club?: ClubCarriere, leger = false): VueCarriereEnLigne {
   const { packsPubReserves: _packsPubReserves, remonteesCombinaisons: _remontees, graine: _secret, migrationsFfr: _migrationsFfr, clubs: _clubs, cartes: _cartes, rencontres: _rencontres, objectifs: _objectifs, transactions: _transactions, echanges: _echanges, ...publics } = etat;
   return copier({ ...publics, packsActifs: packsActifsLigue(etat), monClubId: club?.id ?? '', observateur: club ? undefined : true,
+    publique: etat.publique ? { cycle: etat.publique.cycle, division: etat.publique.division, poule: etat.publique.poule,
+      barrage: etat.publique.barrage, finLe: etat.publique.finLe, derniereDivision: etat.publique.derniereDivision, attenteProchainCycle: etat.publique.attenteProchainCycle } : undefined,
     competitions: etat.competitions.map(c => c.format === 'poules' && c.poules
       ? { ...c, classementsPoules: c.poules.map(poule => classementCompetition(etat, c.id, poule, c.journeesRegulieres)) }
       : c),

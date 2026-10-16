@@ -246,7 +246,7 @@ const TABLE: Record<string, CompetitionRules> = Object.fromEntries([
   regles('f-ail2', { qualified: 1, playoffs: 0, accessMatchPositions: [1] }),
   // Ligue en ligne
   regles('ligueEnLigne', { qualified: 0, playoffs: 'auto' }, COUPERET_TIRS),
-  regles('divisionPublique', { qualified: 0, playoffs: 'auto', promotion: 1, ...UN_PLUS_ACCES }, COUPERET_TIRS),
+  regles('divisionPublique', { qualified: 0, playoffs: 0, promotion: 2, directRelegation: 4, accessMatchPositions: [] }, COUPERET_TIRS),
   regles('coupeDuMonde', { qualified: 2, playoffs: 0 }, COUPERET_TIRS),
 ].map((r) => [r.competition, r]));
 

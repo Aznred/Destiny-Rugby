@@ -4,6 +4,8 @@ import { cleClub } from './cleClub.js';
 import { catalogueAdmin } from './ligue/atelierCatalogue.js';
 
 export interface LocalisationClub {
+  /** Identité visuelle publiée avec une contribution de club ; distincte des portraits. */
+  logo?: string; c1?: string; c2?: string;
   ville?: string; stade?: string; adresseStade?: string;
   departement?: string; departementNum?: string; codePostal?: string; region?: string; pays?: string;
   latitude?: number; longitude?: number; latitudeVille?: number; longitudeVille?: number;
@@ -23,6 +25,9 @@ export function appliquerLocalisations(clubs: Record<string, LocalisationClub>, 
 /** Révisions immuables utilisées pour invalider les regroupements géographiques. */
 export function sourcesLocalisationsClubs() {
   return [editionsLocales, catalogueAdmin().clubs] as const;
+}
+export function identiteClubPubliee(nom: string): LocalisationClub | undefined {
+  return catalogueAdmin().clubs?.[nom] ?? editionsLocales[nom];
 }
 export function enrichirClub(c: Club, pays?: string): Club {
   const enrichi = { ...c, pays: c.pays ?? pays, region: c.region ?? c.ligue,

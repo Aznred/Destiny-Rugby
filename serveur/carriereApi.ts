@@ -3,8 +3,8 @@ import { contexteFfr, serviceFfr } from './ffr/contexte.js';
 import { cartesJeunesseARetirer } from '../src/lib/ligue/migrationJeunesse.js';
 import { VERSION_PROTECTION_FFR } from '../src/data/protectionFfr.generated.js';
 import type { SourceCarte } from '../src/lib/ligue/catalogueCarriere.js';
-import { validerCarteNormale, validerDemandeCarte } from '../src/lib/cartesNormales.js';
-import { catalogueAvecCarteNormale } from './cartesNormales.js';
+import { validerCarteNormale, validerClubPropose, validerDemandeCarte } from '../src/lib/cartesNormales.js';
+import { catalogueAvecCarteNormale, catalogueAvecClubPropose } from './cartesNormales.js';
 import { contexteAtelier, enregistrerAtelier, vueAtelier, vueDonneesClubs } from './atelierAdmin.js';
 import { lotImport, vueImports, vueSpeciales } from './atelierSpeciales.js';
 import { catalogueSpecial, specialesPubliques, cataloguePacksPublicitaires } from '../src/lib/ligue/catalogueSpecial.js';
@@ -13,7 +13,10 @@ import { createHash, randomBytes, randomUUID, scrypt, timingSafeEqual } from 'no
 import { isDeepStrictEqual, promisify } from 'node:util';
 import { configurationPush, envoyerPush, idPush, notifierMatchs, validerAbonnement } from './notificationsPush.js';
 import { agirCarriere, avancerCarriere as actualiserCarriere, avancerCarrierePourDirect, creerCarriere, creerDivisionPublique, creerLaboratoireCarriere, memeEtatDurable, vueCarriere, vueCarriereObservateur, vueRencontreCarriere, vueRencontreCarriereObservateur } from '../src/lib/ligue/carriere.js';
-import { planifierDivisionsPubliques } from './divisionsPubliques.js';
+import { actualiserEloPublic } from './eloPublic.js';
+import { creerPyramidePublique } from './pyramidePublique.js';
+import { codePoule } from './pyramideStockage.js';
+import { nomPoulePublique, positionPoule, positionPublique } from '../src/lib/ligue/pyramidePublique.js';
 import { creerMarcheCommun } from './marcheCommun.js';
 import { creerMarcheCombinaisons, RefusMarche } from './marcheCombinaisons.js';
 import { MOTIFS_SIGNALEMENT, type MotifSignalement } from '../src/lib/ligue/marcheCombinaisons.js';
@@ -23,7 +26,7 @@ import { assemblerStatistiques, jourUTC, validerEnvoi, type PeriodeUsage } from 
 import { echeanceLigue } from '../src/lib/ligue/echeanceCarriere.js';
 import type { CommandeCarriere, EtatCarriereEnLigne } from '../src/lib/ligue/typesCarriere.js';
 import { DELAI_PRESENCE } from '../src/lib/ligue/matchCarriere.js';
-import type { CompteStocke, LigueStockee, PresenceMatchStockee, ResumeDivisionPublique, SalonAmicalStocke, StockageCarriere } from './carriereStockage.js';
+import type { CompteStocke, LigueStockee, PresenceMatchStockee, SalonAmicalStocke, StockageCarriere } from './carriereStockage.js';
 import { OAuth2Client } from 'google-auth-library';
 import { appliquerModificationsBoutiqueCompte, validerEtatBoutiqueCompte, validerModificationsBoutiqueCompte } from '../src/lib/boutiqueCompte.js';
 import { catalogueBaseCarriere, catalogueMondialCarriere, MEZE_RUGBY_EMBLEME } from '../src/lib/ligue/catalogueCarriere.js';
@@ -470,7 +473,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
     if (!stockage.resumesDivisionsPubliques) return undefined;
     let limite = limitesPubliques.get(cycle);
     if (!limite || limite.expire <= Date.now()) {
-      const derniere = stockage.resumesDivisionsPubliques(cycle).then(l => Math.max(0, ...l.map(d => d.division)));
+      const derniere = stockage.pyramide ? stockage.pyramide.bilan(cycle).then(b => b.derniereDivision) : stockage.resumesDivisionsPubliques(cycle).then(l => Math.max(0, ...l.map(d => positionPublique(d).division)));
       limite = { expire: Date.now() + 5000, derniere };
       limitesPubliques.set(cycle, limite);
       if (limitesPubliques.size > 4) limitesPubliques.delete(limitesPubliques.keys().next().value!);
@@ -565,6 +568,13 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
       ? { ...r, match: { ...r.match, presence: {} } }
       : r),
   });
+  const indexPublic = new Map<string, string>();
+  async function synchroniserPyramide(ligne: LigueStockee) {
+    if (!ligne.etat.publique || !stockage.pyramide || !ligne.etat.publique.empreinteElo || indexPublic.get(ligne.id) === ligne.etat.publique.empreinteElo) return;
+    await stockage.pyramide.synchroniser(ligne);
+    indexPublic.delete(ligne.id); indexPublic.set(ligne.id, ligne.etat.publique.empreinteElo);
+    while (indexPublic.size > 512) indexPublic.delete(indexPublic.keys().next().value!);
+  }
   async function appliquer(id: string, compte: string, requete: string,
     operation: (etat: EtatCarriereEnLigne, maintenant: number, graine: string) => EtatCarriereEnLigne | Promise<EtatCarriereEnLigne>,
     autoriserInscription = false, verifierRecu = true,
@@ -579,6 +589,8 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
       if (!ligne || (!autoriserInscription && compte !== 'horloge' && !ligne.comptes.includes(compte))) {
         throw new ErreurHttp(404, 'Ligue introuvable.');
       }
+      if (ligne.etat.publique && compte !== 'horloge' && verifierRecu && await stockage.pyramide?.plan(ligne.etat.publique.cycle + 1))
+        throw new ErreurHttp(409, 'Reclassement de fin de saison : retrouve ta nouvelle poule dans le portail.');
       if (verifierRecu && (controle ? controle.dejaTraitee : await stockage.dejaTraitee(id, compte, requete))) return ligne.etat;
       const maintenant = Date.now();
       const presence = await avecPresences(ligne.etat, maintenant, fraicheurPresences);
@@ -586,7 +598,9 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         if(!stockage.snapshotFfr)throw new ErreurHttp(503,'Snapshot de migration FFR indisponible.');
         await stockage.snapshotFfr(ligne,VERSION_PROTECTION_FFR);
       }
-      const suivant = await ffr.avecPool(presence.etat.publique ? 'mixed' : presence.etat.playerPool ?? 'men', () => operation(presence.etat, maintenant, randomBytes(24).toString('hex')));
+      const resultatOperation = await ffr.avecPool(presence.etat.publique ? 'mixed' : presence.etat.playerPool ?? 'men', () => operation(presence.etat, maintenant, randomBytes(24).toString('hex')));
+      let suivant = actualiserEloPublic(resultatOperation);
+      if (suivant !== resultatOperation && suivant.version <= ligne.etat.version) suivant = { ...suivant, version: ligne.etat.version + 1 };
       // Les matchs terminés versent au marché ce que ses combinaisons ont donné. Le marché refuse un match déjà compté :
       // si l'écriture de la ligue échoue et qu'on recommence, rien n'est compté deux fois. Marché fermé : la file attend.
       if (suivant.remonteesCombinaisons?.length && marcheCombinaisons
@@ -638,6 +652,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         // qu'il refuse par principe de revenir en arrière.
         const avance = { ...suivant, version: ligne.etat.version };
         const stable = memoriserLigue(id, { ...ligne, etat: avance, echeance }).etat;
+        await synchroniserPyramide({ ...ligne, etat: stable });
         await reprisesMatch.deposer(id, stable).catch(() => 0);
         // Un sondage du direct n'est qu'une lecture : le notifier ici lançait
         // une programmation de file et une recherche d'alertes à chaque GET.
@@ -649,6 +664,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
       if (await stockage.comparerEtEcrire(maj, ligne.version, verifierRecu ? { compte, requete } : undefined)) {
         sondagesDirects.delete(id);
         memoriserLigue(id, { ...maj, version: ligne.version + 1, echeance: echeanceLigue(durable, maintenant) });
+        await synchroniserPyramide(maj);
         await reprisesMatch.deposer(id, durable).catch(() => 0);
         await notifier(durable);
         return durable;
@@ -698,7 +714,8 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
     };
     await Promise.all(Array.from({ length: Math.min(8, ids.length) }, () => ouvrier()));
     const publicCourant = await assurerDivisionsPubliques(Date.now());
-    if (publicCourant.divisions.length > 0 && await marcheCommun.disponible().catch(() => false)) await marcheCommun.entretenir(publicCourant.cycle).catch(() => {});
+    if (publicCourant.nombre > 0 && await marcheCommun.disponible().catch(() => false)) await marcheCommun.entretenir(publicCourant.cycle).catch(() => {});
+    await pyramide.initialiser(publicCourant.cycle, 8);
     return { actualisees: traitees, supprimees: supprimees.length };
   }
   async function assurerLaboratoireKiri(compte: CompteStocke, maintenant: number) {
@@ -727,83 +744,78 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
     ligues = await stockage.ligues(compte.id);
     return ligues;
   }
-  async function assurerDivisionsPubliques(maintenant: number) {
-    if (!stockage.dernierCyclePublic || !stockage.divisionsPubliques || !stockage.resumesDivisionsPubliques) return { cycle: 0, divisions: [] as ResumeDivisionPublique[] };
-    const dernier = await stockage.dernierCyclePublic();
-    if (dernier === null) return { cycle: 0, divisions: [] as ResumeDivisionPublique[] };
-    const materialiser = async (numero: number, precedentesResume: ResumeDivisionPublique[], existantes: ResumeDivisionPublique[]) => {
-      const precedentes = await stockage.divisionsPubliques(numero - 1);
-      // Le dernier groupe plein peut avoir commencé après le premier. Chacun
-      // joue ses 30 jours ; la nouvelle saison attend la fin du dernier groupe.
-      const clotureSimulee = maintenant;
-      for (const ligne of precedentes) {
-        let terminee = false;
-        for (let tour = 0; tour < 8; tour++) {
-          const etat = await appliquer(ligne.id, 'horloge', `fin-cycle-${numero}-${tour}`,
-            (courant, _n, g) => actualiserCarriere(courant, clotureSimulee, g), false, false);
-          if (etat.phase === 'intersaison' || etat.phase === 'salon') { terminee = true; break; }
-        }
-        if (!terminee) return false;
-      }
-      const plans = planifierDivisionsPubliques(await stockage.divisionsPubliques(numero - 1), numero);
-      for (const plan of plans) {
-        if (existantes.some(l => l.division === plan.division) || !plan.heritiers.length) continue;
-        const premier = plan.heritiers[0].club;
-        const id = randomUUID();
-        const code = `DR-PUBLIC-C${numero}-D${plan.division}`;
-        const etat = await ffr.avecPool('mixed', () => creerDivisionPublique({ id, code, compteId: premier.compteId, pseudo: premier.pseudo, clubNom: premier.nom },
-          numero, plan.division, maintenant, randomBytes(24).toString('hex'), plan.heritiers));
-        if (plan.barrage) etat.publique!.barrage = plan.barrage;
-        await stockage.creerLigue({ id, code, etat, comptes: comptesEtat(etat), version: 0 });
-      }
-      return true;
-    };
-    let cycle = dernier;
-    for (let tour = 0; tour < 4; tour++) {
-      const courantes = await stockage.resumesDivisionsPubliques(cycle);
-      if (cycle > 0) {
-        const precedentes = await stockage.resumesDivisionsPubliques(cycle - 1);
-        if (courantes.length < precedentes.length) {
-          if (!await materialiser(cycle, precedentes, courantes)) return { cycle: cycle - 1, divisions: precedentes };
-          continue;
-        }
-      }
-      const commencees = courantes.filter(l => l.phase !== 'salon');
-      if (!commencees.length || commencees.some(l => !l.finLe || Date.parse(l.finLe) > maintenant)) return { cycle, divisions: courantes };
-      if (!await materialiser(cycle + 1, courantes, await stockage.resumesDivisionsPubliques(cycle + 1))) return { cycle, divisions: courantes };
-      cycle++;
+  const pyramide = creerPyramidePublique(stockage, {
+    lire: async id => { const l = await lireLigue(id); return l ? { ...l, etat: actualiserEloPublic(l.etat) } : null; },
+    actualiser: (id, maintenant) => appliquer(id, 'horloge', 'cloture-pyramide-' + maintenant,
+      (e, _n, g) => actualiserCarriere(e, maintenant, g), false, false),
+    async creer(cycle, plan, heritiers, maintenant) {
+      if (!heritiers.length) return;
+      const premier = heritiers[0].club, id = randomUUID(), code = codePoule(cycle, plan);
+      let etat = await ffr.avecPool('mixed', () => creerDivisionPublique({ id, code, compteId: premier.compteId,
+        pseudo: premier.pseudo, clubNom: premier.nom }, cycle, plan.division, maintenant, randomBytes(24).toString('hex'), heritiers, plan.poule));
+      if (etat.phase === 'salon') etat.publique!.attenteProchainCycle = true;
+      etat = actualiserEloPublic(etat);
+      const ligne = { id, code, etat, comptes: comptesEtat(etat), version: 0 };
+      if (await stockage.creerLigue(ligne)) await stockage.pyramide!.synchroniser(ligne);
+    },
+  });
+  const assurerDivisionsPubliques = (maintenant: number) => pyramide.assurer(maintenant);
+  async function rejoindreDivisionPublique(compte: CompteStocke, clubNom: string, embleme: string | undefined, maintenant: number, automatique = false) {
+    const depot = stockage.pyramide;
+    if (!depot) throw new ErreurHttp(503, 'La ligue publique est indisponible sur ce serveur.');
+    const jeton = randomUUID(), cle = 'inscription:' + compte.id;
+    for (let essai = 0; !await depot.verrou(cle, jeton, Date.now(), 60_000); essai++) {
+      if (essai >= 40) throw new ErreurHttp(409, 'Ton inscription est en cours.');
+      await new Promise(r => setTimeout(r, 100));
     }
-    return { cycle, divisions: await stockage.resumesDivisionsPubliques(cycle) };
-  }
-  async function rejoindreDivisionPublique(compte: CompteStocke, clubNom: string, embleme: string | undefined, maintenant: number) {
-    if (!stockage.divisionsPubliques || !stockage.resumesDivisionsPubliques || !stockage.dernierCyclePublic) throw new ErreurHttp(503, 'La ligue publique est indisponible sur ce serveur.');
-    for (let tentative = 0; tentative < 5; tentative++) {
-      const etatPublic = await assurerDivisionsPubliques(maintenant);
-      const deja = etatPublic.divisions.find(l => l.comptes.includes(compte.id));
-      if (deja) return await vueCompte((await appliquer(deja.id, compte.id, `lecture-publique-${Math.floor(maintenant / 2000)}`,
-        (e, n, g) => actualiserCarriere(e, n, g), false, false)), compte.id);
-      const ouverte = etatPublic.divisions.find(l => l.nombreClubs < 16);
-      if (ouverte) {
+    try {
+      for (let tentative = 0; tentative < 12; tentative++) {
+        const situation = await assurerDivisionsPubliques(maintenant);
+        const cycle = situation.transition ?? situation.cycle;
+        const deja = await depot.duCompte(situation.cycle, compte.id) ?? (cycle !== situation.cycle ? await depot.duCompte(cycle, compte.id) : null);
+        if (deja) return await vueCompte(await appliquer(deja.id, compte.id, 'lecture-publique-' + Math.floor(maintenant / 2000),
+          (e, n, g) => actualiserCarriere(e, n, g), false, false), compte.id);
+        const cleCycle = 'cycle:' + (cycle + 1), verrouCycle = randomUUID();
+        if (!await depot.verrou(cleCycle, verrouCycle, Date.now(), 60_000)) { await new Promise(r => setTimeout(r, 100)); pyramide.invalider(); continue; }
         try {
-          const etat = await appliquer(ouverte.id, compte.id, `adhesion-publique-${compte.id}`,
-            (e, n, g) => agirCarriere(e, compte.id, { type: 'rejoindre', pseudo: compte.pseudo, clubNom, embleme }, n, g), true);
-          return await vueCompte(etat, compte.id);
-        } catch (erreur) {
-          if (tentative === 4) throw erreur;
-          continue;
-        }
+          // Le plan peut avoir été figé entre la lecture du portail et la prise du verrou.
+          if (await depot.plan(cycle + 1)) { pyramide.invalider(); continue; }
+          const ouverte = await depot.ouverte(cycle);
+          const bilan = await depot.bilan(cycle);
+          if (ouverte) {
+            try {
+              const etat = await appliquer(ouverte.id, compte.id, 'adhesion-publique-' + compte.id,
+                (e, n, g) => {
+                  let nomDisponible = clubNom, suffixe = 1;
+                  if (automatique) while (e.clubs.some(c => c.nom.toLocaleLowerCase('fr') === nomDisponible.toLocaleLowerCase('fr')))
+                    nomDisponible = clubNom.slice(0, 34) + ' ' + ++suffixe;
+                  return agirCarriere(bilan.fin && e.phase === 'salon' ? { ...e, publique: { ...e.publique!, attenteProchainCycle: true } } : e,
+                    compte.id, { type: 'rejoindre', pseudo: compte.pseudo, clubNom: nomDisponible, embleme }, n, g);
+                }, true);
+              pyramide.invalider();
+              return await vueCompte(etat, compte.id);
+            } catch (erreur) { if (tentative === 11) throw erreur; continue; }
+          }
+          const position = positionPoule(await depot.prochainIndice(cycle));
+          const id = randomUUID(), code = codePoule(cycle, position);
+          let etat = await ffr.avecPool('mixed', () => creerDivisionPublique({ id, code, compteId: compte.id, pseudo: compte.pseudo, clubNom, embleme },
+            cycle, position.division, maintenant, randomBytes(24).toString('hex'), [], position.poule));
+          if (bilan.fin) etat.publique!.attenteProchainCycle = true;
+          etat = actualiserEloPublic(etat);
+          const ligne = { id, code, etat, comptes: comptesEtat(etat), version: 0 };
+          if (await stockage.creerLigue(ligne)) {
+            await depot.synchroniser(ligne);
+            limitesPubliques.delete(cycle); pyramide.invalider();
+            return await vueCompte(etat, compte.id);
+          }
+        } finally { await depot.liberer(cleCycle, verrouCycle); }
       }
-      const division = Math.max(0, ...etatPublic.divisions.map(l => l.division)) + 1;
-      const id = randomUUID();
-      const code = `DR-PUBLIC-C${etatPublic.cycle}-D${division}`;
-      const etat = await ffr.avecPool('mixed', () => creerDivisionPublique({ id, code, compteId: compte.id, pseudo: compte.pseudo, clubNom, embleme },
-        etatPublic.cycle, division, maintenant, randomBytes(24).toString('hex')));
-      if (await stockage.creerLigue({ id, code, etat, comptes: comptesEtat(etat), version: 0 })) {
-        limitesPubliques.delete(etatPublic.cycle);
-        return await vueCompte(etat, compte.id);
-      }
-    }
-    throw new ErreurHttp(409, 'Inscription en cours. Réessaie dans un instant.');
+      throw new ErreurHttp(409, 'Inscription en cours. Réessaie dans un instant.');
+    } finally { await depot.liberer(cle, jeton); }
+  }
+  async function inscrireAutomatiquement(compte: CompteStocke, maintenant: number) {
+    if (!stockage.pyramide) return;
+    await rejoindreDivisionPublique(compte, ('XV de ' + compte.pseudo).slice(0, 40), undefined, maintenant, true);
   }
   async function handler(req: RequeteCarriere, res: ReponseCarriere) {
     res.setHeader('Cache-Control', 'no-store');
@@ -989,7 +1001,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
 
       const corps = req.method === 'POST' ? objet(typeof req.body === 'string' ? JSON.parse(req.body) : req.body) : {};
       // Le Labo envoie des images de cartes (350 Ko) et des lots d'import ; « Mon image », un portrait de 600 px.
-      const tailleMax = corps.action === 'sauvegarderBoutique' ? 4_000_000 : corps.action === 'atelier' ? 1_000_000 : corps.action === 'demandeImage' ? 300_000 : corps.action === 'demandesCartes' ? 500_000 : corps.action === 'marcheCombinaisons' ? 60_000 : 24_000;
+      const tailleMax = corps.action === 'sauvegarderBoutique' ? 4_000_000 : corps.action === 'atelier' ? 1_000_000 : corps.action === 'demandeImage' ? 300_000 : corps.action === 'demandesCartes' ? 3_000_000 : corps.action === 'marcheCombinaisons' ? 60_000 : 24_000;
       const corpsJson = JSON.stringify(corps);
       if (corpsJson.length > tailleMax) throw new ErreurHttp(413, 'Demande trop volumineuse.');
       const action = corps.action;
@@ -1039,6 +1051,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
             }
           }
         }
+        await inscrireAutomatiquement(compte, maintenant);
         const jeton = randomBytes(32).toString('hex');
         await stockage.ouvrirSession(empreinteJeton(jeton), compte.id, maintenant + DUREE_SESSION);
         sessionsChaudes.set(empreinteJeton(jeton), { compte, jusqua: maintenant + 60_000 });
@@ -1067,6 +1080,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
           if (!compte) { await hacherMotDePasse(mot); throw new ErreurHttp(401, 'Identifiant ou mot de passe incorrect.'); }
           if (!compte.empreinte || !await verifierMotDePasse(mot, compte.empreinte)) throw new ErreurHttp(401, 'Identifiant ou mot de passe incorrect.');
         }
+        await inscrireAutomatiquement(compte, maintenant);
         const jeton = randomBytes(32).toString('hex');
         await stockage.ouvrirSession(empreinteJeton(jeton), compte.id, maintenant + DUREE_SESSION);
         sessionsChaudes.set(empreinteJeton(jeton), { compte, jusqua: maintenant + 60_000 });
@@ -1086,6 +1100,18 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         sessionsChaudes.set(empreinteSession, { compte, jusqua: maintenant + 60_000, toucheLe: toucher ? maintenant : sessionChaude!.toucheLe });
       }
       if (!compte) throw new ErreurHttp(401, 'Connectez-vous pour retrouver vos ligues.');
+      if (req.method === 'GET' && url.searchParams.get('classementMondial') === '1') {
+        if (!stockage.pyramide) throw new ErreurHttp(503, 'Classement mondial indisponible.');
+        const situation = await assurerDivisionsPubliques(maintenant);
+        await pyramide.initialiser(situation.cycle, 4);
+        const page = Math.min(10000, Math.max(1, Math.floor(Number(url.searchParams.get('page')) || 1)));
+        const resultat = await stockage.pyramide.classement(situation.cycle, compte.id, page);
+        const publicEquipe = (e: typeof resultat.equipes[number]) => ({ clubId: e.clubId, nom: e.nom,
+          division: e.division, poule: e.poule, elo: Math.round(e.elo), rangMondial: e.rangMondial,
+          joues: e.joues, gagnes: e.gagnes, nuls: e.nuls, perdus: e.perdus });
+        return res.status(200).json({ cycle: situation.cycle, page, total: resultat.total,
+          equipes: resultat.equipes.map(publicEquipe), moi: resultat.moi ? publicEquipe(resultat.moi) : undefined });
+      }
       if (url.searchParams.has('classementValidation') || action === 'classementValidation') {
         if (compte.identifiant !== 'kiri') throw new ErreurHttp(404, 'Page introuvable.');
         if (!stockage.classementValidation) throw new ErreurHttp(503, 'Validation du classement indisponible.');
@@ -1187,10 +1213,11 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
           let fait = false;
           if (corps.operation === 'refuser') fait = await depot.refuser(demande.id,demande.revision,String(corps.reponse ?? '').slice(0,500),compte.identifiant);
           else {
-            const carte = demande.type === 'retrait'
+            const club = demande.type === 'club' ? validerClubPropose(corps.clubPropose ?? demande.clubPropose) : undefined;
+            const carte = club ? club.joueurs[0] ?? demande.carte : demande.type === 'retrait'
               ? (corps.carte ? validerCarteNormale(corps.carte) : demande.carte)
               : validerCarteNormale(corps.carte);
-            if (corps.operation === 'modifier') fait = await depot.modifier(demande.id,demande.revision,carte);
+            if (corps.operation === 'modifier') fait = await depot.modifier(demande.id,demande.revision,carte,club);
             else if (corps.operation === 'approuver') {
               const courant = catalogueAdmin();
               if (corps.revisionCatalogue !== courant.revision) throw new ErreurHttp(409, 'Le catalogue a changé. Recharge les demandes.');
@@ -1227,11 +1254,13 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
                 if (suivant.ajouts?.[id]) {
                   delete suivant.ajouts[id];
                 }
+              } else if (club) {
+                suivant = await ffr.avecPool('mixed', async () => catalogueAvecClubPropose(courant,demande.id,club));
               } else {
                 suivant = await ffr.avecPool('mixed', async () => catalogueAvecCarteNormale(courant,demande.sourceId ?? `normale-${demande.id}`,carte));
               }
               suivant.revision = courant.revision + 1;
-              fait = await depot.approuver(demande.id,demande.revision,suivant,courant.revision,carte,compte.identifiant);
+              fait = await depot.approuver(demande.id,demande.revision,suivant,courant.revision,carte,compte.identifiant,club);
               if (fait) catalogueLuLe = -Infinity;
             } else throw new ErreurHttp(400, 'Opération inconnue.');
           }
@@ -1762,16 +1791,18 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         const id = url.searchParams.get('ligue');
         if (!id) {
           const publicCourant = await assurerDivisionsPubliques(maintenant);
-          const ligues = (await assurerLaboratoireKiri(compte, maintenant))
-            .filter(l => (!l.publique || l.publique.cycle === publicCourant.cycle) && (POOLS_FEMININS_OUVERTS || l.playerPool !== 'women' || contexte?.authorized));
+          if (stockage.pyramide && !await stockage.pyramide.duCompte(publicCourant.cycle, compte.id) && !(publicCourant.transition && await stockage.pyramide.duCompte(publicCourant.transition, compte.id))) await inscrireAutomatiquement(compte, maintenant);
+          const toutes = await assurerLaboratoireKiri(compte, maintenant);
+          const cycleDuCompte = toutes.some(l => l.publique?.cycle === publicCourant.cycle) ? publicCourant.cycle : publicCourant.transition ?? publicCourant.cycle;
+          const ligues = toutes.filter(l => (!l.publique || l.publique.cycle === cycleDuCompte) && (POOLS_FEMININS_OUVERTS || l.playerPool !== 'women' || contexte?.authorized));
           // ⚠️ LE RÉSUMÉ ARRIVE DÉJÀ TAILLÉ. `stockage.ligues` rendait l'état
           // complet de chaque ligue pour qu'on en extraie ces sept champs ici :
           // 400 Ko traversaient le réseau par ligue et par ouverture d'écran.
           // C'est Postgres qui les extrait maintenant.
           return res.status(200).json({ compte: publicCompte(compte), ligues: ligues.map(l => ({
-            id: l.id, nom: l.nom, etat: l.phase, clubNom: l.clubNom, ovas: l.ovas, playerPool: l.playerPool,
+            id: l.id, nom: l.publique ? nomPoulePublique(positionPublique(l.publique)) : l.nom, etat: l.phase, clubNom: l.clubNom, ovas: l.ovas, playerPool: l.playerPool,
             clubEmbleme: l.clubEmbleme, logo: l.logo, laboratoire: l.laboratoire,
-            createur: l.createurId === compte.id && !l.publique, publique: l.publique,
+            createur: l.createurId === compte.id && !l.publique, publique: l.publique ? { cycle: l.publique.cycle, ...positionPublique(l.publique) } : undefined,
           })) });
         }
         if (!idValide(id)) throw new ErreurHttp(404, 'Ligue introuvable.');
@@ -1860,7 +1891,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         }
         const cycleAnnonce = Number(url.searchParams.get('cycle'));
         const divisionAnnoncee = Number(url.searchParams.get('division'));
-        const limitePublique = Number.isSafeInteger(cycleAnnonce) && cycleAnnonce > 0
+        const limitePublique = url.searchParams.has('cycle') && Number.isSafeInteger(cycleAnnonce) && cycleAnnonce >= 0
           ? await derniereDivisionPublique(cycleAnnonce) : undefined;
         const contextePublicInchange = limitePublique === undefined
           || (url.searchParams.get('derniere') === '1') === (divisionAnnoncee === limitePublique);

@@ -4,6 +4,7 @@ import type { DemandeCarte, SaisieCarteNormale } from '../lib/cartesNormales';
 import type { SourceCarte } from '../lib/ligue/catalogueCarriere';
 import { FormulaireCarteNormale } from './FormulaireCarteNormale';
 import { Blason } from './Blason';
+import { EffectifClubPropose } from './EffectifClubPropose';
 
 interface Vue { demandes: DemandeCarte[]; cartes: SourceCarte[]; revisionCatalogue: number }
 
@@ -21,6 +22,7 @@ export function LaboCartesNormales({ demandesSeulement = false }: { demandesSeul
   const [message, setMessage] = useState('');
   const [occupe, setOccupe] = useState(false);
   const [pret, setPret] = useState(!demandesSeulement);
+  const [editionClub, setEditionClub] = useState(false);
 
   // Filtres pour les demandes
   const [filtreStatut, setFiltreStatut] = useState<FiltreStatut>('attente');
@@ -37,12 +39,17 @@ export function LaboCartesNormales({ demandesSeulement = false }: { demandesSeul
   }, []);
 
   const choisirDemande = async (id: string) => {
+    if (editionClub) {
+      setErreur('Enregistre le joueur en cours ou annule sa saisie avant de changer de demande.');
+      return;
+    }
     setOccupe(true);
     setErreur('');
     setMessage('');
     try {
       const { demande } = await appelCartes<{ demande: DemandeCarte }>(undefined, `&id=${encodeURIComponent(id)}`);
       setSelection(demande);
+      setEditionClub(false);
       setCarte(demande.carte);
       setReponse(demande.reponse ?? '');
       setPret(true);
@@ -55,6 +62,10 @@ export function LaboCartesNormales({ demandesSeulement = false }: { demandesSeul
 
   const agir = async (operation: 'modifier' | 'approuver' | 'refuser' | 'creer') => {
     if (!vue) return;
+    if (editionClub && operation !== 'refuser') {
+      setErreur('Enregistre le joueur en cours ou annule sa saisie avant de publier le club.');
+      return;
+    }
     setOccupe(true);
     setErreur('');
     setMessage('');
@@ -85,7 +96,8 @@ export function LaboCartesNormales({ demandesSeulement = false }: { demandesSeul
           id: selection.id,
           revision: selection.revision,
           revisionCatalogue: vue.revisionCatalogue,
-          ...(operation === 'refuser' ? { reponse } : selection.type === 'retrait' ? {} : { carte: validerCarteNormale(carte) }),
+          ...(operation === 'refuser' ? { reponse } : selection.type === 'retrait' ? {}
+            : selection.type === 'club' ? { clubPropose: selection.clubPropose } : { carte: validerCarteNormale(carte) }),
         });
         setMessage(
           operation === 'approuver'
@@ -112,7 +124,7 @@ export function LaboCartesNormales({ demandesSeulement = false }: { demandesSeul
   };
 
   // Compteurs
-  const demandes = vue?.demandes ?? [];
+  const demandes = useMemo(() => vue?.demandes ?? [], [vue?.demandes]);
   const nbAttente = useMemo(() => demandes.filter(d => d.statut === 'attente').length, [demandes]);
   const nbAcceptees = useMemo(() => demandes.filter(d => d.statut === 'acceptee').length, [demandes]);
   const nbRefusees = useMemo(() => demandes.filter(d => d.statut === 'refusee').length, [demandes]);
@@ -426,6 +438,11 @@ export function LaboCartesNormales({ demandesSeulement = false }: { demandesSeul
                 En validant cette demande, la carte sera immédiatement ajoutée à la table des retraits officiels (retirée du catalogue, des packs et du marché).
               </p>
             </div>
+          ) : selection?.type === 'club' && selection.clubPropose ? (
+            <EffectifClubPropose key={selection.id} club={selection.clubPropose}
+              changer={selection.statut === 'attente' ? joueurs => setSelection(s => s?.clubPropose
+                ? { ...s, clubPropose: { ...s.clubPropose, joueurs } } : s) : undefined}
+              occupe={occupe} onEdition={setEditionClub} />
           ) : (
             <FormulaireCarteNormale
               carte={carte}
@@ -451,14 +468,15 @@ export function LaboCartesNormales({ demandesSeulement = false }: { demandesSeul
                 />
               </label>
               <div className="cn-actions">
-                <button className={`btn ${selection.type === 'retrait' ? 'ak-supprimer' : 'primaire'}`} disabled={occupe}>
-                  {selection.type === 'retrait' ? 'Valider le retrait de la carte' : 'Valider et publier la carte'}
+                <button className={`btn ${selection.type === 'retrait' ? 'ak-supprimer' : 'primaire'}`} disabled={occupe || editionClub}>
+                  {selection.type === 'retrait' ? 'Valider le retrait de la carte' : selection.type === 'club'
+                    ? `Publier le club et ${selection.clubPropose?.joueurs.length === 1 ? 'son joueur' : `ses ${selection.clubPropose?.joueurs.length ?? 0} joueurs`}` : 'Valider et publier la carte'}
                 </button>
                 {selection.type !== 'retrait' && (
                   <button
                     type="button"
                     className="btn fantome"
-                    disabled={occupe}
+                    disabled={occupe || editionClub}
                     onClick={() => void agir('modifier')}
                   >
                     Enregistrer les modifications

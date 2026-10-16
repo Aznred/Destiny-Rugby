@@ -26,7 +26,7 @@ import { afficheDuClub } from '../src/lib/matchLive';
 import { departageDuMatch, departager, inscrireIssueJouee } from '../src/lib/couperet';
 import { effectifDuClub } from '../src/lib/effectif';
 import { avancer, creerMatch } from '../src/lib/moteur/moteur';
-import { IA_MATCH_DE_CARRIERE } from '../src/lib/moteur/passerelle3D';
+import { IA_MATCH_DE_CARRIERE } from '../src/lib/moteur/ia/reglages';
 
 let controles = 0;
 const ok = (condition: unknown, message: string) => { assert.ok(condition, message); controles++; };
@@ -109,7 +109,7 @@ egal(standingsStatuses(rulesFor('reg3'), 12).includes('DIRECT_RELEGATION'), fals
 egal(standingsStatuses(rulesFor('urc'), 16).some((s) => s === 'DIRECT_RELEGATION' || s === 'ACCESS_MATCH'), false, 'une ligue fermée n\'a ni relégation ni barrage');
 {
   const publique = standingsStatuses(onlineRules({ publique: { division: 2 }, playoffs: false }), 16);
-  egal([publique[0], publique[14], publique[15]], ['PROMOTION', 'ACCESS_MATCH', 'DIRECT_RELEGATION'], 'division publique 2 : montée, barrage, relégation');
+  egal([publique[0], publique[1], publique[12], publique[15]], ['PROMOTION', 'PROMOTION', 'DIRECT_RELEGATION', 'DIRECT_RELEGATION'], 'division publique 2 : deux candidats à la montée, quatre à la descente');
   egal(standingsStatuses(onlineRules({ publique: { division: 1 }, playoffs: false }), 16)[0], 'SAFE', 'division publique 1 : personne ne monte plus haut');
   const privee = standingsStatuses(onlineRules({ playoffs: true }), 6);
   egal(privee, ['PLAYOFF', 'PLAYOFF', 'PLAYOFF', 'PLAYOFF', 'SAFE', 'SAFE'], 'ligue privée à six avec phase finale : quatre qualifiés, aucune relégation');
