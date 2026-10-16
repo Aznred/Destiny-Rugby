@@ -1,4 +1,4 @@
-import { Component, Suspense, useEffect, useMemo, useRef, useState, memo } from 'react';
+import { Component, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode, MutableRefObject, CSSProperties } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { Html, useGLTF } from '@react-three/drei';
@@ -14,36 +14,17 @@ class Protection extends Component<{children:ReactNode; secours:ReactNode},{erre
   state={erreur:false}; static getDerivedStateFromError(){return {erreur:true};}
   render(){return this.state.erreur ? this.props.secours : this.props.children;}
 }
-const cacheGeometrie = new Map<string, { scale: number; center: Vector3 }>();
-
-const Pochette = memo(function Pochette({pack,slot,mouvement,achat,surToucher,gratuit}: {pack:PackCarriere;slot:number;mouvement:MutableRefObject<Mouvement>;achat:string|null;surToucher:(slot:number)=>void;gratuit:boolean}) {
-  const url = modelePackParNom(pack);
-  const {scene}=useGLTF(url, '/draco/');
+function Pochette({pack,slot,mouvement,achat,surToucher,gratuit}: {pack:PackCarriere;slot:number;mouvement:MutableRefObject<Mouvement>;achat:string|null;surToucher:(slot:number)=>void;gratuit:boolean}) {
+  const {scene}=useGLTF(modelePackParNom(pack), '/draco/');
   const ref=useRef<Group>(null);
   const etiquette=useRef<HTMLSpanElement>(null);
-  const clone=useMemo(()=>{
-    let geo = cacheGeometrie.get(url);
-    if (!geo) {
-      const box=new Box3().setFromObject(scene,true);
-      const size=box.getSize(new Vector3());
-      const center=box.getCenter(new Vector3());
-      const scale=2.8/Math.max(size.x,size.y,size.z);
-      geo = { scale, center };
-      cacheGeometrie.set(url, geo);
-    }
-    const obj=scene.clone(true);
-    const g=new Group();
-    g.add(obj);
-    g.scale.setScalar(geo.scale);
-    g.position.copy(geo.center.clone().multiplyScalar(-geo.scale));
-    return g;
-  },[scene, url]);
+  const clone=useMemo(()=>{const obj=scene.clone(true);const box=new Box3().setFromObject(obj,true);const size=box.getSize(new Vector3());const center=box.getCenter(new Vector3());const scale=2.8/Math.max(size.x,size.y,size.z);const g=new Group();g.add(obj);g.scale.setScalar(scale);g.position.copy(center.multiplyScalar(-scale));return g;},[scene]);
   useFrame(({clock},dt)=>{if(!ref.current)return;const a=(slot-mouvement.current.position)*Math.PI*2/7;const devant=(Math.cos(a)+1)/2;ref.current.position.set(Math.sin(a)*5.2, (mouvement.current.calme?0:Math.sin(clock.elapsedTime*1.3+slot)*.045), Math.cos(a)*2.25-1.1);ref.current.rotation.set(0,-a*.35+(mouvement.current.calme?0:Math.sin(clock.elapsedTime*.7+slot)*.07),0);if(etiquette.current)etiquette.current.style.visibility=Math.cos(a)>.4?'visible':'hidden';const cible=achat===pack.id?1.35:.72+devant*.28;ref.current.scale.lerp(new Vector3(cible,cible,cible),1-Math.exp(-dt*9));});
   return <group ref={ref} onClick={e=>{e.stopPropagation();surToucher(slot);}}>
     <primitive object={clone}/>
     <Html position={[0,-1.7,0]} center zIndexRange={[10,0]} style={{pointerEvents:'none'}}><span ref={etiquette} className="bp3-etiquette"><b>{nomPackCarriere(pack)}</b><small>{gratuit?t('shop.free'):(etiquettePrixGlobale?etiquettePrixGlobale(pack):`${nombre(pack.prix)} Ovas`)}</small></span></Html>
   </group>;
-});
+}
 function Couronne({packs,mouvement,achat,surToucher,onSelection,gratuit,packsGratuits}: {packs:PackCarriere[];mouvement:MutableRefObject<Mouvement>;achat:string|null;surToucher:(slot:number)=>void;onSelection:(n:number)=>void;gratuit:boolean;packsGratuits:ReadonlySet<string>}) {
   const [centre,setCentre]=useState(0);
   const dernier=useRef(0);

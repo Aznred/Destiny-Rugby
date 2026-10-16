@@ -101,7 +101,7 @@ export default function OuverturePack({ cartes, pack, modele, garantie, apparenc
       const index = ordre.length - 1 - revelees;
       sons.carte(rangPack(ordre[index]));
       setRevelees(n => n+1);
-    }, calme ? 80 : revelees === ordre.length-1 ? 550 : 340);
+    }, calme ? 100 : revelees === ordre.length-1 ? 1250 : 720);
     return () => clearTimeout(timer);
   }, [phase, calme, sons, revelees, toutes, ordre]);
   useEffect(() => {
@@ -169,27 +169,15 @@ export default function OuverturePack({ cartes, pack, modele, garantie, apparenc
   return createPortal(<div ref={dialogue} tabIndex={-1} className={`pack-show phase-${phase} palier-${rarete}${eclatSpecial}${calme ? ' calme' : ''}${instant ? ' instant' : ''}`} style={{ '--pack-color': eclatSpecial ? (speciale === 'halloween' ? '#ff8a1c' : '#e8c46a') : evolutionElite ? COULEURS[rang ? 2 : 3] : COULEURS[rang] } as CSSProperties} role="dialog" aria-modal="true" aria-labelledby="pack-show-title" onKeyDown={e => {
     if (e.key === 'Tab') { const elements = Array.from(dialogue.current?.querySelectorAll<HTMLElement>('button:not(:disabled), [tabindex="0"]') ?? []); const premier = elements[0], dernier = elements[elements.length-1]; if (e.shiftKey && document.activeElement === premier) { e.preventDefault(); dernier?.focus(); } else if (!e.shiftKey && document.activeElement === dernier) { e.preventDefault(); premier?.focus(); } }
   }}><main className="pack-show-main cel-panneau">
-    <div className="pack-show-heading">
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-        <div>
-          <p className="eyebrow">{t("ui.4dfd1ccc8b22", { v0: pack, v1: cartes ? ` · ${t('online.shop.cards',{n:cartes.length})}` : '' })}</p>
-          <h2 id="pack-show-title" key={phase} aria-live="polite">{phase === 'cartes' ? t('online.pack.recruits') : pack}</h2>
-        </div>
-        {pret && !toutes && (
-          <button type="button" className="btn fantome petit pack-show-btn-passer" onClick={passer}>
-            ⚡ {t('online.pack.reveal')}
-          </button>
-        )}
-      </div>
-    </div>
-    {phase !== 'cartes' ? <><div className="pack-show-stage" onClick={() => { if (pret && phase !== 'attente') passer(); }}>
+    <div className="pack-show-heading"><p className="eyebrow">{t("ui.4dfd1ccc8b22", { v0: pack, v1: cartes ? ` · ${t('online.shop.cards',{n:cartes.length})}` : '' })}</p><h2 id="pack-show-title" key={phase} aria-live="polite">{phase === 'cartes' ? t('online.pack.recruits') : pack}</h2></div>
+    {phase !== 'cartes' ? <><div className="pack-show-stage">
       <div className="pack-show-beams" aria-hidden="true"/><div className="pack-show-orbit" aria-hidden="true"/>
       <div className="pack-show-particles" key={rang} aria-hidden="true">{Array.from({length:28}, (_,i) => <i key={i} style={{'--x':`${i*37%100}%`, '--delay':`${i%9*-.35}s`, '--duration':`${2+i%4}s`, '--drift':`${(i%2?1:-1)*(20+i*3)}px`} as CSSProperties}/>)}</div>
       <div className="pack-show-model"><Suspense fallback={null}><Pack3D rarete={rarete} rareteSuivante={prochainPalier && !evolutionElite ? PALIERS_PACK[rang + 1] : undefined} modele={modeleAffiche} modeleSuivant={prochainPalier && evolutionElite ? modeleElite1 : undefined} ouvert={phase === 'ouverture'} calme={calme} transition={phase}/></Suspense></div>
       {phase === 'attente' && <button ref={principale} type="button" className="pack-show-touch" data-tuto="pack-ouvrir" onClick={avancerPack} disabled={attenteTirage} aria-label={libelleAction} />}
       {(phase === 'charge' || phase === 'evolution') && <div className="pack-show-upgrade" aria-hidden="true"><i/><i/><span/></div>}
       {phase === 'ouverture' && <div className="pack-show-flash" aria-hidden="true"/>}
-    </div><p className="pack-show-hint" aria-live="polite">{phase === 'attente' ? attenteTirage ? t('online.pack.waitCards') : t('online.pack.openHint') : phase === 'charge' || phase === 'evolution' ? t('online.pack.upgrading') : t('online.shop.opening')}</p></> : <div className="pack-show-results" data-tuto="pack-cartes" role="list" aria-label={t('online.pack.obtainedCards')} style={{ '--pack-count': ordre.length } as CSSProperties} onClick={() => { if (!toutes) passer(); }}>{ordre.map((carte,i) => {
+    </div><p className="pack-show-hint" aria-live="polite">{phase === 'attente' ? attenteTirage ? t('online.pack.waitCards') : t('online.pack.openHint') : phase === 'charge' || phase === 'evolution' ? t('online.pack.upgrading') : t('online.shop.opening')}</p></> : <div className="pack-show-results" data-tuto="pack-cartes" role="list" aria-label={t('online.pack.obtainedCards')} style={{ '--pack-count': ordre.length } as CSSProperties}>{ordre.map((carte,i) => {
       const visible = i >= ordre.length - revelees;
       const meilleure = i === 0;
       const active = i === carteActive;
