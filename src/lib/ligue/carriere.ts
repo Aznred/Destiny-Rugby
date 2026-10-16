@@ -34,7 +34,7 @@ export const PACKS_DIVISION_PUBLIQUE = ['bronze', 'standard', 'or'] as const;
 // La division publique conserve uniquement Bronze, Argent et Or. Les packs par championnat féminin suivent les
 // joueuses dans les ligues privées, sans passer par la liste cochée à la création.
 export const packsActifsLigue = (etat: EtatCarriereEnLigne): string[] | undefined =>
-  etat.publique ? [...PACKS_DIVISION_PUBLIQUE, ...etat.packs.filter(p => p.id.startsWith('womens:')).map(p => p.id)]
+  etat.publique ? [...PACKS_DIVISION_PUBLIQUE]
     : etat.packsActifs && (etat.playerPool ?? 'men') !== 'men' ? [...etat.packsActifs, ...etat.packs.filter(p => p.id.startsWith('womens:')).map(p => p.id)]
     : etat.packsActifs;
 
@@ -608,7 +608,7 @@ export function creerLaboratoireCarriere(config: Pick<CreationCarriere, 'id' | '
 }
 
 function ouvrirPack(etat: EtatCarriereEnLigne, club: ClubCarriere, packId: string, maintenant: number, graine: string, gratuit = false, reservePub = false) {
-  exiger(reservePub || !etat.publique || PACKS_DIVISION_PUBLIQUE.includes(packId as typeof PACKS_DIVISION_PUBLIQUE[number]) || packId.startsWith('womens:'), 'Ce pack est désactivé dans cette ligue.');
+  exiger(reservePub || !etat.publique || PACKS_DIVISION_PUBLIQUE.includes(packId as typeof PACKS_DIVISION_PUBLIQUE[number]), 'Ce pack est désactivé dans cette ligue.');
   const pack = etat.packs.find(p => p.id === packId); exiger(pack, 'Pack inconnu.');
   // ⚠️ UN PACK D'ÉVÉNEMENT (HALLOWEEN…) NE SE VEND PAS EN LIGUE : il est dans la
   // boutique de packs spéciaux de la Collection solo. Ses cartes, elles, peuvent
@@ -1520,7 +1520,7 @@ function completerPacks(etat: EtatCarriereEnLigne) {
   etat.packs = etat.packs.filter(packPropose).map(actualiserAncienPackBronze);
   // Conserver les packs déjà offerts quand leur ancienne pochette est retirée.
   const disponibles = new Set(etat.packs.map(p => p.id));
-  const remplacer = (id: string) => etat.publique && !(PACKS_DIVISION_PUBLIQUE as readonly string[]).includes(id) && !id.startsWith('womens:') ? 'standard' : disponibles.has(id) ? id
+  const remplacer = (id: string) => etat.publique && !(PACKS_DIVISION_PUBLIQUE as readonly string[]).includes(id) ? 'standard' : disponibles.has(id) ? id
     : id === 'womens:elite 2 feminine' && disponibles.has('womens:elite 1 feminine') ? 'womens:elite 1 feminine'
     : anciensPacks.get(id)?.garantie === 'elite' ? 'elite'
     : anciensPacks.get(id)?.garantie === 'or' ? 'or' : 'standard';

@@ -27,9 +27,8 @@ const liguePublique = creerDivisionPublique(
 verifier(liguePublique.playerPool === 'mixed', 'La division publique a le pool mixed');
 const packsDispos = packsActifsLigue(liguePublique) ?? [];
 console.log('Packs actifs en division publique :', packsDispos);
-verifier(packsDispos.includes('bronze') && packsDispos.includes('standard') && packsDispos.includes('or'), 'Packs de base présents');
-verifier(packsDispos.some(p => p.startsWith('womens:')), 'Les packs de championnats féminins sont disponibles en division publique');
-verifier(packsDispos.includes('womens:premiership women s rugby'), 'Le pack Premiership Women Rugby (avec Holly Aitchison) est actif');
+verifier(packsDispos.length === 3 && packsDispos.includes('bronze') && packsDispos.includes('standard') && packsDispos.includes('or'), 'Seulement Bronze, Argent (standard) et Or en boutique de division publique');
+verifier(!packsDispos.some(p => p.startsWith('womens:')), 'Aucun pack féminin en boutique publique (réservés aux ligues privées)');
 
 const searchAitchison = collectionCarriere(liguePublique, 'user-1', new URLSearchParams('q=Aitchison'));
 verifier(searchAitchison.total >= 1, 'Holly Aitchison est trouvable dans la collection de la division publique');
