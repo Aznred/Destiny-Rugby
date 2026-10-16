@@ -610,7 +610,18 @@ export function stockageNeon(url: string): StockageCarriere {
         cross join lateral jsonb_array_elements(case jsonb_typeof(l.donnees->'ventes') when 'array' then l.donnees->'ventes' else '[]'::jsonb end) v
         where v->>'etat' = 'vendue' and v->>'acheteurId' is not null`,
 
-        sql`with packs_par_club as (
+        sql`with club_comptes as (
+          select
+            l.id as ligue_id,
+            coalesce(l.donnees->>'nom', 'Ligue') as ligue,
+            c->>'id' as club_id,
+            c->>'compteId' as compte_id,
+            coalesce(c->>'pseudo', c->>'nom', 'Manager') as pseudo
+          from carriere_ligues l
+          cross join lateral jsonb_array_elements(case jsonb_typeof(l.donnees->'clubs') when 'array' then l.donnees->'clubs' else '[]'::jsonb end) c
+          where c->>'compteId' is not null
+        ),
+        packs_par_club as (
           select
             l.id as ligue_id,
             t->>'clubId' as club_id,
@@ -619,20 +630,28 @@ export function stockageNeon(url: string): StockageCarriere {
           cross join lateral jsonb_array_elements(case jsonb_typeof(l.donnees->'transactions') when 'array' then l.donnees->'transactions' else '[]'::jsonb end) t
           where t->>'nature' = 'pack' and t->>'clubId' is not null
           group by l.id, t->>'clubId'
+        ),
+        packs_par_compte as (
+          select
+            cc.compte_id,
+            sum(p.packs)::int as packs,
+            count(distinct p.ligue_id)::int as nb_ligues,
+            (array_agg(cc.ligue order by p.packs desc))[1] as principale_ligue,
+            max(cc.pseudo) as pseudo
+          from packs_par_club p
+          join club_comptes cc on cc.ligue_id = p.ligue_id and cc.club_id = p.club_id
+          group by cc.compte_id
           order by packs desc
           limit 10
         )
         select
           p.packs,
-          coalesce(l.donnees->>'nom', 'Ligue') as ligue,
-          coalesce(c.club->>'pseudo', c.club->>'nom', 'Manager') as pseudo
-        from packs_par_club p
-        join carriere_ligues l on l.id = p.ligue_id
-        left join lateral (
-          select club from jsonb_array_elements(case jsonb_typeof(l.donnees->'clubs') when 'array' then l.donnees->'clubs' else '[]'::jsonb end) club
-          where club->>'id' = p.club_id
-          limit 1
-        ) c on true
+          coalesce(u.pseudo, p.pseudo, 'Manager') as pseudo,
+          case when p.nb_ligues > 1
+               then p.principale_ligue || ' (+' || (p.nb_ligues - 1)::text || ')'
+               else coalesce(p.principale_ligue, '') end as ligue
+        from packs_par_compte p
+        left join comptes u on u.id::text = p.compte_id
         order by p.packs desc`,
 
         sql`with packs_par_ligue as (

@@ -463,8 +463,35 @@ export function stockageFichier(fichier: string): StockageCarriere {
     async nombreLigues(compte) { return base.ligues.filter(l => l.comptes.includes(compte) && !l.etat.laboratoire && !l.etat.publique).length; },
     async statistiquesGlobales() {
       const vues = base.ligues.flatMap(l => l.etat.clubs[0] ? [{ ligue: l.etat.nom, etat: l.etat, stats: vueCarriere(l.etat, l.etat.clubs[0].compteId).statistiques }] : []);
-      const ouvreurs = vues.flatMap(v => v.stats.parClub.map(c => ({ pseudo: c.pseudo, packs: c.packs, ligue: v.ligue }))).sort((a, b) => b.packs - a.packs);
-      const topOuvreurs = ouvreurs.slice(0, 10);
+      const packsParCompte = new Map<string, { packs: number; ligues: Map<string, number>; pseudo: string }>();
+      for (const l of base.ligues) {
+        const transactions = (l.etat.transactions ?? []).filter(t => t.nature === 'pack' && t.clubId);
+        for (const t of transactions) {
+          const club = l.etat.clubs.find(c => c.id === t.clubId);
+          if (!club?.compteId) continue;
+          let statsCompte = packsParCompte.get(club.compteId);
+          if (!statsCompte) {
+            const compte = base.comptes.find(c => c.id === club.compteId);
+            statsCompte = { packs: 0, ligues: new Map(), pseudo: compte?.pseudo ?? club.pseudo ?? club.nom ?? 'Manager' };
+            packsParCompte.set(club.compteId, statsCompte);
+          }
+          statsCompte.packs += 1;
+          statsCompte.ligues.set(l.etat.nom, (statsCompte.ligues.get(l.etat.nom) ?? 0) + 1);
+        }
+      }
+      const topOuvreurs = [...packsParCompte.values()]
+        .sort((a, b) => b.packs - a.packs)
+        .slice(0, 10)
+        .map(c => {
+          const liguesTriees = [...c.ligues.entries()].sort((a, b) => b[1] - a[1]);
+          const principale = liguesTriees[0]?.[0] ?? '';
+          const autres = liguesTriees.length - 1;
+          return {
+            pseudo: c.pseudo,
+            packs: c.packs,
+            ligue: autres > 0 ? `${principale} (+${autres})` : principale,
+          };
+        });
       const meilleurs = vues.flatMap(v => v.stats.meilleurPack ? [{ ...v.stats.meilleurPack, ligue: v.ligue }] : []).sort((a, b) => b.note - a.note);
       const ventes = base.ligues.flatMap(l => (l.etat.ventes ?? []).filter(v => v.etat === 'vendue' && v.acheteurId).map(v => {
         const montant = v.type === 'enchere' ? v.enchere?.montant ?? v.prix : v.prix;

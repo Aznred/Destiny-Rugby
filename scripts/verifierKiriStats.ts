@@ -100,30 +100,57 @@ try {
   };
   ligue2.transactions.push(tPack3);
 
+  // Ajout d'un club pour Alice (joueur1) sur ligue2 pour tester le cumul multi-ligues
+  const clubAliceLigue2Id = randomUUID();
+  ligue2.clubs.push({
+    id: clubAliceLigue2Id,
+    compteId: joueur1,
+    pseudo: 'Alice',
+    nom: 'Toulouse UK',
+    ovas: 1000,
+    cartes: [],
+    composition: { titulaires: [], remplacants: [] },
+    strategie: {} as any,
+    rejointLe: new Date().toISOString(),
+  });
+  ligue2.transactions.push({
+    id: randomUUID(),
+    clubId: clubAliceLigue2Id,
+    nature: 'pack',
+    ovas: -500,
+    cartes: [],
+    libelle: 'Pack Argent',
+    date: new Date().toISOString(),
+  });
+
   await stockage.creerLigue({ id: ligue1.id, code: ligue1.code, version: 0, comptes: [joueur1], etat: ligue1 });
-  await stockage.creerLigue({ id: ligue2.id, code: ligue2.code, version: 0, comptes: [joueur2], etat: ligue2 });
+  await stockage.creerLigue({ id: ligue2.id, code: ligue2.code, version: 0, comptes: [joueur2, joueur1], etat: ligue2 });
 
   // Test de statistiquesGlobales
   const stats = await stockage.statistiquesGlobales();
   assert.equal(stats.ligues, 2);
-  assert.equal(stats.packsOuverts, 3);
-  assert.equal(stats.ovasDepensesPacks, 1800);
+  assert.equal(stats.packsOuverts, 4);
+  assert.equal(stats.ovasDepensesPacks, 2300);
   assert.equal(stats.volumeMarche, 25000);
 
-  // Vérification des Top 10
+  // Vérification des Top 10 cumulés par compte
   assert.ok(Array.isArray(stats.topOuvreurs), 'topOuvreurs doit être un tableau');
   assert.equal(stats.topOuvreurs.length, 2);
+  // Alice a ouvert 2 packs sur ligue1 + 1 pack sur ligue2 = 3 packs cumulés sur son compte
   assert.equal(stats.topOuvreurs[0].pseudo, 'Alice');
-  assert.equal(stats.topOuvreurs[0].packs, 2);
+  assert.equal(stats.topOuvreurs[0].packs, 3);
+  assert.equal(stats.topOuvreurs[0].ligue, 'Top 14 Elite (+1)');
+  // Bob a ouvert 1 pack sur ligue2
   assert.equal(stats.topOuvreurs[1].pseudo, 'Bob');
   assert.equal(stats.topOuvreurs[1].packs, 1);
+  assert.equal(stats.topOuvreurs[1].ligue, 'Premiership Rugby');
 
   assert.ok(Array.isArray(stats.topLiguesPacks), 'topLiguesPacks doit être un tableau');
   assert.equal(stats.topLiguesPacks.length, 2);
   assert.equal(stats.topLiguesPacks[0].ligue, 'Top 14 Elite');
   assert.equal(stats.topLiguesPacks[0].packs, 2);
   assert.equal(stats.topLiguesPacks[1].ligue, 'Premiership Rugby');
-  assert.equal(stats.topLiguesPacks[1].packs, 1);
+  assert.equal(stats.topLiguesPacks[1].packs, 2);
 
   assert.ok(Array.isArray(stats.topVentes), 'topVentes doit être un tableau');
   assert.equal(stats.topVentes.length, 1);
@@ -156,7 +183,7 @@ try {
   // Kiri a accès
   const rKiri = await appeler(kiri, '/api/carriere?statistiques=globales');
   assert.equal(rKiri.statut, 200, 'Kiri accède aux statistiques globales');
-  assert.equal(rKiri.donnees.packsOuverts, 3);
+  assert.equal(rKiri.donnees.packsOuverts, 4);
   assert.equal(rKiri.donnees.topOuvreurs.length, 2);
   assert.equal(rKiri.donnees.topLiguesPacks.length, 2);
   assert.equal(rKiri.donnees.topVentes.length, 1);
