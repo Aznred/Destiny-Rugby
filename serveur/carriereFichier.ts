@@ -178,19 +178,31 @@ export function stockageFichier(fichier: string): StockageCarriere {
       async creer(compte, id, saisie) {
         base.demandesCartes ??= [];
         if (base.demandesCartes.filter(d => d.compte === compte && d.statut === 'attente').length >= 5) return false;
-        base.demandesCartes.push({ ...copie(saisie), id, compte, statut: 'attente', revision: 0, creeLe: new Date().toISOString() });
+        const carteAStocker = saisie.clubPropose ? { ...saisie.carte, clubPropose: saisie.clubPropose } : saisie.carte;
+        base.demandesCartes.push({ ...copie(saisie), carte: carteAStocker, id, compte, statut: 'attente', revision: 0, creeLe: new Date().toISOString() });
         sauver(); return true;
       },
       async lister(compte) {
         return (base.demandesCartes ?? []).filter(d => compte === null || d.compte === compte)
           .sort((a,b) => Number(b.statut === 'attente') - Number(a.statut === 'attente') || b.creeLe.localeCompare(a.creeLe)).slice(0,200)
-          .map(({ compte: auteur, ...d }) => { const { photo, ...carte } = d.carte; return copie({ ...d, carte,
-            photoProposee: Boolean(photo), pseudo: base.comptes.find(c => c.id === auteur)?.pseudo }); });
+          .map(({ compte: auteur, ...d }) => {
+            const carteObj = (d.carte ?? {}) as Record<string, unknown>;
+            const clubPropose = d.clubPropose ?? (carteObj.clubPropose as import('../src/lib/cartesNormales.js').PropositionClub | undefined);
+            const { photo, ...carte } = d.carte;
+            return copie({
+              ...d, carte,
+              clubPropose: clubPropose ? { ...clubPropose, logo: undefined } : undefined,
+              photoProposee: Boolean(photo || clubPropose?.logo || clubPropose?.joueurs?.some(j => j.photo)),
+              pseudo: base.comptes.find(c => c.id === auteur)?.pseudo,
+            });
+          });
       },
       async lire(id, compte) {
         const d = base.demandesCartes?.find(d => d.id === id && (compte === null || d.compte === compte));
         if (!d) return null;
-        const { compte: _compte, ...publique } = d; return copie(publique);
+        const carteObj = (d.carte ?? {}) as Record<string, unknown>;
+        const clubPropose = d.clubPropose ?? (carteObj.clubPropose as import('../src/lib/cartesNormales.js').PropositionClub | undefined);
+        const { compte: _compte, ...publique } = d; return copie({ ...publique, clubPropose });
       },
       async modifier(id, revision, carte) {
         const d = base.demandesCartes?.find(d => d.id === id && d.revision === revision && d.statut === 'attente');

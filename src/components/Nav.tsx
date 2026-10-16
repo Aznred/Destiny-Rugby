@@ -56,6 +56,7 @@ function MenuMobile({ ecran, joueurPresent, onFermer, onNaviguer, onReglages }: 
           </button>
         </div>
         <div className="nav-mobile-menu-grille">
+          {entree('contribuer', <Icone nom="maillot" taille={19} />, t('nav.contribuer'))}
           {entree('carriereEnLigne', <Icone nom="equipe" taille={19} />, t("online.title"))}
           {entree('collectionSolo', <Icone nom="cadeau" taille={19} />, t('nav.collectionSolo'))}
           {joueurPresent && entree('profil', <Icone nom="profil" taille={19} />, t('nav.profil'))}
@@ -117,8 +118,8 @@ export function Nav({ onReglages }: NavProps) {
   );
 
   const ecransMenu: Ecran[] = carriereActive
-    ? ['collectionSolo', 'championnats', 'classement', 'pantheon', 'boutique']
-    : ['collectionSolo', 'pantheon', 'boutique'];
+    ? ['contribuer', 'collectionSolo', 'championnats', 'classement', 'pantheon', 'boutique']
+    : ['contribuer', 'collectionSolo', 'pantheon', 'boutique'];
   const menuActif = menuMobileOuvert || ecransMenu.includes(ecran);
 
   return (
@@ -138,6 +139,7 @@ export function Nav({ onReglages }: NavProps) {
 
         <nav className="liens nav-bureau" aria-label={t('nav.navigation')}>
           {lien('accueil', t('nav.accueil'))}
+          {lien('contribuer', t('nav.contribuer'))}
           {lien('carriereEnLigne', t('nav.enLigne'))}
           {lien('collectionSolo', t('nav.collectionSolo'))}
           {joueur

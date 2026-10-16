@@ -112,6 +112,7 @@ const ECRIT_A_LA_MAIN: Record<string, Traduction> = {
 
   // --- NAVIGATION ---------------------------------------------------------
   'nav.accueil': { fr: 'Accueil', en: 'Home', es: 'Inicio', it: 'Home', de: 'Start', pt: 'Início', ja: 'ホーム' },
+  'nav.contribuer': { fr: 'Complète ta carte', en: 'Complete your card', es: 'Completa tu carta', it: 'Completa la tua carta', de: 'Ergänze deine Karte', pt: 'Complete a sua carta', ja: 'カード補完' },
   'nav.creer': { fr: 'Créer', en: 'Create', es: 'Crear', it: 'Crea', de: 'Erstellen', pt: 'Criar', ja: '作成' },
   'nav.carriere': { fr: 'Carrière', en: 'Career', es: 'Carrera', it: 'Carriera', de: 'Karriere', pt: 'Carreira', ja: 'キャリア' },
   'nav.profil': { fr: 'Profil', en: 'Profile', es: 'Perfil', it: 'Profilo', de: 'Profil', pt: 'Perfil', ja: 'プロフィール' },

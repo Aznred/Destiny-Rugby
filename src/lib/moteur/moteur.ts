@@ -133,12 +133,12 @@ const RAYON_PLAQUAGE = 1.6;
 const ARRETS: Record<string, { visuel: number; horloge: number; direct: number }> = {
   // Le direct garde assez de temps pour lire les formations, sans reproduire
   // les longues attentes télévisées où rien ne bouge.
-  melee: { visuel: 6.2, horloge: 50, direct: 9.5 },
-  touche: { visuel: 6.5, horloge: 35, direct: 8.5 },
+  melee: { visuel: 6.2, horloge: 0, direct: 9.5 },
+  touche: { visuel: 6.5, horloge: 0, direct: 8.5 },
   transformation: { visuel: 45, horloge: 45, direct: 45 },
   tirAuBut: { visuel: 45, horloge: 45, direct: 45 },
-  coupEnvoi: { visuel: 4.5, horloge: 22, direct: 5 },
-  renvoi22: { visuel: 7, horloge: 20, direct: 7 },
+  coupEnvoi: { visuel: 4.5, horloge: 0, direct: 5 },
+  renvoi22: { visuel: 7, horloge: 0, direct: 7 },
   apresEssai: { visuel: 3, horloge: 8, direct: 3 },
   penalite: { visuel: 2.5, horloge: 12, direct: 3 },
   tmo: { visuel: 3.6, horloge: 0, direct: 3.6 },
@@ -203,22 +203,53 @@ export const RITUEL_TIR = { celebration: 6, ramassage: 1.5, pose: 9.6, pret: 1.8
 /** Secondes simulées accordées au joueur pour viser un tir : au-delà, l'IA tape à sa place. */
 export const DELAI_TIR_HUMAIN = 25;
 
+/** Durée maximale d'un match de carrière solo (secondes d'écran actives : 12 minutes au lieu de 10). */
+export const DUREE_MATCH_SOLO = 720;
+
 /**
- * En match de dix minutes, l'horloge avance huit fois plus vite que l'écran.
- * Appliqué tel quel à une mêlée de onze secondes ou au rituel d'un buteur, ce
- * rapport avalerait un quart du match : un arrêt consomme donc son temps de
- * jeu prévu, réparti sur ce qu'il dure réellement à l'écran.
+ * Vrai si le match est en train de mettre en place une conquête ou une remise en jeu.
+ * Le chronomètre s'arrête pendant toute cette installation, et reprend dès que le
+ * jeu recommence (frappe de l'engagement/renvoi, lancer de touche, introduction en mêlée).
+ */
+export function arretMiseEnPlaceChrono(e: EtatMatch): boolean {
+  if (e.phase === 'coupEnvoi' || e.phase === 'renvoi22' || e.phase === 'touche') {
+    return true;
+  }
+  if (e.phase === 'melee') {
+    if (e.cadenceDetaillee && e.conquete?.melee) {
+      const etape = e.conquete.melee.etape;
+      // Arrêt du chrono pendant le placement, la liaison et l'impact.
+      // Le chrono reprend dès l'introduction du ballon dans la mêlée.
+      return etape === 'placement' || etape === 'liaison' || etape === 'impact';
+    }
+    // En mode standard : le chrono s'arrête pendant la mise en place de la mêlée
+    return avancementArret(e) < 0.48;
+  }
+  if (e.phase === 'miTemps' || e.phase === 'bagarre' || e.phase === 'tmo') {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * En match solo condensé, un arrêt consomme son temps de jeu prévu réparti sur
+ * ce qu'il dure à l'écran. Pendant la mise en place d'une conquête, le chrono
+ * est arrêté (facteur 0).
  */
 function facteurArretDetaille(e: EtatMatch): number {
+  if (arretMiseEnPlaceChrono(e)) return 0;
   const a = ARRETS[e.phase];
   const vivant = horlogeCondensee(e);
   if (!a) return vivant;
-  if (e.carriereDixMinutes && !e.tempsReel) return e.phase === 'miTemps' ? 0 : vivant;
+  if (e.carriereDixMinutes && !e.tempsReel) {
+    if (e.phase === 'miTemps' || e.phase === 'bagarre' || e.phase === 'tmo') return 0;
+    return a.horloge === 0 ? (e.phase === 'melee' ? vivant : 0) : Math.min(vivant, a.horloge / Math.max(1, a.visuel));
+  }
   const duree = e.phase === 'melee' ? DUREE_MELEE_DETAILLEE : a.visuel;
   return Math.min(vivant, a.horloge / Math.max(1, duree));
 }
 
-/** Secondes d'horloge par seconde d'écran, ballon vivant, dans un match de dix minutes. */
+/** Secondes d'horloge par seconde d'écran, ballon vivant, dans un match de carrière solo (~12 min). */
 function horlogeCondensee(e: EtatMatch): number {
   return e.carriereDixMinutes && !e.tempsReel ? 12 : iaParPoste(e) ? REGLAGES_IA.horlogeCondensee : 8;
 }
@@ -719,7 +750,7 @@ function tick(e: EtatMatch, compterBudget = true): void {
   if (compterBudget && e.carriereDixMinutes && !e.tempsReel && !e.dureeReelleArcade) {
     e.secondesActivesSolo = (e.secondesActivesSolo ?? 0) + DT;
     const total = 4800 + (e.departage?.periodes ?? 0) * (e.departage?.duree ?? 0);
-    const limite = 600 * finDePeriode(e) / total;
+    const limite = DUREE_MATCH_SOLO * finDePeriode(e) / total;
     // La sirène réserve trente secondes à la dernière action et à sa transformation.
     if (e.secondesActivesSolo >= limite - 30) e.t = Math.max(e.t, finDePeriode(e));
     if (e.secondesActivesSolo >= limite) {
@@ -731,6 +762,7 @@ function tick(e: EtatMatch, compterBudget = true): void {
       while (e.transformationDue && !e.fini && e.periode === periode && garde++ < 4000) {
         if (e.responsabilites?.attente?.type === 'tir' && !e.tir?.visee) return;
         tick(e, false);
+        e.apresPas?.(e);
       }
       if (!e.fini && e.periode === periode) return clorePeriode(e);
       return;
@@ -764,8 +796,9 @@ function tick(e: EtatMatch, compterBudget = true): void {
     e.echappee.restant -= dt;
     if (e.echappee.restant <= 0 || e.porteur !== e.echappee.pion) e.echappee = null;
   }
-  // ⚠️ L'HORLOGE S'ARRÊTE QUAND LE JEU ATTEND LE JOUEUR (Correctif 17) : décider ne coûte pas une minute de match.
-  const dtHorloge = e.responsabilites?.attente || e.controleEquipe?.sortie?.auSol ? 0 : dt * (e.dureeReelleArcade ? e.phase === 'miTemps' ? 0 : 4800 / e.dureeReelleArcade
+  // ⚠️ L'HORLOGE S'ARRÊTE QUAND LE JEU ATTEND LE JOUEUR (Correctif 17) OU PENDANT LA MISE EN PLACE DES CONQUÊTES.
+  const arretChrono = e.responsabilites?.attente || e.controleEquipe?.sortie?.auSol || arretMiseEnPlaceChrono(e);
+  const dtHorloge = arretChrono ? 0 : dt * (e.dureeReelleArcade ? e.phase === 'miTemps' ? 0 : 4800 / e.dureeReelleArcade
     : e.carriereDixMinutes ? (e.cadenceDetaillee ? facteurArretDetaille(e) : horlogeCondensee(e)) : facteurHorloge(e.phase, e.tempsReel));
   e.t += dtHorloge;
   e.minute = Math.min(e.prolongation ? Math.round(finDePeriode(e, 2 + (e.departage?.periodes ?? 0)) / 60) : 80, Math.floor(e.t / 60));

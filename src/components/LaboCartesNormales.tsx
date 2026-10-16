@@ -3,6 +3,7 @@ import { appelCartes, carteNormaleVide, validerCarteNormale, saisieDepuisSource 
 import type { DemandeCarte, SaisieCarteNormale } from '../lib/cartesNormales';
 import type { SourceCarte } from '../lib/ligue/catalogueCarriere';
 import { FormulaireCarteNormale } from './FormulaireCarteNormale';
+import { Blason } from './Blason';
 
 interface Vue { demandes: DemandeCarte[]; cartes: SourceCarte[]; revisionCatalogue: number }
 export function LaboCartesNormales({ demandesSeulement = false }: { demandesSeulement?: boolean }) {
@@ -29,7 +30,7 @@ export function LaboCartesNormales({ demandesSeulement = false }: { demandesSeul
         if (!selection) return;
         await appelCartes({action:'demandesCartes',operation,id:selection.id,revision:selection.revision,revisionCatalogue:vue.revisionCatalogue,
           ...(operation==='refuser'?{reponse}:{carte:validerCarteNormale(carte)})});
-        setMessage(operation==='approuver'?'Carte validée et publiée.':operation==='refuser'?'Demande refusée.':'Proposition modifiée.');
+        setMessage(operation==='approuver'?'Demande validée et publiée.':operation==='refuser'?'Demande refusée.':'Proposition modifiée.');
         if (operation==='modifier') {
           const {demande} = await appelCartes<{demande:DemandeCarte}>(undefined,`&id=${selection.id}`);setSelection(demande);setCarte(demande.carte);
         } else {setSelection(undefined);setPret(false);}
@@ -42,9 +43,16 @@ export function LaboCartesNormales({ demandesSeulement = false }: { demandesSeul
     {!demandesSeulement && <><button className="btn primaire" type="button" disabled={occupe} onClick={() => {setCarte(carteNormaleVide());setSourceId(undefined);setSelection(undefined);setPret(true);}}>Nouvelle carte normale</button>
       <div className="cn-recherche"><label>Rechercher une carte<input value={q} onChange={e => setQ(e.target.value)} /></label><button type="button" disabled={occupe} onClick={() => void charger().catch(e => setErreur(e.message))}>Rechercher</button>
         <div className="cn-resultats">{vue?.cartes.map(s => <button type="button" key={s.sourceId} onClick={() => {setCarte(saisieDepuisSource(s));setSourceId(s.sourceId);setSelection(undefined);setPret(true);}}><b>{s.nom}</b><small>{s.clubReel} · {s.note} GEN</small></button>)}</div></div></>}
-    {demandesSeulement && <div className="cn-resultats">{vue?.demandes.map(d => <button type="button" key={d.id} aria-pressed={selection?.id===d.id} disabled={occupe} onClick={() => void choisirDemande(d.id)}><b>{d.carte.nom}</b><small>{d.pseudo} · {d.type==='creation'?'Création':'Correction'} · {d.statut==='attente'?'En attente':d.statut==='acceptee'?'Validée':'Refusée'}</small></button>)}{vue && !vue.demandes.length && <p>Aucune demande.</p>}</div>}
+    {demandesSeulement && <div className="cn-resultats">{vue?.demandes.map(d => <button type="button" key={d.id} aria-pressed={selection?.id===d.id} disabled={occupe} onClick={() => void choisirDemande(d.id)}><b>{d.clubPropose ? `[Club] ${d.clubPropose.nom}` : d.carte.nom}</b><small>{d.pseudo} · {d.type==='club'?'Club':d.type==='creation'?'Création':'Correction'} · {d.statut==='attente'?'En attente':d.statut==='acceptee'?'Validée':'Refusée'}</small></button>)}{vue && !vue.demandes.length && <p>Aucune demande.</p>}</div>}
     {pret && <form onSubmit={e => {e.preventDefault();void agir(selection?'approuver':'creer');}}>
       {selection && <p>{selection.message || 'Aucune information complémentaire.'}</p>}
+      {selection?.type === 'club' && selection.clubPropose && <div className="cn-club-card-preview" style={{margin:'1rem 0'}}>
+        <div className="cn-club-blason-box"><Blason club={{nom:selection.clubPropose.nom,logo:selection.clubPropose.logo,c1:selection.clubPropose.c1??'#1e3a8a',c2:selection.clubPropose.c2??'#ffd700'}} taille={50} /></div>
+        <h4>{selection.clubPropose.nom}</h4>
+        <span className="cn-division-tag">{selection.clubPropose.division}</span>
+        <small>{selection.clubPropose.ville || 'Ville non précisée'} · {selection.clubPropose.pays || 'France'}</small>
+        <p><b>{selection.clubPropose.joueurs?.length ?? 0} joueur(s) associé(s) à ce club</b></p>
+      </div>}
       <FormulaireCarteNormale carte={carte} changer={setCarte} occupe={occupe || (!!selection && selection.statut!=='attente')} onPreparation={setOccupe} />
       {!selection ? <button className="btn primaire" disabled={occupe}>Enregistrer la carte normale</button> : selection.statut==='attente' && <>
         <label>Motif du refus<textarea maxLength={500} value={reponse} onChange={e => setReponse(e.target.value)} /></label>

@@ -7,13 +7,31 @@ export interface SaisieCarteNormale {
   nation: string; clubReel: string; championnat: string; pays: string;
   gender: 'male' | 'female'; photo?: string;
 }
+export interface PropositionClub {
+  nom: string;
+  division: string;
+  ville?: string;
+  pays?: string;
+  logo?: string;
+  c1?: string;
+  c2?: string;
+  joueurs: SaisieCarteNormale[];
+}
 export interface DemandeCarte {
-  id: string; type: 'creation' | 'correction'; sourceId?: string;
-  carte: SaisieCarteNormale; message: string;
+  id: string; type: 'creation' | 'correction' | 'club'; sourceId?: string;
+  carte: SaisieCarteNormale; clubPropose?: PropositionClub; message: string;
   statut: 'attente' | 'acceptee' | 'refusee'; revision: number;
   creeLe: string; decideLe?: string; reponse?: string; pseudo?: string; photoProposee?: boolean;
+  droitsCertifies?: boolean;
 }
-export type SaisieDemandeCarte = Pick<DemandeCarte, 'type' | 'sourceId' | 'carte' | 'message'>;
+export interface SaisieDemandeCarte {
+  type: 'creation' | 'correction' | 'club';
+  sourceId?: string;
+  carte: SaisieCarteNormale;
+  clubPropose?: PropositionClub;
+  message: string;
+  droitsCertifies: boolean;
+}
 
 const texte = (v: unknown, max: number, nom: string) => {
   if (typeof v !== 'string' || !v.trim() || v.length > max) throw new Error(`${nom} manquant ou trop long.`);
@@ -40,17 +58,90 @@ export function validerCarteNormale(brut: unknown): SaisieCarteNormale {
     if (typeof b.photo !== 'string' || b.photo.length > 90_000) throw new Error('Photo trop volumineuse (90 Ko maximum).');
     let valide = /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+=*$/.test(b.photo)
       || (/^\/photos\/[a-zA-Z0-9_./%-]+$/.test(b.photo) && !b.photo.includes('..'));
-    try { const url = new URL(b.photo); valide ||= url.protocol === 'https:' && !url.username && !url.password && b.photo.length <= 2048; } catch { /* chemin ou image importée */ }
-    if (!valide) throw new Error('Photo : importe un PNG, JPEG ou WebP, ou utilise une URL HTTPS.');
+    try { const url = new URL(b.photo); valide ||= (url.protocol === 'https:' || url.protocol === 'http:') && !url.username && !url.password && b.photo.length <= 2048; } catch { /* chemin ou image importée */ }
+    if (!valide) throw new Error('Photo : importe un PNG, JPEG ou WebP, ou utilise une URL.');
     carte.photo = b.photo;
   }
   return carte;
 }
+
+export function validerClubPropose(brut: unknown): PropositionClub {
+  if (!brut || typeof brut !== 'object' || Array.isArray(brut)) throw new Error('Proposition de club invalide.');
+  const b = brut as Record<string, unknown>;
+  const nom = texte(b.nom, 100, 'Nom du club');
+  const division = texte(b.division, 100, 'Division');
+  const ville = b.ville ? texte(b.ville, 80, 'Ville') : undefined;
+  const pays = b.pays ? texte(b.pays, 80, 'Pays') : 'France';
+  let logo: string | undefined;
+  if (b.logo !== undefined && b.logo !== '') {
+    if (typeof b.logo !== 'string' || b.logo.length > 90_000) throw new Error('Logo trop volumineux (90 Ko maximum).');
+    let valide = /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+=*$/.test(b.logo)
+      || (/^\/logos\/[a-zA-Z0-9_./%-]+$/.test(b.logo) && !b.logo.includes('..'));
+    try { const url = new URL(b.logo); valide ||= (url.protocol === 'https:' || url.protocol === 'http:') && !url.username && !url.password && b.logo.length <= 2048; } catch { /* format base64 */ }
+    if (!valide) throw new Error('Logo : importe un PNG, JPEG ou WebP, ou utilise une URL.');
+    logo = b.logo;
+  }
+  const c1 = typeof b.c1 === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(b.c1) ? b.c1 : '#1e3a8a';
+  const c2 = typeof b.c2 === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(b.c2) ? b.c2 : '#ffd700';
+  const joueurs: SaisieCarteNormale[] = [];
+  if (Array.isArray(b.joueurs)) {
+    for (const j of b.joueurs.slice(0, 30)) {
+      if (j && typeof j === 'object') {
+        const jObj = j as Record<string, unknown>;
+        joueurs.push(validerCarteNormale({
+          ...jObj,
+          clubReel: typeof jObj.clubReel === 'string' && jObj.clubReel.trim() ? jObj.clubReel : nom,
+          championnat: typeof jObj.championnat === 'string' && jObj.championnat.trim() ? jObj.championnat : division,
+          pays: typeof jObj.pays === 'string' && jObj.pays.trim() ? jObj.pays : pays,
+        }));
+      }
+    }
+  }
+  return { nom, division, ville, pays, logo, c1, c2, joueurs };
+}
+
 export function validerDemandeCarte(brut: Record<string, unknown>): SaisieDemandeCarte {
-  if (brut.type !== 'creation' && brut.type !== 'correction') throw new Error('Type de demande invalide.');
+  if (brut.type !== 'creation' && brut.type !== 'correction' && brut.type !== 'club') throw new Error('Type de demande invalide.');
+  if (brut.droitsCertifies === false) throw new Error("Tu dois certifier avoir les droits d'utilisation de l'image postée ou des images postées.");
   const sourceId = brut.type === 'correction' ? texte(brut.sourceId, 250, 'Carte à corriger') : undefined;
-  return { type: brut.type, sourceId, carte: validerCarteNormale(brut.carte),
-    message: typeof brut.message === 'string' ? brut.message.trim().slice(0, 500) : '' };
+  let clubPropose: PropositionClub | undefined;
+  let carte: SaisieCarteNormale;
+
+  if (brut.type === 'club') {
+    clubPropose = validerClubPropose(brut.clubPropose);
+    if (clubPropose.joueurs.length > 0) {
+      carte = clubPropose.joueurs[0];
+    } else {
+      carte = {
+        nom: clubPropose.nom,
+        poste: 'demi_ouverture',
+        note: 60,
+        potentiel: 65,
+        age: 24,
+        nation: clubPropose.pays || 'France',
+        clubReel: clubPropose.nom,
+        championnat: clubPropose.division,
+        pays: clubPropose.pays || 'France',
+        gender: 'male',
+      };
+    }
+  } else {
+    carte = validerCarteNormale(brut.carte);
+  }
+
+  const aImage = Boolean(carte.photo || clubPropose?.logo || clubPropose?.joueurs.some(j => j.photo));
+  if (aImage && brut.droitsCertifies === false) {
+    throw new Error("Tu dois certifier avoir les droits d'utilisation de l'image postée ou des images postées.");
+  }
+
+  return {
+    type: brut.type,
+    sourceId,
+    carte,
+    clubPropose,
+    droitsCertifies: brut.droitsCertifies !== false,
+    message: typeof brut.message === 'string' ? brut.message.trim().slice(0, 500) : '',
+  };
 }
 export const carteNormaleVide = (): SaisieCarteNormale => ({ nom: '', poste: 'demi_melee', note: 50, potentiel: 53,
   age: 25, nation: 'France', clubReel: '', championnat: '', pays: 'France', gender: 'male' });

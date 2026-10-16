@@ -62,7 +62,7 @@ export function possibiliteDeSortie(e: EtatMatch): PossibiliteDeSortie {
   if (!moi) return { possible: false, raison: 'absent' };
   if (!moi.surLeTerrain) {
     if (moi.sanction > 0) return { possible: false, raison: 'sanction' };
-    return { possible: false, raison: moi.minutes > 0 ? 'sorti' : 'banc' };
+    return { possible: false, raison: moi.remplace || moi.minutes > 0 ? 'sorti' : 'banc' };
   }
   if (e.remplacementsDemandes[moi.cote]?.sortantId === moi.sourceId) return { possible: false, raison: 'demande' };
   if ((moi.cote === 'A' ? e.remplacementsA : e.remplacementsB) >= CHANGEMENTS_MAXIMUM) return { possible: false, raison: 'aucunRemplacant' };

@@ -1,4 +1,4 @@
-import type { DemandeCarte, SaisieCarteNormale, SaisieDemandeCarte } from '../src/lib/cartesNormales.js';
+import type { DemandeCarte, PropositionClub, SaisieCarteNormale, SaisieDemandeCarte } from '../src/lib/cartesNormales.js';
 import type { CatalogueAdmin } from '../src/lib/ligue/atelierCatalogue.js';
 import type { ExecuterSql } from './packsInternesStockage.js';
 
@@ -11,20 +11,25 @@ export interface StockageDemandesCartes {
   /** L'approbation et le catalogue sont inscrits ensemble, avec leurs deux révisions. */
   approuver(id: string, revision: number, config: CatalogueAdmin, revisionCatalogue: number, carte: SaisieCarteNormale, par: string): Promise<boolean>;
 }
-const versDemande = (r: Record<string, unknown>): DemandeCarte => ({
-  id: String(r.id), type: r.type as DemandeCarte['type'], sourceId: r.source_id ? String(r.source_id) : undefined,
-  carte: r.carte as SaisieCarteNormale, message: String(r.message), statut: r.statut as DemandeCarte['statut'],
-  revision: Number(r.revision), creeLe: new Date(String(r.cree_le)).toISOString(),
-  decideLe: r.decide_le ? new Date(String(r.decide_le)).toISOString() : undefined,
-  reponse: r.reponse ? String(r.reponse) : undefined, pseudo: r.pseudo ? String(r.pseudo) : undefined,
-  photoProposee: Boolean(r.photo_proposee),
-});
+const versDemande = (r: Record<string, unknown>): DemandeCarte => {
+  const carteObj = (r.carte ?? {}) as Record<string, unknown>;
+  const clubPropose = (carteObj.clubPropose ?? r.club_propose) as PropositionClub | undefined;
+  return {
+    id: String(r.id), type: r.type as DemandeCarte['type'], sourceId: r.source_id ? String(r.source_id) : undefined,
+    carte: r.carte as SaisieCarteNormale, clubPropose, message: String(r.message), statut: r.statut as DemandeCarte['statut'],
+    revision: Number(r.revision), creeLe: new Date(String(r.cree_le)).toISOString(),
+    decideLe: r.decide_le ? new Date(String(r.decide_le)).toISOString() : undefined,
+    reponse: r.reponse ? String(r.reponse) : undefined, pseudo: r.pseudo ? String(r.pseudo) : undefined,
+    photoProposee: Boolean(r.photo_proposee || carteObj.photo || clubPropose?.logo),
+    droitsCertifies: true,
+  };
+};
 export function demandesCartesSql(sql: ExecuterSql): StockageDemandesCartes {
   let preparation: Promise<unknown> | undefined;
   const preparer = async () => {
     preparation ??= (async () => {
       await sql`create table if not exists demandes_cartes (
-        id uuid primary key, compte uuid not null references comptes(id), type text not null check(type in ('creation','correction')),
+        id uuid primary key, compte uuid not null references comptes(id), type text not null check(type in ('creation','correction','club')),
         source_id text, carte jsonb not null, message text not null default '', statut text not null default 'attente' check(statut in ('attente','acceptee','refusee')),
         revision integer not null default 0, place integer not null check(place between 1 and 5), cree_le timestamptz not null default now(),
         decide_le timestamptz, decide_par text, reponse text)`;
@@ -36,8 +41,9 @@ export function demandesCartesSql(sql: ExecuterSql): StockageDemandesCartes {
   return {
     async creer(compte, id, s) {
       await preparer();
+      const carteAStocker = s.clubPropose ? { ...s.carte, clubPropose: s.clubPropose } : s.carte;
       const r = await sql`insert into demandes_cartes(id, compte, type, source_id, carte, message, place)
-        select ${id}::uuid, ${compte}::uuid, ${s.type}, ${s.sourceId ?? null}, ${JSON.stringify(s.carte)}::jsonb, ${s.message}, n
+        select ${id}::uuid, ${compte}::uuid, ${s.type}, ${s.sourceId ?? null}, ${JSON.stringify(carteAStocker)}::jsonb, ${s.message}, n
         from generate_series(1,5) n where not exists(select 1 from demandes_cartes where compte=${compte}::uuid and place=n and statut='attente')
         order by n limit 1 on conflict do nothing returning id`;
       return r.length > 0;

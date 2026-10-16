@@ -596,7 +596,9 @@ export type Ecran =
   | 'creationManager'
   | 'carriereEnLigne'
   | 'collectionSolo'
-  | 'manager';
+  | 'manager'
+  // ── Contribution communautaire ───────────────────────────────────────
+  | 'contribuer';
 
 // ---------------------------------------------------------------------------
 // CLUBS & CHAMPIONNATS

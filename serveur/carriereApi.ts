@@ -986,7 +986,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
 
       const corps = req.method === 'POST' ? objet(typeof req.body === 'string' ? JSON.parse(req.body) : req.body) : {};
       // Le Labo envoie des images de cartes (350 Ko) et des lots d'import ; « Mon image », un portrait de 600 px.
-      const tailleMax = corps.action === 'sauvegarderBoutique' ? 4_000_000 : corps.action === 'atelier' ? 1_000_000 : corps.action === 'demandeImage' ? 300_000 : corps.action === 'demandesCartes' ? 110_000 : corps.action === 'marcheCombinaisons' ? 60_000 : 24_000;
+      const tailleMax = corps.action === 'sauvegarderBoutique' ? 4_000_000 : corps.action === 'atelier' ? 1_000_000 : corps.action === 'demandeImage' ? 300_000 : corps.action === 'demandesCartes' ? 500_000 : corps.action === 'marcheCombinaisons' ? 60_000 : 24_000;
       const corpsJson = JSON.stringify(corps);
       if (corpsJson.length > tailleMax) throw new ErreurHttp(413, 'Demande trop volumineuse.');
       const action = corps.action;

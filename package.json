@@ -22,6 +22,7 @@
     "verify:complement29": "vite-node scripts/verifierComplement29.ts",
     "verify:reglements": "vite-node scripts/verifierReglements.ts",
     "verify:voix": "vite-node scripts/verifierVoix.ts",
+    "verify:chrono-mises-en-place": "vite-node scripts/verifierChronoMisesEnPlace.ts",
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",

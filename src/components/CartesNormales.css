@@ -17,3 +17,124 @@
 .cn-demandes article{display:grid;gap:.3rem;padding:.7rem;border-bottom:1px solid var(--bordure,#294236)}
 .cn-labo form,.cn-demandes form{display:grid;gap:1rem;min-width:0}
 @media(max-width:700px){.cn-formulaire{grid-template-columns:minmax(0,1fr)}.cn-apercu{position:static;grid-row:1}.cn-actions button{flex:1 1 160px}.cn-champs{grid-template-columns:minmax(0,1fr)}}
+
+/* ── Écran Complète ta carte ────────────────────────────────────────── */
+.complete-carte-page{max-width:1050px;margin:0 auto;padding:1.5rem 1rem 3rem;display:grid;gap:1.5rem;min-width:0}
+.complete-carte-entete{display:grid;gap:1.25rem;background:linear-gradient(135deg,rgba(16,30,23,0.9),rgba(8,22,15,0.95));border:1px solid var(--bordure,#294236);border-radius:16px;padding:1.5rem}
+.complete-carte-badge{display:inline-flex;align-items:center;gap:.4rem;font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--or,#d5b56d);background:rgba(213,181,109,.12);padding:.3rem .75rem;border-radius:20px;width:fit-content}
+.complete-carte-titre-zone h1{margin:.35rem 0 .5rem;font-family:var(--police-titres,Anton,sans-serif);font-size:clamp(1.75rem,4vw,2.5rem);letter-spacing:.02em;color:#fff}
+.complete-carte-titre-zone p{margin:0;color:rgba(255,255,255,.8);max-width:720px;line-height:1.5}
+.complete-carte-alerte-compte{display:flex;align-items:center;gap:1rem;background:rgba(213,181,109,.08);border:1px solid rgba(213,181,109,.3);border-radius:12px;padding:1rem}
+.complete-carte-alerte-compte div{flex:1;min-width:0}
+.complete-carte-alerte-compte b{display:block;color:var(--or,#d5b56d);margin-bottom:.2rem}
+.complete-carte-alerte-compte p{margin:0;font-size:.9rem;color:rgba(255,255,255,.85)}
+
+.complete-carte-onglets{display:flex;gap:.6rem;flex-wrap:wrap;border-top:1px solid rgba(255,255,255,.1);padding-top:1.25rem}
+.complete-carte-onglets button{display:inline-flex;align-items:center;gap:.5rem;padding:.75rem 1.1rem;border-radius:10px;border:1px solid var(--bordure,#294236);background:var(--fond-carte,#101e17);color:inherit;font-weight:600;font-size:.95rem;cursor:pointer;transition:all .15s ease}
+.complete-carte-onglets button:hover{border-color:var(--or,#d5b56d);color:#fff}
+.complete-carte-onglets button.actif{border-color:var(--or,#d5b56d);background:rgba(213,181,109,.15);color:var(--or,#d5b56d)}
+.complete-carte-bulle-compteur{background:var(--or,#d5b56d);color:#08160f;font-size:.75rem;font-weight:800;padding:.15rem .45rem;border-radius:10px;margin-left:.25rem}
+
+.complete-carte-section{background:var(--fond-carte,#101e17);border:1px solid var(--bordure,#294236);border-radius:16px;padding:1.5rem;display:grid;gap:1.5rem}
+.complete-carte-sous-titre h2,.complete-carte-sous-titre h3{margin:0 0 .3rem;font-size:1.35rem;color:#fff}
+.complete-carte-sous-titre small,.complete-carte-sous-titre p{margin:0;color:rgba(255,255,255,.7);font-size:.9rem}
+.complete-carte-message{display:flex;align-items:center;gap:.75rem;padding:.9rem 1.1rem;border-radius:10px;font-size:.95rem}
+.complete-carte-message.erreur{background:rgba(220,38,38,.12);border:1px solid #dc2626;color:#fca5a5}
+.complete-carte-message.succes{background:rgba(34,197,94,.12);border:1px solid #22c55e;color:#86efac}
+
+/* Recherche carte */
+.complete-carte-bloc-recherche{display:grid;gap:1rem;padding-bottom:1.25rem;border-bottom:1px solid var(--bordure,#294236)}
+.complete-carte-bloc-recherche h2{margin:0;font-size:1.25rem}
+.complete-carte-bloc-recherche p{margin:0;color:rgba(255,255,255,.7);font-size:.9rem}
+.cn-recherche-barre{display:flex;gap:.6rem;align-items:center}
+.cn-recherche-barre input{flex:1;min-width:0;background:rgba(0,0,0,.25);border:1px solid var(--bordure,#294236);border-radius:10px;padding:.75rem 1rem;color:inherit;font-size:1rem}
+.cn-resultats-grille{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:.6rem;max-height:260px;overflow-y:auto;padding:.5rem 0}
+.cn-carte-choix{display:grid;gap:.25rem;text-align:left;padding:.75rem .9rem;background:rgba(255,255,255,.03);border:1px solid var(--bordure,#294236);border-radius:10px;color:inherit;cursor:pointer}
+.cn-carte-choix:hover,.cn-carte-choix.choisie{border-color:var(--or,#d5b56d);background:rgba(213,181,109,.1)}
+.cn-carte-choix b{color:#fff;font-size:.95rem}
+.cn-carte-choix small{color:rgba(255,255,255,.65);font-size:.8rem}
+
+.complete-carte-formulaire-conteneur{display:grid;gap:1.5rem}
+.complete-carte-champ{display:grid;gap:.4rem}
+.complete-carte-champ b{font-size:.95rem;color:#fff}
+.complete-carte-champ small{color:rgba(255,255,255,.6);font-size:.8rem}
+.complete-carte-champ input,.complete-carte-champ textarea{width:100%;box-sizing:border-box;background:rgba(0,0,0,.3);border:1px solid var(--bordure,#294236);border-radius:10px;padding:.75rem;color:inherit;font-family:inherit;font-size:.95rem}
+.complete-carte-actions-fin{display:flex;justify-content:flex-end;margin-top:.5rem}
+.complete-carte-actions-fin .btn.grande{padding:.85rem 1.6rem;font-size:1.05rem;font-weight:700}
+
+/* Case à cocher de droits d'image obligatoire */
+.cn-droits{display:flex;align-items:flex-start;gap:.85rem;background:rgba(213,181,109,.08);border:1px solid rgba(213,181,109,.35);padding:1rem 1.15rem;border-radius:12px;cursor:pointer;margin-top:.5rem;transition:border-color .15s}
+.cn-droits:hover{border-color:var(--or,#d5b56d)}
+.cn-droits input[type=checkbox]{width:20px;height:20px;margin-top:.15rem;accent-color:var(--or,#d5b56d);cursor:pointer;flex-shrink:0}
+.cn-droits span{font-size:.95rem;font-weight:600;color:#fff;line-height:1.4}
+
+/* Proposition de club */
+.complete-carte-grille-club{display:grid;grid-template-columns:minmax(0,1fr) 250px;gap:1.5rem;align-items:start}
+.complete-carte-colonne-formulaire{display:grid;gap:1.25rem}
+.cn-club-fieldset{border:1px solid var(--bordure,#294236);border-radius:12px;padding:1.25rem;display:grid;gap:1rem}
+.cn-club-fieldset legend{padding:0 .5rem;color:var(--or,#d5b56d);font-weight:700;font-size:1rem}
+
+.complete-carte-apercu-club{position:sticky;top:1rem}
+.cn-club-card-preview{display:grid;gap:.6rem;justify-items:center;text-align:center;background:rgba(0,0,0,.25);border:1px solid var(--bordure,#294236);border-radius:14px;padding:1.5rem 1rem}
+.cn-club-blason-box{width:80px;height:80px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.05);border-radius:14px;border:1px solid rgba(255,255,255,.1)}
+.cn-club-card-preview h4{margin:0;font-size:1.15rem;color:#fff}
+.cn-division-tag{display:inline-block;background:rgba(213,181,109,.15);color:var(--or,#d5b56d);border:1px solid rgba(213,181,109,.3);border-radius:20px;padding:.2rem .65rem;font-size:.8rem;font-weight:600}
+
+.complete-carte-couleurs{display:grid;gap:.75rem;margin-top:.5rem}
+.complete-carte-couleurs>b{font-size:.9rem;color:#fff}
+.cn-palettes-rapides{display:flex;gap:.5rem;flex-wrap:wrap}
+.cn-palette-pastille{width:38px;height:26px;border-radius:6px;border:1px solid rgba(255,255,255,.25);overflow:hidden;padding:0;cursor:pointer;display:flex}
+.cn-palette-pastille span{flex:1;height:100%}
+.cn-input-couleur-wrap{display:flex;align-items:center;gap:.6rem;background:rgba(0,0,0,.3);border:1px solid var(--bordure,#294236);border-radius:8px;padding:.35rem .6rem}
+.cn-input-couleur-wrap input[type=color]{width:32px;height:28px;border:none;border-radius:4px;cursor:pointer;background:transparent;padding:0}
+.cn-input-couleur-wrap code{font-size:.85rem;color:rgba(255,255,255,.8)}
+
+/* Effectif club */
+.cn-joueurs-section{border-color:rgba(213,181,109,.3)}
+.cn-joueurs-grille{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1rem;margin-bottom:1rem}
+.cn-joueur-carte-mini{background:rgba(0,0,0,.3);border:1px solid var(--bordure,#294236);border-radius:12px;padding:.75rem;display:grid;gap:.5rem}
+.cn-joueur-mini-tete{display:flex;justify-content:space-between;align-items:center}
+.cn-joueur-mini-tete b{color:#fff;font-size:.95rem}
+.cn-joueur-mini-corps{display:flex;flex-wrap:wrap;gap:.4rem;align-items:baseline;font-size:.85rem}
+.cn-joueur-mini-corps b{color:var(--or,#d5b56d)}
+.cn-mini-apercu-carte{display:flex;justify-content:center;margin-top:.25rem}
+.cn-mini-apercu-carte .carte-joueur-en-ligne{transform:scale(0.85);transform-origin:top center;margin-bottom:-25px}
+
+.cn-nouveau-joueur-formulaire{background:rgba(0,0,0,.35);border:1px solid rgba(213,181,109,.3);border-radius:12px;padding:1.25rem;display:grid;gap:1rem}
+.cn-nouveau-joueur-formulaire h4{margin:0;color:var(--or,#d5b56d);font-size:1rem}
+
+/* Mes propositions */
+.cn-mes-propositions-liste{display:grid;gap:1rem}
+.cn-demande-carte{background:rgba(0,0,0,.25);border:1px solid var(--bordure,#294236);border-radius:14px;padding:1.25rem;display:grid;gap:.9rem}
+.cn-demande-carte.statut-attente{border-left:4px solid var(--or,#d5b56d)}
+.cn-demande-carte.statut-acceptee{border-left:4px solid #22c55e}
+.cn-demande-carte.statut-refusee{border-left:4px solid #ef4444}
+.cn-demande-tete{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem}
+.cn-demande-titre-group{display:flex;align-items:center;gap:.6rem}
+.cn-demande-titre-group h3{margin:0;font-size:1.15rem;color:#fff}
+.cn-demande-type{display:inline-block;font-size:.75rem;font-weight:700;text-transform:uppercase;padding:.2rem .55rem;border-radius:6px}
+.cn-demande-type.type-club{background:rgba(59,130,246,.2);color:#60a5fa}
+.cn-demande-type.type-creation{background:rgba(34,197,94,.2);color:#4ade80}
+.cn-demande-type.type-correction{background:rgba(213,181,109,.2);color:var(--or,#d5b56d)}
+.cn-demande-statut-badge{font-size:.85rem;font-weight:600;padding:.25rem .7rem;border-radius:20px}
+.cn-demande-statut-badge.statut-attente{background:rgba(213,181,109,.15);color:var(--or,#d5b56d)}
+.cn-demande-statut-badge.statut-acceptee{background:rgba(34,197,94,.15);color:#4ade80}
+.cn-demande-statut-badge.statut-refusee{background:rgba(239,68,68,.15);color:#f87171}
+.cn-demande-contenu{display:grid;gap:.5rem;font-size:.9rem}
+.cn-demande-contenu p{margin:0;color:rgba(255,255,255,.85)}
+.cn-demande-message{font-style:italic;color:rgba(255,255,255,.7)!important;background:rgba(255,255,255,.04);padding:.5rem .75rem;border-radius:8px}
+.cn-demande-reponse-labo{background:rgba(213,181,109,.08);border:1px solid rgba(213,181,109,.25);border-radius:8px;padding:.6rem .8rem}
+.cn-demande-reponse-labo b{color:var(--or,#d5b56d);font-size:.85rem;display:block;margin-bottom:.2rem}
+.cn-demande-reponse-labo p{color:#fff!important}
+.cn-demande-pied{display:flex;justify-content:space-between;color:rgba(255,255,255,.5);font-size:.8rem;border-top:1px solid rgba(255,255,255,.08);padding-top:.5rem;margin-top:.25rem}
+
+.complete-carte-vide{display:grid;gap:.75rem;justify-items:center;text-align:center;padding:3rem 1rem;color:rgba(255,255,255,.5)}
+.complete-carte-vide p{margin:0}
+
+@media(max-width:760px){
+  .complete-carte-grille-club{grid-template-columns:minmax(0,1fr)}
+  .complete-carte-apercu-club{position:static;grid-row:1}
+  .cn-recherche-barre{flex-direction:column}
+  .cn-recherche-barre button{width:100%}
+  .complete-carte-onglets button{flex:1 1 140px;justify-content:center}
+}

@@ -6,8 +6,8 @@ import { ecrirePreferencesControle } from '../src/lib/controleDirect/prefs';
 import { LecteurManette, libellesManette } from '../src/lib/controleDirect/manette';
 for (let k=0;k<12;k++) {
  const e=creerMatchDEmpreinte(k); let n=0;
- while(!e.fini && n++<4100) avancer(e, DT);
- assert.ok(e.fini, 'match terminé'); assert.ok((e.secondesActivesSolo??0)<=600.16,'moins de dix minutes');
+ while(!e.fini && n++<5200) avancer(e, DT);
+ assert.ok(e.fini, 'match terminé'); assert.ok((e.secondesActivesSolo??0)<=720.16,'moins de douze minutes');
  console.log('Match',k,Math.round(e.secondesActivesSolo??0),'secondes',e.scoreA,e.scoreB);
 }
 for(const type of ['penaltouche','box'] as const) {
