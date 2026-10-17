@@ -1185,6 +1185,11 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
             if (!idValide(id)) throw new ErreurHttp(400, 'Demande invalide.');
             const demande = await depot.lire(id, auteur);
             if (!demande) throw new ErreurHttp(404, 'Demande introuvable.');
+            if (interne && demande.type === 'correction') {
+              const carteActuelle = await ffr.avecPool('mixed', async () =>
+                catalogueMondialCarriere().find(c => c.sourceId === demande.sourceId && !c.speciale) ?? null);
+              return res.status(200).json({ demande, carteActuelle });
+            }
             return res.status(200).json({ demande });
           }
           const q = (url.searchParams.get('q') ?? '').trim().slice(0,100).toLocaleLowerCase('fr');

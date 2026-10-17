@@ -10,9 +10,10 @@ import type { PropositionClub, SaisieCarteNormale } from '../lib/cartesNormales'
 import { championnatCarteNormale, championnatsCarteNormale, clubsCarteNormale, choisirChampionnatCarte, choisirClubCarte, changerGenreCarte } from '../lib/clubsCarteNormale';
 import './CartesNormales.css';
 
-export function FormulaireCarteNormale({ carte, changer, occupe = false, onPreparation, clubFixe }: {
+export function FormulaireCarteNormale({ carte, changer, occupe = false, onPreparation, clubFixe, afficherApercu = true }: {
   carte: SaisieCarteNormale; changer: (carte: SaisieCarteNormale) => void; occupe?: boolean; onPreparation?: (occupe: boolean) => void;
   clubFixe?: Pick<PropositionClub, 'nom' | 'division' | 'pays' | 'logo'>;
+  afficherApercu?: boolean;
 }) {
   const [erreur, setErreur] = useState('');
   const [photoEnCours, setPhotoEnCours] = useState(false);
@@ -36,7 +37,7 @@ export function FormulaireCarteNormale({ carte, changer, occupe = false, onPrepa
       vignette: <Blason club={c.club} taille={26} />,
     })),
   ], [clubs, competition, clubActuel, carte.clubReel, carte.championnat]);
-  return <div className="cn-formulaire">
+  return <div className={`cn-formulaire${afficherApercu ? '' : ' cn-formulaire-sans-apercu'}`}>
     <fieldset disabled={occupe || photoEnCours}>
       <legend>Informations de la carte</legend>
       <label>Prénom et nom<input required maxLength={80} value={carte.nom} onChange={e => champ('nom',e.target.value)} /></label>
@@ -61,7 +62,7 @@ export function FormulaireCarteNormale({ carte, changer, occupe = false, onPrepa
       {carte.photo && <button type="button" className="btn fantome" onClick={() => champ('photo',undefined)}>Retirer la photo proposée</button>}
       {photoEnCours && <p role="status">Préparation de la photo…</p>}{erreur && <p role="alert">{erreur}</p>}
     </fieldset>
-    {carte.nom.trim() && <aside className="cn-apercu"><CarteJoueurEnLigne logoClub={clubFixe?.logo} carte={{ ...carte, id:'apercu-normale',sourceId:'apercu-normale',famille,
+    {afficherApercu && carte.nom.trim() && <aside className="cn-apercu"><CarteJoueurEnLigne logoClub={clubFixe?.logo} carte={{ ...carte, id:'apercu-normale',sourceId:'apercu-normale',famille,
       origine:'professionnel',rarete:rareteCarriere(carte.note),statistiques:statistiquesCarte(carte.note,famille,'apercu-normale'),
       proprietaire:null,fatigue:0,matchs:0,essais:0,clubs:[] }} /><small>Aperçu de la carte normale</small></aside>}
   </div>;

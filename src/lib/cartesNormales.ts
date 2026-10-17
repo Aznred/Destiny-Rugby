@@ -33,6 +33,12 @@ export interface SaisieDemandeCarte {
   droitsCertifies: boolean;
 }
 
+/** La référence publiée est réservée au détail de modération de Kiri. */
+export interface DetailDemandeCarte {
+  demande: DemandeCarte;
+  carteActuelle?: SourceCarte | null;
+}
+
 export const MAX_JOUEURS_CLUB_PROPOSE = 30;
 
 /** L'identité du club reste commune à tout l'effectif, même après une correction du nom. */

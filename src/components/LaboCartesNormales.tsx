@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { appelCartes, carteNormaleVide, validerCarteNormale, saisieDepuisSource } from '../lib/cartesNormales';
-import type { DemandeCarte, SaisieCarteNormale } from '../lib/cartesNormales';
+import type { DemandeCarte, DetailDemandeCarte, SaisieCarteNormale } from '../lib/cartesNormales';
 import type { SourceCarte } from '../lib/ligue/catalogueCarriere';
 import { FormulaireCarteNormale } from './FormulaireCarteNormale';
 import { Blason } from './Blason';
 import { EffectifClubPropose } from './EffectifClubPropose';
+import { ComparaisonCarteNormale } from './ComparaisonCarteNormale';
 
 interface Vue { demandes: DemandeCarte[]; cartes: SourceCarte[]; revisionCatalogue: number }
 
@@ -14,6 +15,7 @@ type FiltreType = 'tous' | 'joueur' | 'club' | 'retrait';
 export function LaboCartesNormales({ demandesSeulement = false }: { demandesSeulement?: boolean }) {
   const [vue, setVue] = useState<Vue>();
   const [selection, setSelection] = useState<DemandeCarte>();
+  const [carteActuelle, setCarteActuelle] = useState<SourceCarte | null>(null);
   const [carte, setCarte] = useState<SaisieCarteNormale>(carteNormaleVide);
   const [sourceId, setSourceId] = useState<string>();
   const [q, setQ] = useState('');
@@ -47,8 +49,9 @@ export function LaboCartesNormales({ demandesSeulement = false }: { demandesSeul
     setErreur('');
     setMessage('');
     try {
-      const { demande } = await appelCartes<{ demande: DemandeCarte }>(undefined, `&id=${encodeURIComponent(id)}`);
+      const { demande, carteActuelle } = await appelCartes<DetailDemandeCarte>(undefined, `&id=${encodeURIComponent(id)}`);
       setSelection(demande);
+      setCarteActuelle(carteActuelle ?? null);
       setEditionClub(false);
       setCarte(demande.carte);
       setReponse(demande.reponse ?? '');
@@ -87,6 +90,7 @@ export function LaboCartesNormales({ demandesSeulement = false }: { demandesSeul
         if (!r.ok) throw new Error(d.erreur);
         setMessage(sourceId ? 'Carte modifiée dans le catalogue.' : 'Carte normale créée dans le catalogue.');
         setSourceId(undefined);
+        setCarteActuelle(null);
         setCarte(carteNormaleVide());
       } else {
         if (!selection) return;
@@ -107,8 +111,9 @@ export function LaboCartesNormales({ demandesSeulement = false }: { demandesSeul
             : 'Proposition modifiée.'
         );
         if (operation === 'modifier') {
-          const { demande } = await appelCartes<{ demande: DemandeCarte }>(undefined, `&id=${selection.id}`);
+          const { demande, carteActuelle } = await appelCartes<DetailDemandeCarte>(undefined, `&id=${selection.id}`);
           setSelection(demande);
+          setCarteActuelle(carteActuelle ?? null);
           setCarte(demande.carte);
         } else {
           setSelection(undefined);
@@ -129,6 +134,7 @@ export function LaboCartesNormales({ demandesSeulement = false }: { demandesSeul
   const nbAcceptees = useMemo(() => demandes.filter(d => d.statut === 'acceptee').length, [demandes]);
   const nbRefusees = useMemo(() => demandes.filter(d => d.statut === 'refusee').length, [demandes]);
   const totalDemandes = demandes.length;
+  const comparer = selection?.type === 'correction' || (!selection && !!sourceId);
 
   // Filtrage
   const demandesFiltrees = useMemo(() => {
@@ -166,6 +172,7 @@ export function LaboCartesNormales({ demandesSeulement = false }: { demandesSeul
             onClick={() => {
               setCarte(carteNormaleVide());
               setSourceId(undefined);
+              setCarteActuelle(null);
               setSelection(undefined);
               setPret(true);
             }}
@@ -188,6 +195,7 @@ export function LaboCartesNormales({ demandesSeulement = false }: { demandesSeul
                   onClick={() => {
                     setCarte(saisieDepuisSource(s));
                     setSourceId(s.sourceId);
+                    setCarteActuelle(s);
                     setSelection(undefined);
                     setPret(true);
                   }}
@@ -444,12 +452,16 @@ export function LaboCartesNormales({ demandesSeulement = false }: { demandesSeul
                 ? { ...s, clubPropose: { ...s.clubPropose, joueurs } } : s) : undefined}
               occupe={occupe} onEdition={setEditionClub} />
           ) : (
-            <FormulaireCarteNormale
-              carte={carte}
-              changer={setCarte}
-              occupe={occupe || (!!selection && selection.statut !== 'attente')}
-              onPreparation={setOccupe}
-            />
+            <>
+              {comparer && <ComparaisonCarteNormale actuelle={carteActuelle} proposition={carte} />}
+              <FormulaireCarteNormale
+                carte={carte}
+                changer={setCarte}
+                occupe={occupe || (!!selection && selection.statut !== 'attente')}
+                onPreparation={setOccupe}
+                afficherApercu={!comparer}
+              />
+            </>
           )}
 
           {!selection ? (

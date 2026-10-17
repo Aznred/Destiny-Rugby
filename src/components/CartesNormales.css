@@ -1,5 +1,30 @@
 .cn-labo,.cn-demandes{display:grid;gap:1rem;min-width:0}
 .cn-formulaire{display:grid;grid-template-columns:minmax(0,1fr) 230px;gap:1.5rem;align-items:start}
+.cn-formulaire.cn-formulaire-sans-apercu{grid-template-columns:minmax(0,1fr)}
+.cn-comparaison{min-width:0;padding:1rem;border:1px solid var(--bordure,#294236);border-radius:14px;background:rgba(0,0,0,.12)}
+.cn-comparaison-entete{display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:wrap;margin-bottom:1rem}
+.cn-comparaison-entete h3{margin:0;font-size:1.1rem}
+.cn-comparaison-entete>span{color:var(--or,#d5b56d);font-size:.85rem;font-weight:700}
+.cn-comparaison-contenu{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:1.25rem;align-items:start}
+.cn-comparaison-cartes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.75rem;width:100%;max-width:480px;justify-self:center}
+.cn-comparaison-cartes figure{margin:0;min-width:0;display:grid;gap:.75rem;align-content:start}
+.cn-comparaison-cartes figcaption{display:grid;gap:.25rem;text-align:center}
+.cn-comparaison-cartes figcaption b{font-size:.95rem}
+.cn-comparaison-cartes figcaption small{font-size:.75rem;color:var(--texte-secondaire,#b0bfb6)}
+.cn-comparaison-proposition figcaption b{color:var(--or,#d5b56d)}
+.cn-comparaison-absente{display:grid;place-items:center;aspect-ratio:2/3;padding:.75rem;margin:0;border:1px dashed var(--bordure,#294236);border-radius:10px;text-align:center;font-size:.85rem}
+.cn-comparaison-changements{min-width:0}
+.cn-comparaison-changements>p{margin:0;line-height:1.5;color:var(--texte-secondaire,#b0bfb6)}
+.cn-comparaison table{width:100%;table-layout:fixed;border-collapse:collapse;font-size:.85rem;overflow-wrap:anywhere}
+.cn-comparaison caption{text-align:left;font-weight:700;margin-bottom:.65rem}
+.cn-comparaison th,.cn-comparaison td{text-align:left;vertical-align:top;padding:.65rem .4rem;border-bottom:1px solid var(--bordure,#294236)}
+.cn-comparaison thead th{font-size:.75rem;color:var(--texte-secondaire,#b0bfb6)}
+.cn-comparaison th:first-child{width:27%}
+.cn-comparaison td:last-child b{color:var(--or,#d5b56d)}
+.cn-comparaison-ecart{display:inline-block;margin-left:.35rem;padding:.1rem .35rem;border-radius:5px;background:rgba(213,181,109,.12);color:var(--or,#d5b56d);white-space:nowrap}
+@media(max-width:900px){.cn-comparaison-contenu{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:400px){.cn-comparaison{padding:.75rem}.cn-comparaison-cartes{gap:.5rem}.cn-comparaison th,.cn-comparaison td{padding:.55rem .25rem;font-size:.8rem}.cn-comparaison th:first-child{width:32%}}
+@media(max-width:360px){.cn-comparaison-cartes figcaption{min-height:5.25rem;align-content:start}.cn-comparaison th:first-child{width:37%}}
 .cn-formulaire fieldset{min-width:0;display:grid;gap:.9rem;border:1px solid var(--bordure,#294236);padding:1rem;border-radius:12px}
 .cn-formulaire label,.cn-labo form>label,.cn-demandes form>label,.cn-recherche>label{display:grid;gap:.35rem;min-width:0}
 .cn-formulaire input,.cn-labo textarea,.cn-demandes textarea,.cn-recherche input{width:100%;min-width:0;box-sizing:border-box;background:var(--fond-carte,#101e17);color:inherit;border:1px solid var(--bordure,#294236);border-radius:8px;padding:.65rem}

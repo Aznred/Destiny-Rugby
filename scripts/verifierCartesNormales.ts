@@ -75,6 +75,7 @@ eg((await appel(joueur,{action:'demandesCartes',operation:'soumettre',type:'crea
 let vue = await appel(kiri), demande:DemandeCarte = vue.donnees.demandes[0];
 eg(demande.carte.photo,undefined,'La liste ne transporte pas les portraits proposés');
 eg((await appel(kiri,undefined,`&id=${demande.id}`)).donnees.demande.carte.photo,PNG,'Le détail interne contient la photo proposée');
+eg((await appel(kiri,undefined,`&id=${demande.id}`)).donnees.carteActuelle,undefined,'Une création ne reçoit pas de fausse ancienne carte');
 eg((await appel(autre)).donnees.demandes.length,0,'Demandes privées');
 eg((await appel(autre,undefined,`&id=${demande.id}`)).statut,404,'Détail privé');
 eg((await db.atelier!.lire()).ajouts,undefined,'Aucune publication avant la décision');
@@ -98,6 +99,12 @@ const source=(await appel(kiri,undefined,'&q=Adrien%20V%C3%A9rification')).donne
 const correction={...saisieDepuisSource(source),poste:'arriere' as const,age:26,note:80,potentiel:85};
 eg((await appel(joueur,{action:'demandesCartes',operation:'soumettre',type:'correction',sourceId,carte:correction})).statut,200,'Correction proposée');
 vue=await appel(kiri);demande=vue.donnees.demandes.find((d:DemandeCarte)=>d.statut==='attente');
+const comparaison=(await appel(kiri,undefined,`&id=${demande.id}`)).donnees;
+eg(comparaison.carteActuelle.sourceId,sourceId,'Kiri reçoit la carte publiée correspondant à la correction');
+eg([comparaison.carteActuelle.note,comparaison.demande.carte.note],[75,80],'Le détail distingue la note publiée et la proposition');
+eg(comparaison.carteActuelle.photo,PNG,'Le portrait actuel accompagne le comparatif privé');
+eg((await appel(joueur,undefined,`&id=${demande.id}`)).donnees.carteActuelle,undefined,'Le comparatif interne reste réservé à Kiri');
+eg(vue.donnees.demandes.some((d:Record<string,unknown>)=>'carteActuelle' in d),false,'Les listes de demandes ne transportent aucune ancienne carte ni son portrait');
 eg((await appel(kiri,{action:'demandesCartes',operation:'approuver',id:demande.id,revision:0,revisionCatalogue:0,carte:correction})).statut,409,'Ancienne révision du catalogue refusée');
 eg((await appel(kiri,{action:'demandesCartes',operation:'approuver',id:demande.id,revision:0,revisionCatalogue:1,carte:correction})).statut,200,'Correction validée');
 config=await db.atelier!.lire();

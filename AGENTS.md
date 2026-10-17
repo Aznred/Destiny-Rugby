@@ -3187,6 +3187,12 @@ L'approbation et la publication du catalogue sont atomiques (CTE SQL ou une écr
 locale). Les corrections manuelles restent prioritaires sur les sources FFR.
 Les photos ne traversent pas les listes de demandes. Banc : `verify:cartes-normales` ;
 aperçu sans publication : `/scripts/apercuCartesNormales.html`.
+Le détail privé d’une correction fournit à Kiri la carte actuellement publiée,
+retrouvée par `sourceId` dans le vivier mixte ; elle n’est pas ajoutée aux listes
+ni au détail du proposant. Le Labo compare les deux cartes côte à côte avec les
+seules informations modifiées, mises à jour pendant les retouches. La même
+comparaison sert à l’édition directe ; une carte introuvable est signalée.
+Il s’agit de la version publiée au chargement, pas d’un historique à la soumission.
 
 Migration atomique : `npm run migrer:classement38`. Audit/revalidation : `npm run audit:classement38`, `npm run revalider:classement38`. Le 11 octobre 2026 : 1 304 lignes existantes conservées, revalidées et visibles provisoirement ; les anciennes projections ne stockaient pas l'âge initial/version, 80 ont seulement un score. Les anciens refus ne sont pas quantifiables puisqu'ils n'étaient pas enregistrés. Aucun changement de sauvegarde. Détails et limites : [VALIDATION-CORRECTIF-38.md](VALIDATION-CORRECTIF-38.md). Banc : `npm run verify:correctif38` ; aperçu desktop/mobile `/scripts/apercuCorrectif38.html`.
 
