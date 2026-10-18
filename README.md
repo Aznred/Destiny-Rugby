@@ -1,5 +1,17 @@
 # Destiny Rugby 🏉
 
+- **Durée des matchs de carrière** : choix de 3, 5, 6, 8, 10, 15, 20 ou 40 minutes
+  par mi-temps dès la création (joueur, joueur existant ou entraîneur), puis dans
+  Paramètres. Six minutes par défaut, à vitesse ×1, hors pauses, mises en place
+  et temps additionnel ; le chrono sportif reste sur 40/80 minutes. Le choix est
+  enregistré dans la sauvegarde et s'applique aux prochains matchs solo ; un match
+  déjà ouvert conserve sa durée. Contrôles : `npm run verify:duree-match`,
+  `node scripts/verifierDureeMatchNavigateur.cjs` (aperçu local sur le port 5188).
+- **Pub TikTok / Reels** : [vidéo de présentation de 28 secondes](trailer/presentation-2026-10-18/Destiny-Rugby-presentation-28s.mp4)
+  et [légende prête à publier](trailer/presentation-2026-10-18/publication.md).
+  Montage vertical avec images du jeu, accroche, trois modes et appel à jouer.
+  Régénération : `node scripts/creerPublicitePresentation.cjs`.
+
 - **Ligue mondiale** : inscription automatique des comptes (mot de passe, Google et anciens comptes sans club public).
   Dix niveaux : 1/2/4/8/16/32/64/128/256 poules de 16 en D1–D9, poules illimitées en D10. Les anciennes poules
   conservent leur identifiant, leurs participants et leurs rencontres ; leur ancien numéro est converti en niveau/poule.

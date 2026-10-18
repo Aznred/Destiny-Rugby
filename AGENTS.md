@@ -3199,13 +3199,24 @@ Migration atomique : `npm run migrer:classement38`. Audit/revalidation : `npm ru
 
 ### Confort des matchs solo — 15 octobre 2026
 
-Les carrières joueur et entraîneur condensent désormais le chronomètre à ×12,
-arrêts compris. Le budget actif est plafonné à dix minutes (réserve répartie
-entre les périodes, prolongations comprises). La dernière action dispose de
-trente secondes ; une transformation acquise est résolue par le même moteur,
-avec mise en scène abrégée si le plafond est atteint. Les pauses volontaires
-et la visée humaine sont hors budget. Le placement des touches, mêlées et
-renvois passe à ×2, sauf pendant une responsabilité ou un duel de pack.
+Les carrières joueur et entraîneur proposent **3, 5, 6, 8, 10, 15, 20 ou 40 minutes
+par mi-temps** (six par défaut), à la création et dans Paramètres. Ce temps de jeu
+à ×1 exclut les pauses, mises en place et temps additionnel ; le chrono sportif
+garde ses repères de 40 et 80 minutes. Le choix vit dans la sauvegarde de carrière
+(`dureeMiTempsSolo`), est normalisé au chargement sans migration destructive et se
+fige à l'ouverture de `MatchLive`. Les prolongations suivent la même échelle ;
+les accélérations et la simulation restent disponibles. Les matchs en temps réel
+et en ligne ne lisent pas ce réglage. Sans option, le moteur conserve sa cadence
+historique. Le placement des touches, mêlées et renvois passe à ×2, sauf pendant
+une responsabilité ou un duel de pack. Banc : `npm run verify:duree-match` ; recette
+ordinateur/mobile : `node scripts/verifierDureeMatchNavigateur.cjs` (serveur local
+5188, profil temporaire supprimé après fermeture).
+
+La publicité verticale de présentation (28 s, 1080 × 1920) se régénère avec
+`node scripts/creerPublicitePresentation.cjs` : vrai match 3D, écrans joueur et
+entraîneur, capture réelle du wiki pour la ligue, textes intégrés et ambiance du
+jeu. Exports et légende dans `trailer/presentation-2026-10-18/`. Les rushes et le
+profil du navigateur sont temporaires et supprimés dans un `finally`.
 
 Les pénaltouches humaines et sorties « box » ouvrent une cible sur un plan du
 terrain, réglable à la souris, au doigt, au clavier ou au stick. Le moteur attend

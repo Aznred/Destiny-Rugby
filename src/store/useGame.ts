@@ -73,6 +73,7 @@ import {
 } from '../lib/international';
 import { CALENDRIER as SEMAINES } from '../data/calendrier';
 import { appliquerCompte, ecrireCompte } from '../lib/sauvegardes';
+import { DUREE_MI_TEMPS_SOLO_DEFAUT, normaliserDureeMiTempsSolo, type DureeMiTempsSolo } from '../lib/dureeMatchSolo';
 import {
   chargerAncienneCollectionSolo, normaliserCollectionSolo,
   type EtatCollectionSolo, type ResultatPackSolo,
@@ -945,6 +946,8 @@ interface GameState {
   // fond (les variables `--pelouse-*` d'index.css) : l'or, le cuir et la craie
   // ne bougent pas, sinon on perdrait l'identité « stade nocturne » du jeu.
   theme: Theme;
+  /** Temps de jeu par mi-temps, propre à cette sauvegarde de carrière solo. */
+  dureeMiTempsSolo: DureeMiTempsSolo;
   // La langue de TOUT : l'interface (data/textes.ts) et le contenu écrit par
   // l'IA (consigneDeLangue, ajoutée à chaque prompt).
   langue: Langue;
@@ -1158,6 +1161,7 @@ interface GameState {
     arret: 'arrive' | 'decision' | 'match' | 'saison' | 'sansBanc' | 'approche' | 'contrat';
   };
   setTheme: (t: Theme) => void;
+  setDureeMiTempsSolo: (minutes: number) => void;
   setLangue: (l: Langue) => void;
   appliquerLangueAutomatique: (l: Langue) => void;
   entrainer: (attribut: keyof Attributs) => void;
@@ -1592,6 +1596,7 @@ export const useGame = create<GameState>()(
       approches: [],
       dossiersRecrutement: {},
       theme: 'vert',
+      dureeMiTempsSolo: DUREE_MI_TEMPS_SOLO_DEFAUT,
       langue: langueDuNavigateur(LANGUE_DE_REPLI),
       langueManuelle: false,
       mouvementsClubs: {}, arriveesClubs: {},
@@ -2697,6 +2702,7 @@ export const useGame = create<GameState>()(
         appliquerTheme(theme);
         set({ theme });
       },
+      setDureeMiTempsSolo: (minutes) => set({ dureeMiTempsSolo: normaliserDureeMiTempsSolo(minutes) }),
 
       // ---- ENTRAÎNEMENT DE LA SEMAINE ----
       // Une séance ciblée par semaine : c'est le seul levier direct du joueur
@@ -8217,6 +8223,7 @@ export const useGame = create<GameState>()(
         approches: s.approches,
         dossiersRecrutement: s.dossiersRecrutement,
         theme: s.theme,
+        dureeMiTempsSolo: s.dureeMiTempsSolo,
         langue: s.langue,
         langueManuelle: s.langueManuelle,
         mouvementsClubs: s.mouvementsClubs,
@@ -8260,6 +8267,7 @@ export const useGame = create<GameState>()(
       merge: (persiste, courant) => appliquerCompte({
         ...courant,
         ...(persiste as Partial<GameState>),
+        dureeMiTempsSolo: normaliserDureeMiTempsSolo((persiste as Partial<GameState> | null)?.dureeMiTempsSolo),
       }) as GameState,
     },
   ),

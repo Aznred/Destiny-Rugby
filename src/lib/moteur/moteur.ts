@@ -203,7 +203,7 @@ export const RITUEL_TIR = { celebration: 6, ramassage: 1.5, pose: 9.6, pret: 1.8
 /** Secondes simulées accordées au joueur pour viser un tir : au-delà, l'IA tape à sa place. */
 export const DELAI_TIR_HUMAIN = 25;
 
-/** Durée maximale d'un match de carrière solo (secondes d'écran actives : 12 minutes au lieu de 10). */
+/** Budget de référence en secondes actives pour les matchs solo sans durée configurée. */
 export const DUREE_MATCH_SOLO = 720;
 
 /**
@@ -249,9 +249,10 @@ function facteurArretDetaille(e: EtatMatch): number {
   return Math.min(vivant, a.horloge / Math.max(1, duree));
 }
 
-/** Secondes d'horloge par seconde d'écran, ballon vivant, dans un match de carrière solo (~12 min). */
+/** Le chrono sportif garde 40 minutes par période ; seuls les matchs solo configurés changent de cadence. */
 function horlogeCondensee(e: EtatMatch): number {
-  return e.carriereDixMinutes && !e.tempsReel ? 12 : iaParPoste(e) ? REGLAGES_IA.horlogeCondensee : 8;
+  return e.carriereDixMinutes && !e.tempsReel ? (e.dureeMiTempsSolo ? 40 / e.dureeMiTempsSolo : 12)
+    : iaParPoste(e) ? REGLAGES_IA.horlogeCondensee : 8;
 }
 
 /** Ce qui est déjà écoulé de la phase arrêtée, de 0 à 1. */
@@ -468,6 +469,8 @@ export interface OptionsMatch {
   cohesionB?: number;
   /** Le match se regarde à la vitesse réelle : voir `EtatMatch.tempsReel`. */
   tempsReel?: boolean;
+  /** Carrière solo : minutes par mi-temps à ×1, hors pauses et mises en place. */
+  dureeMiTempsSolo?: import('../dureeMatchSolo.js').DureeMiTempsSolo;
   /** Phases jouées à leur rythme de terrain : voir `EtatMatch.cadenceDetaillee`. */
   cadenceDetaillee?: boolean;
   /** Personne n'est installé d'un coup, la phase attend : voir `EtatMatch.placementJoue`. */
@@ -649,6 +652,7 @@ export function creerMatch(
     remplacementsA: 0, remplacementsB: 0, remplacementsDemandes: {}, prochaineDecision: 1, compteur: 0,
     commentaires: [], fini: false, rng,
     tempsReel: options.tempsReel,
+    ...(options.dureeMiTempsSolo && !options.tempsReel ? { dureeMiTempsSolo: options.dureeMiTempsSolo } : {}),
     cadenceDetaillee: options.cadenceDetaillee,
     placementJoue: options.placementJoue,
     resserrement: options.resserrement,
@@ -750,7 +754,8 @@ function tick(e: EtatMatch, compterBudget = true): void {
   if (compterBudget && e.carriereDixMinutes && !e.tempsReel && !e.dureeReelleArcade) {
     e.secondesActivesSolo = (e.secondesActivesSolo ?? 0) + DT;
     const total = 4800 + (e.departage?.periodes ?? 0) * (e.departage?.duree ?? 0);
-    const limite = DUREE_MATCH_SOLO * finDePeriode(e) / total;
+    const budget = e.dureeMiTempsSolo ? e.dureeMiTempsSolo * 120 : DUREE_MATCH_SOLO;
+    const limite = budget * finDePeriode(e) / total;
     // Filet de sécurité ultime (15 min actives) uniquement si la sirène a déjà retenti et aucun tir n'est dû.
     // L'horloge progresse naturellement jusqu'à 80' sans saut artificiel ni coupure brutale en pleine attaque.
     if (e.secondesActivesSolo >= limite + 180 && e.sirene && !coupDePiedDu(e) && !e.transformationDue) {

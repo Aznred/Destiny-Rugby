@@ -564,6 +564,8 @@ export function MatchLive({
       // impitoyable chez les professionnels (voir `moteur/bagarre.ts`).
       {
         niveau: niveauDuMatch(joueur, selection), controle: true,
+        // La préférence est lue une fois : modifier les réglages ne recale jamais un match déjà ouvert.
+        dureeMiTempsSolo: useGame.getState().dureeMiTempsSolo,
         // ⚠️ MATCH COUPERET : LE NUL N'EXISTE PAS (Correctif 29). Le règlement de la compétition dit ce qui se joue à
         // égalité à la sirène — prolongations, puis sa procédure. Une journée de championnat ou de poule n'en reçoit pas.
         departage: departageDuMatch(cle),

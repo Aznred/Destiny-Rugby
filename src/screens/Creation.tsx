@@ -22,6 +22,7 @@ import type { PosteId } from '../types';
 import { EditeurApparence } from '../components/EditeurApparence';
 import { apparencePourPoste, morphoConseillee, type ApparenceJoueur } from '../lib/apparenceJoueur';
 import { attributsDeCreation } from '../lib/attributsCreation';
+import { ChoixDureeMatch } from '../components/ChoixDureeMatch';
 import type { SourceCarte } from '../lib/ligue/catalogueCarriere';
 import '../components/SelectionJoueurExistant.css';
 
@@ -318,6 +319,7 @@ export function Creation() {
 
       {mode === 'joueur' && depart === 'existant' && avertissementVu && (
         <Suspense fallback={<p className="aide">{t('cr.existant.chargement')}</p>}>
+          <div className="carte" style={{ padding: '1.6rem', marginBottom: '1rem' }}><ChoixDureeMatch /></div>
           <SelectionJoueurExistant onChoisir={choisirUnExistant} erreur={refus} />
         </Suspense>
       )}
@@ -489,6 +491,7 @@ export function Creation() {
           <div className="trait-note">{t('cr.traitsBoutique')}</div>
         </div>
 
+        <ChoixDureeMatch />
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
           <button className="btn primaire grand" onClick={valider} data-tuto="cr-valider">
             <Icone nom="ballon" taille={20} /> {t('cr.lancer')}

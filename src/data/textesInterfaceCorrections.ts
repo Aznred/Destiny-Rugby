@@ -2,6 +2,41 @@ import type { Traduction } from '../lib/i18n';
 
 /** Vocabulaire et formulations revus manuellement ; prioritaires sur les lots traduits. */
 export const TEXTES_INTERFACE_CORRECTIONS: Record<string, Traduction> = {
+  'nav.reglages': {
+    fr: 'Paramètres', en: 'Settings', es: 'Ajustes', it: 'Impostazioni',
+    de: 'Einstellungen', pt: 'Definições', ja: '設定',
+  },
+  'match.duree.titre': {
+    fr: 'Temps par mi-temps · carrière solo', en: 'Time per half · solo career',
+    es: 'Tiempo por parte · carrera individual', it: 'Tempo per frazione · carriera in solitaria',
+    de: 'Zeit pro Halbzeit · Solokarriere', pt: 'Tempo por parte · carreira a solo', ja: 'ハーフの長さ · ソロキャリア',
+  },
+  'match.duree.minutes': {
+    fr: '{n} min', en: '{n} min', es: '{n} min', it: '{n} min', de: '{n} Min.', pt: '{n} min', ja: '{n}分',
+  },
+  'match.duree.total': {
+    fr: 'Environ {n} min par match à vitesse ×1.', en: 'About {n} min per match at ×1 speed.',
+    es: 'Unos {n} min por partido a velocidad ×1.', it: 'Circa {n} min a partita a velocità ×1.',
+    de: 'Etwa {n} Min. pro Spiel bei Tempo ×1.', pt: 'Cerca de {n} min por jogo à velocidade ×1.', ja: '×1速度で1試合約{n}分。',
+  },
+  'match.duree.aide': {
+    fr: 'Hors pauses, mises en place et temps additionnel. Le chrono affiche toujours 40 puis 80 minutes ; les accélérations restent disponibles.',
+    en: 'Excluding pauses, set-up time and added time. The clock still shows 40 then 80 minutes; speed controls remain available.',
+    es: 'Sin pausas, preparativos ni tiempo añadido. El reloj sigue marcando 40 y 80 minutos; puedes acelerar el juego.',
+    it: 'Escluse pause, preparativi e recupero. Il cronometro indica sempre 40 e 80 minuti; puoi ancora accelerare.',
+    de: 'Ohne Pausen, Aufstellungen und Nachspielzeit. Die Uhr zeigt weiterhin 40 und 80 Minuten; die Tempostufen bleiben verfügbar.',
+    pt: 'Sem pausas, preparativos e tempo adicional. O relógio continua a marcar 40 e 80 minutos; podes continuar a acelerar.',
+    ja: '一時停止、セットプレーの準備、追加時間は含みません。時計は40分・80分を表示し、速度変更も利用できます。',
+  },
+  'match.duree.prochains': {
+    fr: 'Choix enregistré pour les prochains matchs de cette carrière, joueur ou entraîneur. Modifiable à tout moment dans les paramètres.',
+    en: 'Saved for upcoming matches in this player or manager career. You can change it at any time in settings.',
+    es: 'Se guarda para los próximos partidos de esta carrera de jugador o entrenador. Puedes cambiarlo en los ajustes.',
+    it: 'Salvato per le prossime partite di questa carriera da giocatore o allenatore. Modificabile nelle impostazioni.',
+    de: 'Für kommende Spiele dieser Spieler- oder Trainerkarriere gespeichert. Jederzeit in den Einstellungen änderbar.',
+    pt: 'Guardado para os próximos jogos desta carreira de jogador ou treinador. Podes alterá-lo nas definições.',
+    ja: '選手・監督キャリアの次の試合から適用されます。設定でいつでも変更できます。',
+  },
   "ui.80f8c8ad9857": {
     "fr": "Sac de match brodé",
     "en": "Embroidered kit bag",

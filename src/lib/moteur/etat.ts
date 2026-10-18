@@ -703,8 +703,10 @@ export interface EtatMatch {
   suiviCombinaison?: import('./lectureCombinaison.js').SuiviCombinaison | null;
   bilansCombinaisons?: import('./lectureCombinaison.js').BilanCombinaisonMatch[];
   memoireCombinaisons?: Partial<Record<Cote, Record<string, import('./lectureCombinaison.js').MemoireCombinaison>>>;
-  /** Solo : mouvements naturels, horloge sportive sur dix minutes. */
+  /** Solo : mouvements naturels et horloge sportive condensée. */
   carriereDixMinutes?: boolean;
+  /** Minutes jouées par mi-temps solo à ×1 ; figées à l'ouverture du match. */
+  dureeMiTempsSolo?: import('../dureeMatchSolo.js').DureeMiTempsSolo;
   /** Budget solo actif, phases arrêtées comprises ; la visée et les pauses n'appellent pas avancer. */
   secondesActivesSolo?: number;
   piedHumain?: { type: 'penaltouche' | 'box'; auteurId: string; origine: Vec };

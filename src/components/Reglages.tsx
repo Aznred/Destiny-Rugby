@@ -18,6 +18,7 @@ import { ReglagesTutoriel } from './tutoriel/ReglagesTutoriel';
 import { ReglagesImage } from './ReglagesImage';
 import { DemandesCartes } from './DemandesCartes';
 import { usePreferencesInterface } from '../store/preferencesInterface';
+import { ChoixDureeMatch } from './ChoixDureeMatch';
 
 // Les huit ambiances. `apercu` est le dégradé montré sur la pastille — il
 // reprend exactement les deux extrémités de la rampe de fond du thème.
@@ -107,6 +108,7 @@ export function Reglages({ onFermer }: Props) {
       >
         <div className="eyebrow">{t('reg.eyebrow')}</div>
         <h2 id="reglages-titre">{t('reg.titre')}</h2>
+        <ChoixDureeMatch />
         <div className="champ reglages-confort">
           <label><input type="checkbox" checked={animationsMenus} onChange={e => setAnimationsMenus(e.target.checked)} />{t("ui.5fa56ad8c721")}</label>
           <p className="aide">{t("ui.6520acf6e8d3")}</p>
