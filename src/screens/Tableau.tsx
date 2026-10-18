@@ -27,6 +27,7 @@ import { coupeEnDirect, coupesDuClubALaDate } from '../lib/coupe';
 import { type StandingsStatus } from '../lib/competitionRules';
 import { statutsDeLaPoule } from '../lib/promotion';
 import { TableauClassement } from '../components/TableauClassement';
+import { RegleAccession } from '../components/RegleAccession';
 import {
   internationalEnDirect, affichesInternationales, competitionsDeLaSaison,
   fenetreInternationale, journeesInternationalesA, classementMondial,
@@ -987,6 +988,7 @@ export function Tableau() {
             </div>
             <Tableau1 lignes={etat.classement} club={carriere.club}
               statuts={statutsDeLaPoule(choix, poules.length > 1 ? poule : 0, etat.classement.length)} />
+            <RegleAccession division={choix} />
           </div>
 
           {/* ---------- TOURNOI DE FIN D'ANNÉE ---------- */}

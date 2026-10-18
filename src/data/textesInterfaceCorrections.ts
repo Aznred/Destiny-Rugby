@@ -2,6 +2,24 @@ import type { Traduction } from '../lib/i18n';
 
 /** Vocabulaire et formulations revus manuellement ; prioritaires sur les lots traduits. */
 export const TEXTES_INTERFACE_CORRECTIONS: Record<string, Traduction> = {
+  'accession.quart': {
+    fr: 'Montée en Fédérale 1 : les 8 clubs qualifiés pour les quarts de finale. Finir premier de poule ne suffit pas.',
+    en: 'Promotion to Fédérale 1: the 8 clubs reaching the quarter-finals. Winning your pool is not enough.',
+    es: 'Ascenso a Fédérale 1: los 8 clubes clasificados para cuartos de final. Ganar el grupo no basta.',
+    it: 'Promozione in Fédérale 1: gli 8 club qualificati ai quarti di finale. Vincere il girone non basta.',
+    de: 'Aufstieg in die Fédérale 1: die 8 Viertelfinalisten. Der Gruppensieg allein reicht nicht.',
+    pt: 'Subida à Fédérale 1: os 8 clubes apurados para os quartos de final. Vencer o grupo não basta.',
+    ja: 'Fédérale 1昇格：準々決勝に進んだ8クラブ。プール首位だけでは昇格できません。',
+  },
+  'accession.demie': {
+    fr: 'Montée en Nationale 2 : les 4 clubs qualifiés pour les demi-finales. Finir premier de poule ne suffit pas.',
+    en: 'Promotion to Nationale 2: the 4 clubs reaching the semi-finals. Winning your pool is not enough.',
+    es: 'Ascenso a Nationale 2: los 4 clubes clasificados para semifinales. Ganar el grupo no basta.',
+    it: 'Promozione in Nationale 2: i 4 club qualificati alle semifinali. Vincere il girone non basta.',
+    de: 'Aufstieg in die Nationale 2: die 4 Halbfinalisten. Der Gruppensieg allein reicht nicht.',
+    pt: 'Subida à Nationale 2: os 4 clubes apurados para as meias-finais. Vencer o grupo não basta.',
+    ja: 'Nationale 2昇格：準決勝に進んだ4クラブ。プール首位だけでは昇格できません。',
+  },
   'forme.difficulte.titre': { fr: 'Gestion de la forme en carrière', en: 'Career fitness management', es: 'Gestión física en carrera', it: 'Gestione fisica in carriera', de: 'Fitnessmanagement in der Karriere', pt: 'Gestão física na carreira', ja: 'キャリアのコンディション管理' },
   'forme.difficulte.facile': { fr: 'Facile', en: 'Easy', es: 'Fácil', it: 'Facile', de: 'Einfach', pt: 'Fácil', ja: 'かんたん' },
   'forme.difficulte.moyen': { fr: 'Moyen', en: 'Normal', es: 'Medio', it: 'Medio', de: 'Mittel', pt: 'Médio', ja: 'ふつう' },

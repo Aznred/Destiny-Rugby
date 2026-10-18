@@ -1,0 +1,16 @@
+import { createRoot } from 'react-dom/client';
+import { Manager } from '../src/screens/Manager';
+import { Tableau } from '../src/screens/Tableau';
+import { useGame } from '../src/store/useGame';
+import { poulesDe } from '../src/lib/championnat';
+import { chargerTextes } from '../src/lib/i18n';
+import { TEXTES } from '../src/data/textes';
+import '../src/index.css';
+import '../src/App.css';
+chargerTextes(TEXTES);
+useGame.persist.setOptions({ storage: { getItem: () => null, setItem: () => {}, removeItem: () => {} } });
+const parametres = new URLSearchParams(location.search);
+const division = parametres.get('division') === 'fed1' ? 'fed1' : 'fed2';
+useGame.getState().creerManager({ nom:'Banc accession', nation:'France', age:40, club:poulesDe(division)[0][0], libre:true });
+useGame.setState({ iaActivee:false });
+createRoot(document.getElementById('root')!).render(parametres.get('ecran') === 'tableau' ? <Tableau /> : <Manager />);

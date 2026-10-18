@@ -22,6 +22,8 @@
     "verify:complement29": "vite-node scripts/verifierComplement29.ts",
     "verify:reglements": "vite-node scripts/verifierReglements.ts",
     "verify:retours-reglements": "vite-node scripts/verifierRetoursReglements.ts",
+    "verify:accession-federale": "vite-node scripts/verifierAccessionFederale.ts",
+    "verify:accession-federale:navigateur": "node scripts/verifierAccessionNavigateur.cjs",
     "verify:voix": "vite-node scripts/verifierVoix.ts",
     "verify:chrono-mises-en-place": "vite-node scripts/verifierChronoMisesEnPlace.ts",
     "verify:duree-match": "vite-node scripts/verifierDureeMatchSolo.ts",

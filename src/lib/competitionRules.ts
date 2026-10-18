@@ -71,11 +71,10 @@ export interface PoolQualification {
 // Signalé en jeu : « plusieurs groupes/régions participent à la compétition, mais finalement un seul club obtient la
 // montée, comme si toute la pyramide dépendait du champion unique du tableau final ».
 //
-// ⚠️ LA MONTÉE SE GAGNE AU CLASSEMENT DE SA POULE, LE TITRE DANS LE TABLEAU. Finir assez haut donne la montée ; on
-// continue ensuite les phases finales pour devenir champion. Chaque division déclare ses quatre blocs ci-dessous, et
-// corriger une compétition, c'est changer SA ligne dans `TABLE`.
+// Chaque division distingue les places gagnées au classement et celles gagnées dans le tableau : en Fédérale 2,
+// les quart-finalistes montent ; en Fédérale 1, les demi-finalistes. Les Régionales gardent leurs places par poule.
 
-/** Qui dispute le tableau final. Le tableau désigne le champion ; il ne donne pas la montée (voir `ChampionshipBracket`). */
+/** Qui dispute le tableau final, distinct des conditions d'accession (`ChampionshipBracket`). */
 export interface QualificationToFinals {
   /** Qualifiés par poule. `auto` : la phase finale de la poule (poule unique), deux par poule jusqu'à trois poules, un au-delà. */
   perPool: number | 'auto';
@@ -85,9 +84,9 @@ export interface QualificationToFinals {
   bestRunnersUp: boolean;
 }
 
-/** La montée sportive : des places PAR POULE, gagnées au classement de la saison régulière. */
+/** Les montées acquises au classement ; zéro lorsque l'accession dépend des phases finales. */
 export interface PromotionRules {
-  /** Montées par poule (`promotionSlots`). 0 : personne ne monte de cette division. */
+  /** Montées acquises par poule. 0 : aucune montée au seul classement. */
   promotionSlots: number;
   /**
    * Le territoire de l'échange avec l'étage du dessus. `ligue` : les places se comptent à l'intérieur de chaque ligue
@@ -110,10 +109,18 @@ export interface RelegationRules {
 /**
  * Le tableau final et la montée. `decides` : le champion monte, le finaliste joue l'accès (poule unique : Pro D2,
  * Nationale). `tiebreak` : le tableau ne donne aucune place, mais le champion passe en tête des meilleurs suivants.
- * `none` : le tableau ne désigne que le champion.
+ * `none` : le tableau ne désigne que le champion. `qualification` : atteindre `tourAccession` donne la montée.
  */
 export interface ChampionshipBracket {
-  promotionImpact: 'decides' | 'tiebreak' | 'none';
+  promotionImpact: 'decides' | 'tiebreak' | 'none' | 'qualification';
+  /** L'accession est acquise en atteignant ce tour, même si le club y perd ensuite. */
+  tourAccession?: 'quart' | 'demie';
+}
+
+export function placesAccessionParTableau(rules: CompetitionRules): number {
+  return rules.championshipBracket.promotionImpact === 'qualification'
+    ? rules.championshipBracket.tourAccession === 'quart' ? 8 : rules.championshipBracket.tourAccession === 'demie' ? 4 : 0
+    : 0;
 }
 
 export interface CompetitionRules {
@@ -148,6 +155,7 @@ interface ReglesSportives {
   promotion?: Partial<PromotionRules>;
   finals?: Partial<QualificationToFinals>;
   bracket?: ChampionshipBracket['promotionImpact'];
+  tourAccession?: ChampionshipBracket['tourAccession'];
 }
 
 const regles = (
@@ -163,7 +171,7 @@ const regles = (
     // ⚠️ UNE SEULE SAISIE : les descentes sont celles de `standings`, que `zones()` colore au classement.
     relegationRules: { directPerPool: s.directRelegation, accessMatchPositions: s.accessMatchPositions },
     // Sans précision, c'est le tableau qui donne la place (le comportement de toute poule unique).
-    championshipBracket: { promotionImpact: sport.bracket ?? 'decides' },
+    championshipBracket: { promotionImpact: sport.bracket ?? 'decides', ...(sport.tourAccession ? { tourAccession: sport.tourAccession } : {}) },
     league: { allowDraw: true },
     knockout,
     ...(poolQualification ? { poolQualification } : {}),
@@ -210,8 +218,8 @@ const TABLE: Record<string, CompetitionRules> = Object.fromEntries([
   division('prod2', UN_PLUS_ACCES, MONTEE_DU_CHAMPION),
   division('nationale', DEUX_DIRECTS, MONTEE_DU_CHAMPION),
   division('nationale2', DEUX_DIRECTS, { ...MONTEE_PAR_POULE, finals: { perPool: 2, playoffsPerPool: 4 } }),
-  division('fed1', DEUX_DIRECTS, { ...MONTEE_PAR_POULE, finals: { perPool: 2, playoffsPerPool: 4 } }),
-  division('fed2', DEUX_DIRECTS, { ...MONTEE_PAR_POULE, finals: { perPool: 2, playoffsPerPool: 4 } }),
+  division('fed1', DEUX_DIRECTS, { bracket: 'qualification', tourAccession: 'demie', finals: { perPool: 2, playoffsPerPool: 4 } }),
+  division('fed2', DEUX_DIRECTS, { bracket: 'qualification', tourAccession: 'quart', finals: { perPool: 2, playoffsPerPool: 4 } }),
   // FFR : trois qualifiés directs, puis un barrage entre les quatrième et cinquième en Fédérale 3.
   division('fed3', DEUX_DIRECTS, { ...MONTEE_ET_MEILLEURS_DEUXIEMES, finals: { perPool: 3, playoffsPerPool: 2 } }),
   division('reg1', UN_DIRECT, { ...MONTEE_ET_MEILLEURS_DEUXIEMES, finals: { playoffsPerPool: 'auto' } }),

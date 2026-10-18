@@ -5,10 +5,10 @@
 //
 // Ce que ce banc tient :
 //   1. chaque division déclare ses quatre blocs (qualification aux finales, montée, relégation, tableau) ;
-//   2. dans une division à poules, le premier de CHAQUE poule monte — pas un seul club pour toute la division ;
+//   2. les places de poule restent acquises hors Fédérales 1/2, dont les qualifications sportives décident ;
 //   3. ce qu'un étage promeut, celui du dessus le relègue : aucune division ne change de taille, sur trois saisons ;
 //   4. les Régionales s'échangent par LIGUE : autant de descentes que de montées dans chaque ligue régionale ;
-//   5. le tableau final ne change pas les montées : on peut perdre son premier match de phase finale et monter ;
+//   5. les phases finales donnent les montées de Fédérales 1/2, mais pas celles des Régionales ;
 //   6. vu d'un club (carrière d'entraîneur), TOUTE sa division bouge, pas seulement sa poule ;
 //   7. le classement affiché dit vrai : ce qui est « montée » monte, ce qui est « relégation » descend.
 //
@@ -17,7 +17,8 @@
 import { strict as assert } from 'node:assert';
 import { COMPETITIONS } from '../src/data/clubs';
 import { poulesDe, effacerResultatsJoues } from '../src/lib/championnat';
-import { rulesFor } from '../src/lib/competitionRules';
+import { placesAccessionParTableau, rulesFor } from '../src/lib/competitionRules';
+import { qualifiesPourAccession } from '../src/lib/accessionFederale';
 import {
   ligueDeLaPoule, nomDivision, oublierResultats, placesDeLaPoule, resoudreSaisonClub, resoudreToutesDivisions,
   setContexteJoueur, statutsDeLaPoule, type MouvementClub,
@@ -50,7 +51,7 @@ for (const id of PYRAMIDE) {
 }
 egal(A_POULES, ['nationale2', 'fed1', 'fed2', 'fed3', 'reg1', 'reg2', 'reg3'], 'sept divisions sont découpées en poules');
 for (const id of A_POULES) {
-  ok(rulesFor(id).promotionRules.promotionSlots >= 1, `${id} : chaque poule a au moins une place de montée`);
+  ok(rulesFor(id).promotionRules.promotionSlots >= 1 || placesAccessionParTableau(rulesFor(id)) > 0, `${id} : l'accession est déclarée par poule ou par tour`);
   ok(rulesFor(id).championshipBracket.promotionImpact !== 'decides', `${id} : le tableau final ne donne pas la montée`);
 }
 egal(rulesFor('reg2').promotionRules.territory, 'ligue', 'Régionale 2 : les places se comptent par ligue régionale');
@@ -69,6 +70,7 @@ const poulesParLigue = (id: string) => {
 const liguesAuDepart = { reg2: poulesParLigue('reg2'), reg3: poulesParLigue('reg3') };
 
 function verifierUneSaison(saison: number) {
+  jouerAutresPhasesFinales(saison, SEMAINES_PAR_SAISON, '');
   const bilan = resoudreToutesDivisions(saison);
   egal(bilan.incidents, [], `saison ${saison} : toutes les frontières se résolvent`);
   for (let i = 0; i < PYRAMIDE.length - 1; i++) {
@@ -82,6 +84,8 @@ function verifierUneSaison(saison: number) {
       `S${saison} ${bas} : ${montees.length} montées pour ${poules.length} poules — plus jamais un seul club`);
     const tournoi = tournoiDeFinDAnnee(bas, saison, nomDivision(bas))!;
     const promus = new Set(montees.map((m) => m.club));
+    const parTableau = placesAccessionParTableau(rulesFor(bas));
+    if (parTableau) egal(promus, new Set(qualifiesPourAccession(rulesFor(bas), tournoi.matchs)), `${bas} : exactement les clubs ayant atteint le tour d'accession`);
     const premiers = tournoi.poules.map((p) => p.classement[0].club);
     // ── Le classement affiché dit vrai ────────────────────────────────────
     tournoi.poules.forEach((p, n) => {
@@ -89,12 +93,13 @@ function verifierUneSaison(saison: number) {
       const statuts = statutsDeLaPoule(bas, n, p.classement.length);
       egal(statuts.filter((s) => s === 'PROMOTION' || s === 'PROMOTION_FINALS').length, places.promotion, `S${saison} ${bas} poule ${n + 1} : autant de places « montée » affichées que de places sûres`);
       p.classement.forEach((l, r) => {
+        if (parTableau) return; // Le classement ne promet aucune montée en Fédérales 1 et 2.
         if (r < places.promotion) ok(promus.has(l.club), `S${saison} ${bas} poule ${n + 1} : ${l.club}, place de montée, monte`);
         else if (r >= places.promotion + places.promotionPossible) ok(!promus.has(l.club), `S${saison} ${bas} poule ${n + 1} : ${l.club} (${r + 1}e) ne monte pas`);
       });
     });
     const sansPlace = premiers.filter((c) => !promus.has(c));
-    egal(sansPlace, [], `S${saison} ${bas} : le premier de chaque poule monte`);
+    if (!parTableau) egal(sansPlace, [], `S${saison} ${bas} : le premier de chaque poule monte`);
     // Les descentes de l'étage du dessus, poule par poule.
     const relegues = new Set(descentes.map((m) => m.club));
     const hautPoules = poulesDe(haut).length > 1
@@ -137,6 +142,7 @@ ok(poulesDe('reg1').some((p, n) => ligueDeLaPoule(p) === 'ILE-DE-FRANCE' && plac
 console.log(`✓ règlement, places par poule, échange par ligue, classement affiché (${controles} contrôles, ${chrono()})`);
 
 // ═══ 5. Le tableau final ne change pas les montées ═══════════════════════════════════════════════════════
+effacerResultatsJoues(); oublierResultats();
 const montantsAvant = (bas: string, haut: string) => frontiere(resoudreToutesDivisions(1).mouvements, haut, bas).montees.map((m) => m.club).sort();
 const avantTableau = { reg3: montantsAvant('reg3', 'reg2'), fed2: montantsAvant('fed2', 'fed1') };
 ok(tournoiDeFinDAnnee('reg3', 1, nomDivision('reg3'))!.champion === null, 'avant le tableau, la Régionale 3 n’a pas de champion');
@@ -145,7 +151,8 @@ oublierResultats();
 const championReg3 = tournoiDeFinDAnnee('reg3', 1, nomDivision('reg3'))!.champion;
 ok(championReg3, `le tableau final de Régionale 3 a désigné son champion (${championReg3})`);
 egal(montantsAvant('reg3', 'reg2'), avantTableau.reg3, 'Régionale 3 : les mêmes clubs montent, tableau final joué ou non');
-egal(montantsAvant('fed2', 'fed1'), avantTableau.fed2, 'Fédérale 2 : les mêmes clubs montent, tableau final joué ou non');
+egal(avantTableau.fed2, [], 'Fédérale 2 : aucune montée avant les résultats du tableau');
+egal(montantsAvant('fed2', 'fed1').length, 8, 'Fédérale 2 : huit clubs montent après qualification en quarts');
 const tableau = tournoiDeFinDAnnee('reg3', 1, nomDivision('reg3'))!;
 const elimines = tableau.matchs.filter((m) => m.status === 'completed').map((m) => m.perdant!).filter((c) => avantTableau.reg3.includes(c));
 ok(elimines.length >= 10, `${elimines.length} clubs de Régionale 3 perdent en phase finale ET montent : la montée est acquise au classement`);
@@ -174,7 +181,7 @@ console.log(`✓ carrière d’entraîneur : toute la division bouge (${controle
 effacerResultatsJoues(); oublierResultats();
 const mouvements: Record<string, string> = {};
 for (let saison = 1; saison <= 3; saison++) {
-  const bilan = saison === 1 ? resoudreToutesDivisions(1) : verifierUneSaison(saison);
+  const bilan = verifierUneSaison(saison);
   for (const m of bilan.mouvements) mouvements[m.club] = m.vers;
   setMouvementsClubs({ ...mouvements });
   oublierResultats();

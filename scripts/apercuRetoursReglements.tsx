@@ -10,6 +10,8 @@ import { championnatEnDirect, enregistrerResultatJoue } from '../src/lib/champio
 import { tournoiDeFinDAnnee } from '../src/lib/tournoi';
 import { coupeEnDirect } from '../src/lib/coupe';
 import { standingsStatuses, rulesFor } from '../src/lib/competitionRules';
+import { RegleAccession } from '../src/components/RegleAccession';
+import { qualifiesPourAccession } from '../src/lib/accessionFederale';
 import '../src/index.css';
 import '../src/App.css';
 chargerTextes(TEXTES);
@@ -41,6 +43,10 @@ export function ApercuRetours() {
     <p>{europe ? 'Reversés classés 9 à 12 : huitième à l’extérieur, puis réception selon le rang.' : division === 'premiership' ? 'Aucune relégation ni match d’accès automatique.' : `${tournoi?.qualifiesDirects?.length ?? 0} qualifiés directs · ${tournoi?.barragistes?.length ?? 0} barragistes`}</p>
     <div className="carte bloc-competition" style={{ padding: '1rem', margin: '1rem 0' }}>
       <TableauClassement lignes={cl.map((l, i) => ({ ...l, cle: l.club, nom: l.club, position: i + 1, statut: statuts[i] }))}/>
+      <RegleAccession division={division} />
+      {['fed1','fed2'].includes(division) && <p data-promus={qualifiesPourAccession(rulesFor(division), tournoi?.matchs ?? []).length}>
+        Accession acquise : {qualifiesPourAccession(rulesFor(division), tournoi?.matchs ?? []).join(', ') || 'aucun club avant les résultats qualificatifs'}
+      </p>}
     </div>
     {!!matchs.length && <section className="carte bloc-competition" style={{ padding: '1rem' }}>
       <button className="btn primaire" onClick={jouer}>Jouer le tour de démonstration</button>

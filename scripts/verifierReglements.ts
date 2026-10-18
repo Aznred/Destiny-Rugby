@@ -33,6 +33,8 @@ let controles = 0;
 const ok = (condition: unknown, message: string) => { assert.ok(condition, message); controles++; };
 const egal = <T>(a: T, b: T, message: string) => { assert.deepEqual(a, b, message); controles++; };
 const SAISON = 1;
+// Le contrôle des règles peut se faire sans les simulations longues du moteur.
+const avecMoteur = !process.argv.includes('--regles-seules');
 
 const equilibre = (mouvements: MouvementClub[]) => {
   const solde = new Map<string, number>();
@@ -45,6 +47,8 @@ const equilibre = (mouvements: MouvementClub[]) => {
 
 // ── 1. Fédérale : deux relégués directs, aucun match d'accès ───────────────────────────────────────────────────
 effacerResultatsJoues(); oublierResultats();
+// L'échange avec les Fédérales 1 et 2 attend leurs qualifications sportives.
+jouerAutresPhasesFinales(SAISON, 51, '');
 for (const division of ['fed1', 'fed2', 'fed3']) {
   const regles = rulesFor(division);
   egal(regles.standings.directRelegation, 2, `${division} : le règlement relègue deux clubs`);
@@ -161,7 +165,7 @@ egal(standingsStatuses(rulesFor('urc'), 16).some((s) => s === 'DIRECT_RELEGATION
 }
 
 // ── 5. Essai après la sirène : la transformation avant tout coup de sifflet ────────────────────────────────────
-{
+if (avecMoteur) {
   let apresSirene = 0;
   let transformes = 0;
   let periodesCloses = 0;
@@ -205,6 +209,7 @@ egal(standingsStatuses(rulesFor('urc'), 16).some((s) => s === 'DIRECT_RELEGATION
   egal(departageDuMatch('top14#1#3#A#B'), undefined, 'championnat : aucune prolongation prévue');
   egal(departageDuMatch('coupe#championsCup#1#quart#A#B'), { periodes: 2, minutes: 10, criteres: ['essais', 'tirsAuBut'] }, 'coupe d\'Europe : 2 × 10 minutes, puis essais, puis tirs au but');
 
+  if (avecMoteur) {
   const top = clubsDeDivision('top14');
   const jouer = (n: number, couperet: boolean) => {
     const [a, b] = [top[n % top.length], top[(n + 3) % top.length]];
@@ -277,6 +282,7 @@ egal(standingsStatuses(rulesFor('urc'), 16).some((s) => s === 'DIRECT_RELEGATION
   }
   ok(nuls > 0, `championnat : ${nuls} match(s) nul(s) sur 12, comme le règlement le permet`);
 
+  }
   // Un match couperet non joué (résultat automatique) garde son départage abstrait : jamais de nul non plus.
   const abstrait = departager('phase#top14#1#demie#A#B', 17, 17);
   ok(abstrait.prolongation && abstrait.scorePour !== abstrait.scoreContre, 'résultat automatique : le nul couperet est départagé');

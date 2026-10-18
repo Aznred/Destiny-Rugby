@@ -102,6 +102,18 @@ Bancs : `npm run verify:optimisation`, `npm run verify:optimisation:navigateur` 
 `/scripts/apercuOptimisation.html` et `/scripts/apercuFluiditeManager.html`. Les profils et captures du nouveau
 banc sont temporaires, supprimés après fermeture ; `DESTINY_GARDER_CAPTURES=1` les conserve pour inspection.
 
+### Accession des Fédérales en carrière solo
+
+Le socle 2025/26 garde huit montées Fédérale 2 → Fédérale 1 (qualification en quarts) et quatre Fédérale 1 →
+Nationale 2 (qualification en demies). `competitionRules.ts` déclare `promotionImpact: 'qualification'` et
+`tourAccession`, sans place automatique au classement. `accessionFederale.ts` lit les résultats établis : le vainqueur
+du tour précédent est qualifié même si les autres rencontres de son tour ne sont pas finies ; perdre ensuite ne
+retire pas l'accession. `promotion.ts` partage ce calcul entre les deux carrières et équilibre les échanges.
+Le motif `phaseFinale` ne doit pas être raconté comme un titre de champion. Les anciens tableaux restent intacts,
+sans ajout de clubs fictifs ni réécriture des saisons terminées. Les tours restent à match unique.
+`RegleAccession` explique le seuil dans le bureau, le calendrier et l'écran des classements. Les Régionales gardent
+leurs places par poule. Bancs : `verify:accession-federale`, `verify:montees`, `verify:accession-federale:navigateur`.
+
 ### Pyramide publique et classement mondial
 
 - `lib/ligue/pyramidePublique.ts` distingue niveau D1–D10 et numéro de poule. Sans `publique.poule`, l’ancien

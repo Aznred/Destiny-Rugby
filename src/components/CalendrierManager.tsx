@@ -1,4 +1,6 @@
 import { tn, texteTraduit, t } from '../lib/i18n';
+import { RegleAccession } from './RegleAccession';
+import { placesAccessionParTableau, rulesFor } from '../lib/competitionRules';
 import { useMemo, useState } from 'react';
 import { CALENDRIER, libelleDate, libelleSemaine, SEMAINES_PAR_SAISON, semaine } from '../data/calendrier';
 import { afficheDuClub, affichesChampionnatDuClub, libelleAfficheManager } from '../lib/matchLive';
@@ -93,7 +95,8 @@ export function CalendrierManager({ onMatch }: { onMatch: () => void }) {
         {manager.decision.choix.map((c) => <button className="btn fantome" key={c.id} onClick={() => repondre(manager.decision!.id, c.id)}>{texteTraduit(c.label)}</button>)}
       </div>}
     </div>
-    <p className="manager-cal-reglement"><Icone nom="trophee" taille={16} />{t("ui.db7d1924170c", { v0: qualifies, v1: auDessus ? t("ui.cdd7b2e9d6c7", { v0: nomDivision(auDessus) }) : t("ui.10f08cb68cfd") })}</p>
+    {placesAccessionParTableau(rulesFor(manager.division)) ? <RegleAccession division={manager.division} />
+      : <p className="manager-cal-reglement"><Icone nom="trophee" taille={16} />{t("ui.db7d1924170c", { v0: qualifies, v1: auDessus ? t("ui.cdd7b2e9d6c7", { v0: nomDivision(auDessus) }) : t("ui.10f08cb68cfd") })}</p>}
     <QualificationsMondial saison={manager.saison} numero={manager.semaine} />
     {!!manager.avancee?.convocations.length && <details className="carte manager-cal-commandes"><summary>{t("ui.eaee921b00a9", { v0: manager.avancee.convocations.length })}</summary>
       {manager.avancee.convocations.map((c) => <p key={c.id}>{c.nom} · {c.nation} · {c.competition}<br />{t("ui.91395a560243", { v0: libelleDate(semaine(c.debut)), v1: libelleDate(semaine(c.fin)), v2: manager.semaine < c.debut ? t("ui.429042e3ba31") : t("ui.1cd6cb797eb4") })}</p>)}

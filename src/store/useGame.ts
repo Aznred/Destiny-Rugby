@@ -2573,7 +2573,7 @@ export const useGame = create<GameState>()(
               role: 'mj',
               titre: sien.sens === 'montee' ? '⬆️ Ton club monte !' : '⬇️ Ton club descend',
               texte: sien.sens === 'montee'
-                ? `${joueur.club} accède à la ${nomDivision(sien.vers)}${parAcces ? ' au terme du match d’accès' : sien.motif === 'classement' ? ' grâce à sa place en tête de poule' : sien.motif === 'repechage' ? ' parmi les meilleurs deuxièmes' : ' en tant que champion'}. Une marche de plus, et un niveau de jeu qui va piquer.`
+                ? `${joueur.club} accède à la ${nomDivision(sien.vers)}${parAcces ? ' au terme du match d’accès' : sien.motif === 'phaseFinale' ? ' grâce à sa qualification en phases finales' : sien.motif === 'classement' ? ' grâce à sa place en tête de poule' : sien.motif === 'repechage' ? ' parmi les meilleurs deuxièmes' : ' en tant que champion'}. Une marche de plus, et un niveau de jeu qui va piquer.`
                 : `${joueur.club} est relégué en ${nomDivision(sien.vers)}${parAcces ? ' après avoir perdu le match d’accès' : ''}. À toi de voir si tu suis le club ou si tu cherches mieux ailleurs.`,
               deltas: sien.sens === 'montee' ? { moral: 10, reputation: 3 } : { moral: -10 },
             });

@@ -49,6 +49,7 @@ import {
 } from '../lib/manager';
 import { libelleAfficheManager, type AfficheComplete } from '../lib/matchLive';
 import { RapportAdjoint } from '../components/RapportAdjoint';
+import { RegleAccession } from '../components/RegleAccession';
 import { GestionContrats } from '../components/GestionContrats';
 import { compositionDeLAdjoint, etatsPhysiquesManager, penalitesConditionManager, rapportAdjointManager } from '../lib/adjointManager';
 import { departActe } from '../lib/contratsAutomatiques';
@@ -822,6 +823,7 @@ function BureauManager({ manager }: { manager: NonNullable<ReturnType<typeof use
               </section>
 
               <section className="carte manager-classement-complet" data-tuto="mgr-classement">
+                <RegleAccession division={manager.division} />
                 <div className="comp-tete">
                   <div><b><Icone nom="resultats" taille={16} />{t("ui.b82c15fd7ceb", { v0: manager.divisionNom })}</b><small>{t("ui.1193ecba856d")}</small></div>
                   <button onClick={() => setEcran('tableau')}>{t("ui.eecc9ea176d1")}</button>
