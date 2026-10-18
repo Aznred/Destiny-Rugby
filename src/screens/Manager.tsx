@@ -498,9 +498,11 @@ function BureauManager({ manager }: { manager: NonNullable<ReturnType<typeof use
     return map;
   }, [vue, avancee, effectifBrut, dossiersMedicaux, manager, convocationsActives]);
   // La feuille de l'adjoint pour l'affiche à venir : la même fonction que la composition déléguée.
-  const managerAvecEtat = avancee ? { ...manager, avancee } : manager;
+  const managerAvecEtat = useMemo(() => avancee ? { ...manager, avancee } : manager, [manager, avancee]);
   const afficheAVenir = afficheManager && !resultatManager ? afficheManager : null;
-  const rapportAdjoint = manager.club && vue === 'equipe' ? rapportAdjointManager(managerAvecEtat, effectifBrut, { affiche: afficheAVenir }) : null;
+  const rapportAdjoint = useMemo(() => managerAvecEtat.club && vue === 'equipe'
+    ? rapportAdjointManager(managerAvecEtat, effectifBrut, { affiche: afficheAVenir }) : null,
+  [managerAvecEtat, vue, effectifBrut, afficheAVenir]);
   const laisserLAdjointComposer = () => {
     if (!manager.club) return;
     definirComposition(compositionDeLAdjoint(managerAvecEtat, effectifBrut, { affiche: afficheAVenir }));

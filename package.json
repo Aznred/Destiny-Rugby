@@ -27,6 +27,8 @@
     "verify:duree-match": "vite-node scripts/verifierDureeMatchSolo.ts",
     "verify:forme-carriere": "vite-node scripts/verifierFormeCarriere.ts",
     "verify:forme-carriere:navigateur": "node scripts/verifierFormeNavigateur.cjs",
+    "verify:optimisation": "vite-node scripts/verifierFormatageOptimise.ts && vite-node scripts/verifierFluiditeManager.ts",
+    "verify:optimisation:navigateur": "node scripts/verifierOptimisationNavigateur.cjs",
     "verify:duree-match:navigateur": "node scripts/verifierDureeMatchNavigateur.cjs",
     "pub:presentation": "node scripts/creerPublicitePresentation.cjs",
     "dev": "vite",

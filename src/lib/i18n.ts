@@ -251,7 +251,10 @@ export function t(cle: string, vars?: Record<string, string | number | boolean |
 
 /** Le pluriel, à la française : 0 et 1 au singulier, le reste au pluriel. */
 export function tn(cle: string, n: number, vars?: Record<string, string | number | boolean | null | undefined>): string {
-  const pluriel = new Intl.PluralRules(locale()).select(n) !== 'one';
+  const l = locale();
+  let regles = reglesPluriel.get(l);
+  if (!regles) { regles = new Intl.PluralRules(l); reglesPluriel.set(l, regles); }
+  const pluriel = regles.select(n) !== 'one';
   return t(pluriel ? `${cle}.pluriel` : cle, { ...vars, n });
 }
 
@@ -266,6 +269,10 @@ const LOCALES: Record<Langue, string> = {
   fr: 'fr-FR', en: 'en-GB', es: 'es-ES', it: 'it-IT',
   de: 'de-DE', pt: 'pt-PT', ja: 'ja-JP',
 };
+// Sept langues, donc sept instances au maximum : aucun cache de nombres ou de
+// textes de joueurs. Les règles natives restent identiques à chaque affichage.
+const formatsNombres = new Map<string, Intl.NumberFormat>();
+const reglesPluriel = new Map<string, Intl.PluralRules>();
 
 export function locale(l: Langue = courante): string {
   return LOCALES[l] ?? LOCALES.fr;
@@ -273,7 +280,10 @@ export function locale(l: Langue = courante): string {
 
 /** Un nombre dans la langue du joueur : `nombre(1200000)` → « 1 200 000 ». */
 export function nombre(n: number): string {
-  return n.toLocaleString(locale());
+  const l = locale();
+  let format = formatsNombres.get(l);
+  if (!format) { format = new Intl.NumberFormat(l); formatsNombres.set(l, format); }
+  return format.format(n);
 }
 
 // ---------------------------------------------------------------------------

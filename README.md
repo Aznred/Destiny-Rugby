@@ -1,5 +1,15 @@
 # Destiny Rugby 🏉
 
+- **Optimisation des interfaces** : les sélecteurs fermés ne préparent que leur sélection ; toutes les options,
+  groupes, traductions et commandes clavier restent disponibles à l'ouverture. La recherche réutilise les noms
+  normalisés, les nombres et pluriels partagent leurs formateurs natifs, et le rapport de l'adjoint est réutilisé
+  tant que son état ne change pas. Contrôles : `npm run verify:optimisation` et
+  `npm run verify:optimisation:navigateur` (port local 5188, ordinateur et mobile).
+  Banc local Chrome/React en développement, 2 000 options : médiane d'un sélecteur fermé de 16,5 à 0,6 ms
+  après le premier rendu ; 5 000 formatages de nombres/pluriels de 229 à 23 ms. Ces mesures ciblent ces opérations,
+  pas la vitesse globale du jeu ni les performances d'un téléphone physique.
+  Étude séparée, fonctionnalité non intégrée : [scores réels, collecte et budget](sources/SUIVI-MATCHS-REELS.md).
+
 - **Gestion de la forme en carrière** : Facile, Moyen (défaut) ou Difficile dès la création et dans Paramètres,
   pour les carrières joueur et entraîneur. Les minutes réellement jouées et l'intensité règlent l'effort ;
   la récupération tient compte de la charge d'entraînement. La condition pèse aussi dans les matchs délégués.

@@ -63,6 +63,16 @@ const PLACE_MINIMALE = 180;
  */
 const LARGEUR_MINIMALE = 232;
 
+function traduireOption(o: OptionSelecteur): OptionSelecteur {
+  return {
+    ...o, label: texteTraduit(o.label),
+    sous: o.sous == null ? undefined : texteTraduit(o.sous),
+    groupe: o.groupe == null ? undefined : texteTraduit(o.groupe),
+  };
+}
+
+const normaliserRecherche = (texte: string) => texte.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+
 export function Selecteur({
   id,
   options: optionsSource,
@@ -72,14 +82,18 @@ export function Selecteur({
   recherche,
 }: Props) {
   const langue = langueCourante();
-  const options = useMemo(() => optionsSource.map(o => ({
-    ...o, label: texteTraduit(o.label),
-    sous: o.sous == null ? undefined : texteTraduit(o.sous),
-    groupe: o.groupe == null ? undefined : texteTraduit(o.groupe),
+  const [ouvert, setOuvert] = useState(false);
+  // Un menu fermé n'affiche qu'un choix. Les catalogues de milliers de clubs
+  // ne sont traduits et préparés qu'à l'ouverture, sans retirer aucune option.
+  const options = useMemo(() => ouvert ? optionsSource.map(traduireOption) : [],
   // La traduction lit la langue globale ; cette dépendance actualise les libellés.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  })), [optionsSource, langue]);
-  const [ouvert, setOuvert] = useState(false);
+  [optionsSource, langue, ouvert]);
+  const selection = useMemo(() => {
+    const source = optionsSource.find(o => o.valeur === valeur);
+    return source ? traduireOption(source) : undefined;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [optionsSource, valeur, langue]);
   const [filtre, setFiltre] = useState('');
   const [survol, setSurvol] = useState(0);
   const [position, setPosition] = useState<Position | null>(null);
@@ -93,23 +107,17 @@ export function Selecteur({
   const autoId = useId();
   const listeId = id ?? autoId;
 
-  const avecRecherche = recherche ?? options.length > 10;
-  const selection = options.find((o) => o.valeur === valeur);
+  const avecRecherche = recherche ?? optionsSource.length > 10;
+
+  // La saisie relit les mêmes noms : les accents ne se normalisent qu'une fois
+  // par liste ouverte (et à nouveau si ses options ou sa traduction changent).
+  const recherches = useMemo(() => options.map(o => normaliserRecherche(`${o.label} ${o.sous ?? ''} ${o.recherche ?? ''}`)), [options]);
 
   const filtrees = useMemo(() => {
     if (!filtre.trim()) return options;
-    const q = filtre
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[̀-ͯ]/g, '');
-    return options.filter((o) =>
-      `${o.label} ${o.sous ?? ''} ${o.recherche ?? ''}`
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[̀-ͯ]/g, '')
-        .includes(q),
-    );
-  }, [options, filtre]);
+    const q = normaliserRecherche(filtre);
+    return options.filter((_o, i) => recherches[i].includes(q));
+  }, [options, recherches, filtre]);
 
   /**
    * Aligne le menu sur son déclencheur, en coordonnées de fenêtre.

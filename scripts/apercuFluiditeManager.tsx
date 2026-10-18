@@ -13,9 +13,12 @@ useGame.getState().creerManager({ nom: 'Coach Fluidité', nation: 'France', club
 useGame.setState({ iaActivee: false });
 let clic = 0;
 let rendus = 0;
+const mesures: { duree: number; reponse: number }[] = [];
+Object.assign(window, { __fluiditeManager: { mesures, useGame } });
 document.addEventListener('click', () => { clic = performance.now(); }, true);
 createRoot(document.getElementById('root')!).render(
   <Profiler id="manager" onRender={(_id, _phase, duree) => {
+    mesures.push({ duree, reponse: clic ? performance.now() - clic : 0 });
     const mesure = document.getElementById('mesures')!;
     mesure.textContent = `Aperçu sans sauvegarde · rendu ${++rendus} : ${duree.toFixed(0)} ms${clic ? ` · réponse au clic : ${(performance.now() - clic).toFixed(0)} ms` : ''}`;
     mesure.style.cssText = 'padding:8px;background:#14261c;color:white;position:relative;z-index:100';

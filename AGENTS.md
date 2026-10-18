@@ -91,6 +91,17 @@ puis à la racine. Le jeu ne lit que `public/m3d/` (**85 `.glb`, 114 Mo**).
 
 ## Architecture
 
+### Fluidité des contrôles partagés
+
+`Selecteur.tsx` ne traduit et ne prépare les listes complètes que si elles sont ouvertes : fermé, seul le choix
+actuel est traduit. Toutes les options restent accessibles, avec groupes, recherche sans accents et clavier ;
+la langue et les options invalident les préparations. Les index de recherche ne vivent que pour cette liste.
+`i18n.ts` réutilise un `Intl.NumberFormat` et un `Intl.PluralRules` par langue, sans mémoriser les valeurs affichées.
+Le rapport d'adjoint du bureau est mémorisé selon manager, état avancé, effectif, affiche et onglet.
+Bancs : `npm run verify:optimisation`, `npm run verify:optimisation:navigateur` ; aperçus sans sauvegarde
+`/scripts/apercuOptimisation.html` et `/scripts/apercuFluiditeManager.html`. Les profils et captures du nouveau
+banc sont temporaires, supprimés après fermeture ; `DESTINY_GARDER_CAPTURES=1` les conserve pour inspection.
+
 ### Pyramide publique et classement mondial
 
 - `lib/ligue/pyramidePublique.ts` distingue niveau D1–D10 et numéro de poule. Sans `publique.poule`, l’ancien
