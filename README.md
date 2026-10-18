@@ -1,5 +1,11 @@
 # Destiny Rugby 🏉
 
+- **Publicités « Ta carte » FR / EN** : deux montages verticaux de 25 s, 1080 × 1920 à 60 images/s,
+  avec les vraies cartes, pochettes et modèles 3D, le parcours de correction, musique et bruitages.
+  Les propositions restent soumises à vérification. Les exports sont sans voix off, avec textes et repères prêts
+  à doubler : [vidéos et pistes](trailer/cartes-tiktok-2026-10-18/LISEZ-MOI.md).
+  Régénération : `node scripts/creerPublicitesCartes.cjs` ; contrôle : `node scripts/verifierPublicitesCartes.cjs`.
+
 - **Montées en Nationale 2 et Fédérales 1 et 2** : l'accession suit les résultats des phases finales du socle 2025/26.
   Les huit quart-finalistes de Fédérale 2 montent en Fédérale 1 ; les quatre demi-finalistes de Fédérale 1 montent
   en Nationale 2 ; les deux finalistes de Nationale 2 montent en Nationale, même celui qui perd la finale.

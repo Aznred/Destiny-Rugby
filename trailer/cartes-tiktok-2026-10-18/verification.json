@@ -1,0 +1,33 @@
+{
+  "medias": [
+    {
+      "langue": "fr",
+      "largeur": 1080,
+      "hauteur": 1920,
+      "fps": 60,
+      "duree": 25,
+      "images": 1500,
+      "imagesDistinctes": 1500,
+      "creteAudioDb": -1.3,
+      "octets": 13503853,
+      "voixOff": false
+    },
+    {
+      "langue": "en",
+      "largeur": 1080,
+      "hauteur": 1920,
+      "fps": 60,
+      "duree": 25,
+      "images": 1500,
+      "imagesDistinctes": 1500,
+      "creteAudioDb": -1.3,
+      "octets": 13689939,
+      "voixOff": false
+    }
+  ],
+  "navigateur": [
+    1920,
+    390
+  ],
+  "exceptions": []
+}

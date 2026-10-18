@@ -91,6 +91,17 @@ puis à la racine. Le jeu ne lit que `public/m3d/` (**85 `.glb`, 114 Mo**).
 
 ## Architecture
 
+### Publicités des cartes
+
+`scripts/creerPublicitesCartes.cjs` produit la campagne FR/EN de 25 s en 1080 × 1920 à 60 images/s,
+dans `trailer/cartes-tiktok-2026-10-18/`. `scripts/campagneCartes/` sépare structure commune,
+captures, montage et composition musicale originale ; `apercuCampagneCartes.tsx` utilise les composants et le
+catalogue réels, en mode mixte adulte. Les lectures de demandes sont simulées et tous les POST refusés.
+Les corrections sont des propositions à vérifier. Le formulaire conserve ses vrais libellés, y compris en anglais.
+Les exports sont sans voix off, avec sous-titres, textes et repères à doubler. Aucun crédit ElevenLabs n'est consommé.
+Les profils, images intermédiaires et polices de travail restent temporaires et sont supprimés dans un `finally`.
+Contrôle média et lecture sur ordinateur/mobile : `node scripts/verifierPublicitesCartes.cjs` (aperçu sur 5188).
+
 ### Fluidité des contrôles partagés
 
 `Selecteur.tsx` ne traduit et ne prépare les listes complètes que si elles sont ouvertes : fermé, seul le choix

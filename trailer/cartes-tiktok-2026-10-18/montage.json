@@ -1,0 +1,146 @@
+{
+  "largeur": 1080,
+  "hauteur": 1920,
+  "fps": 60,
+  "duree": 25,
+  "voixOff": false,
+  "motif": "À doubler : choix explicite du demandeur après vérification du quota ElevenLabs.",
+  "scenes": [
+    {
+      "nom": "mystere",
+      "debut": 0,
+      "fin": 1.2,
+      "type": "pack",
+      "titre": "hook"
+    },
+    {
+      "nom": "revelation",
+      "debut": 1.2,
+      "fin": 3,
+      "type": "carte",
+      "i": 0,
+      "titre": "hook",
+      "revelation": true
+    },
+    {
+      "nom": "clubs",
+      "debut": 3,
+      "fin": 4.2,
+      "type": "carte",
+      "i": 3,
+      "titre": "decouverte"
+    },
+    {
+      "nom": "joueuses",
+      "debut": 4.2,
+      "fin": 5.4,
+      "type": "carte",
+      "i": 1,
+      "titre": "joueuses"
+    },
+    {
+      "nom": "amateurs",
+      "debut": 5.4,
+      "fin": 6.8,
+      "type": "duo",
+      "indices": [
+        4,
+        5
+      ],
+      "titre": "amateurs"
+    },
+    {
+      "nom": "terrain",
+      "debut": 6.8,
+      "fin": 8,
+      "type": "match",
+      "titre": "decouverte"
+    },
+    {
+      "nom": "profil",
+      "debut": 8,
+      "fin": 9.2,
+      "type": "carte",
+      "i": 0,
+      "titre": "profil"
+    },
+    {
+      "nom": "parametres",
+      "debut": 9.2,
+      "fin": 10.6,
+      "type": "ecran",
+      "image": "parametres",
+      "titre": "reglages"
+    },
+    {
+      "nom": "menu",
+      "debut": 10.6,
+      "fin": 12,
+      "type": "ecran",
+      "image": "menu",
+      "titre": "menu"
+    },
+    {
+      "nom": "champs",
+      "debut": 12,
+      "fin": 13.5,
+      "type": "ecran",
+      "image": "champs",
+      "titre": "champs"
+    },
+    {
+      "nom": "photo",
+      "debut": 13.5,
+      "fin": 15,
+      "type": "ecran",
+      "image": "photo",
+      "titre": "photo"
+    },
+    {
+      "nom": "recherche",
+      "debut": 15,
+      "fin": 16.5,
+      "type": "ecran",
+      "image": "recherche",
+      "titre": "recherche"
+    },
+    {
+      "nom": "ta-carte",
+      "debut": 16.5,
+      "fin": 18,
+      "type": "carte",
+      "i": 5,
+      "titre": "recherche",
+      "revelation": true
+    },
+    {
+      "nom": "collection",
+      "debut": 18,
+      "fin": 19.5,
+      "type": "collection",
+      "titre": "collection"
+    },
+    {
+      "nom": "equipe",
+      "debut": 19.5,
+      "fin": 21,
+      "type": "match",
+      "titre": "collection"
+    },
+    {
+      "nom": "signature",
+      "debut": 21,
+      "fin": 23,
+      "type": "final",
+      "titre": "final"
+    },
+    {
+      "nom": "adresse",
+      "debut": 23,
+      "fin": 25,
+      "type": "final",
+      "titre": "final",
+      "adresse": true
+    }
+  ]
+}

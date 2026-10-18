@@ -1,0 +1,45 @@
+[
+  {
+    "nom": "Antoine DUPONT",
+    "club": "Stade Toulousain",
+    "championnat": "Top 14",
+    "photo": "/photos/antoine_dupont.webp",
+    "sourceId": "reel:antoine dupont"
+  },
+  {
+    "nom": "Gabrielle VERNIER",
+    "club": "Gloucester-Hartpury",
+    "championnat": "Premiership Women's Rugby",
+    "genre": "female",
+    "photo": "/photos/feminines/pwr/gloucester-hartpury/gabrielle-vernier.webp",
+    "sourceId": "feminin:gloucester hartpury:gabrielle vernier"
+  },
+  {
+    "nom": "Thomas RAMOS",
+    "club": "Stade Toulousain",
+    "championnat": "Top 14",
+    "photo": "/photos/thomas_ramos.webp",
+    "sourceId": "reel:thomas ramos"
+  },
+  {
+    "nom": "Adrian MITU",
+    "club": "Soyaux-Angoulême XV",
+    "championnat": "Pro D2",
+    "photo": "/photos/adrian_mitu.webp",
+    "sourceId": "reel:adrian mitu"
+  },
+  {
+    "nom": "Aboubacar YAMBA",
+    "club": "Rugby Club Mediterranee Palavas",
+    "championnat": "Fédérale 1",
+    "photo": "/photos/ffr/rugby-club-mediterranee-palavas/Aboubacar%20YAMBA.webp",
+    "sourceId": "reel:aboubacar yamba"
+  },
+  {
+    "nom": "Anthony RODRIGUES",
+    "club": "US Baumoise",
+    "championnat": "Régionale 3",
+    "photo": "/photos/ffr/us-baumoise/978752_anthony_rodrigues.webp",
+    "sourceId": "reel:anthony rodrigues"
+  }
+]

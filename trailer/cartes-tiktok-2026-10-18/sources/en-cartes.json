@@ -1,0 +1,44 @@
+[
+  {
+    "nom": "Marcus SMITH",
+    "club": "Harlequins",
+    "championnat": "Gallagher Premiership",
+    "photo": "/photos/new%20maj/marcus_smith.jpg",
+    "sourceId": "reel:marcus smith"
+  },
+  {
+    "nom": "Ellie KILDUNNE",
+    "club": "Bristol Bears Women",
+    "championnat": "Premiership Women's Rugby",
+    "genre": "female",
+    "photo": "/photos/feminines/pwr/bristol-bears/ellie-kildunne.webp",
+    "sourceId": "feminin:bristol bears women:ellie kildunne"
+  },
+  {
+    "nom": "Cheslin KOLBE",
+    "club": "Tokyo Sungoliath",
+    "championnat": "Japan Rugby League One : D1",
+    "photo": "/photos/monde/jpn_cheslin_kolbe.webp",
+    "sourceId": "reel:cheslin kolbe"
+  },
+  {
+    "nom": "Ben MURPHY",
+    "club": "Doncaster Knights",
+    "championnat": "RFU Championship",
+    "sourceId": "import:ben-murphy:doncaster-knights"
+  },
+  {
+    "nom": "Aaron WAINWRIGHT",
+    "club": "Dragons RFC",
+    "championnat": "United Rugby Championship",
+    "photo": "/photos/new%20maj/urc_aaron_wainwright.webp",
+    "sourceId": "reel:aaron wainwright"
+  },
+  {
+    "nom": "Anthony RODRIGUES",
+    "club": "US Baumoise",
+    "championnat": "Régionale 3",
+    "photo": "/photos/ffr/us-baumoise/978752_anthony_rodrigues.webp",
+    "sourceId": "reel:anthony rodrigues"
+  }
+]
