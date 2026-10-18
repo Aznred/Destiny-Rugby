@@ -18,6 +18,7 @@ import type { Pion } from './entites.js';
 import type { StatsDirectes } from './direct.js';
 import type { AttributId, Joueur, PosteId, StatVariable } from '../../types.js';
 import { POSTE_PAR_ID } from '../../data/rugby.js';
+import { coutFormeMatch } from '../formeCarriere.js';
 
 // ⚠️ TROIS POINTS PAR SAISON, PAS PLUS. C'est ~+0,4 de générale par saison, soit
 // environ +4 sur une carrière de douze saisons : de quoi sentir qu'un grand
@@ -330,7 +331,7 @@ export function retourDeMatch(
 
   const deltas: Partial<Record<StatVariable, number>> = {
     // Un match, ça coûte. Plus on joue, plus on est cuit.
-    forme: -Math.round(3 + s.minutes / 14),
+    forme: -coutFormeMatch(s.minutes, j.difficulteCarriere),
     moral: Math.round(ecart * 1.8),
     reputation: note >= 8.2 ? 2 : note >= 7 ? 1 : note <= 4 ? -1 : 0,
   };

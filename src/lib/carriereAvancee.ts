@@ -40,6 +40,7 @@ import { forceDuGroupe, ouvrirNegociationManager, salairesEffectif } from './rec
 import { pseudoStable } from './comptes.js';
 import { centreMedical, niveauMedical, normaliserSoin, dateMedicale, evoluerSoin, choisirReprise, autorisationMedicale, risqueReprise } from './infirmerieManager.js';
 import { accepterProlongation } from './conseilManager.js';
+import { coutFormeMatch, recuperationConditionManager } from './formeCarriere.js';
 import { dossierMedicalOuvert, horsDEtatDeJouer, MATCHS_AVANT_DE_SE_PLAINDRE, tempsDeJeuReclamable } from './tempsDeJeuManager.js';
 
 const borne = (n: number) => Math.max(0, Math.min(100, Math.round(n)));
@@ -1009,9 +1010,11 @@ function traiterMedicalApresMatch(a: EtatCarriereAvancee, m: Manager, effectif: 
       titularisations: lignes[index].titularisations + (joue && m.composition.titulaires.includes(j.id) ? 1 : 0),
       empeches: (lignes[index].empeches ?? Math.max(0, lignes[index].possibles - lignes[index].disponibles)) + (empeche ? 1 : 0),
     };
+    const intensite = m.tactique.rythme === 'intense' ? 1.25 : m.tactique.rythme === 'gestion' ? .82 : 1;
+    const cout = coutFormeMatch(minutes, m.difficulteCarriere, intensite);
     profilsMedicaux[j.id] = { ...profil, disponibilites: lignes,
-      fatigue: borne(profil.fatigue + (joue ? (m.composition.titulaires.includes(j.id) ? 15 : 8) : -7)),
-      condition: borne(profil.condition + (joue ? -3 : 2)), rythme: borne(profil.rythme + (joue ? 5 : -1)) };
+      fatigue: borne(profil.fatigue + cout / 2),
+      condition: borne(profil.condition - cout), rythme: borne(profil.rythme + (joue ? 5 : -1)) };
   }
 
   const actifs = new Set(medical.filter((d) => d.phase !== 'clos').map((d) => d.joueurId));
@@ -1163,9 +1166,10 @@ export function avancerSemaineCarriereAvancee(m: Manager, effectif: Coequipier[]
         semainesBlessees: lignes[index].semainesBlessees + 1,
         joursBlesse: lignes[index].joursBlesse + Math.min(joursAvances, (avantMedical.find(d => d.joueurId === j.id)?.joursRestants ?? 0) / centreMedical(m).vitesse) };
     }
+    const recuperation = recuperationConditionManager(charge, a.chargeEntrainement.recuperation, m.difficulteCarriere) * joursAvances / 7;
     profilsMedicaux[j.id] = { ...profil, disponibilites: lignes,
-      fatigue: borne(profil.fatigue + charge * 1.7 - a.chargeEntrainement.recuperation * 4),
-      condition: borne(profil.condition + (charge <= 5 ? 2 : charge >= 9 ? -2 : 1)), rythme: borne(profil.rythme + 1) };
+      fatigue: borne(profil.fatigue - recuperation * .8 + Math.max(0, charge - 7)),
+      condition: borne(profil.condition + recuperation), rythme: borne(profil.rythme + 1) };
   }
   // Une blessure passée laisse enfin une trace durable : récidive et séquelle
   // influenceront les saisons suivantes et la visite médicale d'un contrat.

@@ -1,5 +1,14 @@
 # Destiny Rugby 🏉
 
+- **Gestion de la forme en carrière** : Facile, Moyen (défaut) ou Difficile dès la création et dans Paramètres,
+  pour les carrières joueur et entraîneur. Les minutes réellement jouées et l'intensité règlent l'effort ;
+  la récupération tient compte de la charge d'entraînement. La condition pèse aussi dans les matchs délégués.
+  Changer de niveau conserve la forme et les blessures actuelles.
+- **Forme en ligue en ligne** : un match de 80 minutes coûte 24 points de fatigue, contre 32 auparavant.
+  Le rattrapage d'une absence alterne les matchs et les jours de repos dans l'ordre chronologique ;
+  la feuille gelée fait autorité, même si la composition a changé. Le barème est commun à tous les clubs.
+  Contrôles : `npm run verify:forme-carriere`, `npm run verify:forme-carriere:navigateur` (port local 5188).
+
 - **Règlements des carrières** : promus de Pro D2 en Challenge Cup après rechargement ; reversés de Champions Cup
   à l'extérieur en huitièmes, puis réception selon leur rang initial. Barrages et qualifications directes distincts
   en Nationale 2 et Fédérales, formats régionaux adaptés aux poules, sans perte de qualifiés dans un tableau incomplet.

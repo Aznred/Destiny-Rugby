@@ -5,9 +5,8 @@
  * joueurs réservés au banc par le médecin, condition physique, consignes de l'entraîneur, enjeu de l'affiche.
  *
  * ⚠️ LA CONDITION LUE ICI EST CELLE QUE L'ÉCRAN AFFICHE (`etatsPhysiquesManager`, passé à la composition) : l'adjoint
- * ne décide pas sur un chiffre que l'entraîneur ne voit pas. C'est `ProfilMedicalJoueur.condition` (−3 par match
- * joué, +2 par semaine sans surcharge), pas `fatigue`, qui sert au risque de blessure et sature à 100 chez tout
- * titulaire régulier : s'en servir ferait tourner l'effectif entier une semaine sur deux.
+ * ne décide pas sur un chiffre que l'entraîneur ne voit pas. `ProfilMedicalJoueur.condition` suit les minutes jouées,
+ * l'intensité, le niveau de gestion choisi et le repos ; `fatigue` reste la charge médicale cumulée.
  */
 import type { CompositionManager, Manager } from '../types.js';
 import type { Coequipier } from './effectif.js';
@@ -17,7 +16,7 @@ import { autorisationMedicale } from './infirmerieManager.js';
 import { nombreJournees } from './championnat.js';
 import { forceDuGroupe } from './recrutementManager.js';
 import {
-  composerParLAdjoint, importanceDeLAffiche,
+  composerParLAdjoint, facteurPhysique, importanceDeLAffiche,
   type EtatPhysiqueAdjoint, type ImportanceMatch, type RapportAdjoint,
 } from './adjointComposition.js';
 import type { AfficheComplete } from './matchLive.js';
@@ -40,6 +39,12 @@ export function etatsPhysiquesManager(
       ...(penalites[d.joueurId] ? { penalite: penalites[d.joueurId] } : {}) });
   }
   return etats;
+}
+
+/** Même condition pour le rapport de l'adjoint, le match joué et l'avance déléguée. */
+export function penalitesConditionManager(avancee: EtatCarriereAvancee | undefined, effectif: readonly Coequipier[]): Record<string, number> {
+  const etats = etatsPhysiquesManager(avancee, effectif);
+  return Object.fromEntries(effectif.map(j => [j.id, Math.round(j.note * (1 - facteurPhysique(etats.get(j.id)?.fraicheur ?? 100)))]));
 }
 
 /** L'enjeu de l'affiche pour ce club : couperet, finale, adversaire nettement plus fort ou plus faible, fin de saison. */

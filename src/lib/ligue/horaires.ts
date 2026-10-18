@@ -38,7 +38,7 @@ export function recuperationFatigueSelonRythme(rythme: number): number {
 /**
  * Récupération passive par jour de repos entre les matchs.
  * À un rythme hebdomadaire (rythme 1), les joueurs regagnent ~5 points de fatigue
- * par jour de repos (~35 points sur 7 jours, effaçant les 32 points d'un match de 80 min).
+ * par jour de repos (~35 points sur 7 jours, effaçant les 24 points d'un match de 80 min).
  * Plus le rythme de la ligue est accéléré, plus la récupération par jour augmente.
  */
 export function recuperationFatigueParJour(rythme: number): number {
@@ -46,4 +46,9 @@ export function recuperationFatigueParJour(rythme: number): number {
   const joursParMatch = Math.max(1, 7 / cadence);
   const total = recuperationFatigueSelonRythme(cadence);
   return Math.max(5, Math.round(total / joursParMatch));
+}
+
+/** Barème commun aux ligues privées et publiques : 24 points pour 80 minutes. */
+export function coutFatigueMatchEnLigne(minutes: number): number {
+  return Number.isFinite(minutes) ? Math.round(Math.max(0, Math.min(120, minutes)) * .3) : 0;
 }

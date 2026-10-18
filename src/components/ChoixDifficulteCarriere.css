@@ -1,0 +1,11 @@
+.choix-difficulte-carriere { min-width:0; margin:1.4rem 0; padding:0; border:0; }
+.choix-difficulte-carriere legend { color:var(--craie); font-weight:700; margin-bottom:.65rem; }
+.difficulte-carriere-options { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.55rem; }
+.difficulte-carriere-options label { position:relative; display:flex; flex-direction:column; gap:.35rem; margin:0; padding:.9rem; min-height:76px; border:1px solid var(--bordure); border-radius:8px; background:rgba(0,0,0,.15); cursor:pointer; }
+.difficulte-carriere-options label.actif { border-color:var(--or); background:rgba(205,166,83,.12); }
+.difficulte-carriere-options label.actif b { color:var(--or); }
+.difficulte-carriere-options label:hover { border-color:var(--or); }
+.difficulte-carriere-options input { position:absolute; opacity:0; width:1px; height:1px; }
+.difficulte-carriere-options label:has(input:focus-visible) { outline:2px solid var(--or); outline-offset:3px; }
+.difficulte-carriere-options span,.choix-difficulte-carriere .aide { font-size:.82rem; color:var(--craie-dim); line-height:1.45; }
+@media(max-width:560px) { .difficulte-carriere-options { grid-template-columns:1fr; } .difficulte-carriere-options label { min-height:44px; padding:.7rem .9rem; } }

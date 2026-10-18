@@ -404,6 +404,29 @@ Banc du mode : `npm run verify:carriere` (208 contrôles, ~3 min).
 
 ## Les deux carrières
 
+### Gestion physique
+
+`lib/formeCarriere.ts` porte les niveaux **Facile / Moyen / Difficile**. Le choix est proposé dans les créations
+joueur (nouveau ou existant) et entraîneur, puis dans Paramètres (`ChoixDifficulteCarriere`). Il est persisté dans
+le store et copié sur le joueur/manager ; une sauvegarde sans niveau utilise Moyen. Changer le niveau conserve
+forme, profils médicaux et blessures. Les notes de base, la progression et les adversaires gardent leur barème.
+
+Pour 80 minutes au rythme normal : coût de condition **10 / 18 / 24**, récupération hebdomadaire de base
+**12 / 10 / 8**. L'entraîneur paie les minutes réelles, prolongation comprise, avec le rythme tactique ;
+un banc inutilisé ne paie rien. La charge d'entraînement et le repos modulent la récupération. La condition affichée
+est celle du rapport de l'adjoint, des pénalités de performance du match joué et de l'avance déléguée ; elle initialise
+aussi l'endurance de tous les joueurs du groupe, pas seulement ceux ayant un dossier médical ouvert.
+La carrière joueur partage le coût par minute entre match regardé et estimé ; l'effort précède la récupération
+de la semaine, sans double débit d'un match déjà regardé. Âge, endurance et traits modulent le retour au repos.
+
+En ligue privée/publique : **24 points de fatigue pour 80 minutes**, récupération quotidienne selon la cadence.
+`horaires.ts` est l'unique barème, réexporté par `carriere.ts`. `avancerInterne` parcourt les rencontres par date
+et intercale la récupération avant/après leurs feuilles gelées, puis jusqu'à l'heure courante. L'ancre quotidienne
+ne recule jamais lors d'un rattrapage. Une feuille existante prime sur la composition actuelle, y compris pour un
+joueur à zéro minute. Les matchs et blessures enregistrés ne sont pas réinitialisés.
+Contrôles : `npm run verify:forme-carriere`, `scripts/verifierFormeNavigateur.cjs`,
+`scripts/verifierRecuperationPassiveEtFiltres.ts`, `npm run verify:correctif41`.
+
 ### Joueur
 
 1. On tape une action en français dans `Carriere.tsx` (ou on clique une suggestion).
@@ -2289,10 +2312,9 @@ Cette section couvre les points 33 à 46 et le point 15 ; l'atelier de combinais
   « pour faire souffler X », jeune lancé, consigne, couverture du banc, dépannage hors poste) et ceux qu'on s'attendait à
   voir (repos avec leur condition, indisponible, consigne, devancé par Y). ⚠️ L'écran ne décide de rien : il affiche
   `rapportAdjointManager`, la fonction que lit la composition déléguée. C'est aussi le moyen de repérer une décision absurde.
-- ⚠️ **LA CONDITION LUE EST CELLE QUE L'ÉCRAN AFFICHE** : `ProfilMedicalJoueur.condition` (−3 par match joué, +2 par
-  semaine sans surcharge), posée sur chaque joueur de la composition (`etatsPhysiquesManager`). PAS `fatigue`, qui sert au
-  risque de blessure et monte à 100 chez tout titulaire régulier en six matchs (+15 par titularisation, −1 par semaine) :
-  s'en servir ferait tourner l'effectif entier une semaine sur deux.
+- ⚠️ **LA CONDITION LUE EST CELLE QUE L'ÉCRAN AFFICHE** : `ProfilMedicalJoueur.condition`, réglée par les minutes,
+  le niveau de gestion, l'intensité et le repos (`formeCarriere.ts`), puis posée sur chaque joueur de la composition
+  (`etatsPhysiquesManager`). `fatigue` porte la charge médicale cumulée et reste distincte du rendement immédiat.
 - **Branchements** : « Meilleure équipe » et le bouton du terrain appellent l'adjoint ; « Compositions » déléguée
   (`semaineManager`) refait la feuille chaque semaine pour l'affiche qui arrive ; la feuille d'un banc qu'on prend
   (`feuilleDeDepart`) est celle de l'adjoint. `meilleureCompositionManager` a disparu (un seul algorithme).

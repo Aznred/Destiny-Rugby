@@ -11,6 +11,7 @@ import { Blason } from '../components/Blason';
 import { Icone } from '../components/Icone';
 import { LogoCompet } from '../components/LogoCompet';
 import { ChoixDureeMatch } from '../components/ChoixDureeMatch';
+import { ChoixDifficulteCarriere } from '../components/ChoixDifficulteCarriere';
 import { LIMITES } from '../lib/classementMondial';
 import {
   MARGE_AMBITION, PRESTIGE_DEBUT, clubsAccessibles, etageAccessible,
@@ -256,6 +257,7 @@ export function CreationManager() {
         )}
 
         <ChoixDureeMatch />
+        <ChoixDifficulteCarriere />
         <div className="actions">
           <button className="btn primaire grand" onClick={valider} disabled={!choisi} data-tuto="cm-valider">
             <><Icone nom={libre ? 'etoile' : 'signature'} taille={19} /> {libre ? t('mgr.creation.prendreLibre') : t('mgr.signer')}</>

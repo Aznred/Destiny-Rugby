@@ -15,7 +15,8 @@ import { POSTE_PAR_ID } from '../../data/rugby.js';
 import type { CompositionManager } from '../../types.js';
 import { compositionManagerParDefaut, EFFECTIF_MINIMUM, POSTES_BANC_MANAGER, POSTES_XV_MANAGER, reconcilerCompositionManager } from '../compositionManager.js';
 import { affichesToutesRondes } from './calendrier.js';
-import { horairesChampionnat } from './horaires.js';
+import { coutFatigueMatchEnLigne, horairesChampionnat, recuperationFatigueParJour } from './horaires.js';
+export { recuperationFatigueParJour, recuperationFatigueSelonRythme } from './horaires.js';
 import { graine as hasard, tirerPondere } from './aleatoire.js';
 import { actualiserAncienPackBronze, packsCatalogueAdmin, bandesGaranties, carteDepuisSource, catalogueMondialCarriere, coequipierDepuisCarte, dotationBronzeCarriere, emblemeValide, logoCompetitionValide, nomTrophee, PACKS_CARRIERE, RARETES_CARRIERE, rayonDePack, tirerDuRayon, tropheeValide, vivierRestant } from './catalogueCarriere.js';
 import { actualiserCahierMatchEnLigne, avancerMatchEnLigne, commanderMatchEnLigne, conclureMatchEnLigne, creerMatchEnLigne, DUREE_REELLE, dureeMatchEnLigne, forceFeuille, MARGE_AUTORITE, STRATEGIE_EN_LIGNE_DEFAUT, strategieValide, resumeMatchEnLigne, vueMatchEnLigne } from './matchCarriere.js';
@@ -38,29 +39,6 @@ export const packsActifsLigue = (etat: EtatCarriereEnLigne): string[] | undefine
   etat.publique ? [...PACKS_DIVISION_PUBLIQUE]
     : etat.packsActifs && (etat.playerPool ?? 'men') !== 'men' ? [...etat.packsActifs, ...etat.packs.filter(p => p.id.startsWith('womens:')).map(p => p.id)]
     : etat.packsActifs;
-
-/**
- * Une saison accélérée ne doit pas transformer chaque match en dette physique.
- * La base reste exigeante à un rendez-vous hebdomadaire ; chaque cran de rythme
- * rend trois points de fatigue supplémentaires entre deux rencontres.
- */
-export function recuperationFatigueSelonRythme(rythme: number): number {
-  const cadence = Math.max(1, Math.min(7, Math.round(rythme)));
-  return 22 + (cadence - 1) * 3;
-}
-
-/**
- * Récupération passive par jour de repos entre les matchs.
- * À un rythme hebdomadaire (rythme 1), les joueurs regagnent ~5 points de fatigue
- * par jour de repos (~35 points sur 7 jours, effaçant les 32 points d'un match de 80 min).
- * Plus le rythme de la ligue est accéléré, plus la récupération par jour augmente.
- */
-export function recuperationFatigueParJour(rythme: number): number {
-  const cadence = Math.max(1, Math.min(7, Math.round(rythme)));
-  const joursParMatch = Math.max(1, 7 / cadence);
-  const total = recuperationFatigueSelonRythme(cadence);
-  return Math.max(5, Math.round(total / joursParMatch));
-}
 
 /** Les indisponibilités suivent le temps de la ligue, pas le calendrier réel. */
 export function dureeBlessureSelonRythme(jours: number, rythme: number): number {
@@ -281,7 +259,7 @@ function attribuerPacksQuotidiens(etat: EtatCarriereEnLigne, maintenant: number)
  *
  * Entre deux matchs, les joueurs se reposent et régénèrent passivement leur
  * condition physique chaque jour (date serveur). Un match plein (80 min)
- * engendre ~32 points de fatigue ; au rythme hebdomadaire de base (rythme 1),
+ * engendre 24 points de fatigue ; au rythme hebdomadaire de base (rythme 1),
  * un joueur au repos récupère ~5 points de fatigue par jour de repos (~35 points
  * sur la semaine, soit un retour complet à 100% de fraîcheur avant le match
  * suivant). Les rythmes accélérés augmentent proportionnellement ce gain quotidien.
@@ -297,10 +275,12 @@ export function recupererFatiguePassivement(etat: EtatCarriereEnLigne, maintenan
 
   const dernierMs = Date.parse(etat.dernierJourRecuperation + 'T00:00:00Z');
   const aujourdhuiMs = Date.parse(jour + 'T00:00:00Z');
-  if (Number.isNaN(dernierMs) || Number.isNaN(aujourdhuiMs) || aujourdhuiMs <= dernierMs) {
+  if (Number.isNaN(dernierMs) || Number.isNaN(aujourdhuiMs)) {
     etat.dernierJourRecuperation = jour;
     return;
   }
+  // Un rattrapage historique ne remet jamais l'ancre de récupération dans le passé.
+  if (aujourdhuiMs <= dernierMs) return;
 
   const joursEcoules = Math.max(1, Math.min(30, Math.round((aujourdhuiMs - dernierMs) / JOUR)));
   const gainParJour = recuperationFatigueParJour(etat.rythme);
@@ -1415,10 +1395,10 @@ function enregistrerResultat(etat: EtatCarriereEnLigne, r: RencontreCarriere, ma
       // Léger décrassage post-match (la récupération principale s'opère passivement jour après jour entre les rencontres via recupererFatiguePassivement).
       c.fatigue = Math.max(0, c.fatigue - 2);
       const ligne = minutes.get(c.id);
-      if (!ligne && !titulaires.has(c.id)) continue;
-      const jouees = ligne?.minutes ?? 80;
+      const jouees = m.feuille ? ligne?.minutes ?? 0 : titulaires.has(c.id) ? 80 : 0;
+      if (jouees <= 0) continue;
       c.matchs++; c.essais += ligne?.essais ?? 0;
-      c.fatigue = Math.min(100, c.fatigue + Math.round(jouees * 0.4));
+      c.fatigue = Math.min(100, c.fatigue + coutFatigueMatchEnLigne(jouees));
       if (rng() < .018 * (jouees / 80)) {
         const jours = 3 + Math.floor(rng() * 6);
         c.blesseJusqua = dateServeur(maintenant + dureeBlessureSelonRythme(jours, etat.rythme));
@@ -1545,12 +1525,18 @@ function avancerInterne(etat: EtatCarriereEnLigne, maintenant: number, graine: s
   }
   completerPacks(etat);
   attribuerPacksQuotidiens(etat, maintenant);
-  recupererFatiguePassivement(etat, maintenant);
   renouvelerObjectifs(etat, maintenant);
   // La récupération est attachée aux dates des rencontres, pas au nombre d'actualisations.
-  for (const c of etat.cartes) if (c.blesseJusqua && Date.parse(c.blesseJusqua) <= maintenant) delete c.blesseJusqua;
-  for (const r of etat.rencontres) {
+  const dateEffort = (r: RencontreCarriere) => r.match
+    ? Math.min(maintenant, r.match.debut + dureeMatchEnLigne(r.match)) : Date.parse(r.ferme) + DUREE_REELLE;
+  // Une absence de plusieurs jours rejoue efforts ET repos dans l'ordre des dates.
+  // L'ordre stocké des rencontres et les feuilles déjà gelées restent intacts.
+  for (const r of [...etat.rencontres].sort((a, b) => dateEffort(a) - dateEffort(b))) {
     if (r.resultat) continue;
+    if (!r.match && Date.parse(r.ferme) > maintenant) continue;
+    const instantDebut = Math.min(maintenant, r.match?.debut ?? Date.parse(r.ferme));
+    recupererFatiguePassivement(etat, instantDebut);
+    for (const c of etat.cartes) if (c.blesseJusqua && Date.parse(c.blesseJusqua) <= instantDebut) delete c.blesseJusqua;
     // ⚠️ LA FENÊTRE FERMÉE JOUE LE MATCH, MÊME SI PERSONNE N'EST VENU. C'est
     // l'invariant du mode : « un match ne doit jamais bloquer toute la ligue ».
     // Les compositions et les consignes enregistrées entraînent les deux
@@ -1565,9 +1551,13 @@ function avancerInterne(etat: EtatCarriereEnLigne, maintenant: number, graine: s
         ? conclureMatchEnLigne(r.match)
         : avancerMatchEnLigne(r.match, maintenant);
     }
-    enregistrerResultat(etat, r, maintenant, graine);
+    const instantEffort = Math.min(maintenant, dateEffort(r));
+    if (r.match?.termine) recupererFatiguePassivement(etat, instantEffort);
+    enregistrerResultat(etat, r, instantEffort, graine);
     if (r.resultat) renouvelerObjectifs(etat, maintenant);
   }
+  recupererFatiguePassivement(etat, maintenant);
+  for (const c of etat.cartes) if (c.blesseJusqua && Date.parse(c.blesseJusqua) <= maintenant) delete c.blesseJusqua;
   expirerMarche(etat, maintenant); avancerCompetitions(etat, maintenant);
 }
 

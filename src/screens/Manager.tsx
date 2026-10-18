@@ -50,7 +50,7 @@ import {
 import { libelleAfficheManager, type AfficheComplete } from '../lib/matchLive';
 import { RapportAdjoint } from '../components/RapportAdjoint';
 import { GestionContrats } from '../components/GestionContrats';
-import { compositionDeLAdjoint, etatsPhysiquesManager, rapportAdjointManager } from '../lib/adjointManager';
+import { compositionDeLAdjoint, etatsPhysiquesManager, penalitesConditionManager, rapportAdjointManager } from '../lib/adjointManager';
 import { departActe } from '../lib/contratsAutomatiques';
 import { afficheSure, contratsExpirants, diagnostiquerCloture, estSemaineDeCloture, prolongationsAcceptees, type VerrouCloture } from '../lib/clotureSaison';
 import { VerrousSaison } from '../components/VerrousSaison';
@@ -330,9 +330,10 @@ function BureauManager({ manager }: { manager: NonNullable<ReturnType<typeof use
   }, [afficheMemo, manager?.club, catalogue]);
   const penalitesNote = useMemo(() => {
     const medicales = penalitesMedicales(avancee ?? undefined);
+    const physiques = penalitesConditionManager(avancee ?? undefined, effectifBrut);
     const capitanat = ajustementsCapitaines(avancee?.profonde, effectifBrut);
-    return Object.fromEntries([...new Set([...Object.keys(medicales), ...Object.keys(capitanat)])]
-      .map((id) => [id, (medicales[id] ?? 0) + (capitanat[id] ?? 0) - (derbyMemo?.motivation ?? 0)]));
+    return Object.fromEntries([...new Set([...Object.keys(medicales), ...Object.keys(physiques), ...Object.keys(capitanat)])]
+      .map((id) => [id, (medicales[id] ?? 0) + (physiques[id] ?? 0) + (capitanat[id] ?? 0) - (derbyMemo?.motivation ?? 0)]));
   }, [avancee, derbyMemo?.motivation, effectifBrut]);
   const effectifComplet = useMemo(
     () => effectifBrut
@@ -1845,7 +1846,7 @@ function BureauManager({ manager }: { manager: NonNullable<ReturnType<typeof use
               indisponibles,
               penalitesNote,
               risquesBlessure: risquesBlessureMatch,
-              conditions: Object.fromEntries(dossiersMedicaux.map(d => [d.joueurId, d.condition ?? 70])),
+              conditions: Object.fromEntries([...etatsPhysiquesManager(avancee ?? undefined, effectifBrut)].map(([id, etat]) => [id, etat.fraicheur ?? 100])),
             }}
             onTermine={({ scoreA, scoreB, essaisA, essaisB, blessures, minutesJouees }) => {
               const domicile = matchOuvert.match.domicile === manager.club;

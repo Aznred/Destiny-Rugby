@@ -135,6 +135,7 @@ export interface ResponsabilitesJoueur {
 }
 
 export interface Joueur {
+  difficulteCarriere?: import('./lib/formeCarriere').DifficulteCarriere;
   /**
    * Carrière de JOUEUSE : elle se joue dans le monde du rugby féminin (`lib/mondeActif.ts`). Absent : carrière masculine.
    * ⚠️ Posé à la création, jamais modifié : c'est lui qui dit quel monde charger pour cette sauvegarde.
@@ -1158,6 +1159,7 @@ export interface ReponseJeuneManager {
 export type ActionAcademieManager = 'u18' | 'espoirs' | 'pret' | 'senior' | 'liberer' | 'entrainement_senior';
 
 export interface Manager {
+  difficulteCarriere?: import('./lib/formeCarriere').DifficulteCarriere;
   /** Ce que l'entraîneur impose à son adjoint quand celui-ci compose (`lib/adjointComposition.ts`). Absent : aucune consigne. */
   consignesAdjoint?: import('./lib/adjointComposition').ConsignesAdjoint;
   /** La politique que l'assistant sportif applique aux contrats (`lib/contratsAutomatiques.ts`). Absente : celle par défaut. */

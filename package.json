@@ -25,6 +25,8 @@
     "verify:voix": "vite-node scripts/verifierVoix.ts",
     "verify:chrono-mises-en-place": "vite-node scripts/verifierChronoMisesEnPlace.ts",
     "verify:duree-match": "vite-node scripts/verifierDureeMatchSolo.ts",
+    "verify:forme-carriere": "vite-node scripts/verifierFormeCarriere.ts",
+    "verify:forme-carriere:navigateur": "node scripts/verifierFormeNavigateur.cjs",
     "verify:duree-match:navigateur": "node scripts/verifierDureeMatchNavigateur.cjs",
     "pub:presentation": "node scripts/creerPublicitePresentation.cjs",
     "dev": "vite",

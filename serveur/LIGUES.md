@@ -937,6 +937,14 @@ fatigue augmente avec le rythme (22 à 40 points entre deux rencontres) et la
 durée réelle des blessures est divisée par la cadence : accélérer une saison ne
 condamne donc pas un joueur à manquer artificiellement sept fois plus de matchs.
 
+Le coût d'effort est de **0,3 point par minute réellement jouée**, soit 24 pour 80 minutes
+(`horaires.ts`, barème unique pour toutes les ligues). La récupération quotidienne garde un minimum de cinq points.
+Le rattrapage parcourt les rencontres par date et intercale les jours de repos ; une longue absence ne cumule donc
+pas tous les efforts après un unique crédit de récupération. L'ancre quotidienne ne recule pas lorsqu'un événement
+ancien est relu. Une feuille gelée présente interdit de déduire des minutes de la composition actuelle ; zéro minute
+ne crédite ni match joué, ni fatigue. Les résultats déjà enregistrés restent intacts.
+Contrôles : `npm run verify:forme-carriere`, `scripts/verifierRecuperationPassiveEtFiltres.ts`.
+
 > ⚠️ **Ce que les rappels sont, et ce qu'ils ne sont pas.** Ce sont des
 > notifications de NAVIGATEUR, déclenchées par l'onglet ouvert : une journée qui
 > s'ouvre, un match qui commence, le tien qui se termine. Elles ne réveillent

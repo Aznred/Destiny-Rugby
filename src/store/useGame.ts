@@ -74,6 +74,7 @@ import {
 import { CALENDRIER as SEMAINES } from '../data/calendrier';
 import { appliquerCompte, ecrireCompte } from '../lib/sauvegardes';
 import { DUREE_MI_TEMPS_SOLO_DEFAUT, normaliserDureeMiTempsSolo, type DureeMiTempsSolo } from '../lib/dureeMatchSolo';
+import { BAREMES_FORME, coutFormeMatch, DIFFICULTE_CARRIERE_DEFAUT, normaliserDifficulteCarriere, type DifficulteCarriere } from '../lib/formeCarriere';
 import {
   chargerAncienneCollectionSolo, normaliserCollectionSolo,
   type EtatCollectionSolo, type ResultatPackSolo,
@@ -222,7 +223,7 @@ import { nouerRelations, bonusVestiaire, meriteLeBrassard } from '../lib/vestiai
 import { evaluerResponsabilites, ligneDeJournal, responsabilitesInitiales } from '../lib/responsabilites';
 import { compositionMedicale, niveauMedical, CENTRES_MEDICAUX, evoluerSoin, dateMedicale } from '../lib/infirmerieManager';
 import { suivreConseil, bilanContrat, offreDeSecours } from '../lib/conseilManager';
-import { compositionDeLAdjoint } from '../lib/adjointManager';
+import { compositionDeLAdjoint, penalitesConditionManager } from '../lib/adjointManager';
 import {
   politiqueContrats, reglerLesContrats, type OptionsContrats, type PolitiqueContrats, type ResultatContrat,
 } from '../lib/contratsAutomatiques';
@@ -567,16 +568,8 @@ function motifFinParDefaut(joueur: Joueur): MotifFinCarriere {
 // ~30 semaines de match d'une saison de Top 14, ça fait −300 pour +90 : le
 // joueur touchait le fond avant Noël, et n'en ressortait plus.
 //
-// ⚠️ CE N'EST PAS UN BONUS FIXE, C'EST UNE CONVERGENCE, et c'est ce qui rend le
-// réglage stable. Le corps revient vers une CONDITION DE BASE, d'autant plus
-// vite qu'il en est loin — comme dans la réalité. Un bonus fixe aurait le même
-// défaut que l'ancien système, à l'envers : trop petit il ne change rien, trop
-// grand tout le monde reste à 100 et la forme cesse de vouloir dire quelque
-// chose. Ici, l'équilibre se cale tout seul :
-//
-//   · joueur qui enchaîne les matchs ....... plafonne vers « base − 20 »
-//   · joueur qui ne joue pas ............... remonte à sa condition de base
-//   · vétéran de 35 ans .................... base plus basse, donc plus fragile
+// Le niveau de gestion règle effort et récupération. Le retour au repos est
+// plafonné selon l'âge et l'endurance ; les traits gardent leur effet.
 //
 /** La condition de base d'un joueur : là où son corps revient au repos. */
 export function conditionDeBase(j: Joueur): number {
@@ -593,16 +586,16 @@ export function recuperationHebdo(j: Joueur): number {
   // ⚠️ Un joueur à l'infirmerie ne « récupère » pas sa condition de match : il
   // soigne une blessure. On vise plus bas, sinon on revenait de six semaines
   // d'arrêt plus frais qu'en sortant d'un week-end de repos.
-  const cible = conditionDeBase(j) - (j.blessure && j.blessure.semaines > 0 ? 18 : 0);
+  const cible = Math.min(98, conditionDeBase(j) + 22) - (j.blessure && j.blessure.semaines > 0 ? 18 : 0);
   // ⚠️ LE TRAIT DE CARACTÈRE ENTRE ENFIN ICI, et c'était un bug muet.
   // `formeParSemaine` était calculé par `effetsTraits()` et **lu nulle part** :
   // « Professionnel » promettait de mieux récupérer et ne récupérait rien de
   // plus, « Fêtard » promettait de le payer physiquement et ne payait rien.
   // Deux traits sur douze annonçaient un effet inexistant — c'est exactement le
   // genre de promesse qui rend un choix de création sans conséquence.
-  return Math.max(0, Math.round(
-    (cible - j.forme) * 0.45 + 4 + effetsTraits(j.traits).formeParSemaine,
-  ));
+  const gain = BAREMES_FORME[normaliserDifficulteCarriere(j.difficulteCarriere)].recuperation
+    + (conditionDeBase(j) - 72) * .15 + effetsTraits(j.traits).formeParSemaine;
+  return Math.max(0, Math.min(Math.round(gain), Math.round(cible - j.forme)));
 }
 
 // ---------------------------------------------------------------------------
@@ -948,6 +941,7 @@ interface GameState {
   theme: Theme;
   /** Temps de jeu par mi-temps, propre à cette sauvegarde de carrière solo. */
   dureeMiTempsSolo: DureeMiTempsSolo;
+  difficulteCarriere: DifficulteCarriere;
   // La langue de TOUT : l'interface (data/textes.ts) et le contenu écrit par
   // l'IA (consigneDeLangue, ajoutée à chaque prompt).
   langue: Langue;
@@ -1162,6 +1156,7 @@ interface GameState {
   };
   setTheme: (t: Theme) => void;
   setDureeMiTempsSolo: (minutes: number) => void;
+  setDifficulteCarriere: (niveau: DifficulteCarriere) => void;
   setLangue: (l: Langue) => void;
   appliquerLangueAutomatique: (l: Langue) => void;
   entrainer: (attribut: keyof Attributs) => void;
@@ -1398,7 +1393,9 @@ function resultatDelegue(avant: Manager, affiche: AfficheComplete): ResultatMatc
     const meilleurs = [...liste].sort((a, b) => b.note - a.note).slice(0, 23);
     return meilleurs.reduce((n, j) => n + j.note, 0) / Math.max(1, meilleurs.length);
   };
-  const bonus = moyenne(groupe.filter((j) => !absents.has(j.id))) - moyenne(groupe);
+  const physiques = penalitesConditionManager(avant.avancee, groupe);
+  const fatigueXV = avant.composition.titulaires.reduce((n, id) => n + (physiques[id] ?? 0), 0) / Math.max(1, avant.composition.titulaires.length);
+  const bonus = moyenne(groupe.filter((j) => !absents.has(j.id))) - moyenne(groupe) - fatigueXV;
   const match = jouerRencontre(domicile, exterieur, avant.saison, affiche.cle, { club: avant.club, bonus });
   const chezMoi = domicile === avant.club;
   return {
@@ -1597,6 +1594,7 @@ export const useGame = create<GameState>()(
       dossiersRecrutement: {},
       theme: 'vert',
       dureeMiTempsSolo: DUREE_MI_TEMPS_SOLO_DEFAUT,
+      difficulteCarriere: DIFFICULTE_CARRIERE_DEFAUT,
       langue: langueDuNavigateur(LANGUE_DE_REPLI),
       langueManuelle: false,
       mouvementsClubs: {}, arriveesClubs: {},
@@ -1721,6 +1719,7 @@ export const useGame = create<GameState>()(
         // sous un identifiant technique que rien ne rattachait à lui.
         const nomChoisi = input.nom.trim() || nomAleatoirePourNation(input.nation);
         const joueur: Joueur = {
+          difficulteCarriere: get().difficulteCarriere,
           ...(MONDE_FEMININ ? { genre: 'F' as const } : {}),
           usageId: crypto.randomUUID(), usageDebut: new Date().toISOString().slice(0, 10),
           // ⚠️ PLUS DE « Anonyme ». Un champ laissé vide donne désormais un nom
@@ -1806,7 +1805,7 @@ export const useGame = create<GameState>()(
         // ⚠️ LE MONDE PERD SON DOUBLE AVANT TOUTE LECTURE D'EFFECTIF : les rôles et l'apport du joueur se calculent
         // sur son club tel qu'il sera joué — sans lui, puisque c'est lui qui joue (voir `lib/joueurIncarne.ts`).
         setJoueurIncarne(fiche.nomIncarne);
-        const base = fiche.joueur;
+        const base = { ...fiche.joueur, difficulteCarriere: get().difficulteCarriere };
         const avecRoles: Joueur = { ...base, responsabilites: responsabilitesDeDepart(base, forceEffectif(base.club, base.saison)) };
         // ⚠️ SON APPORT AU CLUB DÈS LA PREMIÈRE SAISON. Une carrière ordinaire commence à zéro (un débutant ne pèse
         // pas encore sur son club) ; ici le joueur est retiré de l'effectif, donc le club doit déjà compter sur lui.
@@ -2703,6 +2702,12 @@ export const useGame = create<GameState>()(
         set({ theme });
       },
       setDureeMiTempsSolo: (minutes) => set({ dureeMiTempsSolo: normaliserDureeMiTempsSolo(minutes) }),
+      setDifficulteCarriere: (niveau) => set(s => {
+        const difficulteCarriere = normaliserDifficulteCarriere(niveau);
+        return { difficulteCarriere,
+          joueur: s.joueur ? { ...s.joueur, difficulteCarriere } : null,
+          manager: s.manager ? { ...s.manager, difficulteCarriere } : null };
+      }),
 
       // ---- ENTRAÎNEMENT DE LA SEMAINE ----
       // Une séance ciblée par semaine : c'est le seul levier direct du joueur
@@ -2876,22 +2881,19 @@ export const useGame = create<GameState>()(
         // résumés contradictoires — une feuille de match à 32 minutes suivie de
         // « tu n'es pas retenu dans le groupe ».
         const matchDejaVecu = get().matchRegarde === `${joueur.saison}#${numero}`;
-        // ⚠️ LA SEMAINE COMMENCE PAR LA RÉCUPÉRATION, ET ELLE EST LA MÊME POUR
-        // LES DEUX CHEMINS. Elle est appliquée ici, en un seul endroit, qu'on
-        // ait regardé le match (la fatigue a déjà été payée par
-        // `enregistrerMatchVecu`) ou non : c'est le seul moyen d'avoir un
-        // barème de forme unique. Voir `recuperationHebdo`.
-        const recuperation = recuperationHebdo(joueur);
+        // L'effort précède la récupération, qu'il ait été joué ou délégué.
+        // Un match regardé l'a déjà payé ; il ne faut jamais le débiter deux fois.
+        let j = appliquerDeltas(joueur, matchDejaVecu ? {} : resultat.deltas);
+        const recuperation = recuperationHebdo(j);
         // ⚠️ `moralParSemaine` SOUFFRAIT DU MÊME BUG QUE `formeParSemaine` : il
         // était cumulé par `effetsTraits()` et jamais lu. Quatre traits sur
         // douze — Fêtard, Leader naturel, Ambitieux, Fidèle au maillot —
         // annonçaient un effet sur le moral qui n'existait pas. Il s'applique
         // désormais chaque semaine, comme la récupération physique.
-        let j = appliquerDeltas(joueur, {
+        j = appliquerDeltas(j, {
           forme: recuperation,
           moral: effetsTraits(joueur.traits).moralParSemaine,
         });
-        j = appliquerDeltas(j, matchDejaVecu ? {} : resultat.deltas);
 
         // Suivi de l'infirmerie : on décompte, ou on encaisse une nouvelle blessure.
         if (resultat.soinBlessure && j.blessure) {
@@ -4006,6 +4008,7 @@ export const useGame = create<GameState>()(
         const objectif = objectifDuBoard(club, comp, 1);
         const budgets = budgetsDuClub(club, 1);
         const manager: Manager = {
+          difficulteCarriere: get().difficulteCarriere,
           usageId: crypto.randomUUID(), usageDebut: new Date().toISOString().slice(0, 10),
           // ⚠️ MÊME RÈGLE QUE POUR UN JOUEUR, et pour la même raison : l’écran
           // de création PROMET « laissé vide, un nom de ta nation est tiré ».
@@ -8224,6 +8227,7 @@ export const useGame = create<GameState>()(
         dossiersRecrutement: s.dossiersRecrutement,
         theme: s.theme,
         dureeMiTempsSolo: s.dureeMiTempsSolo,
+        difficulteCarriere: s.difficulteCarriere,
         langue: s.langue,
         langueManuelle: s.langueManuelle,
         mouvementsClubs: s.mouvementsClubs,
@@ -8270,6 +8274,7 @@ export const useGame = create<GameState>()(
         ...(persiste as Partial<GameState>),
         arriveesClubs: reconstituerArriveesClubs((persiste ?? courant) as Partial<GameState>),
         dureeMiTempsSolo: normaliserDureeMiTempsSolo((persiste as Partial<GameState> | null)?.dureeMiTempsSolo),
+        difficulteCarriere: normaliserDifficulteCarriere((persiste as Partial<GameState> | null)?.difficulteCarriere),
       }) as GameState,
     },
   ),
@@ -8679,7 +8684,7 @@ function jouerMatch(j: Joueur, intensite: number, role?: 'titulaire' | 'remplaca
     )) * 10,
   ) / 10;
 
-  const fatigue = -Math.round(minutes / 12);
+  const fatigue = -coutFormeMatch(minutes, j.difficulteCarriere);
   const deltas: Partial<Record<StatVariable, number>> = {
     forme: fatigue,
     moral: note >= 7 ? 4 : note >= 5 ? 1 : -3,
