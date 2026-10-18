@@ -44,7 +44,7 @@ export function ApercuRetours() {
     <div className="carte bloc-competition" style={{ padding: '1rem', margin: '1rem 0' }}>
       <TableauClassement lignes={cl.map((l, i) => ({ ...l, cle: l.club, nom: l.club, position: i + 1, statut: statuts[i] }))}/>
       <RegleAccession division={division} />
-      {['fed1','fed2'].includes(division) && <p data-promus={qualifiesPourAccession(rulesFor(division), tournoi?.matchs ?? []).length}>
+      {['nationale2','fed1','fed2'].includes(division) && <p data-promus={qualifiesPourAccession(rulesFor(division), tournoi?.matchs ?? []).length}>
         Accession acquise : {qualifiesPourAccession(rulesFor(division), tournoi?.matchs ?? []).join(', ') || 'aucun club avant les résultats qualificatifs'}
       </p>}
     </div>

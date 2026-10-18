@@ -5,10 +5,10 @@
 //
 // Ce que ce banc tient :
 //   1. chaque division déclare ses quatre blocs (qualification aux finales, montée, relégation, tableau) ;
-//   2. les places de poule restent acquises hors Fédérales 1/2, dont les qualifications sportives décident ;
+//   2. les places de poule restent acquises hors Nationale 2 et Fédérales 1/2, dont les qualifications sportives décident ;
 //   3. ce qu'un étage promeut, celui du dessus le relègue : aucune division ne change de taille, sur trois saisons ;
 //   4. les Régionales s'échangent par LIGUE : autant de descentes que de montées dans chaque ligue régionale ;
-//   5. les phases finales donnent les montées de Fédérales 1/2, mais pas celles des Régionales ;
+//   5. les phases finales donnent les montées de Nationale 2 et Fédérales 1/2, mais pas celles des Régionales ;
 //   6. vu d'un club (carrière d'entraîneur), TOUTE sa division bouge, pas seulement sa poule ;
 //   7. le classement affiché dit vrai : ce qui est « montée » monte, ce qui est « relégation » descend.
 //
@@ -93,7 +93,7 @@ function verifierUneSaison(saison: number) {
       const statuts = statutsDeLaPoule(bas, n, p.classement.length);
       egal(statuts.filter((s) => s === 'PROMOTION' || s === 'PROMOTION_FINALS').length, places.promotion, `S${saison} ${bas} poule ${n + 1} : autant de places « montée » affichées que de places sûres`);
       p.classement.forEach((l, r) => {
-        if (parTableau) return; // Le classement ne promet aucune montée en Fédérales 1 et 2.
+        if (parTableau) return; // Le classement ne promet aucune montée en Nationale 2 et Fédérales 1 et 2.
         if (r < places.promotion) ok(promus.has(l.club), `S${saison} ${bas} poule ${n + 1} : ${l.club}, place de montée, monte`);
         else if (r >= places.promotion + places.promotionPossible) ok(!promus.has(l.club), `S${saison} ${bas} poule ${n + 1} : ${l.club} (${r + 1}e) ne monte pas`);
       });

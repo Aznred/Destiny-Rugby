@@ -72,7 +72,8 @@ export interface PoolQualification {
 // montée, comme si toute la pyramide dépendait du champion unique du tableau final ».
 //
 // Chaque division distingue les places gagnées au classement et celles gagnées dans le tableau : en Fédérale 2,
-// les quart-finalistes montent ; en Fédérale 1, les demi-finalistes. Les Régionales gardent leurs places par poule.
+// les quart-finalistes montent ; en Fédérale 1, les demi-finalistes ; en Nationale 2, les deux finalistes.
+// Les Régionales gardent leurs places par poule.
 
 /** Qui dispute le tableau final, distinct des conditions d'accession (`ChampionshipBracket`). */
 export interface QualificationToFinals {
@@ -114,12 +115,12 @@ export interface RelegationRules {
 export interface ChampionshipBracket {
   promotionImpact: 'decides' | 'tiebreak' | 'none' | 'qualification';
   /** L'accession est acquise en atteignant ce tour, même si le club y perd ensuite. */
-  tourAccession?: 'quart' | 'demie';
+  tourAccession?: 'quart' | 'demie' | 'finale';
 }
 
 export function placesAccessionParTableau(rules: CompetitionRules): number {
   return rules.championshipBracket.promotionImpact === 'qualification'
-    ? rules.championshipBracket.tourAccession === 'quart' ? 8 : rules.championshipBracket.tourAccession === 'demie' ? 4 : 0
+    ? rules.championshipBracket.tourAccession === 'quart' ? 8 : rules.championshipBracket.tourAccession === 'demie' ? 4 : rules.championshipBracket.tourAccession === 'finale' ? 2 : 0
     : 0;
 }
 
@@ -191,8 +192,6 @@ const UN_DIRECT = { directRelegation: 1, accessMatchPositions: [] };
 
 /** Poule unique : le champion monte, le finaliste joue l'accès. C'est le tableau final qui donne la place. */
 const MONTEE_DU_CHAMPION: ReglesSportives = { promotion: { promotionSlots: 1 }, bracket: 'decides' };
-/** Division à poules : le premier de CHAQUE poule monte. Le tableau final ne désigne que le champion. */
-const MONTEE_PAR_POULE: ReglesSportives = { promotion: { promotionSlots: 1 }, bracket: 'none' };
 /** Le premier de chaque poule monte, et les meilleurs deuxièmes prennent les places que l'étage du dessus libère en plus. */
 const MONTEE_ET_MEILLEURS_DEUXIEMES: ReglesSportives = { promotion: { promotionSlots: 1, bestRunnersUp: true }, bracket: 'tiebreak' };
 /** Régionale : le premier de chaque poule monte, à l'intérieur de sa ligue régionale. */
@@ -217,7 +216,7 @@ const TABLE: Record<string, CompetitionRules> = Object.fromEntries([
   division('top14', UN_PLUS_ACCES),
   division('prod2', UN_PLUS_ACCES, MONTEE_DU_CHAMPION),
   division('nationale', DEUX_DIRECTS, MONTEE_DU_CHAMPION),
-  division('nationale2', DEUX_DIRECTS, { ...MONTEE_PAR_POULE, finals: { perPool: 2, playoffsPerPool: 4 } }),
+  division('nationale2', DEUX_DIRECTS, { bracket: 'qualification', tourAccession: 'finale', finals: { perPool: 2, playoffsPerPool: 4 } }),
   division('fed1', DEUX_DIRECTS, { bracket: 'qualification', tourAccession: 'demie', finals: { perPool: 2, playoffsPerPool: 4 } }),
   division('fed2', DEUX_DIRECTS, { bracket: 'qualification', tourAccession: 'quart', finals: { perPool: 2, playoffsPerPool: 4 } }),
   // FFR : trois qualifiés directs, puis un barrage entre les quatrième et cinquième en Fédérale 3.

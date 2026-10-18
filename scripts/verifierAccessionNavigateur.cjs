@@ -12,7 +12,7 @@ const { ouvrirNavigateur, attendre } = require('./outilsNavigateur.cjs');
   try {
     for (const [largeur,hauteur] of [[1920,1080],[390,844]]) {
       await p.dimensions(largeur,hauteur);
-      for (const [division,nombre] of [['fed2',8],['fed1',4]]) {
+      for (const [division,nombre] of [['fed2',8],['fed1',4],['nationale2',2]]) {
         await p.ouvrir(`http://127.0.0.1:5188/scripts/apercuRetoursReglements.html?division=${division}`);
         await p.jusqua(`Boolean(document.querySelector('[data-promus="0"]'))`);
         assert.equal(await p.evaluer(`document.querySelectorAll('.clt-rang[data-statut^="PROMOTION"]').length`), 0);

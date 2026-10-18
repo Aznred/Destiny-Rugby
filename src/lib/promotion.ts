@@ -10,7 +10,7 @@
 //      règlement de la division (`competitionRules.ts`) : un en Top 14, deux en
 //      Fédérale ;
 //   ⬆️ AUTANT de clubs montent de la division du dessous. Fédérale 2 : les
-//      quart-finalistes ; Fédérale 1 : les demi-finalistes. En POULE UNIQUE : son
+//      quart-finalistes ; Fédérale 1 : les demi-finalistes ; Nationale 2 : les deux finalistes. En POULE UNIQUE : son
 //      champion, puis son finaliste, puis le classement. Dans les AUTRES DIVISIONS À
 //      POULES (Correctif 39) : les places de CHAQUE poule, gagnées au classement
 //      — le tableau final ne désigne que le champion (`echangeFrontiere`) ;
@@ -154,7 +154,7 @@ export function phaseFinaleDe(
 //   • RÉGIONALES (`territory: 'ligue'`) : l'échange se fait à l'intérieur de chaque ligue régionale. Les premiers des
 //     poules d'Occitanie montent, et ce sont des clubs d'Occitanie qui descendent à leur place. Une ligue qui n'a
 //     personne en dessous ne relègue personne.
-//   • FÉDÉRALES 1 ET 2 : le tour d'accession déclaré dans le règlement décide ; aucune place n'est acquise en poule.
+//   • NATIONALE 2 ET FÉDÉRALES 1 ET 2 : le tour d'accession déclaré dans le règlement décide ; aucune place n'est acquise en poule.
 
 /** Un club dans le classement final de sa poule, avec ce qu'il faut pour le comparer aux autres poules. */
 interface Classe {
@@ -322,7 +322,7 @@ function echangeAPlaces(haut: string, bas: string, saison: number): MouvementClu
   ];
 }
 
-/** Fédérales : la qualification sportive donne la place ; le premier de poule n'a aucune priorité. */
+/** Nationale 2 et Fédérales : la qualification sportive donne la place ; le premier de poule n'a aucune priorité. */
 function echangeParPhaseFinale(haut: string, bas: string, saison: number): MouvementClub[] {
   const regles = rulesFor(bas);
   const tournoi = tournoiContextuel(bas, saison);

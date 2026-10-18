@@ -1,8 +1,9 @@
 # Destiny Rugby 🏉
 
-- **Montées en Fédérales 1 et 2** : l'accession suit les résultats des phases finales du socle 2025/26.
+- **Montées en Nationale 2 et Fédérales 1 et 2** : l'accession suit les résultats des phases finales du socle 2025/26.
   Les huit quart-finalistes de Fédérale 2 montent en Fédérale 1 ; les quatre demi-finalistes de Fédérale 1 montent
-  en Nationale 2. Aucun premier de poule n'est promu automatiquement. Le bureau, le calendrier et le classement
+  en Nationale 2 ; les deux finalistes de Nationale 2 montent en Nationale, même celui qui perd la finale.
+  Aucun premier de poule n'est promu automatiquement dans ces trois divisions. Le bureau, le calendrier et le classement
   expliquent cette condition. Les anciens résultats et les tailles des divisions sont conservés ; les tours restent
   à match unique. Sources et limites : [règlements des carrières](sources/REGLEMENTS-CARRIERES.md).
   Contrôles : `npm run verify:accession-federale`, `npm run verify:montees`,

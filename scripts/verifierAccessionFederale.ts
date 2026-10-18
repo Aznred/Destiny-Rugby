@@ -8,7 +8,7 @@ import { echangeFrontiere, oublierResultats, statutsDeLaPoule, placesDeLaPoule, 
 import { setMouvementsClubs } from '../src/lib/divisions';
 
 setMouvementsClubs({}); setContexteJoueur('', 0); effacerResultatsJoues(); oublierResultats();
-for (const [division, haut, tour, nombre] of [['fed2','fed1','quart',8],['fed1','nationale2','demie',4]] as const) {
+for (const [division, haut, tour, nombre] of [['fed2','fed1','quart',8],['fed1','nationale2','demie',4],['nationale2','nationale','finale',2]] as const) {
   const regles = rulesFor(division);
   assert.equal(placesAccessionParTableau(regles), nombre);
   assert.equal(regles.championshipBracket.tourAccession, tour);
@@ -64,6 +64,12 @@ const avant = preparerElimination('A', 'B', 'temoin-accession', 'huitieme', 'Té
 assert.deepEqual(qualifiesPourAccession(rulesFor('fed2'), [avant]), []);
 const gagne = { ...avant, status:'completed' as const, vainqueur:'B', perdant:'A', scoreD:10, scoreE:20 };
 assert.deepEqual(qualifiesPourAccession(rulesFor('fed2'), [gagne]), ['B']);
+const demie = preparerElimination('C', 'D', 'temoin-accession-n2', 'demie', 'Demi-finale', 50);
+assert.deepEqual(qualifiesPourAccession(rulesFor('nationale2'), [demie]), []);
+const finaliste = { ...demie, status:'completed' as const, vainqueur:'D', perdant:'C', scoreD:10, scoreE:20 };
+assert.deepEqual(qualifiesPourAccession(rulesFor('nationale2'), [finaliste]), ['D'], 'Le vainqueur de demi-finale monte sans attendre l’autre demi-finale.');
+const finale = preparerElimination('D', 'E', 'temoin-finale-n2', 'finale', 'Finale', 51);
+assert.deepEqual(new Set(qualifiesPourAccession(rulesFor('nationale2'), [finale])), new Set(['D','E']), 'Les deux finalistes montent avant de jouer le titre.');
 // Un ancien tableau plus petit garde son parcours et ne crée aucun club supplémentaire.
 const ancien = preparerElimination('A', 'B', 'ancien-accession', 'demie', 'Ancienne demi-finale', 50);
 assert.deepEqual(qualifiesPourAccession(rulesFor('fed2'), [ancien]), ['A','B']);
