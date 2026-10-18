@@ -9,14 +9,15 @@ import { clubsDeDivision } from './divisions.js';
 /** Commande de simulation du week-end. Les générateurs restent entièrement en lecture seule. */
 export function jouerAutresPhasesFinales(saison: number, semaine: number, clubProtege: string, bonus = 0): Record<string, MatchChampionnat> {
   const resultats: Record<string, MatchChampionnat> = {};
-  if (semaine < 46) return resultats;
+  // Un tableau régional de 128 places peut commencer avant les tableaux fédéraux.
+  if (semaine < 44) return resultats;
   const phases = () => COMPETITIONS.flatMap(comp => {
     const ancre = clubsDeDivision(comp.id).includes(clubProtege) ? clubProtege : '';
     const tournoi = tournoiDeFinDAnnee(comp.id, saison, comp.nom, ancre, ancre ? bonus : 0);
     return tournoi ? tournoi.matchs : phaseFinale(comp.id, saison, ancre, ancre ? bonus : 0).matchs;
   });
   // Rattrapage des seules dates déjà atteintes ; un match du club humain bloque son tour jusqu'à sa sirène.
-  for (let garde = 0; garde < 6; garde++) {
+  for (let garde = 0; garde < 8; garde++) {
     let joues = 0;
     for (const m of phases()) {
       if (m.status !== 'scheduled' || m.semaine > semaine || resultatJoue(m.cle)

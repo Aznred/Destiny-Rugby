@@ -73,8 +73,8 @@ for (const division of ['reg3', 'reg2', 'reg1', 'fed3', 'fed2', 'fed1', 'nationa
   if (tournoi) {
     eg(new Set(tournoi.qualifies.map(q => q.qualificationId)).size, tournoi.qualifies.length, 'Identités uniques même avec les mêmes places de poule');
     ok(tournoi.qualifies.every(q => q.poule < poulesDe(division).length && q.rang > 0 && q.seed), 'Origine et classement conservés');
-    eg(matchs.length, tournoi.qualifies.length / 2, 'Premier tour complet');
-    const club = tournoi.qualifies[0].club;
+    eg(matchs.length, tournoi.barragistes?.length ? tournoi.barragistes.length / 2 : tournoi.qualifies.length - 2 ** Math.floor(Math.log2(tournoi.qualifies.length)), 'Premier tour complet, exemptions respectées');
+    const club = matchs[0].domicile;
     eg(journeesALaSemaine(division, matchs[0].semaine, nombreJournees(division, club)), nombreJournees(division, club), 'Toutes les journées régulières précèdent le premier tour');
     ok(!estJourneeDe(division, CALENDRIER[matchs[0].semaine - 1]), 'Aucun conflit entre journée régulière et tour éliminatoire');
     const c = { club, division, saison: 1, semaine: matchs[0].semaine - 1, resultats: {} };
@@ -118,7 +118,8 @@ console.log('Vérification du parcours entraîneur…');
 effacerResultatsJoues(); oublierResultats();
 const division = 'fed3';
 const comp = COMPETITIONS.find(c => c.id === division)!;
-const club = tournoiDeFinDAnnee(division, 1, comp.nom)!.qualifies[0].club;
+// Un barragiste dispute le tour préliminaire puis tous les tours du tableau.
+const club = tournoiDeFinDAnnee(division, 1, comp.nom)!.matchs[0].domicile;
 useGame.getState().creerManager({ nom: 'Banc 36', club, nation: 'France', age: 40, libre: true });
 const initial = tournoiDeFinDAnnee(division, 1, comp.nom, club)!;
 let joues = 0;
@@ -135,7 +136,7 @@ for (let semaine = initial.matchs[0].semaine; semaine <= semaineElimination(2); 
   useGame.getState().semaineManager();
   eg(useGame.getState().manager!.semaine, semaine + 1, 'La semaine avance après son match');
 }
-eg(joues, Math.log2(initial.qualifies.length), 'Le club joue tous ses tours');
+eg(joues, 1 + Math.ceil(Math.log2(initial.tailleTableau!)), 'Le club joue son barrage puis tous ses tours');
 eg(tournoiDeFinDAnnee(division, 1, comp.nom, club)!.champion, club, 'Champion issu de la finale réellement jouée');
 ok(Object.keys(useGame.getState().resultatsPhasesFinales).length, 'Les autres résultats sont persistés');
 const resultatsAvant = JSON.stringify(useGame.getState().resultatsPhasesFinales);
@@ -146,14 +147,15 @@ eg(tournoiDeFinDAnnee(division, 1, comp.nom, club)!.champion, club, 'Même champ
 
 // La carrière joueur partage les mêmes dates et qualifiés avec son apport sportif.
 effacerResultatsJoues(); oublierResultats();
-const contexteJoueur = { club, division, saison: 1, semaine: initial.matchs[0].semaine, resultatsClub: {},
-  age: 25, forme: 90, moral: 80, reputation: 45, apportClub: 4 } as unknown as Joueur;
+const clubJoueur = tournoiDeFinDAnnee(division, 1, comp.nom)!.qualifies.at(-1)!.club;
+const contexteJoueur = { club: clubJoueur, division, saison: 1, semaine: initial.matchs[0].semaine, resultatsClub: {},
+  age: 25, forme: 90, moral: 80, reputation: 45, apportClub: 0 } as unknown as Joueur;
 const bonus = bonusClubDuJoueur(contexteJoueur);
 useGame.setState({ manager: null, joueur: contexteJoueur });
-useGame.getState().simulerAutresPhasesFinales(1, contexteJoueur.semaine!, club);
+useGame.getState().simulerAutresPhasesFinales(1, contexteJoueur.semaine!, clubJoueur);
 const afficheJoueur = afficheDuJoueur(contexteJoueur, bonus);
 ok(afficheJoueur?.cle.startsWith('tournoi#'), 'Le joueur attend son propre premier tour');
-ok(tournoiDeFinDAnnee(division, 1, comp.nom, club, bonus)!.matchs.some(m => m.status === 'scheduled' && [m.domicile, m.exterieur].includes(club)), 'La simulation des partenaires ne joue jamais à sa place');
+ok(tournoiDeFinDAnnee(division, 1, comp.nom, clubJoueur, bonus)!.matchs.some(m => m.status === 'scheduled' && [m.domicile, m.exterieur].includes(clubJoueur)), 'La simulation des partenaires ne joue jamais à sa place');
 
 // Prolongation : offre modifiable, acceptation, nouveau salaire, refus et absence de double signature.
 console.log('Vérification des contrats…');

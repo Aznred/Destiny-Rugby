@@ -16,6 +16,7 @@ import { CALENDRIER, NB_JOURNEES, type Semaine, type TypeSemaine } from '../data
 import { clubParNom } from '../data/clubs.js';
 import { CHAMPIONNATS_FEMININS } from '../data/mondeFeminin.generated.js';
 import { sourcesLocalisationsClubs } from './localisationClub.js';
+import { formatTournoi, rulesFor } from './competitionRules.js';
 
 export interface MatchChampionnat {
   domicile: string;
@@ -133,10 +134,12 @@ export function debutPlayoffsDivision(divisionId: string): number {
   const connu = datesPlayoffs.get(divisionId);
   if (connu?.clubs === clubs) return connu.semaine;
   const poules = poulesDe(divisionId);
+  const format = formatTournoi(rulesFor(divisionId), poules.map(p => p.length));
   let taille = 2;
   const candidats = poules.reduce((n, p) => n + Math.min(2, p.length), 0);
   while (taille * 2 <= candidats && taille < 64) taille *= 2;
-  const semaine = poules.length <= 1 ? barrage : CALENDRIER.find(s => s.tourFinal === 'finale')!.numero - Math.log2(taille) + 1;
+  if (format) taille = Math.max(2, 2 ** Math.ceil(Math.log2(format.principal)));
+  const semaine = poules.length <= 1 ? barrage : CALENDRIER.find(s => s.tourFinal === 'finale')!.numero - Math.log2(taille) + 1 - (format?.barrages ? 1 : 0);
   datesPlayoffs.set(divisionId, { clubs, semaine });
   return semaine;
 }

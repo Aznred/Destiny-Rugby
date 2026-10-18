@@ -23,6 +23,7 @@ import { duel, phaseFinale } from '../src/lib/phaseFinale';
 import { oublierResultats, resoudrePyramide, resoudreSaisonClub, resoudreToutesDivisions, type MouvementClub } from '../src/lib/promotion';
 import { coupeEnDirect, coupesDuClub, coupesDuClubALaDate } from '../src/lib/coupe';
 import { afficheDuClub } from '../src/lib/matchLive';
+import { jouerAutresPhasesFinales } from '../src/lib/phasesFinalesJouees';
 import { departageDuMatch, departager, inscrireIssueJouee } from '../src/lib/couperet';
 import { effectifDuClub } from '../src/lib/effectif';
 import { avancer, creerMatch } from '../src/lib/moteur/moteur';
@@ -93,6 +94,8 @@ egal(equilibre(resoudreToutesDivisions(SAISON).mouvements), [], 'toute la pyrami
   egal(statuts[n - 2], 'ACCESS_MATCH', 'top14 : avant-dernier en orange');
   egal(statuts.slice(0, 6), ['QUALIFIED', 'QUALIFIED', 'PLAYOFF', 'PLAYOFF', 'PLAYOFF', 'PLAYOFF'], 'top14 : deux qualifiés directs, quatre barragistes');
   egal(statuts[6], 'SAFE', 'top14 : le septième est tranquille');
+  // Le prétendant n'existe qu'après la vraie finale de Pro D2.
+  jouerAutresPhasesFinales(SAISON, 51, '');
   const py = resoudrePyramide('top14', SAISON, club);
   ok(py.accesDepuisLeBas && py.accesDepuisLeBas.domicile === phase.barragistes[0], 'top14 : le match d\'accès oppose l\'avant-dernier au prétendant de Pro D2');
   egal(equilibre(py.mouvements), [], 'top14 : mouvements équilibrés');
@@ -212,22 +215,26 @@ egal(standingsStatuses(rulesFor('urc'), 16).some((s) => s === 'DIRECT_RELEGATION
     let garde = 0;
     while (!e.fini && e.t < 78 * 60 && garde++ < 8000) avancer(e, 4);
     e.scoreA = e.scoreB = Math.max(e.scoreA, e.scoreB);
-    const enduranceA80 = e.pions.filter((p) => p.surLeTerrain).reduce((s, p) => s + p.endurance, 0);
     const minutesA80 = Math.max(...e.pions.map((p) => p.minutes));
     const remplacements80 = e.pions.filter((p) => p.remplace).length;
     const periodes = new Set<number>([e.periode]);
-    let enduranceDebutProlongation: number | null = null;
+    let fatigueConservee = false;
     while (!e.fini && garde++ < 20000) {
+      const enduranceAvant = e.pions.map(p => p.endurance);
       avancer(e, 2);
-      if (!periodes.has(e.periode) && e.periode === 3) enduranceDebutProlongation = e.pions.filter((p) => p.surLeTerrain).reduce((s, p) => s + p.endurance, 0);
+      if (!periodes.has(e.periode) && e.periode === 3) {
+        // Même pion juste avant/après la transition, plutôt que deux XV
+        // différents à la 78e et à la 80e (des remplacements restent possibles).
+        fatigueConservee = e.pions.every((p, i) => p.endurance <= enduranceAvant[i] + 1);
+      }
       periodes.add(e.periode);
     }
-    return { e, cle, periodes, enduranceA80, enduranceDebutProlongation, minutesA80, remplacements80 };
+    return { e, cle, periodes, fatigueConservee, minutesA80, remplacements80 };
   };
 
   let prolongations = 0, tirs = 0, auxEssais = 0, enProlongation = 0;
   for (let n = 0; n < 36; n++) {
-    const { e, cle, periodes, enduranceA80, enduranceDebutProlongation, minutesA80, remplacements80 } = jouer(n, true);
+    const { e, cle, periodes, fatigueConservee, minutesA80, remplacements80 } = jouer(n, true);
     ok(e.fini, `couperet ${n} : le match se termine`);
     if (!e.prolongation) { ok(e.scoreA !== e.scoreB, `couperet ${n} : sans prolongation, il y a un vainqueur au score`); continue; }
     prolongations++;
@@ -236,7 +243,7 @@ egal(standingsStatuses(rulesFor('urc'), 16).some((s) => s === 'DIRECT_RELEGATION
     ok(e.issue, `couperet ${n} : une issue est inscrite`);
     ok(e.scoreA !== e.scoreB || e.issue!.critere !== 'prolongation', `couperet ${n} : à égalité, c'est la procédure qui désigne le vainqueur`);
     // Ce n'est pas un nouveau match : la fatigue de la 80e est encore là, les remplacés ne reviennent pas.
-    ok(enduranceDebutProlongation !== null && enduranceDebutProlongation <= enduranceA80 * 1.05 + 1, `couperet ${n} : la fatigue est conservée à la reprise`);
+    ok(fatigueConservee, `couperet ${n} : la fatigue est conservée à la reprise`);
     ok(Math.max(...e.pions.map((p) => p.minutes)) >= minutesA80, `couperet ${n} : le temps de jeu continue de s'accumuler`);
     ok(e.pions.filter((p) => p.remplace).length >= remplacements80 && e.pions.filter((p) => p.remplace).every((p) => !p.surLeTerrain), `couperet ${n} : les remplacés restent remplacés`);
     if (e.issue!.critere === 'tirsAuBut') { tirs++; ok(e.issue!.tirs && e.issue!.tirs[0] !== e.issue!.tirs[1], `couperet ${n} : la séance de tirs au but a un vainqueur`); }

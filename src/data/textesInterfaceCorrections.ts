@@ -2,6 +2,14 @@ import type { Traduction } from '../lib/i18n';
 
 /** Vocabulaire et formulations revus manuellement ; prioritaires sur les lots traduits. */
 export const TEXTES_INTERFACE_CORRECTIONS: Record<string, Traduction> = {
+  'compo.reserves.precedents': { fr: 'Précédents', en: 'Previous', es: 'Anteriores', it: 'Precedenti', de: 'Zurück', pt: 'Anteriores', ja: '前へ' },
+  'compo.reserves.suivants': { fr: 'Suivants', en: 'Next', es: 'Siguientes', it: 'Successivi', de: 'Weiter', pt: 'Seguintes', ja: '次へ' },
+  'compo.reserves.page': { fr: '{debut}–{fin} sur {total}', en: '{debut}–{fin} of {total}', es: '{debut}–{fin} de {total}', it: '{debut}–{fin} di {total}', de: '{debut}–{fin} von {total}', pt: '{debut}–{fin} de {total}', ja: '{total}人中{debut}–{fin}人' },
+  'tb.repartitionTournoi': {
+    fr: '{directs} qualifiés directs · {barragistes} barragistes', en: '{directs} direct qualifiers · {barragistes} playoff teams',
+    es: '{directs} clasificados directos · {barragistes} en repesca', it: '{directs} qualificati diretti · {barragistes} agli spareggi',
+    de: '{directs} direkt qualifiziert · {barragistes} in den Playoffs', pt: '{directs} qualificados diretos · {barragistes} no playoff', ja: '直接出場{directs}チーム · プレーオフ{barragistes}チーム',
+  },
   'nav.reglages': {
     fr: 'Paramètres', en: 'Settings', es: 'Ajustes', it: 'Impostazioni',
     de: 'Einstellungen', pt: 'Definições', ja: '設定',

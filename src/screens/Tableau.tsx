@@ -98,7 +98,7 @@ function titreTour(tour: string): string {
 }
 // L'ordre des COLONNES de l'arbre, de gauche à droite. La petite finale se
 // place juste avant la finale : c'est là qu'elle se joue dans un tournoi.
-const ORDRE_TOURS = ['trenteDeuxieme', 'seizieme', 'barrage', 'huitieme', 'quart', 'demie', 'petiteFinale', 'finale', 'accession'];
+const ORDRE_TOURS = ['barrage', 'soixanteQuatrieme', 'trenteDeuxieme', 'seizieme', 'huitieme', 'quart', 'demie', 'petiteFinale', 'finale', 'accession'];
 const ORDRE_TOUR_FINAL: Record<string, number> = {
   barrage: 1, huitieme: 1, quart: 1, demie: 2, petiteFinale: 3, finale: 3, accession: 4,
 };
@@ -113,7 +113,7 @@ export function Arbre({ matchs, club, taille }: { matchs: (MatchFinal | MatchEli
     <div className="arbre">
       {tours.map((g) => (
         <div key={g.tour} className="arbre-tour">
-          <div className="arbre-titre">{g.matchs[0] && 'codeTour' in g.matchs[0] ? g.matchs[0].libelle.split(' : ')[0] : titreTour(g.tour)}</div>
+          <div className="arbre-titre">{g.matchs[0] && 'codeTour' in g.matchs[0] ? g.matchs[0].libelle.split(' : ')[0] : titreTour(g.tour === 'barrage' && g.matchs[0]?.libelle.startsWith('Huitième') ? 'huitieme' : g.tour)}</div>
           <div className="arbre-matchs">
             {g.matchs.map((m) => (
               <div
@@ -142,7 +142,7 @@ export function Arbre({ matchs, club, taille }: { matchs: (MatchFinal | MatchEli
           </div>
         </div>
       ))}
-      {taille && Object.entries(TOURS_ELIMINATION).reverse().filter(([n, info]) => Number(n) <= taille
+      {taille && matchs.some(m => 'codeTour' in m) && Object.entries(TOURS_ELIMINATION).reverse().filter(([n, info]) => Number(n) <= taille
         && !tours.some(g => g.tour === info.tour)).map(([n, info]) => <div className="arbre-tour verrouille" key={info.code} aria-disabled="true">
           <div className="arbre-titre">{info.libelle}</div>
           <p>{libelleDate(semaine(semaineElimination(Number(n))))}</p>
@@ -1005,7 +1005,8 @@ export function Tableau() {
               <details><summary>{t('tb.nombreQualifies', { n: tournoi.qualifies.length })}</summary>
                 <div className="grille-poules">{tournoi.qualifies.map(q => <span key={q.qualificationId}>{q.club} · {t('tb.poule', { n: q.poule + 1 })} · {q.rang}</span>)}</div>
               </details>
-              <Arbre matchs={matchsTournoiVisibles} club={carriere.club} taille={tournoi.qualifies.length} />
+              {tournoi.qualifiesDirects && <p>{t('tb.repartitionTournoi', { directs: tournoi.qualifiesDirects.length, barragistes: tournoi.barragistes?.length ?? 0 })}</p>}
+              <Arbre matchs={matchsTournoiVisibles} club={carriere.club} taille={tournoi.tailleTableau ?? tournoi.qualifies.length} />
             </div>
           )}
 

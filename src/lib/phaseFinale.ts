@@ -28,7 +28,7 @@ import { CALENDRIER } from '../data/calendrier.js';
  * PORTEUSES pour les coupes.
  */
 export type TourFinal =
-  | 'trenteDeuxieme' | 'seizieme' | 'barrage' | 'huitieme' | 'quart' | 'demie' | 'petiteFinale' | 'finale' | 'accession';
+  | 'soixanteQuatrieme' | 'trenteDeuxieme' | 'seizieme' | 'barrage' | 'huitieme' | 'quart' | 'demie' | 'petiteFinale' | 'finale' | 'accession';
 
 export interface MatchFinal {
   tour: TourFinal;

@@ -202,7 +202,7 @@ import {
 import { avatarPourCompte } from '../lib/avatars';
 import { reportsBudgets, renouvelerBudgets, reparerPlafondSalarial } from '../lib/tresorerieManager';
 import { objectifsDeSaison } from '../lib/objectifsManager';
-import { competitionEffective, setArriveesClubs, setMouvementsClubs } from '../lib/divisions';
+import { competitionEffective, reconstituerArriveesClubs, setArriveesClubs, setMouvementsClubs } from '../lib/divisions';
 import { phaseFinale, type MatchFinal, type PhaseFinale } from '../lib/phaseFinale';
 import { jouerAutresPhasesFinales } from '../lib/phasesFinalesJouees';
 import { tournoiDeFinDAnnee } from '../lib/tournoi';
@@ -8227,6 +8227,7 @@ export const useGame = create<GameState>()(
         langue: s.langue,
         langueManuelle: s.langueManuelle,
         mouvementsClubs: s.mouvementsClubs,
+        arriveesClubs: s.arriveesClubs,
         posts: s.posts.slice(-120),
         filSemaine: s.filSemaine,
         matchRegarde: s.matchRegarde,
@@ -8267,6 +8268,7 @@ export const useGame = create<GameState>()(
       merge: (persiste, courant) => appliquerCompte({
         ...courant,
         ...(persiste as Partial<GameState>),
+        arriveesClubs: reconstituerArriveesClubs((persiste ?? courant) as Partial<GameState>),
         dureeMiTempsSolo: normaliserDureeMiTempsSolo((persiste as Partial<GameState> | null)?.dureeMiTempsSolo),
       }) as GameState,
     },

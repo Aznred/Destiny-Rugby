@@ -79,6 +79,8 @@ export interface PoolQualification {
 export interface QualificationToFinals {
   /** Qualifiés par poule. `auto` : la phase finale de la poule (poule unique), deux par poule jusqu'à trois poules, un au-delà. */
   perPool: number | 'auto';
+  /** Barragistes de chaque poule ; « auto » adapte le format régional à son effectif. */
+  playoffsPerPool?: number | 'auto';
   /** Le tableau est complété à la puissance de deux par les meilleurs suivants. */
   bestRunnersUp: boolean;
 }
@@ -207,16 +209,18 @@ const TABLE: Record<string, CompetitionRules> = Object.fromEntries([
   division('top14', UN_PLUS_ACCES),
   division('prod2', UN_PLUS_ACCES, MONTEE_DU_CHAMPION),
   division('nationale', DEUX_DIRECTS, MONTEE_DU_CHAMPION),
-  division('nationale2', DEUX_DIRECTS, MONTEE_PAR_POULE),
-  division('fed1', DEUX_DIRECTS, MONTEE_PAR_POULE),
-  division('fed2', DEUX_DIRECTS, MONTEE_PAR_POULE),
-  division('fed3', DEUX_DIRECTS, MONTEE_ET_MEILLEURS_DEUXIEMES),
-  division('reg1', UN_DIRECT, MONTEE_ET_MEILLEURS_DEUXIEMES),
-  division('reg2', UN_DIRECT, MONTEE_PAR_LIGUE),
-  division('reg3', {}, MONTEE_PAR_LIGUE),
+  division('nationale2', DEUX_DIRECTS, { ...MONTEE_PAR_POULE, finals: { perPool: 2, playoffsPerPool: 4 } }),
+  division('fed1', DEUX_DIRECTS, { ...MONTEE_PAR_POULE, finals: { perPool: 2, playoffsPerPool: 4 } }),
+  division('fed2', DEUX_DIRECTS, { ...MONTEE_PAR_POULE, finals: { perPool: 2, playoffsPerPool: 4 } }),
+  // FFR : trois qualifiés directs, puis un barrage entre les quatrième et cinquième en Fédérale 3.
+  division('fed3', DEUX_DIRECTS, { ...MONTEE_ET_MEILLEURS_DEUXIEMES, finals: { perPool: 3, playoffsPerPool: 2 } }),
+  division('reg1', UN_DIRECT, { ...MONTEE_ET_MEILLEURS_DEUXIEMES, finals: { playoffsPerPool: 'auto' } }),
+  division('reg2', UN_DIRECT, { ...MONTEE_PAR_LIGUE, finals: { playoffsPerPool: 'auto' } }),
+  division('reg3', {}, { ...MONTEE_PAR_LIGUE, finals: { playoffsPerPool: 'auto' } }),
   // Pyramides étrangères
-  division('premiership', UN_PLUS_ACCES),
-  division('championship', {}, MONTEE_DU_CHAMPION),
+  // La PREM n'échange plus automatiquement ses clubs avec le Championship.
+  division('premiership', {}, { bracket: 'none' }),
+  division('championship', {}, { bracket: 'none' }),
   division('japon1', UN_PLUS_ACCES),
   division('japon2', UN_PLUS_ACCES, MONTEE_DU_CHAMPION),
   division('japon3', {}, MONTEE_DU_CHAMPION),
@@ -283,6 +287,24 @@ export function nombreQualifies(taille: number): number {
   return Math.min(2, Math.max(0, taille));
 }
 
+/** Le format de la poule, partagé par ses couleurs, ses barrages et son calendrier. */
+export function qualificationParPoule(rules: CompetitionRules, taille: number): { directs: number; barragistes: number } | null {
+  const f = rules.qualificationToFinals;
+  if (f.playoffsPerPool === undefined) return null;
+  const total = nombreQualifies(taille);
+  const directs = Math.min(taille, f.perPool === 'auto' ? (total >= 6 ? 2 : total) : f.perPool);
+  const demandes = f.playoffsPerPool === 'auto' ? Math.max(0, total - directs) : f.playoffsPerPool;
+  // Un barrage a deux participants : une poule raccourcie ne crée jamais un adversaire absent.
+  return { directs, barragistes: Math.max(0, Math.floor(Math.min(demandes, taille - directs) / 2) * 2) };
+}
+
+/** Nombre de places du tableau principal et présence du tour préliminaire. */
+export function formatTournoi(rules: CompetitionRules, tailles: number[]): { principal: number; barrages: boolean } | null {
+  const formats = tailles.map(t => qualificationParPoule(rules, t));
+  if (formats.some(f => !f)) return null;
+  return { principal: formats.reduce((n, f) => n + f!.directs + f!.barragistes / 2, 0), barrages: formats.some(f => f!.barragistes > 0) };
+}
+
 /**
  * LIGUE EN LIGNE : combien de clubs disputent la phase finale d'un championnat (Correctif 33).
  * 4 clubs → 2 (finale sèche), 6 → 4, 8 → 4, 10 → 6 (barrages puis demi-finales), 16 et plus → 8.
@@ -333,7 +355,11 @@ export function zones(rules: CompetitionRules, taille: number, poules = 1): Zone
   const phase = nombreQualifies(taille);
   let qualified: number;
   let playoffs: number;
-  if (s.qualified === 'auto') {
+  const poule = poules > 1 ? qualificationParPoule(rules, taille) : null;
+  if (poule) {
+    qualified = poule.directs;
+    playoffs = poule.barragistes;
+  } else if (s.qualified === 'auto') {
     // Poule unique : les deux premiers attendent en demi-finale quand il y a des barrages. Division à poules : les
     // qualifiés du tournoi final (deux par poule jusqu'à trois poules, un au-delà).
     const finales = rules.qualificationToFinals.perPool;

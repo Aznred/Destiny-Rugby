@@ -169,7 +169,7 @@ export function libelleAfficheManager(affiche: AfficheComplete, division: string
  */
 export function affichesDePhaseFinale(c: CarriereDeClub, bonus = 0): AfficheComplete[] {
   const sem = semaineDuCalendrier(c.semaine);
-  if (!c.club || !c.division || c.semaine < 46) return [];
+  if (!c.club || !c.division || c.semaine < 44) return [];
   const affiches: AfficheComplete[] = [];
   const duelEnAffiche = (m: MatchFinal | MatchElimination): MatchChampionnat => ({
     domicile: m.domicile, exterieur: m.exterieur,

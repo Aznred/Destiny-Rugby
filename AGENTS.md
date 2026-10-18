@@ -1533,13 +1533,30 @@ des effectifs du Correctif 24 ; le moteur, lui, n'a pas bougé).
 
 ### Matchs couperets, propositions de cartes et fin de match (Correctif 26)
 
+**Règlements des carrières solo** : `competitionRules.ts` définit les places directes et barrages par poule : N2/F1/F2,
+deux directs et places 3–6 en barrage ; F3, trois directs et places 4–5 en barrage. Le régional adapte le nombre
+de candidats à la taille de la poule (6 à partir de 12 clubs, 4 de 8 à 11, sinon 2). `tournoi.ts` attend les vrais
+barrages avant de construire le tableau principal ; jusqu'à 128 places, avec exemptions plutôt que suppression
+de qualifiés. Un ancien tableau déjà commencé conserve son format cette saison. La PREM anglaise et le Championship
+n'échangent plus automatiquement de clubs. Les reversés de Champions Cup sont classés 9–12 en Challenge Cup,
+à l'extérieur en huitièmes, puis réception selon le rang initial. `arriveesClubs` est persisté ; le rechargement
+ne reconstitue une ancienne arrivée que si l'historique ou le journal prouve la montée. Sources, limites régionales
+et contrôles : `sources/REGLEMENTS-CARRIERES.md`, `npm run verify:retours-reglements`, `scripts/verifierRetoursNavigateur.cjs`.
+
+**Réserve de composition** : `CompositionTerrainManager` ne monte les cartes du banc et de la réserve que pour
+le groupe affiché. La réserve est paginée par douze, y compris dans la présentation classique ; les joueurs
+restent tous accessibles et la sélection est conservée entre les pages. Aucun portrait n'est monté pour une
+réserve masquée. `scripts/verifierReserveNavigateur.cjs` vérifie le vrai bureau entraîneur, une permutation,
+les ouvertures répétées et un effectif de 223 joueurs (200 en réserve), sur ordinateur et mobile, sans sauvegarde.
+
 **Matchs couperets** (`lib/matchLive.ts`, `lib/couperet.ts`, `lib/tournoi.ts`)
 
 - ⚠️ **LE TOURNOI FINAL DES DIVISIONS À POULES N'ÉTAIT PROPOSÉ NULLE PART.** De la Nationale 2 à la Régionale 3 (sept
   divisions, de 2 à 22 poules), le champion sort d'un tableau sec entre les meilleurs de chaque poule : l'écran Résultats
   l'affichait, la fin de saison s'en servait, mais ni l'entraîneur ni le joueur ne pouvaient en disputer un match.
   `affichesDePhaseFinale(c)` propose le tour national de la division à sa date, sans phase locale supplémentaire.
-  Les tailles 64/32/16/8/4/2 correspondent aux 32es/16es/8es/quarts/demies/finale, semaines 46 à 51.
+  Les tailles 128/64/32/16/8/4/2 correspondent aux 64es/32es/16es/8es/quarts/demies/finale, semaines 45 à 51.
+  Un barrage préalable peut occuper la semaine 44.
   `debutPlayoffsDivision` réserve ces dates dans le calendrier amateur ; toutes les journées régulières se répartissent
   sur les week-ends précédents, y compris les journées exemptes ou doubles, sans concurrence avec le premier tour.
   `bracketProgressif.ts` construit seulement le tour actuel : scores et qualifié restent `null` jusqu'au vrai résultat.

@@ -21,6 +21,7 @@
     "verify:influenceurs": "vite-node scripts/verifierInfluenceurs.ts",
     "verify:complement29": "vite-node scripts/verifierComplement29.ts",
     "verify:reglements": "vite-node scripts/verifierReglements.ts",
+    "verify:retours-reglements": "vite-node scripts/verifierRetoursReglements.ts",
     "verify:voix": "vite-node scripts/verifierVoix.ts",
     "verify:chrono-mises-en-place": "vite-node scripts/verifierChronoMisesEnPlace.ts",
     "verify:duree-match": "vite-node scripts/verifierDureeMatchSolo.ts",

@@ -39,7 +39,7 @@ for (const division of ['nationale2', 'fed1', 'reg1']) {
   const debut = Date.now();
   const tournoi = tournoiDeFinDAnnee(division, SAISON, nom(division))!;
   const calcul = Date.now() - debut;
-  ok(tournoi && tournoi.matchs.length === tournoi.qualifies.length / 2, `${division} : le premier tour final est complet (${poulesDe(division).length} poules)`);
+  ok(tournoi && tournoi.matchs.length === (tournoi.barragistes?.length ? tournoi.barragistes.length / 2 : tournoi.qualifies.length - 2 ** Math.floor(Math.log2(tournoi.qualifies.length))), `${division} : le premier tour final est complet (${poulesDe(division).length} poules)`);
   ok(tournoi.matchs.every((m) => m.cle?.startsWith(`tournoi#${division}#${SAISON}#`)), `${division} : chaque match du tournoi porte la clé que le tableau relit`);
   const rappel = Date.now();
   tournoiDeFinDAnnee(division, SAISON, nom(division));
@@ -86,7 +86,7 @@ for (const division of ['nationale2', 'fed1', 'reg1']) {
 
   // Une défaite élimine : plus aucune affiche de tournoi ensuite.
   effacerResultatsJoues(); oublierResultats();
-  const autre = tournoiDeFinDAnnee(division, SAISON, nom(division))!.qualifies[0].club;
+  const autre = tournoiDeFinDAnnee(division, SAISON, nom(division))!.matchs[0].domicile;
   const perdus: Record<string, unknown> = {};
   const premiere = affichesDePhaseFinale({ division, club: autre, saison: SAISON, semaine: tournoi.matchs[0].semaine, resultats: perdus })
     .find((a) => a.cle.startsWith('tournoi#'));
@@ -174,7 +174,7 @@ for (const division of ['nationale2', 'fed1', 'reg1']) {
   effacerResultatsJoues(); oublierResultats();
   const division = 'fed1';
   const tournoi = tournoiDeFinDAnnee(division, SAISON, nom(division))!;
-  const club = tournoi.qualifies[0].club;
+  const club = tournoi.matchs[0].domicile;
   const joueur = (semaine: number, resultatsClub: Record<string, unknown> = {}) =>
     ({ nom: 'Banc', club, division, saison: SAISON, semaine, resultatsClub }) as unknown as Joueur;
   const semaine = tournoi.matchs[0].semaine;

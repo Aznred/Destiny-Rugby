@@ -40,11 +40,10 @@ export interface MouvementClub {
 }
 
 // Ordre des divisions françaises, du sommet vers le bas. Les championnats du
-// monde sont pour la plupart fermés (franchises) : seuls l'Angleterre et le
-// Japon ont une vraie pyramide.
+// monde sont pour la plupart fermés (franchises). La PREM anglaise n'a plus
+// d'échange automatique à partir de 2026/27 ; le Japon conserve ses étages.
 const PYRAMIDES: string[][] = [
   ['top14', 'prod2', 'nationale', 'nationale2', 'fed1', 'fed2', 'fed3', 'reg1', 'reg2', 'reg3'],
-  ['premiership', 'championship'],
   ['japon1', 'japon2', 'japon3'],
   // Rugby féminin (`data/mondeFeminin.generated.ts`) : la France et l'Irlande ont deux étages, le reste est fermé.
   ['f-elite1', 'f-elite2'],

@@ -1,5 +1,14 @@
 # Destiny Rugby 🏉
 
+- **Règlements des carrières** : promus de Pro D2 en Challenge Cup après rechargement ; reversés de Champions Cup
+  à l'extérieur en huitièmes, puis réception selon leur rang initial. Barrages et qualifications directes distincts
+  en Nationale 2 et Fédérales, formats régionaux adaptés aux poules, sans perte de qualifiés dans un tableau incomplet.
+  Aucun échange automatique entre les deux championnats anglais. Les tableaux déjà commencés conservent leurs résultats.
+  Sources et limites : [règlements des carrières](sources/REGLEMENTS-CARRIERES.md).
+- **Réserve entraîneur** : cartes chargées uniquement pour le groupe affiché, réserve paginée par douze.
+  Vérification ordinateur/mobile : `node scripts/verifierReserveNavigateur.cjs` (port local 5188), avec permutation
+  dans le vrai bureau et accès à 200 réservistes dans un aperçu sans sauvegarde.
+
 - **Durée des matchs de carrière** : choix de 3, 5, 6, 8, 10, 15, 20 ou 40 minutes
   par mi-temps dès la création (joueur, joueur existant ou entraîneur), puis dans
   Paramètres. Six minutes par défaut, à vitesse ×1, hors pauses, mises en place

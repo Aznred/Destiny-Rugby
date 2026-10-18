@@ -57,6 +57,31 @@ export function arriveesClubs(): Record<string, number> {
   return ARRIVEES;
 }
 
+/** Les anciennes sauvegardes peuvent retrouver une arrivée prouvée par l'historique ou le journal. */
+export function reconstituerArriveesClubs(etat: {
+  arriveesClubs?: Record<string, number>;
+  mouvementsClubs?: Record<string, string>;
+  manager?: { historique?: { club: string; division: string; saison: number; montee?: boolean }[] } | null;
+  journal?: { titre?: string; texte?: string; saison: number }[];
+}): Record<string, number> {
+  const arrivees = { ...etat.arriveesClubs };
+  for (const [club, division] of Object.entries(etat.mouvementsClubs ?? {})) {
+    if (Number.isFinite(arrivees[club]) && arrivees[club] > 0) continue;
+    const saisons: number[] = [];
+    // Une montée explicite de Pro D2 prouve l'arrivée en Top 14 pour la saison suivante.
+    if (division === 'top14') for (const s of etat.manager?.historique ?? []) {
+      if (s.club === club && s.division === 'prod2' && s.montee) saisons.push(s.saison + 1);
+    }
+    const nom = COMPETITIONS.find(c => c.id === division)?.nom;
+    if (nom) for (const e of etat.journal ?? []) {
+      if (e.titre?.includes('Ton club monte') && e.texte?.startsWith(`${club} accède à la ${nom}`)) saisons.push(e.saison);
+    }
+    const derniere = Math.max(0, ...saisons.filter(s => Number.isInteger(s) && s > 0));
+    if (derniere) arrivees[club] = derniere;
+  }
+  return arrivees;
+}
+
 /**
  * Ce club jouait-il déjà dans cette division à la fin de la saison donnée ?
  *

@@ -48,7 +48,7 @@ import { COUPES_EUROPE } from '../data/mondeReel.js';
 import { forceEffectif } from './effectif.js';
 import { clubsDeDivision, etaitDansLaDivision} from './divisions.js';
 import {
-  championnatEnDirect, classer, graine, jouerRencontre,
+  championnatEnDirect, classer, graine, jouerRencontre, resultatJoue,
   type LigneTableau, type MatchChampionnat,
 } from './championnat.js';
 import { duel, type MatchFinal } from './phaseFinale.js';
@@ -90,8 +90,8 @@ export interface EtatCoupe {
   /** Les clubs reversés depuis la Champions Cup (Challenge Cup uniquement). */
   reverses: string[];
   /**
-   * D'où vient chaque club du tableau (`qualified_from`). Un `CHAMPIONS_CUP_5TH` est moins bien classé que tous les
-   * qualifiés de poule : il joue son huitième à l'extérieur — le terrain n'est jamais tiré au sort.
+   * D'où vient chaque club du tableau. Un reversé est classé de 9 à 12 : huitième à l'extérieur,
+   * puis avantage du terrain selon son rang, comme les autres clubs.
    */
   qualifiedFrom: Record<string, QualifiedFrom>;
   /** Les cinquièmes de poule que cette coupe reverse ailleurs, et où (Champions Cup, une fois les poules finies). */
@@ -111,7 +111,7 @@ export interface EtatCoupe {
 //    (`lib/mondial.ts`) et ne lit pas cette table. Leur rang ici ne sert à
 //    rien — l'ordre d'AFFICHAGE vit dans `ORDRE_TOURS` (Tableau.tsx).
 export const ORDRE_TOUR: Record<MatchFinal['tour'], number> = {
-  trenteDeuxieme: 0, seizieme: 0,
+  soixanteQuatrieme: 0, trenteDeuxieme: 0, seizieme: 0,
   barrage: 1, quart: 2, demie: 3, finale: 4, accession: 5,
   huitieme: 6, petiteFinale: 7,
 };
@@ -491,6 +491,7 @@ export function coupeEnDirect(
   // rejoue donc la phase de poules de la Champions Cup pour les connaître :
   // c'est déterministe et sans état, il n'y a rien à mémoriser.
   let seize = phase.seize;
+  let classementTerrain = phase.seize;
   let reverses: string[] = [];
   const qualifiedFrom: Record<string, QualifiedFrom> = Object.fromEntries(seize.map((club) => [club, 'POOL' as const]));
   // Quelle coupe reverse ses cinquièmes ICI ? Le règlement le dit (`transferred.to`) — pas un nom en dur.
@@ -500,10 +501,15 @@ export function coupeEnDirect(
     reverses = grande?.reverses ?? [];
     const origine = rulesFor(source.id).poolQualification!.transferred!.origin;
     for (const club of reverses) qualifiedFrom[club] = origine;
-    // ⚠️ LES QUALIFIÉS D'OFFICE DEVANT, LES REVERSÉS DERRIÈRE : un cinquième de Champions Cup est tête de série
-    // 13 à 16 et se déplace chez l'un des quatre meilleurs premiers. Le tableau apparie 1-16, 2-15… et le mieux
-    // classé reçoit : l'avantage du terrain découle de l'origine, il n'est jamais tiré.
-    seize = [...seize, ...reverses];
+    // EPCR : les reversés occupent les rangs 9 à 12, après les huit premiers de Challenge.
+    // Une ancienne carrière ayant déjà joué ses huitièmes conserve son tableau.
+    const ancien = [...seize, ...reverses];
+    classementTerrain = [...seize.slice(0, 8), ...reverses, ...seize.slice(8)];
+    const commence = ancien.slice(0, 8).some((club, i) => {
+      const autre = ancien[15 - i];
+      return !!resultatJoue(`coupe#${coupeId}#${saison}#barrage#${club}#${autre}`);
+    });
+    seize = commence ? ancien : classementTerrain;
   }
   const transfert = rulesFor(coupeId).poolQualification?.transferred;
   const transferes = transfert && phase.reverses.length ? { clubs: phase.reverses, vers: transfert.to } : null;
@@ -513,6 +519,7 @@ export function coupeEnDirect(
   let ordreTourCourant = 0;
 
   if (jusqua >= total && seize.length >= 4) {
+    const rang = new Map(classementTerrain.map((club, i) => [club, i]));
     const cle = (tour: string, a: string, b: string) => `coupe#${coupeId}#${saison}#${tour}#${a}#${b}`;
     // Tableau classique : 1-16, 2-15, 3-14… le mieux classé reçoit.
     let tour = seize.slice(0, 16);
@@ -527,9 +534,13 @@ export function coupeEnDirect(
       const suivants: string[] = [];
       const moitie = Math.floor(tour.length / 2);
       for (let i = 0; i < moitie; i++) {
-        const d = tour[i];
-        const e = tour[tour.length - 1 - i];
+        let d = tour[i];
+        let e = tour[tour.length - 1 - i];
         const finale = tour.length === 2;
+        // Le tableau conserve ses croisements ; recevoir dépend du classement initial à CHAQUE tour.
+        if (!finale && (rang.get(d) ?? 99) > (rang.get(e) ?? 99)) [d, e] = [e, d];
+        // Ne jamais inverser une rencontre effectivement jouée dans une ancienne carrière.
+        if (resultatJoue(cle(nomsTours[etape], e, d))) [d, e] = [e, d];
         const m = duel(
           d, e, saison, cle(nomsTours[etape], d, e), nomsTours[etape],
           `${libelles[etape]} : ${d} - ${e}`,

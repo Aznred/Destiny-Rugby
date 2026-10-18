@@ -2,8 +2,9 @@ import { resultatJoue, resultatsJouesDuTableau } from './championnat.js';
 import { CALENDRIER } from '../data/calendrier.js';
 import type { MatchFinal, TourFinal } from './phaseFinale.js';
 
-export type CodeTour = 'ROUND_OF_64' | 'ROUND_OF_32' | 'ROUND_OF_16' | 'QUARTER_FINAL' | 'SEMI_FINAL' | 'FINAL';
+export type CodeTour = 'ROUND_OF_128' | 'ROUND_OF_64' | 'ROUND_OF_32' | 'ROUND_OF_16' | 'QUARTER_FINAL' | 'SEMI_FINAL' | 'FINAL';
 export const TOURS_ELIMINATION: Record<number, { code: CodeTour; tour: TourFinal; libelle: string }> = {
+  128: { code: 'ROUND_OF_128', tour: 'soixanteQuatrieme', libelle: '64es de finale' },
   64: { code: 'ROUND_OF_64', tour: 'trenteDeuxieme', libelle: '32es de finale' },
   32: { code: 'ROUND_OF_32', tour: 'seizieme', libelle: '16es de finale' },
   16: { code: 'ROUND_OF_16', tour: 'huitieme', libelle: '8es de finale' },
@@ -69,13 +70,16 @@ export function vainqueursDuTour(matchs: MatchElimination[], participants: strin
 }
 
 export function construireBracket(qualifies: string[], prefixe: string): MatchElimination[] {
-  if (!TOURS_ELIMINATION[qualifies.length] || new Set(qualifies).size !== qualifies.length) {
+  if (qualifies.length < 2 || qualifies.length > 128 || new Set(qualifies).size !== qualifies.length) {
     throw new Error('Tableau invalide : qualifications non uniques ou taille non prise en charge.');
   }
   const matchs: MatchElimination[] = [];
   let participants = [...qualifies];
   while (participants.length >= 2) {
-    const taille = participants.length;
+    const taille = 2 ** Math.ceil(Math.log2(participants.length));
+    // Une division incomplète garde tous ses qualifiés ; les meilleures têtes de série sont exemptées.
+    const exempts = participants.slice(0, taille - participants.length);
+    const aJouer = participants.slice(exempts.length);
     const { code, tour, libelle } = TOURS_ELIMINATION[taille];
     // Une ancienne carrière peut avoir joué un croisement différent : on conserve les vrais matchs
     // uniquement quand les deux clubs se sont effectivement qualifiés au tour précédent.
@@ -84,10 +88,10 @@ export function construireBracket(qualifies: string[], prefixe: string): MatchEl
     const utilises = new Set<string>();
     for (const { match } of anciens) {
       const { domicile: a, exterieur: b } = match;
-      if (!participants.includes(a) || !participants.includes(b) || a === b || utilises.has(a) || utilises.has(b)) continue;
+      if (!aJouer.includes(a) || !aJouer.includes(b) || a === b || utilises.has(a) || utilises.has(b)) continue;
       paires.push([a, b]); utilises.add(a); utilises.add(b);
     }
-    const restants = participants.filter(c => !utilises.has(c));
+    const restants = aJouer.filter(c => !utilises.has(c));
     for (let i = 0; i < restants.length / 2; i++) paires.push([restants[i], restants[restants.length - 1 - i]]);
     paires.sort((a, b) => Math.min(...a.map(c => participants.indexOf(c))) - Math.min(...b.map(c => participants.indexOf(c))));
     const rencontres = paires.map(([a, b]) => {
@@ -95,10 +99,10 @@ export function construireBracket(qualifies: string[], prefixe: string): MatchEl
         `${libelle} : ${a} - ${b}`, semaineElimination(taille), code);
     });
     matchs.push(...rencontres);
-    const suivants = vainqueursDuTour(rencontres, participants);
+    const suivants = vainqueursDuTour(rencontres, aJouer);
     if (!suivants) break;
     // L'ordre des rencontres est conservé : aucun nouveau tri par force ne change les croisements.
-    participants = suivants;
+    participants = [...exempts, ...suivants];
   }
   return matchs;
 }

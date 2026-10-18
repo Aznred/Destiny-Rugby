@@ -3,6 +3,18 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 
 /* Modal conteneur plein écran */
+.ct-pagination-reserves { display:flex; align-items:center; justify-content:space-between; gap:8px; margin:6px 0; }
+.cel-compo .ct-pagination-reserves button { min-height:44px; padding:6px 12px; border:1px solid #46616a; border-radius:6px; background:#102a32; color:var(--craie); font:inherit; font-size:.8rem; cursor:pointer; }
+.cel-compo .ct-pagination-reserves button:hover:not(:disabled) { border-color:var(--or); color:var(--or); }
+.ct-pagination-reserves span { color:var(--craie-dim); font-size:.8rem; }
+.ct-pagination-reserves button:disabled { opacity:.4; cursor:default; }
+/* La pagination occupe sa ligne sans réduire ni masquer le défilement des cartes. */
+.cel-compo .ct-feuille-fut .manager-reserves:has(.ct-pagination-reserves) > div { height:calc(100% - 56px); min-height:145px; }
+.cel-compo .ct-feuille-fut .manager-reserves:has(.ct-pagination-reserves) > p { display:none; }
+@media (min-width:701px) {
+  .cel-compo .ct-feuille-fut[data-groupe="reserves"]:has(.ct-pagination-reserves) { --ct-hauteur-groupe:225px; }
+}
+
 .cel-fullscreen-compo {
   position: fixed;
   inset: 0;
@@ -747,7 +759,7 @@
     flex:1;
     min-height:0;
     grid-template-columns:190px minmax(0,1fr) !important;
-    grid-template-rows:minmax(0,1fr) 42px 42px 165px !important;
+    grid-template-rows:minmax(0,1fr) 42px 42px var(--ct-hauteur-groupe,165px) !important;
     gap:6px 12px;
   }
   :is(.collection-solo-compo > .cel-compo, .cel-compo.manager-compo-partagee) .manager-feuille-visuelle > .ct-entete {

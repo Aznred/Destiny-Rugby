@@ -4,23 +4,20 @@
 // aligne 157 clubs, la Régionale 1 en compte 63. On les découpe en poules de
 // 12 (`poulesDe`, lib/championnat.ts) — mais alors, qui est CHAMPION ?
 //
-// Réponse, et c'est la demande explicite du joueur : un TOURNOI DE FIN
-// D'ANNÉE, façon coupe de France. Les meilleurs de chaque poule se qualifient,
-// on complète à la puissance de deux inférieure avec les meilleurs deuxièmes,
-// et on joue un tableau sec jusqu'au titre.
-//
-//   • 1 poule  → pas de tournoi, la phase finale classique suffit ;
-//   • 2 à 3 poules → les 2 premiers de chaque poule (4 à 6 qualifiés) ;
-//   • 4 poules et plus → le premier de chaque poule, plus les meilleurs
-//     deuxièmes pour atteindre 8, 16, 32 ou 64 équipes.
+// Les places directes et les barrages de poule viennent de competitionRules.
+// Les vainqueurs rejoignent ensuite un tableau sec jusqu'au titre. Les poules
+// incomplètes donnent des exemptions aux meilleures têtes de série : aucun
+// qualifié n'est supprimé pour arrondir la taille à une puissance de deux.
+// Une poule unique garde sa phase finale classique. Un ancien tableau déjà
+// commencé conserve ses appariements et ses résultats pour cette saison.
 //
 // Le tableau est une lecture des résultats enregistrés : sa construction
 // ne simule aucune rencontre et n'anticipe aucun vainqueur.
 
-import { poulesDe, versionResultatsJoues, type LigneTableau } from './championnat.js';
+import { poulesDe, resultatsJouesDuTableau, versionResultatsJoues, type LigneTableau } from './championnat.js';
 import { championnatEnDirect } from './championnat.js';
-import { construireBracket, type MatchElimination } from './bracketProgressif.js';
-import { rulesFor, zones } from './competitionRules.js';
+import { construireBracket, preparerElimination, semaineElimination, vainqueursDuTour, type MatchElimination } from './bracketProgressif.js';
+import { formatTournoi, qualificationParPoule, rulesFor, zones } from './competitionRules.js';
 import { clubParNom } from '../data/clubs.js';
 
 export interface QualifieTournoi {
@@ -44,6 +41,9 @@ export interface Tournoi {
   finaliste: string | null;
   /** Les relégués directs de chaque poule (règlement de la division) : tous les derniers d'abord, puis les avant-derniers. */
   relegues: string[];
+  qualifiesDirects?: string[];
+  barragistes?: string[];
+  tailleTableau?: number;
 }
 
 // La plus grande puissance de deux qui tienne dans le nombre de candidats
@@ -80,6 +80,51 @@ export function tournoiDeFinDAnnee(
 const memoire = new Map<string, Tournoi | null>();
 
 function calculerTournoi(
+  poules: string[][], divisionId: string, saison: number, nomDivision: string, clubJoueur: string, bonusJoueur: number,
+): Tournoi {
+  const reglement = rulesFor(divisionId);
+  const format = formatTournoi(reglement, poules.map(p => p.length));
+  const prefixe = `tournoi#${divisionId}#${saison}`;
+  // Une phase finale déjà commencée conserve ses clubs, ses clés et ses résultats.
+  if (!format || resultatsJouesDuTableau(prefixe).some(r => /^\d+$/.test(r.cle.split('#')[3]))) {
+    const ancien = calculerAncienTournoi(poules, divisionId, saison, nomDivision, clubJoueur, bonusJoueur);
+    if (!format || ancien.matchs.some(m => m.status === 'completed')) return ancien;
+  }
+  const classements = poules.map((_, i) => championnatEnDirect(divisionId, saison, clubJoueur, 999, bonusJoueur, i).classement);
+  const qualifies: QualifieTournoi[] = [];
+  const directs: string[] = [], barragistes: string[] = [];
+  const matchs: MatchElimination[] = [];
+  const taille = Math.max(2, 2 ** Math.ceil(Math.log2(format!.principal)));
+  const debut = semaineElimination(taille);
+  const relegues: string[] = [];
+  classements.forEach((cl, i) => {
+    const f = qualificationParPoule(reglement, cl.length)!;
+    cl.slice(0, f.directs + f.barragistes).forEach((l, r) => {
+      qualifies.push({ club: l.club, qualificationId: `${divisionId}#${saison}#${l.club}`, poule: i, rang: r + 1, points: l.points, difference: l.difference, region: clubParNom(l.club)?.ligue });
+      (r < f.directs ? directs : barragistes).push(l.club);
+    });
+    const candidats = cl.slice(f.directs, f.directs + f.barragistes);
+    for (let j = 0; j < candidats.length / 2; j++) {
+      const a = candidats[j].club, b = candidats[candidats.length - 1 - j].club;
+      matchs.push(preparerElimination(a, b, `${prefixe}#format2026#barrage#${a}#${b}`, 'barrage', `Barrage : ${a} - ${b}`, debut - 1));
+    }
+    const n = zones(reglement, cl.length, poules.length).directRelegation;
+    relegues.push(...cl.slice(cl.length - n).reverse().map(l => l.club));
+  });
+  qualifies.sort((a, b) => a.rang - b.rang || b.points - a.points || b.difference - a.difference || a.club.localeCompare(b.club, 'fr'));
+  qualifies.forEach((q, i) => { q.seed = i + 1; });
+  const gagnants = barragistes.length ? vainqueursDuTour(matchs, barragistes) : [];
+  if (gagnants) {
+    const retenus = new Set([...directs, ...gagnants]);
+    matchs.push(...construireBracket(qualifies.filter(q => retenus.has(q.club)).map(q => q.club), `${prefixe}#format2026`));
+  }
+  const finale = matchs.find(m => m.tour === 'finale' && m.status === 'completed');
+  return { divisionId, nom: `Tournoi final de ${nomDivision}`, poules: classements.map((classement, i) => ({ nom: `Poule ${i + 1}`, classement })),
+    qualifies, qualifiesDirects: directs, barragistes, tailleTableau: taille, matchs,
+    champion: finale?.vainqueur ?? null, finaliste: finale?.perdant ?? null, relegues };
+}
+
+function calculerAncienTournoi(
   poules: string[][], divisionId: string, saison: number, nomDivision: string, clubJoueur: string, bonusJoueur: number,
 ): Tournoi {
 

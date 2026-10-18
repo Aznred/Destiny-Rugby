@@ -26,6 +26,10 @@ export function analyserReparationPlayoffs(c: { division: string; club: string; 
   const tours = [...new Set(matchs.map(m => m.tour))];
   const dernierTourValide = tours.filter(tour => matchs.filter(m => m.tour === tour).every(m => m.status === 'completed')).at(-1) ?? null;
   const encoreQualifies = manquants.length ? manquants.flatMap(m => [m.domicile, m.exterieur]) : phase.champion ? [phase.champion] : [];
+  if (tournoi && manquants.length) {
+    const elimines = new Set(matchs.filter(m => m.status === 'completed').map(m => m.perdant));
+    encoreQualifies.push(...tournoi.qualifies.filter(q => !elimines.has(q.club)).map(q => q.club));
+  }
   // Les deux premiers d'une phase classique à six clubs sont explicitement exempts de barrages.
   if (!tournoi && manquants.some(m => m.tour === 'barrage')) encoreQualifies.push(...(phase as ReturnType<typeof phaseFinale>).qualifies.slice(0, 2));
   encoreQualifies.push(...matchs.filter(m => m.status === 'completed' && m.tour === manquants[0]?.tour).map(m => m.vainqueur!));

@@ -518,6 +518,7 @@ export function CompositionTerrainManager({
   const [cibleDepot, setCibleDepot] = useState<string | null>(null);
   const [reservesOuvertes, setReservesOuvertes] = useState(!rendreCarte);
   const [groupe, setGroupe] = useState<'banc' | 'reserves'>('banc');
+  const [pageReserveDemandee, setPageReserve] = useState(0);
   const [detailsSelection, setDetailsSelection] = useState(false);
   const panneauRef = useRef<HTMLElement>(null);
   // ⚠️ Le tutoriel guidé attend ces deux actes (« touche un joueur », « pose-le sur un poste ») : un seul endroit les signale, pour
@@ -535,6 +536,12 @@ export function CompositionTerrainManager({
     () => effectifComplet.filter((j) => !surFeuille.has(j.id) && (!reservesVisibles || reservesVisibles.has(j.id))).sort((a, b) => b.note - a.note),
     [effectifComplet, surFeuille, reservesVisibles],
   );
+  // Les cartes masquées ne montent aucun portrait. Même après de nombreux
+  // recrutements, ouvrir la réserve ne dessine que douze cartes à la fois.
+  const taillePageReserve = 12;
+  const pageReserve = Math.min(pageReserveDemandee, Math.max(0, Math.ceil(reserves.length / taillePageReserve) - 1));
+  const debutReserve = pageReserve * taillePageReserve;
+  const reserveAffichee = rendreCarte ? groupe === 'reserves' : reservesOuvertes;
 
   const titulaires = useMemo(
     () => composition.titulaires.map((id) => parId.get(id)),
@@ -805,7 +812,7 @@ export function CompositionTerrainManager({
         </nav>
       </>}
 
-      <div className="manager-banc-visuel" data-tuto="compo-banc">
+      {(!rendreCarte || groupe === 'banc') && <div className="manager-banc-visuel" data-tuto="compo-banc">
         <div className="comp-tete">
           <b><Icone nom="banc" taille={16} /> {t('compo.banc')}</b>
           <span className="comp-count">8</span>
@@ -855,7 +862,7 @@ export function CompositionTerrainManager({
             );
           })}
         </div>
-      </div>
+      </div>}
 
       <details
         data-tuto="compo-reserves"
@@ -864,9 +871,15 @@ export function CompositionTerrainManager({
         onToggle={(e) => { if (!rendreCarte) setReservesOuvertes(e.currentTarget.open); }}
       >
         <summary>{t('compo.effectifDispo')} <span>{reserves.length}</span></summary>
+        {reserveAffichee && <>
         <p>{t('compo.aideReserve')}</p>
+        {reserves.length > taillePageReserve && <nav className="ct-pagination-reserves" aria-label={t('compo.groupes.label')}>
+          <button type="button" disabled={pageReserve === 0} onClick={() => setPageReserve(pageReserve - 1)}>{t('compo.reserves.precedents')}</button>
+          <span role="status">{t('compo.reserves.page', { debut: debutReserve + 1, fin: Math.min(debutReserve + taillePageReserve, reserves.length), total: reserves.length })}</span>
+          <button type="button" disabled={debutReserve + taillePageReserve >= reserves.length} onClick={() => setPageReserve(pageReserve + 1)}>{t('compo.reserves.suivants')}</button>
+        </nav>}
         <div>
-          {reserves.map((joueur) => {
+          {reserves.slice(debutReserve, debutReserve + taillePageReserve).map((joueur) => {
             const etat = etats?.get(joueur.id) ?? {};
             const indisponible = indisponibles?.has(joueur.id) ?? false;
             const raison = etat.enSelection
@@ -917,6 +930,7 @@ export function CompositionTerrainManager({
             );
           })}
         </div>
+        </>}
       </details>
     </section>
   );
