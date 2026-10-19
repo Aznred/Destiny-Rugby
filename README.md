@@ -1,5 +1,12 @@
 # Destiny Rugby 🏉
 
+Corrections du 19 octobre 2026 : les anciens nuls sans vainqueur ne bloquent plus les phases finales de Fédérale 2,
+Fédérale 1 et Nationale 2 ; leurs scores restent conservés et le tableau va jusqu'au champion. La sirène des nouveaux
+matchs attend un ballon mort, avec pénaltouche et transformation dues jouées. Le retour des vidéos de packs libère
+les fenêtres et verrous, y compris en cas d'erreur du média, de son ou de requête sans réponse.
+Contrôles : `npm run verify:champions-bloques`, `npm run verify:sirene-ballon-mort`,
+`npm run verify:publicites`, `npm run verify:blocages:navigateur` (aperçu local sur 5188, annonces simulées).
+
 - **Publicités « Ta carte » FR / EN** : deux montages verticaux de 25 s, 1080 × 1920 à 60 images/s,
   avec les vraies cartes, pochettes et modèles 3D, le parcours de correction, musique et bruitages.
   Les propositions restent soumises à vérification. Les exports sont sans voix off, avec textes et repères prêts

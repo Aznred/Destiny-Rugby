@@ -29,12 +29,14 @@ export function RoulettePacksPub({ recompense,chances,onOuvrir,onFermer,audioIni
     const courbe = (t: number) => 10*t*t - 20*t**3 + 15*t**4 - 4*t**5;
     const bruit = (important = false) => {
       const ctx = audio.current; if (!ctx || ctx.state !== 'running') return;
+      try {
       const osc = ctx.createOscillator(), volume = ctx.createGain();
       osc.type='triangle'; osc.frequency.value=important ? 660 : 1800;
       volume.gain.setValueAtTime(important ? .08 : .022,ctx.currentTime);
       volume.gain.exponentialRampToValueAtTime(.001,ctx.currentTime + (important ? .35 : .035));
       osc.connect(volume); volume.connect(ctx.destination); osc.start(); osc.stop(ctx.currentTime+(important ? .4 : .04));
       osc.onended=() => { osc.disconnect(); volume.disconnect(); };
+      } catch { /* Le son facultatif ne doit pas interrompre l'animation de la roulette. */ }
     };
     const avancer = (instant: number) => {
       debut ??= instant;
@@ -56,8 +58,10 @@ export function RoulettePacksPub({ recompense,chances,onOuvrir,onFermer,audioIni
   },[]);
   useEffect(() => () => { void audio.current?.close().catch(() => {}); audio.current=null; },[]);
   const basculerSon = () => {
+    try {
     if (son && audio.current?.state !== 'closed') { void audio.current?.suspend().catch(() => {}); setSon(false); }
     else { if (!audio.current || audio.current.state === 'closed') audio.current = new AudioContext(); void audio.current.resume().catch(() => {}); setSon(true); }
+    } catch { setSon(false); }
   };
   return createPortal(<div className="pub-overlay pub-roulette-overlay" ref={overlayRef}>
     <div className={`pub-dialogue pub-roulette ${terminee ? 'gagnee' : ''} rarete-${rarete}`} ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="roulette-titre">

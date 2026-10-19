@@ -588,7 +588,9 @@ export interface EtatMatchEnLigne {
 // faux saut, changement de bloc et maul en touche, mémoire tactique, bilan de chaque combinaison jouée. Même IA (niveau 8) :
 // un match sans cahier se joue exactement comme en règles 10 (empreinte du moteur inchangée). Un match créé avant garde ses
 // règles ; revenir en arrière = remettre 10. ⚠️ À METTRE EN LIGNE QUAND AUCUN MATCH NE SE JOUE.
-export const REGLES_MATCH_EN_LIGNE = 11;
+// Règles 12 : la sirène attend un ballon mort, sans minuterie coupant une attaque.
+// Les rencontres déjà ouvertes conservent leur version et leurs résultats.
+export const REGLES_MATCH_EN_LIGNE = 12;
 /**
  * Défense resserrée des règles 2 : la cadence détaillée marque davantage, ce
  * réglage ramène le nombre d'essais à celui des matchs de ligue d'avant
@@ -1018,7 +1020,7 @@ export function optionsMoteurDesRegles(regles: number | undefined = REGLES_MATCH
     // chaque arrêt utilise sa durée directe, courte mais lisible.
     tempsReel: true,
     scoreSurTerrain: true,
-    reglesSirene: (regles ?? 1) >= 6 ? 'transformation' as const : 'historique' as const,
+    reglesSirene: (regles ?? 1) >= 12 ? 'ballonMort' as const : (regles ?? 1) >= 6 ? 'transformation' as const : 'historique' as const,
     // ⚠️ UN MATCH COMMENCÉ AVANT LES RÈGLES 8 SE REJOUE AVEC SA PÉNALTOUCHE D'ORIGINE : sinon le lancer d'une touche
     // déjà jouée changerait de camp à la rejoue, et le score annoncé avec lui.
     ...((regles ?? 1) < 8 ? { reglesPenaltouche: 'historique' as const } : {}),

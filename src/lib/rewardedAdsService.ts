@@ -10,16 +10,22 @@ interface OptionsAppLixir {
 declare global { interface Window { initializeAndOpenPlayer?: (options: OptionsAppLixir) => void | Promise<unknown> } }
 export interface SessionNavigateurPub extends RecompensePub { apiKey: string; mode: 'TEST' | 'LIVE' }
 export async function appelerPublicites<T>(corps?: unknown, ligue?: string, signal?: AbortSignal): Promise<T> {
-  const r = await fetch(`/api/carriere?publicites=1${ligue ? `&ligue=${encodeURIComponent(ligue)}` : ''}`, {
-    method: corps ? 'POST' : 'GET', credentials: 'same-origin', cache: 'no-store', signal,
-    headers: corps ? { 'Content-Type': 'application/json' } : undefined,
-    body: corps ? JSON.stringify({ action: 'publicites', ...corps as object }) : undefined,
-  });
-  const d = await r.json();
-  // Toute écriture périme les vues gardées : la prochaine lecture repart du serveur.
-  if (corps) vues.clear();
-  if (!r.ok) throw new Error(r.status === 401 ? 'Connectez-vous à votre compte pour recevoir la récompense.' : d.erreur ?? 'Publicité indisponible.');
-  return d as T;
+  const controle = new AbortController();
+  const annuler = () => controle.abort(signal?.reason);
+  if (signal?.aborted) annuler(); else signal?.addEventListener('abort', annuler, { once: true });
+  const delai = setTimeout(() => controle.abort(new Error('La connexion a pris trop de temps. Votre récompense reste récupérable.')), 15000);
+  try {
+    const r = await fetch(`/api/carriere?publicites=1${ligue ? `&ligue=${encodeURIComponent(ligue)}` : ''}`, {
+      method: corps ? 'POST' : 'GET', credentials: 'same-origin', cache: 'no-store', signal: controle.signal,
+      headers: corps ? { 'Content-Type': 'application/json' } : undefined,
+      body: corps ? JSON.stringify({ action: 'publicites', ...corps as object }) : undefined,
+    });
+    const d = await r.json();
+    // Toute écriture périme les vues gardées : la prochaine lecture repart du serveur.
+    if (corps) vues.clear();
+    if (!r.ok) throw new Error(r.status === 401 ? 'Connectez-vous à votre compte pour recevoir la récompense.' : d.erreur ?? 'Publicité indisponible.');
+    return d as T;
+  } finally { clearTimeout(delai); signal?.removeEventListener('abort', annuler); }
 }
 
 /**
@@ -62,6 +68,7 @@ class ServicePublicitesRecompensees {
   private chargement?: Promise<void>;
   private config?: ConfigPublicites;
   private terminer?: () => void;
+  private sessionActive?: string;
   initialize(config: ConfigPublicites): Promise<void> {
     this.config = config;
     if (!config.enabled) return Promise.reject(new Error('Publicités désactivées.'));
@@ -80,7 +87,7 @@ class ServicePublicitesRecompensees {
     return this.chargement;
   }
   isAvailable(): boolean { return Boolean(this.config?.enabled && window.initializeAndOpenPlayer && !this.terminer); }
-  cancel(): void { this.terminer?.(); }
+  cancel(id?: string): void { if (!id || id === this.sessionActive) this.terminer?.(); }
   showRewardedAd(contexte: ContextePub, session: SessionNavigateurPub): Promise<boolean> {
     if (!this.isAvailable() || session.contexte !== contexte) return Promise.reject(new Error('Publicité indisponible.'));
     const conteneur = document.getElementById('applixir-ad-container');
@@ -91,21 +98,31 @@ class ServicePublicitesRecompensees {
       let finie = false, complete = false, fermeture: ReturnType<typeof setTimeout> | undefined;
       const signaler = (evenement: string) => appelerPublicites({operation:'evenement',rewardSessionId:session.rewardSessionId,evenement}).catch(() => {});
       const finir = (ok: boolean, evenement?: string) => {
-        if (finie) return; finie = true; clearTimeout(delai); clearTimeout(fermeture); this.terminer = undefined;
+        if (finie) return; finie = true; clearTimeout(delai); clearTimeout(fermeture);
         // ⚠️ LA FIN EST ENREGISTRÉE AVANT QUE L'ÉCRAN NE RELISE SES COMPTEURS. Rendue tout de suite, la relecture partait avant
         // la fermeture : le serveur voyait encore la pub « en cours », l'écran affichait « Revenez demain » et n'y revenait plus.
         const envoi: Promise<unknown> = evenement ? signaler(evenement) : Promise.resolve();
         sessionOuverte(complete ? null : session.rewardSessionId);
-        for (const media of conteneur.querySelectorAll<HTMLMediaElement>('video,audio')) { media.pause(); media.removeAttribute('src'); media.load(); }
-        conteneur.replaceChildren();
-        for (const a of audios) { if (a.isConnected) void a.play().catch(() => {}); }
-        void Promise.race([envoi, new Promise(fin => setTimeout(fin, 4000))]).then(() => { sessionOuverte(null); resolve(ok); });
+        // Un lecteur tiers détaché ou un média en erreur ne doit jamais empêcher
+        // la résolution de la promesse et laisser toute l'offre « occupée ».
+        for (const media of conteneur.querySelectorAll<HTMLMediaElement>('video,audio')) {
+          try { media.pause(); media.removeAttribute('src'); media.load(); } catch { /* nettoyage facultatif */ }
+        }
+        try { conteneur.replaceChildren(); } catch { /* le portail peut déjà être démonté */ }
+        for (const a of audios) { try { if (a.isConnected) void a.play().catch(() => {}); } catch { /* son facultatif */ } }
+        void Promise.race([envoi, new Promise(fin => setTimeout(fin, 4000))]).then(() => {
+          // Le portail reste présent jusqu'à cette résolution. Un second lecteur
+          // ouvert plus tôt retrouverait l'ancien conteneur portant le même id.
+          this.terminer = undefined; this.sessionActive = undefined;
+          sessionOuverte(null); resolve(ok);
+        });
       };
       // Les callbacks locaux précèdent le traitement interne du SDK (reçu et télémétrie).
       // Ne pas retirer son lecteur au milieu de cette pile d'appels.
       const finirApresSdk = (evenement?: string) => queueMicrotask(() => finir(complete,complete ? undefined : evenement));
       const attendreFinSdk = () => { fermeture ??= setTimeout(() => finir(complete,complete ? undefined : 'NO_FILL'),5000); };
       this.terminer = () => finir(complete,complete ? undefined : 'CLOSED');
+      this.sessionActive = session.rewardSessionId;
       sessionOuverte(session.rewardSessionId);
       const delai = setTimeout(() => finir(complete,complete ? undefined : 'FAILED'),180000);
       try {

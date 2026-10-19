@@ -4,6 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "verify:champions-bloques": "vite-node scripts/verifierChampionsBloques.ts",
+    "verify:sirene-ballon-mort": "vite-node scripts/verifierSireneBallonMort.ts",
+    "verify:blocages:navigateur": "node scripts/verifierBlocagesNavigateur.cjs",
     "verify:physique-creation": "node --loader ./scripts/chargeurTests36.mjs scripts/verifierPhysiqueCreation.ts",
     "verify:correctif36": "vite-node scripts/verifierCorrectif36.ts",
     "verify:correctif41": "vite-node scripts/verifierCorrectif41.ts",

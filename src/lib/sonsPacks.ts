@@ -32,6 +32,7 @@ export function creerSonsPacks() {
   }
   function note(frequence: number, debut: number, duree: number, volume: number, type: OscillatorType = 'sine', pan = 0, fin = frequence) {
     if (!contexte || !entree || muet) return;
+    try {
     const osc = contexte.createOscillator(), gain = contexte.createGain(), stereo = contexte.createStereoPanner();
     const t = contexte.currentTime + debut;
     osc.type = type; osc.frequency.setValueAtTime(frequence, t);
@@ -41,9 +42,11 @@ export function creerSonsPacks() {
     stereo.pan.value = pan;
     osc.connect(gain); gain.connect(stereo); stereo.connect(entree);
     suivre(osc, [gain, stereo]); osc.start(t); osc.stop(t + duree + .01);
+    } catch { /* Le pack s'ouvre aussi quand le navigateur refuse un son. */ }
   }
   function cliquet(debut: number, intensite = 1, pan = 0) {
     if (!contexte || !entree || muet) return;
+    try {
     const buffer = contexte.createBuffer(1, Math.ceil(contexte.sampleRate * .035), contexte.sampleRate);
     const data = buffer.getChannelData(0);
     for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / data.length) ** 4;
@@ -52,6 +55,7 @@ export function creerSonsPacks() {
     gain.gain.value = .15 * intensite; stereo.pan.value = pan;
     source.connect(filtre); filtre.connect(gain); gain.connect(stereo); stereo.connect(entree);
     suivre(source, [filtre, gain, stereo]); source.start(contexte.currentTime + debut);
+    } catch { /* Un effet audio défaillant ne doit pas bloquer les cartes. */ }
   }
   function cloche(frequence: number, debut: number, volume = .075, pan = 0) {
     note(frequence, debut, .6, volume, 'sine', pan);

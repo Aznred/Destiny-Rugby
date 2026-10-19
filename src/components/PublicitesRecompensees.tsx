@@ -122,7 +122,7 @@ function useOffrePublicitaire({ contexte, ligue, article, onPack, onCosmetique }
   };
   const fermer = () => {
     if (!session) return;
-    if (occupe) RewardedAdsService.cancel();
+    if (occupe) RewardedAdsService.cancel(session.rewardSessionId);
     else void fermerPreparee().then(() => { publicitesModifiees(); });
     setSession(null);
   };
@@ -276,7 +276,7 @@ export function DeblocageCosmetiqueParPub({ article, possede = false, onCosmetiq
 
 function LecteurPublicite({ session, lecture, lancer, fermer }: { session: SessionNavigateurPub; lecture: boolean; lancer: () => void; fermer: () => void }) {
   const {overlayRef,dialogRef} = useModalDialog(fermer);
-  useEffect(() => () => { RewardedAdsService.cancel(); },[]);
+  useEffect(() => () => { RewardedAdsService.cancel(session.rewardSessionId); },[session.rewardSessionId]);
   const gain = session.contexte === 'SHOP_OVAS' ? `+ ${session.montant} Ovas` : session.contexte === 'COSMETIC' ? '1 pas vers ton cosmétique'
     : session.contexte === 'SHOP_PREMIUM_PACK' ? '1 pack Premium garanti' : '1 pack garanti';
   return createPortal(<div className="pub-overlay" ref={overlayRef}>

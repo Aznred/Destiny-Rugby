@@ -91,6 +91,23 @@ puis à la racine. Le jeu ne lit que `public/m3d/` (**85 `.glb`, 114 Mo**).
 
 ## Architecture
 
+### Champions, sirène et sortie des publicités — 19 octobre 2026
+
+`phasesFinalesJouees.ts` reprend les anciens nuls couperets sans issue : il inscrit uniquement le vainqueur désigné,
+conserve le score, puis laisse le tableau aller jusqu'au champion. Un match humain sans résultat reste à jouer.
+Les montées acquises par qualification restent indépendantes du titre. Banc : `verify:champions-bloques`.
+Les nouveaux matchs utilisent `reglesSirene: 'ballonMort'` : franchir 40/80 minutes ou dépasser un budget de temps
+ne coupe plus un ballon vivant. Touche, en-avant, maul coffré et autres ballons morts clôturent la période ; la pénalité,
+sa pénaltouche et la transformation due se jouent. Règles de ligue 12 ; les directs déjà ouverts conservent leur version.
+Bancs : `verify:sirene-ballon-mort`, `verify:duree-match`, `verify:reglements`.
+`useModalDialog` isole depuis le portail au premier plan et Échap ferme uniquement celui-ci ; les fermetures dans le
+désordre rendent le fond utilisable. `OuverturePack` partage ce verrou : restaurer son propre ancien `overflow` après
+la roulette laissait le défilement bloqué. Son portail passe devant la roulette et le test utilise le vrai composant.
+Le lecteur publicitaire s'annule par identifiant de session, son nettoyage et le
+son de roulette peuvent échouer sans bloquer l'offre ; les requêtes publicitaires expirent après 15 s sans crédit local.
+Recettes : `verify:publicites`, `verify:modales`, `verify:blocages:navigateur` (aperçu simulé sur 5188).
+Une vraie annonce AppLixir et son reçu signé restent à vérifier avec le fournisseur.
+
 ### Publicités des cartes
 
 `scripts/creerPublicitesCartes.cjs` produit la campagne FR/EN de 25 s en 1080 × 1920 à 60 images/s,

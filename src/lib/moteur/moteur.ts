@@ -432,8 +432,8 @@ export interface Avatar {
 }
 
 export interface OptionsMatch {
-  /** Les anciens directs gardent leur garde-fou historique ; les nouveaux attendent la transformation. */
-  reglesSirene?: 'historique' | 'transformation';
+  /** Les nouveaux matchs attendent un ballon mort ; les anciens directs gardent leur version de règles. */
+  reglesSirene?: 'historique' | 'transformation' | 'ballonMort';
   /** `historique` : les directs de ligue créés avant les règles 8 gardent l'ancienne pénaltouche (voir `EtatMatch.reglesPenaltouche`). */
   reglesPenaltouche?: 'historique';
   /** Un générateur dont le serveur conserve l'état permet les reprises exactes. */
@@ -662,7 +662,7 @@ export function creerMatch(
     ...((options.ia ?? 1) >= 2 && options.vent !== null ? ventDuMatch(options.vent ?? creerVent(cle)) : {}),
     styles: options.cadenceDetaillee || (options.ia ?? 1) >= 2 ? { A: styleDuClub(clubA), B: styleDuClub(clubB) } : undefined,
     scoreSurTerrain: options.scoreSurTerrain ?? true, meteoTir: options.meteoTir,
-    reglesSirene: options.reglesSirene,
+    reglesSirene: options.reglesSirene ?? 'ballonMort',
     ...(options.reglesPenaltouche ? { reglesPenaltouche: options.reglesPenaltouche } : {}),
     ...(options.departage && (options.scoreSurTerrain ?? true) ? { departage: {
       periodes: options.departage.periodes, duree: options.departage.minutes * 60, criteres: options.departage.criteres,
@@ -758,7 +758,7 @@ function tick(e: EtatMatch, compterBudget = true): void {
     const limite = budget * finDePeriode(e) / total;
     // Filet de sécurité ultime (15 min actives) uniquement si la sirène a déjà retenti et aucun tir n'est dû.
     // L'horloge progresse naturellement jusqu'à 80' sans saut artificiel ni coupure brutale en pleine attaque.
-    if (e.secondesActivesSolo >= limite + 180 && e.sirene && !coupDePiedDu(e) && !e.transformationDue) {
+    if (e.reglesSirene !== 'ballonMort' && e.secondesActivesSolo >= limite + 180 && e.sirene && !coupDePiedDu(e) && !e.transformationDue) {
       return clorePeriode(e);
     }
   }
@@ -803,11 +803,12 @@ function tick(e: EtatMatch, compterBudget = true): void {
     e.sirene = true;
     dire(e, 'jalon', null, C.texteMatch(e.periode === 1 ? 'sirenePremiere' : e.periode > 2 ? 'sireneProlongation' : 'sireneFinale'));
   }
-  // Garde-fou : temps additionnel maximum (6 minutes après la sirène).
+  // Rejoue des anciennes règles : temps additionnel maximum (6 minutes après la sirène).
+  // Les nouveaux matchs ne coupent plus un ballon vivant sur un délai arbitraire.
   // ⚠️ JAMAIS PENDANT UN ESSAI, SA TRANSFORMATION OU UN TIR (Correctif 29). En match de dix minutes l'horloge court huit
   // fois plus vite que l'écran : une longue séquence après la sirène dépassait les six minutes, et l'essai qui la
   // concluait était suivi du coup de sifflet final AVANT la transformation. Le filet absolu reste douze minutes plus loin.
-  if (e.sirene && !e.finSurSortieOuEnAvant && e.t > finPeriode + 360
+  if (e.reglesSirene !== 'ballonMort' && e.sirene && !e.finSurSortieOuEnAvant && e.t > finPeriode + 360
     && (e.reglesSirene === 'historique' || !coupDePiedDu(e) || (e.t > finPeriode + 1080 && !e.transformationDue))) {
     e.transformationDue = false;
     return clorePeriode(e);
@@ -2760,7 +2761,7 @@ function phaseBallonEnLAir(e: EtatMatch): void {
       v.auteur.stats.pointsAuPied = (v.auteur.stats.pointsAuPied ?? 0) + 3;
       marquer(e, camp, 3);
       dire(e, 'but', camp, C.phrase(e.rng, C.DROP, { nom: v.auteur.nom }), 3, v.auteur.moi);
-      if (e.sirene && !e.finSurSortieOuEnAvant) return clorePeriode(e);
+      if (e.sirene && (!e.finSurSortieOuEnAvant || e.reglesSirene === "ballonMort")) return clorePeriode(e);
       return preparerCoupEnvoi(e, adverse(camp));
     }
     dire(e, 'butRate', camp, C.texteMatch('dropRate', { nom: v.auteur.nom }), 0, v.auteur.moi);
@@ -6581,8 +6582,8 @@ function arret(e: EtatMatch, quoi: Phase, pour: Cote, lieu: Vec, enAvant = false
 ): void {
   // Une période se termine sur ballon mort (touche, mêlée/en-avant, renvoi 22),
   // mais JAMAIS sur une pénalité qui doit toujours pouvoir être disputée.
-  if (e.sirene && !(dePenalite && jeuVivant(e))
-    && (e.finSurSortieOuEnAvant ? quoi === 'touche' || enAvant : quoi !== 'penalite')) return clorePeriode(e);
+  if (e.sirene && !(dePenalite && (jeuVivant(e) || e.reglesSirene === 'ballonMort'))
+    && (e.finSurSortieOuEnAvant && e.reglesSirene !== 'ballonMort' ? quoi === 'touche' || enAvant : quoi !== 'penalite')) return clorePeriode(e);
   e.possession = pour;
   e.porteur = null;
   e.vol = null;
@@ -8899,10 +8900,10 @@ function phaseTirAuBut(e: EtatMatch): void {
   e.tir = null;
   e.placement = null;
   if (reussi) {
-    if (e.sirene && !e.finSurSortieOuEnAvant) return clorePeriode(e);
+    if (e.sirene && (!e.finSurSortieOuEnAvant || e.reglesSirene === "ballonMort")) return clorePeriode(e);
     return preparerCoupEnvoi(e, adverse(cote));
   }
-  if (e.sirene && !e.finSurSortieOuEnAvant) return clorePeriode(e);
+  if (e.sirene && (!e.finSurSortieOuEnAvant || e.reglesSirene === "ballonMort")) return clorePeriode(e);
   return arret(e, 'renvoi22', adverse(cote), {
     x: adverse(cote) === 'A' ? M22_A : M22_B, y: AXE,
   });
@@ -8980,7 +8981,7 @@ function phaseTransformation(e: EtatMatch): void {
   e.placement = null;
   // Le tir est résolu : la période peut maintenant se terminer.
   e.transformationDue = false;
-  if (e.sirene && !e.finSurSortieOuEnAvant) return clorePeriode(e);
+  if (e.sirene && (!e.finSurSortieOuEnAvant || e.reglesSirene === "ballonMort")) return clorePeriode(e);
   preparerCoupEnvoi(e, adverse(cote));
 }
 
@@ -9614,7 +9615,7 @@ function phaseAplatissage(e: EtatMatch): void {
 function phaseApresEssai(e: EtatMatch): void {
   if (e.minuteur > 0) return;
   e.placement = null;
-  if (e.sirene && !e.finSurSortieOuEnAvant) return clorePeriode(e);
+  if (e.sirene && (!e.finSurSortieOuEnAvant || e.reglesSirene === "ballonMort")) return clorePeriode(e);
   preparerCoupEnvoi(e, e.possession);
 }
 

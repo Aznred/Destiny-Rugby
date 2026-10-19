@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 
 let modalesOuvertes = 0;
 let ancienDebordement = '';
@@ -19,6 +19,27 @@ const SELECTEUR_FOCUS = [
 // par la seconde : toute l'application restait morte au toucher, sans erreur.
 // Ici l'état d'origine est pris à la PREMIÈRE prise et rendu à la dernière.
 const prises = new Map<HTMLElement, { n: number; inert: boolean; ariaHidden: string | null }>();
+const dialogues = new Set<HTMLElement>();
+const isolesParLesDialogues = new Set<HTMLElement>();
+
+function dialogueAuPremierPlan(): HTMLElement | undefined {
+  // L'ordre du DOM est celui des portails. Les effets React d'un enfant peuvent
+  // s'exécuter avant ceux de son parent : leur ordre d'inscription ne suffit pas.
+  return [...dialogues].filter(e => e.isConnected).sort((a, b) =>
+    a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1).at(-1);
+}
+
+function actualiserIsolation() {
+  const premier = dialogueAuPremierPlan();
+  const autres = new Set([...document.body.children].filter((element): element is HTMLElement =>
+    element instanceof HTMLElement && Boolean(premier) && !element.contains(premier!)));
+  for (const element of isolesParLesDialogues) if (!autres.has(element)) {
+    rendre(element); isolesParLesDialogues.delete(element);
+  }
+  for (const element of autres) if (!isolesParLesDialogues.has(element)) {
+    isoler(element); isolesParLesDialogues.add(element);
+  }
+}
 
 export function isoler(element: HTMLElement) {
   const prise = prises.get(element);
@@ -43,6 +64,7 @@ export function rendre(element: HTMLElement) {
  */
 export function libererArrierePlan() {
   if (modalesOuvertes > 0 || typeof document === 'undefined') return;
+  isolesParLesDialogues.clear();
   for (const element of [...prises.keys()]) { prises.delete(element); element.inert = false; element.removeAttribute('aria-hidden'); }
   for (const element of document.body.children) {
     if (element instanceof HTMLElement && element.inert && !element.dataset.inertVoulu) { element.inert = false; element.removeAttribute('aria-hidden'); }
@@ -57,26 +79,27 @@ export function useModalDialog(onFermer: () => void) {
   const fermerRef = useRef(onFermer);
   fermerRef.current = onFermer;
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const overlay = overlayRef.current;
     const dialogue = dialogRef.current;
     if (!overlay || !dialogue) return;
     if (modalesOuvertes++ === 0) { ancienDebordement = document.body.style.overflow; document.body.style.overflow = 'hidden'; }
+    dialogues.add(overlay);
 
     const precedent = document.activeElement instanceof HTMLElement
       ? document.activeElement
       : null;
-    const autres = [...document.body.children]
-      .filter((element): element is HTMLElement => element instanceof HTMLElement && element !== overlay);
-    for (const element of autres) isoler(element);
+    actualiserIsolation();
 
     const focusables = () => [...dialogue.querySelectorAll<HTMLElement>(SELECTEUR_FOCUS)]
       .filter((element) => !element.hidden && element.getClientRects().length > 0);
-    (focusables()[0] ?? dialogue).focus();
+    if (dialogueAuPremierPlan() === overlay) (focusables()[0] ?? dialogue).focus();
 
     const clavier = (event: KeyboardEvent) => {
+      if (dialogueAuPremierPlan() !== overlay) return;
       if (event.key === 'Escape') {
         event.preventDefault();
+        event.stopImmediatePropagation();
         fermerRef.current();
         return;
       }
@@ -102,8 +125,10 @@ export function useModalDialog(onFermer: () => void) {
     return () => {
       document.removeEventListener('keydown', clavier, true);
       if (--modalesOuvertes === 0) document.body.style.overflow = ancienDebordement;
-      for (const element of autres) rendre(element);
-      precedent?.focus();
+      const etaitAuPremierPlan = dialogueAuPremierPlan() === overlay || !overlay.isConnected;
+      dialogues.delete(overlay);
+      actualiserIsolation();
+      if (etaitAuPremierPlan && precedent?.isConnected && !precedent.closest('[inert]')) precedent.focus();
     };
   }, []);
 

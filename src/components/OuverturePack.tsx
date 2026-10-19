@@ -6,6 +6,7 @@ import { creerSonsPacks } from '../lib/sonsPacks';
 import { PALIERS_PACK, rangPack, modeleElite1 } from '../lib/presentationPacks';
 import { t } from '../lib/i18n';
 import { signaler } from '../lib/tutoriel/guide';
+import { useModalDialog } from '../lib/useModalDialog';
 import './OuverturePack.css';
 
 // ⚠️ CE `lazy` N'EST PLUS LE PREMIER À DEMANDER LE MODULE. `Pack3D` tire
@@ -62,10 +63,13 @@ export default function OuverturePack({ cartes, pack, modele, garantie, apparenc
   const [muet, setMuet] = useState(false);
   const [calme, setCalme] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   const sons = useMemo(creerSonsPacks, []);
-  const dialogue = useRef<HTMLDivElement>(null);
   const principale = useRef<HTMLButtonElement>(null);
   const cartesRefs = useRef<(HTMLDivElement | null)[]>([]);
   const toutes = pret && revelees >= ordre.length;
+  const { overlayRef, dialogRef: dialogue } = useModalDialog(() => {
+    if (phase === 'cartes' && toutes) onFermer();
+    else if (pret && phase === 'ouverture') { setInstant(true); sons.arreter(); setPhase('cartes'); setRevelees(ordre.length); }
+  });
   const rarete = evolutionElite ? 'elite' : PALIERS_PACK[rang];
   // La famille de la meilleure carte spéciale colore l'éclat d'ouverture.
   // ⚠️ SEULEMENT À L'OUVERTURE : avant, la pochette ne dit que son palier, sinon
@@ -75,12 +79,9 @@ export default function OuverturePack({ cartes, pack, modele, garantie, apparenc
   // La première carte spéciale tirée a droit à son explication (file du tutoriel : jamais par-dessus un autre).
   useEffect(() => { if (speciale) signaler('context.carteSpeciale'); }, [speciale]);
   useEffect(() => {
-    const precedent = document.activeElement as HTMLElement | null;
-    const overflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden'; dialogue.current?.focus();
     const media = window.matchMedia('(prefers-reduced-motion: reduce)');
     const changer = () => setCalme(media.matches); media.addEventListener('change', changer);
-    return () => { document.body.style.overflow = overflow; precedent?.focus(); sons.detruire(); media.removeEventListener('change', changer); };
+    return () => { sons.detruire(); media.removeEventListener('change', changer); };
   }, [sons]);
   useEffect(() => {
     if (phase !== 'charge' && phase !== 'evolution') return;
@@ -156,19 +157,12 @@ export default function OuverturePack({ cartes, pack, modele, garantie, apparenc
   useEffect(() => {
     const clavier = (e: KeyboardEvent) => {
       if (e.key.toLowerCase() === 'm') { sons.couper(!muet); setMuet(!muet); }
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        if (phase === 'cartes' && toutes) onFermer();
-        else if (pret && phase === 'ouverture') { setInstant(true); sons.arreter(); setPhase('cartes'); setRevelees(ordre.length); }
-      }
     };
     window.addEventListener('keydown', clavier);
     if (!dialogue.current?.contains(document.activeElement)) (principale.current ?? dialogue.current)?.focus();
     return () => window.removeEventListener('keydown', clavier);
-  }, [phase, toutes, ordre.length, onFermer, muet, sons, pret]);
-  return createPortal(<div ref={dialogue} tabIndex={-1} className={`pack-show phase-${phase} palier-${rarete}${eclatSpecial}${calme ? ' calme' : ''}${instant ? ' instant' : ''}`} style={{ '--pack-color': eclatSpecial ? (speciale === 'halloween' ? '#ff8a1c' : '#e8c46a') : evolutionElite ? COULEURS[rang ? 2 : 3] : COULEURS[rang] } as CSSProperties} role="dialog" aria-modal="true" aria-labelledby="pack-show-title" onKeyDown={e => {
-    if (e.key === 'Tab') { const elements = Array.from(dialogue.current?.querySelectorAll<HTMLElement>('button:not(:disabled), [tabindex="0"]') ?? []); const premier = elements[0], dernier = elements[elements.length-1]; if (e.shiftKey && document.activeElement === premier) { e.preventDefault(); dernier?.focus(); } else if (!e.shiftKey && document.activeElement === dernier) { e.preventDefault(); premier?.focus(); } }
-  }}><main className="pack-show-main cel-panneau">
+  }, [phase, toutes, ordre.length, onFermer, muet, sons, pret, dialogue]);
+  return createPortal(<div ref={noeud => { overlayRef.current = noeud; dialogue.current = noeud; }} tabIndex={-1} className={`pack-show phase-${phase} palier-${rarete}${eclatSpecial}${calme ? ' calme' : ''}${instant ? ' instant' : ''}`} style={{ '--pack-color': eclatSpecial ? (speciale === 'halloween' ? '#ff8a1c' : '#e8c46a') : evolutionElite ? COULEURS[rang ? 2 : 3] : COULEURS[rang] } as CSSProperties} role="dialog" aria-modal="true" aria-labelledby="pack-show-title"><main className="pack-show-main cel-panneau">
     <div className="pack-show-heading"><p className="eyebrow">{t("ui.4dfd1ccc8b22", { v0: pack, v1: cartes ? ` · ${t('online.shop.cards',{n:cartes.length})}` : '' })}</p><h2 id="pack-show-title" key={phase} aria-live="polite">{phase === 'cartes' ? t('online.pack.recruits') : pack}</h2></div>
     {phase !== 'cartes' ? <><div className="pack-show-stage">
       <div className="pack-show-beams" aria-hidden="true"/><div className="pack-show-orbit" aria-hidden="true"/>

@@ -113,7 +113,9 @@ try {
   const callbacksRetardes=await Promise.all([callback(signature(derniere.donnees.rewardSessionId)),callback(signature(annulee.donnees.rewardSessionId))]);
   egal(callbacksRetardes.map(r=>r.statut).sort(),[200,403],'callbacks concurrents et retardés soumis au plafond quotidien');
   const sansAnnonce=await action('kiri','commencer',{contexte:'SHOP_OVAS'});
-  await action('kiri','evenement',{rewardSessionId:sansAnnonce.donnees.rewardSessionId,evenement:'NO_FILL'});
+  egal(sansAnnonce.statut,200,'session sans annonce créée');
+  egal((await action('kiri','evenement',{rewardSessionId:sansAnnonce.donnees.rewardSessionId,evenement:'NO_FILL'})).statut,200,'absence d’annonce enregistrée');
+  egal((await db.publicites!.statistiques()).noFill,1,'absence d’annonce comptée avant redémarrage');
 
   const ligue=randomUUID();
   let etat=creerCarriere({id:ligue,code:'PUBBANC',nom:'Banc Publicités',compteId:joueur,pseudo:'Alice',clubNom:'Club Test',maxClubs:2,rythme:3,

@@ -20,8 +20,20 @@ export function jouerAutresPhasesFinales(saison: number, semaine: number, clubPr
   for (let garde = 0; garde < 8; garde++) {
     let joues = 0;
     for (const m of phases()) {
-      if (m.status !== 'scheduled' || m.semaine > semaine || resultatJoue(m.cle)
-        || m.domicile === clubProtege || m.exterieur === clubProtege) continue;
+      if (m.semaine > semaine) continue;
+      const inscrit = resultatJoue(m.cle);
+      // Certaines sauvegardes ont conservé un nul couperet sans son issue : le
+      // tour restait « en cours » pour toujours et personne ne pouvait être champion.
+      // On conserve le score et tous les joueurs ; seul le départage manquant est inscrit.
+      if (m.status === 'in_progress' && inscrit && inscrit.scoreD === inscrit.scoreE && !inscrit.vainqueurDesigne) {
+        const fin = departager(m.cle, inscrit.scoreD, inscrit.scoreE);
+        const vainqueur = fin.issue?.vainqueur;
+        const match: MatchChampionnat = { ...inscrit, prolongation: true,
+          vainqueurDesigne: vainqueur ? vainqueur === m.domicile ? 'D' : 'E' : fin.scorePour > fin.scoreContre ? 'D' : 'E' };
+        enregistrerResultatJoue(m.cle, match); resultats[m.cle] = match; joues++;
+        continue;
+      }
+      if (m.status !== 'scheduled' || inscrit || m.domicile === clubProtege || m.exterieur === clubProtege) continue;
       const brut = jouerRencontre(m.domicile, m.exterieur, saison, m.cle, null);
       const fin = departager(m.cle, brut.scoreD, brut.scoreE);
       const match = { ...brut, scoreD: fin.scorePour, scoreE: fin.scoreContre, prolongation: fin.prolongation };

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { PUBLICITES_PAR_DEFAUT } from '../src/lib/publicitesRecompensees';
-import { RewardedAdsService, type SessionNavigateurPub } from '../src/lib/rewardedAdsService';
+import { appelerPublicites, RewardedAdsService, type SessionNavigateurPub } from '../src/lib/rewardedAdsService';
 
 let scripts=0,lecteurs=0,pauses=0,reprises=0,nettoyages=0, chargementEchoue=true;
 let options: Parameters<NonNullable<Window['initializeAndOpenPlayer']>>[0];
@@ -36,7 +36,9 @@ p=RewardedAdsService.showRewardedAd('DAILY_PACK',session);options!.adErrorCallba
 p=RewardedAdsService.showRewardedAd('DAILY_PACK',session);RewardedAdsService.cancel();assert.equal(await p,false);
 p=RewardedAdsService.showRewardedAd('DAILY_PACK',session);options!.adStatusCallbackFn({type:'start'});options!.adStatusCallbackFn({type:'complete'});options!.adStatusCallbackFn({type:'allAdsCompleted'});
 assert.equal(nettoyages,4,'lecteur conservé pendant l’envoi du reçu fournisseur');
-options!.adStatusCallbackFn({type:'thankYouModalClosed'});assert.equal(nettoyages,4,'nettoyage différé après le dernier callback SDK');assert.equal(await p,true);
+options!.adStatusCallbackFn({type:'thankYouModalClosed'});assert.equal(nettoyages,4,'nettoyage différé après le dernier callback SDK');
+assert.equal(RewardedAdsService.isAvailable(),false,'pas de second lecteur avant la résolution et la fermeture du portail');
+assert.equal(await p,true);
 fenetre.initializeAndOpenPlayer=()=>Promise.reject(new Error('initialisation distante refusée'));
 p=RewardedAdsService.showRewardedAd('DAILY_PACK',session);assert.equal(await p,false,'rejet asynchrone SDK ferme et libère la tentative');
 fenetre.initializeAndOpenPlayer=sdk;
@@ -46,4 +48,24 @@ assert.equal(await p,true,'complétion tardive dans le même cycle reconnue');
 assert.equal(nettoyages,7,'player vidé à chaque fin');assert.equal(pauses,7);assert.equal(reprises,7,'audio repris à chaque fin');
 assert.deepEqual(evenements,['NO_FILL','CLOSED','NO_FILL','CLOSED','STARTED','WATCHED','FAILED','WATCHED'],'WATCHED est un suivi local et jamais une validation de récompense');
 assert.equal(RewardedAdsService.isAvailable(),true,'aucun lecteur ou verrou conservé');
+const suivante = { ...session, rewardSessionId: 'b'.repeat(36) };
+p = RewardedAdsService.showRewardedAd('DAILY_PACK', suivante);
+RewardedAdsService.cancel(session.rewardSessionId);
+assert.equal(RewardedAdsService.isAvailable(),false,'le démontage d’un ancien lecteur ne ferme pas une nouvelle session');
+const mediaDefectueux = { pause: () => { throw new Error('média détaché'); } };
+Object.assign(conteneur, { querySelectorAll: () => [mediaDefectueux] });
+Object.assign(audio, { play: () => { throw new Error('lecture refusée'); } });
+options!.adStatusCallbackFn({ type: 'complete' });
+options!.adStatusCallbackFn({ type: 'thankYouModalClosed' });
+assert.equal(await p, true, 'une erreur de nettoyage ou de reprise audio ne bloque pas la fin');
+assert.equal(RewardedAdsService.isAvailable(),true);
+// Une requête sans réponse se termine et rend la main à l'offre.
+const temporiser = globalThis.setTimeout;
+globalThis.setTimeout = ((f: (...args: unknown[]) => void, ms?: number, ...args: unknown[]) =>
+  temporiser(f, ms === 15000 ? 5 : ms, ...args)) as typeof setTimeout;
+Object.defineProperty(globalThis,'fetch',{value:async (_url:unknown, init:RequestInit) => new Promise((_res, rej) => {
+  init.signal?.addEventListener('abort', () => rej(init.signal?.reason), { once: true });
+}),configurable:true});
+try { await assert.rejects(appelerPublicites(), /connexion a pris trop de temps/); }
+finally { globalThis.setTimeout = temporiser; }
 console.log('Service SDK validé : relance du chargement, start IMA, cycle complet, reçu avant nettoyage, rejet asynchrone et complétion tardive.');

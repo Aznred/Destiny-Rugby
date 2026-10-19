@@ -3,8 +3,9 @@
 //   /scripts/apercuCorrectif42.html             les trois usages
 //   /scripts/apercuCorrectif42.html?epuise=1    les deux récompenses de ligue déjà utilisées
 //   /scripts/apercuCorrectif42.html?vue=labo    le Labo
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import OuverturePack from '../src/components/OuverturePack';
 import { DeblocageCosmetiqueParPub, ManqueOvasLigue, OffrePublicitaire } from '../src/components/PublicitesRecompensees';
 import { LaboPublicites } from '../src/components/LaboPublicites';
 import type { SessionNavigateurPub } from '../src/lib/rewardedAdsService';
@@ -55,8 +56,10 @@ window.initializeAndOpenPlayer = (options) => {
   };
   conteneur.appendChild(bouton); options.adStatusCallbackFn({ type: 'start' });
 };
+const fetchReel = window.fetch.bind(window);
 window.fetch = async (adresse, options) => {
   const url = String(adresse), body = options?.body ? JSON.parse(String(options.body)) : null;
+  if (!new URL(url, location.href).pathname.startsWith('/api/')) return fetchReel(adresse, options);
   let donnees: unknown, statut = 200;
   if (url.includes('atelier')) donnees = { revision: 0, config, modeEffectif: 'TEST', callbackConfigure: true, packs, chances: chancesPacksPub(packs, Date.now()),
     statistiques: { ...STATS_PUB_VIDES(), requested: 61, started: 55, completed: 48, joueurs: 17, packsEarned: 30,
@@ -91,8 +94,16 @@ activerSynchronisationBoutiqueCompte();
 
 function Apercu() {
   const [manque, setManque] = useState(false);
+  const [packOuvert, setPackOuvert] = useState('');
+  const finPack = useRef<() => void>(() => {});
   const [journal, setJournal] = useState<string[]>([]);
   const noter = (ligne: string) => setJournal((j) => [...j, ligne]);
+  const ouvrir = async (ligne: string, nom: string) => {
+    if (parametres.has('pack')) await new Promise<void>(resolve => {
+      finPack.current = () => { setPackOuvert(''); resolve(); }; setPackOuvert(nom);
+    });
+    noter(ligne);
+  };
   if (parametres.get('vue') === 'labo') return <main style={{ maxWidth: 1200, margin: 'auto', padding: '1rem' }}><LaboPublicites /></main>;
   return <main style={{ maxWidth: 1100, margin: 'auto', padding: '1rem', display: 'grid', gap: '1rem' }}>
     <h1>Correctif 42 · aperçu simulé</h1>
@@ -100,9 +111,9 @@ function Apercu() {
       <h2>Ligue en ligne</h2>
       <p className="aide">Un pack à 300 Ovas, un solde de 120 : la fenêtre propose la publicité, sur le compteur du Pack Pub.</p>
       <button className="btn primaire" data-essai="manque" onClick={() => setManque(true)}>Ouvrir le pack Or (300 Ovas)</button>
-      <OffrePublicitaire contexte="DAILY_PACK" ligue="ligue-apercu" onPack={async (id, pack) => noter(`Ligue : ${pack.nom} ouvert (${id.slice(0, 8)})`)} />
+      <OffrePublicitaire contexte="DAILY_PACK" ligue="ligue-apercu" onPack={async (id, pack) => ouvrir(`Ligue : ${pack.nom} ouvert (${id.slice(0, 8)})`, pack.nom)} />
       {manque && <ManqueOvasLigue ligue="ligue-apercu" pack="Or" manque={180} onFermer={() => setManque(false)} onObtenir={() => noter('Vers l’onglet du club')}
-        onPack={async (id, pack) => noter(`Ligue (fenêtre) : ${pack.nom} ouvert (${id.slice(0, 8)})`)} />}
+        onPack={async (id, pack) => ouvrir(`Ligue (fenêtre) : ${pack.nom} ouvert (${id.slice(0, 8)})`, pack.nom)} />}
     </section>
     <section className="carte" style={{ padding: '1rem' }}>
       <h2>Boutique</h2>
@@ -118,6 +129,10 @@ function Apercu() {
       </div>
     </section>
     <ol data-essai="journal">{journal.map((ligne, i) => <li key={i}>{ligne}</li>)}</ol>
+    {packOuvert && <PackDeVerification nom={packOuvert} fermer={() => finPack.current()} />}
   </main>;
+}
+function PackDeVerification({ nom, fermer }: { nom: string; fermer: () => void }) {
+  return <OuverturePack pack={nom} cartes={[]} garantie="bronze" onFermer={fermer} rendreCarte={() => null} />;
 }
 createRoot(document.getElementById('root')!).render(<Apercu />);

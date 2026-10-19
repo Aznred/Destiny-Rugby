@@ -869,7 +869,7 @@ export interface EtatMatch {
    * résultat, un bonus ou la différence de points. Baissé quand le tir est résolu.
    */
   transformationDue?: boolean;
-  reglesSirene?: 'historique' | 'transformation';
+  reglesSirene?: 'historique' | 'transformation' | 'ballonMort';
   /**
    * `historique` : une pénaltouche retombée dans le champ redevient un ballon ordinaire (les matchs de ligue créés avant
    * les règles 8 se rejouent ainsi). Absent : le lancer reste au botteur, rebonds compris (Correctif 33).
