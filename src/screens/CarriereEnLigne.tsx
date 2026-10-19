@@ -1797,18 +1797,38 @@ export function Composition({ vue, agir, occupe, erreur = '' }: { vue: VueCarrie
  * `verifierDepart` : les cartes verrouillées (déjà en vente, déjà promises à
  * un échange) ne comptent pas dans l'effectif disponible.
  */
-function Effectif({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; occupe: boolean }) {
+const CARTES_PAR_PAGE_EFFECTIF = 12;
+
+export function Effectif({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; occupe: boolean }) {
   const logos = useLogosDeClub();
   const [tri, setTri] = useState('note');
   const [famille, setFamille] = useState('');
+  const [page, setPage] = useState(0);
+  const debut = useRef<HTMLDivElement>(null);
   const [demande, setDemande] = useState<CarteCarriere[] | null>(null);
   const [selection, setSelection] = useState<string[]>([]);
-  const feuille = feuilleDeMatch(vue.clubs.find(c => c.id === vue.monClubId));
-  const toutes = vue.cartes.filter(c => c.proprietaire === vue.monClubId);
-  const cartes = toutes
+  const feuille = useMemo(() => feuilleDeMatch(vue.clubs.find(c => c.id === vue.monClubId)), [vue.clubs, vue.monClubId]);
+  const toutes = useMemo(() => vue.cartes.filter(c => c.proprietaire === vue.monClubId), [vue.cartes, vue.monClubId]);
+  const cartes = useMemo(() => toutes
     .filter(c => !famille || c.famille === famille)
-    .sort((a, b) => tri === 'note' ? b.note - a.note : tri === 'poste' ? (POSTE_PAR_ID[a.poste]?.numero ?? 0) - (POSTE_PAR_ID[b.poste]?.numero ?? 0) : tri === 'age' ? a.age - b.age : a.nom.localeCompare(b.nom, 'fr'));
+    .sort((a, b) => tri === 'note' ? b.note - a.note : tri === 'poste' ? (POSTE_PAR_ID[a.poste]?.numero ?? 0) - (POSTE_PAR_ID[b.poste]?.numero ?? 0) : tri === 'age' ? a.age - b.age : a.nom.localeCompare(b.nom, 'fr')), [toutes, famille, tri]);
   const familles = [...new Set(toutes.map(c => c.famille))];
+  // Seule la page visible est montée : une longue grille de cartes illustrées
+  // et filtrées alourdit fortement le défilement mobile. La sélection garde les
+  // identifiants de tout l'effectif, indépendamment des pages et des filtres.
+  const pages = Math.max(1, Math.ceil(cartes.length / CARTES_PAR_PAGE_EFFECTIF));
+  const pageAffichee = Math.min(page, pages - 1);
+  const visibles = cartes.slice(pageAffichee * CARTES_PAR_PAGE_EFFECTIF, (pageAffichee + 1) * CARTES_PAR_PAGE_EFFECTIF);
+  const changerPage = (prochaine: number) => {
+    setPage(Math.max(0, Math.min(prochaine, pages - 1)));
+    debut.current?.scrollIntoView({ block: 'start' });
+  };
+  const pagination = pages > 1 && <nav className="cel-pagination-effectif" aria-label={t('online.squad.title')}>
+    <button type="button" className="btn fantome petit" disabled={pageAffichee === 0} onClick={() => changerPage(pageAffichee - 1)}>{t('solo.pagination.prev')}</button>
+    <span aria-live="polite">{t('solo.pagination.page', { page: pageAffichee + 1, pages })}</span>
+    <button type="button" className="btn fantome petit" disabled={pageAffichee === pages - 1} onClick={() => changerPage(pageAffichee + 1)}>{t('solo.pagination.next')}</button>
+  </nav>;
+  const selectionnee = new Set(selection);
 
   const cessible = (c: CarteCarriere) => !c.verrou && !feuille.has(c.id);
   /**
@@ -1819,7 +1839,7 @@ function Effectif({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; 
    */
   const groupable = (c: CarteCarriere) => cessible(c) && !c.favori;
   const favoris = cartes.filter(c => c.favori && cessible(c)).length;
-  const choisies = toutes.filter(c => selection.includes(c.id) && cessible(c));
+  const choisies = toutes.filter(c => selectionnee.has(c.id) && cessible(c));
   const total = choisies.reduce((somme, c) => somme + valeurVenteRapide(c), 0);
   const disponibles = toutes.filter(c => !c.verrou).length;
   const restants = disponibles - choisies.length;
@@ -1839,11 +1859,11 @@ function Effectif({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; 
     void agir(lot.length === 1 ? { type: 'venteRapide', carteId: lot[0].id } : { type: 'venteRapideGroupee', carteIds: lot.map(c => c.id) });
   };
 
-  return <>
+  return <div className="cel-effectif" ref={debut}>
     <section className="cel-panneau cel-filtres">
       <div><div className="eyebrow">{cartes.length} {t('online.common.players')}</div><h2>{t('online.squad.title')}</h2></div>
-      <Choix label={t('online.squad.sort')} valeur={tri} options={[['note', 'GEN'], ['poste', t('online.squad.position')], ['age', t('compo.ans')], ['nom', t('solo.search')]]} onChange={setTri} />
-      <Choix label={t('online.squad.position')} valeur={famille} options={[['', t('online.squad.allPositions')], ...familles.map(f => [f, nomPoste(POSTES_XV_MANAGER.find(p => POSTE_PAR_ID[p].famille === f) ?? 'arriere')] as [string, string])]} onChange={setFamille} />
+      <Choix label={t('online.squad.sort')} valeur={tri} options={[['note', 'GEN'], ['poste', t('online.squad.position')], ['age', t('compo.ans')], ['nom', t('solo.search')]]} onChange={valeur => { setTri(valeur); setPage(0); }} />
+      <Choix label={t('online.squad.position')} valeur={famille} options={[['', t('online.squad.allPositions')], ...familles.map(f => [f, nomPoste(POSTES_XV_MANAGER.find(p => POSTE_PAR_ID[p].famille === f) ?? 'arriere')] as [string, string])]} onChange={valeur => { setFamille(valeur); setPage(0); }} />
       <button type="button" className="btn fantome petit" disabled={!cartes.some(groupable)}
         title={favoris ? tn("ui.a845aee4e903", favoris, { v0: favoris }) : undefined}
         onClick={() => setSelection(liste => cartes.filter(groupable).every(c => liste.includes(c.id)) ? [] : [...new Set([...liste, ...cartes.filter(groupable).map(c => c.id)])].slice(0, maximumVendable))}>
@@ -1857,12 +1877,16 @@ function Effectif({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; 
       )}
     </section>
 
-    <div className="cel-grille-cartes">{cartes.map(c => {
+    {pagination}
+    {/* Les douze emplacements réutilisent leur dessin SVG et ses identifiants.
+        La sélection appartient aux cartes, en dehors de ces composants ; le
+        portrait réinitialise déjà ses échecs quand le joueur change. */}
+    <div className="cel-grille-cartes">{visibles.map((c, emplacement) => {
       const maillot = feuille.get(c.id);
       const estBlesse = Boolean(c.blesseJusqua && c.blesseJusqua > maintenantISO());
       const libre = cessible(c);
-      const choisie = libre && selection.includes(c.id);
-      return <div className={`cel-carte-quick${choisie ? ' choisie' : ''}${c.favori ? ' favorite' : ''}${estBlesse ? ' cel-carte-blessee' : ''}`} key={c.id}>
+      const choisie = libre && selectionnee.has(c.id);
+      return <div className={`cel-carte-quick${choisie ? ' choisie' : ''}${c.favori ? ' favorite' : ''}${estBlesse ? ' cel-carte-blessee' : ''}`} key={emplacement} data-carte-id={c.id}>
         {libre && <button type="button" className="cel-coche" aria-pressed={choisie} aria-label={choisie ? t('online.squad.deselectPlayer', { name: c.nom }) : t('online.squad.selectPlayer', { name: c.nom })} onClick={() => basculer(c.id)}><Icone nom="check" taille={13} /></button>}
         {estBlesse && (
           <span className="cel-badge-blessure-flottant" title={t('online.infirmary.injuredUntilTooltip', { date: dateHeure(c.blesseJusqua!), time: formatTempsBlessureDetaille(c.blesseJusqua!) })}>
@@ -1886,6 +1910,7 @@ function Effectif({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; 
         </button>
       </div>;
     })}</div>
+    {pagination}
     {!cartes.length && <Vide icone="equipe" titre={t('online.squad.emptyPositionTitle')}>{t('online.squad.emptyPositionHelp')}</Vide>}
 
     {/* La barre ne s'affiche qu'une fois quelque chose de coché : tant qu'on
@@ -1915,7 +1940,7 @@ function Effectif({ vue, agir, occupe }: { vue: VueCarriereEnLigne; agir: Agir; 
       onNon={() => setDemande(null)}
       onOui={() => vendre(demande)}
     />}
-  </>;
+  </div>;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

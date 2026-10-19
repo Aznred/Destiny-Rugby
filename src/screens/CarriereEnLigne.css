@@ -957,6 +957,16 @@
 .cel-barre-selection b { display: block; font-family: var(--police-forte); }
 .cel-barre-selection small { color: var(--craie-dim); font-size: 0.8rem; }
 .cel-barre-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+/* Effectif : douze cartes montées au maximum, sans surfaces de flou pendant
+   le défilement. La coche et le cadre du bouton suffisent à signaler le lot. */
+.cel-effectif { min-width: 0; scroll-margin-top: 1rem; }
+.cel-pagination-effectif { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin: 0.85rem 0; }
+.cel-pagination-effectif span { color: var(--craie-dim); font-size: 0.8rem; text-align: center; }
+.cel-pagination-effectif .btn { min-height: 44px; }
+.cel-effectif .cel-carte-quick > .cel-carte.dr-player { filter: none; }
+.cel-effectif .cel-coche, .cel-effectif .cel-favori { backdrop-filter: none; background-color: #07130d; }
+.cel-effectif .choisie .cel-coche, .cel-effectif .favorite .cel-favori { background-color: var(--or-500); }
+.cel-effectif .cel-barre-selection { backdrop-filter: none; background: #0a1610; }
 .cel-carte {
   position: relative;
   display: flex;

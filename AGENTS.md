@@ -91,6 +91,20 @@ puis à la racine. Le jeu ne lit que `public/m3d/` (**85 `.glb`, 114 Mo**).
 
 ## Architecture
 
+### Effectif de ligue et défilement mobile — 19 octobre 2026
+
+`Effectif` monte au maximum douze cartes par page, sur ordinateur comme sur téléphone.
+Les douze emplacements réutilisent leurs composants et identifiants SVG entre les pages ; la sélection
+reste portée par les identifiants des cartes, et `usePortrait` réinitialise les échecs au changement de joueur.
+Les identifiants sélectionnés restent indépendants de la page, du tri et du filtre ; « Tout cocher »
+porte sur tout le résultat filtré et conserve la limite de 100, les favoris exclus, la feuille protégée
+et le plancher de 26 disponibles. Le tri/filtre revient en première page ; une vente recale la page restante.
+Les cartes, coches, favoris et la barre fixe de cet écran évitent les filtres d'ombre et de flou.
+Recette isolée sans compte distant : `/scripts/apercuEffectifMobile.html?nombre=500` sur 5188.
+`verify:effectif-mobile:navigateur` parcourt les 500 cartes sur ordinateur et au format mobile,
+vérifie sélection, tri, filtre, annulation, ventes via la règle réelle et protections. Chromium mobile
+ne remplace pas une validation sur iPhone/Safari. Profils et captures temporaires nettoyés en fin de test.
+
 ### Champions, sirène et sortie des publicités — 19 octobre 2026
 
 `phasesFinalesJouees.ts` reprend les anciens nuls couperets sans issue : il inscrit uniquement le vainqueur désigné,

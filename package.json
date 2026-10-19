@@ -164,6 +164,7 @@
     "verify:calendrier-carriere": "vite-node scripts/verifierCalendrierCarriere.ts",
     "verify:laboratoire": "vite-node scripts/verifierLaboratoireLigue.ts",
     "verify:mobile-carriere": "vite-node scripts/verifierCorrectifsMobile.ts",
+    "verify:effectif-mobile:navigateur": "node scripts/verifierEffectifMobile.cjs",
     "verify:traductions": "vite-node scripts/verifierTraductions.ts",
     "audit:traductions": "vite-node scripts/auditerTraductions.ts",
     "mesure:endurance": "vite-node scripts/mesurerEndurance.ts",

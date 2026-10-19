@@ -368,6 +368,12 @@ Contrôles : `npm run verify:champions-bloques`, `npm run verify:sirene-ballon-m
   refus dit son chiffre, et « Tout cocher » coche exactement ce qui est
   vendable — le plus petit du lot maximum et de ce que le plancher de 26
   joueurs autorise.
+- **Effectif de ligue allégé sur mobile (19 octobre 2026).** Douze cartes s'affichent par page,
+  avec les joueurs cochés conservés entre les pages, tris et filtres. « Tout cocher » conserve sa portée
+  sur le résultat filtré entier et les protections de vente. Les halos des cartes et les flous des commandes sont retirés
+  pour réduire la charge pendant le défilement. Recette avec 500 joueurs :
+  `npm run verify:effectif-mobile:navigateur` (aperçu local sur 5188). Sélection, annulation et ventes
+  vérifiées sur Chromium ordinateur et au format mobile ; confirmation sur iPhone/Safari encore nécessaire.
 - 💸 **Le mode en ligne consommait 15 fois trop de réseau, et ça se payait.** Le
   quota de transfert de la base (5 Go/mois) est parti en huit jours — 6,1 Go —
   et la base a fini par refuser jusqu'au moindre `select`. Aucun bug : l'écran
