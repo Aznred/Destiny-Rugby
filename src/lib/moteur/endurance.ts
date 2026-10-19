@@ -27,6 +27,8 @@ export const REGLAGES_ENDURANCE = {
   usureGenerale: 0.6,
   /** Souffle repris par l'endurance générale pendant un arrêt de jeu, par seconde d'horloge. */
   recupArretGenerale: 0.055,
+  /** Repos au vestiaire : une récupération partielle, une seule fois à 40 minutes. */
+  recuperationMiTemps: 15,
   /** Elle ne tombe jamais plus bas : un joueur « à plat » court encore. */
   plancher: 12,
   /** Dépense par seconde simulée des efforts collectifs, en points d'endurance générale. */
@@ -65,6 +67,16 @@ export function enduranceDeuxReserves(e: Pick<EtatMatch, 'ia'>): boolean { retur
 export function sprintMaxDe(endurance: number): number {
   const R = REGLAGES_ENDURANCE;
   return Math.min(100, R.sprintMin + R.sprintPente * Math.max(0, Math.min(100, endurance)));
+}
+
+/** Le chronomètre est arrêté au vestiaire : ce repos ne dépend pas des ticks de jeu. */
+export function recupererAMiTemps(p: Pion): void {
+  p.endurance = Math.min(100, p.endurance + REGLAGES_ENDURANCE.recuperationMiTemps);
+  if (p.deuxReserves) {
+    p.sprintMax = sprintMaxDe(p.endurance);
+    p.sprint = p.sprintMax;
+    p.essoufle = false;
+  }
 }
 
 /** Allure de course normale (hors sprint) : la fatigue générale n'écrase jamais un joueur sur place. */

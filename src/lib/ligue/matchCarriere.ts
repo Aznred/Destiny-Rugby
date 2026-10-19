@@ -590,7 +590,8 @@ export interface EtatMatchEnLigne {
 // règles ; revenir en arrière = remettre 10. ⚠️ À METTRE EN LIGNE QUAND AUCUN MATCH NE SE JOUE.
 // Règles 12 : la sirène attend un ballon mort, sans minuterie coupant une attaque.
 // Les rencontres déjà ouvertes conservent leur version et leurs résultats.
-export const REGLES_MATCH_EN_LIGNE = 12;
+// Règles 13 : récupération partielle au vestiaire, indépendante du chronomètre arrêté.
+export const REGLES_MATCH_EN_LIGNE = 13;
 /**
  * Défense resserrée des règles 2 : la cadence détaillée marque davantage, ce
  * réglage ramène le nombre d'essais à celui des matchs de ligue d'avant
@@ -1021,6 +1022,7 @@ export function optionsMoteurDesRegles(regles: number | undefined = REGLES_MATCH
     tempsReel: true,
     scoreSurTerrain: true,
     reglesSirene: (regles ?? 1) >= 12 ? 'ballonMort' as const : (regles ?? 1) >= 6 ? 'transformation' as const : 'historique' as const,
+    recuperationMiTemps: (regles ?? 1) >= 13,
     // ⚠️ UN MATCH COMMENCÉ AVANT LES RÈGLES 8 SE REJOUE AVEC SA PÉNALTOUCHE D'ORIGINE : sinon le lancer d'une touche
     // déjà jouée changerait de camp à la rejoue, et le score annoncé avec lui.
     ...((regles ?? 1) < 8 ? { reglesPenaltouche: 'historique' as const } : {}),

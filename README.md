@@ -374,6 +374,11 @@ Contrôles : `npm run verify:champions-bloques`, `npm run verify:sirene-ballon-m
   pour réduire la charge pendant le défilement. Recette avec 500 joueurs :
   `npm run verify:effectif-mobile:navigateur` (aperçu local sur 5188). Sélection, annulation et ventes
   vérifiées sur Chromium ordinateur et au format mobile ; confirmation sur iPhone/Safari encore nécessaire.
+- **Récupération à la mi-temps (19 octobre 2026).** Sur les nouveaux matchs, les joueurs reprennent
+  jusqu'à 15 points d'endurance (maximum 100) et rechargent leur réserve de sprint au vestiaire.
+  Le bonus ne dépend plus du chronomètre arrêté et ne se répète pas pendant la pause ou les prolongations.
+  Les rencontres en ligne déjà commencées conservent leurs règles et leur rejoue.
+  Bancs : `npm run verify:recuperation-mi-temps` et `npm run verify:recuperation-mi-temps:navigateur`.
 - 💸 **Le mode en ligne consommait 15 fois trop de réseau, et ça se payait.** Le
   quota de transfert de la base (5 Go/mois) est parti en huit jours — 6,1 Go —
   et la base a fini par refuser jusqu'au moindre `select`. Aucun bug : l'écran

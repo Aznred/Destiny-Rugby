@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="fr">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Recette de récupération à la mi-temps</title>
+<style>
+body{margin:0;background:#0a1610;color:#f7edda;font:16px system-ui}main{max-width:900px;margin:auto;padding:16px}button{padding:12px;margin:4px;border:1px solid #d8b65c;border-radius:8px;background:#173223;color:inherit;cursor:pointer}output{display:block;padding:16px 0}.joueur{display:grid;grid-template-columns:minmax(0,1fr) 90px 90px;gap:8px;padding:8px 0;border-bottom:1px solid #34513e}.joueur span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}progress{width:100%;accent-color:#d8b65c}
+</style></head>
+<body><main><h1>Repos au vestiaire</h1><p>Recette locale du moteur réel, sans compte ni sauvegarde.</p>
+<button id="pause">Atteindre la mi-temps</button><button id="attendre">Attendre à la pause</button><button id="reprendre">Reprendre</button>
+<output></output><div id="joueurs"></div></main>
+<script type="module">
+import { creerRecetteMiTemps } from './recetteRecuperationMiTemps.ts';
+import { avancer, DT } from '../src/lib/moteur/moteur.ts';
+if (!import.meta.env.DEV) throw new Error('Recette réservée au développement.');
+const e = creerRecetteMiTemps(), avant = e.pions.map(p => p.endurance);
+function afficher() {
+  const sortie=document.querySelector('output');
+  sortie.dataset.phase=e.phase; sortie.dataset.horloge=e.t;
+  sortie.textContent=`Période ${e.periode} · ${e.phase} · ${e.minute} minutes`;
+  document.querySelector('#joueurs').replaceChildren(...e.pions.map((p,i)=>{
+    const ligne=document.createElement('div'); ligne.className='joueur';
+    ligne.dataset.avant=avant[i]; ligne.dataset.endurance=p.endurance;
+    const nom=document.createElement('span');nom.textContent=`${p.cote} · ${p.nom}`;
+    const ancien=document.createElement('span');ancien.textContent=`${avant[i]} % →`;
+    const actuel=document.createElement('span');actuel.textContent=`${Math.round(p.endurance)} %`;
+    const jauge=document.createElement('progress');jauge.max=100;jauge.value=p.endurance;actuel.append(jauge);
+    ligne.append(nom,ancien,actuel);return ligne;
+  }));
+}
+document.querySelector('#pause').onclick=()=>{avancer(e,DT);afficher();};
+document.querySelector('#attendre').onclick=()=>{avancer(e,DT*2);afficher();};
+document.querySelector('#reprendre').onclick=()=>{e.minuteur=0;avancer(e,DT);afficher();};
+afficher();
+</script></body></html>

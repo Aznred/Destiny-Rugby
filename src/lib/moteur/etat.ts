@@ -707,6 +707,8 @@ export interface EtatMatch {
   carriereDixMinutes?: boolean;
   /** Minutes jouées par mi-temps solo à ×1 ; figées à l'ouverture du match. */
   dureeMiTempsSolo?: import('../dureeMatchSolo.js').DureeMiTempsSolo;
+  /** Repos partiel à la mi-temps ; absent sur les anciennes rencontres, dont la rejoue reste identique. */
+  recuperationMiTemps?: boolean;
   /** Budget solo actif, phases arrêtées comprises ; la visée et les pauses n'appellent pas avancer. */
   secondesActivesSolo?: number;
   piedHumain?: { type: 'penaltouche' | 'box'; auteurId: string; origine: Vec };

@@ -104,7 +104,7 @@ import {
 import { CADENCE_TOUCHE, FRAPPE_VIVE, MELEE_VIVE, REGLAGES_CONQUETE, RITUEL_VIF, conqueteLisible, jeuVivant } from './conquete.js';
 import { SUIVI_DE_FRAPPE, aLaSortieDuRuck, frappeFranche, planDeFrappe, type GesteDeFrappe } from './frappe.js';
 import { apportDuGeste, appuyerPack, choisirSortieDuPack, majPack } from './pack.js';
-import { REGLAGES_ENDURANCE, coutEffort, enduranceDeuxReserves, sprintMaxDe } from './endurance.js';
+import { REGLAGES_ENDURANCE, coutEffort, enduranceDeuxReserves, recupererAMiTemps, sprintMaxDe } from './endurance.js';
 import { lectureLocale, ligneDePasseCoupee, lireLeSurnombre, niveauDeLecture, regarderDevant } from './ia/vision.js';
 import {
   AXE, LARGEUR, LONGUEUR, LIGNE_A, LIGNE_B, MILIEU, M22_A, M22_B, adverse, borner,
@@ -471,6 +471,8 @@ export interface OptionsMatch {
   tempsReel?: boolean;
   /** Carrière solo : minutes par mi-temps à ×1, hors pauses et mises en place. */
   dureeMiTempsSolo?: import('../dureeMatchSolo.js').DureeMiTempsSolo;
+  /** Repos partiel au vestiaire, actif par défaut ; false conserve la rejoue des anciennes ligues. */
+  recuperationMiTemps?: boolean;
   /** Phases jouées à leur rythme de terrain : voir `EtatMatch.cadenceDetaillee`. */
   cadenceDetaillee?: boolean;
   /** Personne n'est installé d'un coup, la phase attend : voir `EtatMatch.placementJoue`. */
@@ -663,6 +665,7 @@ export function creerMatch(
     styles: options.cadenceDetaillee || (options.ia ?? 1) >= 2 ? { A: styleDuClub(clubA), B: styleDuClub(clubB) } : undefined,
     scoreSurTerrain: options.scoreSurTerrain ?? true, meteoTir: options.meteoTir,
     reglesSirene: options.reglesSirene ?? 'ballonMort',
+    recuperationMiTemps: options.recuperationMiTemps ?? true,
     ...(options.reglesPenaltouche ? { reglesPenaltouche: options.reglesPenaltouche } : {}),
     ...(options.departage && (options.scoreSurTerrain ?? true) ? { departage: {
       periodes: options.departage.periodes, duree: options.departage.minutes * 60, criteres: options.departage.criteres,
@@ -10609,6 +10612,13 @@ function clorePeriode(e: EtatMatch): void {
   // buteur gardait le rituel du tee en plein jeu à la reprise (cadence détaillée).
   if (e.cadenceDetaillee) e.tir = null;
   if (e.periode === 1) {
+    // L'horloge reste à 40 minutes pendant la pause : la récupération ordinaire
+    // des arrêts ne peut pas compter le repos au vestiaire. Ce passage n'arrive
+    // qu'une fois ; les pauses courtes des prolongations ne redonnent pas ce gain.
+    if (e.recuperationMiTemps) for (const p of e.pions) {
+      recupererAMiTemps(p);
+      if (p.fatigue !== undefined) p.fatigue = niveauFatigue(p);
+    }
     e.periode = 2;
     e.sirene = false;
     e.t = DUREE_PERIODE;

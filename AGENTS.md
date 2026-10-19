@@ -91,6 +91,17 @@ puis à la racine. Le jeu ne lit que `public/m3d/` (**85 `.glb`, 114 Mo**).
 
 ## Architecture
 
+### Repos au vestiaire — 19 octobre 2026
+
+Les nouveaux matchs appliquent `recuperationMiTemps` une seule fois à l'entrée dans la pause de 40 minutes :
+15 points d'endurance, plafonnés à 100, et la réserve de sprint rechargée à son plafond recalculé.
+Le chronomètre arrêté ne permettait aucun repos via `dtHorloge`. Cartons, blessures et remplacements
+restent en place ; les pauses courtes de prolongation ne donnent pas le bonus du vestiaire.
+`REGLES_MATCH_EN_LIGNE = 13` active ce repos ; les rencontres déjà ouvertes en règles 1–12 gardent
+leur rejoue. Une ancienne sauvegarde moteur sans ce drapeau conserve aussi son comportement.
+Banc : `verify:recuperation-mi-temps` ; recette ordinateur/mobile : `verify:recuperation-mi-temps:navigateur`,
+avec `/scripts/apercuRecuperationMiTemps.html` sur 5188 (moteur réel, aucune écriture de compte).
+
 ### Effectif de ligue et défilement mobile — 19 octobre 2026
 
 `Effectif` monte au maximum douze cartes par page, sur ordinateur comme sur téléphone.
