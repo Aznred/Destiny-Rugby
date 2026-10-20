@@ -1,5 +1,6 @@
 import { carteRetireeDuCatalogue } from './atelierCatalogue.js';
 import { personneRetiree } from '../retraitsPersonnes.js';
+import { effectifClubRetire } from '../effectifsRetires.js';
 import { sourceRetireeFfr, empreinteSourceFfr } from './eligibiliteJoueurs.js';
 import { VERSION_PROTECTION_FFR } from '../../data/protectionFfr.generated.js';
 import { graine } from './aleatoire.js';
@@ -9,7 +10,7 @@ import type { EtatCarriereEnLigne } from './typesCarriere.js';
 const first=['Mathis','Adam','Noé','Louis','Arthur','Hugo','Gabriel','Jules','Raphaël','Léo'];
 const last=['Bernard','Laurent','Morel','Garnier','Fontaine','Roux','Leroy','Faure','Perrin','Blanc'];
 export const cartesJeunesseARetirer = (etat: EtatCarriereEnLigne) => etat.cartes.filter(c => !c.retiree && (carteRetireeDuCatalogue(c.sourceId, c.speciale?.base) || c.origine !== 'formation'
-  && (personneRetiree(c.nom) || sourceRetireeFfr(c.sourceId) || sourceRetireeFfr(c.speciale?.base ?? c.sourceId) || c.age < 18)));
+  && (effectifClubRetire(c.clubReel) || personneRetiree(c.nom) || sourceRetireeFfr(c.sourceId) || sourceRetireeFfr(c.speciale?.base ?? c.sourceId) || c.age < 18)));
 /** Nettoie les instantanés et récits en conservant leurs références primaires. */
 export function anonymiseurJeunesse(identites: readonly {nom:string;photo?:string}[]) {
   const photos = new Set(identites.map(c => c.photo).filter(Boolean));

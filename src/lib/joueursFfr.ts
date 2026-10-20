@@ -1,4 +1,5 @@
 import { personneRetiree, sourcePersonneRetiree } from './retraitsPersonnes.js';
+import { effectifClubRetire } from './effectifsRetires.js';
 import { CLUBS_AMATEURS, POSTES_AMATEURS } from '../data/amateurs.js';
 import { EFFECTIFS_AMATEURS } from '../data/sourcesDuMonde.js';
 import { PHOTOS_FFR_PAR_ID, PHOTOS_FFR_SUPPLEMENTAIRES } from '../data/photosFfr.js';
@@ -27,6 +28,7 @@ const structures = new Map(Object.values(CLUBS_AMATEURS).flat().map(c => [c.nom,
 
 /** Les emplacements retirés restent vides pour préserver les indices des sauvegardes. */
 export function joueursFfrDuClub(club: string): readonly JoueurFfr[] {
+  if (effectifClubRetire(club)) return [];
   const connus = cache.get(club); if (connus) return connus;
   const supplement = PHOTOS_FFR_SUPPLEMENTAIRES[structures.get(club) ?? ''] ?? {};
   const liste: JoueurFfr[] = (EFFECTIFS_AMATEURS[club] ?? '').split('~').map((entree, indexSource) => {
@@ -88,6 +90,7 @@ function ajouter(table: Map<string, string | null>, nom: string, photo?: string)
 }
 /** Recherche exacte : les homonymes restent sans portrait en l'absence de club. */
 export function photoJoueurFfr(nom: string, club?: string): string | undefined {
+  if (effectifClubRetire(club)) return undefined;
   const detouree = club ? PHOTOS_DETOUREES_PAR_CLUB[club]?.[normaliserNomFfr(nom)] : undefined;
   if (detouree) return detouree;
   if (club && structures.has(club)) {

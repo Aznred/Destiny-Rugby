@@ -102,6 +102,8 @@
     "verify:complete-carte": "node --loader ./scripts/chargeurTests36.mjs scripts/verifierCompleteTaCarte.ts",
     "verify:contribution:navigateur": "node scripts/verifierContributionNavigateur.cjs",
     "verify:retraits-cartes": "vite-node scripts/verifierRetraitsCartes.ts",
+    "verify:retrait-effectif": "node --loader ./scripts/chargeurTests36.mjs scripts/verifierRetraitEffectif.ts",
+    "verify:retrait-effectif:navigateur": "node scripts/verifierRetraitEffectifNavigateur.cjs",
     "verify:mode-libre-clubs": "vite-node scripts/verifierModeLibreClubs.ts",
     "verify:paliers": "vite-node scripts/verifPaliersStructures.ts",
     "verify:ligue": "vite-node scripts/verifLigue.ts",

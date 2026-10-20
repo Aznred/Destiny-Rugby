@@ -1,6 +1,7 @@
 import { catalogueMondialCarriere, type SourceCarte } from './ligue/catalogueCarriere.js';
 import { cleClub } from './cleClub.js';
 import { MONDE_FEMININ } from './mondeActif.js';
+import { effectifClubRetire } from './effectifsRetires.js';
 
 let publicSolo: readonly SourceCarte[] | undefined;
 let indexSource: readonly SourceCarte[] | undefined;
@@ -10,6 +11,7 @@ let clubs = new Map<string, SourceCarte[]>();
 export function fournirCatalogueEffectifs(source: readonly SourceCarte[]) { publicSolo = source; }
 export function sourceCatalogueEffectifs() { return publicSolo ?? catalogueMondialCarriere(); }
 export function joueursCatalogueDuClub(club: string): readonly SourceCarte[] {
+  if (effectifClubRetire(club)) return [];
   const source = sourceCatalogueEffectifs();
   if (source !== indexSource) {
     indexSource = source;

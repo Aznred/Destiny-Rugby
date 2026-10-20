@@ -19,6 +19,7 @@
 // Relancer : node scripts/genAmateurs.cjs
 const fs = require('fs');
 const path = require('path');
+const EFFECTIFS_RETIRES = require('../src/data/effectifsRetires.json');
 
 const RACINE = path.join(__dirname, '..');
 const lire = (p) => JSON.parse(fs.readFileSync(path.join(RACINE, p), 'utf8'));
@@ -389,12 +390,12 @@ for (const [division, clubs] of Object.entries(jeu)) {
     }
     if (trouve) {
       prises.add(trouve);
-      EFFECTIFS[c.nom] = encoder(dispo.get(trouve).joueurs);
+      if (!EFFECTIFS_RETIRES.some(nom => cle(nom) === cle(c.nom))) EFFECTIFS[c.nom] = encoder(dispo.get(trouve).joueurs);
     } else {
       // Le club a pu changer de division depuis la collecte (Niort et Tarbes
       // sont en Nationale dans le jeu, en Fédérale 3 dans les données).
       const ailleurs = chercherAilleurs(cles, division);
-      if (ailleurs) EFFECTIFS[c.nom] = encoder(ailleurs.joueurs);
+      if (ailleurs && !EFFECTIFS_RETIRES.some(nom => cle(nom) === cle(c.nom))) EFFECTIFS[c.nom] = encoder(ailleurs.joueurs);
       else sansEffectif.push(`${division} · ${c.nom}`);
     }
 

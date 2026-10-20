@@ -39,7 +39,7 @@ verifier('chaque club utilise les coordonnées réelles de sa commune',
 
 const joueurs = Object.values(EFFECTIFS_AMATEURS)
   .reduce((total, effectif) => total + effectif.split('~').filter(Boolean).length, 0);
-verifier('l’export complet reste disponible comme source', joueurs === 73_999,
+verifier('l’export reste disponible hors effectifs retirés', joueurs === 60_078 - 67,
   joueurs.toLocaleString('fr-FR'));
 
 let completionsAttendues = 0;

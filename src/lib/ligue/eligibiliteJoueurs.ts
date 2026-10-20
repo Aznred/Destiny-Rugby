@@ -1,5 +1,6 @@
 import { carteRetireeDuCatalogue, catalogueAdmin, retraitsCartes, type CatalogueAdmin } from './atelierCatalogue.js';
 import { personneRetiree, sourcePersonneRetiree } from '../retraitsPersonnes.js';
+import { effectifClubRetire } from '../effectifsRetires.js';
 import { SOURCES_FFR_RETIREES } from '../../data/protectionFfr.generated.js';
 import type { SourceCarte } from './catalogueCarriere.js';
 import { MONDE_FEMININ } from '../mondeActif.js';
@@ -11,8 +12,8 @@ export function empreinteSourceFfr(id: string): string {
   return `${(a >>> 0).toString(36)}.${(b >>> 0).toString(36)}`;
 }
 export const sourceRetireeFfr = (id: string) => sourcePersonneRetiree(id) || retirees.has(empreinteSourceFfr(id));
-export function carteSeniorAutorisee(c: Pick<SourceCarte, 'sourceId' | 'age' | 'origine' | 'gender' | 'retiree' | 'speciale'> & { nom?: string }, pool: 'men' | 'women' | 'mixed' = 'men', config: CatalogueAdmin = catalogueAdmin()) {
-  return !carteRetireeDuCatalogue(c.sourceId, c.speciale?.base, config) && !personneRetiree(c.nom) && !c.retiree && !sourceRetireeFfr(c.sourceId) && !sourceRetireeFfr(c.speciale?.base ?? c.sourceId) && (c.origine === 'formation' || c.age >= 18)
+export function carteSeniorAutorisee(c: Pick<SourceCarte, 'sourceId' | 'age' | 'origine' | 'gender' | 'retiree' | 'speciale'> & { nom?: string; clubReel?: string }, pool: 'men' | 'women' | 'mixed' = 'men', config: CatalogueAdmin = catalogueAdmin()) {
+  return !(c.origine !== 'formation' && effectifClubRetire(c.clubReel)) && !carteRetireeDuCatalogue(c.sourceId, c.speciale?.base, config) && !personneRetiree(c.nom) && !c.retiree && !sourceRetireeFfr(c.sourceId) && !sourceRetireeFfr(c.speciale?.base ?? c.sourceId) && (c.origine === 'formation' || c.age >= 18)
     // Une carte SPÉCIALE est une carte de collection : elle sort et se joue dans toutes les ligues (Octobre Rose chez
     // les joueurs, ICONS chez les joueuses). Seules les cartes ordinaires suivent le genre de la ligue.
     && (pool === 'mixed' || Boolean(c.speciale) || (c.gender === 'female' ? pool === 'women' : pool === 'men'));

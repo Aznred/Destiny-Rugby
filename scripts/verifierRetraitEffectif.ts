@@ -1,0 +1,57 @@
+import assert from 'node:assert/strict';
+import { CLUBS_AMATEURS, EFFECTIFS_AMATEURS, LOGO_AMATEUR } from '../src/data/amateurs.js';
+import { effectifClubRetire } from '../src/lib/effectifsRetires.js';
+import { joueursFfrDuClub, photoJoueurFfr } from '../src/lib/joueursFfr.js';
+import { fournirCatalogueEffectifs, joueursCatalogueDuClub } from '../src/lib/catalogueEffectifs.js';
+import { effectifDuClub } from '../src/lib/effectif.js';
+import { carteDepuisSource, catalogueBaseCarriere } from '../src/lib/ligue/catalogueCarriere.js';
+import { carteSeniorAutorisee, fournirPoolFfr, filtrerCatalogueFfr } from '../src/lib/ligue/eligibiliteJoueurs.js';
+import { migrerCartesJeunesse } from '../src/lib/ligue/migrationJeunesse.js';
+import type { EtatCarriereEnLigne } from '../src/lib/ligue/typesCarriere.js';
+
+const nom = 'Le Relecq Kerhuon Rugby';
+const club = Object.values(CLUBS_AMATEURS).flat().find(c => c.nom === nom)!;
+assert.equal(club.structureId, 2657);
+assert.equal(club.logo, LOGO_AMATEUR[nom]);
+assert.equal(nom in EFFECTIFS_AMATEURS, false);
+for (const variante of [nom, 'LE RELECQ-KERHUON RUGBY', 'Relecq Kerhuon Rugby']) assert.equal(effectifClubRetire(variante), true);
+assert.equal(effectifClubRetire('Rugby Club Iroise Saint Renan'), false);
+assert.deepEqual(joueursFfrDuClub(nom), []);
+assert.equal(photoJoueurFfr('Profil de démonstration', nom), undefined);
+const catalogue = catalogueBaseCarriere();
+assert.ok(catalogue.length > 1000);
+assert.ok(catalogue.every(c => !effectifClubRetire(c.clubReel)));
+const voisine = catalogue.find(c => c.clubReel !== nom && c.origine === 'ffr')!;
+const ancienne = { ...voisine, sourceId: 'ffr-retrait-effectif-test', nom: 'Profil de démonstration', clubReel: nom };
+assert.equal(carteSeniorAutorisee(ancienne, 'mixed'), false);
+assert.equal(carteSeniorAutorisee(voisine, 'mixed'), true);
+// Un catalogue reçu du serveur ou relu du cache ne réintroduit pas l'effectif.
+fournirPoolFfr(() => ({pool: 'mixed', joueurs: [ancienne]}));
+assert.deepEqual(filtrerCatalogueFfr([voisine]).map(c => c.sourceId), [voisine.sourceId]);
+fournirPoolFfr(() => null);
+fournirCatalogueEffectifs([ancienne, voisine]);
+assert.deepEqual(joueursCatalogueDuClub(nom), []);
+assert.deepEqual(joueursCatalogueDuClub(voisine.clubReel), [voisine]);
+const genere = effectifDuClub(nom, 1);
+assert.equal(genere.length, 26);
+assert.ok(genere.every(j => !j.sourcePlayerId && !j.photo && !j.id.includes('-am-')));
+fournirCatalogueEffectifs(catalogue);
+
+// Les anciennes cartes possédées reçoivent la compensation existante sans casser la feuille.
+const carte = carteDepuisSource(ancienne, 'retrait-test', 'proprietaire-test', 1);
+const autre = carteDepuisSource(voisine, 'retrait-test', 'autre-proprietaire', 1);
+const proprietaire = {id: 'proprietaire-test', ovas: 100, composition: {titulaires: [carte.id], remplacants: [], capitaineId: carte.id}};
+const etat = {id: 'retrait-test', cartes: [carte, autre], clubs: [proprietaire], rencontres: [], transactions: [], ventes: [], echanges: [], histoire: []} as unknown as EtatCarriereEnLigne;
+migrerCartesJeunesse(etat, 1);
+assert.equal(carte.retiree, true);
+const compensation = etat.cartes.find(c => c.origine === 'formation')!;
+assert.ok(compensation && compensation.note >= ancienne.note);
+assert.equal(compensation.proprietaire, proprietaire.id);
+assert.equal(proprietaire.composition.titulaires[0], compensation.id);
+assert.equal(proprietaire.composition.capitaineId, compensation.id);
+assert.equal(carteSeniorAutorisee(compensation, 'mixed'), true);
+assert.equal(autre.retiree, undefined);
+migrerCartesJeunesse(etat, 2);
+assert.equal(etat.cartes.length, 3, 'La compensation ne se répète pas.');
+assert.equal(proprietaire.ovas, 100);
+console.log('OK — effectif retiré des sources et catalogues, club et blason conservés, rechargement bloqué, 26 joueurs fictifs jouables et anciennes cartes compensées une seule fois.');

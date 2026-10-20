@@ -78,6 +78,11 @@ Contrôles : `npm run verify:champions-bloques`, `npm run verify:sirene-ballon-m
   Préparation réelle du déploiement : `scripts/verifierPyramideDbIntegration.ts`, tables/index installés sur Neon,
   lectures et écritures SQL validées dans une transaction annulée, sans modification des états de ligue existants.
 
+- **Le Relecq-Kerhuon Rugby** : effectif réel retiré des sources et des catalogues. Le club et son blason restent
+  présents, avec un groupe fictif pour les matchs. La liste d’exclusion est respectée par les imports ; les anciennes
+  cartes possédées sont remplacées par des cartes fictives équivalentes, compositions conservées.
+  Contrôles : `npm run verify:retrait-effectif`, `npm run verify:retrait-effectif:navigateur` (aperçu local sur 5188).
+
 - **Complète ta carte** : les cinq onglets, le formulaire de carte et le suivi des demandes sont traduits dans les
   sept langues, avec leurs dates et messages d’erreur. Les noms et les textes saisis restent ceux du contributeur.
   Pour proposer un club absent du jeu, les quinze postes du XV et au moins huit remplaçants sont obligatoires,

@@ -91,6 +91,16 @@ puis à la racine. Le jeu ne lit que `public/m3d/` (**85 `.glb`, 114 Mo**).
 
 ## Architecture
 
+### Effectif retiré du Relecq-Kerhuon — 20 octobre 2026
+
+`data/effectifsRetires.json` exclut l’effectif réel du Relecq-Kerhuon, avec ses variantes de nom, sans retirer le club,
+son blason ou ses compétitions. Les deux générateurs d’amateurs respectent cette liste. Les lectures FFR,
+portraits, catalogues reçus et cartes éligibles la contrôlent également, y compris après rechargement d’un cache.
+Le solo génère son groupe fictif jouable habituel de 26 joueurs. La migration des cartes retirées remplace les
+anciennes cartes possédées par des cartes fictives équivalentes et recale les compositions une seule fois.
+Ces compensations de formation restent autorisées. Contrôles : `verify:retrait-effectif`, `verify:retrait-effectif:navigateur`
+et `scripts/verifDonneesFfr.ts` ; aperçu `/scripts/apercuRetraitEffectif.html` sur 5188, sans compte distant.
+
 ### Packs saisonniers publicitaires et doublons de composition — 20 octobre 2026
 
 `packPublicitaireDeLigue` ramène les récompenses Halloween et Octobre Rose à trois cartes après les réglages du Labo.

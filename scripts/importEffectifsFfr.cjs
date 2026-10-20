@@ -12,6 +12,7 @@
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
+const EFFECTIFS_RETIRES = require('../src/data/effectifsRetires.json');
 
 const RACINE = path.join(__dirname, '..');
 if (process.argv[2] && !fs.existsSync(path.resolve(process.cwd(), process.argv[2]))) {
@@ -236,6 +237,7 @@ function profilPostes(joueur) {
 }
 
 function chaineEffectif(club, canonique) {
+  if (EFFECTIFS_RETIRES.some(nom => cle(nom) === cle(canonique))) return '';
   const postesConnus = positionsAnciennes.get(canonique) ?? new Map();
   const ids = new Set();
   const joueurs = [];
