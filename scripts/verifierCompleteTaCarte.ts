@@ -1,10 +1,9 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
-  validerCarteNormale,
   validerClubPropose,
   validerDemandeCarte,
   carteNormaleVide,
@@ -13,6 +12,7 @@ import {
 } from '../src/lib/cartesNormales.js';
 import { stockageFichier } from '../serveur/carriereFichier.js';
 import { creerGestionnaireCarriere, empreinteJeton } from '../serveur/carriereApi.js';
+import { POSTES } from '../src/data/rugby.js';
 
 let controles = 0;
 const eg = <T>(obtenu: T, attendu: T, message: string) => {
@@ -32,16 +32,13 @@ const clubValide: PropositionClub = {
   logo: PNG,
   c1: '#002B49',
   c2: '#FFFFFF',
-  joueurs: [
-    { ...carteNormaleVide(), nom: 'Maxime Lafage', poste: 'demi_ouverture', note: 74, potentiel: 76, age: 26 },
-    { ...carteNormaleVide(), nom: 'Gwenael Duprat', poste: 'talonneur', note: 71, potentiel: 74, age: 24 },
-  ],
+  joueurs: Array.from({length: 23}, (_, i) => ({ ...carteNormaleVide(), nom: `Joueur témoin ${i + 1}`, poste: POSTES[i % 15].id })),
 };
 
 const clubNettoye = validerClubPropose(clubValide);
 eg(clubNettoye.nom, 'RC Vannes', 'Nom de club préservé');
 eg(clubNettoye.division, 'Top 14', 'Division préservée');
-eg(clubNettoye.joueurs.length, 2, 'Les 2 joueurs sont validés');
+eg(clubNettoye.joueurs.length, 23, 'Le XV et les huit remplaçants sont validés');
 eg(clubNettoye.logo, PNG, 'Logo préservé');
 
 // Rejets sur données invalides
@@ -89,6 +86,7 @@ eg(demandeValidee.droitsCertifies, true, 'Droits certifiés acceptés');
 
 // 3. Cycle complet API serveur : soumission, consultation, décision Kiri
 const dossier = mkdtempSync(join(tmpdir(), 'destiny-complete-carte-'));
+try {
 const fichier = join(dossier, 'carriere.json');
 const db = stockageFichier(fichier);
 const api = creerGestionnaireCarriere(db);
@@ -153,7 +151,7 @@ const detailDemande = await appel(kiri, undefined, `&id=${demandeId}`);
 eg(detailDemande.statut, 200, 'Détail de la demande accessible');
 eg(detailDemande.donnees.demande.clubPropose.nom, 'RC Vannes', 'Détails du club complets');
 eg(detailDemande.donnees.demande.clubPropose.logo, PNG, 'Logo accessible pour examen');
-eg(detailDemande.donnees.demande.clubPropose.joueurs.length, 2, 'Effectif complet accessible');
+eg(detailDemande.donnees.demande.clubPropose.joueurs.length, 23, 'Effectif complet accessible');
 
 // 3.4 Décision de refus avec message explicatif
 const repRefus = await appel(kiri, {
@@ -256,3 +254,4 @@ eg(atelierApres.retraitsCartes[carteARetirer.sourceId].sourceId, carteARetirer.s
 controles += 2;
 
 console.log(`OK · ${controles} contrôles réussis pour CompleteTaCarte, clubs, retraits de cartes et droits d'images.`);
+} finally { rmSync(dossier, {recursive: true, force: true}); }

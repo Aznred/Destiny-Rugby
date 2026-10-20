@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { t, texteTraduit } from '../lib/i18n';
 import { POSTES, POSTE_PAR_ID } from '../data/rugby';
 import { carteNormaleVide, compositionClubPropose, joueurDuClubPropose, MAX_JOUEURS_CLUB_PROPOSE, titulariserJoueurClubPropose, validerCarteNormale } from '../lib/cartesNormales';
 import type { PropositionClub, SaisieCarteNormale } from '../lib/cartesNormales';
@@ -32,13 +33,13 @@ export function EffectifClubPropose({ club, changer, occupe = false, onEdition }
       changer(suivants); fermer();
     } catch (e) { setErreur((e as Error).message); }
   };
-  return <section className="cn-effectif-club" aria-label="Composition et effectif du club">
+  return <section className="cn-effectif-club" aria-label={t('contributionCarte.effectif')}>
     <header className="cn-effectif-entete">
-      <div><h3>Composition et effectif</h3><p>{club.joueurs.length} / {MAX_JOUEURS_CLUB_PROPOSE} joueurs · {titulaires.length} / 15 postes du XV renseignés</p></div>
-      {changer && <button type="button" className="btn secondaire" disabled={occupe || !!edition || club.joueurs.length >= MAX_JOUEURS_CLUB_PROPOSE} onClick={() => ouvrir(null)}><Icone nom="ajouter" taille={16} /> Ajouter un joueur</button>}
+      <div><h3>{t('contributionCarte.effectif')}</h3><p role="status">{t('contributionCarte.effectifCompteur', {n: club.joueurs.length, max: MAX_JOUEURS_CLUB_PROPOSE, xv: titulaires.length, banc: remplacants.length})}</p></div>
+      {changer && <button type="button" className="btn secondaire" disabled={occupe || !!edition || club.joueurs.length >= MAX_JOUEURS_CLUB_PROPOSE} onClick={() => ouvrir(null)}><Icone nom="ajouter" taille={16} /> {t('contributionCarte.ajouterJoueur')} </button>}
     </header>
-    <p>Le premier joueur renseigné à chaque poste apparaît dans le XV. Les autres figurent dans les remplaçants. Toutes les cartes de l’effectif seront publiées après validation du club.</p>
-    <div className="cn-terrain-proposition" aria-label="XV proposé par poste">
+    <p>{t('contributionCarte.effectifAide')}</p>
+    <div className="cn-terrain-proposition" aria-label={t('contributionCarte.xvPropose')}>
       {LIGNES_XV.map((ligne, i) => <div className={`cn-ligne-xv${ligne.length === 4 ? ' cn-ligne-xv-quatre' : ''}`} key={i}>
         {ligne.map(numero => {
           const poste = POSTES.find(p => p.numero === numero)!;
@@ -46,21 +47,21 @@ export function EffectifClubPropose({ club, changer, occupe = false, onEdition }
           const joueur = index === undefined ? undefined : club.joueurs[index];
           return <button type="button" key={numero} className={joueur ? 'renseigne' : ''}
             disabled={!changer || occupe || preparation || !!edition || (!joueur && club.joueurs.length >= MAX_JOUEURS_CLUB_PROPOSE)}
-            aria-label={`${joueur ? 'Modifier' : 'Ajouter'} : n° ${numero}, ${poste.nom}${joueur ? `, ${joueur.nom}` : ''}`}
+            aria-label={t(joueur ? 'contributionCarte.modifierPoste' : 'contributionCarte.ajouterPoste', {numero, poste: texteTraduit(poste.nom), nom: joueur?.nom})}
             onClick={() => ouvrir(index ?? null, poste.id)}>
-            <b>{numero}</b><span>{joueur?.nom || 'Libre'}</span><small>{poste.nom}</small>
+            <b>{numero}</b><span>{joueur?.nom || t('contributionCarte.libre')}</span><small>{texteTraduit(poste.nom)}</small>
           </button>;
         })}
       </div>)}
     </div>
     {edition && <div className="cn-nouveau-joueur-formulaire">
-      <h4>{edition.index === null ? 'Ajouter un joueur' : `Modifier ${club.joueurs[edition.index].nom}`}</h4>
-      <p>{club.nom || 'Club proposé'} · {club.division} — le portrait du joueur et le blason du club sont deux images distinctes.</p>
+      <h4>{edition.index === null ? t('contributionCarte.ajouterJoueur') : t('contributionCarte.modifier', {nom: club.joueurs[edition.index].nom})}</h4>
+      <p>{club.nom || t('contributionCarte.clubPropose')} · {texteTraduit(club.division)} — {t('contributionCarte.portraitBlason')}</p>
       <FormulaireCarteNormale carte={joueurDuClubPropose(edition.joueur, club)} clubFixe={club}
         changer={joueur => setEdition({ ...edition, joueur })} occupe={occupe} onPreparation={setPreparation} />
-      {erreur && <p role="alert">{erreur}</p>}
-      <div className="cn-actions"><button type="button" className="btn primaire" disabled={occupe || preparation} onClick={valider}>{edition.index === null ? 'Ajouter à l’effectif' : 'Enregistrer ce joueur'}</button>
-        <button type="button" className="btn fantome" disabled={preparation} onClick={fermer}>Annuler</button></div>
+      {erreur && <p role="alert">{texteTraduit(erreur)}</p>}
+      <div className="cn-actions"><button type="button" className="btn primaire" disabled={occupe || preparation} onClick={valider}>{t(edition.index === null ? 'contributionCarte.ajouterEffectif' : 'contributionCarte.enregistrerJoueur')}</button>
+        <button type="button" className="btn fantome" disabled={preparation} onClick={fermer}> {t('contributionCarte.annuler')} </button></div>
     </div>}
     {club.joueurs.length > 0 && <div className="cn-joueurs-grille">
       {club.joueurs.map((source, index) => {
@@ -68,17 +69,17 @@ export function EffectifClubPropose({ club, changer, occupe = false, onEdition }
         const famille = POSTE_PAR_ID[joueur.poste].famille;
         const id = `club-propose-${index}`;
         return <article className="cn-joueur-carte-mini" key={index}>
-          <header><b>{joueur.nom}</b><small>{remplacants.includes(index) ? 'Remplaçant' : `XV · n° ${POSTE_PAR_ID[joueur.poste].numero}`}</small></header>
+          <header><b>{joueur.nom}</b><small>{remplacants.includes(index) ? t('contributionCarte.remplacant') : t('contributionCarte.xvNumero', {n: POSTE_PAR_ID[joueur.poste].numero})}</small></header>
           <div className="cn-mini-apercu-carte"><CarteJoueurEnLigne logoClub={club.logo} carte={{ ...joueur, id, sourceId: id, famille,
             origine: 'professionnel', rarete: rareteCarriere(joueur.note), statistiques: statistiquesCarte(joueur.note, famille, id),
             proprietaire: null, fatigue: 0, matchs: 0, essais: 0, clubs: [] }} /></div>
           {changer && <div className="cn-actions">
-            {remplacants.includes(index) && <button type="button" className="btn secondaire petit" disabled={occupe || !!edition} onClick={() => changer(titulariserJoueurClubPropose(club.joueurs, index))}>Placer {joueur.nom} dans le XV</button>}
-            <button type="button" className="btn fantome petit" disabled={occupe || !!edition} onClick={() => ouvrir(index)}>Modifier {joueur.nom}</button>
-            <button type="button" className="btn fantome petit" disabled={occupe || !!edition} onClick={() => changer(club.joueurs.filter((_, i) => i !== index))} aria-label={`Retirer ${joueur.nom}`}><Icone nom="croix" taille={14} /></button></div>}
+            {remplacants.includes(index) && <button type="button" className="btn secondaire petit" disabled={occupe || !!edition} onClick={() => changer(titulariserJoueurClubPropose(club.joueurs, index))}>{t('contributionCarte.titulariser', {nom: joueur.nom})}</button>}
+            <button type="button" className="btn fantome petit" disabled={occupe || !!edition} onClick={() => ouvrir(index)}>{t('contributionCarte.modifier', {nom: joueur.nom})}</button>
+            <button type="button" className="btn fantome petit" disabled={occupe || !!edition} onClick={() => changer(club.joueurs.filter((_, i) => i !== index))} aria-label={t('contributionCarte.retirerJoueur', {nom: joueur.nom})}><Icone nom="croix" taille={14} /></button></div>}
         </article>;
       })}
     </div>}
-    {club.joueurs.length === 0 && <p className="cn-effectif-vide">Choisis un poste sur le terrain ou « Ajouter un joueur ». Tu peux proposer un effectif partiel.</p>}
+    {club.joueurs.length === 0 && <p className="cn-effectif-vide">{t('contributionCarte.effectifVide')}</p>}
   </section>;
 }

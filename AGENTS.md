@@ -3292,15 +3292,22 @@ Bancs : `npm run verify:publicites` (serveur et SDK), `npm run verify:publicites
 
 ### Cartes normales et propositions de cartes
 
-Contribution → Proposer un club utilise `EffectifClubPropose` : XV par poste, effectif partiel jusqu’à 30 joueurs,
-remplaçants et changement de titulaire, avec la même revue côté Labo. `catalogueAvecClubPropose` prépare toutes les
+« Complète ta carte » → Proposer un club absent du jeu utilise `EffectifClubPropose` : les 15 postes distincts du XV
+et au moins 8 remplaçants sont obligatoires avant l’envoi (jusqu’à 30 joueurs). Le compteur distingue XV et banc.
+`validerClubPropose` impose la même règle à la soumission et à l’approbation, et refuse les fiches invalides et doublons.
+Le Labo peut encore enregistrer les corrections d’un ancien dossier partiel, mais doit le compléter avant publication.
+Les cinq onglets publics, le formulaire partagé et le suivi des demandes utilisent `textesContributionCarte.ts`
+dans les sept langues, dates et erreurs comprises ; noms, messages et valeurs saisies restent inchangés.
+`catalogueAvecClubPropose` prépare toutes les
 cartes et l’identité visuelle avant l’unique écriture atomique d’approbation. Une correspondance nom + club conserve
-la carte existante ; les nouveaux identifiants sont stables. Un club sans joueurs ne crée aucune fausse carte.
+la carte existante ; les nouveaux identifiants sont stables. Aucun club incomplet ne peut être publié.
 Le blason est partagé dans `CatalogueAdmin.clubs` et résolu par `useBlasonCarte`, sans remplacer `photo` ni recopier
 le logo dans chaque portrait. Les listes retirent aussi les images imbriquées ; modifier/accepter conserve le club
 complet dans le JSON de la demande (stockage fichier et SQL). La limite d’envoi est 3 Mo pour 30 portraits de 90 Ko.
-Banc : `scripts/verifierContributionClub.ts` ; test historique `scripts/verifierCompleteTaCarte.ts` ; aperçu
-`/scripts/apercuContributionClub.html`. SQL vérifié par requêtes simulées, pas sur la base de production.
+Bancs : `verify:contribution-club`, `verify:complete-carte`, `verify:contribution:navigateur` et `verify:traductions`.
+Aperçu `/scripts/apercuContributionClub.html?langue=en` (serveur local sur 5188). La recette navigateur parcourt les
+cinq onglets dans les sept langues, puis saisit et soumet réellement les 23 fiches sur ordinateur et au format mobile.
+SQL vérifié par requêtes simulées, pas sur la base de production ; profils et bases temporaires nettoyés en fin de test.
 
 Labo → Cartes normales crée ou modifie une carte ordinaire via `CatalogueAdmin.ajouts`,
 avec la même identité pour les corrections. GEN, potentiel, poste, âge senior,

@@ -48,6 +48,7 @@ import { TEXTES_CLOTURE } from './textesCloture.js';
 import { TEXTES_CORRECTIF41 } from './textesCorrectif41.js';
 import { TEXTES_COMBINAISONS41 } from './textesCombinaisons41.js';
 import { TEXTES_MARCHE41 } from './textesMarche41.js';
+import { TEXTES_CONTRIBUTION_CARTE } from './textesContributionCarte.js';
 
 // ⚠️ LA TRADUCTION AUTOMATIQUE PASSE EN DERNIER — c'est-à-dire qu'elle est
 // écrasée par tout le reste. `scripts/traduire.ts` remplit les langues
@@ -931,5 +932,6 @@ const ECRIT_A_LA_MAIN: Record<string, Traduction> = {
 
 export const TEXTES: Record<string, Traduction> = {
   ...fusionner(ECRIT_A_LA_MAIN),
+  ...TEXTES_CONTRIBUTION_CARTE,
   ...TEXTES_INTERFACE_CORRECTIONS,
 };

@@ -78,11 +78,16 @@ Contrôles : `npm run verify:champions-bloques`, `npm run verify:sirene-ballon-m
   Préparation réelle du déploiement : `scripts/verifierPyramideDbIntegration.ts`, tables/index installés sur Neon,
   lectures et écritures SQL validées dans une transaction annulée, sans modification des états de ligue existants.
 
-- **Contribution de club** : saisie du XV par poste, remplaçants, modification des fiches et choix des titulaires.
+- **Complète ta carte** : les cinq onglets, le formulaire de carte et le suivi des demandes sont traduits dans les
+  sept langues, avec leurs dates et messages d’erreur. Les noms et les textes saisis restent ceux du contributeur.
+  Pour proposer un club absent du jeu, les quinze postes du XV et au moins huit remplaçants sont obligatoires,
+  avec un compteur séparé. Le contrôle s’applique aussi au serveur ; un simple total de 23 joueurs ne suffit pas
+  si un poste du XV est absent. Les fiches restent modifiables et les titulaires peuvent être changés.
   Le Labo examine et publie tout l’effectif (jusqu’à 30 cartes) en une seule validation, avec le blason du club
   distinct des portraits. Les propositions restent complètes après modification et acceptation.
-  Contrôle : `node --loader ./scripts/chargeurTests36.mjs scripts/verifierContributionClub.ts` ; aperçu local
-  `/scripts/apercuContributionClub.html`, sans publication réelle.
+  Contrôles : `npm run verify:contribution-club`, `npm run verify:complete-carte`, `npm run verify:contribution:navigateur`
+  et `npm run verify:traductions` ; aperçu local `/scripts/apercuContributionClub.html?langue=en` sur 5188,
+  sans publication réelle. Parcours vérifié sur ordinateur et au format mobile dans les sept langues.
 
 - **Fluidité de la carrière entraîneur (16 octobre 2026)** : les bancs et leurs objectifs se préparent uniquement
   quand leur liste est affichée ; les poules géographiques sont réutilisées jusqu'à un changement de clubs ou de

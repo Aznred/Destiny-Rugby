@@ -40,6 +40,7 @@ export interface DetailDemandeCarte {
 }
 
 export const MAX_JOUEURS_CLUB_PROPOSE = 30;
+export const MIN_REMPLACANTS_CLUB_PROPOSE = 8;
 
 /** L'identité du club reste commune à tout l'effectif, même après une correction du nom. */
 export function joueurDuClubPropose(joueur: SaisieCarteNormale, club: Pick<PropositionClub, 'nom' | 'division' | 'pays'>): SaisieCarteNormale {
@@ -55,6 +56,13 @@ export function compositionClubPropose(joueurs: SaisieCarteNormale[]) {
     else { postes.add(joueur.poste); titulaires.push(index); }
   });
   return { titulaires, remplacants };
+}
+
+/** Une proposition publiable couvre chaque maillot du XV et un banc complet. */
+export function effectifClubProposeComplet(joueurs: SaisieCarteNormale[]): boolean {
+  const { titulaires, remplacants } = compositionClubPropose(joueurs);
+  return titulaires.length === 15 && titulaires.every(i => Object.hasOwn(POSTE_PAR_ID, joueurs[i].poste))
+    && remplacants.length >= MIN_REMPLACANTS_CLUB_PROPOSE;
 }
 
 export function titulariserJoueurClubPropose(joueurs: SaisieCarteNormale[], index: number): SaisieCarteNormale[] {
@@ -107,7 +115,7 @@ export function validerCarteNormale(brut: unknown): SaisieCarteNormale {
   return carte;
 }
 
-export function validerClubPropose(brut: unknown): PropositionClub {
+export function validerClubPropose(brut: unknown, exigerEffectifComplet = true): PropositionClub {
   if (!brut || typeof brut !== 'object' || Array.isArray(brut)) throw new Error('Proposition de club invalide.');
   const b = brut as Record<string, unknown>;
   const nom = texte(b.nom, 100, 'Nom du club');
@@ -135,9 +143,17 @@ export function validerClubPropose(brut: unknown): PropositionClub {
           ...jObj,
           clubReel: nom, championnat: division, pays,
         }));
-      }
+      } else throw new Error('Carte invalide.');
     }
   }
+  const noms = new Set<string>();
+  for (const joueur of joueurs) {
+    const cle = joueur.nom.toLocaleLowerCase('fr');
+    if (noms.has(cle)) throw new Error(`Le joueur ${joueur.nom} apparaît deux fois dans l'effectif.`);
+    noms.add(cle);
+  }
+  if (exigerEffectifComplet && !effectifClubProposeComplet(joueurs))
+    throw new Error('Renseigne les 15 postes du XV et au moins 8 remplaçants avant de proposer le club.');
   return { nom, division, ville, pays, logo, c1, c2, joueurs };
 }
 

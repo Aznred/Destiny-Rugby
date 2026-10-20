@@ -1218,7 +1218,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
           let fait = false;
           if (corps.operation === 'refuser') fait = await depot.refuser(demande.id,demande.revision,String(corps.reponse ?? '').slice(0,500),compte.identifiant);
           else {
-            const club = demande.type === 'club' ? validerClubPropose(corps.clubPropose ?? demande.clubPropose) : undefined;
+            const club = demande.type === 'club' ? validerClubPropose(corps.clubPropose ?? demande.clubPropose, corps.operation !== 'modifier') : undefined;
             const carte = club ? club.joueurs[0] ?? demande.carte : demande.type === 'retrait'
               ? (corps.carte ? validerCarteNormale(corps.carte) : demande.carte)
               : validerCarteNormale(corps.carte);

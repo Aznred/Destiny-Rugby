@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { carteNormaleVide, compositionClubPropose, titulariserJoueurClubPropose, validerClubPropose } from '../src/lib/cartesNormales';
+import { carteNormaleVide, compositionClubPropose, effectifClubProposeComplet, titulariserJoueurClubPropose, validerClubPropose } from '../src/lib/cartesNormales';
 import type { PropositionClub } from '../src/lib/cartesNormales';
 import { catalogueAvecClubPropose } from '../serveur/cartesNormales';
 import { CATALOGUE_ADMIN_VIDE } from '../src/lib/ligue/atelierCatalogue';
@@ -35,12 +35,24 @@ assert.equal(catalogue.clubs![club.nom].logo, logo);
 assert.ok(Object.values(catalogue.ajouts!).every(j => j.photo === '/photos/silhouette.webp'));
 const repete = catalogueAvecClubPropose(catalogue, id, club);
 assert.equal(Object.keys(repete.ajouts!).length, 30, 'Reprise sans doublons.');
-assert.equal(Object.keys(catalogueAvecClubPropose(CATALOGUE_ADMIN_VIDE, randomUUID(), { ...club, joueurs: [] }).ajouts!).length, 0);
+assert.throws(() => catalogueAvecClubPropose(CATALOGUE_ADMIN_VIDE, randomUUID(), { ...club, joueurs: [] }), /15 postes du XV/);
 assert.throws(() => catalogueAvecClubPropose(CATALOGUE_ADMIN_VIDE, id, { ...club, joueurs: [club.joueurs[0], club.joueurs[0]] }), /deux fois/);
+const complet = { ...club, joueurs: club.joueurs.slice(0, 23) };
+const sansPoste = { ...complet, joueurs: complet.joueurs.map(j => ({ ...j, poste: POSTES[0].id })) };
+for (const partiel of [[], club.joueurs.slice(0, 15), club.joueurs.slice(0, 22), sansPoste.joueurs]) {
+  assert.equal(effectifClubProposeComplet(partiel), false);
+  assert.throws(() => validerClubPropose({ ...club, joueurs: partiel }), /15 postes du XV/);
+}
+assert.equal(effectifClubProposeComplet(complet.joueurs), true);
+assert.equal(validerClubPropose(complet).joueurs.length, 23);
+assert.throws(() => validerClubPropose({ ...complet, joueurs: [...complet.joueurs, null] }), /Carte invalide/);
+assert.equal(validerClubPropose({ ...club, joueurs: [] }, false).joueurs.length, 0, 'Le Labo peut enregistrer les corrections d’un ancien dossier partiel.');
 appliquerLocalisations(catalogue.clubs!);
 assert.equal(identiteClubPubliee(club.nom)?.logo, logo);
 
-const db = stockageFichier(join(mkdtempSync(join(tmpdir(), 'contribution-club-')), 'carriere.json'));
+const dossier = mkdtempSync(join(tmpdir(), 'contribution-club-'));
+try {
+const db = stockageFichier(join(dossier, 'carriere.json'));
 const api = creerGestionnaireCarriere(db);
 const membre = randomUUID(), kiri = randomUUID();
 for (const [compte, identifiant] of [[membre, 'contribution_test'], [kiri, 'kiri']]) {
@@ -54,6 +66,12 @@ async function appel(compte: string, corps?: unknown, params = '') {
   await api.handler({ method: corps ? 'POST' : 'GET', url: `/api/carriere?demandesCartes=1${params}`,
     headers: { host: 'localhost', origin: 'http://localhost', 'content-type': 'application/json', cookie: `destiny_carriere=${compte}` }, body: corps }, res);
   return { statut, donnees };
+}
+for (const incomplet of [{ ...club, joueurs: [] }, { ...club, joueurs: club.joueurs.slice(0, 22) }, sansPoste]) {
+  const rejet = await appel(membre, { action: 'demandesCartes', operation: 'soumettre', type: 'club', clubPropose: incomplet, droitsCertifies: true });
+  assert.equal(rejet.statut, 400);
+  assert.match(rejet.donnees.erreur, /15 postes du XV/);
+  assert.equal((await appel(membre)).donnees.demandes.length, 0, 'Un appel direct ne contourne pas le XV et le banc.');
 }
 const soumise = await appel(membre, { action: 'demandesCartes', operation: 'soumettre', type: 'club', clubPropose: club, droitsCertifies: true });
 assert.equal(soumise.statut, 200);
@@ -103,3 +121,4 @@ await depotSql.approuver(demande.id, 1, publie, 0, corrige.joueurs[0], 'kiri', c
 assert.equal(ecritures.length, 2);
 assert.ok(ecritures.every(e => JSON.parse(e).clubPropose.joueurs.length === 30));
 console.log('OK — 30 cartes publiées, blason distinct du portrait, édition conservée, reprise sans doublons, autorisations et révisions, métadonnées SQL.');
+} finally { rmSync(dossier, {recursive: true, force: true}); }

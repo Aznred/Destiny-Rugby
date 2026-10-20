@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { t } from '../lib/i18n';
 import { POSTES, POSTE_PAR_ID } from '../data/rugby';
 import { Selecteur } from './Selecteur';
 import { Blason } from './Blason';
@@ -39,31 +40,31 @@ export function FormulaireCarteNormale({ carte, changer, occupe = false, onPrepa
   ], [clubs, competition, clubActuel, carte.clubReel, carte.championnat]);
   return <div className={`cn-formulaire${afficherApercu ? '' : ' cn-formulaire-sans-apercu'}`}>
     <fieldset disabled={occupe || photoEnCours}>
-      <legend>Informations de la carte</legend>
-      <label>Prénom et nom<input required maxLength={80} value={carte.nom} onChange={e => champ('nom',e.target.value)} /></label>
+      <legend>{t('contributionCarte.informations')}</legend>
+      <label>{t('contributionCarte.prenomNom')}<input required maxLength={80} value={carte.nom} onChange={e => champ('nom',e.target.value)} /></label>
       <div className="cn-champs">
-        <label>Joueur ou joueuse<Selecteur valeur={carte.gender} options={[{valeur:'male',label:'Joueur'},{valeur:'female',label:'Joueuse'}]} onChange={v => changer(changerGenreCarte(carte,v as SaisieCarteNormale['gender']))} /></label>
-        <label>Poste<Selecteur valeur={carte.poste} options={POSTES.map(p => ({valeur:p.id,label:p.nom}))} onChange={v => champ('poste',v as SaisieCarteNormale['poste'])} /></label>
-        {(['note','potentiel','age'] as const).map(cle => <label key={cle}>{cle === 'note' ? 'Général' : cle === 'potentiel' ? 'Potentiel' : 'Âge'}<input required type="number" min={cle === 'age' ? 18 : 20} max={cle === 'age' ? 50 : 99} value={carte[cle]} onChange={e => changer({ ...carte,[cle]:Number(e.target.value),...(cle === 'note' && Number(e.target.value) > carte.potentiel ? {potentiel:Number(e.target.value)} : {}) })} /></label>)}
-        <label>Nation<input required maxLength={80} value={carte.nation} onChange={e => champ('nation',e.target.value)} /></label>
-        {!clubFixe && <><label>Championnat<Selecteur valeur={championnatId} options={optionsChampionnats} recherche onChange={id => changer(choisirChampionnatCarte(carte,id))} /></label>
-        <label>Club<Selecteur valeur={clubId} options={optionsClubs} recherche onChange={id => changer(choisirClubCarte(carte,id))} /><small>{competition ? 'Clubs du championnat choisi.' : 'Choisis un club : son championnat sera rempli automatiquement.'}</small></label>
-        <label>Pays du championnat<input required maxLength={80} readOnly={!!competition} value={carte.pays} onChange={e => champ('pays',e.target.value)} /></label></>}
+        <label>{t('contributionCarte.genre')}<Selecteur valeur={carte.gender} options={[{valeur:'male',label:'Joueur'},{valeur:'female',label:'Joueuse'}]} onChange={v => changer(changerGenreCarte(carte,v as SaisieCarteNormale['gender']))} /></label>
+        <label>{t('cr.poste')}<Selecteur valeur={carte.poste} options={POSTES.map(p => ({valeur:p.id,label:p.nom}))} onChange={v => champ('poste',v as SaisieCarteNormale['poste'])} /></label>
+        {(['note','potentiel','age'] as const).map(cle => <label key={cle}>{t(cle === 'note' ? 'contributionCarte.general' : cle === 'potentiel' ? 'contributionCarte.potentiel' : 'contributionCarte.age')}<input required type="number" min={cle === 'age' ? 18 : 20} max={cle === 'age' ? 50 : 99} value={carte[cle]} onChange={e => changer({ ...carte,[cle]:Number(e.target.value),...(cle === 'note' && Number(e.target.value) > carte.potentiel ? {potentiel:Number(e.target.value)} : {}) })} /></label>)}
+        <label>{t('cr.nation')}<input required maxLength={80} value={carte.nation} onChange={e => champ('nation',e.target.value)} /></label>
+        {!clubFixe && <><label>{t('contributionCarte.championnat')}<Selecteur valeur={championnatId} options={optionsChampionnats} recherche onChange={id => changer(choisirChampionnatCarte(carte,id))} /></label>
+        <label> {t('contributionCarte.club')} <Selecteur valeur={clubId} options={optionsClubs} recherche onChange={id => changer(choisirClubCarte(carte,id))} /><small>{t(competition ? 'contributionCarte.clubsChampionnat' : 'contributionCarte.clubAide')}</small></label>
+        <label>{t('contributionCarte.paysChampionnat')}<input required maxLength={80} readOnly={!!competition} value={carte.pays} onChange={e => champ('pays',e.target.value)} /></label></>}
       </div>
-      <label>Adresse de la photo<input type="url" placeholder="https://… (facultatif)" value={carte.photo?.startsWith('https:') ? carte.photo : ''} onChange={e => champ('photo',e.target.value || undefined)} /></label>
-      <label>Importer une photo<input type="file" accept="image/png,image/jpeg,image/webp" onChange={e => {
+      <label>{t('contributionCarte.photoAdresse')}<input type="url" placeholder={t('contributionCarte.photoFacultative')} value={carte.photo?.startsWith('https:') ? carte.photo : ''} onChange={e => champ('photo',e.target.value || undefined)} /></label>
+      <label>{t('ov.importerPhoto')}<input type="file" accept="image/png,image/jpeg,image/webp" onChange={e => {
         const fichier = e.target.files?.[0]; e.target.value = ''; if (!fichier) return;
         setPhotoEnCours(true); onPreparation?.(true); setErreur('');
         void (async () => {
           for (const taille of [320,240,160]) { const photo = await preparerPortrait(fichier,taille); if (photo.length <= 90_000) { changer({...carte,photo}); return; } }
-          throw new Error('Choisis une photo moins volumineuse.');
+          throw new Error(t('contributionCarte.photoVolume'));
         })().catch(e => setErreur((e as Error).message)).finally(() => { setPhotoEnCours(false); onPreparation?.(false); });
       }} /></label>
-      {carte.photo && <button type="button" className="btn fantome" onClick={() => champ('photo',undefined)}>Retirer la photo proposée</button>}
-      {photoEnCours && <p role="status">Préparation de la photo…</p>}{erreur && <p role="alert">{erreur}</p>}
+      {carte.photo && <button type="button" className="btn fantome" onClick={() => champ('photo',undefined)}>{t('contributionCarte.photoRetirer')}</button>}
+      {photoEnCours && <p role="status">{t('contributionCarte.photoPreparation')}</p>}{erreur && <p role="alert">{erreur}</p>}
     </fieldset>
     {afficherApercu && carte.nom.trim() && <aside className="cn-apercu"><CarteJoueurEnLigne logoClub={clubFixe?.logo} carte={{ ...carte, id:'apercu-normale',sourceId:'apercu-normale',famille,
       origine:'professionnel',rarete:rareteCarriere(carte.note),statistiques:statistiquesCarte(carte.note,famille,'apercu-normale'),
-      proprietaire:null,fatigue:0,matchs:0,essais:0,clubs:[] }} /><small>Aperçu de la carte normale</small></aside>}
+      proprietaire:null,fatigue:0,matchs:0,essais:0,clubs:[] }} /><small>{t('contributionCarte.apercu')}</small></aside>}
   </div>;
 }

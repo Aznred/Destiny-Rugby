@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { t, texteTraduit, locale } from '../lib/i18n';
 import { Icone } from '../components/Icone';
 import { Blason } from '../components/Blason';
 import { EffectifClubPropose } from '../components/EffectifClubPropose';
@@ -10,6 +11,8 @@ import {
   carteNormaleVide,
   saisieDepuisSource,
   validerCarteNormale,
+  validerClubPropose,
+  effectifClubProposeComplet,
   type DemandeCarte,
   type PropositionClub,
   type SaisieCarteNormale,
@@ -97,7 +100,7 @@ export function CompleteTaCarte() {
   const [joueursClub, setJoueursClub] = useState<SaisieCarteNormale[]>([]);
   const [messageClub, setMessageClub] = useState('');
   const [formulaireJoueurClubOuvert, setFormulaireJoueurClubOuvert] = useState(false);
-  const divisionFinale = divisionChoisie === 'Autre division' ? divisionAutre.trim() || 'Division personnalisée' : divisionChoisie;
+  const divisionFinale = divisionChoisie === 'Autre division' ? divisionAutre.trim() : divisionChoisie;
 
   // Charger les demandes existantes
   const chargerDemandes = async () => {
@@ -243,7 +246,7 @@ export function CompleteTaCarte() {
         action: 'demandesCartes',
         operation: 'soumettre',
         type: 'club',
-        clubPropose,
+        clubPropose: validerClubPropose(clubPropose),
         message: messageClub,
         droitsCertifies: true,
       });
@@ -263,16 +266,13 @@ export function CompleteTaCarte() {
   };
 
   // Aperçu du blason pour le club proposé
-  const clubApercu = useMemo(
-    () => ({
-      nom: nomClub.trim() || 'Nouveau Club',
+  const clubApercu = {
+      nom: nomClub.trim() || t('contributionCarte.nouveauClub'),
       ville: villeClub.trim() || undefined,
       c1: couleur1,
       c2: couleur2,
       logo: logoClub,
-    }),
-    [nomClub, villeClub, couleur1, couleur2, logoClub],
-  );
+  };
 
   // Recherche de carte à retirer
   const chercherCarteRetrait = async () => {
@@ -330,7 +330,7 @@ export function CompleteTaCarte() {
 
   // Annulation d'une demande par son auteur
   const annulerDemande = async (id: string) => {
-    if (!window.confirm('Es-tu sûr de vouloir retirer / annuler cette proposition ?')) return;
+    if (!window.confirm(t('contributionCarte.annulerConfirmation'))) return;
     setOccupe(true);
     setErreur('');
     setSucces('');
@@ -354,12 +354,10 @@ export function CompleteTaCarte() {
       <header className="complete-carte-entete">
         <div className="complete-carte-titre-zone">
           <span className="complete-carte-badge">
-            <Icone nom="maillot" taille={18} /> Contribution
-          </span>
-          <h1>Complète ta carte</h1>
+            <Icone nom="maillot" taille={18} /> {t('contributionCarte.badge')} </span>
+          <h1>{t('nav.contribuer')}</h1>
           <p>
-            Participe à l&apos;évolution de Destiny Rugby ! Propose un nouveau club avec sa division et son effectif,
-            ajoute un joueur manquant, corrige une carte existante ou demande le retrait d&apos;une carte.
+            {t('contributionCarte.enteteAide')}
           </p>
         </div>
 
@@ -367,16 +365,14 @@ export function CompleteTaCarte() {
           <aside className="complete-carte-alerte-compte" role="status">
             <Icone nom="alerte" taille={20} />
             <div>
-              <b>Connecte ton compte en ligne</b>
-              <p>Pour envoyer des propositions de clubs ou de cartes et suivre leur validation par Kiri, rejoins le mode en ligne.</p>
+              <b> {t('contributionCarte.connexion')} </b>
+              <p> {t('contributionCarte.connexionAide')} </p>
             </div>
-            <button type="button" className="btn primaire" onClick={() => setEcran('carriereEnLigne')}>
-              Se connecter
-            </button>
+            <button type="button" className="btn primaire" onClick={() => setEcran('carriereEnLigne')}> {t('contributionCarte.connecter')} </button>
           </aside>
         )}
 
-        <nav className="complete-carte-onglets" aria-label="Modes de contribution">
+        <nav className="complete-carte-onglets" aria-label={t('contributionCarte.modes')}>
           <button
             type="button"
             className={onglet === 'correction' ? 'actif' : ''}
@@ -387,7 +383,7 @@ export function CompleteTaCarte() {
             }}
           >
             <Icone nom="loupe" taille={17} />
-            <span>Corriger une carte</span>
+            <span>{t('contributionCarte.corriger')}</span>
           </button>
           <button
             type="button"
@@ -399,7 +395,7 @@ export function CompleteTaCarte() {
             }}
           >
             <Icone nom="joueur" taille={17} />
-            <span>Créer un joueur</span>
+            <span>{t('contributionCarte.creerJoueur')}</span>
           </button>
           <button
             type="button"
@@ -411,7 +407,7 @@ export function CompleteTaCarte() {
             }}
           >
             <Icone nom="clubs" taille={17} />
-            <span>Proposer un club</span>
+            <span>{t('contributionCarte.proposerClub')}</span>
           </button>
           <button
             type="button"
@@ -423,7 +419,7 @@ export function CompleteTaCarte() {
             }}
           >
             <Icone nom="corbeille" taille={17} />
-            <span>Retirer sa carte</span>
+            <span>{t('contributionCarte.retirerCarte')}</span>
           </button>
           <button
             type="button"
@@ -436,7 +432,7 @@ export function CompleteTaCarte() {
             }}
           >
             <Icone nom="dossier" taille={17} />
-            <span>Mes propositions</span>
+            <span>{t('contributionCarte.propositions')}</span>
             {demandes.length > 0 && <span className="complete-carte-bulle-compteur">{demandes.length}</span>}
           </button>
         </nav>
@@ -445,13 +441,13 @@ export function CompleteTaCarte() {
       {erreur && (
         <div className="complete-carte-message erreur" role="alert">
           <Icone nom="stop" taille={18} />
-          <span>{erreur}</span>
+          <span>{texteTraduit(erreur)}</span>
         </div>
       )}
       {succes && (
         <div className="complete-carte-message succes" role="status">
           <Icone nom="ok" taille={18} />
-          <span>{succes}</span>
+          <span>{texteTraduit(succes)}</span>
         </div>
       )}
 
@@ -459,8 +455,8 @@ export function CompleteTaCarte() {
       {onglet === 'correction' && (
         <section className="complete-carte-section">
           <div className="complete-carte-bloc-recherche">
-            <h2>Rechercher la carte à corriger</h2>
-            <p>Saisis le prénom, le nom ou le club du joueur que tu souhaites corriger dans la base de données.</p>
+            <h2>{t('contributionCarte.rechercherCarte')}</h2>
+            <p>{t('contributionCarte.rechercheAide')}</p>
             <div className="cn-recherche-barre">
               <input
                 type="search"
@@ -469,10 +465,10 @@ export function CompleteTaCarte() {
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') void chercherCarte();
                 }}
-                placeholder="Ex : Dupont, Ntamack, Alldritt..."
+                placeholder={t('contributionCarte.rechercheExemple')}
               />
               <button type="button" className="btn primaire" disabled={occupe || !q.trim()} onClick={() => void chercherCarte()}>
-                <Icone nom="loupe" taille={16} /> Rechercher
+                <Icone nom="loupe" taille={16} /> {t('contributionCarte.rechercher')}
               </button>
             </div>
 
@@ -492,7 +488,7 @@ export function CompleteTaCarte() {
                   >
                     <b>{s.nom}</b>
                     <small>
-                      {s.clubReel} · {s.note} GEN · {s.age} ans
+                      {t('contributionCarte.resultat',{club:s.clubReel,note:s.note,age:s.age})}
                     </small>
                   </button>
                 ))}
@@ -503,8 +499,8 @@ export function CompleteTaCarte() {
           {sourceId ? (
             <form onSubmit={soumettreCorrection} className="complete-carte-formulaire-conteneur">
               <div className="complete-carte-sous-titre">
-                <h3>Correction de : {carteCorrection.nom}</h3>
-                <small>Modifie les attributs erronés, le club ou propose un nouveau portrait.</small>
+                <h3>{t('contributionCarte.correctionDe',{nom:carteCorrection.nom})}</h3>
+                <small>{t('contributionCarte.correctionAide')}</small>
               </div>
 
               <FormulaireCarteNormale
@@ -516,14 +512,14 @@ export function CompleteTaCarte() {
 
               <div className="complete-carte-champ">
                 <label htmlFor="msg-correction">
-                  <b>Informations complémentaires ou sources</b>
-                  <small>Lien officiel, article, justification des changements...</small>
+                  <b>{t('contributionCarte.sources')}</b>
+                  <small>{t('contributionCarte.sourcesAide')}</small>
                 </label>
                 <textarea
                   id="msg-correction"
                   rows={3}
                   maxLength={500}
-                  placeholder="Ex : Changement officiel de club au mercato d'été, poste régulier en championnat..."
+                  placeholder={t('contributionCarte.sourcesExemple')}
                   value={messageCorrection}
                   onChange={(e) => setMessageCorrection(e.target.value)}
                 />
@@ -537,7 +533,7 @@ export function CompleteTaCarte() {
                   checked={droitsCertifies}
                   onChange={(e) => setDroitsCertifies(e.target.checked)}
                 />
-                <span>Je certifie avoir les droits d'utilisation de l'image postée ou des images postées.</span>
+                <span>{t('contributionCarte.droits')}</span>
               </label>
 
               <div className="complete-carte-actions-fin">
@@ -546,14 +542,14 @@ export function CompleteTaCarte() {
                   className="btn primaire grande"
                   disabled={occupe || !droitsCertifies}
                 >
-                  <Icone nom="check" taille={18} /> Envoyer la demande de correction
+                  <Icone nom="check" taille={18} /> {t('contributionCarte.envoyerCorrection')}
                 </button>
               </div>
             </form>
           ) : (
             <div className="complete-carte-vide">
               <Icone nom="loupe" taille={36} />
-              <p>Recherche et sélectionne une carte ci-dessus pour la modifier.</p>
+              <p>{t('contributionCarte.vide')}</p>
             </div>
           )}
         </section>
@@ -564,8 +560,8 @@ export function CompleteTaCarte() {
         <section className="complete-carte-section">
           <form onSubmit={soumettreCreationJoueur} className="complete-carte-formulaire-conteneur">
             <div className="complete-carte-sous-titre">
-              <h2>Créer un joueur manquant</h2>
-              <p>Renseigne l&apos;identité, les statistiques et le club du joueur à ajouter au catalogue.</p>
+              <h2> {t('contributionCarte.creationTitre')} </h2>
+              <p> {t('contributionCarte.creationAide')} </p>
             </div>
 
             <FormulaireCarteNormale
@@ -577,14 +573,14 @@ export function CompleteTaCarte() {
 
             <div className="complete-carte-champ">
               <label htmlFor="msg-creation">
-                <b>Informations complémentaires ou sources</b>
-                <small>Sources officielles, fiche club, palmarès ou parcours...</small>
+                <b> {t('contributionCarte.sources')} </b>
+                <small> {t('contributionCarte.creationSources')} </small>
               </label>
               <textarea
                 id="msg-creation"
                 rows={3}
                 maxLength={500}
-                placeholder="Ex : Joueur intégrant l'équipe première cette saison, source : site du club..."
+                placeholder={t('contributionCarte.creationExemple')}
                 value={messageCreation}
                 onChange={(e) => setMessageCreation(e.target.value)}
               />
@@ -598,7 +594,7 @@ export function CompleteTaCarte() {
                 checked={droitsCertifies}
                 onChange={(e) => setDroitsCertifies(e.target.checked)}
               />
-              <span>Je certifie avoir les droits d'utilisation de l'image postée ou des images postées.</span>
+              <span> {t('contributionCarte.droits')} </span>
             </label>
 
             <div className="complete-carte-actions-fin">
@@ -607,8 +603,7 @@ export function CompleteTaCarte() {
                 className="btn primaire grande"
                 disabled={occupe || !carteCreation.nom.trim() || !droitsCertifies}
               >
-                <Icone nom="check" taille={18} /> Envoyer la proposition de joueur
-              </button>
+                <Icone nom="check" taille={18} /> {t('contributionCarte.envoyerJoueur')} </button>
             </div>
           </form>
         </section>
@@ -619,24 +614,24 @@ export function CompleteTaCarte() {
         <section className="complete-carte-section">
           <form onSubmit={soumettrePropositionClub} className="complete-carte-formulaire-conteneur">
             <div className="complete-carte-sous-titre">
-              <h2>Proposer un nouveau club</h2>
+              <h2> {t('contributionCarte.clubTitre')} </h2>
               <p>
-                Renseigne les coordonnées du club, sa division, son blason/logo et les joueurs qui composent son effectif.
+                {t('contributionCarte.clubAideComplet')}
               </p>
             </div>
 
             <div className="complete-carte-grille-club">
               <div className="complete-carte-colonne-formulaire">
                 <fieldset className="cn-club-fieldset">
-                  <legend>1. Identité du club</legend>
+                  <legend> {t('contributionCarte.identiteClub')} </legend>
 
                   <label className="complete-carte-champ">
-                    <b>Nom du club *</b>
+                    <b> {t('contributionCarte.nomClubRequis')} </b>
                     <input
                       type="text"
                       required
                       maxLength={100}
-                      placeholder="Ex : US Carcassonne, RC Vannes, Servette Genève..."
+                      placeholder={t('contributionCarte.clubExemple')}
                       value={nomClub}
                       onChange={(e) => setNomClub(e.target.value)}
                     />
@@ -644,7 +639,7 @@ export function CompleteTaCarte() {
 
                   <div className="cn-champs">
                     <label className="complete-carte-champ">
-                      <b>Division / Championnat *</b>
+                      <b> {t('contributionCarte.divisionRequise')} </b>
                       <Selecteur
                         valeur={divisionChoisie}
                         options={DIVISIONS_POPULAIRES.map((div) => ({ valeur: div, label: div }))}
@@ -654,12 +649,12 @@ export function CompleteTaCarte() {
 
                     {divisionChoisie === 'Autre division' && (
                       <label className="complete-carte-champ">
-                        <b>Précise la division *</b>
+                        <b> {t('contributionCarte.divisionPreciser')} </b>
                         <input
                           type="text"
                           required
                           maxLength={100}
-                          placeholder="Nom de la division ou ligue"
+                          placeholder={t('contributionCarte.divisionNom')}
                           value={divisionAutre}
                           onChange={(e) => setDivisionAutre(e.target.value)}
                         />
@@ -667,22 +662,22 @@ export function CompleteTaCarte() {
                     )}
 
                     <label className="complete-carte-champ">
-                      <b>Ville</b>
+                      <b> {t('contributionCarte.ville')} </b>
                       <input
                         type="text"
                         maxLength={80}
-                        placeholder="Ex : Carcassonne, Vannes..."
+                        placeholder={t('contributionCarte.villeExemple')}
                         value={villeClub}
                         onChange={(e) => setVilleClub(e.target.value)}
                       />
                     </label>
 
                     <label className="complete-carte-champ">
-                      <b>Pays</b>
+                      <b> {t('contributionCarte.pays')} </b>
                       <input
                         type="text"
                         maxLength={80}
-                        placeholder="Ex : France, Suisse, Italie..."
+                        placeholder={t('contributionCarte.paysExemple')}
                         value={paysClub}
                         onChange={(e) => setPaysClub(e.target.value)}
                       />
@@ -691,11 +686,11 @@ export function CompleteTaCarte() {
                 </fieldset>
 
                 <fieldset className="cn-club-fieldset">
-                  <legend>Visuel : Logo et Couleurs du blason</legend>
+                  <legend> {t('contributionCarte.visuelClub')} </legend>
 
                   <label className="complete-carte-champ">
-                    <b>Importer le logo du club</b>
-                    <small>Fichier PNG avec fond transparent recommandé (90 Ko max).</small>
+                    <b> {t('contributionCarte.importerLogo')} </b>
+                    <small> {t('contributionCarte.logoAide')} </small>
                     <input
                       type="file"
                       accept="image/png,image/jpeg,image/webp"
@@ -722,7 +717,7 @@ export function CompleteTaCarte() {
                   </label>
 
                   <label className="complete-carte-champ">
-                    <b>Ou adresse web du logo (HTTPS)</b>
+                    <b> {t('contributionCarte.logoAdresse')} </b>
                     <input
                       type="url"
                       placeholder="https://..."
@@ -737,19 +732,18 @@ export function CompleteTaCarte() {
                       className="btn fantome petit"
                       onClick={() => setLogoClub(undefined)}
                     >
-                      <Icone nom="croix" taille={14} /> Retirer le logo
-                    </button>
+                      <Icone nom="croix" taille={14} /> {t('contributionCarte.logoRetirer')} </button>
                   )}
 
                   <div className="complete-carte-couleurs">
-                    <b>Couleurs du blason (repli & maillot)</b>
+                    <b> {t('contributionCarte.couleurs')} </b>
                     <div className="cn-palettes-rapides">
                       {PALETTES_COULEURS.map((p) => (
                         <button
                           key={p.nom}
                           type="button"
                           className="cn-palette-pastille"
-                          title={p.nom}
+                          title={texteTraduit(p.nom)}
                           onClick={() => {
                             setCouleur1(p.c1);
                             setCouleur2(p.c2);
@@ -763,7 +757,7 @@ export function CompleteTaCarte() {
 
                     <div className="cn-champs">
                       <label className="complete-carte-champ-couleur">
-                        <span>Couleur principale</span>
+                        <span> {t('contributionCarte.couleur1')} </span>
                         <div className="cn-input-couleur-wrap">
                           <input
                             type="color"
@@ -774,7 +768,7 @@ export function CompleteTaCarte() {
                         </div>
                       </label>
                       <label className="complete-carte-champ-couleur">
-                        <span>Couleur secondaire</span>
+                        <span> {t('contributionCarte.couleur2')} </span>
                         <div className="cn-input-couleur-wrap">
                           <input
                             type="color"
@@ -795,30 +789,30 @@ export function CompleteTaCarte() {
                   <div className="cn-club-blason-box">
                     <Blason club={clubApercu} taille={70} />
                   </div>
-                  <h4>{nomClub.trim() || 'Nom du club'}</h4>
-                  <span className="cn-division-tag">{divisionFinale}</span>
+                  <h4>{nomClub.trim() || t('contributionCarte.nomClub')}</h4>
+                  <span className="cn-division-tag">{texteTraduit(divisionFinale)}</span>
                   {villeClub.trim() && <small>{villeClub} · {paysClub}</small>}
                 </div>
               </aside>
             </div>
 
             <fieldset className="cn-club-fieldset cn-joueurs-section">
-              <legend>2. Composition et effectif</legend>
-              <EffectifClubPropose club={{ nom: nomClub.trim() || "Club proposé", division: divisionFinale, pays: paysClub,
+              <legend> {t('contributionCarte.effectifLegende')} </legend>
+              <EffectifClubPropose club={{ nom: nomClub.trim() || t('contributionCarte.clubPropose'), division: divisionFinale, pays: paysClub,
                 logo: logoClub, c1: couleur1, c2: couleur2, joueurs: joueursClub }} changer={setJoueursClub}
                 occupe={occupe} onEdition={setFormulaireJoueurClubOuvert} />
             </fieldset>
 
             <div className="complete-carte-champ">
               <label htmlFor="msg-club">
-                <b>Sources et informations complémentaires</b>
-                <small>Site officiel du club, liens vers les réseaux sociaux, page Wikipedia ou FFR...</small>
+                <b> {t('contributionCarte.clubSources')} </b>
+                <small> {t('contributionCarte.clubSourcesAide')} </small>
               </label>
               <textarea
                 id="msg-club"
                 rows={3}
                 maxLength={500}
-                placeholder="Ex : Club officiel évoluant en Fédérale 1, logo issu de la charte officielle..."
+                placeholder={t('contributionCarte.clubSourcesExemple')}
                 value={messageClub}
                 onChange={(e) => setMessageClub(e.target.value)}
               />
@@ -832,16 +826,16 @@ export function CompleteTaCarte() {
                 checked={droitsCertifies}
                 onChange={(e) => setDroitsCertifies(e.target.checked)}
               />
-              <span>Je certifie avoir les droits d'utilisation de l'image postée ou des images postées.</span>
+              <span> {t('contributionCarte.droits')} </span>
             </label>
 
             <div className="complete-carte-actions-fin">
               <button
                 type="submit"
                 className="btn primaire grande"
-                disabled={occupe || formulaireJoueurClubOuvert || !nomClub.trim() || !droitsCertifies}
+                disabled={occupe || formulaireJoueurClubOuvert || !nomClub.trim() || !divisionFinale || !droitsCertifies || !effectifClubProposeComplet(joueursClub)}
               >
-                <Icone nom="check" taille={18} /> Envoyer le club et {joueursClub.length === 1 ? 'son joueur' : `ses ${joueursClub.length} joueurs`}
+                <Icone nom="check" taille={18} /> {t('contributionCarte.envoyerClub')}
               </button>
             </div>
           </form>
@@ -854,18 +848,14 @@ export function CompleteTaCarte() {
           <div className="cn-retrait-avertissement">
             <Icone nom="bouclier" taille={28} />
             <div>
-              <h3>Droit à l&apos;image & retrait d&apos;une carte joueur</h3>
-              <p>
-                Tu es joueur licencié, joueuse licenciée ou représentant d&apos;un club et tu souhaites que ta carte soit retirée du jeu ?
-                Conformément à la protection des données personnelles et au droit à l&apos;image, tu peux demander son retrait officiel du catalogue,
-                des packs et du marché des transferts.
-              </p>
+              <h3> {t('contributionCarte.retraitTitre')} </h3>
+              <p> {t('contributionCarte.retraitAide')} </p>
             </div>
           </div>
 
           <div className="complete-carte-bloc-recherche">
-            <h2>1. Rechercher la carte à retirer</h2>
-            <p>Saisis ton prénom, ton nom ou ton club pour retrouver la carte concernée dans la base.</p>
+            <h2> {t('contributionCarte.retraitRecherche')} </h2>
+            <p> {t('contributionCarte.retraitRechercheAide')} </p>
             <div className="cn-recherche-barre">
               <input
                 type="search"
@@ -874,7 +864,7 @@ export function CompleteTaCarte() {
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') void chercherCarteRetrait();
                 }}
-                placeholder="Ex : Dupont, Penaud, Ntamack..."
+                placeholder={t('contributionCarte.retraitRechercheExemple')}
               />
               <button
                 type="button"
@@ -882,8 +872,7 @@ export function CompleteTaCarte() {
                 disabled={occupe || !qRetrait.trim()}
                 onClick={() => void chercherCarteRetrait()}
               >
-                <Icone nom="loupe" taille={16} /> Rechercher
-              </button>
+                <Icone nom="loupe" taille={16} /> {t('contributionCarte.rechercher')} </button>
             </div>
 
             {sourcesRetrait.length > 0 && (
@@ -901,7 +890,7 @@ export function CompleteTaCarte() {
                   >
                     <b>{s.nom}</b>
                     <small>
-                      {s.clubReel} · {s.note} GEN · {s.age} ans
+                      {t('contributionCarte.resultat', {club: s.clubReel, note: s.note, age: s.age})}
                     </small>
                   </button>
                 ))}
@@ -912,22 +901,22 @@ export function CompleteTaCarte() {
           {carteRetraitSelectionnee ? (
             <form onSubmit={soumettreRetrait} className="complete-carte-formulaire-conteneur">
               <div className="complete-carte-sous-titre">
-                <h2>2. Confirmer le retrait de la carte</h2>
-                <p>Vérifie les informations ci-dessous et indique le motif de ta demande.</p>
+                <h2> {t('contributionCarte.retraitConfirmer')} </h2>
+                <p> {t('contributionCarte.retraitVerification')} </p>
               </div>
 
               <div className="cn-carte-retrait-apercu">
                 <CarteJoueurEnLigne carte={carteDepuisSource(carteRetraitSelectionnee, 'retrait', 'retrait', 1)} />
                 <div className="cn-carte-retrait-infos">
                   <h3>{carteRetraitSelectionnee.nom}</h3>
-                  <p><b>Club actuel :</b> {carteRetraitSelectionnee.clubReel} ({carteRetraitSelectionnee.championnat})</p>
-                  <p><b>Poste :</b> {POSTE_PAR_ID[carteRetraitSelectionnee.poste]?.nom ?? carteRetraitSelectionnee.poste}</p>
-                  <p><b>Général :</b> {carteRetraitSelectionnee.note} GEN · <b>Âge :</b> {carteRetraitSelectionnee.age} ans</p>
+                  <p><b> {t('contributionCarte.clubActuel')} </b> {carteRetraitSelectionnee.clubReel} ({carteRetraitSelectionnee.championnat})</p>
+                  <p><b> {t('contributionCarte.poste')} </b> {texteTraduit(POSTE_PAR_ID[carteRetraitSelectionnee.poste]?.nom ?? carteRetraitSelectionnee.poste)}</p>
+                  <p><b> {t('contributionCarte.generalValeur')} </b> {carteRetraitSelectionnee.note} {t('contributionCarte.generalCourt')} · <b> {t('contributionCarte.ageValeur')} </b> {t('contributionCarte.ans', {n: carteRetraitSelectionnee.age})}</p>
                 </div>
               </div>
 
               <div className="complete-carte-champ">
-                <b>Motif principal de la demande *</b>
+                <b> {t('contributionCarte.motif')} </b>
                 <Selecteur
                   valeur={motifRetrait}
                   options={[
@@ -943,14 +932,14 @@ export function CompleteTaCarte() {
 
               <div className="complete-carte-champ">
                 <label htmlFor="details-retrait">
-                  <b>Précisions complémentaires (facultatif)</b>
-                  <small>Ajoute toute information utile pour faciliter le traitement de la demande par le Labo.</small>
+                  <b> {t('contributionCarte.precisions')} </b>
+                  <small> {t('contributionCarte.precisionsAide')} </small>
                 </label>
                 <textarea
                   id="details-retrait"
                   rows={3}
                   maxLength={400}
-                  placeholder="Ex : Je suis le joueur représenté sur cette carte et je demande le retrait définitif..."
+                  placeholder={t('contributionCarte.precisionsExemple')}
                   value={detailsRetrait}
                   onChange={(e) => setDetailsRetrait(e.target.value)}
                 />
@@ -964,9 +953,7 @@ export function CompleteTaCarte() {
                   checked={certificationRetrait}
                   onChange={(e) => setCertificationRetrait(e.target.checked)}
                 />
-                <span>
-                  Je certifie sur l&apos;honneur être le joueur concerné par cette carte (ou son représentant légal / club) et demander son retrait officiel du jeu Destiny Rugby.
-                </span>
+                <span> {t('contributionCarte.certification')} </span>
               </label>
 
               <div className="complete-carte-actions-fin">
@@ -976,13 +963,12 @@ export function CompleteTaCarte() {
                   style={{ background: '#dc2626', borderColor: '#b91c1c' }}
                   disabled={occupe || !certificationRetrait}
                 >
-                  <Icone nom="corbeille" taille={18} /> Confirmer et demander le retrait
-                </button>
+                  <Icone nom="corbeille" taille={18} /> {t('contributionCarte.envoyerRetrait')} </button>
               </div>
             </form>
           ) : (
             <div style={{ textAlign: 'center', padding: '1rem', color: 'rgba(255,255,255,0.6)' }}>
-              <p>Recherche et sélectionne une carte ci-dessus pour préparer sa demande de retrait.</p>
+              <p> {t('contributionCarte.retraitVide')} </p>
             </div>
           )}
         </section>
@@ -992,8 +978,8 @@ export function CompleteTaCarte() {
       {onglet === 'mesDemandes' && (
         <section className="complete-carte-section">
           <div className="complete-carte-sous-titre">
-            <h2>Mes propositions soumises</h2>
-            <p>Retrouve ici l&apos;état d&apos;examen de tes demandes de création, de correction, de retrait ou de club.</p>
+            <h2> {t('contributionCarte.mesTitre')} </h2>
+            <p> {t('contributionCarte.mesAide')} </p>
           </div>
 
           {demandes.length > 0 && (
@@ -1003,28 +989,28 @@ export function CompleteTaCarte() {
                 className={filtreMesDemandes === 'toutes' ? 'actif' : ''}
                 onClick={() => setFiltreMesDemandes('toutes')}
               >
-                Toutes ({demandes.length})
+                {t('contributionCarte.toutes')} ({demandes.length})
               </button>
               <button
                 type="button"
                 className={filtreMesDemandes === 'attente' ? 'actif' : ''}
                 onClick={() => setFiltreMesDemandes('attente')}
               >
-                ⏳ En attente ({demandes.filter(d => d.statut === 'attente').length})
+                {t('contributionCarte.attente')} ({demandes.filter(d => d.statut === 'attente').length})
               </button>
               <button
                 type="button"
                 className={filtreMesDemandes === 'acceptee' ? 'actif' : ''}
                 onClick={() => setFiltreMesDemandes('acceptee')}
               >
-                ✅ Validées ({demandes.filter(d => d.statut === 'acceptee').length})
+                {t('contributionCarte.acceptees')} ({demandes.filter(d => d.statut === 'acceptee').length})
               </button>
               <button
                 type="button"
                 className={filtreMesDemandes === 'refusee' ? 'actif' : ''}
                 onClick={() => setFiltreMesDemandes('refusee')}
               >
-                ❌ Refusées ({demandes.filter(d => d.statut === 'refusee').length})
+                {t('contributionCarte.refusees')} ({demandes.filter(d => d.statut === 'refusee').length})
               </button>
             </div>
           )}
@@ -1036,12 +1022,12 @@ export function CompleteTaCarte() {
                   <header className="cn-demande-tete">
                     <div className="cn-demande-titre-group">
                       <span className={`cn-demande-type type-${d.type}`}>
-                        {d.type === 'club' ? 'Club' : d.type === 'creation' ? 'Création' : d.type === 'retrait' ? 'Retrait' : 'Correction'}
+                        {t(`contributionCarte.${d.type}`)}
                       </span>
                       <h3>{d.clubPropose ? d.clubPropose.nom : d.carte.nom}</h3>
                     </div>
                     <span className={`cn-demande-statut-badge statut-${d.statut}`}>
-                      {d.statut === 'attente' ? '⏳ En attente' : d.statut === 'acceptee' ? '✅ Validée' : '❌ Refusée'}
+                      {t(`contributionCarte.${d.statut}`)}
                     </span>
                   </header>
 
@@ -1049,26 +1035,26 @@ export function CompleteTaCarte() {
                     {d.type === 'club' && d.clubPropose ? (
                       <div className="cn-demande-details-club">
                         <p>
-                          <b>Division :</b> {d.clubPropose.division}
+                          <b>{t('contributionCarte.division')} :</b> {texteTraduit(d.clubPropose.division)}
                           {d.clubPropose.ville && ` · ${d.clubPropose.ville}`}
                           {d.clubPropose.pays && ` (${d.clubPropose.pays})`}
                         </p>
                         {d.clubPropose.joueurs && d.clubPropose.joueurs.length > 0 && (
                           <p>
-                            <b>Effectif proposé :</b> {d.clubPropose.joueurs.length} joueur(s)
+                            <b> {t('contributionCarte.effectifPropose')} </b> {t('contributionCarte.joueursNombre', {n: d.clubPropose.joueurs.length})}
                           </p>
                         )}
                       </div>
                     ) : d.type === 'retrait' ? (
                       <div className="cn-demande-details-joueur">
                         <p>
-                          <b style={{ color: '#fca5a5' }}>Demande de retrait du jeu :</b> {d.carte.clubReel} · <b>Poste :</b> {POSTE_PAR_ID[d.carte.poste]?.nom ?? d.carte.poste} · <b>GEN :</b> {d.carte.note}
+                          <b style={{ color: '#fca5a5' }}> {t('contributionCarte.retraitJeu')} </b> {d.carte.clubReel} · <b> {t('contributionCarte.poste')} </b> {texteTraduit(POSTE_PAR_ID[d.carte.poste]?.nom ?? d.carte.poste)} · <b>{t('contributionCarte.generalCourt')} :</b> {d.carte.note}
                         </p>
                       </div>
                     ) : (
                       <div className="cn-demande-details-joueur">
                         <p>
-                          <b>Club :</b> {d.carte.clubReel} · <b>Poste :</b> {POSTE_PAR_ID[d.carte.poste].nom} · <b>GEN :</b> {d.carte.note}
+                          <b>{t('contributionCarte.club')} :</b> {d.carte.clubReel} · <b> {t('contributionCarte.poste')} </b> {texteTraduit(POSTE_PAR_ID[d.carte.poste].nom)} · <b>{t('contributionCarte.generalCourt')} :</b> {d.carte.note}
                         </p>
                       </div>
                     )}
@@ -1077,15 +1063,15 @@ export function CompleteTaCarte() {
 
                     {d.reponse && (
                       <div className="cn-demande-reponse-labo">
-                        <b>Message du Labo :</b>
+                        <b> {t('contributionCarte.messageLabo')} </b>
                         <p>{d.reponse}</p>
                       </div>
                     )}
 
                     <footer className="cn-demande-pied">
                       <div>
-                        <small>Soumise le {new Date(d.creeLe).toLocaleDateString('fr-FR')}</small>
-                        {d.decideLe && <small> · Décidée le {new Date(d.decideLe).toLocaleDateString('fr-FR')}</small>}
+                        <small>{t('contributionCarte.soumise', {date: new Date(d.creeLe).toLocaleDateString(locale())})}</small>
+                        {d.decideLe && <small> · {t('contributionCarte.decidee', {date: new Date(d.decideLe).toLocaleDateString(locale())})}</small>}
                       </div>
                       {d.statut === 'attente' && (
                         <button
@@ -1101,8 +1087,7 @@ export function CompleteTaCarte() {
                           disabled={occupe}
                           onClick={() => void annulerDemande(d.id)}
                         >
-                          <Icone nom="croix" taille={12} /> Annuler ma demande
-                        </button>
+                          <Icone nom="croix" taille={12} /> {t('contributionCarte.annulerDemande')} </button>
                       )}
                     </footer>
                   </div>
@@ -1112,7 +1097,7 @@ export function CompleteTaCarte() {
           ) : (
             <div className="complete-carte-vide">
               <Icone nom="dossier" taille={36} />
-              <p>Tu n&apos;as soumis aucune proposition pour le moment.</p>
+              <p> {t('contributionCarte.mesVide')} </p>
             </div>
           )}
         </section>

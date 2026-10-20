@@ -9,12 +9,14 @@ import { carteDepuisSource, rareteCarriere, statistiquesCarte } from '../src/lib
 import type { SourceCarte } from '../src/lib/ligue/catalogueCarriere';
 import { appliquerLocalisations } from '../src/lib/localisationClub';
 import { POSTE_PAR_ID } from '../src/data/rugby';
-import { chargerTextes } from '../src/lib/i18n';
+import { chargerTextes, definirLangue, LANGUES } from '../src/lib/i18n';
 import { TEXTES } from '../src/data/textes';
 import '../src/index.css';
 import '../src/App.css';
 import '../src/components/AtelierKiri.css';
 chargerTextes(TEXTES);
+const langue = LANGUES.find(l => l.id === new URLSearchParams(location.search).get('langue'));
+definirLangue(langue?.id ?? 'fr');
 const demandes: DemandeCarte[] = [{ id: crypto.randomUUID(), type: 'club', carte: { ...carteNormaleVide(), nom: 'Louis Exemple' },
   clubPropose: { nom: 'Club Contribution', division: 'Régionale 1', pays: 'France', logo: '/logos/arcol.png', c1: '#235c41', c2: '#dec175',
     joueurs: ['Louis Exemple', 'Martin Exemple', 'Jules Exemple'].map((nom, i) => ({ ...carteNormaleVide(), nom,
@@ -39,7 +41,7 @@ window.fetch = async (input, init) => {
       const demande = demandes.find(d => d.id === b.id)!;
       if (b.operation === 'refuser') { demande.statut = 'refusee'; demande.reponse = b.reponse; }
       else {
-        demande.clubPropose = validerClubPropose(b.clubPropose);
+        demande.clubPropose = validerClubPropose(b.clubPropose, b.operation !== 'modifier');
         if (b.operation === 'approuver') {
           const club = demande.clubPropose;
           appliquerLocalisations({ [club.nom]: { logo: club.logo, c1: club.c1, c2: club.c2 } });
