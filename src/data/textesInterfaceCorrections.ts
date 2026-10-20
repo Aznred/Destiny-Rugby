@@ -2,6 +2,9 @@ import type { Traduction } from '../lib/i18n';
 
 /** Vocabulaire et formulations revus manuellement ; prioritaires sur les lots traduits. */
 export const TEXTES_INTERFACE_CORRECTIONS: Record<string, Traduction> = {
+  'online.lineup.duplicatePlayer': { fr: '{name} est déjà sur la feuille avec une autre de ses cartes.', en: '{name} is already on the team sheet with another card.', es: '{name} ya está en la alineación con otra de sus cartas.', it: '{name} è già in distinta con un’altra carta.', de: '{name} steht bereits mit einer anderen Karte im Kader.', pt: '{name} já está na ficha de jogo com outra carta.', ja: '{name}は別のカードですでにメンバーに登録されています。' },
+  'pub.ligue.halloween.promesse': { fr: 'Trois cartes, dont au moins une Halloween.', en: 'Three cards, including at least one Halloween card.', es: 'Tres cartas, incluida al menos una de Halloween.', it: 'Tre carte, di cui almeno una Halloween.', de: 'Drei Karten, darunter mindestens eine Halloween-Karte.', pt: 'Três cartas, incluindo pelo menos uma de Halloween.', ja: 'ハロウィンカード1枚以上を含む3枚。' },
+  'pub.ligue.rose.promesse': { fr: 'Trois cartes, dont au moins une Octobre Rose.', en: 'Three cards, including at least one Pink October card.', es: 'Tres cartas, incluida al menos una de Octubre Rosa.', it: 'Tre carte, di cui almeno una Ottobre Rosa.', de: 'Drei Karten, darunter mindestens eine Pink-October-Karte.', pt: 'Três cartas, incluindo pelo menos uma de Outubro Rosa.', ja: 'ピンク・オクトーバーカード1枚以上を含む3枚。' },
   'accession.quart': {
     fr: 'Montée en Fédérale 1 : les 8 clubs qualifiés pour les quarts de finale. Finir premier de poule ne suffit pas.',
     en: 'Promotion to Fédérale 1: the 8 clubs reaching the quarter-finals. Winning your pool is not enough.',

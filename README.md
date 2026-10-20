@@ -379,6 +379,12 @@ Contrôles : `npm run verify:champions-bloques`, `npm run verify:sirene-ballon-m
   Le bonus ne dépend plus du chronomètre arrêté et ne se répète pas pendant la pause ou les prolongations.
   Les rencontres en ligne déjà commencées conservent leurs règles et leur rejoue.
   Bancs : `npm run verify:recuperation-mi-temps` et `npm run verify:recuperation-mi-temps:navigateur`.
+- **Packs publicitaires et doublons en ligue (20 octobre 2026).** Halloween et Octobre Rose rapportent trois cartes
+  par publicité de ligue, avec leur carte spéciale garantie. Les packs de la Collection solo restent à dix cartes.
+  Une personne n'occupe qu'une place sur les 23 maillots, même avec plusieurs exemplaires ordinaires ou spéciaux.
+  Placement manuel, modèles sauvegardés, assemblage automatique et validation serveur appliquent cette règle.
+  Les cartes en réserve restent possédées ; les anciennes feuilles sont corrigées sans réécrire les matchs ouverts.
+  Recettes : `verify:packs-doublons-ligue` et `verify:doublons-ligue:navigateur` (aperçu local sur 5188).
 - 💸 **Le mode en ligne consommait 15 fois trop de réseau, et ça se payait.** Le
   quota de transfert de la base (5 Go/mois) est parti en huit jours — 6,1 Go —
   et la base a fini par refuser jusqu'au moindre `select`. Aucun bug : l'écran

@@ -91,6 +91,19 @@ puis à la racine. Le jeu ne lit que `public/m3d/` (**85 `.glb`, 114 Mo**).
 
 ## Architecture
 
+### Packs saisonniers publicitaires et doublons de composition — 20 octobre 2026
+
+`packPublicitaireDeLigue` ramène les récompenses Halloween et Octobre Rose à trois cartes après les réglages du Labo.
+Le filtre de stock utilise ce volume ; les poids de roulette, garanties et probabilités des cartes restent ceux du pack.
+La Collection solo et sa roulette Premium conservent leur volume. Le contenu déjà réservé reste un droit figé.
+`doublonDeComposition` compare l'identité du joueur sur les 23 maillots, cartes ordinaires et spéciales comprises.
+Le serveur refuse les feuilles et modèles invalides et réconcilie les anciennes feuilles avant le prochain coup d'envoi,
+en conservant les cartes possédées ; un exemplaire blessé n'écarte pas sa copie saine. L'interface contrôle les placements
+et le chargement d'un modèle, tout en permettant de remplacer la carte d'une personne par une autre de ses versions.
+L'assemblage automatique affecte des personnes aux postes puis choisit leurs variantes, sans doublon entre XV et banc.
+Bancs : `verify:packs-doublons-ligue` (API locale, reçus simulés signés), `verify:doublons-ligue:navigateur` sur 5188,
+`verify:publicites` et `verify:meilleure-composition`. Aucun compte distant modifié par ces recettes.
+
 ### Repos au vestiaire — 19 octobre 2026
 
 Les nouveaux matchs appliquent `recuperationMiTemps` une seule fois à l'entrée dans la pause de 40 minutes :

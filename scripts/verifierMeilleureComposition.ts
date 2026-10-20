@@ -4,7 +4,7 @@ import { POSTES_XV_MANAGER, POSTES_BANC_MANAGER } from '../src/lib/compositionMa
 import { POSTE_PAR_ID } from '../src/data/rugby';
 import type { CarteCarriere } from '../src/lib/ligue/typesCarriere';
 const postes=[...POSTES_XV_MANAGER,...POSTES_BANC_MANAGER];
-const cartes=postes.map((poste,i)=>({id:`j${i}`,poste,famille:POSTE_PAR_ID[poste].famille,note:60,age:25,fatigue:0,statistiques:{PIED:50}} as CarteCarriere));
+const cartes=postes.map((poste,i)=>({id:`j${i}`,sourceId:`source-j${i}`,nom:`Joueur ${i}`,poste,famille:POSTE_PAR_ID[poste].famille,note:60,age:25,fatigue:0,statistiques:{PIED:50}} as CarteCarriere));
 cartes.push({...cartes[9],id:'meilleur',note:99,statistiques:{PIED:99}});
 cartes.push({...cartes[9],id:'blesse',note:100,blesseJusqua:'2099-01-01'});
 const c=meilleureComposition(cartes)!;
@@ -17,7 +17,7 @@ assert.equal(meilleureComposition(cartes.slice(0,22)),null);
 assert.equal(meilleureComposition(cartes.map(x=>({...x,poste:'ailier_gauche',famille:'ailier'}))),null);
 assert.deepEqual(meilleureComposition([...cartes].reverse()),c);
 const cartesCollectif=postes.map((poste,i)=>({
-  id:`c${i}`,poste,famille:POSTE_PAR_ID[poste].famille,note:70,age:25,fatigue:0,
+  id:`c${i}`,sourceId:`source-c${i}`,nom:`Collectif ${i}`,poste,famille:POSTE_PAR_ID[poste].famille,note:70,age:25,fatigue:0,
   clubReel:[0,3,6].includes(i)?'Bloc':`Club ${i}`,nation:`Nation ${i}`,championnat:`Championnat ${i}`,
   statistiques:{PIED:50},
 } as CarteCarriere));

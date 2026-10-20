@@ -25,7 +25,7 @@ import type { RepereChrono } from './filmDirect.js';
 import type { CarteCarriere, ClubCarriere, CommandeCarriere, CompetitionCarriere, CreationCarriere, EtatCarriereEnLigne, HistoireCarriere, LigneClassementCarriere, ObjectifCarriere, PackCarriere, RencontreCarriere, TransactionCarriere, VueCarriereEnLigne } from './typesCarriere.js';
 import { LOT_VENTE_RAPIDE_MAX, valeurVenteRapide } from './venteRapideCarriere.js';
 import { bonusCollectif, collectifCarriere } from './collectifCarriere.js';
-import { carteEchangeAutorise, carteSurMarcheAutorisee, catalogueSpecial, identiteJoueur, preparerTirageSpecial, resumeSpeciauxLigue, tirerSpeciale } from './catalogueSpecial.js';
+import { carteEchangeAutorise, carteSurMarcheAutorisee, catalogueSpecial, doublonDeComposition, identiteJoueur, preparerTirageSpecial, resumeSpeciauxLigue, tirerSpeciale } from './catalogueSpecial.js';
 import { estPuissanceDeDeux, nombreQualifiesPlayoffs, nombreQualifiesPoules, prochainTourPlayoffs, repartirPoules } from './poulesCarriere.js';
 
 const HEURE = 3_600_000;
@@ -297,8 +297,8 @@ export function recupererFatiguePassivement(etat: EtatCarriereEnLigne, maintenan
  * ⚠️ DEUX CARTES DU MÊME JOUEUR NE JOUENT PAS ENSEMBLE. Dupont et Dupont
  * Halloween, McCaw ICON et McCaw Halloween : une seule va sur la feuille —
  * celle que le manager y a mise, sinon la meilleure. Les autres restent dans
- * l'effectif. On ne regarde que les groupes où figure une carte spéciale : les
- * doublons ordinaires des ligues qui les autorisent ne changent pas.
+ * l'effectif. Autoriser les doublons dans la collection ne permet pas de les
+ * aligner ensemble, ni entre le XV et le banc.
  */
 function ecartesParIdentite(cartes: readonly CarteCarriere[], composition: CompositionManager | undefined): Set<string> {
   const groupes = new Map<string, CarteCarriere[]>();
@@ -306,7 +306,7 @@ function ecartesParIdentite(cartes: readonly CarteCarriere[], composition: Compo
   const feuille = composition ? [...composition.titulaires, ...composition.remplacants] : [];
   const ecartes = new Set<string>();
   for (const groupe of groupes.values()) {
-    if (groupe.length < 2 || !groupe.some(c => c.speciale)) continue;
+    if (groupe.length < 2) continue;
     const garde = groupe.filter(c => feuille.includes(c.id)).sort((a, b) => feuille.indexOf(a.id) - feuille.indexOf(b.id))[0]
       ?? [...groupe].sort((a, b) => b.note - a.note || (a.id < b.id ? -1 : 1))[0];
     for (const c of groupe) if (c !== garde) ecartes.add(c.id);
@@ -316,7 +316,7 @@ function ecartesParIdentite(cartes: readonly CarteCarriere[], composition: Compo
 function ajusterComposition(etat: EtatCarriereEnLigne, club: ClubCarriere, maintenant: number) {
   const cartes = cartesClub(etat, club.id);
   const indisponibles = new Set(cartes.filter(c => c.blesseJusqua && Date.parse(c.blesseJusqua) > maintenant).map(c => c.id));
-  for (const id of ecartesParIdentite(cartes, club.composition)) indisponibles.add(id);
+  for (const id of ecartesParIdentite(cartes.filter(c => !indisponibles.has(c.id)), club.composition)) indisponibles.add(id);
   club.composition = reconcilerCompositionManager(cartes.map(coequipierDepuisCarte), club.composition, indisponibles);
   if (!club.buteurManuel) {
     const parId = new Map(cartes.map(c => [c.id, c]));
@@ -383,12 +383,8 @@ function verifierComposition(etat: EtatCarriereEnLigne, club: ClubCarriere, vale
   const ids = [...valeur.titulaires, ...valeur.remplacants];
   exiger(valeur.titulaires.length === 15 && valeur.remplacants.length === 8 && new Set(ids).size === 23, 'La feuille doit contenir 15 titulaires et 8 remplaçants distincts.');
   exiger(valeur.titulaires.includes(valeur.capitaineId) && ids.includes(valeur.buteurId), 'Choisissez un capitaine titulaire et un buteur sur la feuille.');
-  const presents = new Map<string, CarteCarriere>();
-  for (const id of ids) {
-    const c = carteParId(etat, id), identite = identiteJoueur(c), deja = presents.get(identite);
-    exiger(!deja || (!deja.speciale && !c.speciale), `${c.nom} est déjà sur la feuille avec une autre de ses cartes.`);
-    presents.set(identite, c);
-  }
+  const doublon = doublonDeComposition(etat.cartes, valeur);
+  exiger(!doublon, `${doublon?.nom ?? 'Ce joueur'} est déjà sur la feuille avec une autre de ses cartes.`);
   ids.forEach((id, i) => {
     const c = carteParId(etat, id);
     exiger(c.proprietaire === club.id, 'Cette carte appartient à un autre club.');

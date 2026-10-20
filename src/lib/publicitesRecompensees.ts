@@ -114,6 +114,14 @@ export const STATS_PUB_VIDES = (): StatsPublicites => ({
 export function jourPublicites(maintenant: number): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit' }).format(maintenant);
 }
+/** Les pochettes saisonnières de ligue ne reprennent pas le volume de la Collection solo. */
+export function packPublicitaireDeLigue(pack: PackCarriere): PackCarriere {
+  const famille = pack.evenement?.type ?? (pack.id === 'evenement-halloween-2026' ? 'halloween'
+    : pack.id === 'evenement-octobre-rose-2026' ? 'octobre-rose' : undefined);
+  if (famille !== 'halloween' && famille !== 'octobre-rose') return pack;
+  return { ...pack, cartes: 3, promesse: famille === 'halloween'
+    ? 'Trois cartes, dont au moins une Halloween.' : 'Trois cartes, dont au moins une Octobre Rose.' };
+}
 export function chancesPacksPub(packs: PackCarriere[], maintenant: number): ChancePackPub[] {
   const eligibles = packs.filter(p => p.published !== false && p.rewardedAdsEnabled === true
     && (p.rewardedAdWeight === undefined || (Number.isFinite(p.rewardedAdWeight) && p.rewardedAdWeight > 0))
@@ -129,7 +137,7 @@ export function chancesPacksPub(packs: PackCarriere[], maintenant: number): Chan
   const ponderes = eligibles.map(pack => ({pack, poids: automatiques.includes(pack)
     ? (autres ? autres / (100 - partAutomatique) : 1) * CHANCES_PACKS_PUB_PAR_DEFAUT[pack.id] : poidsOrdinaire(pack)}));
   const total = ponderes.reduce((n,p) => n + p.poids,0);
-  return ponderes.map(p => ({...p,chance:p.poids / total * 100}));
+  return ponderes.map(p => ({...p,pack:packPublicitaireDeLigue(p.pack),chance:p.poids / total * 100}));
 }
 /**
  * LA ROULETTE DES PACKS PREMIUM. Le Labo donne un poids à chaque pack (`premiumPacks`, 0 = exclu) ; sans réglage, tous

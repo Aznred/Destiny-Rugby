@@ -71,7 +71,7 @@ import type { Affinite, AffiniteCarte } from '../lib/ligue/collectifCarriere';
 import { ModaleMarche } from '../components/ModaleMarche';
 import { PACKS_CARRIERE, packsBoutiqueDuJour } from '../lib/ligue/catalogueCarriere';
 import { ManqueOvasLigue, OffrePublicitaire } from '../components/PublicitesRecompensees';
-import { nomFamilleSpeciale } from '../lib/ligue/cartesSpeciales';
+import { doublonDeComposition, nomFamilleSpeciale } from '../lib/ligue/cartesSpeciales';
 import { Citrouille, EmblemeIcon } from '../components/EmblemesSpeciaux';
 import { tn, texteTraduit, locale, nombre, t } from '../lib/i18n';
 import { fusionnerDeltaDirect, fusionnerVueLigue, presencesAcquittees } from '../lib/ligue/fusionDirect';
@@ -1586,6 +1586,12 @@ export function Composition({ vue, agir, occupe, erreur = '' }: { vue: VueCarrie
     recupPassiveParJour: recupJour,
   }])), [cartes, recupJour]);
   const [brouillon, setBrouillon] = useState<CompositionManager | null>(null);
+  const [erreurPlacement, setErreurPlacement] = useState('');
+  const adopterComposition = useCallback((suivante: CompositionManager) => {
+    const doublon = doublonDeComposition(cartes, suivante);
+    if (doublon) { setErreurPlacement(t('online.lineup.duplicatePlayer', { name: doublon.nom })); return; }
+    setErreurPlacement(''); setBrouillon(suivante);
+  }, [cartes]);
   // ⚠️ LA FEUILLE VIDE EST UNE CONSTANTE, PAS UN LITTÉRAL. Recréée à chaque
   // rendu, elle changeait d'identité en permanence : le calcul du collectif
   // (`useMemo`) se refaisait pour rien à chaque frappe.
@@ -1602,12 +1608,12 @@ export function Composition({ vue, agir, occupe, erreur = '' }: { vue: VueCarrie
     setTimeout(() => {
       try {
         const opt = meilleureComposition(cartes, Date.now());
-        if (opt) setBrouillon(opt);
+        if (opt) adopterComposition(opt);
       } finally {
         setAssemblageEnCours(false);
       }
     }, 16);
-  }, [occupe, assemblageEnCours, cartes]);
+  }, [occupe, assemblageEnCours, cartes, adopterComposition]);
   const cartesMap = useMemo(() => new Map(cartes.map(c => [c.id, c])), [cartes]);
   const optionsFiltre = (cle: 'championnat' | 'clubReel' | 'pays') => [...new Set(cartes.map(c => c[cle]).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'fr'));
   const reservesVisibles = useMemo(() => new Set(cartes.filter(c =>
@@ -1626,7 +1632,7 @@ export function Composition({ vue, agir, occupe, erreur = '' }: { vue: VueCarrie
     suivante[zone][index] = joueurId;
     if (suivante.capitaineId === ancien && zone === 'titulaires') suivante.capitaineId = joueurId;
     if (suivante.buteurId === ancien) suivante.buteurId = joueurId;
-    setBrouillon(suivante);
+    adopterComposition(suivante);
   };
   const majStrategie = (cle: keyof StrategieEnLigne, valeur: string) => {
     void agir({ type: 'strategie', strategie: { ...strategie, [cle]: valeur } as StrategieEnLigne });
@@ -1672,7 +1678,7 @@ export function Composition({ vue, agir, occupe, erreur = '' }: { vue: VueCarrie
       <button className="btn" disabled={occupe || assemblageEnCours} onClick={assemblerMeilleureEquipe}>{assemblageEnCours ? 'Calcul...' : t('online.lineup.best')}</button>
       <button className="btn primaire" data-tuto="cel-compo-enregistrer" disabled={occupe || !modifie} onClick={async () => { const v = await agir({ type: 'composition', composition }); if (v) setBrouillon(null); }}>{modifie ? t('compoSolo.saveBtn') : t('compoSolo.savedBtn')}</button>
     </section>
-    {vueEtendue && erreur && <div className="cel-erreur cel-erreur-compo" role="alert"><Icone nom="alerte" taille={20} /><p>{erreur}</p></div>}
+    {(erreurPlacement || (vueEtendue && erreur)) && <div className="cel-erreur cel-erreur-compo" role="alert"><Icone nom="alerte" taille={20} /><p>{erreurPlacement || erreur}</p></div>}
     <div className="cel-outils-compo">
       <button
         type="button"
@@ -1696,7 +1702,7 @@ export function Composition({ vue, agir, occupe, erreur = '' }: { vue: VueCarrie
           <div className="cel-actions"><input aria-label={t('compoSolo.teamPlaceholder')} maxLength={40} placeholder={t('compoSolo.teamPlaceholder')} value={nomEquipe} onChange={e => setNomEquipe(e.target.value)} />
             <button type="button" className="btn" disabled={occupe || nomEquipe.trim().length < 2 || sauvegardees.length >= 15} onClick={async () => { const v = await agir({ type: 'sauvegarderComposition', nom: nomEquipe.trim(), composition }); if (v) setNomEquipe(''); }}>{t('compoSolo.saveTeamBtn')}</button></div>
           {sauvegardees.map(equipe => <div className="cel-equipe-sauvegardee" key={equipe.id}><span>{equipe.nom}</span>
-            <button type="button" className="btn" disabled={occupe} onClick={() => setBrouillon(structuredClone(equipe.composition))}>{t('compoSolo.loadTeamBtn')}</button>
+            <button type="button" className="btn" disabled={occupe} onClick={() => adopterComposition(structuredClone(equipe.composition))}>{t('compoSolo.loadTeamBtn')}</button>
             <button type="button" className="btn fantome" disabled={occupe} onClick={() => { void agir({ type: 'supprimerComposition', id: equipe.id }); }} aria-label={t("ui.30283dd7e597", { v0: equipe.nom })}>{t('compoSolo.deleteTeamBtn')}</button></div>)}
         </div>
       </details>

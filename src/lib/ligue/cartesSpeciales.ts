@@ -22,7 +22,7 @@
 // Les cartes déjà distribuées ne sont jamais retirées à leur club.
 
 import { POSTES, POSTE_PAR_ID } from '../../data/rugby.js';
-import type { PosteId } from '../../types.js';
+import type { CompositionManager, PosteId } from '../../types.js';
 import { tirerPondere } from './aleatoire.js';
 import type { SourceCarte } from './catalogueCarriere.js';
 import { carteDansPack, rareteCarriere } from './raretesCartes.js';
@@ -352,6 +352,18 @@ export function identiteJoueur(c: Pick<CarteCarriere, 'sourceId' | 'nom' | 'spec
   if (!c.speciale) return c.sourceId;
   if (c.speciale.type === 'influencer') return c.sourceId;
   return c.speciale.base ?? `legende:${normaliserNom(c.nom)}`;
+}
+
+/** Exemplaires ordinaires et variantes spéciales partagent la même place sur les 23 maillots. */
+export function doublonDeComposition(cartes: readonly CarteCarriere[], composition: Pick<CompositionManager, 'titulaires' | 'remplacants'>): CarteCarriere | undefined {
+  const parId = new Map(cartes.map(c => [c.id, c])), presentes = new Set<string>();
+  for (const id of [...composition.titulaires, ...composition.remplacants]) {
+    const carte = parId.get(id);
+    if (!carte) continue;
+    const identite = identiteJoueur(carte);
+    if (presentes.has(identite)) return carte;
+    presentes.add(identite);
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

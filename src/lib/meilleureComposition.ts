@@ -4,6 +4,7 @@ import type { CompositionManager } from '../types';
 import { POSTES_XV_MANAGER, POSTES_BANC_MANAGER } from './compositionManager';
 import { adequationAuPoste } from './carteJoueur';
 import { collectifCarriere } from './ligue/collectifCarriere';
+import { identiteJoueur } from './ligue/cartesSpeciales';
 
 interface ClusterAffinite {
   type: 'club' | 'nation' | 'championnat';
@@ -94,6 +95,14 @@ export function meilleureComposition(
   const postes = [...POSTES_XV_MANAGER, ...POSTES_BANC_MANAGER];
   const n = 23;
   const m = joueurs.length;
+  const identites = joueurs.map(identiteJoueur);
+  const parIdentite = new Map<string, number[]>();
+  identites.forEach((identite, i) => {
+    const groupe = parIdentite.get(identite) ?? [];
+    groupe.push(i); parIdentite.set(identite, groupe);
+  });
+  const groupes = [...parIdentite.values()];
+  if (groupes.length < 23) return null;
 
   // 1. Détecte les clusters d'affinité dominants de l'effectif
   const compteursClubs = new Map<string, number>();
@@ -178,7 +187,13 @@ export function meilleureComposition(
       }),
     );
 
-    const choixInitial = resoudreHongrois(couts, n, m);
+    // Une colonne représente une personne, avec sa meilleure carte pour CE
+    // poste et cette affinité. Le XV et le banc ne peuvent pas choisir deux
+    // exemplaires, sans éliminer d'avance une variante mieux adaptée ailleurs.
+    const variantes = couts.map(ligne => groupes.map(groupe => groupe.reduce((meilleur, j) => ligne[j] < ligne[meilleur] ? j : meilleur)));
+    const coutsParIdentite = variantes.map((ligne, i) => ligne.map(j => couts[i][j]));
+    const choixInitial = resoudreHongrois(coutsParIdentite, n, groupes.length)
+      .map((groupe, i) => groupe < 0 ? -1 : variantes[i][groupe]);
     if (choixInitial.some((j) => j < 0)) continue;
 
     let choixCourant = [...choixInitial];
@@ -218,15 +233,19 @@ export function meilleureComposition(
           const adeqCandidat = adequationAuPoste(joueurCandidat.poste, postes[place], joueurCandidat.postesSecondaires);
           if (adeqCandidat === 'horsPoste') continue;
 
-          const indexExistant = choixCourant.indexOf(candidat);
+          const indexExistant = choixCourant.findIndex(j => identites[j] === identites[candidat]);
           const copie = [...choixCourant];
 
-          if (indexExistant >= 15) {
+          if (indexExistant === place) {
+            // Une autre version de la personne qui occupe déjà cette place.
+            copie[place] = candidat;
+          } else if (indexExistant >= 15) {
             // Le candidat est sur le banc : le titulaire sortant prend-il le banc sans être hors-poste ?
             const titulaireSortant = joueurs[choixCourant[place]];
             const adeqSortant = adequationAuPoste(titulaireSortant.poste, postes[indexExistant], titulaireSortant.postesSecondaires);
             if (adeqSortant === 'horsPoste') continue;
-            [copie[place], copie[indexExistant]] = [copie[indexExistant], copie[place]];
+            copie[place] = candidat;
+            copie[indexExistant] = choixCourant[place];
           } else if (indexExistant < 0) {
             // Le candidat vient des réserves (hors feuille)
             copie[place] = candidat;

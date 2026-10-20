@@ -42,7 +42,7 @@ import { cleJoueurImage, imagesDepuisDemandes, validerDemandeImage, type ImagesJ
 import { apparencePackInterne, contenuPackInterne, detailPackInterne, rechercherCartes, resoudreCartes, universCartes } from './packsInternes.js';
 import { creerServicePublicites, configPublicites, raisonModePublicites, packPourPublicites, parametresCallbackAppLixir, resumeCallback, type RefusCallback } from './publicitesRecompensees.js';
 import { ouvrirPackPublicitaire, reserverPackPublicitaire, packPublicitaireDisponible } from '../src/lib/ligue/carriere.js';
-import { chancesPacksPremium, chancesPacksPub, completerConfigPublicites, CONTEXTES_PUB, type ContextePub } from '../src/lib/publicitesRecompensees.js';
+import { chancesPacksPremium, chancesPacksPub, completerConfigPublicites, CONTEXTES_PUB, packPublicitaireDeLigue, type ContextePub } from '../src/lib/publicitesRecompensees.js';
 import { creerServiceValidation, dossierPublic } from './validationClassement.js';
 
 export interface RequeteCarriere {
@@ -1448,7 +1448,7 @@ export function creerGestionnaireCarriere(stockage: StockageCarriere, programmer
         // Catalogue publicitaire indépendant des rayons payants : Top 14 et autres skins autorisés par le Labo.
         const packs = ligne ? await ffr.avecPool('mixed', () =>
           cataloguePacksPublicitaires()
-            .map(packPourPublicites).filter(p => packPublicitaireDisponible(ligne.etat,p,maintenant))) : [];
+            .map(packPourPublicites).filter(p => packPublicitaireDisponible(ligne.etat,packPublicitaireDeLigue(p),maintenant))) : [];
         // ── Correctif 42 : la roulette Premium tire dans les packs de la Collection solo. Elle ne se calcule que hors
         // d'une ligue (Boutique, Collection) : un sondage de ligue ne paie pas ce catalogue.
         const premium = async () => (ligne ? [] : await ffr.avecPool('mixed', () => cataloguePacksPublicitaires().map(packPourPublicites)));
